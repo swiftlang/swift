@@ -1219,14 +1219,14 @@ do {
     tests.test("FlattenSequence/\(data)") {
       var base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      checkSequence(expected, base.flatten(), resiliencyChecks: .none)
+      checkSequence(expected, base.joined(), resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
 
       // checkSequence consumed base, so reassign
       base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(
@@ -1240,7 +1240,7 @@ do {
         elements: data.map { MinimalSequence(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
@@ -1252,7 +1252,7 @@ do {
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
@@ -1269,7 +1269,7 @@ do {
         elements: data.map { Minimal${TraversalCollection}(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
 
       var calls = 0
       _ = flattened.map { _ in calls += 1 }

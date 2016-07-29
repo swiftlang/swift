@@ -691,7 +691,7 @@ suite.test("reverseSubrange") {
         b.reverseSubrange(p..<q)
         expectEqual(
           b,
-          Array([prefix, ArraySlice(a[p..<q].reversed()), suffix].flatten()))
+          Array([prefix, ArraySlice(a[p..<q].reversed()), suffix].joined()))
         }
     }
   }
@@ -709,7 +709,7 @@ suite.test("rotate") {
         for m in p...q {
           var b = a
           let r0 = b._rotateSubrangeForward(p..<q, shiftingToStart: m)
-          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].flatten())
+          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
           expectEqual(b, rotated)
           expectEqual(r0, a.index(p, offsetBy: a[m..<q].count))
 
@@ -738,7 +738,7 @@ suite.test("rotateRandomAccess") {
         for m in p...q {
           var b = a
           let r0 = b[p..<q].rotateRandomAccess(shiftingToStart: m)
-          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].flatten())
+          let rotated = Array([prefix, a[m..<q], a[p..<m], suffix].joined())
           expectEqual(b, rotated)
           expectEqual(r0, a.index(p, offsetBy: a[m..<q].count))
 

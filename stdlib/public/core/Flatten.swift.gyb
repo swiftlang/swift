@@ -68,13 +68,13 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
 /// The elements of this view are a concatenation of the elements of
 /// each sequence in the base.
 ///
-/// The `flatten` property is always lazy, but does not implicitly
+/// The `joined` method is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary sequences `s`:
 ///
-/// * `s.flatten()` does not create new storage
-/// * `s.flatten().map(f)` maps eagerly and returns a new array
-/// * `s.lazy.flatten().map(f)` maps lazily and returns a `LazyMapSequence`
+/// * `s.joined()` does not create new storage
+/// * `s.joined().map(f)` maps eagerly and returns a new array
+/// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
 ///
 /// - See also: `FlattenCollection`
 public struct FlattenSequence<Base : Sequence> : Sequence
@@ -113,8 +113,8 @@ extension Sequence where Iterator.Element : Sequence {
   ///     // Prints "8..<10"
   ///     // Prints "15..<17"
   ///
-  ///     // Use 'flatten()' to access each element of each range:
-  ///     for index in ranges.flatten() {
+  ///     // Use 'joined()' to access each element of each range:
+  ///     for index in ranges.joined() {
   ///         print(index, terminator: " ")
   ///     }
   ///     // Prints: "0 1 2 8 9 15 16"
@@ -123,8 +123,13 @@ extension Sequence where Iterator.Element : Sequence {
   ///   sequence of sequences.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  public func flatten() -> FlattenSequence<Self> {
+  public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> FlattenSequence<Self> {
+    Builtin.unreachable()
   }
 }
 
@@ -134,10 +139,15 @@ extension LazySequenceProtocol
   Iterator.Element : Sequence {
 
   /// A concatenation of the elements of `self`.
-  public func flatten() -> LazySequence<
+  public func joined() -> LazySequence<
     FlattenSequence<Elements>
   > {
     return FlattenSequence(_base: elements).lazy
+  }
+
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> LazySequence<FlattenSequence<Elements>> {
+    Builtin.unreachable()
   }
 }
 
@@ -209,13 +219,13 @@ extension ${Index} : Comparable {
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
 ///
-/// The `flatten` property is always lazy, but does not implicitly
+/// The `joined` method is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary collections `c`:
 ///
-/// * `c.flatten()` does not create new storage
-/// * `c.flatten().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
+/// * `c.joined()` does not create new storage
+/// * `c.joined().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.joined().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
 ///   that depend on `startIndex`, or of advancing a `${Collection}Index`
@@ -381,8 +391,8 @@ extension ${collectionForTraversal(traversal)}
   ///     // Prints "8..<10"
   ///     // Prints "15..<17"
   ///
-  ///     // Use 'flatten()' to access each element of each range:
-  ///     for index in ranges.flatten() {
+  ///     // Use 'joined()' to access each element of each range:
+  ///     for index in ranges.joined() {
   ///         print(index, terminator: " ")
   ///     }
   ///     // Prints: "0 1 2 8 9 15 16"
@@ -391,8 +401,13 @@ extension ${collectionForTraversal(traversal)}
   ///   collection of collections.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  public func flatten() -> ${Collection}<Self> {
+  public func joined() -> ${Collection}<Self> {
     return ${Collection}(self)
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> ${Collection}<Self> {
+    Builtin.unreachable()
   }
 }
 
@@ -404,8 +419,13 @@ extension LazyCollectionProtocol
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
-  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+  public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+    Builtin.unreachable()
   }
 }
 
