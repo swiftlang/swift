@@ -1,3 +1,5 @@
+// REQUIRES: se_0111_complete
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.toplevel.txt

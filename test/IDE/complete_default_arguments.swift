@@ -1,3 +1,5 @@
+// REQUIRES: se_0111_complete
+
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
 // RUN: %target-swift-frontend -verify -parse %t_no_errors.swift
 

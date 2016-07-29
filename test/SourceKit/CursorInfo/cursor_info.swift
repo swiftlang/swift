@@ -1,3 +1,5 @@
+// REQUIRES: se_0111_complete
+
 import Foo
 import FooSwiftModule
 
