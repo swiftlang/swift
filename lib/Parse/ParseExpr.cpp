@@ -1420,6 +1420,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       // Handle "x.dynamicType" - A metatype expr.
       // Deprecated in SE-0096: `x.dynamicType` becomes `type(of: x)`
+      //
+      // FIXME(SE-0096): This will go away along with the keyword soon.
       if (Tok.is(tok::kw_dynamicType)) {
         // Fix-it
         auto range = Result.get()->getSourceRange();
@@ -1429,8 +1431,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           .fixItReplace(dynamicTypeExprRange, ")")
           .fixItInsert(range.Start, "type(of: ");
 
-        Result = makeParserResult(
-          new (Context) DynamicTypeExpr(Result.get(), dynamicTypeExprRange.End, Type()));
+        // HACK: Arbitrary.
+        auto loc = range.Start;
+        auto dt = new (Context) DynamicTypeExpr(loc, loc, Result.get(), loc, Type());
+        dt->setImplicit();
+        Result = makeParserResult(dt);
         continue;
       }
 
@@ -3018,23 +3023,33 @@ Parser::parseVersionConstraintSpec() {
 ///     'type' '(' 'of:' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprTypeOf() {
-
-  assert(Tok.getText() == "type" && "only 'type' should be handled here");
-
   // Consume 'type'
   SourceLoc keywordLoc = consumeToken();
-  // Consume '('
+
+  // Parse the leading '('.
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
-  // Parse `of` label
-  // If we see a potential argument label followed by a ':', consume
-  // it.
-  if (Tok.canBeArgumentLabel() && Tok.getText() == "of" && peekToken().is(tok::colon)) {
+  // Parse `of` label.
+  auto ofRange = Tok.getRange();
+  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+    bool hasOf = Tok.getText() == "of";
+    if (!hasOf) {
+      // User mis-spelled the 'of' label.
+      diagnose(Tok, diag::expr_typeof_expected_label_of)
+        .fixItReplace({ ofRange.getStart(), ofRange.getEnd() }, "of");
+    }
+
+    // Consume either 'of' or the misspelling.
     consumeToken();
     consumeToken(tok::colon);
+
+    if (!hasOf) {
+      return makeParserError();
+    }
   } else {
-    diagnose(Tok, diag::expr_typeof_expected_label_of);
-    return makeParserError();
+    // No label at all; insert it.
+    diagnose(Tok, diag::expr_typeof_expected_label_of)
+      .fixItInsert(ofRange.getStart(), "of: ");
   }
 
   // Parse the subexpression.
@@ -3059,15 +3074,18 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
   if (subExpr.isParseError()) {
     if (subExpr.hasCodeCompletion()) {
       auto res = makeParserResult(
-                                  new (Context) DynamicTypeExpr(subExpr.get(), consumeToken(), Type()));
+                   new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
+                                                 subExpr.get(), rParenLoc,
+                                                 Type()));
       res.setHasCodeCompletion();
       return res;
     } else {
       return makeParserResult<Expr>(
-                                    new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
     }
   }
 
   return makeParserResult(
-                          new (Context) DynamicTypeExpr(subExpr.get(), rParenLoc, Type()));
+           new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
+                                         subExpr.get(), rParenLoc, Type()));
 }

@@ -509,7 +509,7 @@ func test18_2() -> Bool {
 // CHECK-NEXT: return %1
 @inline(never)
 func test19() -> Bool {
-    let t: Any.Type = (1 as Any).dynamicType
+    let t: Any.Type = type(of: 1 as Any)
     return t is Int.Type
 }
 

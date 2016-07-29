@@ -486,17 +486,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       // Allow references to types as a part of:
-      // - member references T.foo, T.Type, T.self, etc. (but *not* T.type)
+      // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
       if (auto *ParentExpr = Parent.getAsExpr()) {
-        // Reject use of "T.dynamicType", it should be written as "T.self".
-        if (auto metaExpr = dyn_cast<DynamicTypeExpr>(ParentExpr)) {
-          // Add a fixit to replace '.dynamicType' with '.self'.
-          TC.diagnose(E->getStartLoc(), diag::type_of_metatype)
-            .fixItReplace(metaExpr->getMetatypeLoc(), "self");
-          return;
-        }
-
         // This is the white-list of accepted syntactic forms.
         if (isa<ErrorExpr>(ParentExpr) ||
             isa<DotSelfExpr>(ParentExpr) ||               // T.self

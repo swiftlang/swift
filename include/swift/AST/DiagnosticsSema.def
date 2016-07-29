@@ -2271,8 +2271,6 @@ WARNING(optional_pattern_match_promotion,none,
         (Type, Type))
 
 
-ERROR(type_of_metatype,none,
-      "'.dynamicType' is not allowed after a type name", ())
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",
       (Identifier, bool))
