@@ -104,7 +104,7 @@ protocol ThrowingProto {
 
 func testExistential(_ p : ThrowingProto) throws {
   try p.foo()
-  try p.dynamicType.bar()
+  try type(of: p).bar()
 }
 func testGeneric<P : ThrowingProto>(p : P) throws {
   try p.foo()

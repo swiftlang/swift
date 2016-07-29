@@ -186,8 +186,8 @@ var f2: (B) -> Bool = { $0 is D }
 func metatype_casts<T, U>(_ b: B.Type, t:T.Type, u: U.Type) {
   _ = b is D.Type
   _ = T.self is U.Type
-  _ = T.self.dynamicType is U.Type.Type
-  _ = b.dynamicType is D.Type // expected-warning{{always fails}}
+  _ = type(of: T.self) is U.Type.Type
+  _ = type(of: b) is D.Type // expected-warning{{always fails}}
   _ = b is D.Type.Type // expected-warning{{always fails}}
 
 }

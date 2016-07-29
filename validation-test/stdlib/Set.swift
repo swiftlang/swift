@@ -137,12 +137,12 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
 
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
+  let className: NSString = NSStringFromClass(type(of: s)) as NSString
   return className.range(of: "NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(_ s: NSSet) -> Bool {
-  let className: NSString = NSStringFromClass(s.dynamicType) as NSString
+  let className: NSString = NSStringFromClass(type(of: s)) as NSString
   return className.range(of: "NSSet").length > 0 ||
     className.range(of: "NSCFSet").length > 0
 }

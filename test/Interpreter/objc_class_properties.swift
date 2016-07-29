@@ -178,12 +178,12 @@ class NamingConflictSubclass : PropertyNamingConflict {
 ClassProperties.test("namingConflict") {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop.map { $0 as AnyObject })
-  expectEmpty(obj.dynamicType.prop)
+  expectEmpty(type(of: obj).prop)
   expectEmpty(PropertyNamingConflict.prop)
 
   let sub = NamingConflictSubclass()
   expectEmpty(sub.prop)
-  expectNotEmpty(sub.dynamicType.prop)
+  expectNotEmpty(type(of: sub).prop)
   expectNotEmpty(NamingConflictSubclass.prop)
 }
 
@@ -201,7 +201,7 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
 ClassProperties.test("namingConflict/protocol") {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp.map { $0 as AnyObject })
-  expectEmpty(obj.dynamicType.protoProp)
+  expectEmpty(type(of: obj).protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
   expectEmpty(type.protoProp)

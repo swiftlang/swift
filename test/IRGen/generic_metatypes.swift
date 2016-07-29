@@ -17,7 +17,7 @@
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
-  return x.dynamicType
+  return type(of: x)
 }
 
 struct Foo {}
@@ -69,7 +69,7 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[T0:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[METATYPE]], 0
   // CHECK: [[T1:%.*]] = insertvalue { %swift.type*, i8** } [[T0]], i8** [[WTABLE]], 1
   // CHECK: ret { %swift.type*, i8** } [[T1]]
-  return x.dynamicType
+  return type(of: x)
 }
 
 struct Zim : Bas {}

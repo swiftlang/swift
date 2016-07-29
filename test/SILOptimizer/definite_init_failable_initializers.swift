@@ -1504,7 +1504,7 @@ extension P2 {
 }
 
 ////
-// self.dynamicType with uninitialized self
+// type(of: self) with uninitialized self
 ////
 
 func use(_ a : Any) {}
@@ -1513,24 +1513,24 @@ class DynamicTypeBase {
   var x: Int
 
   init() {
-    use(self.dynamicType)
+    use(type(of: self))
     x = 0
   }
 
   convenience init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }
 
 class DynamicTypeDerived : DynamicTypeBase {
   override init() {
-    use(self.dynamicType)
+    use(type(of: self))
     super.init()
   }
 
   convenience init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }
@@ -1539,12 +1539,12 @@ struct DynamicTypeStruct {
   var x: Int
 
   init() {
-    use(self.dynamicType)
+    use(type(of: self))
     x = 0
   }
 
   init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }

@@ -491,9 +491,9 @@ func testAnyObject14() {
 }
 
 func testAnyObjectClassMethods1(_ dl: AnyObject) {
-  dl.dynamicType#^DL_CLASS_NO_DOT_1^#
+  type(of: dl)#^DL_CLASS_NO_DOT_1^#
 }
 
 func testAnyObjectClassMethods2(_ dl: AnyObject) {
-  dl.dynamicType.#^DL_CLASS_DOT_1^#
+  type(of: dl).#^DL_CLASS_DOT_1^#
 }

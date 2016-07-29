@@ -213,7 +213,7 @@ dump(CGRect(x: 50, y: 60, width: 100, height: 150))
 
 @objc class CanaryBase {
   deinit {
-    print("\(self.dynamicType) overboard")
+    print("\(type(of: self)) overboard")
   }
 
   required init() { }

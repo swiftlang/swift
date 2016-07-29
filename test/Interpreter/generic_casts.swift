@@ -139,12 +139,12 @@ print(allMetasToAllMetas(C.self, D.self)) // CHECK: false
 print(C.self is D.Type) // CHECK: false
 print((D.self as C.Type) is D.Type) // CHECK: true
 
-let t: Any.Type = (1 as Any).dynamicType
+let t: Any.Type = type(of: 1 as Any)
 print(t is Int.Type) // CHECK: true
 print(t is Float.Type) // CHECK: false
 print(t is C.Type) // CHECK: false
 
-let u: Any.Type = (D() as Any).dynamicType
+let u: Any.Type = type(of: (D() as Any))
 print(u is C.Type) // CHECK: true
 print(u is D.Type) // CHECK: true
 print(u is E.Type) // CHECK: false
@@ -154,7 +154,7 @@ print(u is Int.Type) // CHECK: false
 // CHECK-LABEL: AnyObject casts:
 print("AnyObject casts:")
 print(allToAll(C(), AnyObject.self)) // CHECK-NEXT: true
-print(allToAll(C().dynamicType, AnyObject.self)) // CHECK-NEXT: true
+print(allToAll(type(of: C()), AnyObject.self)) // CHECK-NEXT: true
 // Bridging
 print(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
 

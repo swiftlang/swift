@@ -67,7 +67,7 @@ func testCFStringAnyObjectType() {
   let cfStr: CFString
     = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
-  let cfStrType = cfStr.dynamicType
+  let cfStrType = type(of: cfStr)
   // CHECK: [[STRING_CLASS:(NS|CF).*String]]
   print(cfStrType)
 

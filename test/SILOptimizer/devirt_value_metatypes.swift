@@ -19,7 +19,7 @@ class B: A {
 // CHECK: class_method
 // CHECK: }
 public func testValueMetatype(_ x:A) {
-    x.dynamicType.foo()
+    type(of: x).foo()
 }
 
 public class C {
@@ -42,7 +42,7 @@ public class D : C {
 // CHECK-NOT: class_method
 // CHECK: }
 public func testD(_ x: D) -> Int {
-  return (x.dynamicType as C.Type).foo()
+  return (type(of: x) as C.Type).foo()
 }
 
 
@@ -58,5 +58,5 @@ public final class E : C {
 // CHECK: apply
 // CHECK: return
 public func testE(_ x: E) -> Int {
-  return (x.dynamicType as C.Type).foo()
+  return (type(of: x) as C.Type).foo()
 }

@@ -317,26 +317,26 @@ Runtime.test("typeName") {
   expectEqual("Swift.Optional<Swift.AnyObject>.Type", _typeName((AnyObject?).Type.self))
 
   var a: Any = SomeClass()
-  expectEqual("a.SomeClass", _typeName(a.dynamicType))
+  expectEqual("a.SomeClass", _typeName(type(of: a)))
 
   a = SomeStruct()
-  expectEqual("a.SomeStruct", _typeName(a.dynamicType))
+  expectEqual("a.SomeStruct", _typeName(type(of: a)))
 
   a = SomeEnum()
-  expectEqual("a.SomeEnum", _typeName(a.dynamicType))
+  expectEqual("a.SomeEnum", _typeName(type(of: a)))
 
   a = AnyObject.self
-  expectEqual("Swift.AnyObject.Protocol", _typeName(a.dynamicType))
+  expectEqual("Swift.AnyObject.Protocol", _typeName(type(of: a)))
 
   a = AnyClass.self
-  expectEqual("Swift.AnyObject.Type.Protocol", _typeName(a.dynamicType))
+  expectEqual("Swift.AnyObject.Type.Protocol", _typeName(type(of: a)))
 
   a = (AnyObject?).self
   expectEqual("Swift.Optional<Swift.AnyObject>.Type",
-    _typeName(a.dynamicType))
+    _typeName(type(of: a)))
 
   a = Any.self
-  expectEqual("Any.Protocol", _typeName(a.dynamicType))
+  expectEqual("Any.Protocol", _typeName(type(of: a)))
 }
 
 class SomeSubclass : SomeClass {}

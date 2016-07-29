@@ -145,15 +145,15 @@ TypeNameTests.test("Functions") {
   }
 
   expectEqual("(()) -> ()",
-    _typeName(curry1.dynamicType))
+    _typeName(type(of: curry1)))
   expectEqual("(()) -> (()) -> ()",
-    _typeName(curry2.dynamicType))
+    _typeName(type(of: curry2)))
   expectEqual("(()) throws -> (()) -> ()",
-    _typeName(curry2Throws.dynamicType))
+    _typeName(type(of: curry2Throws)))
   expectEqual("(()) -> (()) throws -> ()",
-    _typeName(curry3.dynamicType))
+    _typeName(type(of: curry3)))
   expectEqual("(()) throws -> (()) throws -> ()",
-    _typeName(curry3Throws.dynamicType))
+    _typeName(type(of: curry3Throws)))
 }
 
 runAllTests()

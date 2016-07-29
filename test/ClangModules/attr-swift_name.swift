@@ -12,7 +12,7 @@ func test(_ i: Int) {
   t.theMethod(number: i)
 
   _ = t.renamedSomeProp
-  _ = t.dynamicType.renamedClassProp
+  _ = type(of: t).renamedClassProp
 
   // We only see these two warnings because Clang can catch the other invalid
   // cases, and marks the attribute as invalid ahead of time.

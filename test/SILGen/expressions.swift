@@ -516,7 +516,7 @@ func testDiscardLValue() {
 
 
 func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
-  return a.dynamicType
+  return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
 // CHECK: bb0(%0 : $Super1):
@@ -526,7 +526,7 @@ func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
 struct NonTrivialStruct { var c : Super1 }
 
 func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
-  return a.dynamicType
+  return type(of: a)
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : $NonTrivialStruct):

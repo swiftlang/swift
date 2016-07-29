@@ -19,7 +19,7 @@ import TestsUtils
 class Thing : NSObject {
 
   required override init() {
-    let c = self.dynamicType.col()
+    let c = type(of: self).col()
     CheckResults(c!.count == 10, "The rules of the universe apply")
   }
 

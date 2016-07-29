@@ -38,7 +38,7 @@ func struct_metatypes(s: SomeStruct)
   // CHECK: [[STRUCT1:%[0-9]+]] = metatype $@thin SomeStruct.Type
   // CHECK: [[STRUCT2:%[0-9]+]] = metatype $@thin SomeStruct.Type
   // CHECK: tuple ([[STRUCT1]] : {{.*}}, [[STRUCT2]] : {{.*}})
-  return (s.dynamicType, SomeStruct.self)
+  return (type(of: s), SomeStruct.self)
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes15class_metatypes
@@ -49,7 +49,7 @@ func class_metatypes(c: SomeClass, s: SomeSubclass)
   // CHECK: [[SUBCLASS:%[0-9]+]] = value_metatype $@thick SomeSubclass.Type,
   // CHECK: [[SUBCLASS_UPCAST:%[0-9]+]] = upcast [[SUBCLASS]] : ${{.*}} to $@thick SomeClass.Type
   // CHECK: tuple ([[CLASS]] : {{.*}}, [[SUBCLASS_UPCAST]] : {{.*}})
-  return (c.dynamicType, s.dynamicType)
+  return (type(of: c), type(of: s))
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes19archetype_metatypes
@@ -58,13 +58,13 @@ func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
   // CHECK: [[STATIC_T:%[0-9]+]] = metatype $@thick T.Type
   // CHECK: [[DYN_T:%[0-9]+]] = value_metatype $@thick T.Type, %0
   // CHECK: tuple ([[STATIC_T]] : {{.*}}, [[DYN_T]] : {{.*}})
-  return (T.self, t.dynamicType)
+  return (T.self, type(of: t))
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes21existential_metatypes
 func existential_metatypes(p: SomeProtocol) -> SomeProtocol.Type {
   // CHECK: existential_metatype $@thick SomeProtocol.Type
-  return p.dynamicType
+  return type(of: p)
 }
 
 struct SomeGenericStruct<T> {}
@@ -99,7 +99,7 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK-NEXT: return [[T2]] : $@thick Any.Type
 func existential_metatype_from_thin_value() -> Any.Type {
   let s = SomeStruct()
-  return s.dynamicType
+  return type(of: s)
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes20specialized_metatypeFT_GVs10DictionarySSSi_

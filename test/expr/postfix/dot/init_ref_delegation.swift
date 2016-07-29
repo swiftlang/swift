@@ -113,7 +113,7 @@ class Z4 {
 
   convenience init(other: Z4) {
     other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{10-10=.dynamicType}}
-    other.dynamicType.init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
+    type(of: other).init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
   }
 }
 
@@ -151,7 +151,7 @@ struct RDar16603812 {
    init() {}
    func foo() {
       self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{11-11=.dynamicType}}
-      self.dynamicType.init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
+      type(of: self).init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
 
@@ -255,20 +255,20 @@ protocol P {
 }
 
 func foo<T: C>(_ x: T, y: T.Type) where T: P {
-  var c1 = x.dynamicType.init(required: 0)
-  var c2 = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
-  var c3 = x.dynamicType.init() // expected-error{{'required' initializer}}
-  var c4 = x.dynamicType.init(proto: "")
+  var c1 = type(of: x).init(required: 0)
+  var c2 = type(of: x).init(x: 0) // expected-error{{'required' initializer}}
+  var c3 = type(of: x).init() // expected-error{{'required' initializer}}
+  var c4 = type(of: x).init(proto: "")
 
-  var cf1: (Double) -> T = x.dynamicType.init
-  var cf2: (Int) -> T    = x.dynamicType.init // expected-error{{'required' initializer}}
-  var cf3: () -> T       = x.dynamicType.init // expected-error{{'required' initializer}}
-  var cf4: (String) -> T = x.dynamicType.init
+  var cf1: (Double) -> T = type(of: x).init
+  var cf2: (Int) -> T    = type(of: x).init // expected-error{{'required' initializer}}
+  var cf3: () -> T       = type(of: x).init // expected-error{{'required' initializer}}
+  var cf4: (String) -> T = type(of: x).init
 
-  var c1a = x.dynamicType.init(required: 0)
-  var c2a = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
-  var c3a = x.dynamicType.init() // expected-error{{'required' initializer}}
-  var c4a = x.dynamicType.init(proto: "")
+  var c1a = type(of: x).init(required: 0)
+  var c2a = type(of: x).init(x: 0) // expected-error{{'required' initializer}}
+  var c3a = type(of: x).init() // expected-error{{'required' initializer}}
+  var c4a = type(of: x).init(proto: "")
 
   var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
   var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}

@@ -41,7 +41,7 @@ func -(a: Interval, b: Interval) -> Interval {
 }
 
 prefix func -(a: Interval) -> Interval {
-  return a.dynamicType.like(-a.hi, -a.lo)
+  return type(of: a).like(-a.hi, -a.lo)
 }
 
 // CHECK: [-2, -1]

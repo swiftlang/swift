@@ -82,7 +82,7 @@ ErrorBridgingTests.test("NSCoding") {
     let orig = EnumError.ReallyBadError as NSError
     let unarchived = archiveAndUnarchiveObject(orig)!
     expectEqual(orig, unarchived)
-    expectTrue(unarchived.dynamicType == NSError.self)
+    expectTrue(type(of: unarchived) == NSError.self)
   }
 }
 
