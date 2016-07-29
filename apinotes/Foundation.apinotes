@@ -1215,10 +1215,6 @@ Classes:
 - Name: NSUnitTemperature
   SwiftName: UnitTemperature
 Protocols:
-- Name: NSKeyedArchiverDelegate
-  SwiftName: KeyedArchiverDelegate
-- Name: NSKeyedUnarchiverDelegate
-  SwiftName: KeyedUnarchiverDelegate
 - Name: NSLocking
   SwiftName: NSLocking
 - Name: NSMetadataQueryDelegate
@@ -1467,7 +1463,6 @@ Tags:
 - Name: NSTextCheckingType
   SwiftName: NSTextCheckingResult.CheckingType
 - Name: NSTextCheckingTypes
-  SwiftName: TextCheckingTypes
   Availability: nonswift
   AvailabilityMsg: Use 'NSTextCheckingResult.CheckingType'
 - Name: NSTimeZoneNameStyle
@@ -1544,12 +1539,6 @@ Tags:
   SwiftName: NSURL.BookmarkResolutionOptions
 - Name: NSURLHandleStatus
   SwiftName: NSURLHandle.Status
-- Name: NSBinarySearchingOptions
-  SwiftName: BinarySearchingOptions
-- Name: NSEnumerationOptions
-  SwiftName: EnumerationOptions
-- Name: NSSortOptions
-  SwiftName: SortOptions
 Typedefs:
 - Name: NSAffineTransformStruct
   SwiftName: AffineTransform

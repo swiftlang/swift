@@ -131,13 +131,13 @@
 // CHECK-FOUNDATION: var withHTTPS: NSURL { get }
 
 // Note: lowercasing option set values
-// CHECK-FOUNDATION: struct EnumerationOptions
-// CHECK-FOUNDATION: static var concurrent: EnumerationOptions
-// CHECK-FOUNDATION: static var reverse: EnumerationOptions
+// CHECK-FOUNDATION: struct NSEnumerationOptions
+// CHECK-FOUNDATION: static var concurrent: NSEnumerationOptions
+// CHECK-FOUNDATION: static var reverse: NSEnumerationOptions
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(_: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options: EnumerationOptions = [], using: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(block: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
@@ -158,7 +158,7 @@
 // CHECK-FOUNDATION: func doSomething(with: NSUnderlyingType)
 
 // Don't introduce default arguments for lone parameters to setters.
-// CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: EnumerationOptions)
+// CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: NSEnumerationOptions)
 
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
