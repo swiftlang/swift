@@ -956,6 +956,7 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 namespace  {
 
 static UIdent getAccessibilityUID(Accessibility Access) {
+  static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
   static UIdent AccessFilePrivate("source.lang.swift.accessibility.fileprivate");
@@ -970,6 +971,8 @@ static UIdent getAccessibilityUID(Accessibility Access) {
     return AccessInternal;
   case Accessibility::Public:
     return AccessPublic;
+  case Accessibility::Open:
+    return AccessOpen;
   }
 }
 

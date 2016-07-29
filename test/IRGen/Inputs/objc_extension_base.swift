@@ -1,8 +1,8 @@
 import gizmo
 
-public class SwiftBaseGizmo : Gizmo {
+open class SwiftBaseGizmo : Gizmo {
 }
 
 extension SwiftBaseGizmo {
-  public override func frob() {}
+  open override func frob() {}
 }

@@ -1596,7 +1596,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
-        param,
+        param, Accessibility::Private,
         /*IsLet*/ true, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName, swiftParamTy,
         ImportedHeaderUnit);
@@ -2395,7 +2395,8 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Set up the parameter info.
     auto paramInfo
-      = createDeclWithClangNode<ParamDecl>(param, /*IsLet*/ true,
+      = createDeclWithClangNode<ParamDecl>(param, Accessibility::Private,
+                                           /*IsLet*/ true,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName, swiftParamTy,

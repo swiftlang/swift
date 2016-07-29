@@ -245,8 +245,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (CD->getEffectiveAccess()) {
-  case Accessibility::Public:
+  case Accessibility::Open:
     return false;
+  case Accessibility::Public:
   case Accessibility::Internal:
     if (!AI.getModule().isWholeModule())
       return false;

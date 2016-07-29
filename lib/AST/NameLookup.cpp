@@ -1031,7 +1031,7 @@ static bool checkAccessibility(const DeclContext *useDC,
                                const DeclContext *sourceDC,
                                Accessibility access) {
   if (!useDC)
-    return access == Accessibility::Public;
+    return access >= Accessibility::Public;
 
   assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
@@ -1052,6 +1052,7 @@ static bool checkAccessibility(const DeclContext *useDC,
     return false;
   }
   case Accessibility::Public:
+  case Accessibility::Open:
     return true;
   }
   llvm_unreachable("bad Accessibility");

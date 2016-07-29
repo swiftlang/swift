@@ -201,9 +201,9 @@ protected:
     friend class AbstractAccessibilityAttr;
     unsigned : NumDeclAttrBits;
 
-    unsigned AccessLevel : 2;
+    unsigned AccessLevel : 3;
   };
-  enum { NumAccessibilityAttrBits = NumDeclAttrBits + 2 };
+  enum { NumAccessibilityAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumAccessibilityAttrBits <= 32, "fits in an unsigned");
 
   class AutoClosureAttrBitFields {

@@ -1242,6 +1242,7 @@ checkWitnessAccessibility(Accessibility *requiredAccess,
     auto ASD = cast<AbstractStorageDecl>(witness);
     const DeclContext *accessDC;
     switch (*requiredAccess) {
+    case Accessibility::Open:
     case Accessibility::Public:
       accessDC = nullptr;
       break;

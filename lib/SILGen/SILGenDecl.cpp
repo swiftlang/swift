@@ -1451,8 +1451,8 @@ public:
       isFragile = IsFragile;
     if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
       if (nominal->hasFixedLayout() &&
-          proto->getEffectiveAccess() == Accessibility::Public &&
-          nominal->getEffectiveAccess() == Accessibility::Public)
+          proto->getEffectiveAccess() >= Accessibility::Public &&
+          nominal->getEffectiveAccess() >= Accessibility::Public)
         isFragile = IsFragile;
 
     // Check if we already have a declaration or definition for this witness

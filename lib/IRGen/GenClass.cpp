@@ -1892,7 +1892,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
                                                          /*implicit=*/true));
   SwiftRootClass->setImplicit();
-  SwiftRootClass->setAccessibility(Accessibility::Public);
+  SwiftRootClass->setAccessibility(Accessibility::Open);
   
   SwiftRootClasses.insert({name, SwiftRootClass});
   return SwiftRootClass;

@@ -13,14 +13,14 @@ public protocol Foo {
     var bar: String { get set }
 }
 
-public class BaseFoo: Foo {
-    public var bar: String = "hello"
+open class BaseFoo: Foo {
+    open var bar: String = "hello"
 }
 
-public class ChildFoo: BaseFoo {
+open class ChildFoo: BaseFoo {
     private var _bar: String = "world"
 
-    override public var bar: String {
+    override open var bar: String {
         get {
             return _bar
         }

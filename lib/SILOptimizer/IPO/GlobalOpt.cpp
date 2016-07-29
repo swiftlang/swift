@@ -747,6 +747,7 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
     case Accessibility::Internal:
       return !SILG->getModule().isWholeModule();
     case Accessibility::Public:
+    case Accessibility::Open:
       return true;
     }
   }

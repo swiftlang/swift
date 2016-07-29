@@ -692,7 +692,7 @@ struct ASTNodeBase {};
       if (D->hasAccessibility()) {
         PrettyStackTraceDecl debugStack("verifying access", D);
         if (D->getFormalAccessScope() == nullptr &&
-            D->getFormalAccess() != Accessibility::Public) {
+            D->getFormalAccess() < Accessibility::Public) {
           Out << "non-public decl has no formal access scope\n";
           D->dump(Out);
           abort();

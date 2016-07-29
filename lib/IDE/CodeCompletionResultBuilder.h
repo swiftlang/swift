@@ -128,6 +128,11 @@ public:
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
       break;
+    case Accessibility::Open:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "open ");
+      break;
     }
   }
 
