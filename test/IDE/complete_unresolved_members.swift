@@ -46,6 +46,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OTHER_FILE_1 %S/Inputs/EnumFromOtherFile.swift | FileCheck %s -check-prefix=OTHER_FILE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_1 | FileCheck %s -check-prefix=NON_OPT_SET_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_2 | FileCheck %s -check-prefix=NON_OPT_SET_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_3 | FileCheck %s -check-prefix=NON_OPT_SET_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -271,10 +275,11 @@ func testAvail1(x: EnumAvail1) {
 func testAvail2(x: OptionsAvail1) {
   testAvail2(.#^OPTIONS_AVAIL_1^#)
 }
-// OPTIONS_AVAIL_1: Begin completions, 2 items
+// OPTIONS_AVAIL_1: Begin completions, 3 items
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal:        aaa[#OptionsAvail1#];
 // OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/NotRecommended: BBB[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal:      init({#rawValue: Int#})[#OptionsAvail1#]
 // ENUM_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
 
@@ -329,3 +334,33 @@ func enumFromOtherFile() -> EnumFromOtherFile {
 // OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     a({#Int#})[#(Int) -> EnumFromOtherFile#];
 // OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific:     c[#EnumFromOtherFile#];
 // OTHER_FILE_1: End completions
+
+struct NonOptSet {
+  static let a = NonOptSet()
+  static let wrongType = 1
+  let notStatic = NonOptSet()
+  init(x: Int, y: Int) {}
+  init() {}
+  static func b() -> NonOptSet { return NonOptSet() }
+  static func wrongType() -> Int { return 0 }
+  func notStatic() -> NonOptSet { return NonOptSet() }
+}
+
+func testNonOptSet() {
+  let x: NonOptSet
+  x = .#^NON_OPT_SET_1^#
+}
+// NON_OPT_SET_1: Begin completions, 4 items
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal:        a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#}, {#y: Int#})[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal:      init()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal:     b()[#NonOptSet#]
+// NON_OPT_SET_1: End completions
+
+func testNonOptSet() {
+  let x: NonOptSet = .#^NON_OPT_SET_2^#
+}
+
+func testNonOptSet() -> NonOptSet {
+  return .#^NON_OPT_SET_3^#
+}
