@@ -19,9 +19,10 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 using namespace swift::constraints;
@@ -3036,20 +3037,25 @@ public:
     return Expr->getType();
   }
 
-  void collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
+  bool collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
     if (auto Bind = S.typeBindings[VT]) {
       // We allow type variables in the overall solution, but must skip any
       // type variables in the binding for VT; these types must outlive the
       // constraint solver memory arena.
-      if (!Bind->hasTypeVariable())
+      if (!Bind->hasTypeVariable()) {
         PossibleTypes.push_back(Bind);
+        return true;
+      }
     }
+    return false;
   }
 };
 
 bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
                                     Expr *E, Expr *Parent,
                                     SmallVectorImpl<Type> &PossibleTypes) {
+  PrettyStackTraceExpr stackTrace(DC.getASTContext(),
+                                  "type-checking unresolved member", Parent);
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3058,12 +3064,29 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
 
+  if (TC->getLangOpts().DebugConstraintSolver) {
+    auto &log = DC.getASTContext().TypeCheckerDebug->getStream();
+    log << "---Initial constraints for the given expression---\n";
+    Parent->print(log);
+    log << "\n";
+    CS.print(log);
+  }
+
   SmallVector<Solution, 3> solutions;
   if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return false;
   }
+
   for (auto &S : solutions) {
-    MCG.collectResolvedType(S, PossibleTypes);
+    bool resolved = MCG.collectResolvedType(S, PossibleTypes);
+
+    if (TC->getLangOpts().DebugConstraintSolver) {
+      auto &log = DC.getASTContext().TypeCheckerDebug->getStream();
+      log << "--- Solution ---\n";
+      S.dump(log);
+      if (resolved)
+        log << "--- Resolved target type ---\n" << PossibleTypes.back() << "\n";
+    }
   }
   return !PossibleTypes.empty();
 }
