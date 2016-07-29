@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s --check-prefix=CHECK2
 func use<T>(_ t: T) {}
 
 public func f(_ i : Int?)
@@ -12,5 +13,16 @@ public func f(_ i : Int?)
   // CHECK: ![[DBG0]] = !DILocation(line: 0, scope: ![[F]])
   // CHECK: ![[DBG1]] = !DILocation(line: [[@LINE+1]],
   guard let val = i else { return }
+  use(val)
+}
+
+public func g(_ s : String?)
+{
+  // CHECK2: define {{.*}}@_TF4main1gFGSqSS_T_
+  // The shadow copy store should not have a location.
+  // CHECK2: getelementptr inbounds {{.*}} %s.debug, {{.*}}, !dbg ![[DBG0:.*]]
+  // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g",
+  // CHECK2: ![[DBG0]] = !DILocation(line: 0, scope: ![[G]])
+  guard let val = s else { return }
   use(val)
 }
