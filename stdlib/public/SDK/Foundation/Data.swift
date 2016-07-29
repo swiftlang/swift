@@ -660,7 +660,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         private var _idx: Data.Index
         private let _endIdx: Data.Index
 
-        private init(_data: Data) {
+        fileprivate init(_data: Data) {
             self._data = _data
             _buffer = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
             _idx = 0
