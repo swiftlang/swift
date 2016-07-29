@@ -40,7 +40,7 @@ public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(_swift_stdlib_CFStringGetCharactersPtr(source))
+  return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
 /// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII

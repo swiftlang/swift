@@ -190,7 +190,10 @@ func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(objects: UnsafePointer($0.baseAddress!), count: $0.count)
+    let ns =  NSArray(
+      objects: unsafeBitCast($0.baseAddress!,
+        to: UnsafeMutablePointer<AnyObject>.self),
+      count: $0.count)
     return ns as! [NSString]
   }
 }
