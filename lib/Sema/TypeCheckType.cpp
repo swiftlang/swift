@@ -698,17 +698,6 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   return type;
 }
 
-/// Retrieve the nearest enclosing nominal type context.
-static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
-  while (dc->isLocalContext())
-    dc = dc->getParent();
-
-  if (auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext())
-    return nominal;
-
-  return nullptr;
-}
-
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -728,28 +717,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 UnsatisfiedDependency *unsatisfiedDependency) {
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    // Attempt to refer to 'Self' within a non-protocol nominal
-    // type. Fix this by replacing 'Self' with the nominal type name.
-    NominalTypeDecl *nominal = nullptr;
-    if (comp->getIdentifier() == tc.Context.Id_Self &&
-        !isa<GenericIdentTypeRepr>(comp) &&
-        (nominal = getEnclosingNominalContext(dc))) {
-      // Retrieve the nominal type and resolve it within this context.
-      assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-      auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, nullptr,
-                                  options, resolver, unsatisfiedDependency);
-      if (type->is<ErrorType>())
-        return type;
-
-      // Produce a Fix-It replacing 'Self' with the nominal type name.
-      tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
-        .fixItReplace(comp->getIdLoc(), nominal->getName().str());
-      comp->overwriteIdentifier(nominal->getName());
-      comp->setValue(nominal);
-      return type;
-    }
-    
-    // Fallback.
     SourceLoc L = comp->getIdLoc();
     SourceRange R = SourceRange(comp->getIdLoc());
 
@@ -826,18 +793,36 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                            resolver, unsatisfiedDependency);
   }
 
+  // Identifier is 'Self'
+  if (comp->getIdentifier() == TC.Context.Id_Self) {
+    // Dynamic 'Self' in the result type of a function body.
+    if (options.contains(TR_DynamicSelfResult)) {
+      auto func = cast<FuncDecl>(DC);
+      assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
+
+      return func->getDynamicSelf();
+    }
+
+    // Otherwise it is a concrete reference to the enclosing
+    // nominal type if we are in a type context.
+    if (auto nominal = DC->getEnclosingNominalContext()) {
+      // In protocols, 'Self' is always the 'Self' generic param,
+      // so don't resolve it here.
+      if (!nominal->getAsProtocolOrProtocolExtensionContext())
+        return resolveTypeDecl(TC, nominal, comp->getIdLoc(), DC, nullptr,
+                               options, resolver, unsatisfiedDependency);
+    } else {
+      // Warn if 'Self' is referenced outside a nominal type context.
+      TC.diagnose(comp->getIdLoc(), diag::self_outside_nominal)
+        .highlight(comp->getSourceRange());
+      comp->setInvalid();
+      return ErrorType::get(TC.Context);
+    }
+  }
+
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   DeclContext *lookupDC = DC;
-
-  // Dynamic 'Self' in the result type of a function body.
-  if (options.contains(TR_DynamicSelfResult) &&
-      comp->getIdentifier() == TC.Context.Id_Self) {
-    auto func = cast<FuncDecl>(DC);
-    assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-    
-    return func->getDynamicSelf();
-  }
 
   // For lookups within the generic signature, look at the generic
   // parameters (only), then move up to the enclosing context.

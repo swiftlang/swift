@@ -4511,7 +4511,7 @@ public:
 
     // Dynamic 'Self' is only permitted on methods.
     if (!dc->isTypeContext()) {
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
+      TC.diagnose(simpleRepr->getIdLoc(), diag::self_non_method,
                   dc->isLocalContext());
       simpleRepr->setInvalid();
       return true;
@@ -4522,26 +4522,15 @@ public:
     auto declaredType = dc->getDeclaredTypeOfContext();
     if (declaredType->is<ErrorType>())
       return false;
-
     auto nominal = declaredType->getAnyNominal();
-    if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
-      int which;
-      if (isa<StructDecl>(nominal))
-        which = 0;
-      else if (isa<EnumDecl>(nominal))
-        which = 1;
-      else
-        llvm_unreachable("Unknown nominal type");
-      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
-                  which, nominal->getName())
-        .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
-      simpleRepr->setInvalid();
-      return true;
+
+    // 'Self' return types in classes or protocols are dynamic 'Self'
+    if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal)) {
+      // Note that the function has a dynamic Self return type and set
+      // the return type component to the dynamic self type.
+      func->setDynamicSelf(true);
     }
 
-    // Note that the function has a dynamic Self return type and set
-    // the return type component to the dynamic self type.
-    func->setDynamicSelf(true);
     return false;
   }
 

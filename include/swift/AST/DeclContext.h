@@ -263,7 +263,10 @@ public:
 
   /// If this DeclContext is a protocol extension, return the extended protocol.
   ProtocolDecl *getAsProtocolExtensionContext() const;
-
+ 
+  /// Retrieve the nearest enclosing nominal type context.
+  NominalTypeDecl *getEnclosingNominalContext() const;
+  
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///

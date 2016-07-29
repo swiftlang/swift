@@ -431,6 +431,18 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
+    // Recover from not finding 'Self' in a nominal type, if we are
+    // in a type context we can return the TypeExpr
+    if (Name.getBaseName() == Context.Id_Self) {
+      if (auto nominal = DC->getEnclosingNominalContext())
+        return TypeExpr::createForDecl(Loc, nominal, false);
+      
+      // Warn if 'Self' is referenced outside a nominal type context
+      diagnose(Loc, diag::self_outside_nominal)
+        .highlight(UDRE->getSourceRange());
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
+    }
+
     // If we failed lookup of an operator, check to see it to see if it is
     // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
     // If so, emit specific diagnostics for it.
