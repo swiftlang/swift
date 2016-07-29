@@ -103,7 +103,7 @@ public protocol _Mirror {
   /// The instance being reflected.
   var value: Any { get }
 
-  /// Identical to `value.dynamicType`.
+  /// Identical to `type(of: value)`.
   var valueType: Any.Type { get }
 
   /// A unique identifier for `value` if it is a class instance; `nil`
@@ -214,7 +214,7 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
   _dumpPrint_unlocked(value, mirror, &target)
 
   let id: ObjectIdentifier?
-  if value.dynamicType is AnyObject.Type {
+  if type(of: value) is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     id = ObjectIdentifier(_unsafeDowncastToAnyObject(fromAny: value))
   } else if let metatypeInstance = value as? Any.Type {

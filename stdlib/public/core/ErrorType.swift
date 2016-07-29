@@ -169,7 +169,7 @@ public typealias ErrorProtocol = Error
 
 extension Error {
   public var _domain: String {
-    return String(reflecting: self.dynamicType)
+    return String(reflecting: type(of: self))
   }
 
   public var _userInfo: Any? {

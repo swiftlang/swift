@@ -491,10 +491,10 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
   expectEqual(
-    0, lc.log._withUnsafeMutableBufferPointerIfSupported[lc.dynamicType])
+    0, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
   expectEqual(
     0,
-    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[lc.dynamicType])
+    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
 
   expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
 }
@@ -808,10 +808,10 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
   })
 
   expectEqual(
-    1, lc.log._withUnsafeMutableBufferPointerIfSupported[lc.dynamicType])
+    1, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
   expectEqual(
     withUnsafeMutableBufferPointerIsSupported ? 1 : 0,
-    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[lc.dynamicType])
+    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
 
   expectEqual(4, lc.distance(from: lc.startIndex, to: pivot))
   expectEqualsUnordered([1, 2, 3, 4], lc.prefix(upTo: pivot).map { extractValue($0).value })

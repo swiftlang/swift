@@ -488,7 +488,7 @@ internal func _makeBridgeObject(
 
   _sanityCheck(
     _isObjCTaggedPointer(object)
-    || _usesNativeSwiftReferenceCounting(object.dynamicType)
+    || _usesNativeSwiftReferenceCounting(type(of: object))
     || bits == _objectPointerIsObjCBit,
     "All spare bits must be set in non-native, non-tagged bridge objects"
   )
@@ -565,7 +565,7 @@ func _isUnique_native<T>(_ object: inout T) -> Bool {
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)
   _sanityCheck(_usesNativeSwiftReferenceCounting(
-      (Builtin.reinterpretCast(object) as AnyObject).dynamicType))
+      type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUnique_native(&object))
 }
 
@@ -580,7 +580,7 @@ func _isUniqueOrPinned_native<T>(_ object: inout T) -> Bool {
     (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
     == 0)
   _sanityCheck(_usesNativeSwiftReferenceCounting(
-      (Builtin.reinterpretCast(object) as AnyObject).dynamicType))
+      type(of: Builtin.reinterpretCast(object) as AnyObject)))
   return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
 
@@ -606,8 +606,8 @@ public func unsafeUnwrap<T>(_ nonEmpty: T?) -> T {
 
 /// Extract an object reference from an Any known to contain an object.
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
-  _sanityCheck(any.dynamicType is AnyObject.Type
-               || any.dynamicType is AnyObject.Protocol,
+  _sanityCheck(type(of: any) is AnyObject.Type
+               || type(of: any) is AnyObject.Protocol,
                "Any expected to contain object reference")
   // With a SIL instruction, we could more efficiently grab the object reference
   // out of the Any's inline storage.

@@ -3517,7 +3517,7 @@ public:
   }
 };
 
-/// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
+/// DynamicTypeExpr - "type(of: base)" - Produces a metatype value.
 ///
 /// The metatype value can comes from evaluating an expression and then
 /// getting its metatype.

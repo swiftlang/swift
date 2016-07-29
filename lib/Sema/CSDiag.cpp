@@ -2267,14 +2267,14 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
           return true;
         }
         
-        // Suggest inserting '.dynamicType' to construct another object of the
-        // same dynamic type.
-        SourceLoc fixItLoc
-          = ctorRef->getNameLoc().getBaseNameLoc().getAdvancedLoc(-1);
+        // Suggest inserting a call to 'type(of:)' to construct another object
+        // of the same dynamic type.
+        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
         
-        // Place the '.dynamicType' right before the init.
+        // Surround the caller in `type(of:)`.
         diagnose(anchor->getLoc(), diag::init_not_instance_member)
-          .fixItInsert(fixItLoc, ".dynamicType");
+          .fixItInsert(fixItRng.Start, "type(of: ")
+          .fixItInsertAfter(fixItRng.End, ")");
         return true;
       }
     }

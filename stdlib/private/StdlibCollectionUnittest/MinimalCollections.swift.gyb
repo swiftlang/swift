@@ -555,7 +555,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     self.underestimatedCount = 0
     self._elements = []
     self._collectionState =
-      _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
+      _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
   public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
