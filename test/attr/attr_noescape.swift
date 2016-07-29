@@ -14,17 +14,17 @@ func takesNoEscapeClosure(_ fn : @noescape () -> Int) {
 
   _ = fn()  // ok
 
-  var x = fn  // expected-error {{@noescape parameter 'fn' may only be called}}
+  var x = fn  // expected-error {{non-escaping parameter 'fn' may only be called}}
 
   // This is ok, because the closure itself is noescape.
   takesNoEscapeClosure { fn() }
 
   // This is not ok, because it escapes the 'fn' closure.
-  doesEscape { fn() }   // expected-error {{closure use of @noescape parameter 'fn' may allow it to escape}}
+  doesEscape { fn() }   // expected-error {{closure use of non-escaping parameter 'fn' may allow it to escape}}
 
   // This is not ok, because it escapes the 'fn' closure.
   func nested_function() {
-    _ = fn()   // expected-error {{declaration closing over @noescape parameter 'fn' may allow it to escape}}
+    _ = fn()   // expected-error {{declaration closing over non-escaping parameter 'fn' may allow it to escape}}
   }
 
   takesNoEscapeClosure(fn)  // ok
@@ -165,8 +165,8 @@ func takeNoEscapeTest2(_ fn : @noescape () -> ()) {
 
 // Autoclosure implies noescape, but produce nice diagnostics so people know
 // why noescape problems happen.
-func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly @noescape because it was declared @autoclosure}}
-  doesEscape { a() }  // expected-error {{closure use of @noescape parameter 'a' may allow it to escape}}
+func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter 'a' is implicitly non-escaping because it was declared @autoclosure}}
+  doesEscape { a() }  // expected-error {{closure use of non-escaping parameter 'a' may allow it to escape}}
 }
 
 
@@ -262,15 +262,15 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
 typealias CompletionHandlerNE = @noescape (success: Bool) -> ()
 typealias CompletionHandler = (success: Bool) -> ()
 var escape : CompletionHandlerNE
-func doThing1(_ completion: @noescape (success: Bool) -> ()) {
-  // expected-error @+2 {{@noescape value 'escape' may only be called}}
-  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+func doThing1(_ completion: (success: Bool) -> ()) {
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
 }
 func doThing2(_ completion: CompletionHandlerNE) {
-  // expected-error @+2 {{@noescape value 'escape' may only be called}}
-  // expected-error @+1 {{@noescape parameter 'completion' may only be called}}
-  escape = completion // expected-error {{declaration closing over @noescape parameter 'escape' may allow it to escape}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
