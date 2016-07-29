@@ -61,9 +61,9 @@ pointer to a child node.
 Define `ChildNodeOrKey` to be a type that is an unsafe union of `Key` and
 `UnsafePointer<Node>`:
 
-  sizeof(ChildNodeOrKey)   = max(sizeof(UnsafePointer), sizeof(Key))
-  alignof(ChildNodeOrKey)  = max(alignof(UnsafePointer), alignof(Key))
-  strideof(ChildNodeOrKey) = max(strideof(UnsafePointer), strideof(Key))
+  MemoryLayout<ChildNodeOrKey>.size      = max(MemoryLayout<UnsafePointer>.size, MemoryLayout<Key>.size)
+  MemoryLayout<ChildNodeOrKey>.alignment = max(MemoryLayout<UnsafePointer>.alignment, MemoryLayout<Key>.alignment)
+  MemoryLayout<ChildNodeOrKey>.stride    = max(MemoryLayout<UnsafePointer>.stride, MemoryLayout<Key>.stride)
 
 Memory layout:
 
@@ -275,20 +275,20 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   typealias _Self = _PVSparseVectorNodePointer
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _childNodePopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _childNodePopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _childNodePopulationBitmapOffset: Int {
     let padding =
@@ -297,10 +297,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static var _keyPopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _keyPopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _keyPopulationBitmapOffset: Int {
     let padding =
@@ -310,10 +310,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _childNodeVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(UnsafePointer<UInt8>.self) * layout.childNodeCount
+    return MemoryLayout<UnsafePointer<UInt8>>.stride * layout.childNodeCount
   }
   static var _childNodeVectorAlignment: Int {
-    return alignof(UnsafePointer<UInt8>.self)
+    return MemoryLayout<UnsafePointer<UInt8>>.alignment
   }
   static var _childNodeVectorOffset: Int {
     let padding =
@@ -322,10 +322,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _keyVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(Key.self) * layout.keyCount
+    return MemoryLayout<Key>.stride * layout.keyCount
   }
   static var _keyVectorAlignment: Int {
-    return alignof(Key.self)
+    return MemoryLayout<Key>.alignment
   }
   static func _keyVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
     let padding =
@@ -334,10 +334,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _valueVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(Value.self) * layout.keyCount
+    return MemoryLayout<Value>.stride * layout.keyCount
   }
   static var _valueVectorAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static func _valueVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
     let padding =
@@ -942,30 +942,30 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
 
   static var _childNodeOrKeyStride: Int {
     return max(
-      strideof(UnsafePointer<UInt8>.self),
-      strideof(Key.self))
+      MemoryLayout<UnsafePointer<UInt8>>.stride,
+      MemoryLayout<Key>.stride)
   }
   static var _childNodeOrKeyAlignment: Int {
     return max(
-      alignof(UnsafePointer<UInt8>.self),
-      alignof(Key.self))
+      MemoryLayout<UnsafePointer<UInt8>>.alignment,
+      MemoryLayout<Key>.alignment)
   }
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _childNodePopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _childNodePopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _childNodePopulationBitmapOffset: Int {
     let padding = max(
@@ -975,10 +975,10 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
   }
 
   static var _keyPopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _keyPopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _keyPopulationBitmapOffset: Int {
     let padding = max(
@@ -1002,10 +1002,10 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
   }
 
   static var _valueArraySize: Int {
-    return strideof(Value.self) * 32
+    return MemoryLayout<Value>.stride * 32
   }
   static var _valueArrayAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static var _valueArrayOffset: Int {
     let padding =
@@ -1182,20 +1182,20 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   typealias _Self = _PVCollisionNodePointer
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _countSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _countAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _countOffset: Int {
     let padding = max(
@@ -1205,10 +1205,10 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   }
 
   static func _keyArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
-    return strideof(Key.self) * layout.keyCount
+    return MemoryLayout<Key>.stride * layout.keyCount
   }
   static var _keyArrayAlignment: Int {
-    return alignof(Key.self)
+    return MemoryLayout<Key>.alignment
   }
   static var _keyArrayOffset: Int {
     let padding =
@@ -1217,10 +1217,10 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   }
 
   static func _valueArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
-    return strideof(Value.self) * layout.keyCount
+    return MemoryLayout<Value>.stride * layout.keyCount
   }
   static var _valueArrayAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static func _valueArrayOffset(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
     let padding =
@@ -1880,14 +1880,14 @@ var PersistentVectorTests = TestSuite("PersistentVector")
 
 PersistentVectorTests.test("sizeof") {
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVSparseVectorNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVSparseVectorNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVArrayNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVArrayNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVAnyNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVAnyNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
 }
 
 %{

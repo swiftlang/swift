@@ -137,7 +137,7 @@ extension ${Self} {
   func toNSNumberByteArray() -> [UInt8] {
     var v = self
     var result: [UInt8] = []
-    for _ in 0..<sizeof(${Self}.self) {
+    for _ in 0 ..< MemoryLayout<${Self}>.size {
       result.append(UInt8(v & 0xff))
       v = v >> 8
     }
@@ -151,7 +151,7 @@ extension ${Self} {
   func toNSNumberByteArray() -> [UInt8] {
     var v = self.bitPattern
     var result: [UInt8] = []
-    for _ in 0..<sizeof(v.dynamicType) {
+    for _ in 0 ..< MemoryLayout._ofInstance(v).size {
       result.append(UInt8(v & 0xff))
       v = v >> 8
     }

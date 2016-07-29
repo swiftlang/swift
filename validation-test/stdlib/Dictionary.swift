@@ -72,9 +72,9 @@ DictionaryTestSuite.test("AssociatedTypes") {
 DictionaryTestSuite.test("sizeof") {
   var dict = [1: "meow", 2: "meow"]
 #if arch(i386) || arch(arm)
-  expectEqual(4, sizeofValue(dict))
+  expectEqual(4, MemoryLayout._ofInstance(dict).size)
 #else
-  expectEqual(8, sizeofValue(dict))
+  expectEqual(8, MemoryLayout._ofInstance(dict).size)
 #endif
 }
 

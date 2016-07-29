@@ -382,8 +382,8 @@ func _float${bits}ToString(_ value: Float${bits}, debug: Bool) -> String {
     }
   }
 
-  _sanityCheck(sizeof(_Buffer32.self) == 32)
-  _sanityCheck(sizeof(_Buffer72.self) == 72)
+  _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
+  _sanityCheck(MemoryLayout<_Buffer72>.size == 72)
 
   var buffer = _Buffer32()
   return buffer.withBytes { (bufferPtr) in
@@ -469,7 +469,7 @@ func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
       radix: 16,
       uppercase: false
     )
-  for _ in 0..<(2 * sizeof(UnsafeRawPointer.self) - result.utf16.count) {
+  for _ in 0..<(2 * MemoryLayout<UnsafeRawPointer>.size - result.utf16.count) {
     result = "0" + result
   }
   return "0x" + result

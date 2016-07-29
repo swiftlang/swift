@@ -106,7 +106,7 @@ final class CodecTest<Codec : TestableUnicodeCodec> {
 
     // Use Cocoa to encode the scalar
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
-    let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
+    let nsEncoded = nsEncodeBuffer[0..<(used/MemoryLayout<CodeUnit>.size)]
     var encodeIndex = encodeBuffer.startIndex
     let encodeOutput: (CodeUnit) -> Void = {
       self.encodeBuffer[encodeIndex] = $0

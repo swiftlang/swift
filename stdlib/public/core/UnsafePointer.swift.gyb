@@ -20,8 +20,8 @@
 /// provides no automated memory management, and therefore must
 /// be handled with great care to ensure safety.
 ///
-/// Instances must be aligned to `alignof(Pointee.self)`, i.e.
-/// `(UnsafePointer<Int8>(self) - nil) % alignof(Pointee.self) == 0`
+/// Instances must be aligned to `MemoryLayout<Pointee>.alignment`, i.e.
+/// `(UnsafePointer<Int8>(self) - nil) % MemoryLayout<Pointee>.alignment == 0`
 ///
 /// The memory referenced by an instance can be in one of the following states:
 ///
@@ -133,7 +133,7 @@ public struct ${Self}<Pointee>
   /// - Postcondition: The pointee is allocated, but not initialized.
   static public func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
-    let size = strideof(Pointee.self) * count
+    let size = MemoryLayout<Pointee>.stride * count
     let rawPtr =
       Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Pointee.self))
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
@@ -147,7 +147,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Postcondition: The memory has been deallocated.
   public func deallocate(capacity: Int) {
-    let size = strideof(Pointee.self) * capacity
+    let size = MemoryLayout<Pointee>.stride * capacity
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, Builtin.alignof(Pointee.self))
   }
@@ -365,7 +365,7 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
   ///
-  /// - Precondition: The memory `self..<self + count * strideof(T.self)`
+  /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
     _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
@@ -484,7 +484,7 @@ public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
 @_transparent
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* strideof(Pointee.self))._builtinWordValue))
+    lhs._rawValue, (rhs &* MemoryLayout<Pointee>.stride)._builtinWordValue))
 }
 
 @_transparent
@@ -503,7 +503,7 @@ public func - <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
                          Builtin.ptrtoint_Word(rhs._rawValue)))
-    / strideof(Pointee.self)
+    / MemoryLayout<Pointee>.stride
 }
 
 @_transparent

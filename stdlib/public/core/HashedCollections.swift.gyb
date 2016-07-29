@@ -280,14 +280,14 @@ internal struct _UnmanagedAnyObjectArray {
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(
-        fromByteOffset: i * strideof(AnyObject.self),
+        fromByteOffset: i * MemoryLayout<AnyObject>.stride,
         as: Unmanaged<AnyObject>.self)
       return unmanaged.takeUnretainedValue()
     }
     nonmutating set(newValue) {
       let unmanaged = Unmanaged.passUnretained(newValue)
       value.storeBytes(of: unmanaged,
-        toByteOffset: i * strideof(AnyObject.self),
+        toByteOffset: i * MemoryLayout<AnyObject>.stride,
         as: Unmanaged<AnyObject>.self)
     }
   }
@@ -2511,15 +2511,15 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// padding to align the start to word alignment.
   internal static func bytesForBitMap(capacity: Int) -> Int {
     let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
-    return numWords * strideof(UInt.self) + alignof(UInt.self)
+    return numWords * MemoryLayout<UInt>.stride + MemoryLayout<UInt>.alignment
   }
 
   /// Returns the bytes necessary to store 'capacity' keys and padding to align
   /// the start to the alignment of the 'Key' type assuming a word aligned base
   /// address.
   internal static func bytesForKeys(capacity: Int) -> Int {
-    let padding = max(0, alignof(Key.self) - alignof(UInt.self))
-    return strideof(Key.self) * capacity + padding
+    let padding = max(0, MemoryLayout<Key>.alignment - MemoryLayout<UInt>.alignment)
+    return MemoryLayout<Key>.stride * capacity + padding
   }
 
 %if Self == 'Dictionary':
@@ -2528,9 +2528,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// address aligned to the maximum of the alignment of the 'Key' type and the
   /// alignment of a word.
   internal static func bytesForValues(capacity: Int) -> Int {
-    let maxPrevAlignment = max(alignof(Key.self), alignof(UInt.self))
-    let padding = max(0, alignof(Value.self) - maxPrevAlignment)
-    return strideof(Value.self) * capacity + padding
+    let maxPrevAlignment = max(MemoryLayout<Key>.alignment, MemoryLayout<UInt>.alignment)
+    let padding = max(0, MemoryLayout<Value>.alignment - maxPrevAlignment)
+    return MemoryLayout<Value>.stride * capacity + padding
   }
 %end
 
@@ -2582,7 +2582,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
     let bitMapSizeInBytes =
       _unsafeMultiply(
         _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
-        strideof(UInt.self))
+        MemoryLayout<UInt>.stride)
     let start =
       UnsafeMutableRawPointer(_initializedHashtableEntriesBitMapStorage)
       + bitMapSizeInBytes
@@ -2592,7 +2592,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
-    let keysSizeInBytes = _unsafeMultiply(_body.capacity, strideof(Key.self))
+    let keysSizeInBytes = _unsafeMultiply(_body.capacity, MemoryLayout<Key>.stride)
     let start = UnsafeMutableRawPointer(_keys) + keysSizeInBytes
     return _roundUp(start, toAlignmentOf: Value.self)
   }

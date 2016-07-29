@@ -110,13 +110,13 @@ public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
 public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
-    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self))
+    count: (MemoryLayout<T>.size + MemoryLayout<Int>.size - 1) / MemoryLayout<Int>.size)
   _sanityCheck(result.count > 0)
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
           src: UnsafeMutablePointer(Builtin.addressof(&tmp)),
-          size: UInt(sizeof(T.self)))
+          size: UInt(MemoryLayout<T>.size))
   return result
 }
 
@@ -144,7 +144,7 @@ extension Int64 : CVarArg, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout._ofInstance(self).alignment
   }
 }
 
@@ -192,7 +192,7 @@ extension UInt64 : CVarArg, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout._ofInstance(self).alignment
   }
 }
 
@@ -265,7 +265,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(Double(self))
+    return MemoryLayout._ofInstance(Double(self)).alignment
   }
 }
 
@@ -280,7 +280,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return alignofValue(self)
+    return MemoryLayout._ofInstance(self).alignment
   }
 }
 
@@ -298,7 +298,7 @@ final internal class _VaListBuilder {
     // differs from ABI alignment on some architectures.
 #if arch(arm) && !os(iOS)
     if let arg = arg as? _CVarArgAligned {
-      let alignmentInWords = arg._cVarArgAlignment / sizeof(Int.self)
+      let alignmentInWords = arg._cVarArgAlignment / MemoryLayout<Int>.size
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
@@ -349,7 +349,7 @@ final internal class _VaListBuilder {
   }
 
   func rawSizeAndAlignment(_ wordCount: Int) -> (Builtin.Word, Builtin.Word) {
-    return ((wordCount * strideof(Int.self))._builtinWordValue,
+    return ((wordCount * MemoryLayout<Int>.stride)._builtinWordValue,
       requiredAlignmentInBytes._builtinWordValue)
   }
 
@@ -374,7 +374,7 @@ final internal class _VaListBuilder {
   }
 
   // FIXME: alignof differs from the ABI alignment on some architectures
-  let requiredAlignmentInBytes = alignof(Double.self)
+  let requiredAlignmentInBytes = MemoryLayout<Double>.alignment
   var count = 0
   var allocated = 0
   var storage: UnsafeMutablePointer<Int>? = nil
@@ -390,7 +390,7 @@ final internal class _VaListBuilder {
 
   struct Header {
     var gp_offset = CUnsignedInt(0)
-    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Int.self))
+    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
     var overflow_arg_area: UnsafeMutablePointer<Int>? = nil
     var reg_save_area: UnsafeMutablePointer<Int>? = nil
   }

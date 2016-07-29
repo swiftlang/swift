@@ -16,11 +16,11 @@ class Missile {
 UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   Missile.missilesLaunched = 0
   do {
-    let sizeInBytes = 3 * strideof(Missile.self)
+    let sizeInBytes = 3 * MemoryLayout<Missile>.stride
     var p1 = UnsafeMutableRawPointer.allocate(
-      bytes: sizeInBytes, alignedTo: alignof(Missile.self))
+      bytes: sizeInBytes, alignedTo: MemoryLayout<Missile>.alignment)
     defer {
-      p1.deallocate(bytes: sizeInBytes, alignedTo: alignof(Missile.self))
+      p1.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Missile>.alignment)
     }
     var ptrM = p1.initializeMemory(as: Missile.self, to: Missile(1))
     p1.initializeMemory(as: Missile.self, at: 1, count: 2, to: Missile(2))
@@ -29,9 +29,9 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
     expectEqual(2, ptrM[2].number)
 
     var p2 = UnsafeMutableRawPointer.allocate(
-      bytes: sizeInBytes, alignedTo: alignof(Missile.self))
+      bytes: sizeInBytes, alignedTo: MemoryLayout<Missile>.alignment)
     defer {
-      p2.deallocate(bytes: sizeInBytes, alignedTo: alignof(Missile.self))
+      p2.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Missile>.alignment)
     }
     let ptrM2 = p2.moveInitializeMemory(as: Missile.self, from: ptrM, count: 3)
     defer {
@@ -55,11 +55,11 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
-  let sizeInBytes = 3 * strideof(Int.self)
+  let sizeInBytes = 3 * MemoryLayout<Int>.stride
   var p1 = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   defer {
-    p1.deallocate(bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    p1.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   }
   let ptrI = p1.bindMemory(to: Int.self, capacity: 3)
   ptrI.initialize(from: 1...3)
@@ -72,33 +72,33 @@ UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
-  let sizeInBytes = 3 * strideof(Int.self)
+  let sizeInBytes = 3 * MemoryLayout<Int>.stride
   var p1 = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   defer {
-    p1.deallocate(bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    p1.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   }
   let ptrI = p1.initializeMemory(as: Int.self, from: 1...3)
   defer {
     ptrI.deinitialize(count: 3)
   }
   expectEqual(1, p1.load(as: Int.self))
-  expectEqual(2, p1.load(fromByteOffset: strideof(Int.self), as: Int.self))
-  expectEqual(3, p1.load(fromByteOffset: 2*strideof(Int.self), as: Int.self))
+  expectEqual(2, p1.load(fromByteOffset: MemoryLayout<Int>.stride, as: Int.self))
+  expectEqual(3, p1.load(fromByteOffset: 2*MemoryLayout<Int>.stride, as: Int.self))
   p1.storeBytes(of: 4, as: Int.self)
-  p1.storeBytes(of: 5, toByteOffset: strideof(Int.self), as: Int.self)
-  p1.storeBytes(of: 6, toByteOffset: 2 * strideof(Int.self), as: Int.self)
+  p1.storeBytes(of: 5, toByteOffset: MemoryLayout<Int>.stride, as: Int.self)
+  p1.storeBytes(of: 6, toByteOffset: 2 * MemoryLayout<Int>.stride, as: Int.self)
   expectEqual(4, p1.load(as: Int.self))
-  expectEqual(5, p1.load(fromByteOffset: strideof(Int.self), as: Int.self))
-  expectEqual(6, p1.load(fromByteOffset: 2 * strideof(Int.self), as: Int.self))
+  expectEqual(5, p1.load(fromByteOffset: MemoryLayout<Int>.stride, as: Int.self))
+  expectEqual(6, p1.load(fromByteOffset: 2 * MemoryLayout<Int>.stride, as: Int.self))
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyBytes") {
-  let sizeInBytes = 4 * strideof(Int.self)
+  let sizeInBytes = 4 * MemoryLayout<Int>.stride
   var rawPtr = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   defer {
-    rawPtr.deallocate(bytes: sizeInBytes, alignedTo: alignof(Int.self))
+    rawPtr.deallocate(bytes: sizeInBytes, alignedTo: MemoryLayout<Int>.alignment)
   }
   let ptrI = rawPtr.initializeMemory(as: Int.self, count: 4, to: 42)
   defer {
@@ -108,8 +108,8 @@ UnsafeMutableRawPointerExtraTestSuite.test("copyBytes") {
   // Right overlap
   ptrI[0] = 1
   ptrI[1] = 2
-  (rawPtr + strideof(Int.self)).copyBytes(
-    from: roPtr, count: 2 * strideof(Int.self))
+  (rawPtr + MemoryLayout<Int>.stride).copyBytes(
+    from: roPtr, count: 2 * MemoryLayout<Int>.stride)
   expectEqual(1, ptrI[1])
   expectEqual(2, ptrI[2])
 
@@ -117,7 +117,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("copyBytes") {
   ptrI[1] = 2
   ptrI[2] = 3
   rawPtr.copyBytes(
-    from: roPtr + strideof(Int.self), count: 2 * strideof(Int.self))
+    from: roPtr + MemoryLayout<Int>.stride, count: 2 * MemoryLayout<Int>.stride)
   expectEqual(2, ptrI[0])
   expectEqual(3, ptrI[1])
 
@@ -125,15 +125,15 @@ UnsafeMutableRawPointerExtraTestSuite.test("copyBytes") {
   ptrI[2] = 2
   ptrI[3] = 3
   rawPtr.copyBytes(
-    from: roPtr + 2 * strideof(Int.self), count: 2 * strideof(Int.self))
+    from: roPtr + 2 * MemoryLayout<Int>.stride, count: 2 * MemoryLayout<Int>.stride)
   expectEqual(2, ptrI[0])
   expectEqual(3, ptrI[1])
 
   // Backwards
   ptrI[0] = 0
   ptrI[1] = 1
-  (rawPtr + 2 * strideof(Int.self)).copyBytes(
-    from: roPtr, count: 2 * strideof(Int.self))
+  (rawPtr + 2 * MemoryLayout<Int>.stride).copyBytes(
+    from: roPtr, count: 2 * MemoryLayout<Int>.stride)
   expectEqual(0, ptrI[2])
   expectEqual(1, ptrI[3])
 }

@@ -16,7 +16,7 @@ extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
   /// Binds the the buffer's memory type to `Element`.
   public init(_ audioBuffer: AudioBuffer) {
-    let count = Int(audioBuffer.mDataByteSize) / strideof(Element.self)
+    let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(
       to: Element.self, capacity: count)
     self.init(start: elementPtr, count: count)
@@ -27,7 +27,7 @@ extension UnsafeMutableBufferPointer {
   /// Initialize an `UnsafeMutableBufferPointer<Element>` from an
   /// `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
-    let count = Int(audioBuffer.mDataByteSize) / strideof(Element.self)
+    let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(
       to: Element.self, capacity: count)
     self.init(start: elementPtr, count: count)
@@ -43,7 +43,7 @@ extension AudioBuffer {
   ) {
     self.mNumberChannels = UInt32(numberOfChannels)
     self.mData = UnsafeMutableRawPointer(typedBuffer.baseAddress)
-    self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element.self))
+    self.mDataByteSize = UInt32(typedBuffer.count * MemoryLayout<Element>.stride)
   }
 }
 
@@ -53,8 +53,8 @@ extension AudioBufferList {
   public static func sizeInBytes(maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
       "AudioBufferList should contain at least one AudioBuffer")
-    return sizeof(AudioBufferList.self) +
-      (maximumBuffers - 1) * strideof(AudioBuffer.self)
+    return MemoryLayout<AudioBufferList>.size +
+      (maximumBuffers - 1) * MemoryLayout<AudioBuffer>.stride
   }
 
   /// Allocate an `AudioBufferList` with a capacity for the specified number of
@@ -72,7 +72,7 @@ extension AudioBufferList {
       "failed to allocate memory for an AudioBufferList")
 
     let listPtr = ablMemory!.bindMemory(to: AudioBufferList.self, capacity: 1)
-    (ablMemory! + strideof(AudioBufferList.self)).bindMemory(
+    (ablMemory! + MemoryLayout<AudioBufferList>.stride).bindMemory(
       to: AudioBuffer.self, capacity: maximumBuffers)
     let abl = UnsafeMutableAudioBufferListPointer(listPtr)
     abl.count = maximumBuffers

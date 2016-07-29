@@ -162,7 +162,7 @@ protocol StaticP {
   static var size: Int { get }
 }
 struct HasStatic<T> : StaticP {
-  static var size: Int { return sizeof(T.self) }
+  static var size: Int { return MemoryLayout<T>.size }
 }
 public func testExMetatype() -> Int {
   let type: StaticP.Type = HasStatic<Int>.self

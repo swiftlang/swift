@@ -87,7 +87,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       // counting while correctly aliasing with all other pointer types.
       UnsafeMutableRawPointer(aBuffer).copyBytes(
         from: objects.baseAddress! + range.location,
-        count: range.length * strideof(AnyObject.self))
+        count: range.length * MemoryLayout<AnyObject>.stride)
     }
   }
 
