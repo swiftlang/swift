@@ -38,7 +38,6 @@ import Calculator
 import CaptureProp
 import Chars
 import ClassArrayGetter
-import Data
 import DeadArray
 import DictTest
 import DictTest2
@@ -142,7 +141,6 @@ precommitTests = [
   "HashTest": run_HashTest,
   "Histogram": run_Histogram,
   "Integrate": run_Integrate,
-  "IterateData": run_IterateData,
   "Join": run_Join,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,
