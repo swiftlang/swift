@@ -106,11 +106,11 @@ func longArray() {
 
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
-func rdar25563498<T : _ArrayProtocol>(t: T) {
+func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
   var x: T = [1] // expected-error {{contextual type 'T' cannot be used with array literal}}
 }
 
-func rdar25563498_ok<T : _ArrayProtocol>(t: T) -> T
+func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
      where T.Element : ExpressibleByIntegerLiteral {
   let x: T = [1]
   return x
