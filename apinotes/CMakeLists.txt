@@ -12,6 +12,7 @@ set(SWIFT_API_NOTES_INPUTS
   CoreLocation
   CoreSpotlight
   CoreText
+  CryptoTokenKit
   Dispatch
   EventKit
   ExternalAccessory
