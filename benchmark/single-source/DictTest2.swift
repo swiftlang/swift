@@ -37,7 +37,7 @@ public func run_Dictionary2(_ N: Int) {
   CheckResults(res == ref_result, "Incorrect results in Dictionary2: \(res) != \(ref_result)")
 }
 
-class Box<T : Hashable> : Hashable {
+class Box<T : Hashable> : Hashable where T : Equatable {
   var value: T
 
   init(_ v: T) {
