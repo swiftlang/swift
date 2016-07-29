@@ -110,8 +110,8 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber.classForCoder") {
   // Check that internal subclass is not achived.
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
-  expectEqual("NSNumber", String(n.classForCoder))
-  expectEqual("NSNumber", String(n.classForKeyedArchiver!))
+  expectEqual("NSNumber", String(describing: n.classForCoder))
+  expectEqual("NSNumber", String(describing: n.classForKeyedArchiver!))
 }
 
 NSNumberTests.test("_SwiftTypePreservingNSNumber.init(coder:)")
@@ -261,11 +261,11 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   expectEmpty(explicitNSNumber._toCustomAnyHashable())
   expectTrue(
     Set(["__NSCFNumber", "__NSCFBoolean"]).contains(
-      String(AnyHashable(explicitNSNumber).base.dynamicType)))
+      String(describing: AnyHashable(explicitNSNumber).base.dynamicType)))
   expectEqual(AnyHashable(explicitNSNumber), AnyHashable(explicitNSNumber))
 
   let ah = AnyHashable(bridgedNSNumber)
-  expectEqual("${Self}", String(ah.base.dynamicType))
+  expectEqual("${Self}", String(describing: ah.base.dynamicType))
 %   if Self in ['Float', 'Double', 'CGFloat']:
   // FIXME: remove special cases for floating point when we fix their
   // conformances to Equatable.

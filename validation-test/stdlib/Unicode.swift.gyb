@@ -2380,7 +2380,7 @@ StringTests.test("StreamableConformance") {
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> Void in
     let expected = test.scalarsHead + test.scalarsRepairedTail
-    let printedSubject = String(subject)
+    let printedSubject = subject
     let actual = printedSubject.unicodeScalars.map { $0.value }
     expectEqual(expected, actual)
   }
