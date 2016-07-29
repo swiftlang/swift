@@ -186,3 +186,21 @@ func testS1Subscripts(s2: S2, a: Int) {
   let _ = s2.s1[a]
   s2.s1[a] = a
 }
+
+// Test delegating initialization.
+struct S3 {
+  init(a: Int, b: Int) { }
+
+  init(all: Int) {
+    self.init(a:b:)(all, all)
+  }
+}
+
+
+// Check lazy inference, which broke in amusing ways with SE-0111.
+class C0 {
+  lazy var a = 32
+}
+
+// Check diagnostics changes.
+let _ = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
