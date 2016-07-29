@@ -1624,8 +1624,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   assert(Conf && "_ObjectiveCBridgeable conformance should exist");
   (void) Conf;
 
-  bool isCurrentModuleBridgeToObjectiveC = false;
-
   // Generate code to invoke _bridgeToObjectiveC
   SILBuilderWithScope Builder(Inst);
 
@@ -1647,16 +1645,13 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     M.getSwiftModule()->lookupMember(Results, Source.getNominalOrBoundGenericNominal(),
                       M.getASTContext().Id_bridgeToObjectiveC, Identifier());
     ResultsRef = Results;
-    isCurrentModuleBridgeToObjectiveC = true;
   }
   if (ResultsRef.size() != 1)
     return nullptr;
 
   auto MemberDeclRef = SILDeclRef(Results.front());
-  auto Linkage = (isCurrentModuleBridgeToObjectiveC)
-                     ? ForDefinition_t::ForDefinition
-                     : ForDefinition_t::NotForDefinition;
-  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef, Linkage);
+  auto *BridgedFunc = M.getOrCreateFunction(Loc, MemberDeclRef,
+                                            ForDefinition_t::NotForDefinition);
   assert(BridgedFunc &&
          "Implementation of _bridgeToObjectiveC could not be found");
 

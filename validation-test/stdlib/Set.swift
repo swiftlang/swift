@@ -12,9 +12,6 @@
 // RUN: %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
 
-// rdar://27547957
-// XFAIL: swift_test_mode_optimize
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 

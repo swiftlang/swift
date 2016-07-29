@@ -12,9 +12,6 @@
 // RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
 
-// rdar://27547957
-// XFAIL: swift_test_mode_optimize
-
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 import Darwin
 #else
