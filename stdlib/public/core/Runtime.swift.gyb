@@ -495,13 +495,15 @@ class _SwiftNativeNSSet {}
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 class _SwiftNativeNSEnumerator {}
 
+// FIXME(ABI): move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
-public class _SwiftNativeNSData {
+open class _SwiftNativeNSData {
   public init() {}
 }
 
+// FIXME(ABI): move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSCharacterSetBase)
-public class _SwiftNativeNSCharacterSet {
+open class _SwiftNativeNSCharacterSet {
   public init() {}
 }
 
