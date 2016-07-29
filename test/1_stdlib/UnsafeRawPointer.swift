@@ -148,53 +148,55 @@ enum Check {
 }
 
 func checkRawPointerCorrectness(_ check: Check,
-  _ f: (UnsafeMutableRawPointer) -> (as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int) -> UnsafeMutablePointer<Int>) {
+  _ f: (UnsafeMutableRawPointer,
+          as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int)
+        -> UnsafeMutablePointer<Int>) {
   let ptr = UnsafeMutablePointer<Int>.allocate(capacity: 4)
   switch check {
   case .RightOverlap:
     ptr.initialize(to: 1)
     (ptr + 1).initialize(to: 2)
-    _ = f(UnsafeMutableRawPointer(ptr + 1))(as: Int.self, from: ptr, count: 2)
+    _ = f(UnsafeMutableRawPointer(ptr + 1), as: Int.self, from: ptr, count: 2)
     expectEqual(1, ptr[1])
     expectEqual(2, ptr[2])
   case .LeftOverlap:
     (ptr + 1).initialize(to: 2)
     (ptr + 2).initialize(to: 3)
-    _ = f(UnsafeMutableRawPointer(ptr))(as: Int.self, from: ptr + 1, count: 2)
+    _ = f(UnsafeMutableRawPointer(ptr), as: Int.self, from: ptr + 1, count: 2)
     expectEqual(2, ptr[0])
     expectEqual(3, ptr[1])
   case .Disjoint:
     (ptr + 2).initialize(to: 2)
     (ptr + 3).initialize(to: 3)
-    _ = f(UnsafeMutableRawPointer(ptr))(as: Int.self, from: ptr + 2, count: 2)
+    _ = f(UnsafeMutableRawPointer(ptr), as: Int.self, from: ptr + 2, count: 2)
     expectEqual(2, ptr[0])
     expectEqual(3, ptr[1])
     // backwards
     let ptr2 = UnsafeMutablePointer<Int>.allocate(capacity: 4)
     ptr2.initialize(to: 0)
     (ptr2 + 1).initialize(to: 1)
-    _ = f(UnsafeMutableRawPointer(ptr2 + 2))(as: Int.self, from: ptr2, count: 2)
+    _ = f(UnsafeMutableRawPointer(ptr2 + 2), as: Int.self, from: ptr2, count: 2)
     expectEqual(0, ptr2[2])
     expectEqual(1, ptr2[3])
   }
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutableRawPointer)
-    -> (as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int)
+  _ f: ((UnsafeMutableRawPointer,
+          as: Int.Type, from: UnsafeMutablePointer<Int>, count: Int)
     -> UnsafeMutablePointer<Int>)
 ) -> (Check) -> Void {
   return { checkRawPointerCorrectness($0, f) }
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutableRawPointer)
-    -> (as: Int.Type, from: UnsafePointer<Int>, count: Int)
+  _ f: ((UnsafeMutableRawPointer,
+          as: Int.Type, from: UnsafePointer<Int>, count: Int)
     -> UnsafeMutablePointer<Int>)
 ) -> (Check) -> Void {
   return {
-    checkRawPointerCorrectness($0) { destPtr in 
-      return { f(destPtr)(as: $0, from: UnsafeMutablePointer($1), count: $2) }
+    checkRawPointerCorrectness($0) { destPtr, type, srcPtr, count in 
+      f(destPtr, as: type, from: UnsafeMutablePointer(srcPtr), count: count)
     }
   }
 }

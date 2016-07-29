@@ -65,8 +65,8 @@ public func foo(_ x: Double) {
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
   // CHECK: thin_to_thick_function [[THUNK]]
-  let d: (Struct1) -> (Double) -> Struct1 = Struct1.translate(radians:)
-  z = d(z)(x)
+  let d: (Struct1, Double) -> Struct1 = Struct1.translate(radians:)
+  z = d(z, x)
 
   // TODO: If we implement SE-0042, this should thunk the value Struct1 param
   // to a const* param to the underlying C symbol.
@@ -90,7 +90,7 @@ public func foo(_ x: Double) {
   // CHECK: thin_to_thick_function [[THUNK]]
   let g = Struct1.scale
   // CHECK: [[ZVAL:%.*]] = load [[Z]]
-  z = g(z)(x)
+  z = g(z, x)
 
   // TODO: If we implement SE-0042, this should directly reference the
   // underlying C function.
@@ -166,8 +166,8 @@ public func foo(_ x: Double) {
   z.selfComesLast(x: x)
   let k: (Double) -> () = z.selfComesLast(x:)
   k(x)
-  let l: (Struct1) -> (Double) -> () = Struct1.selfComesLast(x:)
-  l(z)(x)
+  let l: (Struct1, Double) -> () = Struct1.selfComesLast(x:)
+  l(z, x)
 
   // TODO: If we implement SE-0042, this should thunk to reorder the arguments.
   // let m: @convention(c) (Struct1, Double) -> () = Struct1.selfComesLast(x:)
@@ -179,9 +179,8 @@ public func foo(_ x: Double) {
   z.selfComesThird(a: y, b: 0, x: x)
   let n: (Int32, Float, Double) -> () = z.selfComesThird(a:b:x:)
   n(y, 0, x)
-  let o: (Struct1) -> (Int32, Float, Double) -> ()
-    = Struct1.selfComesThird(a:b:x:)
-  o(z)(y, 0, x)
+  let o: (Struct1, Int32, Float, Double) -> () = Struct1.selfComesThird(a:b:x:)
+  o(z, y, 0, x)
 
   // TODO: If we implement SE-0042, this should thunk to reorder the arguments.
   // let p: @convention(c) (Struct1, Int, Float, Double) -> ()
@@ -239,8 +238,8 @@ public func bar(_ x: Double) {
 
   let a: (Double) -> CCPowerSupply = CCPowerSupply.init(watts:)
   let _ = a(x)
-  let b: (CCRefrigerator) -> () -> () = CCRefrigerator.open
-  b(fridge)()
+  let b: (CCRefrigerator) -> () = CCRefrigerator.open
+  b(fridge)
   let c = fridge.open
   c()
 }

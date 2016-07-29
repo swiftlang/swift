@@ -1430,6 +1430,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
                                    isTypeReference, isDynamicResult,
                                    locator, base, nullptr);
+
+      if (choice.isFlattened())
+        refType = refType->castTo<AnyFunctionType>()->getUncurriedFunction();
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(), isTypeReference,

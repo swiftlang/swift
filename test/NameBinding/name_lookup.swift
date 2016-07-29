@@ -223,12 +223,12 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisDerived1'}}
     self.baseFunc0() // expected-error {{missing argument}}
-    self.baseFunc0(ThisBase1())() // expected-error {{'(ThisBase1) -> () -> ()' is not convertible to '(ThisDerived1) -> () -> ()'}}
-    
-    self.baseFunc0(ThisDerived1())()
-    self.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
-    self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> (Int) -> ()' is not convertible to '(ThisDerived1) -> (Int) -> ()'}}
-    self.baseFunc1(ThisDerived1())(42)
+    self.baseFunc0(ThisBase1()) // expected-error {{'(ThisBase1) -> ()' is not convertible to '(ThisDerived1) -> ()'}}
+
+    self.baseFunc0(ThisDerived1())
+    self.baseFunc1(42) // FIXME: expected-error {{missing argument for parameter #2 in call}}
+    self.baseFunc1(ThisBase1(), 42) // expected-error {{'(ThisBase1, Int) -> ()' is not convertible to '(ThisDerived1, Int) -> ()'}}
+    self.baseFunc1(ThisDerived1(), 42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
     self.baseStaticProp = 42
@@ -253,8 +253,8 @@ class ThisDerived1 : ThisBase1 {
     self.derivedInstanceVar = 42 // expected-error {{member 'derivedInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.derivedProp = 42 // expected-error {{member 'derivedProp' cannot be used on type 'ThisDerived1'}}
     self.derivedFunc0() // expected-error {{missing argument}}
-    self.derivedFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
-    self.derivedFunc0(ThisDerived1())()
+    self.derivedFunc0(ThisBase1()) // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
+    self.derivedFunc0(ThisDerived1())
     self.derivedStaticVar = 42
     self.derivedStaticProp = 42
     self.derivedStaticFunc0()
@@ -292,9 +292,9 @@ class ThisDerived1 : ThisBase1 {
     super.baseInstanceVar = 42 // expected-error {{member 'baseInstanceVar' cannot be used on type 'ThisBase1'}}
     super.baseProp = 42 // expected-error {{member 'baseProp' cannot be used on type 'ThisBase1'}}
     super.baseFunc0() // expected-error {{missing argument}}
-    super.baseFunc0(ThisBase1())()
-    super.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
-    super.baseFunc1(ThisBase1())(42)
+    super.baseFunc0(ThisBase1())
+    super.baseFunc1(42) // FIXME: expected-error {{missing argument for parameter #2 in call}}
+    super.baseFunc1(ThisBase1(), 42)
     super[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisBase1'}}
     super.baseStaticVar = 42
     super.baseStaticProp = 42
@@ -302,7 +302,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{missing argument}}
-    super.baseExtStaticVar = 42 
+    super.baseExtStaticVar = 42
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
 
@@ -457,13 +457,13 @@ protocol MyProto {
 
 // <rdar://problem/14488311>
 struct DefaultArgumentFromExtension {
-  func g(_ x: (DefaultArgumentFromExtension) -> () -> () = f) {
+  func g(_ x: (DefaultArgumentFromExtension) -> () = f) {
     let f = 42
     var x2 = x
-    x2 = f // expected-error{{cannot assign value of type 'Int' to type '(DefaultArgumentFromExtension) -> () -> ()'}}
+    x2 = f // expected-error{{cannot assign value of type 'Int' to type '(DefaultArgumentFromExtension) -> ()'}}
     _ = x2
   }
-  var x : (DefaultArgumentFromExtension) -> () -> () = f
+  var x : (DefaultArgumentFromExtension) -> () = f
 }
 extension DefaultArgumentFromExtension {
   func f() {}
@@ -480,8 +480,9 @@ struct MyStruct {
 
 // <rdar://problem/19935319> QoI: poor diagnostic initializing a variable with a non-class func
 class Test19935319 {
-  let i = getFoo()  // expected-error {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
-  
+  // FIXME-error @+1 {{cannot use instance member 'getFoo' within property initializer; property initializers run before 'self' is available}}
+  let i = getFoo()  // expected-error {{missing argument for parameter #1 in call}}
+
   func getFoo() -> Int {}
 }
 
@@ -492,7 +493,8 @@ class rdar27013358 {
     return 2
   }
   init(defaulted value: Int = defaultValue) {} // expected-error {{cannot use instance member 'defaultValue' as a default parameter}}
-  init(another value: Int = returnTwo()) {} // expected-error {{cannot use instance member 'returnTwo' as a default parameter}}
+  // FIXME-error @+1 {{cannot use instance member 'returnTwo' as a default parameter}}
+  init(another value: Int = returnTwo()) {} // expected-error {{missing argument for parameter #1 in call}}
 }
 
 // <rdar://problem/23904262> QoI: ivar default initializer cannot reference other default initialized ivars?
@@ -500,4 +502,3 @@ class r23904262 {
   let x = 1
   let y = x // expected-error {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 }
-

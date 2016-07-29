@@ -72,8 +72,8 @@ func testDeprecatedStringLiteralSelector() {
   _ = "method3" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-28=#selector(Foo.method3)}}
 
   // Overloaded cases
-  _ = "overloadedWithInt:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-39=#selector(Bar.overloaded(_:) as (Bar) -> (Int) -> ())}}
-  _ = "overloadedWithString:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-42=#selector(Bar.overloaded(_:) as (Bar) -> (String) -> ())}}
+  _ = "overloadedWithInt:" as Selector // FIXME-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-39=#selector(Bar.overloaded(_:) as (Bar) -> (Int) -> ())}}
+  _ = "overloadedWithString:" as Selector // FIXME-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-42=#selector(Bar.overloaded(_:) as (Bar) -> (String) -> ())}}
 
   _ = "staticOverloadedWithInt:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-45=#selector(Bar.staticOverloaded(_:) as (Int) -> ())}}
   _ = "staticOverloadedWithString:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-48=#selector(Bar.staticOverloaded(_:) as (String) -> ())}}
@@ -85,7 +85,7 @@ func testDeprecatedStringLiteralSelector() {
   // We need coercion here because we asked for a selector from an
   // instance method with the same name as (but a different selector
   // from) a static method.
-  _ = "theInstanceOne:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-36=#selector(Bar.staticOrNonStatic2(_:) as (Bar) -> (Int) -> ())}}
+  _ = "theInstanceOne:" as Selector // FIXME-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-36=#selector(Bar.staticOrNonStatic2(_:) as (Bar) -> (Int) -> ())}}
 
   // Note: from Foundation
   _ = "initWithArray:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-35=#selector(NSSet.init(array:))}}

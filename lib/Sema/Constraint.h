@@ -319,6 +319,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// in its disjunction.
   unsigned IsFavored : 1;
 
+  unsigned IsFunctionFlattening : 1;
+
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
@@ -445,6 +447,9 @@ public:
   /// Whether the solver should remember which choice was taken for
   /// this constraint.
   bool shouldRememberChoice() const { return RememberChoice; }
+
+  void setFunctionFlattening() { IsFunctionFlattening = true; }
+  bool isFunctionFlattening() const { return IsFunctionFlattening; }
 
   /// Retrieve the set of type variables referenced by this constraint.
   ArrayRef<TypeVariableType *> getTypeVariables() const {

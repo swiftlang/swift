@@ -8,7 +8,7 @@ class A {
 
 func accept<T>(_ t: T.Type, _ value: inout T) {}
 
-typealias TheType = (A) -> ([(x: Int, y: Double)]) -> ()
+typealias TheType = (A, [(x: Int, y: Double)]) -> ()
 var curried = A.foo
 accept(TheType.self, &curried)
 

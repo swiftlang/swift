@@ -125,8 +125,8 @@ i = xi.g()
 i = yi.f() // expected-error{{static member 'f' cannot be used on instance of type 'YI' (aka 'YT<Int>')}}
 i = yi.g()
 
-var xif : (XI) -> () -> Int = XI.g
-var gif : (YI) -> () -> Int = YI.g
+var xif : (XI) -> Int = XI.g
+var gif : (YI) -> Int = YI.g
 
 var ii : (Int, Int) = xi.prop
 ii = yi.prop

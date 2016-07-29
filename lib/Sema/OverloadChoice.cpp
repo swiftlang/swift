@@ -23,11 +23,14 @@
 using namespace swift;
 using namespace constraints;
 
-OverloadChoice::OverloadChoice(
-    Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS)
-    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
+OverloadChoice::OverloadChoice(Type base, ValueDecl *value,
+                               ConstraintSystem &CS, bool isSpecialized,
+                               bool isFlattened)
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0),
+      IsFlattened(isFlattened) {
   assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
          "Badly aligned decl");
-
+  assert((!isFlattened || isa<FuncDecl>(value)) &&
+         "can only flatten function decls");
   DeclOrKind = reinterpret_cast<uintptr_t>(value);
 }

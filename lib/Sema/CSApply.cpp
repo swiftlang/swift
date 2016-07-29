@@ -1024,7 +1024,16 @@ namespace {
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
         closeExistential(result, /*force=*/openedExistential);
-        return result;
+
+        if (!isa<FuncDecl>(member))
+          return result;
+
+        auto newTy = result->getType()
+                         ->castTo<AnyFunctionType>()
+                         ->getUncurriedFunction();
+        auto conversion = new FunctionConversionExpr(result, newTy);
+        conversion->setFlattening();
+        return conversion;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
@@ -4637,6 +4646,8 @@ static bool isReferenceToMetatypeMember(Expr *expr) {
     return dotIgnored->getLHS()->getType()->is<AnyMetatypeType>();
   if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr))
     return dotSyntax->getBase()->getType()->is<AnyMetatypeType>();
+  if (auto conversion = dyn_cast<FunctionConversionExpr>(expr))
+    return isReferenceToMetatypeMember(conversion->getSubExpr());
   return false;
 }
 
@@ -6952,4 +6963,3 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   isSomeExpr->setType(tc.lookupBoolType(cs.DC));
   return isSomeExpr;
 }
-

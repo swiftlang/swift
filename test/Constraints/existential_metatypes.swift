@@ -83,5 +83,6 @@ class Something {
 
 
 func testP3(_ p: P3, something: Something) {
-  p.withP3(Something.takeP3(something))
+  p.withP3(something.takeP3)
+  p.withP3 { Something.takeP3(something, $0) }
 }

@@ -116,11 +116,11 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
   var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{ambiguous reference to member 'f3'}}
 
-  var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
-  var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3
-  var f3f_unbound2 : (OtherOvl) -> (Float) -> Float = OtherOvl.f3
-  var f3ovl_unbound_1 : (Ovl) -> (Ovl) -> Ovl = Ovl.f3
-  var f3ovl_unbound_2 : (OtherOvl) -> (OtherOvl) -> OtherOvl = OtherOvl.f3
+  var f3i_unbound : (Ovl, Int) -> Int = Ovl.f3
+  var f3f_unbound : (Ovl, Float) -> Float = Ovl.f3
+  var f3f_unbound2 : (OtherOvl, Float) -> Float = OtherOvl.f3
+  var f3ovl_unbound_1 : (Ovl, Ovl) -> Ovl = Ovl.f3
+  var f3ovl_unbound_2 : (OtherOvl, OtherOvl) -> OtherOvl = OtherOvl.f3
 }
 
 //===----------------------------------------------------------------------===//

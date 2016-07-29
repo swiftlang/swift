@@ -25,7 +25,7 @@ var i : Int
 var x : X
 var yf : Y<Float>
 
-func g0(_: (inout X) -> (Float) -> ()) {}
+func g0(_: (inout X, Float) -> ()) {}
 
 _ = x.f0(i)
 x.f0(i).f1(i)
@@ -193,30 +193,27 @@ func generic<T: P>(_ t: T) {
   let _: () -> () = id(T.tum)
 
   // Instance member of archetype metatype
-  let _: (T) -> (Int) -> () = id(T.bar)
-  let _: (Int) -> () = id(T.bar(t))
+  let _: (T, Int) -> () = id(T.bar)
+  let _: () = id(T.bar(t, 0))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
 
   // Instance member of extension returning Self)
-  let _: (T) -> () -> T = id(T.returnSelfInstance)
-  let _: () -> T = id(T.returnSelfInstance(t))
-  let _: T = id(T.returnSelfInstance(t)())
+  let _: (T) -> T = id(T.returnSelfInstance)
+  let _: T = id(T.returnSelfInstance(t))
 
   let _: () -> T = id(t.returnSelfInstance)
   let _: T = id(t.returnSelfInstance())
 
-  let _: (T) -> (Bool) -> T? = id(T.returnSelfOptionalInstance)
-  let _: (Bool) -> T? = id(T.returnSelfOptionalInstance(t))
-  let _: T? = id(T.returnSelfOptionalInstance(t)(false))
+  let _: (T, Bool) -> T? = id(T.returnSelfOptionalInstance)
+  let _: T? = id(T.returnSelfOptionalInstance(t, false))
 
   let _: (Bool) -> T? = id(t.returnSelfOptionalInstance)
   let _: T? = id(t.returnSelfOptionalInstance(true))
 
-  let _: (T) -> (Bool) -> T! = id(T.returnSelfIUOInstance)
-  let _: (Bool) -> T! = id(T.returnSelfIUOInstance(t))
-  let _: T! = id(T.returnSelfIUOInstance(t)(true))
+  let _: (T, Bool) -> T! = id(T.returnSelfIUOInstance)
+  let _: T! = id(T.returnSelfIUOInstance(t, true))
 
   let _: (Bool) -> T! = id(t.returnSelfIUOInstance)
   let _: T! = id(t.returnSelfIUOInstance(true))
@@ -238,9 +235,8 @@ func genericClassP<T: ClassP>(_ t: T) {
   let _: () = id(t.bas(0))
 
   // Instance member of archetype metatype)
-  let _: (T) -> (Int) -> () = id(T.bas)
-  let _: (Int) -> () = id(T.bas(t))
-  let _: () = id(T.bas(t)(1))
+  let _: (T, Int) -> () = id(T.bas)
+  let _: () = id(T.bas(t, 1))
 }
 
 ////
@@ -273,14 +269,12 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
-  let _: (P) -> (Int) -> () = P.bar
-  let _: (Int) -> () = P.bar(ppp)
-  P.bar(ppp)(5)
+  let _: (P, Int) -> () = P.bar
+  P.bar(ppp, 5)
 
   // Instance member of metatype value
-  let _: (P) -> (Int) -> () = pp.bar
-  let _: (Int) -> () = pp.bar(ppp)
-  pp.bar(ppp)(5)
+  let _: (P, Int) -> () = pp.bar
+  pp.bar(ppp, 5)
 
   // Static member of existential metatype value
   let _: () -> () = p.tum
@@ -319,9 +313,10 @@ func existentialClassP(_ p: ClassP) {
   let _: () = id(p.bas(0))
 
   // Instance member of existential metatype)
-  let _: (ClassP) -> (Int) -> () = id(ClassP.bas)
-  let _: (Int) -> () = id(ClassP.bas(p))
-  let _: () = id(ClassP.bas(p)(1))
+  let _: (ClassP, Int) -> () = id(ClassP.bas)
+  let _: (Int) -> () = id(p.bas)
+  let _: (Int) -> () = id({ ClassP.bas(p, $0) })
+  let _: () = id(ClassP.bas(p, 1))
 }
 
 // Partial application of curried protocol methods
@@ -377,7 +372,7 @@ class InstanceOrClassMethod {
 func testPreferClassMethodToCurriedInstanceMethod(_ obj: InstanceOrClassMethod) {
   let result = InstanceOrClassMethod.method(obj)
   let _: Bool = result // no-warning
-  let _: () -> Bool = InstanceOrClassMethod.method(obj)
+  let _: Bool = InstanceOrClassMethod.method(obj)
 }
 
 protocol Numeric {
@@ -557,4 +552,3 @@ enum SomeErrorType {
     return nil
   }
 }
-

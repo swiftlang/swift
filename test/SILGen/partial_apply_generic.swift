@@ -45,19 +45,22 @@ func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic16getInstanceFunc2
-func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
+func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK-NEXT: partial_apply [[REF]]<T>(
+// CHECK: [[THUNK:%.*]] = function_ref @_TTRGRx21partial_apply_generic3Foo
+// CHECK-NEXT: partial_apply [[THUNK]]<T>(
   return T.instanceFunc
 // CHECK-NEXT: destroy_addr %0 : $*
 // CHECK-NEXT: return
 }
 
 // CHECK-LABEL: sil hidden @_TF21partial_apply_generic16getInstanceFunc3
-func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
+func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () {
 // CHECK: [[REF:%.*]] = function_ref @_TFP21partial_apply_generic3Foo12instanceFunc
 // CHECK-NEXT: partial_apply [[REF]]<T>(
+// CHECK: [[THUNK:%.*]] = function_ref @_TTRGRx21partial_apply_generic3Foo
+// CHECK-NEXT: partial_apply [[THUNK]]<T>(
   return t.instanceFunc
 // CHECK-NEXT: return
 }
-

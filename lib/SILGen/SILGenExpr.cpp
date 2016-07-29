@@ -1257,7 +1257,8 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
   if (srcTy != destTy)
-    result = SGF.emitTransformedValue(e, result, srcTy, destTy);
+    result =
+        SGF.emitTransformedValue(e, result, srcTy, destTy, e->isFlattening());
 
   if (destTy != destRepTy)
     result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
