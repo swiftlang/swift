@@ -179,4 +179,23 @@ func makeRequest() {
   }
 }
 
+// <rdar://problem/25271859> QoI: Misleading error message when expression result can't be inferred from closure
+struct r25271859<T> {
+}
+
+extension r25271859 {
+  func map<U>(f: (T) -> U) -> r25271859<U> {
+  }
+
+  func andThen<U>(f: (T)->r25271859<U>) {
+  }
+}
+
+func f(a : r25271859<(Float, Int)>) {
+  a.map { $0.0 }
+    .andThen { _ in   // expected-error {{generic parameter 'U' could not be inferred}}
+      print("hello") // comment this out and it runs, leave any form of print in and it doesn't
+      return Task<String>()
+  }
+}
 

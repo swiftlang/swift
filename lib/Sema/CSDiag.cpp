@@ -2211,7 +2211,21 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     }
   }
 
-  if (baseObjTy->is<TupleType>()) {
+  // If this is a tuple, then the index needs to be valid.
+  if (auto tuple = baseObjTy->getAs<TupleType>()) {
+    StringRef nameStr = memberName.getBaseName().str();
+    int fieldIdx = -1;
+    // Resolve a number reference into the tuple type.
+    unsigned Value = 0;
+    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
+      fieldIdx = Value;
+    } else {
+      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+    }
+
+    if (fieldIdx != -1)
+      return false;    // Lookup is valid.
+
     diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
              baseObjTy, memberName)
       .highlight(anchor->getSourceRange()).highlight(memberRange);
