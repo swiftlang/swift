@@ -37,6 +37,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CaptureProp
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Data
     single-source/DeadArray
     single-source/DictionaryBridge
     single-source/DictionaryLiteral

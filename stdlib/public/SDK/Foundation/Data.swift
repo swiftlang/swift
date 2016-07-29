@@ -647,7 +647,40 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// The iterator will increment byte-by-byte.
     public func makeIterator() -> Data.Iterator {
-        return IndexingIterator(_elements: self)
+        return Iterator(_data: self)
+    }
+
+    public struct Iterator : IteratorProtocol {
+        private let _data: Data
+        private var _buffer: (
+            UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+            UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+            UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+            UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+        private var _idx: Data.Index
+        private let _endIdx: Data.Index
+
+        private init(_data: Data) {
+            self._data = _data
+            _buffer = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+            _idx = 0
+            _endIdx = _data.endIndex
+        }
+
+        public mutating func next() -> UInt8? {
+            guard _idx < _endIdx else { return nil }
+            defer { _idx += 1 }
+            let bufferSize = sizeofValue(_buffer)
+            return withUnsafeMutablePointer(to: &_buffer) { ptr_ in
+                let ptr = UnsafeMutableRawPointer(ptr_).assumingMemoryBound(to: UInt8.self)
+                let bufferIdx = _idx % bufferSize
+                if bufferIdx == 0 {
+                    // populate the buffer
+                    _data.copyBytes(to: ptr, from: _idx..<(_endIdx - _idx > bufferSize ? _idx + bufferSize : _endIdx))
+                }
+                return ptr[bufferIdx]
+            }
+        }
     }
     
     // MARK: -
