@@ -3850,7 +3850,7 @@ private:
   void configureAddressorRecord(AddressorRecord *record,
                                FuncDecl *addressor, FuncDecl *mutableAddressor);
 
-  struct GetSetRecord {
+  struct alignas(1 << 3) GetSetRecord {
     SourceRange Braces;
     FuncDecl *Get = nullptr;       // User-defined getter
     FuncDecl *Set = nullptr;       // User-defined setter
