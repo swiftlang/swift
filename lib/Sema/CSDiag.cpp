@@ -1912,7 +1912,17 @@ public:
   bool diagnoseCalleeResultContextualConversionError();
 
 private:
-    
+  /// Check the specified closure to see if it is a multi-statement closure with
+  /// an uninferred type.  If so, diagnose the problem with an error and return
+  /// true.
+  bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
+
+  /// Emit an error message about an unbound generic parameter existing, and
+  /// emit notes referring to the target of a diagnostic, e.g., the function
+  /// or parameter being used.
+  void diagnoseUnboundArchetype(ArchetypeType *archetype,
+                                ConstraintLocator *targetLocator);
+
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
@@ -6119,8 +6129,8 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 /// Check the specified closure to see if it is a multi-statement closure with
 /// an uninferred type.  If so, diagnose the problem with an error and return
 /// true.
-static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
-                                                   TypeChecker &tc) {
+bool FailureDiagnosis::
+diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
   if (closure->hasSingleExpressionBody() ||
       closure->hasExplicitResultType())
     return false;
@@ -6129,7 +6139,7 @@ static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
   if (!closureType || !isUnresolvedOrTypeVarType(closureType->getResult()))
     return false;
 
-  tc.diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
+  diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
   return true;
 }
 
@@ -6137,11 +6147,9 @@ static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
-static void diagnoseUnboundArchetype(Expr *overallExpr,
-                                     ArchetypeType *archetype,
-                                     ConstraintLocator *targetLocator,
-                                     ConstraintSystem &cs) {
-  auto &tc = cs.getTypeChecker();
+void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
+                                            ConstraintLocator *targetLocator) {
+  auto &tc = CS->getTypeChecker();
   auto anchor = targetLocator->getAnchor();
 
   // The archetype may come from the explicit type in a cast expression.
@@ -6163,10 +6171,10 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
   // has no inferred type, due to being a multiline closure.  Check to see if
   // this is the case and (if so), speculatively diagnose that as the problem.
   bool didDiagnose = false;
-  overallExpr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
+  expr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
     auto closure = dyn_cast<ClosureExpr>(subExpr);
     if (!didDiagnose && closure)
-      didDiagnose = checkMultistatementClosureForAmbiguity(closure, tc);
+      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
     
     return subExpr;
   });
@@ -6176,8 +6184,7 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
   
   // Otherwise, emit an error message on the expr we have, and emit a note
   // about where the archetype came from.
-  tc.diagnose(overallExpr->getLoc(), diag::unbound_generic_parameter,
-              archetype);
+  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
   
   // If we have an anchor, drill into it to emit a
   // "note: archetype declared here".
@@ -6249,7 +6256,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     // Only diagnose archetypes that don't have a parent, i.e., ones
     // that correspond to generic parameters.
     if (archetype && !archetype->getParent()) {
-      diagnoseUnboundArchetype(expr, archetype, tv->getImpl().getLocator(),*CS);
+      diagnoseUnboundArchetype(archetype, tv->getImpl().getLocator());
       return;
     }
     continue;
@@ -6260,7 +6267,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
     // If this is a multi-statement closure with no explicit result type, emit
     // a note to clue the developer in.
-    if (checkMultistatementClosureForAmbiguity(CE, CS->getTypeChecker()))
+    if (diagnoseAmbiguousMultiStatementClosure(CE))
       return;
 
     diagnose(E->getLoc(), diag::cannot_infer_closure_type)
@@ -6311,8 +6318,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   E->forEachChildExpr([&](Expr *subExpr) -> Expr*{
     auto closure = dyn_cast<ClosureExpr>(subExpr);
     if (!didDiagnose && closure)
-      didDiagnose = checkMultistatementClosureForAmbiguity(closure,
-                                                          CS->getTypeChecker());
+      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
     
     return subExpr;
   });
