@@ -44,12 +44,12 @@ var ArrayTestSuite = TestSuite("Array")
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(_ x: inout Int, body: (x: inout Int) -> Void) {
-  body(x: &x)
+func withInoutInt(_ x: inout Int, body: (_ x: inout Int) -> Void) {
+  body(&x)
 }
 
-func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
-  body(x: &x)
+func withInoutT<T>(_ x: inout T, body: (_ x: inout T) -> Void) {
+  body(&x)
 }
 
 % for element_type in ['TestValueTy', 'TestBridgedValueTy']:

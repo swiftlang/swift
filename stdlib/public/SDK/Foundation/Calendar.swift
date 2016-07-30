@@ -825,11 +825,11 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter direction: Which direction in time to search. The default value is `.forward`, which means later in time.
     /// - parameter block: A closure that is called with search results.
     @available(iOS 8.0, *)
-    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: @noescape (result: Date?, exactMatch: Bool, stop: inout Bool) -> Void) {
+    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: @noescape (_ result: Date?, _ exactMatch: Bool, _ stop: inout Bool) -> Void) {
         _handle.map {
             $0.enumerateDates(startingAfter: start, matching: components, options: Calendar._toCalendarOptions(matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy, direction: direction)) { (result, exactMatch, stop) in
                 var stopv = false
-                block(result: result, exactMatch: exactMatch, stop: &stopv)
+                block(result, exactMatch, &stopv)
                 if stopv {
                     stop.pointee = true
                 }

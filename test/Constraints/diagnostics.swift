@@ -344,26 +344,26 @@ func r20789423() {
 
 
 
-func f7(_ a: Int) -> (b: Int) -> Int {
+func f7(_ a: Int) -> (_ b: Int) -> Int {
   return { b in a+b }
 }
 
-_ = f7(1)(b: 1)
+_ = f7(1)(1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}
-f7(1)(b: 1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}   
 
 let f8 = f7(2)
-_ = f8(b: 1)
-f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
-f8(1.0)         // expected-error {{missing argument label 'b:' in call}}
-f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+_ = f8(1)
+f8(10)          // expected-warning {{result of call is unused, but produces 'Int'}}
+f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 
 
 class CurriedClass {
   func method1() {}
-  func method2(_ a: Int) -> (b : Int) -> () { return { b in () } }
+  func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
   func method3(_ a: Int, b : Int) {}
 }
 
@@ -372,25 +372,25 @@ _ = c.method1
 c.method1(1)         // expected-error {{argument passed to call that takes no arguments}}
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1)(b: 2)
-c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}} {{14-15=b}}
-c.method2(1)(c: 2.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
-c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1)(2)
+c.method2(1)(c: 2)   // expected-error {{extraneous argument label 'c:' in call}}
+c.method2(1)(c: 2.0) // expected-error {{extraneous argument label 'c:' in call}}
+c.method2(1)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1.0)(2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
-CurriedClass.method2(c)(32)(b: 1)
+CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
+CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
 
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)

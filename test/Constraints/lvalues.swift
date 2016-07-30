@@ -227,9 +227,9 @@ func rdar23131768() {
 }
 
 // <rdar://problem/23331567> Swift: Compiler crash related to closures with inout parameter.
-func r23331567(_ fn: (x: inout Int) -> Void) {
+func r23331567(_ fn: (_ x: inout Int) -> Void) {
   var a = 0
-  fn(x: &a)
+  fn(&a)
 }
 r23331567 { $0 += 1 }
 

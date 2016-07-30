@@ -8,25 +8,25 @@ func f0(_ x1: X, x2: X) -> X {} // expected-note{{found this candidate}}
 func f0(_ y1: Y, y2: Y) -> Y {} // expected-note{{found this candidate}}
 var f0 : X // expected-note {{found this candidate}} expected-note {{'f0' previously declared here}}
 func f0_init(_ x: X, y: Y) -> X {}
-var f0 : (x : X, y : Y) -> X = f0_init // expected-error{{invalid redeclaration}}
+var f0 : (_ x : X, _ y : Y) -> X = f0_init // expected-error{{invalid redeclaration}}
 func f1(_ x: X) -> X {}
 
-func f2(_ g: (x: X) -> X) -> ((y: Y) -> Y) { }
+func f2(_ g: (_ x: X) -> X) -> ((_ y: Y) -> Y) { }
 
 func test_conv() {
-  var _ : (x1 : X, x2 : X) -> X = f0
+  var _ : (_ x1 : X, _ x2 : X) -> X = f0
   var _ : (X, X) -> X = f0
   var _ : (Y, X) -> X = f0 // expected-error{{ambiguous reference to member 'f0(_:x2:)'}}
   var _ : (X) -> X = f1
   var a7 : (X) -> (X) = f1
-  var a8 : (x2 : X) -> (X) = f1
-  var a9 : (x2 : X) -> ((X)) = f1
+  var a8 : (_ x2 : X) -> (X) = f1
+  var a9 : (_ x2 : X) -> ((X)) = f1
   a7 = a8
   a8 = a9
   a9 = a7
 
   var _ : ((X) -> X) -> ((Y) -> Y) = f2
-  var _ : ((x2 : X) -> (X)) -> (((y2 : Y) -> (Y))) = f2
+  var _ : ((_ x2 : X) -> (X)) -> (((_ y2 : Y) -> (Y))) = f2
 
   typealias fp = ((X) -> X) -> ((Y) -> Y)
   var _ = f2

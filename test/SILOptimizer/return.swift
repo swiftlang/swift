@@ -10,7 +10,7 @@ func singleBlock2() -> Int {
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 class MyClassWithClosure {
-  var f : (s: String) -> String = { (s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
+  var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {

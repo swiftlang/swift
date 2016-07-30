@@ -114,7 +114,7 @@ class C6a : P6 {
 class C7a : P7 {
   @objc func method(foo: Double) { }
   // expected-warning@-1{{instance method 'method(foo:)' nearly matches optional requirement 'method(foo:)' of protocol 'P7'}}
-  // expected-note@-2{{candidate has non-matching type '(foo: Double) -> ()'}}
+  // expected-note@-2{{candidate has non-matching type '(Double) -> ()'}}
   // expected-note@-3{{move 'method(foo:)' to an extension to silence this warning}}
   // expected-note@-4{{make 'method(foo:)' private to silence this warning}}
 }

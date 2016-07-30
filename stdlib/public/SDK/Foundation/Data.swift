@@ -423,12 +423,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// In some cases, (for example, a `Data` backed by a `dispatch_data_t`, the bytes may be stored discontiguously. In those cases, this function invokes the closure for each contiguous region of bytes.
     /// - parameter block: The closure to invoke for each region of data. You may stop the enumeration by setting the `stop` parameter to `true`. 
-    public func enumerateBytes(_ block: @noescape (buffer: UnsafeBufferPointer<UInt8>, byteIndex: Index, stop: inout Bool) -> Void) {
+    public func enumerateBytes(_ block: @noescape (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Index, _ stop: inout Bool) -> Void) {
         _mapUnmanaged {
             $0.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
                 let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: range.length)
-                block(buffer: UnsafeBufferPointer(start: bytePtr, count: range.length), byteIndex: range.length, stop: &stopv)
+                block(UnsafeBufferPointer(start: bytePtr, count: range.length), range.length, &stopv)
                 if stopv {
                     stop.pointee = true
                 }

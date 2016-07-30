@@ -15,8 +15,8 @@ func standalone_function(_ x: Int, _ y: Int) -> Int {
   return x
 }
 
-func higher_order_function(_ f: (x: Int, y: Int) -> Int, _ x: Int, _ y: Int) -> Int {
-  return f(x: x, y: y)
+func higher_order_function(_ f: (_ x: Int, _ y: Int) -> Int, _ x: Int, _ y: Int) -> Int {
+  return f(x, y)
 }
 
 func higher_order_function2(_ f: (Int, Int) -> Int, _ x: Int, _ y: Int) -> Int {
@@ -313,7 +313,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 // CHECK:   %2 = partial_apply %1(%0)
 // CHECK:   return %2
 
-func return_func() -> (x: Builtin.Int64, y: Builtin.Int64) -> Builtin.Int64 {
+func return_func() -> (_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: return [[FUNC_THICK]]
@@ -322,8 +322,8 @@ func return_func() -> (x: Builtin.Int64, y: Builtin.Int64) -> Builtin.Int64 {
 
 func standalone_generic<T>(_ x: T, y: T) -> T { return x }
 
-// CHECK-LABEL: sil hidden @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
-func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
+// CHECK-LABEL: sil hidden @_TF9functions14return_genericFT_FTBi64_Bi64__Bi64_
+func return_generic() -> (_ x:Builtin.Int64, _ y:Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Builtin.Int64>()
   // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
@@ -334,7 +334,7 @@ func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
 
 // CHECK-LABEL: sil hidden @_TF9functions20return_generic_tuple{{.*}}
 func return_generic_tuple()
--> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
+-> (_ x: (Builtin.Int64, Builtin.Int64), _ y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
   // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
   // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)

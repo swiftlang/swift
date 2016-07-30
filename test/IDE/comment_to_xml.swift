@@ -8,3 +8,4 @@
 // REQUIRES: no_asan
 // WRONG-NOT: CommentXMLInvalid
 
+// REQUIRES: se_0111_complete

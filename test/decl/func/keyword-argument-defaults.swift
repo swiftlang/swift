@@ -68,21 +68,21 @@ struct Subscripts2 {
 
 
 func f4(_ a: Int) -> (Int) -> () { return { b in () } }
-func f5(_ a: Int) -> (b: Int) -> () { return { b in () } }
+func f5(_ a: Int) -> (_ b: Int) -> () { return { b in () } }
 
 func testFunctions(_ i: Int, x: X) {
   f4(i)(i)
   f4(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{9-12=}}
-  f5(i)(i) // expected-error{{missing argument label 'b:' in call}} {{9-9=b: }}
-  f5(i)(b: i)
+  f5(i)(i)
+  f5(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}}{{9-12=}}
 }
 
 struct Y {
   func m0(_ a: Int) -> (Int) -> () { return { b in () } }
-  func m1(_ a: Int) -> (b: Int) -> () { return { b in () } }
+  func m1(_ a: Int) -> (_ b: Int) -> () { return { b in () } }
 
   func m2(_ a: Int) -> (Int, Int) -> () { return { b, c in () } }
-  func m3(_ a: Int) -> (b: Int, c2: Int) -> () { return { b, c in () } }
+  func m3(_ a: Int) -> (_ b: Int, _ c2: Int) -> () { return { b, c in () } }
 
   subscript (x: Int) -> Int {
     get { return x }
@@ -96,12 +96,12 @@ struct Y {
 func testMethods(_ i: Int, x: Y) {
   x.m0(i)(i)
   x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{11-14=}}
-  x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}} {{11-11=b: }}
-  x.m1(i)(b: i) 
+  x.m1(i)(i)
+  x.m1(i)(i) 
   x.m2(i)(i, c: i) // expected-error{{extraneous argument label 'c:' in call}} {{14-17=}}
   x.m2(i)(i, i)
-  x.m3(i)(b: i, i) // expected-error{{missing argument label 'c2:' in call}} {{17-17=c2: }}
-  x.m3(i)(b: i, c2: i)
+  x.m3(i)(b: i, i) // expected-error{{extraneous argument label 'b:' in call}}{{11-14=}}
+  x.m3(i)(b: i, c2: i) // expected-error{{extraneous argument labels 'b:c2:' in call}}{{11-14=}}{{17-21=}}
 }
 
 func testSubscripts(_ i: Int, s: String, x: Y) {
@@ -116,6 +116,6 @@ func testSubscripts(_ i: Int, s: String, x: Y) {
 func +(_ a: String,
        b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
-func +(a: Double, b: String) -> (Int) -> (d: Int) -> () {
+func +(a: Double, b: String) -> (Int) -> (_ d: Int) -> () {
   return { c in { e in () } }
 }

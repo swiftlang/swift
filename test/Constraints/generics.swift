@@ -216,7 +216,7 @@ protocol Q19215114 {}
 protocol P19215114 {}
 
 // expected-note @+1 {{in call to function 'body9215114'}}
-func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (u: U) -> () {}
+func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (_ u: U) -> () {}
 
 func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
   //Should complain about not being able to infer type of U.

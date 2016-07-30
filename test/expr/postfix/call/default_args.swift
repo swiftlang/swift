@@ -2,7 +2,7 @@
 
 func foo(x: Int = 0) {}
 let bar = foo
-bar() // expected-error {{missing argument for parameter 'x'}}
+bar() // expected-error {{missing argument for parameter #1}}
 
 func foo2(_ x: Int = 0) {}
 let baz = foo2

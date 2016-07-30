@@ -10,12 +10,12 @@ var f : Float
 
 func f1(y: Float, rest: Int...) {}
 
-func f2(_: (x: Int, y: Int) -> Int) {}
+func f2(_: (_ x: Int, _ y: Int) -> Int) {}
 func f2xy(x: Int, y: Int) -> Int {}
 func f2ab(a: Int, b: Int) -> Int {}
 func f2yx(y: Int, x: Int) -> Int {}
 
-func f3(_ x: (x: Int, y: Int) -> ()) {}
+func f3(_ x: (_ x: Int, _ y: Int) -> ()) {}
 func f3a(_ x: Int, y: Int) {}
 func f3b(_: Int) {}
 
@@ -35,10 +35,10 @@ f4(1, 2, 3)
 
 f2(f2xy)
 f2(f2ab)
-f2(f2yx) // expected-error{{cannot convert value of type '(y: Int, x: Int) -> Int' to expected argument type '(x: Int, y: Int) -> Int'}} 
+f2(f2yx)
 
 f3(f3a)
-f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(x: Int, y: Int) -> ()'}} 
+f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(Int, Int) -> ()'}} 
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()
@@ -72,7 +72,7 @@ extension Int : PosixErrorReturn {
 }
 
 func posixCantFail<A, T : Comparable & PosixErrorReturn>
-  (_ f: @escaping (A) -> T) -> (args:A) -> T
+  (_ f: @escaping (A) -> T) -> (_ args:A) -> T
 {
   return { args in
     let result = f(args)
@@ -85,7 +85,7 @@ func open(_ name: String, oflag: Int) -> Int { }
 
 var foo: Int = 0
 
-var fd = posixCantFail(open)(args: ("foo", 0))
+var fd = posixCantFail(open)(("foo", 0))
 
 // Tuples and lvalues
 class C {

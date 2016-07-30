@@ -404,7 +404,7 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.T
 
 // ==== Make sure we destructure one-element tuples
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion15convTupleScalarFTFPS_1Q_T_2f2FT6parentPS0___T_2f3FT5tupleGSqTSiSi___T__T_
+// CHECK-LABEL: sil hidden @_TF19function_conversion15convTupleScalarFTFPS_1Q_T_2f2FPS0__T_2f3FGSqTSiSi__T__T_
 // CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q___XFo_iPS_1P___
 // CHECK:         function_ref @_TTRXFo_iP19function_conversion1Q___XFo_iPS_1P___
 // CHECK:         function_ref @_TTRXFo_dGSqTSiSi____XFo_dSidSi__
@@ -414,18 +414,18 @@ func convClassBoundMetatypeArchetypeUpcast<T : Parent>(_ f1: @escaping (Parent.T
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqTSiSi____XFo_dSidSi__ : $@convention(thin) (Int, Int, @owned @callee_owned (Optional<(Int, Int)>) -> ()) -> ()
 
 func convTupleScalar(_ f1: @escaping (Q) -> (),
-                     f2: @escaping (parent: Q) -> (),
-                     f3: @escaping (tuple: (Int, Int)?) -> ()) {
-  let _: (parent: P) -> () = f1
+                     f2: @escaping (_ parent: Q) -> (),
+                     f3: @escaping (_ tuple: (Int, Int)?) -> ()) {
+  let _: (P) -> () = f1
   let _: (P) -> () = f2
   let _: (Int, Int) -> () = f3
 }
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion21convTupleScalarOpaqueurFFt4argsGSax__T_GSqFt4argsGSax__T__
-// CHECK:         function_ref @_TTRGrXFo_oGSax___XFo_it4argsGSax___iT__
+// CHECK-LABEL: sil hidden @_TF19function_conversion21convTupleScalarOpaqueurFFtGSax__T_GSqFtGSax__T__
+// CHECK:         function_ref @_TTRGrXFo_oGSax___XFo_itGSax___iT__
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax___XFo_it4argsGSax___iT__ : $@convention(thin) <T> (@in (args: T...), @owned @callee_owned (@owned Array<T>) -> ()) -> @out ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax___XFo_itGSax___iT__ : $@convention(thin) <T> (@in (T...), @owned @callee_owned (@owned Array<T>) -> ()) -> @out ()
 
-func convTupleScalarOpaque<T>(_ f: @escaping (args: T...) -> ()) -> ((args: T...) -> ())? {
+func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {
   return f
 }

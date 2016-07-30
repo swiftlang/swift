@@ -86,21 +86,21 @@ func instanceMethodsInExtensions(_ b: B) {
   b.method(1, separateExtMethod:3.5)
 
   let m1 = b.method(_:onCat1:)
-  _ = m1(1, onCat1: 2.5)
+  _ = m1(1, 2.5)
 
   let m2 = b.method(_:onExtA:)
-  _ = m2(1, onExtA: 2.5)
+  _ = m2(1, 2.5)
 
   let m3 = b.method(_:onExtB:)
-  _ = m3(1, onExtB: 2.5)
+  _ = m3(1, 2.5)
 
   let m4 = b.method(_:separateExtMethod:)
-  _ = m4(1, separateExtMethod: 2.5)
+  _ = m4(1, 2.5)
 }
 
 func dynamicLookupMethod(_ b: AnyObject) {
   if let m5 = b.method(_:separateExtMethod:) {
-    _ = m5(1, separateExtMethod: 2.5)
+    _ = m5(1, 2.5)
   }
 }
 

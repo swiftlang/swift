@@ -3835,16 +3835,14 @@ public:
     
     // If we're stripping argument labels from types, do it when printing.
     Type inputType = T->getInput();
-    if (inputType->getASTContext().LangOpts.SuppressArgumentLabelsInTypes) {
-      if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
-        SmallVector<TupleTypeElt, 4> elements;
-        elements.reserve(tupleTy->getNumElements());
-        for (const auto &elt : tupleTy->getElements()) {
-          elements.push_back(TupleTypeElt(elt.getType(), Identifier(),
-                                          elt.isVararg()));
-        }
-        inputType = TupleType::get(elements, inputType->getASTContext());
+    if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
+      SmallVector<TupleTypeElt, 4> elements;
+      elements.reserve(tupleTy->getNumElements());
+      for (const auto &elt : tupleTy->getElements()) {
+        elements.push_back(TupleTypeElt(elt.getType(), Identifier(),
+                                        elt.isVararg()));
       }
+      inputType = TupleType::get(elements, inputType->getASTContext());
     }
 
     bool needsParens =

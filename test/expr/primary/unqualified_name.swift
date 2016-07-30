@@ -40,7 +40,7 @@ class C0 {
   init(x: Int, y: Int, z: Int) { }
 
   convenience init(all: Int) {
-    self.init(x:y:z:)(x: all, y: all, z: all)
+    self.init(x:y:z:)(all, all, all)
   }
 
   func f0(_ x: Int, y: Int, z: Int) { }
@@ -50,7 +50,7 @@ class C0 {
 
 class C1 : C0 {
   init(all: Int) {
-    super.init(x:y:z:)(x: all, y: all, z: all)
+    super.init(x:y:z:)(all, all, all)
   }
 
   func testC0() {
