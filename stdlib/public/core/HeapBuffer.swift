@@ -137,7 +137,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   internal init(_ storage: AnyObject) {
     _sanityCheck(
-      _usesNativeSwiftReferenceCounting(storage.dynamicType),
+      _usesNativeSwiftReferenceCounting(type(of: storage)),
       "HeapBuffer manages only native objects"
     )
     self._storage = Builtin.castToNativeObject(storage)

@@ -258,7 +258,7 @@ func existential(_ p: P) {
   let _: () = id(p.bar(0))
 
   // Static member of existential metatype)
-  let _: () -> () = id(p.dynamicType.tum)
+  let _: () -> () = id(type(of: p).tum)
 
   // Instance member of extension returning Self
   let _: () -> P = id(p.returnSelfInstance)

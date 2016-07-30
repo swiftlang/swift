@@ -338,7 +338,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
   // string. Check for Optional first, before checking protocol
   // conformance below, because an Optional value is convertible to a
   // protocol if its wrapped type conforms to that protocol.
-  if _isOptional(value.dynamicType) {
+  if _isOptional(type(of: value)) {
     let debugPrintable = value as! CustomDebugStringConvertible
     debugPrintable.debugDescription.write(to: &target)
     return

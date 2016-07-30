@@ -54,7 +54,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   }
 
   internal var _typeID: ObjectIdentifier {
-    return ObjectIdentifier(self.dynamicType)
+    return ObjectIdentifier(type(of: self))
   }
 
   internal func _unbox<T : Hashable>() -> T? {

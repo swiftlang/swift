@@ -79,7 +79,7 @@ public typealias FloatLiteralType = Double
 /// `BooleanLiteralType` alias. For example:
 ///
 ///     let isBool = true
-///     print("isBool is a '\(isBool.dynamicType)'")
+///     print("isBool is a '\(type(of: isBool))'")
 ///     // Prints "isBool is a 'Bool'"
 ///
 /// The type aliased by `BooleanLiteralType` must conform to the
@@ -143,7 +143,7 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 ///     // Prints "true"
 ///
 ///     let v: AnyObject = 100
-///     print(v.dynamicType)
+///     print(type(of: v))
 ///     // Prints "__NSCFNumber"
 ///
 /// The flexible behavior of the `AnyObject` protocol is similar to

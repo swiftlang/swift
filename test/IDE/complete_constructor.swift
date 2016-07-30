@@ -198,14 +198,14 @@ func testGetInitFromMetatype2() {
 
 func testGetInitFromMetatype3() {
   var SS = ExplicitConstructorsBase1.self
-  SS.dynamicType.#^INIT_FROM_METATYPE3^#
+  type(of: SS).#^INIT_FROM_METATYPE3^#
 }
 
 // INIT_FROM_METATYPE3-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
 
 func testGetInitFromMetatype4() {
   var a = ExplicitConstructorsDerived2()
-  a.dynamicType.#^INIT_FROM_METATYPE4^#
+  type(of: a).#^INIT_FROM_METATYPE4^#
 }
 
 // INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]; name=init(a: Int)

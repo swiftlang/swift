@@ -55,7 +55,7 @@ let g: Toaster.Type.Type = HairDryer.Type.self // expected-error {{cannot conver
 let h: WashingMachine.Type.Type = Dryer.Type.self // expected-error {{cannot convert value of type 'Dryer.Type.Type' to specified type 'WashingMachine.Type.Type'}}
 
 func generic<T : WashingMachine>(_ t: T.Type) {
-  let _: Toaster.Type.Type = t.dynamicType
+  let _: Toaster.Type.Type = type(of: t)
 }
 
 // rdar://problem/20780797

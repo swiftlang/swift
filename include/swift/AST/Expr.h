@@ -3517,30 +3517,36 @@ public:
   }
 };
 
-/// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
+/// DynamicTypeExpr - "type(of: base)" - Produces a metatype value.
 ///
-/// The metatype value can comes from evaluating an expression and then
-/// getting its metatype.
+/// The metatype value comes from evaluating an expression then retrieving the
+/// metatype of the result.
 class DynamicTypeExpr : public Expr {
+  SourceLoc KeywordLoc;
+  SourceLoc LParenLoc;
   Expr *Base;
-  SourceLoc MetatypeLoc;
+  SourceLoc RParenLoc;
 
 public:
-  explicit DynamicTypeExpr(Expr *Base, SourceLoc MetatypeLoc, Type Ty)
+  explicit DynamicTypeExpr(SourceLoc KeywordLoc, SourceLoc LParenLoc,
+                           Expr *Base, SourceLoc RParenLoc, Type Ty)
     : Expr(ExprKind::DynamicType, /*Implicit=*/false, Ty),
-      Base(Base), MetatypeLoc(MetatypeLoc) { }
+      KeywordLoc(KeywordLoc), LParenLoc(LParenLoc), Base(Base),
+      RParenLoc(RParenLoc) { }
 
   Expr *getBase() const { return Base; }
   void setBase(Expr *base) { Base = base; }
 
-  SourceLoc getLoc() const { return MetatypeLoc; }
-  SourceLoc getMetatypeLoc() const { return MetatypeLoc; }
-
+  SourceLoc getLoc() const { return KeywordLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(KeywordLoc, RParenLoc);
+  }
+  
   SourceLoc getStartLoc() const {
-    return getBase()->getStartLoc();
+    return KeywordLoc;
   }
   SourceLoc getEndLoc() const {
-    return (MetatypeLoc.isValid() ? MetatypeLoc : getBase()->getEndLoc());
+    return RParenLoc;
   }
 
   static bool classof(const Expr *E) {

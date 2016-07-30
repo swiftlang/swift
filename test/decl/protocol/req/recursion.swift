@@ -8,7 +8,7 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 // rdar://problem/19840527
 class X<T> where T == X { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return self.dynamicType } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
+    var type: T { return type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
 protocol Y {

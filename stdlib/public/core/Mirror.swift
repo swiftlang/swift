@@ -100,7 +100,7 @@ public struct Mirror {
     } else {
       self = Mirror(
         legacy: _reflect(subject),
-        subjectType: subject.dynamicType)
+        subjectType: type(of: subject))
     }
   }
 
@@ -147,7 +147,7 @@ public struct Mirror {
     _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
     
     // get a legacy mirror and the most-derived type
-    var cls: AnyClass = subject.dynamicType
+    var cls: AnyClass = type(of: subject)
     var clsMirror = _reflect(subject)
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
@@ -490,7 +490,7 @@ extension _Mirror {
   internal func _superMirror() -> _Mirror? {
     if self.count > 0 {
       let childMirror = self[0].1
-      if _isClassSuperMirror(childMirror.dynamicType) {
+      if _isClassSuperMirror(type(of: childMirror)) {
         return childMirror
       }
     }

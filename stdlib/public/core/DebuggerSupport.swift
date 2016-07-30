@@ -39,7 +39,7 @@ public enum _DebuggerSupport {
   }
 
   internal static func isClass(_ value: Any) -> Bool {
-    if let _ = value.dynamicType as? AnyClass {
+    if let _ = type(of: value) as? AnyClass {
       return true
     }
     return false
@@ -119,7 +119,7 @@ public enum _DebuggerSupport {
             return csc.description
           }
           // for a Class with no custom summary, mimic the Foundation default
-          return "<\(x.dynamicType): 0x\(String(asNumericValue(x), radix: 16, uppercase: false))>"
+          return "<\(type(of: x)): 0x\(String(asNumericValue(x), radix: 16, uppercase: false))>"
         } else {
           // but if I can't provide a value, just use the type anyway
           return "\(mirror.subjectType)"

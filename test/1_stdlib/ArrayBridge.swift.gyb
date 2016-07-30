@@ -201,9 +201,9 @@ tests.test("testBridgedVerbatim") {
   expectEqual(1, firstBase.serialNumber)
 
   // Verify that NSArray class methods are inherited by a Swift bridging class.
-  let className = String(reflecting: basesConvertedToNSArray.dynamicType)
+  let className = String(reflecting: type(of: basesConvertedToNSArray))
   expectTrue(className.hasPrefix("Swift._ContiguousArrayStorage"))
-  expectTrue(basesConvertedToNSArray.dynamicType.supportsSecureCoding)
+  expectTrue(type(of: basesConvertedToNSArray).supportsSecureCoding)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
   var subclass: [Subclass] = [Subclass(11), Subclass(22)]

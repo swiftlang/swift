@@ -130,12 +130,12 @@ obj.ext1()  // expected-warning {{result of call is unused}}
 obj.wonka()
 
 // Find class methods via dynamic method lookup.
-obj.dynamicType.staticFoo!(5)
-obj.dynamicType.staticWibble!()
+type(of: obj).staticFoo!(5)
+type(of: obj).staticWibble!()
 
 // Same as above but without the '!'
-obj.dynamicType.staticFoo(5)
-obj.dynamicType.staticWibble()
+type(of: obj).staticFoo(5)
+type(of: obj).staticWibble()
 
 // Overloading and ambiguity resolution
 
@@ -205,7 +205,7 @@ class Z4<T> where T : AnyObject { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-obj.dynamicType.foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
 
 // Checked casts to AnyObject
 var p: P = Y()

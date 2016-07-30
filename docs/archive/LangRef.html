@@ -1255,7 +1255,7 @@
     type-metatype ::= type-simple '.' 'Type'
   </pre>
 
-  <p>Every type has an associated metatype <tt>T.dynamicType</tt>.  A value of the metatype
+<p>Every type has an associated metatype <tt>type(of: T)</tt>.  A value of the metatype
     type is a reference to a global object which describes the type.
     Most metatype types are singleton and therefore require no
     storage, but metatypes associated with <a href="#decl-class">class

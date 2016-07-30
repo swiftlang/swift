@@ -664,7 +664,7 @@ internal final class _IndexBox<
   }
 
   internal var _typeID: ObjectIdentifier {
-    return ObjectIdentifier(self.dynamicType)
+    return ObjectIdentifier(type(of: self))
   }
 
   internal func _unbox<T : Comparable>() -> T? {

@@ -382,20 +382,20 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   obj.object = nil
   obj.object(obj, doSomething:#selector(getter: NSMenuItem.action))
 
-  obj.dynamicType.classRef = nil
-  obj.dynamicType.classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: obj).classRef = nil
+  type(of: obj).classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.object = nil
   rev.object(rev, doSomething:#selector(getter: NSMenuItem.action))
 
-  rev.dynamicType.classRef = nil
-  rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: rev).classRef = nil
+  type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
   value = obj.protoProp()
   value = obj.protoPropRO()
-  value = obj.dynamicType.protoClassProp()
-  value = obj.dynamicType.protoClassPropRO()
+  value = type(of: obj).protoClassProp()
+  value = type(of: obj).protoClassPropRO()
   _ = value
 }
 

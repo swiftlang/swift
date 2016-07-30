@@ -43,7 +43,7 @@ func testDynamicLookup(_ obj: AnyObject) {
   obj.bar("abc")
   
   // CHECK-DAG: - !private "classFunc"
-  obj.dynamicType.classFunc()
+  type(of: obj).classFunc()
   
   // CHECK-DAG: - !private "prop"
   _ = obj.prop

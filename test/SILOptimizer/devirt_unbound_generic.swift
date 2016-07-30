@@ -67,7 +67,7 @@ public func doTest2<T>(_ t:T) {
 // CHECK: return
 @inline(never)
 func test3<T>(_ d: Derived<T>) {
-   d.dynamicType.boo()
+   type(of: d).boo()
 }
 
 public func doTest3<T>(_ t:T) {

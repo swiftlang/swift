@@ -168,8 +168,8 @@ public func expectEqualTest<T>(
 ) {
   if !equal(expected, actual) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -178,7 +178,7 @@ public func expectEqualTest<T>(
 public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T, ${TRACE}) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -197,8 +197,8 @@ public func expectOptionalEqual<T>(
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -206,8 +206,8 @@ public func expectOptionalEqual<T>(
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
   if expected != actual {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -217,7 +217,7 @@ public func expectNotEqual<T : Equatable>(
 ) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -240,8 +240,8 @@ public func expectOptionalEqual${Generic}(
     _ expected: ${EquatableType}, _ actual: ${EquatableType}?, ${TRACE}) {
   if (actual == nil) || expected != actual! {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -2270,7 +2270,7 @@ public func expectEqualSequence<
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -2333,7 +2333,7 @@ public func expectEqualsUnordered<T : Strideable>(
 ) {
   if numericCast(expected.count) != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
   let r = Range(uncheckedBounds:
@@ -2341,7 +2341,7 @@ public func expectEqualsUnordered<T : Strideable>(
   for e in actual {
     if !r.contains(e) {
       expectationFailure("expected elements: \"\(expected)\"\n"
-        + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+        + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
         trace: ${trace})
     }
   }

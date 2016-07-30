@@ -2,5 +2,5 @@
 
 func foo(x: UnsafeMutablePointer<UnsafeMutablePointer<()>?>) {
   _ = x.pointee?.pointee
-  _ = x.pointee?.dynamicType
+  _ = type(of: x.pointee)
 }

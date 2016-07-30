@@ -14,7 +14,7 @@ struct S: P {
 // CHECK: bb0([[X:%.*]] : $*P):
 func existentialMetatype(_ x: P) {
   // CHECK: [[TYPE1:%.*]] = existential_metatype $@thick P.Type, [[X]]
-  let type1 = x.dynamicType
+  let type1 = type(of: x)
   // CHECK: [[INSTANCE1:%.*]] = alloc_stack $P
   // CHECK: [[OPEN_TYPE1:%.*]] = open_existential_metatype [[TYPE1]]
   // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]] : $*P

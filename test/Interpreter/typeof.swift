@@ -28,11 +28,11 @@ func archeMetatype<T : Fooable>(_ t: T.Type) {
 }
 
 func archeMetatype2<T : Fooable>(_ t: T) {
-  t.dynamicType.foo()
+  type(of: t).foo()
 }
 
 func boxedExistentialMetatype(_ e: Error) -> Error.Type {
-  return e.dynamicType
+  return type(of: e)
 }
 
 enum Hangry : Error {
@@ -52,19 +52,19 @@ class Meltdown : Error {
 class GrilledCheese : Meltdown {}
 
 // CHECK: Beads?
-classMetatype(B().dynamicType)
+classMetatype(type(of: B()))
 // CHECK: Deeds?
-classMetatype(D().dynamicType)
+classMetatype(type(of: D()))
 
 // CHECK: Seeds?
-structMetatype(S().dynamicType)
+structMetatype(type(of: S()))
 
 // CHECK: Beads?
-archeMetatype(B().dynamicType)
+archeMetatype(type(of: B()))
 // FIXME: Deeds? <rdar://problem/14620454>
-archeMetatype(D().dynamicType)
+archeMetatype(type(of: D()))
 // CHECK: Seeds?
-archeMetatype(S().dynamicType)
+archeMetatype(type(of: S()))
 
 // CHECK: Beads?
 archeMetatype2(B())

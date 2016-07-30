@@ -205,7 +205,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
   ///   `deinit` destroys its stored `Header` and any constructed `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
+    ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
 
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
   }
@@ -220,7 +220,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// it in this specialized constructor.
   @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
+    ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
   }
 

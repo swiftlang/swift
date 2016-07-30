@@ -65,8 +65,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   _ = #selector(P1.method5(_:b:)) // expected-error{{static member 'method5(_:b:)' cannot be used on protocol metatype 'P1.Protocol'}}
   _ = #selector(p1.method4)
   _ = #selector(p1.method4(_:b:))
-  _ = #selector(p1.dynamicType.method5)
-  _ = #selector(p1.dynamicType.method5(_:b:))
+  _ = #selector(type(of: p1).method5)
+  _ = #selector(type(of: p1).method5(_:b:))
 
   // Interesting expressions that refer to methods.
   _ = #selector(Swift.AnyObject.method1)

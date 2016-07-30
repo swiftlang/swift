@@ -193,7 +193,7 @@ pr = "foo"
 // CHECK: String: foo
 pr.foo()
 
-var _ : ([Int]).Type = [4].dynamicType
+var _ : ([Int]).Type = type(of: [4])
 // CHECK: : ([Int]).Type
 var _ : ((Int) -> Int)? = .none
 // CHECK: : ((Int) -> Int)?

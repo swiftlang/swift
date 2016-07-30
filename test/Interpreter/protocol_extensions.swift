@@ -241,7 +241,7 @@ print(hasP.p.extValue)
 
 // rdar://problem/20739719
 class Super: Init {
-  required init(x: Int) { print("\(x) \(self.dynamicType)") }
+  required init(x: Int) { print("\(x) \(type(of: self))") }
 }
 
 class Sub: Super {}

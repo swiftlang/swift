@@ -48,7 +48,7 @@ protocol SomeProtocol {
 func generic_metatypes<T : SomeProtocol>(_ x: T)
   -> (T.Type, T.SomeAssociated.Type)
 {
-  return (x.dynamicType, x.dynamicType.SomeAssociated.self)
+  return (type(of: x), type(of: x).SomeAssociated.self)
 }
 
 // Inferring a variable's type from a call to a generic.

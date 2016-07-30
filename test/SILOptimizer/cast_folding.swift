@@ -37,29 +37,29 @@ class E: CP1, CP2 {}
 
 func cast0<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return A().dynamicType is T.Type
+  return type(of: A()) is T.Type
 }
 
 
 func cast1<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return (A() as AnyObject).dynamicType is T.Type
+  return type(of: (A() as AnyObject)) is T.Type
 }
 
 func cast2<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:AnyObject = A() as AnyObject
-  return ao.dynamicType is T.Type
+  return type(of: ao) is T.Type
 }
 
 
 func cast3(_ p:AnyObject) -> Bool {
   // Always fails
-  return p.dynamicType is AnyObject.Protocol
+  return type(of: p) is AnyObject.Protocol
 }
 
 func cast4(_ p:AnyObject) -> Bool {
-  return p.dynamicType is A.Type
+  return type(of: p) is A.Type
 }
 
 func cast5(_ t:AnyObject.Type) -> Bool {
@@ -80,23 +80,23 @@ func cast7<T>(_ t:T.Type) -> Bool {
 
 func cast8<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return (A() as P).dynamicType is T.Type
+  return type(of: (A() as P)) is T.Type
 }
 
 func cast9<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:P = A() as P
-  return ao.dynamicType is T.Type
+  return type(of: ao) is T.Type
 }
 
 
 func cast10(_ p:P) -> Bool {
-  return p.dynamicType is P.Protocol
+  return type(of: p) is P.Protocol
 }
 
 func cast11(_ p:P) -> Bool {
   // Succeeds if p is of type A
-  return p.dynamicType is A.Type
+  return type(of: p) is A.Type
 }
 
 func cast12(_ t:P.Type) -> Bool {
@@ -509,7 +509,7 @@ func test18_2() -> Bool {
 // CHECK-NEXT: return %1
 @inline(never)
 func test19() -> Bool {
-    let t: Any.Type = (1 as Any).dynamicType
+    let t: Any.Type = type(of: 1 as Any)
     return t is Int.Type
 }
 
