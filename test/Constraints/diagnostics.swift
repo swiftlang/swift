@@ -286,7 +286,7 @@ func r18800223(_ i : Int) {
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{unable to infer closure return type in current context}}
+_ = { $0 }  // expected-error {{unable to infer closure type in the current context}}
 
 
 

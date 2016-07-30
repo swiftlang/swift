@@ -165,11 +165,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-// expected-note @+1 {{in call to function 'callCC'}}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
+  callCC { // expected-error {{unable to infer closure return type in current context}}
     _ = $0
     return 1
   }
@@ -206,3 +205,18 @@ func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
   // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
   // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
+
+// <rdar://problem/23570873> QoI: Poor error calling map without being able to infer "U" (closure result inference)
+struct Thing {
+  init?() {}
+}
+// This throws a compiler error
+let things = Thing().map { thing in  // expected-error {{unable to infer closure return type in current context}}
+  // Commenting out this makes it compile
+  _ = thing
+  return thing
+}
+
+
+
+

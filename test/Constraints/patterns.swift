@@ -222,14 +222,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+  a.map { // expected-error {{unable to infer closure return type in current context}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+  a.map { // expected-error {{unable to infer closure return type in current context}}
     switch $0 {
     case .A:
       return 1
