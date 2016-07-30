@@ -3731,7 +3731,7 @@ enum class AccessStrategy : unsigned char {
 /// Information about a behavior instantiated by a storage declaration.
 ///
 /// TODO: Accessors, composed behaviors
-struct BehaviorRecord {
+struct alignas(1 << 3) BehaviorRecord {
   // The behavior name.
   TypeRepr *ProtocolName;
   // The parameter expression, if any.
