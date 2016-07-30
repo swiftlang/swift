@@ -25,6 +25,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
@@ -1810,6 +1811,9 @@ private:
                         const ApplyExpr *call = nullptr);
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
+  bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
+                                     const AvailableAttr *Attr,
+                                     const ApplyExpr *call);
 
   /// Walks up from a potential callee to the enclosing ApplyExpr.
   const ApplyExpr *getEnclosingApplyExpr() const {
@@ -1948,9 +1952,12 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   if (!D)
     return false;
 
-  if (auto *attr = AvailableAttr::isUnavailable(D))
+  if (auto *attr = AvailableAttr::isUnavailable(D)) {
     if (diagnoseIncDecRemoval(D, R, attr))
       return true;
+    if (call && diagnoseMemoryLayoutMigration(D, R, attr, call))
+      return true;
+  }
 
   if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
     return true;
@@ -2050,7 +2057,81 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
   return false;
 }
 
+/// If this is a call to an unavailable sizeof family functions, diagnose it
+/// with a fixit hint and return true. If not, or if we fail, return false.
+bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
+                                               SourceRange R,
+                                               const AvailableAttr *Attr,
+                                               const ApplyExpr *call) {
 
+  if (!D->getModuleContext()->isStdlibModule())
+    return false;
+
+  std::pair<StringRef, bool> KindValue
+    = llvm::StringSwitch<std::pair<StringRef, bool>>(D->getNameStr())
+      .Case("sizeof", {"size", false})
+      .Case("alignof", {"alignment", false})
+      .Case("strideof", {"stride", false})
+      .Case("sizeofValue", {"size", true})
+      .Case("alignofValue", {"alignment", true})
+      .Case("strideofValue", {"stride", true})
+      .Default({});
+
+  if (KindValue.first.empty())
+    return false;
+
+  auto Kind = KindValue.first;
+  auto isValue = KindValue.second;
+
+  auto args = dyn_cast<ParenExpr>(call->getArg());
+  if (!args)
+    return false;
+
+  auto subject = args->getSubExpr();
+  if (!isValue) {
+    // sizeof(x.dynamicType) is equivalent to sizeofValue(x)
+    if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
+      subject = DTE->getBase();
+      isValue = true;
+    }
+  }
+
+  EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+  auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
+                          D->getFullName(), EncodedMessage.Message);
+  diag.highlight(R);
+
+  StringRef Prefix = "MemoryLayout<";
+  StringRef Suffix = ">.";
+  if (isValue) {
+    auto valueType = subject->getType()->getRValueType();
+    if (!valueType || valueType->is<ErrorType>()) {
+        // If we dont have good argument, We cannot emit fix-it.
+        return true;
+    }
+
+    // NOTE: We are destructively replacing the source text here.
+    // For instance, `sizeof(x.doSomethig())` => `MemoryLayout<T>.size` where
+    // T is return type of `doSomething()`. If that function have any
+    // side effects, it will break the source.
+    diag.fixItReplace(call->getSourceRange(),
+      (Prefix + valueType->getString() + Suffix + Kind).str());
+  } else {
+    SourceRange PrefixRange(call->getStartLoc(), args->getLParenLoc());
+    SourceRange SuffixRange(args->getRParenLoc());
+
+    // We must truncate `.self`.
+    // E.g. sizeof(T.self) => MemoryLayout<T>.size
+    if (auto *DSE = dyn_cast<DotSelfExpr>(subject))
+      SuffixRange.Start = DSE->getDotLoc();
+
+    diag
+      .fixItReplace(PrefixRange, Prefix)
+      .fixItReplace(SuffixRange, (Suffix + Kind).str());
+  }
+
+  return true;
+}
 
 /// Diagnose uses of unavailable declarations.
 static void diagAvailability(TypeChecker &TC, const Expr *E,
