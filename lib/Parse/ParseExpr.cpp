@@ -1095,6 +1095,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::identifier:  // foo
+    // If starts with 'type(', parse the 'type(of: ...)' metatype expression
+    if (Tok.getText() == "type" && peekToken().is(tok::l_paren)) {
+      Result = parseExprTypeOf();
+      break;
+    }
+
     // If we are parsing a refutable pattern and are inside a let/var pattern,
     // the identifiers change to be value bindings instead of decl references.
     // Parse and return this as an UnresolvedPatternExpr around a binding.  This
@@ -1413,11 +1419,21 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       }
 
       // Handle "x.dynamicType" - A metatype expr.
+      // Deprecated in SE-0096: `x.dynamicType` becomes `type(of: x)`
       if (Tok.is(tok::kw_dynamicType)) {
+        // Fix-it
+        auto range = Result.get()->getSourceRange();
+        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
+        diagnose(TokLoc, diag::expr_dynamictype_deprecated)
+          .highlight(dynamicTypeExprRange)
+          .fixItReplace(dynamicTypeExprRange, ")")
+          .fixItInsert(range.Start, "type(of: ");
+
         Result = makeParserResult(
-          new (Context) DynamicTypeExpr(Result.get(), consumeToken(), Type()));
+          new (Context) DynamicTypeExpr(Result.get(), dynamicTypeExprRange.End, Type()));
         continue;
       }
+
 
       // Handle "x.self" expr.
       if (Tok.is(tok::kw_self)) {
@@ -2994,4 +3010,64 @@ Parser::parseVersionConstraintSpec() {
 
   return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
+}
+
+/// parseExprTypeOf
+///
+///   expr-dynamictype:
+///     'type' '(' 'of:' expr ')'
+///
+ParserResult<Expr> Parser::parseExprTypeOf() {
+
+  assert(Tok.getText() == "type" && "only 'type' should be handled here");
+
+  // Consume 'type'
+  SourceLoc keywordLoc = consumeToken();
+  // Consume '('
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  // Parse `of` label
+  // If we see a potential argument label followed by a ':', consume
+  // it.
+  if (Tok.canBeArgumentLabel() && Tok.getText() == "of" && peekToken().is(tok::colon)) {
+    consumeToken();
+    consumeToken(tok::colon);
+  } else {
+    diagnose(Tok, diag::expr_typeof_expected_label_of);
+    return makeParserError();
+  }
+
+  // Parse the subexpression.
+  ParserResult<Expr> subExpr = parseExpr(diag::expr_typeof_expected_expr);
+  if (subExpr.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
+  // Parse the closing ')'
+  SourceLoc rParenLoc;
+  if (subExpr.isParseError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = Tok.getLoc();
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_typeof_expected_rparen, lParenLoc);
+  }
+
+  // If the subexpression was in error, just propagate the error.
+  if (subExpr.isParseError()) {
+    if (subExpr.hasCodeCompletion()) {
+      auto res = makeParserResult(
+                                  new (Context) DynamicTypeExpr(subExpr.get(), consumeToken(), Type()));
+      res.setHasCodeCompletion();
+      return res;
+    } else {
+      return makeParserResult<Expr>(
+                                    new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+    }
+  }
+
+  return makeParserResult(
+                          new (Context) DynamicTypeExpr(subExpr.get(), rParenLoc, Type()));
 }
