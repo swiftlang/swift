@@ -6,6 +6,9 @@
 // RUN: env LD_LIBRARY_PATH=%t DYLD_LIBRARY_PATH=%t %target-run %t/main
 // REQUIRES: executable_test
 
+// rdar://problem/27620565
+// REQUIRES: OS=macosx
+
 import first
 import second
 
