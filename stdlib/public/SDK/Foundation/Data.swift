@@ -669,7 +669,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         public mutating func next() -> UInt8? {
             guard _idx < _endIdx else { return nil }
             defer { _idx += 1 }
-            let bufferSize = sizeofValue(_buffer)
+            let bufferSize = MemoryLayout._ofInstance(_buffer).size
             return withUnsafeMutablePointer(to: &_buffer) { ptr_ in
                 let ptr = UnsafeMutableRawPointer(ptr_).assumingMemoryBound(to: UInt8.self)
                 let bufferIdx = _idx % bufferSize
