@@ -40,59 +40,61 @@ func _countFormatSpecifiers(_ a: String) -> Int {
   // characters (percent, dollar, zero, and nine), we don't need to decode UTF-16.
   
   enum ScanState {
-    case NoPercent
-    case SeenPercent
-    case ScanningDigits
+    case noPercent
+    case seenPercent
+    case scanningDigits
   }
   
-  let percentUTF16  = UTF16.CodeUnit(("%" as UnicodeScalar).value)
-  let dollarUTF16   = UTF16.CodeUnit(("$" as UnicodeScalar).value)
-  let zeroUTF16   = UTF16.CodeUnit(("0" as UnicodeScalar).value)
-  let nineUTF16   = UTF16.CodeUnit(("9" as UnicodeScalar).value)
+  let percentUTF16 = UTF16.CodeUnit(("%" as UnicodeScalar).value)
+  let dollarUTF16  = UTF16.CodeUnit(("$" as UnicodeScalar).value)
+  let zeroUTF16    = UTF16.CodeUnit(("0" as UnicodeScalar).value)
+  let nineUTF16    = UTF16.CodeUnit(("9" as UnicodeScalar).value)
   var count = 0
   var maxPosValue = 0
   var posValue = 0
-  var state = ScanState.NoPercent
+  var state = ScanState.noPercent
   var posMode = false
   
   for c in a.utf16 {
     switch state {
-    case .NoPercent:
+    case .noPercent:
       if c == percentUTF16 {
-        state = .SeenPercent
+        state = .seenPercent
       }
       
-    case .SeenPercent:
+    case .seenPercent:
       if c == percentUTF16 {
         // a "%" following this one should not be taken as literal
-        state = .NoPercent
+        state = .noPercent
       }
       else if c >= zeroUTF16 && c <= nineUTF16 {
         posValue = Int(c) - Int(zeroUTF16)
-        state = .ScanningDigits
+        state = .scanningDigits
       }
       else {
         if posMode {
           // error condition: non-positional format seen after positional format(s)
+          // FIXME: determine how to handle this error condition
           // for now, ignore erroneous format item and continue
         }
         else {
           count += 1
         }
-        state = .NoPercent
+        state = .noPercent
       }
       
-    case .ScanningDigits:
+    case .scanningDigits:
       if c == dollarUTF16 {
         // switch to positional arguments mode (a POSIX extension)
         posMode = true
         if count > 0 {
           // error condition: positional format seen after non-positional format(s)
+          // FIXME: determine how to handle this error condition
           // for now, ignore erroneous format items and continue
         }
         count = 0
         maxPosValue = posValue
-        state = .NoPercent
+        state = .noPercent
       }
       else if c >= zeroUTF16 && c <= nineUTF16 {
         posValue = posValue * 10 + (Int(c) - Int(zeroUTF16))
@@ -100,12 +102,13 @@ func _countFormatSpecifiers(_ a: String) -> Int {
       else {
         if posMode {
           // error condition: non-positional format seen after positional format(s)
+          // FIXME: determine how to handle this error condition
           // for now, ignore erroneous format item and continue
         }
         else {
           count += 1
         }
-        state = .NoPercent
+        state = .noPercent
       }
     }
   }
