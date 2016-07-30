@@ -218,5 +218,16 @@ let things = Thing().map { thing in  // expected-error {{unable to infer closure
 }
 
 
+// <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
+func r21675896(file : String) {
+  let x: String = { // expected-error {{unable to infer closure return type in current context}}
+    if true {
+      return "foo"
+    }
+    else {
+      return file
+    }
+  }().pathExtension
+}
 
 

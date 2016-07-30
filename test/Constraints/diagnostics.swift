@@ -465,9 +465,12 @@ func f20371273() {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-// FIXME: Should complain about not having a return type annotation in the closure.
-[0].map { _ in let r =  (1,2).0;  return r }
-// expected-error @-1 {{expression type '[_]' is ambiguous without more context}}
+[0].map {  // expected-error {{unable to infer closure return type in current context}}
+  _ in
+  let r =  (1,2).0
+  return r
+}
+
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {

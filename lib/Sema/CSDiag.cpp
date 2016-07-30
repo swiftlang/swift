@@ -6304,6 +6304,22 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
+  // A very common cause of this diagnostic is a situation where a closure expr
+  // has no inferred type, due to being a multiline closure.  Check to see if
+  // this is the case and (if so), speculatively diagnose that as the problem.
+  bool didDiagnose = false;
+  E->forEachChildExpr([&](Expr *subExpr) -> Expr*{
+    auto closure = dyn_cast<ClosureExpr>(subExpr);
+    if (!didDiagnose && closure)
+      didDiagnose = checkMultistatementClosureForAmbiguity(closure,
+                                                          CS->getTypeChecker());
+    
+    return subExpr;
+  });
+  
+  if (didDiagnose) return;
+  
+
   
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.
