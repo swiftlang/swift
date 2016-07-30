@@ -893,7 +893,7 @@ func se0101<P: Pse0101>(x: Cse0101<P>) {
   _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
   _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}/
   _ = sizeof(x.dynamicType) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-28=MemoryLayout<Cse0101<P>>.size}} {{none}}
-                            // expected-warning@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}}
+                            // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}}
 
   _ = sizeofValue(x) // expected-error {{'sizeofValue' is unavailable: use MemoryLayout<T>.size instead.}} {{7-21=MemoryLayout<Cse0101<P>>.size}} {{none}}
   _ = alignofValue(x.val) // expected-error {{'alignofValue' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-26=MemoryLayout<P>.alignment}} {{none}}
