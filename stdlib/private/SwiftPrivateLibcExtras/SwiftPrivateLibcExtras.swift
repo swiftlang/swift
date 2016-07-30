@@ -99,6 +99,9 @@ public func _stdlib_select(
         let readAddr = readfds.baseAddress
         let writeAddr = writefds.baseAddress
         let errorAddr = errorfds.baseAddress
+#if CYGWIN
+        typealias fd_set = _types_fd_set
+#endif
         func asFdSetPtr(
           _ p: UnsafeMutablePointer<UInt>?
         ) -> UnsafeMutablePointer<fd_set>? {
