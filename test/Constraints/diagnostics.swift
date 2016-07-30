@@ -428,73 +428,6 @@ CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'Cu
 
 
 
-
-// <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")
-func ident<T>(_ t: T) -> T {}
-var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
-
-// <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
-var afterMessageCount : Int? = nil
-
-func uintFunc() -> UInt {}
-func takeVoidVoidFn(_ a : () -> ()) {}
-takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
-}
-
-// <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {}
-func f19997471(_ x: Int) {}
-
-func someGeneric19997471<T>(_ x: T) {
-  takeVoidVoidFn {
-    f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
-     // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (String), (Int)}}
-  }
-}
-
-// <rdar://problem/20371273> Type errors inside anonymous functions don't provide enough information
-func f20371273() {
-  let x: [Int] = [1, 2, 3, 4]
-  let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int)}}
-}
-
-
-
-
-// <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer closure return type in current context}}
-  _ in
-  let r =  (1,2).0
-  return r
-}
-
-
-// <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
-func rdar21078316() {
-  var foo : [String : String]?
-  var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
-}
-
-
-// <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
-var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
-
-
-
-// <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
-func foo20868864(_ callback: ([String]) -> ()) { }
-func rdar20868864(_ s: String) {
-  var s = s
-  foo20868864 { (strings: [String]) in
-    s = strings   // expected-error {{cannot assign value of type '[String]' to type 'String'}}
-  }
-}
-
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
   case Red // expected-note 2 {{did you mean 'Red'?}}
@@ -709,13 +642,7 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
   f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
 }
 
-// <rdar://problem/22058555> crash in cs diags in withCString
-func r22058555() {
-  var firstChar: UInt8 = 0
-  "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
-  }
-}
+
 
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
