@@ -134,6 +134,6 @@ func existential_metatype_of_metatype(_ x: Any) -> Any.Type.Type {
 }
  */
 
-func function_metatype_of_metatype(_ x: @escaping () -> ()) -> (() -> ()).Type.Type {
+func function_metatype_of_metatype(_ x: () -> ()) -> (() -> ()).Type.Type {
   return x.dynamicType.dynamicType
 }

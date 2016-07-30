@@ -40,8 +40,6 @@ public class ImplicitOptionalInitContainer {
 public class AttributeContainer1 {
   // ATTR1: func m1(a: @autoclosure () -> Int)
   public func m1(a : @autoclosure () -> Int) {}
-  // ATTR1: func m2(a: () -> Int)
-  public func m2(a : @noescape () -> Int) {} // TODO: drop @noescape
-  // ATTR1: func m3(a: @escaping () -> Int)
-  public func m3(a : @escaping () -> Int) {}
+  // ATTR1: func m2(a: @noescape () -> Int)
+  public func m2(a : @noescape () -> Int) {}
 }

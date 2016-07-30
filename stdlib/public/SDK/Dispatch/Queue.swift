@@ -195,7 +195,7 @@ public extension DispatchQueue {
 		group: DispatchGroup? = nil, 
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		execute work: @convention(block) () -> Void) 
 	{
 		if group == nil && qos == .unspecified && flags.isEmpty {
 			// Fast-path route for the most common API usage
@@ -283,7 +283,7 @@ public extension DispatchQueue {
 		deadline: DispatchTime, 
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		execute work: @convention(block) () -> Void) 
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
@@ -297,7 +297,7 @@ public extension DispatchQueue {
 		wallDeadline: DispatchWallTime,
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @escaping @convention(block) () -> Void) 
+		execute work: @convention(block) () -> Void) 
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)

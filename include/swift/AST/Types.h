@@ -2132,6 +2132,7 @@ public:
     enum : uint16_t { AutoClosureMask        = 0x010 };
     enum : uint16_t { NoEscapeMask           = 0x020 };
     enum : uint16_t { ThrowsMask             = 0x040 };
+    enum : uint16_t { ExplicitlyEscapingMask = 0x080 };
 
     uint16_t Bits;
 
@@ -2152,15 +2153,17 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
-            bool IsAutoClosure, bool IsNoEscape,
+            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
             bool Throws)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2284,6 +2287,12 @@ public:
     return getExtInfo().isNoEscape();
   }
 
+  /// \brief True if the parameter declaration it is attached to has explicitly
+  /// been marked with the @escaping attribute. This is a temporary measure.
+  bool isExplicitlyEscaping() const {
+    return getExtInfo().isExplicitlyEscaping();
+  }
+  
   bool throws() const {
     return getExtInfo().throws();
   }

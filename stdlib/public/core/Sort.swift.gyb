@@ -131,7 +131,7 @@ public // @testable
 func _introSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
-  ${", by areInIncreasingOrder: @escaping (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
+  ${", by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) -> Bool" if p else ""}
 ) where
   C : MutableCollection & RandomAccessCollection
   ${"" if p else ", C.Iterator.Element : Comparable"} {

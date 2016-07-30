@@ -17,7 +17,7 @@ func f6(_ a: A, _: Int) { }
 func createB() -> B { }  // expected-note {{found this candidate}}
 func createB(_ i: Int) -> B { } // expected-note {{found this candidate}}
 
-func f7(_ a: A, _: @escaping () -> Int) -> B { }
+func f7(_ a: A, _: () -> Int) -> B { }
 func f7(_ a: A, _: Int) -> Int { }
 
 // Forgot the '()' to call a function.

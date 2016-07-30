@@ -45,7 +45,7 @@ func assign_iuo_lvalue_implicit(_ s: inout S!, _ y: Int) {
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@in Int) -> @out Int
 func assign_optional_lvalue_reabstracted(_ x: inout ((Int) -> Int)?,
-                                         _ y: @escaping (Int) -> Int) {
+                                         _ y: (Int) -> Int) {
   x! = y
 }
 

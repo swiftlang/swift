@@ -396,7 +396,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
 
-func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(thin) () -> ()) {
+func testOnce(_ p: Builtin.RawPointer, f: @convention(thin) () -> ()) {
   Builtin.once(p, f)
 }
 
@@ -408,7 +408,7 @@ struct S {}
 protocol P {}
 
 // CHECK-LABEL: define hidden void @_TF8builtins10canBeClass
-func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
+func canBeClass<T>(_ f: (Builtin.Int8) -> (), _: T) {
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
   // CHECK: call void {{%.*}}(i8 1

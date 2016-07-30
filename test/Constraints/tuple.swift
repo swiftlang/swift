@@ -72,7 +72,7 @@ extension Int : PosixErrorReturn {
 }
 
 func posixCantFail<A, T : Comparable & PosixErrorReturn>
-  (_ f: @escaping (A) -> T) -> (args:A) -> T
+  (_ f:(A) -> T) -> (args:A) -> T
 {
   return { args in
     let result = f(args)

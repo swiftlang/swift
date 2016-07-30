@@ -118,7 +118,7 @@ func ftest1() {
   let myvar = 0
 }
 
-func ftest2(x: @escaping (Int) -> Int) {}
+func ftest2(x: (Int) -> Int) {}
 
 protocol SomeProt {
   func protMeth(p: Int)

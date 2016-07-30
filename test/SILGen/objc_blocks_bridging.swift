@@ -69,9 +69,9 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_TF20objc_blocks_bridging10callBlocks
 func callBlocks(_ x: Foo,
-  f: @escaping (Int) -> Int,
-  g: @escaping (String) -> String,
-  h: @escaping (String?) -> String?
+  f: (Int) -> Int,
+  g: (String) -> String,
+  h: (String?) -> String?
 ) -> (Int, String, String?, String?) {
   // CHECK: [[FOO:%.*]] =  class_method [volatile] %0 : $Foo, #Foo.foo!1.foreign
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage

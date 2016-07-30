@@ -457,7 +457,7 @@ protocol MyProto {
 
 // <rdar://problem/14488311>
 struct DefaultArgumentFromExtension {
-  func g(_ x: @escaping (DefaultArgumentFromExtension) -> () -> () = f) {
+  func g(_ x: (DefaultArgumentFromExtension) -> () -> () = f) {
     let f = 42
     var x2 = x
     x2 = f // expected-error{{cannot assign value of type 'Int' to type '(DefaultArgumentFromExtension) -> () -> ()'}}

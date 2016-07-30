@@ -495,7 +495,7 @@ extension String {
 
   /// Enumerates all the lines in a string.
   public func enumerateLines(
-    invoking body: @escaping (line: String, stop: inout Bool) -> ()
+    invoking body: (line: String, stop: inout Bool) -> ()
   ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
@@ -560,7 +560,7 @@ extension String {
   public func enumerateSubstrings(
     in range: Range<Index>,
     options opts: EnumerationOptions = [],
-    _ body: @escaping (
+    _ body: (
       substring: String?, substringRange: Range<Index>,
       enclosingRange: Range<Index>, inout Bool
     ) -> ()
