@@ -222,14 +222,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer closure return type in current context}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer closure return type in current context}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
     switch $0 {
     case .A:
       return 1

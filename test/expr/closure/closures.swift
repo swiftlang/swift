@@ -259,10 +259,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{unable to infer closure return type in current context}}
-  // FIXME: This diagnostic should be improved, we can infer a type for the closure expr from
-  // its body (by trying really hard in diagnostic generation) and say that we need an explicit
-  // contextual result specified because we don't do cross-statement type inference or something.
+let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
           if (i > 10) { return true }
           else { return false }
         }()

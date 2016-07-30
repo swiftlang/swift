@@ -238,7 +238,8 @@ ERROR(cannot_invoke_closure_type,none,
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
-      "unable to infer closure return type in current context", ())
+      "unable to infer complex closure return type; "
+      "add explicit type to disambiguate", ())
 
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",

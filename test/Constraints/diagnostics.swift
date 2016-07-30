@@ -326,24 +326,6 @@ func rdar19804707() {
 }
 
 
-// <rdar://problem/20789423> Unclear diagnostic for multi-statement closure with no return type
-func r20789423() {
-  class C {
-    func f(_ value: Int) { }
-  }
-
-  let p: C
-  print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
-
-  let _f = { (v: Int) in  // expected-error {{unable to infer closure return type in current context}}
-    print("a")
-    return "hi"
-  }
-
-}
-
-
-
 func f7(_ a: Int) -> (_ b: Int) -> Int {
   return { b in a+b }
 }
