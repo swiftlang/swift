@@ -23,8 +23,8 @@ public func min<T : Comparable>(_ x: T, _ y: T) -> T {
 
 /// Returns the least argument passed.
 ///
-/// - Important: If there are multiple equal least arguments,
-///   this function returns the first one.
+/// If there are multiple equal least arguments,
+/// this function returns the first one.
 public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var minValue = min(min(x, y), z)
   // In case `value == minValue`, we pick `minValue`. See min(_:_:).
@@ -36,7 +36,7 @@ public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 
 /// Returns the greater of `x` and `y`.
 ///
-/// - Important: If `x == y`, this function returns `y`.
+/// If `x == y`, this function returns `y`.
 public func max<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y`, we pick `y`. See min(_:_:).
   return y >= x ? y : x
@@ -44,8 +44,8 @@ public func max<T : Comparable>(_ x: T, _ y: T) -> T {
 
 /// Returns the greatest argument passed.
 ///
-/// - Important: If there are multiple equal greatest arguments,
-///   this function returns the last one.
+/// If there are multiple equal greatest arguments,
+/// this function returns the last one.
 public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var maxValue = max(max(x, y), z)
   // In case `value == maxValue`, we pick `value`. See max(_:_:).
@@ -85,7 +85,7 @@ public struct EnumeratedIterator<
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
-  /// - Note: Once `nil` has been returned, all subsequent calls return `nil`.
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Element? {
     guard let nextElement = _base.next() else { return nil }
     defer { _count += 1 }
@@ -126,7 +126,7 @@ public struct EnumerateSequence<Base : Sequence> { }
 extension EnumeratedIterator {
   // Calling `makeIterator()` on an `EnumeratedSequence` is currently
   // the only public way to obtain an `EnumeratedIterator`.
-  @available(*, unavailable, message: "Construct an `EnumeratedSequence` and call `makeIterator()` on it.")
+  @available(*, unavailable, message: "Call 'enumerated().makeIterator()' on the sequence.")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
