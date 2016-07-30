@@ -1234,23 +1234,31 @@ public func ${x.operator}= <
 % end
 
 
-@available(*, unavailable, message: "Use Arithmetic protocol instead")
-public typealias _IntegerArithmetic = Arithmetic
+// FIXME(integers): test more of these.
+// FIXME: should maybe be BinaryInteger & Arithmetic, but <rdar://27619386> prevents it
+@available(*, unavailable, renamed: "Arithmetic")
+public typealias _IntegerArithmeticType = Arithmetic
 
-@available(*, unavailable, message: "Use Arithmetic protocol instead")
-public typealias IntegerArithmetic = Arithmetic
+@available(*, unavailable, renamed: "Arithmetic")
+public typealias IntegerArithmeticType = Arithmetic
 
-@available(*, unavailable, message: "Use Arithmetic protocol instead")
-public typealias SignedNumber = SignedArithmetic
+@available(*, unavailable, renamed: "SignedArithmetic")
+public typealias SignedNumberType = SignedArithmetic
 
-@available(*, unavailable, message: "Use SignedArithmetic protocol instead")
+@available(*, unavailable, renamed: "SignedInteger")
+public typealias SignedIntegerType = SignedInteger
+
+@available(*, unavailable, renamed: "UnsignedInteger")
+public typealias UnsignedIntegerType = SignedArithmetic
+
+@available(*, unavailable, renamed: "SignedArithmetic")
 public typealias AbsoluteValuable = SignedArithmetic
 
-@available(*, unavailable, message: "Use BinaryInteger protocol instead")
-public typealias _Integer = BinaryInteger
+@available(*, unavailable, renamed: "FixedWidthInteger")
+public typealias _IntegerType = FixedWidthInteger
 
-@available(*, unavailable, message: "Use BinaryInteger protocol instead")
-public typealias Integer = BinaryInteger
+@available(*, unavailable, renamed: "FixedWidthInteger")
+public typealias IntegerType = FixedWidthInteger
 
-@available(*, unavailable, message: "Use SignedInteger protocol instead")
-public typealias _SignedInteger = SignedInteger
+@available(*, unavailable, renamed: "SignedInteger")
+public typealias _SignedIntegerType = SignedInteger

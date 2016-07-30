@@ -197,8 +197,8 @@ func disallowSubscriptingOnIntegers() {
 
     r0[UInt(0)] // expected-error {{cannot subscript a value of type 'CountableRange<Int>' with an index of type 'UInt'}} expected-note {{overloads for 'subscript' exist}}
     r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
-    r2[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
-    r3[UInt(0)] // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Range<ClosedRangeIndex<_>>'}}
+    r2[UInt(0)] // expected-error {{cannot convert call result type 'UInt' to expected type 'Range<ClosedRangeIndex<_>>'}}
+    r3[UInt(0)] // expected-error {{cannot convert call result type 'UInt' to expected type 'Range<ClosedRangeIndex<_>>'}}
 
     r0[0..<4]   // expected-error {{ambiguous use of 'subscript'}}
     r1[0..<4]   // expected-error {{ambiguous use of 'subscript'}}

@@ -166,7 +166,7 @@ func _FixedPoint() {
   u-- // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{4-6= -= 1}} {{none}}
   --u // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= -= 1}} {{none}}
 
-  func fn1<T: IntegerType>(i: T) {} // expected-error {{'IntegerType' has been renamed to 'Integer'}} {{15-26=Integer}} {{none}}
+  func fn1<T: IntegerType>(i: T) {} // expected-error {{'IntegerType' has been renamed to 'FixedWidthInteger'}} {{15-26=FixedWidthInteger}} {{none}}
   func fn2<T: SignedIntegerType>(i: T) {} // expected-error {{'SignedIntegerType' has been renamed to 'SignedInteger'}} {{15-32=SignedInteger}} {{none}}
   func fn3<T: UnsignedIntegerType>(i: T) {} // expected-error {{'UnsignedIntegerType' has been renamed to 'UnsignedInteger'}} {{15-34=UnsignedInteger}} {{none}}
 }
@@ -193,6 +193,8 @@ func _FloatingPoint<F : BinaryFloatingPoint>(f: F) {
 
 func _FloatingPointTypes() {
   var x: Float = 1, y: Float = 1
+  x += 1
+  y += 1
   // FIXME: isSignMinus -> sign is OK? different type.
   _ = x.isSignMinus // expected-error {{'isSignMinus' has been renamed to 'sign'}} {{9-20=sign}} {{none}}
   _ = x % y // expected-error {{'%' is unavailable: Use truncatingRemainder instead}} {{none}}
@@ -241,8 +243,8 @@ func _Index() {
 }
 
 func _IntegerArithmetic() {
-  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'IntegerArithmetic'}} {{16-37=IntegerArithmetic}} {{none}}
-  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumber'}} {{16-32=SignedNumber}} {{none}}
+  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'Arithmetic'}} {{16-37=Arithmetic}} {{none}}
+  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedArithmetic'}} {{16-32=SignedArithmetic}} {{none}}
 }
 
 func _Join() {
