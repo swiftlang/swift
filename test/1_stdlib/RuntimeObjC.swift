@@ -747,7 +747,7 @@ Reflection.test("Unmanaged/nil") {
 Reflection.test("Unmanaged/not-nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? =
-    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
+    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/" as CFString, nil))
   dump(optionalURL, to: &output)
 
   let expected =

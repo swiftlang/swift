@@ -188,9 +188,9 @@ public func testCondCastNStoSwiftArrayString() -> [String]? {
 
 // Check optimization of casts from NSDictionary to Swift Dictionary
 
-var nsDictInt: NSDictionary = [1:1, 2:2, 3:3, 4:4]
-var nsDictDouble: NSDictionary = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
-var nsDictString: NSDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
+var nsDictInt: NSDictionary = [1 as NSNumber:1 as NSNumber, 2 as NSNumber:2 as NSNumber, 3 as NSNumber:3 as NSNumber, 4 as NSNumber:4 as NSNumber]
+var nsDictDouble: NSDictionary = [1.1 as NSNumber : 1.1 as NSNumber, 2.2 as NSNumber : 2.2 as NSNumber, 3.3 as NSNumber : 3.3 as NSNumber, 4.4 as NSNumber : 4.4 as NSNumber]
+var nsDictString: NSDictionary = ["One" as NSString:"One" as NSString, "Two" as NSString:"Two" as NSString, "Three" as NSString:"Three" as NSString, "Four" as NSString:"Four" as NSString]
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testForcedCastNStoSwiftDictIntFT_GVs10DictionarySiSi_
 // CHECK-NOT: unconditional_checked

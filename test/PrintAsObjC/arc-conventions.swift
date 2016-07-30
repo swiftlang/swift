@@ -17,7 +17,7 @@ import Foundation
 public class Test: NSObject {
   public func initAllTheThings() -> AnyObject {
     print("method called")
-    return "initialized"
+    return "initialized" as NSString
   }
 
   deinit {

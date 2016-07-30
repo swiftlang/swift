@@ -7,7 +7,7 @@
 import Foundation
 
 // Test overlain variadic methods.
-let s = NSPredicate(format: "(lastName like[cd] %@) AND (birthday > %@)", "LLLL", "BBBB")
+let s = NSPredicate(format: "(lastName like[cd] %@) AND (birthday > %@)", "LLLL" as NSString, "BBBB" as NSString)
 print(s.predicateFormat)
 
 // CHECK: lastName LIKE[cd] "LLLL" AND birthday > "BBBB"
