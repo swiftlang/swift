@@ -53,10 +53,8 @@ func unqualifiedType() {
   _ = Foo.instMeth
 
   _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{10-10=()}} expected-note{{use '.self'}} {{10-10=.self}}
-  _ = Foo.dynamicType // expected-error {{expected member name or constructor call after type name}}
+  _ = Foo.dynamicType // expected-error {{type 'Foo' has no member 'dynamicType'}}
                       // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{10-22=)}}
-                      // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-                      // expected-note@-3 {{use '.self' to reference the type object}}
 
   _ = Bad // expected-error{{expected member name or constructor call after type name}}
   // expected-note@-1{{use '.self' to reference the type object}}{{10-10=.self}}
@@ -73,10 +71,8 @@ func qualifiedType() {
   _ = Foo.Bar.instMeth
 
   _ = Foo.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} {{14-14=()}} expected-note{{use '.self'}} {{14-14=.self}}
-  _ = Foo.Bar.dynamicType // expected-error {{expected member name or constructor call after type name}}
+  _ = Foo.Bar.dynamicType // expected-error {{type 'Foo.Bar' has no member 'dynamicType'}}
                           // expected-error@-1 {{'.dynamicType' is deprecated. Use 'type(of: ...)' instead}} {{7-7=type(of: }} {{14-26=)}}
-                          // expected-note@-2 {{add arguments after the type to construct a value of the type}}
-                          // expected-note@-3 {{use '.self' to reference the type object}}
 }
 
 /* TODO allow '.Type' in expr context
@@ -119,6 +115,10 @@ func typeOfShadowing() {
     return t
   }
 
+  func type<T, U>(of t: T.Type, _ : U) -> T.Type {
+    return t
+  }
+  
   func type<T>(_ t: T.Type) -> T.Type {
     return t
   }
@@ -131,6 +131,7 @@ func typeOfShadowing() {
   _ = type(Gen<Foo>.Bar) // No error here. 
   _ = type(of: Gen<Foo>.Bar.self, flag: false) // No error here.
   _ = type(fo: Foo.Bar.self) // No error here.
+  _ = type(of: Foo.Bar.self, [1, 2, 3]) // No error here.
 }
 
 func archetype<T: Zim>(_: T) {

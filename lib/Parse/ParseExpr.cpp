@@ -966,8 +966,10 @@ static bool canParseTypeOf(Parser &P) {
 
   // Parse to the closing paren.
   while (!P.Tok.is(tok::r_paren) && !P.Tok.is(tok::eof)) {
-    // Anything that looks like another argument label is bogus.
-    if (P.Tok.is(tok::comma) && P.peekToken().canBeArgumentLabel()) {
+    // Anything that looks like another argument label is bogus.  It is
+    // sufficient to parse for a single trailing comma.  Backtracking will
+    // fall back to an unresolved decl.
+    if (P.Tok.is(tok::comma)) {
       return false;
     }
     P.skipSingle();
@@ -1451,13 +1453,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
       // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
       if (Tok.getText() == "dynamicType") {
+        BacktrackingScope backtrackScope(*this);
         auto range = Result.get()->getSourceRange();
         auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
         diagnose(TokLoc, diag::expr_dynamictype_deprecated)
           .highlight(dynamicTypeExprRange)
           .fixItReplace(dynamicTypeExprRange, ")")
           .fixItInsert(range.Start, "type(of: ");
-        continue;
+
+        // fallthrough to an UnresolvedDotExpr.
       }
            
       // If we have '.<keyword><code_complete>', try to recover by creating
