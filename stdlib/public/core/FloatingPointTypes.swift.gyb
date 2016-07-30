@@ -914,43 +914,6 @@ extension ${Self} : Strideable {
 // Deprecated operators
 //===----------------------------------------------------------------------===//
 
-@_transparent
-@available(*, unavailable, message: "Use truncatingRemainder instead")
-public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  fatalError("% is not available.")
-}
-
-@_transparent
-@available(*, unavailable, message: "Use formTruncatingRemainder instead")
-public func %= (lhs: inout ${Self}, rhs: ${Self}) {
-  fatalError("%= is not available.")
-}
-
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func -- (rhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++ (lhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func -- (lhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
-
 % if bits == 80:
 #endif
 % end
@@ -1006,3 +969,40 @@ extension ${Self} {
 }
 
 % end # for (bits, signed) in allInts()
+
+@_transparent
+@available(*, unavailable, message: "Use truncatingRemainder instead")
+public func % <T: FloatingPoint> (lhs: T, rhs: T) -> T {
+  fatalError("% is not available.")
+}
+
+@_transparent
+@available(*, unavailable, message: "Use formTruncatingRemainder instead")
+public func %= <T: FloatingPoint> (lhs: T, rhs: T) {
+  fatalError("%= is not available.")
+}
+
+@_transparent
+@available(*, unavailable, message: "use += 1")
+@discardableResult
+public prefix func ++ <T: Arithmetic> (rhs: T) -> T {
+  fatalError("++ is not available")
+}
+@_transparent
+@available(*, unavailable, message: "use -= 1")
+@discardableResult
+public prefix func -- <T: Arithmetic> (rhs: T) -> T {
+  fatalError("-- is not available")
+}
+@_transparent
+@available(*, unavailable, message: "use += 1")
+@discardableResult
+public postfix func ++ <T: Arithmetic> (lhs: T) -> T {
+  fatalError("++ is not available")
+}
+@_transparent
+@available(*, unavailable, message: "use -= 1")
+@discardableResult
+public postfix func -- <T: Arithmetic> (lhs: T) -> T {
+  fatalError("-- is not available")
+}
