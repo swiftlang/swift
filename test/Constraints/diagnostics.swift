@@ -179,7 +179,7 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(_ h: Int, w : Int) {
   return h * w  // expected-error {{no '*' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
+  // expected-note @-1 {{overloads for '*' exist with these result types: }}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -457,8 +457,8 @@ func someGeneric19997471<T>(_ x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int)}}
+  _ = x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
+  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 
@@ -542,7 +542,7 @@ func testTypeSugar(_ a : Int) {
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
   let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
+   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -752,8 +752,8 @@ if AssocTest.one(1) == AssocTest.one(1) {} // expected-error{{binary operator '=
 func r24251022() {
   var a = 1
   var b: UInt32 = 2
-  a += a + // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{expected an argument list of type '(Int, Int)'}}
-    b
+  a += a +
+    b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {
@@ -763,10 +763,13 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
   // expected-note @-1 {{expected an argument list of type '(Bool, @autoclosure () throws -> Bool)'}}
 }
 
+postfix operator +++
+postfix func +++ <T>(_: inout T) -> T { fatalError() }
+
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
   let i = 42   // expected-note {{change 'let' to 'var' to make it mutable}}
-  let r = bytes[i++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+  _ = bytes[i+++]  // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
 }
 
 

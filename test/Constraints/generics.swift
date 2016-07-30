@@ -169,7 +169,7 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
 // <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
 func r22459135() {
   func h<S : Sequence>(_ sequence: S) -> S.Iterator.Element
-    where S.Iterator.Element : Integer {
+    where S.Iterator.Element : FixedWidthInteger {
     return 0
   }
 
@@ -205,7 +205,7 @@ var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could no
 
 
 // https://bugs.swift.org/browse/SR-599
-func SR599<T: Integer>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
+func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599'}}
 _ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
 
 
@@ -225,7 +225,7 @@ func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
 }
 
 // <rdar://problem/21718970> QoI: [uninferred generic param] cannot invoke 'foo' with an argument list of type '(Int)'
-class Whatever<A: IntegerArithmetic, B: IntegerArithmetic> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
+class Whatever<A: Arithmetic, B: Arithmetic> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
   static func foo(a: B) {}
   
   static func bar() {}
