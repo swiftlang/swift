@@ -3838,7 +3838,7 @@ private:
   struct GetSetRecord;
   
   /// This is stored immediately before the GetSetRecord.
-  struct AddressorRecord {
+  struct alignas(1 << 3) AddressorRecord {
     FuncDecl *Address = nullptr;        // User-defined address accessor
     FuncDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
 
