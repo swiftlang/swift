@@ -179,8 +179,8 @@ func hitOptionalSpecifically(_ x: Builtin.BridgeObject?) {
 
 if true {
   // CHECK-NEXT: true
-  print(sizeof(Optional<Builtin.BridgeObject>.self)
-            == sizeof(Builtin.BridgeObject.self))
+  print(MemoryLayout<Optional<Builtin.BridgeObject>>.size
+            == MemoryLayout<Builtin.BridgeObject>.size)
 
   var bo: Builtin.BridgeObject? = nil
 

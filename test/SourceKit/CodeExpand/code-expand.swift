@@ -1,3 +1,5 @@
+// REQUIRES: se_0111_complete
+
 // RUN: %sourcekitd-test -req=expand-placeholder %s | FileCheck %s
 
 foo(x: <#T##() -> Void#>)

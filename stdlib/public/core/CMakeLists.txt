@@ -77,6 +77,7 @@ set(SWIFTLIB_ESSENTIAL
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift.gyb
+  MemoryLayout.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift

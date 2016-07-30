@@ -181,7 +181,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     bufferClass: AnyClass,
     minimumCapacity: Int,
     makingHeaderWith factory:
-      (buffer: AnyObject, capacity: (AnyObject) -> Int) throws -> Header
+      (_ buffer: AnyObject, _ capacity: (AnyObject) -> Int) throws -> Header
   ) rethrows {
     self = ManagedBufferPointer(
       bufferClass: bufferClass, minimumCapacity: minimumCapacity)
@@ -190,8 +190,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     try withUnsafeMutablePointerToHeader {
       $0.initialize(to: 
         try factory(
-          buffer: self.buffer,
-          capacity: {
+          self.buffer,
+          {
             ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }
@@ -245,7 +245,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// idea to store this information in the "header" area when
   /// an instance is created.
   public var capacity: Int {
-    return (_capacityInBytes &- _My._elementOffset) / strideof(Element.self)
+    return (_capacityInBytes &- _My._elementOffset) / MemoryLayout<Element>.stride
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -328,7 +328,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       "ManagedBufferPointer must have non-negative capacity")
 
     let totalSize = _My._elementOffset
-      +  minimumCapacity * strideof(Element.self)
+      +  minimumCapacity * MemoryLayout<Element>.stride
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
       bufferType: _uncheckedBufferClass,
@@ -352,11 +352,11 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _debugPrecondition(
-      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
+      _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         !creating
         && _class_getInstancePositiveExtentSize(bufferClass)
-          == _headerOffset + sizeof(Header.self)),
+          == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
     _debugPrecondition(
@@ -369,11 +369,11 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _sanityCheck(
-      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
+      _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         !creating
         && _class_getInstancePositiveExtentSize(bufferClass)
-          == _headerOffset + sizeof(Header.self)),
+          == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
     _sanityCheck(
@@ -385,8 +385,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// The required alignment for allocations of this type, minus 1
   internal static var _alignmentMask: Int {
     return max(
-      alignof(_HeapObject.self),
-      max(alignof(Header.self), alignof(Element.self))) &- 1
+      MemoryLayout<_HeapObject>.alignment,
+      max(MemoryLayout<Header>.alignment, MemoryLayout<Element>.alignment)) &- 1
   }
 
   /// The actual number of bytes allocated for this object.
@@ -403,8 +403,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   internal static var _headerOffset: Int {
     _onFastPath()
     return _roundUp(
-      sizeof(_HeapObject.self),
-      toAlignment: alignof(Header.self))
+      MemoryLayout<_HeapObject>.size,
+      toAlignment: MemoryLayout<Header>.alignment)
   }
 
   /// An **unmanaged** pointer to the storage for the `Header`
@@ -429,8 +429,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   internal static var _elementOffset: Int {
     _onFastPath()
     return _roundUp(
-      _headerOffset + sizeof(Header.self),
-      toAlignment: alignof(Element.self))
+      _headerOffset + MemoryLayout<Header>.size,
+      toAlignment: MemoryLayout<Element>.alignment)
   }
 
   internal mutating func _isUniqueOrPinnedReference() -> Bool {

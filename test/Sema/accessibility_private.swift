@@ -110,3 +110,38 @@ class Sub : Container {
   var subInner: PrivateInner? // FIXME expected-error {{use of undeclared type 'PrivateInner'}}
   var subInnerQualified: Container.PrivateInner? // FIXME expected-error {{'PrivateInner' is not a member type of 'Container'}}
 }
+
+
+protocol VeryImportantProto {
+  associatedtype Assoc
+  var value: Int { get set } // expected-note {{protocol requires property 'value' with type 'Int'; do you want to add a stub?}}
+}
+
+private struct VIPPrivateType : VeryImportantProto {
+  private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+  var value: Int
+}
+
+private struct VIPPrivateProp : VeryImportantProto {
+  typealias Assoc = Int
+  private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+}
+
+private struct VIPPrivateSetProp : VeryImportantProto {
+  typealias Assoc = Int
+  private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+}
+
+private class VIPPrivateSetBase {
+  private var value: Int = 0
+}
+private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto { // expected-error {{type 'VIPPrivateSetSub' does not conform to protocol 'VeryImportantProto'}}
+  typealias Assoc = Int
+}
+
+private class VIPPrivateSetPropBase {
+  private(set) var value: Int = 0 // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+}
+private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
+  typealias Assoc = Int
+}

@@ -772,6 +772,16 @@ static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
   temp.finishInitialization(SGF);
 }
 
+/// If the type is a single-element tuple, return the element type.
+static CanType getSingleTupleElement(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (tupleType->getNumElements() == 1)
+      return tupleType.getElementType(0);
+  }
+
+  return type;
+}
+
 namespace {
   class TranslateArguments {
     SILGenFunction &SGF;
@@ -804,7 +814,7 @@ namespace {
         if (inputOrigType.isTuple() &&
             inputOrigType.getNumTupleElements() == 1) {
           inputOrigType = inputOrigType.getTupleElementType(0);
-          inputSubstType = cast<TupleType>(inputSubstType).getElementType(0);
+          inputSubstType = getSingleTupleElement(inputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }
@@ -812,10 +822,7 @@ namespace {
         if (outputOrigType.isTuple() &&
             outputOrigType.getNumTupleElements() == 1) {
           outputOrigType = outputOrigType.getTupleElementType(0);
-          if (auto outputSubstTuple = dyn_cast<TupleType>(outputSubstType)) {
-            if (outputSubstTuple->getNumElements() > 0)
-              outputSubstType = outputSubstTuple.getElementType(0);
-          }
+          outputSubstType = getSingleTupleElement(outputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }

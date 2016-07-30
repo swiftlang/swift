@@ -20,6 +20,7 @@ import SwiftShims
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(X.self)`, when `X` is a class type, is the
 /// same regardless of how many stored properties `X` has.
+@available(*, deprecated, message: "use MemoryLayout<T>.size instead.")
 @_transparent
 public func sizeof<T>(_:T.Type) -> Int {
   return Int(Builtin.sizeof(T.self))
@@ -30,18 +31,21 @@ public func sizeof<T>(_:T.Type) -> Int {
 /// Does not include any dynamically-allocated or "remote" storage.
 /// In particular, `sizeof(a)`, when `a` is a class instance, is the
 /// same regardless of how many stored properties `a` has.
+@available(*, deprecated, message: "use MemoryLayout<T>.size instead.")
 @_transparent
 public func sizeofValue<T>(_:T) -> Int {
   return sizeof(T.self)
 }
 
 /// Returns the minimum memory alignment of `T`.
+@available(*, deprecated, message: "use MemoryLayout<T>.alignment instead.")
 @_transparent
 public func alignof<T>(_:T.Type) -> Int {
   return Int(Builtin.alignof(T.self))
 }
 
 /// Returns the minimum memory alignment of `T`.
+@available(*, deprecated, message: "use MemoryLayout<T>.alignment instead.")
 @_transparent
 public func alignofValue<T>(_:T) -> Int {
   return alignof(T.self)
@@ -49,6 +53,7 @@ public func alignofValue<T>(_:T) -> Int {
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
+@available(*, deprecated, message: "use MemoryLayout<T>.stride instead.")
 @_transparent
 public func strideof<T>(_:T.Type) -> Int {
   return Int(Builtin.strideof_nonzero(T.self))
@@ -56,6 +61,7 @@ public func strideof<T>(_:T.Type) -> Int {
 
 /// Returns the least possible interval between distinct instances of
 /// `T` in memory.  The result is always positive.
+@available(*, deprecated, message: "use MemoryLayout<T>.stride instead.")
 @_transparent
 public func strideofValue<T>(_:T) -> Int {
   return strideof(T.self)
@@ -100,7 +106,7 @@ internal func _roundUp<DestinationType>(
   return UnsafeMutablePointer<DestinationType>(
     bitPattern: _roundUpImpl(
       UInt(bitPattern: pointer),
-      toAlignment: alignof(DestinationType.self))
+      toAlignment: MemoryLayout<DestinationType>.alignment)
   ).unsafelyUnwrapped
 }
 
@@ -119,7 +125,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to: U.Type) -> U {
-  _precondition(sizeof(T.self) == sizeof(U.self),
+  _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
     "can't unsafeBitCast between types of different sizes")
   return Builtin.reinterpretCast(x)
 }
@@ -249,8 +255,8 @@ public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to: T.Type) -> T {
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
   let storedPropertyOffset = _roundUp(
-    sizeof(_HeapObject.self),
-    toAlignment: alignof(Optional<AnyObject>.self))
+    MemoryLayout<_HeapObject>.size,
+    toAlignment: MemoryLayout<Optional<AnyObject>>.alignment)
   return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(x)) +
     storedPropertyOffset
 }

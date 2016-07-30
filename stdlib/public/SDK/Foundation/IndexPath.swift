@@ -154,7 +154,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         if count == 0 {
             _indexes = []
         } else {
-            var ptr = malloc(count * sizeof(Element.self))
+            var ptr = malloc(count * MemoryLayout<Element>.size)
             defer { free(ptr) }
 
             let elementPtr = ptr!.bindMemory(to: Element.self, capacity: count)

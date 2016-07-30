@@ -12,9 +12,6 @@
 // RUN: %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
 
-// rdar://27547957
-// XFAIL: swift_test_mode_optimize
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -328,9 +325,9 @@ SetTestSuite.test("AssociatedTypes") {
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
 #if arch(i386) || arch(arm)
-  expectEqual(4, sizeofValue(s))
+  expectEqual(4, MemoryLayout._ofInstance(s).size)
 #else
-  expectEqual(8, sizeofValue(s))
+  expectEqual(8, MemoryLayout._ofInstance(s).size)
 #endif
 }
 

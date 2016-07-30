@@ -197,11 +197,11 @@ var _ : ([Int]).Type = [4].dynamicType
 // CHECK: : ([Int]).Type
 var _ : ((Int) -> Int)? = .none
 // CHECK: : ((Int) -> Int)?
-func chained(f f: (Int) -> ()) -> Int { return 0 }
+func chained(f f: @escaping (Int) -> ()) -> Int { return 0 }
 chained
-// CHECK: : (f: (Int) -> ()) -> Int
+// CHECK: : (@escaping (Int) -> ()) -> Int
 [chained]
-// CHECK: : [(f: (Int) -> ()) -> Int]
+// CHECK: : [(@escaping (Int) -> ()) -> Int]
 
 ({97210}())
 // CHECK: = 97210

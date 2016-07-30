@@ -168,7 +168,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is uninitialized.
   ///
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
-  ///   through `self` + `count` * `strideof(T.self)`
+  ///   through `self` + `count` * `MemoryLayout<T>.stride`
   ///
   /// - Warning: Binding memory to a type is potentially undefined if the
   ///   memory is ever accessed as an unrelated type.
@@ -225,10 +225,10 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       "UnsafeMutableRawPointer.initializeMemory: negative count")
 
     Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
-    var nextPtr = self + index &* strideof(T.self)
+    var nextPtr = self + index &* MemoryLayout<T>.stride
     for _ in 0..<count {
       Builtin.initialize(value, nextPtr._rawValue)
-      nextPtr += strideof(T.self)
+      nextPtr += MemoryLayout<T>.stride
     }
     return UnsafeMutablePointer(_rawValue)
   }
@@ -242,20 +242,20 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: `count >= 0`
   ///
   /// - Precondition: The memory regions `source..<source + count` and
-  ///   `self..<self + count * strideof(T.self)` do not overlap.
+  ///   `self..<self + count * MemoryLayout<T>.stride` do not overlap.
   ///
-  /// - Precondition: The memory at `self..<self + count * strideof(T.self)`
+  /// - Precondition: The memory at `self..<self + count * MemoryLayout<T>.stride`
   ///   is uninitialized, and the `T` values at `source..<source + count` are
   ///   initialized.
   ///
   /// - Precondition: The underlying pointer is properly aligned for
   ///                 accessing `T`.
   ///
-  /// - Postcondition: The memory at `self..<self + count * strideof(T.self)`
+  /// - Postcondition: The memory at `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to type `T`.
   ///
   /// - Postcondition: The `T` values at `self..<self + count *
-  ///   strideof(T.self)` and `source..<source + count` are initialized.
+  ///   MemoryLayout<T>.stride` and `source..<source + count` are initialized.
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, from source: UnsafePointer<T>, count: Int
@@ -264,7 +264,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
       count >= 0,
       "UnsafeMutableRawPointer.initializeMemory with negative count")
     _debugPrecondition(
-      (UnsafeRawPointer(self + count * strideof(T.self))
+      (UnsafeRawPointer(self + count * MemoryLayout<T>.stride)
         <= UnsafeRawPointer(source))
       || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
       "UnsafeMutableRawPointer.initializeMemory overlapping range")
@@ -285,13 +285,13 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
   /// - Precondition: The memory at `self..<self + source.count *
-  ///   strideof(T.self)` is uninitialized.
+  ///   MemoryLayout<T>.stride` is uninitialized.
   ///
   /// - Postcondition: The memory at `self..<self + source.count *
-  ///   strideof(T.self)` is bound to type `T`.
+  ///   MemoryLayout<T>.stride` is bound to type `T`.
   ///
   /// - Postcondition: The `T` values at `self..<self + source.count *
-  ///   strideof(T.self)` are initialized.
+  ///   MemoryLayout<T>.stride` are initialized.
   ///
   /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   @discardableResult
@@ -314,14 +314,14 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: `count >= 0`
   ///
   /// - Precondition: The memory at `self..<self + count *
-  ///   strideof(T.self)` is uninitialized and the `T` values at
+  ///   MemoryLayout<T>.stride` is uninitialized and the `T` values at
   ///   `source..<source + count` are initialized.
   ///
   /// - Postcondition: The memory at `self..<self + count *
-  ///   strideof(T.self)` is bound to type `T`.
+  ///   MemoryLayout<T>.stride` is bound to type `T`.
   ///
   /// - Postcondition: The `T` values at `self..<self + count *
-  ///   strideof(T.self)` are initialized and the memory at
+  ///   MemoryLayout<T>.stride` are initialized and the memory at
   ///   `source..<source + count` is uninitialized.
   @discardableResult
   public func moveInitializeMemory<T>(
@@ -368,7 +368,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   such that `T` is layout compatible with `U`.
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(alignof(T.self)) - 1)),
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
     return Builtin.load((self + offset)._rawValue)
@@ -409,17 +409,16 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     of value: T, toByteOffset offset: Int = 0, as: T.Type
   ) {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(alignof(T.self)) - 1)),
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
       "storeBytes to misaligned raw pointer")
 
     var temp = value
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
-      let zero: Int32 = 0
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        (self + offset)._rawValue, rawSrc, UInt64(sizeof(T.self))._value,
-        /*alignment:*/ zero._value,
+        (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
+        /*alignment:*/ Int32(0)._value,
         /*volatile:*/ false._value)
     }
   }
@@ -434,7 +433,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: If the memory at `self..<self+count` is bound to
   ///   a type `U`, then `U` is a trivial type, the underlying
   ///   pointers `source` and `self` are properly aligned for type
-  ///   `U`, and `count` is a multiple of `strideof(U.self)`.
+  ///   `U`, and `count` is a multiple of `MemoryLayout<U>.stride`.
   ///
   /// - Postcondition: The memory at `self..<self+count` is
   ///   initialized to raw bytes. If the memory is bound to type `U`,

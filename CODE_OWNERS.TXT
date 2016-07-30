@@ -43,8 +43,8 @@ N: Jordan Rose
 E: jordan_rose@apple.com
 D: ClangImporter, Serialization, (Objective-)C printer, Driver
 
-N: Nadav Rotem
-E: nrotem@apple.com
+N: Erik Eckstein
+E: eeckstein@apple.com
 D: SILOptimizer
 
 N: Anna Zaks

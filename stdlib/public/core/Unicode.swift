@@ -764,7 +764,7 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
   typealias _UTF8Chunk = _StringCore._UTF8Chunk
 
   let endIndex = input.endIndex
-  let utf8Max = sizeof(_UTF8Chunk.self)
+  let utf8Max = MemoryLayout<_UTF8Chunk>.size
   var result: _UTF8Chunk = 0
   var utf8Count = 0
   var nextIndex = startIndex
@@ -839,7 +839,7 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
     nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
-  if utf8Count < sizeofValue(result) {
+  if utf8Count < MemoryLayout._ofInstance(result).size {
     result |= ~0 << numericCast(utf8Count * 8)
   }
   return (nextIndex, result)
@@ -1021,11 +1021,11 @@ extension UTF16 {
     destination: UnsafeMutablePointer<U>,
     count: Int
   ) {
-    if strideof(T.self) == strideof(U.self) {
+    if MemoryLayout<T>.stride == MemoryLayout<U>.stride {
       _memcpy(
         dest: UnsafeMutablePointer(destination),
         src: UnsafeMutablePointer(source),
-        size: UInt(count) * UInt(strideof(U.self)))
+        size: UInt(count) * UInt(MemoryLayout<U>.stride))
     }
     else {
       for i in 0..<count {

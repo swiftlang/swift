@@ -37,7 +37,6 @@ set(SWIFT_BENCH_MODULES
     single-source/CaptureProp
     single-source/Chars
     single-source/ClassArrayGetter
-    single-source/Data
     single-source/DeadArray
     single-source/DictionaryBridge
     single-source/DictionaryLiteral
@@ -53,6 +52,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/Integrate
+    single-source/IterateData
     single-source/Join
     single-source/LinkedList
     single-source/MapReduce

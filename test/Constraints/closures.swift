@@ -165,18 +165,18 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-// expected-note @+1 {{in call to function 'callCC'}}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
+  callCC { // expected-error {{unable to infer closure return type in current context}}
     _ = $0
     return 1
   }
 }
 
 // SR-832 - both these should be ok
-func someFunc(_ foo: ((String) -> String)?, bar: (String) -> String) {
+func someFunc(_ foo: (@escaping (String) -> String)?, 
+              bar: @escaping (String) -> String) {
     let _: (String) -> String = foo != nil ? foo! : bar
     let _: (String) -> String = foo ?? bar
 }
@@ -200,8 +200,23 @@ struct S<T> {
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: @noescape () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
-  // expected-note@-1{{parameter 'ac1' is implicitly @noescape because it was declared @autoclosure}}
+  // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
   // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
-  // FIXME: expected-error@-2{{closure use of @noescape parameter 'ac1' may allow it to escape}}
+  // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
+
+// <rdar://problem/23570873> QoI: Poor error calling map without being able to infer "U" (closure result inference)
+struct Thing {
+  init?() {}
+}
+// This throws a compiler error
+let things = Thing().map { thing in  // expected-error {{unable to infer closure return type in current context}}
+  // Commenting out this makes it compile
+  _ = thing
+  return thing
+}
+
+
+
+

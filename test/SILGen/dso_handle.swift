@@ -1,18 +1,23 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
 
-// CHECK: sil_global hidden_external @__dso_handle : $UnsafeMutableRawPointer
+// CHECK: sil_global hidden_external [[DSO:@__dso_handle]] : $Builtin.RawPointer
 
 // CHECK-LABEL: sil @main : $@convention(c)
 // CHECK: bb0
-// CHECK: [[DSO:%[0-9]+]] = global_addr @__dso_handle : $*UnsafeMutableRawPointer
-// CHECK: load [[DSO]]
+// CHECK: [[DSOAddr:%[0-9]+]] = global_addr [[DSO]] : $*Builtin.RawPointer
+// CHECK-NEXT: [[DSOPtr:%[0-9]+]] = address_to_pointer [[DSOAddr]] : $*Builtin.RawPointer to $Builtin.RawPointer
+// CHECK-NEXT: [[DSOPtrStruct:[0-9]+]] = struct $UnsafeRawPointer ([[DSOPtr]] : $Builtin.RawPointer)
 
-// CHECK-LABEL: sil hidden @_TIF10dso_handle14printDSOHandleFT3dsoSv_SvA_
-// CHECK: [[DSO:%[0-9]+]] = global_addr @__dso_handle : $*UnsafeMutableRawPointer
-// CHECK: load [[DSO]]
-func printDSOHandle(dso: UnsafeMutableRawPointer = #dsohandle) -> UnsafeMutableRawPointer {
+
+// CHECK-LABEL: sil hidden @_TIF10dso_handle14printDSOHandleFT3dsoSV_SVA_
+// CHECK: [[DSOAddr:%[0-9]+]] = global_addr [[DSO]] : $*Builtin.RawPointer
+// CHECK-NEXT: [[DSOPtr:%[0-9]+]] = address_to_pointer [[DSOAddr]] : $*Builtin.RawPointer to $Builtin.RawPointer
+// CHECK-NEXT: [[DSOPtrStruct:%[0-9]+]] = struct $UnsafeRawPointer ([[DSOPtr]] : $Builtin.RawPointer)
+// CHECK-NEXT: return [[DSOPtrStruct]] : $UnsafeRawPointer
+func printDSOHandle(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
   print(dso)
+  return dso
 }
 
-printDSOHandle()
+_ = printDSOHandle()
 

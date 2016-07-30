@@ -19,11 +19,11 @@ extension Double : P {
 func f0(_ x: Int, 
         _ y: Float) { }
 
-func f1(_: (Int, Float) -> Int) { }
+func f1(_: @escaping (Int, Float) -> Int) { }
 
-func f2(_: (_: (Int) -> Int)) -> Int {}
+func f2(_: (_: @escaping (Int) -> Int)) -> Int {}
 
-func f3(_: (_: (Int) -> Float) -> Int) {}
+func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 
 func f4(_ x: Int) -> Int { }
 
@@ -60,7 +60,7 @@ f1(
    )
 
 f3(
-   f2 // expected-error {{cannot convert value of type '(((Int) -> Int)) -> Int' to expected argument type '((Int) -> Float) -> Int'}}
+   f2 // expected-error {{cannot convert value of type '((@escaping (Int) -> Int)) -> Int' to expected argument type '(@escaping (Int) -> Float) -> Int'}}
    )
 
 f4(i, d) // expected-error {{extra argument in call}}
@@ -93,7 +93,7 @@ func f7() -> (c: Int, v: A) {
   return f6(g) // expected-error {{cannot convert return expression of type '(c: Int, i: A)' to return type '(c: Int, v: A)'}}
 }
 
-func f8<T:P2>(_ n: T, _ f: (T) -> T) {}
+func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{in argument type '(Int) -> Int', 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
@@ -286,7 +286,7 @@ func r18800223(_ i : Int) {
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{unable to infer closure return type in current context}}
+_ = { $0 }  // expected-error {{unable to infer closure type in the current context}}
 
 
 
@@ -344,26 +344,26 @@ func r20789423() {
 
 
 
-func f7(_ a: Int) -> (b: Int) -> Int {
+func f7(_ a: Int) -> (_ b: Int) -> Int {
   return { b in a+b }
 }
 
-_ = f7(1)(b: 1)
+_ = f7(1)(1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-f7(1)(1.0)       // expected-error {{missing argument label 'b:' in call}}
-f7(1)(b: 1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}   
 
 let f8 = f7(2)
-_ = f8(b: 1)
-f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
-f8(1.0)         // expected-error {{missing argument label 'b:' in call}}
-f8(b: 1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+_ = f8(1)
+f8(10)          // expected-warning {{result of call is unused, but produces 'Int'}}
+f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 
 
 class CurriedClass {
   func method1() {}
-  func method2(_ a: Int) -> (b : Int) -> () { return { b in () } }
+  func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
   func method3(_ a: Int, b : Int) {}
 }
 
@@ -372,25 +372,25 @@ _ = c.method1
 c.method1(1)         // expected-error {{argument passed to call that takes no arguments}}
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1)(b: 2)
-c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}} {{14-15=b}}
-c.method2(1)(c: 2.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
-c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1)(2)
+c.method2(1)(c: 2)   // expected-error {{extraneous argument label 'c:' in call}}
+c.method2(1)(c: 2.0) // expected-error {{extraneous argument label 'c:' in call}}
+c.method2(1)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1.0)(2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{use of instance member 'method1' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 
-CurriedClass.method2(c)(32)(b: 1)
+CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{use of instance member 'method2' on type 'CurriedClass'; did you mean to use a value of type 'CurriedClass' instead?}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
+CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
 
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
@@ -834,7 +834,7 @@ func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : Integer>() -> T? {
   var buffer : T 
   let n = withUnsafePointer(to: &buffer) { (p) in
-    read2(UnsafePointer(p), maxLength: sizeof(T)) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
+    read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
 

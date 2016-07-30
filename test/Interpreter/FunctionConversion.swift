@@ -229,7 +229,7 @@ func generic1<T>(t: Parent) -> (T, Trivial) {
   return (t as! T, Trivial(n: 0))
 }
 
-func generic2<T : Parent>(f: (Parent) -> (T, Trivial), t: T) -> (Child) -> (Parent, Trivial?) {
+func generic2<T : Parent>(f: @escaping (Parent) -> (T, Trivial), t: T) -> (Child) -> (Parent, Trivial?) {
   return f
 }
 

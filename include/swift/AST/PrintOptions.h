@@ -261,6 +261,12 @@ struct PrintOptions {
   /// Whether we are printing part of SIL body.
   bool PrintInSILBody = false;
 
+  /// Whether to print the types as if they appear as function parameters. This
+  /// governs whether we print a function type with an explicit @escaping. This
+  /// is also set and restored internally when visiting a type in a parameter
+  /// position.
+  bool PrintAsInParamType = false;
+
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
 

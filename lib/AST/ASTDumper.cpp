@@ -2916,8 +2916,11 @@ namespace {
       }
 
       printFlag(T->isAutoClosure(), "autoclosure");
-      printFlag(T->isNoEscape(), "noescape");
-      printFlag(T->isExplicitlyEscaping(), "escaping");
+
+      // Dump out either @noescape or @escaping
+      printFlag(T->isNoEscape(), "@noescape");
+      printFlag(!T->isNoEscape(), "@escaping");
+
       printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());

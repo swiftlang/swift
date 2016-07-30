@@ -20,7 +20,7 @@ func bytesFromNSData(_ data: NSData) -> [UInt8] {
 
 func floatsFromNSData(_ data: NSData) -> [Float] {
   let floatPtr = data.bytes.bindMemory(to: Float.self, capacity: data.length)
-  return Array(UnsafeBufferPointer(start: floatPtr, count: data.length / sizeof(Float)))
+  return Array(UnsafeBufferPointer(start: floatPtr, count: data.length / MemoryLayout<Float>.size))
 }
 
 if #available(iOS 8.0, *) {
@@ -140,7 +140,7 @@ if #available(iOS 8.0, *) {
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
-    expectEqual(source.bytesPerComponent, sizeof(Float))
+    expectEqual(source.bytesPerComponent, MemoryLayout<Float>.size)
     let positions = floatsFromNSData(source.data as NSData)
     expectEqual(positions[2], 3)
     expectEqual(positions[4], 5)
@@ -154,7 +154,7 @@ if #available(iOS 8.0, *) {
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
-    expectEqual(source.bytesPerComponent, sizeof(Float))
+    expectEqual(source.bytesPerComponent, MemoryLayout<Float>.size)
     let normals = floatsFromNSData(source.data as NSData)
     expectEqual(normals[2], 3)
     expectEqual(normals[4], 5)

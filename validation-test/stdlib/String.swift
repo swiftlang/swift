@@ -45,7 +45,7 @@ extension String {
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-  expectEqual(3 * sizeof(Int.self), sizeof(String.self))
+  expectEqual(3 * MemoryLayout<Int>.size, MemoryLayout<String>.size)
 }
 
 StringTests.test("AssociatedTypes-UTF8View") {
@@ -896,10 +896,10 @@ StringTests.test("toInt") {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     _ initialValue: Int,
-    modification: (chars: inout [UTF8.CodeUnit]) -> Void
+    modification: (_ chars: inout [UTF8.CodeUnit]) -> Void
   ) {
     var chars = Array(String(initialValue).utf8)
-    modification(chars: &chars)
+    modification(&chars)
     let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
     expectEmpty(Int(str))
   }

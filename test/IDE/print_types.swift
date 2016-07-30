@@ -9,8 +9,8 @@ typealias MyInt = Int
 // FULL:  TypeAliasDecl '''MyInt''' swift_ide_test.MyInt.Type{{$}}
 
 func testVariableTypes(_ param: Int, param2: inout Double) {
-// CHECK: FuncDecl '''testVariableTypes''' (Int, param2: inout Double) -> (){{$}}
-// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, param2: inout Swift.Double) -> (){{$}}
+// CHECK: FuncDecl '''testVariableTypes''' (Int, inout Double) -> (){{$}}
+// FULL:  FuncDecl '''testVariableTypes''' (Swift.Int, inout Swift.Double) -> (){{$}}
 
   var a1 = 42
 // CHECK: VarDecl '''a1''' Int{{$}}
@@ -92,16 +92,16 @@ func testFuncType6() -> (Int, Int) {}
 // FULL:  FuncDecl '''testFuncType6''' () -> (Swift.Int, Swift.Int){{$}}
 
 func testFuncType7(_ a: Int, withFloat b: Float) {}
-// CHECK: FuncDecl '''testFuncType7''' (Int, withFloat: Float) -> (){{$}}
-// FULL:  FuncDecl '''testFuncType7''' (Swift.Int, withFloat: Swift.Float) -> (){{$}}
+// CHECK: FuncDecl '''testFuncType7''' (Int, Float) -> (){{$}}
+// FULL:  FuncDecl '''testFuncType7''' (Swift.Int, Swift.Float) -> (){{$}}
 
 func testVariadicFuncType(_ a: Int, b: Float...) {}
-// CHECK: FuncDecl '''testVariadicFuncType''' (Int, b: Float...) -> (){{$}}
-// FULL:  FuncDecl '''testVariadicFuncType''' (Swift.Int, b: Swift.Float...) -> (){{$}}
+// CHECK: FuncDecl '''testVariadicFuncType''' (Int, Float...) -> (){{$}}
+// FULL:  FuncDecl '''testVariadicFuncType''' (Swift.Int, Swift.Float...) -> (){{$}}
 
-func testCurriedFuncType1(_ a: Int) -> (b: Float) -> () {}
-// CHECK: FuncDecl '''testCurriedFuncType1''' (Int) -> (b: Float) -> (){{$}}
-// FULL:  FuncDecl '''testCurriedFuncType1''' (Swift.Int) -> (b: Swift.Float) -> (){{$}}
+func testCurriedFuncType1(_ a: Int) -> (_ b: Float) -> () {}
+// CHECK: FuncDecl '''testCurriedFuncType1''' (Int) -> (Float) -> (){{$}}
+// FULL:  FuncDecl '''testCurriedFuncType1''' (Swift.Int) -> (Swift.Float) -> (){{$}}
 
 protocol FooProtocol {}
 protocol BarProtocol {}

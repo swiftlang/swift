@@ -50,19 +50,27 @@ public extension DispatchQueue {
 
 	public enum GlobalQueuePriority {
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case high
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case `default`
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case low
 
 		@available(OSX, deprecated: 10.10, message: "Use qos attributes instead")
-		@available(*, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(iOS, deprecated: 8.0, message: "Use qos attributes instead")
+		@available(tvOS, deprecated, message: "Use qos attributes instead")
+		@available(watchOS, deprecated, message: "Use qos attributes instead")
 		case background
 
 		internal var _translatedValue: Int {
@@ -111,8 +119,10 @@ public extension DispatchQueue {
 		return _swift_dispatch_get_main_queue()
 	}
 
-	@available(OSX, deprecated: 10.10, message: "")
-	@available(*, deprecated: 8.0, message: "")
+	@available(OSX, deprecated: 10.10)
+	@available(iOS, deprecated: 8.0)
+	@available(tvOS, deprecated)
+	@available(watchOS, deprecated)
 	public class func global(priority: GlobalQueuePriority) -> DispatchQueue {
 		return __dispatch_get_global_queue(priority._translatedValue, 0)
 	}
@@ -185,7 +195,7 @@ public extension DispatchQueue {
 		group: DispatchGroup? = nil, 
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @convention(block) () -> Void) 
+		execute work: @escaping @convention(block) () -> Void) 
 	{
 		if group == nil && qos == .unspecified && flags.isEmpty {
 			// Fast-path route for the most common API usage
@@ -273,7 +283,7 @@ public extension DispatchQueue {
 		deadline: DispatchTime, 
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @convention(block) () -> Void) 
+		execute work: @escaping @convention(block) () -> Void) 
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
@@ -287,7 +297,7 @@ public extension DispatchQueue {
 		wallDeadline: DispatchWallTime,
 		qos: DispatchQoS = .unspecified, 
 		flags: DispatchWorkItemFlags = [], 
-		execute work: @convention(block) () -> Void) 
+		execute work: @escaping @convention(block) () -> Void) 
 	{
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
@@ -344,7 +354,3 @@ internal func _swift_dispatch_queue_concurrent() -> __OS_dispatch_queue_attr
 
 @_silgen_name("_swift_dispatch_get_main_queue")
 internal func _swift_dispatch_get_main_queue() -> DispatchQueue
-
-@_silgen_name("_swift_dispatch_apply_current_root_queue")
-internal func _swift_dispatch_apply_current_root_queue() -> DispatchQueue
-

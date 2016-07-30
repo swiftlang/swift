@@ -1821,6 +1821,8 @@ ERROR(autoclosure_function_type,none,
       ())
 ERROR(autoclosure_function_input_nonunit,none,
       "autoclosure argument type must be '()'", ())
+
+// FIXME: drop these when we drop @noescape
 ERROR(noescape_function_type,none,
       "@noescape may only be applied to parameters of function type",
       ())
@@ -1829,6 +1831,7 @@ ERROR(noescape_implied_by_autoclosure,none,
       "redundantly specified", ())
 ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
+
 ERROR(escaping_function_type,none,
       "@escaping may only be applied to parameters of function type", ())
 
@@ -2271,17 +2274,20 @@ WARNING(optional_pattern_match_promotion,none,
 ERROR(type_of_metatype,none,
       "'.dynamicType' is not allowed after a type name", ())
 ERROR(invalid_noescape_use,none,
-      "@noescape %select{value|parameter}1 %0 may only be called",
+      "non-escaping %select{value|parameter}1 %0 may only be called",
       (Identifier, bool))
 NOTE(noescape_autoclosure,none,
-    "parameter %0 is implicitly @noescape because it was declared @autoclosure",
+    "parameter %0 is implicitly non-escaping because it was declared @autoclosure",
+     (Identifier))
+NOTE(noescape_parameter,none,
+    "parameter %0 is implicitly non-escaping",
      (Identifier))
 
 ERROR(closure_noescape_use,none,
-      "closure use of @noescape parameter %0 may allow it to escape",
+      "closure use of non-escaping parameter %0 may allow it to escape",
       (Identifier))
 ERROR(decl_closure_noescape_use,none,
-      "declaration closing over @noescape parameter %0 may allow it to escape",
+      "declaration closing over non-escaping parameter %0 may allow it to escape",
       (Identifier))
 
 ERROR(capture_across_type_decl,none,

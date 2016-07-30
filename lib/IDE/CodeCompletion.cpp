@@ -1655,6 +1655,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
       DeducedAssociatedTypeCache;
 
   Optional<SemanticContextKind> ForcedSemanticContext = None;
+  bool IsUnresolvedMember = false;
 
   std::unique_ptr<ArchetypeTransformer> TransformerPt = nullptr;
 
@@ -1884,6 +1885,12 @@ public:
                                          DeclVisibilityKind Reason) {
     if (ForcedSemanticContext)
       return *ForcedSemanticContext;
+
+    if (IsUnresolvedMember) {
+      if (isa<EnumElementDecl>(D)) {
+        return SemanticContextKind::ExpressionSpecific;
+      }
+    }
 
     switch (Reason) {
     case DeclVisibilityKind::LocalVariable:
@@ -3002,20 +3009,6 @@ public:
     return false;
   }
 
-  void handleOptionSet(Decl *D, DeclVisibilityKind Reason) {
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      if (isOptionSetDecl(NTD)) {
-        for (auto M : NTD->getMembers()) {
-          if (auto *VD = dyn_cast<VarDecl>(M)) {
-            if (isOptionSet(VD->getType()) && VD->isStatic()) {
-              addVarDeclRef(VD, Reason);
-            }
-          }
-        }
-      }
-    }
-  }
-
   bool isOptionSetDecl(NominalTypeDecl *D) {
     auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
     if (!optionSetType)
@@ -3659,13 +3652,8 @@ public:
         unboxType(FT->getInput());
         unboxType(FT->getResult());
       } else if (auto NTD = T->getNominalOrBoundGenericNominal()){
-        if (HandledDecls.count(NTD) == 0) {
-          auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
-          if (!Lookup.handleEnumElement(NTD, Reason)) {
-            Lookup.handleOptionSet(NTD, Reason);
-          }
-          HandledDecls.insert(NTD);
-        }
+        if (HandledDecls.insert(NTD).second)
+          Lookup.getUnresolvedMemberCompletions(T);
       }
     }
 
@@ -3699,20 +3687,39 @@ public:
     }
   };
 
-  void getUnresolvedMemberCompletions(SourceLoc Loc, SmallVectorImpl<Type> &Types) {
+  void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
       if (T && T->getNominalOrBoundGenericNominal()) {
-        auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
-        if (!handleEnumElement(T->getNominalOrBoundGenericNominal(), Reason)) {
-          handleOptionSet(T->getNominalOrBoundGenericNominal(), Reason);
-        }
+        // We can only say .foo where foo is a static member of the contextual
+        // type and has the same type (or if the member is a function, then the
+        // same result type) as the contextual type.
+        auto contextCanT = T->getCanonicalType();
+        FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
+          if (!VD->hasType()) {
+            TypeResolver->resolveDeclSignature(VD);
+            if (!VD->hasType())
+              return false;
+          }
+
+          auto T = VD->getType();
+          while (auto FT = T->getAs<AnyFunctionType>())
+            T = FT->getResult();
+          return T->getCanonicalType() == contextCanT;
+        });
+
+        auto baseType = MetatypeType::get(T);
+        llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
+        llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
+        llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
+        lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
+                                 TypeResolver.get(),
+                                 /*includeInstanceMembers=*/false);
       }
     }
   }
 
-  void getUnresolvedMemberCompletions(SourceLoc Loc,
-                                      std::vector<std::string> &FuncNames,
+  void getUnresolvedMemberCompletions(std::vector<std::string> &FuncNames,
                                       bool HasReturn) {
     NeedLeadingDot = !HaveDot;
     LookupByName Lookup(*this, FuncNames);
@@ -5186,12 +5193,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       eraseErrorTypes(PE);
       Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr, PE,
                                         PossibleTypes);
-      Lookup.getUnresolvedMemberCompletions(
-        P.Context.SourceMgr.getCodeCompletionLoc(), PossibleTypes);
+      Lookup.getUnresolvedMemberCompletions(PossibleTypes);
     }
     if (!Success) {
       Lookup.getUnresolvedMemberCompletions(
-        P.Context.SourceMgr.getCodeCompletionLoc(),
         TokensBeforeUnresolvedExpr,
         UnresolvedExprInReturn);
     }

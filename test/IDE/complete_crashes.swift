@@ -127,12 +127,12 @@ protocol Fooable {
 
 // rdar://problem/22688199
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | FileCheck %s -check-prefix=FLIP_CURRIED
-func curried(_ a: Int)(b1: Int, b2: Int) { }
+func curried(_ a: Int)(_ b1: Int, _ b2: Int) { }
 func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
-// FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#b1: Int#}, {#b2: Int#})[#(Int) -> ()#]
+// FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#Int#}, {#Int#})[#(Int) -> ()#]
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {

@@ -96,9 +96,9 @@ var ArrayTestSuite = TestSuite("Array")
 ArrayTestSuite.test("sizeof") {
   var a = [ 10, 20, 30 ]
 #if arch(i386) || arch(arm)
-  expectEqual(4, sizeofValue(a))
+  expectEqual(4, MemoryLayout._ofInstance(a).size)
 #else
-  expectEqual(8, sizeofValue(a))
+  expectEqual(8, MemoryLayout._ofInstance(a).size)
 #endif
 }
 

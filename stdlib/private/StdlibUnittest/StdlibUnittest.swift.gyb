@@ -538,7 +538,7 @@ func _defaultTestSuiteFailedCallback() {
 
 var _testSuiteFailedCallback: () -> Void = _defaultTestSuiteFailedCallback
 
-public func _setTestSuiteFailedCallback(_ callback: () -> Void) {
+public func _setTestSuiteFailedCallback(_ callback: @escaping () -> Void) {
   _testSuiteFailedCallback = callback
 }
 
@@ -549,7 +549,7 @@ func _defaultTrappingExpectationFailedCallback() {
 var _trappingExpectationFailedCallback: () -> Void
   = _defaultTrappingExpectationFailedCallback
 
-public func _setTrappingExpectationFailedCallback(callback: () -> Void) {
+public func _setTrappingExpectationFailedCallback(callback: @escaping () -> Void) {
   _trappingExpectationFailedCallback = callback
 }
 
@@ -1201,7 +1201,7 @@ public final class TestSuite {
   public func test(
     _ name: String,
     file: String = #file, line: UInt = #line,
-    _ testFunction: () -> Void
+    _ testFunction: @escaping () -> Void
   ) {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
     .code(testFunction)
@@ -1219,12 +1219,12 @@ public final class TestSuite {
     return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }
 
-  public func setUp(_ code: () -> Void) {
+  public func setUp(_ code: @escaping () -> Void) {
     _precondition(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
-  public func tearDown(_ code: () -> Void) {
+  public func tearDown(_ code: @escaping () -> Void) {
     _precondition(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
@@ -1362,13 +1362,13 @@ public final class TestSuite {
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
 
-    public func code(_ testFunction: () -> Void) {
+    public func code(_ testFunction: @escaping () -> Void) {
       _build(.single(code: testFunction))
     }
 
     public func forEach<Data>(
       in parameterSets: [Data],
-      testFunction: (Data) -> Void
+      testFunction: @escaping (Data) -> Void
     ) {
       _build(.parameterized(
         code: { (i: Int) in testFunction(parameterSets[i]) },
@@ -2280,7 +2280,7 @@ public func expectEqualsUnordered<
   Actual : Sequence
 >(
   _ expected: Expected, _ actual: Actual, ${TRACE},
-  compare: (Expected.Iterator.Element, Expected.Iterator.Element)
+  compare: @escaping (Expected.Iterator.Element, Expected.Iterator.Element)
     -> ExpectedComparisonResult
 ) where
   Expected.Iterator.Element == Actual.Iterator.Element {
@@ -2440,7 +2440,7 @@ public func expectEqualUnicodeScalars(
   }
 }
 
-func compose<A, B, C>(_ f: (A) -> B, _ g: (B) -> C) -> (A) -> C {
+func compose<A, B, C>(_ f: @escaping (A) -> B, _ g: @escaping (B) -> C) -> (A) -> C {
   return { a in
     return g(f(a))
   }

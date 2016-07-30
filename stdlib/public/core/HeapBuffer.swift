@@ -72,21 +72,21 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   internal static func _valueOffset() -> Int {
     return _roundUp(
-      sizeof(_HeapObject.self),
-      toAlignment: alignof(Value.self))
+      MemoryLayout<_HeapObject>.size,
+      toAlignment: MemoryLayout<Value>.alignment)
   }
 
   internal static func _elementOffset() -> Int {
     return _roundUp(
-      _valueOffset() + sizeof(Value.self),
-      toAlignment: alignof(Element.self))
+      _valueOffset() + MemoryLayout<Value>.size,
+      toAlignment: MemoryLayout<Element>.alignment)
   }
 
   internal static func _requiredAlignMask() -> Int {
     // We can't use max here because it can allocate an array.
-    let heapAlign = alignof(_HeapObject.self) &- 1
-    let valueAlign = alignof(Value.self) &- 1
-    let elementAlign = alignof(Element.self) &- 1
+    let heapAlign = MemoryLayout<_HeapObject>.alignment &- 1
+    let valueAlign = MemoryLayout<Value>.alignment &- 1
+    let elementAlign = MemoryLayout<Element>.alignment &- 1
     return (heapAlign < valueAlign
             ? (valueAlign < elementAlign ? elementAlign : valueAlign)
             : (heapAlign < elementAlign ? elementAlign : heapAlign))
@@ -123,7 +123,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
   /// Returns the actual number of `Elements` we can possibly store.
   internal func _capacity() -> Int {
     return (_allocatedSize() - _HeapBuffer._elementOffset())
-      / strideof(Element.self)
+      / MemoryLayout<Element>.stride
   }
 
   internal init() {
@@ -165,7 +165,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
     )
 
     let totalSize = _HeapBuffer._elementOffset() +
-        capacity * strideof(Element.self)
+        capacity * MemoryLayout<Element>.stride
     let alignMask = _HeapBuffer._requiredAlignMask()
 
     let object: AnyObject = _swift_bufferAllocate(

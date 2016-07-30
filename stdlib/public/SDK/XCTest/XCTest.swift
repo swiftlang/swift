@@ -996,7 +996,7 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(_ expression1: @autoclosure
   }
 }
 
-public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (error: Error) -> Void = { _ in }) -> Void {
+public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (_ error: Error) -> Void = { _ in }) -> Void {
   // evaluate expression exactly once
   var caughtErrorOptional: Error?
   
@@ -1011,7 +1011,7 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
   switch result {
   case .success:
     if let caughtError = caughtErrorOptional {
-      errorHandler(error: caughtError)
+      errorHandler(caughtError)
     } else {
       _XCTRegisterFailure(true, "XCTAssertThrowsError failed: did not throw an error", message, file, line)
     }

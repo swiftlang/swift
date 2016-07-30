@@ -38,7 +38,6 @@ import Calculator
 import CaptureProp
 import Chars
 import ClassArrayGetter
-import Data
 import DeadArray
 import DictTest
 import DictTest2
@@ -54,6 +53,7 @@ import Hanoi
 import Hash
 import Histogram
 import Integrate
+import IterateData
 import Join
 import LinkedList
 import MapReduce

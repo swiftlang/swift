@@ -2211,7 +2211,21 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     }
   }
 
-  if (baseObjTy->is<TupleType>()) {
+  // If this is a tuple, then the index needs to be valid.
+  if (auto tuple = baseObjTy->getAs<TupleType>()) {
+    StringRef nameStr = memberName.getBaseName().str();
+    int fieldIdx = -1;
+    // Resolve a number reference into the tuple type.
+    unsigned Value = 0;
+    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
+      fieldIdx = Value;
+    } else {
+      fieldIdx = tuple->getNamedElementId(memberName.getBaseName());
+    }
+
+    if (fieldIdx != -1)
+      return false;    // Lookup is valid.
+
     diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
              baseObjTy, memberName)
       .highlight(anchor->getSourceRange()).highlight(memberRange);
@@ -6102,6 +6116,24 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 }
 
 
+/// Check the specified closure to see if it is a multi-statement closure with
+/// an uninferred type.  If so, diagnose the problem with an error and return
+/// true.
+static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
+                                                   TypeChecker &tc) {
+  if (closure->hasSingleExpressionBody() ||
+      closure->hasExplicitResultType())
+    return false;
+
+  auto closureType = closure->getType()->getAs<AnyFunctionType>();
+  if (!closureType || !isUnresolvedOrTypeVarType(closureType->getResult()))
+    return false;
+
+  tc.diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
+  return true;
+}
+
+
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
@@ -6126,6 +6158,21 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
                   ND->getDeclaredType());
     return;
   }
+
+  // A very common cause of this diagnostic is a situation where a closure expr
+  // has no inferred type, due to being a multiline closure.  Check to see if
+  // this is the case and (if so), speculatively diagnose that as the problem.
+  bool didDiagnose = false;
+  overallExpr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
+    auto closure = dyn_cast<ClosureExpr>(subExpr);
+    if (!didDiagnose && closure)
+      didDiagnose = checkMultistatementClosureForAmbiguity(closure, tc);
+    
+    return subExpr;
+  });
+
+  if (didDiagnose) return;
+
   
   // Otherwise, emit an error message on the expr we have, and emit a note
   // about where the archetype came from.
@@ -6211,16 +6258,11 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
-    auto CFTy = CE->getType()->getAs<AnyFunctionType>();
-    
     // If this is a multi-statement closure with no explicit result type, emit
     // a note to clue the developer in.
-    if (!CE->hasExplicitResultType() && CFTy &&
-        isUnresolvedOrTypeVarType(CFTy->getResult())) {
-      diagnose(CE->getLoc(), diag::cannot_infer_closure_result_type);
+    if (checkMultistatementClosureForAmbiguity(CE, CS->getTypeChecker()))
       return;
-    }
-    
+
     diagnose(E->getLoc(), diag::cannot_infer_closure_type)
       .highlight(E->getSourceRange());
     return;

@@ -16,7 +16,7 @@ class MyClass
     }
 }
 
-func call_me(_ code: () -> Void)
+func call_me(_ code: @escaping () -> Void)
 {
     code ()
 }

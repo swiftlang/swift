@@ -43,7 +43,7 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum16TreeA_reabstractFFSiSiT_
-func TreeA_reabstract(_ f: (Int) -> Int) {
+func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@in Int) -> @out Int

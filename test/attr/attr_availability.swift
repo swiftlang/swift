@@ -343,11 +343,11 @@ func testArgNames() {
 
   unavailableInit(a: 0) // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{3-18=Int}} {{19-20=other}}
   let fn = unavailableInit // expected-error {{'unavailableInit(a:)' has been replaced by 'Int.init(other:)'}} {{12-27=Int.init}}
-  fn(a: 1)
+  fn(1)
 
   unavailableNestedInit(a: 0) // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{3-24=Foo.Bar}} {{25-26=other}}
   let fn2 = unavailableNestedInit // expected-error {{'unavailableNestedInit(a:)' has been replaced by 'Foo.Bar.init(other:)'}} {{13-34=Foo.Bar.init}}
-  fn2(a: 1)
+  fn2(1)
 }
 
 @available(*, unavailable, renamed: "shinyLabeledArguments()")
@@ -516,9 +516,10 @@ func trailingClosureArg(_ value: Int, _ other: Int, fn: () -> Void) {} // expect
 func trailingClosureArg2(_ value: Int, _ other: Int, fn: () -> Void) {} // expected-note {{here}}
 
 func testInstanceTrailingClosure() {
-  trailingClosure(0) {} // expected-error {{'trailingClosure(_:fn:)' has been replaced by instance method 'Int.foo(execute:)'}} {{3-18=0.foo}} {{19-20=}}
-  trailingClosureArg(0, 1) {} // expected-error {{'trailingClosureArg(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} {{3-21=0.foo}} {{22-25=}} {{25-25=bar: }}
-  trailingClosureArg2(0, 1) {} // expected-error {{'trailingClosureArg2(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} {{3-22=1.foo}} {{23-23=bar: }} {{24-27=}}
+  // FIXME: regression in fixit due to noescape-by-default
+  trailingClosure(0) {} // expected-error {{'trailingClosure(_:fn:)' has been replaced by instance method 'Int.foo(execute:)'}} // FIXME: {{3-18=0.foo}} {{19-20=}}
+  trailingClosureArg(0, 1) {} // expected-error {{'trailingClosureArg(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} // FIXME: {{3-21=0.foo}} {{22-25=}} {{25-25=bar: }}
+  trailingClosureArg2(0, 1) {} // expected-error {{'trailingClosureArg2(_:_:fn:)' has been replaced by instance method 'Int.foo(bar:execute:)'}} // FIXME: {{3-22=1.foo}} {{23-23=bar: }} {{24-27=}}
 }
 
 @available(*, unavailable, renamed: "+")

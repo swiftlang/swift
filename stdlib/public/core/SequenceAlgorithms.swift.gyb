@@ -555,11 +555,11 @@ extension Sequence {
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
-      @noescape (partialResult: Result, ${GElement}) throws -> Result
+      @noescape (_ partialResult: Result, ${GElement}) throws -> Result
   ) rethrows -> Result {
     var accumulator = initialResult
     for element in self {
-      accumulator = try nextPartialResult(partialResult: accumulator, element)
+      accumulator = try nextPartialResult(accumulator, element)
     }
     return accumulator
   }

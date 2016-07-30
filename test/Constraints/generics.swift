@@ -178,7 +178,7 @@ func r22459135() {
     g(h([3]))
   }
 
-  func f2<TargetType: AnyObject>(_ target: TargetType, handler: (TargetType) -> ()) {
+  func f2<TargetType: AnyObject>(_ target: TargetType, handler: @escaping (TargetType) -> ()) {
     let _: (AnyObject) -> () = { internalTarget in
       handler(internalTarget as! TargetType)
     }
@@ -216,7 +216,7 @@ protocol Q19215114 {}
 protocol P19215114 {}
 
 // expected-note @+1 {{in call to function 'body9215114'}}
-func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (u: U) -> () {}
+func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (_ u: U) -> () {}
 
 func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
   //Should complain about not being able to infer type of U.
@@ -236,3 +236,20 @@ Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be infer
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
 Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}}
 
+// <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
+protocol P27515965 {
+  associatedtype R
+  func f() -> R
+}
+
+struct S27515965 : P27515965 {
+  func f() -> Any { return self }
+}
+
+struct V27515965 {
+  init<T : P27515965>(_ tp: T) where T.R == Float {}
+}
+
+func test(x: S27515965) -> V27515965 {
+  return V27515965(x) // expected-error {{generic parameter 'T' could not be inferred}}
+}

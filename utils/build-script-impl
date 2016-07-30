@@ -1973,6 +1973,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCLANG_TOOL_CLANG_FORMAT_BUILD=NO
                     )
                 fi
+                
+                if [[ $(true_false "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
+                    cmake_options+=(
+                        -DLLVM_INCLUDE_TESTS=NO
+                        -DCLANG_INCLUDE_TESTS=NO
+                    )
+                fi
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options=(
