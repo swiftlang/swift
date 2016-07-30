@@ -1418,35 +1418,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         continue;
       }
 
-      // Handle "x.dynamicType" - A metatype expr.
-      // Deprecated in SE-0096: `x.dynamicType` becomes `type(of: x)`
-      //
-      // FIXME(SE-0096): This will go away along with the keyword soon.
-      if (Tok.is(tok::kw_dynamicType)) {
-        // Fix-it
-        auto range = Result.get()->getSourceRange();
-        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
-        diagnose(TokLoc, diag::expr_dynamictype_deprecated)
-          .highlight(dynamicTypeExprRange)
-          .fixItReplace(dynamicTypeExprRange, ")")
-          .fixItInsert(range.Start, "type(of: ");
-
-        // HACK: Arbitrary.
-        auto loc = range.Start;
-        auto dt = new (Context) DynamicTypeExpr(loc, loc, Result.get(), loc, Type());
-        dt->setImplicit();
-        Result = makeParserResult(dt);
-        continue;
-      }
-
-
       // Handle "x.self" expr.
       if (Tok.is(tok::kw_self)) {
         Result = makeParserResult(
           new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
         continue;
       }
-      
            
       // If we have '.<keyword><code_complete>', try to recover by creating
       // an identifier with the same spelling as the keyword.
