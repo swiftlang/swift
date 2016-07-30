@@ -12,7 +12,7 @@
 
 /// Returns the lesser of `x` and `y`.
 ///
-/// - Important: If `x == y`, this function returns `x`.
+/// If `x == y`, this function returns `x`.
 public func min<T : Comparable>(_ x: T, _ y: T) -> T {
   // In case `x == y`, we pick `x`.
   // This preserves any pre-existing order in case `T` has identity,
