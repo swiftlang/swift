@@ -147,9 +147,6 @@ KEYWORD(__COLUMN__)
 KEYWORD(__FUNCTION__)
 KEYWORD(__DSO_HANDLE__)
 
-// FIXME(SE-0096): REMOVE ME
-KEYWORD(dynamicType)
-
 // Pattern keywords.
 KEYWORD(_)
 

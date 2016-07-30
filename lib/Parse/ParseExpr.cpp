@@ -950,6 +950,32 @@ getMagicIdentifierLiteralKind(tok Kind) {
   }
 }
 
+/// See if type(of: <expr>) can be parsed backtracking on failure.
+static bool canParseTypeOf(Parser &P) {
+  if (!(P.Tok.getText() == "type" && P.peekToken().is(tok::l_paren))) {
+    return false;
+  }
+  // Look ahead to parse the parenthesized expression.
+  Parser::BacktrackingScope Backtrack(P);
+  P.consumeToken(tok::identifier);
+  P.consumeToken(tok::l_paren);
+  // The first argument label must be 'of'.
+  if (!(P.Tok.getText() == "of" && P.peekToken().is(tok::colon))) {
+    return false;
+  }
+
+  // Parse to the closing paren.
+  while (!P.Tok.is(tok::r_paren) && !P.Tok.is(tok::eof)) {
+    // Anything that looks like another argument label is bogus.  It is
+    // sufficient to parse for a single trailing comma.  Backtracking will
+    // fall back to an unresolved decl.
+    if (P.Tok.is(tok::comma)) {
+      return false;
+    }
+    P.skipSingle();
+  }
+  return true;
+}
 
 /// parseExprPostfix
 ///
@@ -1095,8 +1121,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::identifier:  // foo
-    // If starts with 'type(', parse the 'type(of: ...)' metatype expression
-    if (Tok.getText() == "type" && peekToken().is(tok::l_paren)) {
+    // Attempt to parse for 'type(of: <expr>)'.
+    if (canParseTypeOf(*this)) {
       Result = parseExprTypeOf();
       break;
     }
@@ -1418,12 +1444,16 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         continue;
       }
 
-      // Handle "x.dynamicType" - A metatype expr.
-      // Deprecated in SE-0096: `x.dynamicType` becomes `type(of: x)`
-      //
-      // FIXME(SE-0096): This will go away along with the keyword soon.
-      if (Tok.is(tok::kw_dynamicType)) {
-        // Fix-it
+      // Handle "x.self" expr.
+      if (Tok.is(tok::kw_self)) {
+        Result = makeParserResult(
+          new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
+        continue;
+      }
+
+      // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
+      if (Tok.getText() == "dynamicType") {
+        BacktrackingScope backtrackScope(*this);
         auto range = Result.get()->getSourceRange();
         auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
         diagnose(TokLoc, diag::expr_dynamictype_deprecated)
@@ -1431,22 +1461,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           .fixItReplace(dynamicTypeExprRange, ")")
           .fixItInsert(range.Start, "type(of: ");
 
-        // HACK: Arbitrary.
-        auto loc = range.Start;
-        auto dt = new (Context) DynamicTypeExpr(loc, loc, Result.get(), loc, Type());
-        dt->setImplicit();
-        Result = makeParserResult(dt);
-        continue;
+        // fallthrough to an UnresolvedDotExpr.
       }
-
-
-      // Handle "x.self" expr.
-      if (Tok.is(tok::kw_self)) {
-        Result = makeParserResult(
-          new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
-        continue;
-      }
-      
            
       // If we have '.<keyword><code_complete>', try to recover by creating
       // an identifier with the same spelling as the keyword.
@@ -3030,26 +3046,14 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
   // Parse `of` label.
-  auto ofRange = Tok.getRange();
-  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
-    bool hasOf = Tok.getText() == "of";
-    if (!hasOf) {
-      // User mis-spelled the 'of' label.
-      diagnose(Tok, diag::expr_typeof_expected_label_of)
-        .fixItReplace({ ofRange.getStart(), ofRange.getEnd() }, "of");
-    }
-
-    // Consume either 'of' or the misspelling.
+  if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
+    // Consume the label.
     consumeToken();
     consumeToken(tok::colon);
-
-    if (!hasOf) {
-      return makeParserError();
-    }
   } else {
-    // No label at all; insert it.
-    diagnose(Tok, diag::expr_typeof_expected_label_of)
-      .fixItInsert(ofRange.getStart(), "of: ");
+    // There cannot be a richer diagnostic here because the user may have
+    // defined a function `type(...)` that conflicts with the magic expr.
+    diagnose(Tok, diag::expr_typeof_expected_label_of);
   }
 
   // Parse the subexpression.

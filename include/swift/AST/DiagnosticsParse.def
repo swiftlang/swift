@@ -1114,7 +1114,7 @@ ERROR(expr_typeof_expected_expr,PointsToFirstBadToken,
       "expected an expression within 'type(of: ...)'", ())
 ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete 'type(of: ...)' expression", ())
-WARNING(expr_dynamictype_deprecated,PointsToFirstBadToken,
+ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
 //------------------------------------------------------------------------------

@@ -182,7 +182,7 @@ extension LoggingType {
   }
   
   public var selfType: Any.Type {
-    return self.dynamicType
+    return type(of: self)
   }
 }
 

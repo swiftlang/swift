@@ -596,7 +596,7 @@ AnyHashableTests.test("AnyHashable containing _SwiftNativeNSError") {
   expectEqual(
     .objCClassWrapper,
     SwiftRuntime.metadataKind(of: nsErrors.first!))
-  expectEqual("_SwiftNativeNSError", String(describing: nsErrors[0].dynamicType))
+  expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
   checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
   checkHashable(
     nsErrors.map(AnyHashable.init),

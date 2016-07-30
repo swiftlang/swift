@@ -27,7 +27,7 @@ extension SequenceLog {
 
 extension LoggingSequence {
   func nonCustomizableOperation() {
-    Log.nonCustomizableOperation[self.dynamicType] += 1
+    Log.nonCustomizableOperation[type(of: self)] += 1
     return base.nonCustomizableOperation()
   }
 }

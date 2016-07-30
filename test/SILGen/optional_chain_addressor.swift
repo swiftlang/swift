@@ -2,5 +2,5 @@
 
 func foo(x: UnsafeMutablePointer<UnsafeMutablePointer<()>?>) {
   _ = x.pointee?.pointee
-  _ = type(of: x.pointee)
+  _ = x.pointee.map { type(of: $0) }
 }
