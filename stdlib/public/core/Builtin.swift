@@ -15,56 +15,34 @@ import SwiftShims
 // Definitions that make elements of Builtin usable in real code
 // without gobs of boilerplate.
 
-/// Returns the contiguous memory footprint of `T`.
-///
-/// Does not include any dynamically-allocated or "remote" storage.
-/// In particular, `sizeof(X.self)`, when `X` is a class type, is the
-/// same regardless of how many stored properties `X` has.
-@available(*, deprecated, message: "use MemoryLayout<T>.size instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.size instead.")
 public func sizeof<T>(_:T.Type) -> Int {
-  return Int(Builtin.sizeof(T.self))
+  Builtin.unreachable()
 }
 
-/// Returns the contiguous memory footprint of  `T`.
-///
-/// Does not include any dynamically-allocated or "remote" storage.
-/// In particular, `sizeof(a)`, when `a` is a class instance, is the
-/// same regardless of how many stored properties `a` has.
-@available(*, deprecated, message: "use MemoryLayout<T>.size instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.size instead.")
 public func sizeofValue<T>(_:T) -> Int {
-  return sizeof(T.self)
+  Builtin.unreachable()
 }
 
-/// Returns the minimum memory alignment of `T`.
-@available(*, deprecated, message: "use MemoryLayout<T>.alignment instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.alignment instead.")
 public func alignof<T>(_:T.Type) -> Int {
-  return Int(Builtin.alignof(T.self))
+  Builtin.unreachable()
 }
 
-/// Returns the minimum memory alignment of `T`.
-@available(*, deprecated, message: "use MemoryLayout<T>.alignment instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.alignment instead.")
 public func alignofValue<T>(_:T) -> Int {
-  return alignof(T.self)
+  Builtin.unreachable()
 }
 
-/// Returns the least possible interval between distinct instances of
-/// `T` in memory.  The result is always positive.
-@available(*, deprecated, message: "use MemoryLayout<T>.stride instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.stride instead.")
 public func strideof<T>(_:T.Type) -> Int {
-  return Int(Builtin.strideof_nonzero(T.self))
+  Builtin.unreachable()
 }
 
-/// Returns the least possible interval between distinct instances of
-/// `T` in memory.  The result is always positive.
-@available(*, deprecated, message: "use MemoryLayout<T>.stride instead.")
-@_transparent
+@available(*, unavailable, message: "use MemoryLayout<T>.stride instead.")
 public func strideofValue<T>(_:T) -> Int {
-  return strideof(T.self)
+  Builtin.unreachable()
 }
 
 // This function is the implementation of the `_roundUp` overload set.  It is
