@@ -193,9 +193,9 @@ extension r25271859 {
 
 func f(a : r25271859<(Float, Int)>) {
   a.map { $0.0 }
-    .andThen { _ in   // expected-error {{generic parameter 'U' could not be inferred}}
+    .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
       print("hello") // comment this out and it runs, leave any form of print in and it doesn't
-      return Task<String>()
+      return r25271859<String>()
   }
 }
 

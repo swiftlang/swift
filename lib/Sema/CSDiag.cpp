@@ -6156,7 +6156,9 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
     return false;
 
   auto closureType = closure->getType()->getAs<AnyFunctionType>();
-  if (!closureType || !isUnresolvedOrTypeVarType(closureType->getResult()))
+  if (!closureType ||
+      !(closureType->getResult()->hasUnresolvedType() ||
+        closureType->getResult()->hasTypeVariable()))
     return false;
 
   // Okay, we have a multi-statement closure expr that has no inferred result,
