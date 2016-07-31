@@ -1957,6 +1957,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                           Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
+      
       params.push_back(arg);
     }
   }

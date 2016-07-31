@@ -4401,6 +4401,10 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
                   missingParamIdx+1);
     else
       TC.diagnose(loc, diag::missing_argument_named, name);
+    
+    if (candidate.getDecl())
+      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                  candidate.getDecl()->getFullName());
     return true;
   }
 

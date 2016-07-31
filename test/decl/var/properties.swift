@@ -1147,7 +1147,7 @@ struct r19874152S2 {
 _ = r19874152S2(number:64)  // Ok, property is a var.
 _ = r19874152S2()  // Ok
 
-struct r19874152S3 {
+struct r19874152S3 { // expected-note {{'init(flavour:)' declared here}}
   let number : Int = 42
   let flavour : Int
 }

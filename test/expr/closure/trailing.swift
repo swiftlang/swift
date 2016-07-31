@@ -67,7 +67,7 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 // Calls with multiple trailing closures should be rejected until we have time
 // to design it right.
 // <rdar://problem/16835718> Ban multiple trailing closures
-func multiTrailingClosure(_ a : () -> (), b : () -> ()) {
+func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
   multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
   

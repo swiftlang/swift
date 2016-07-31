@@ -58,7 +58,7 @@ reservedExpr(1, `do`) // expected-error{{missing argument label 'y:' in call}}{{
 reservedExpr(1, y: `do`)
 
 class GenericCtor<U> {
-  init<T>(t : T) {}
+  init<T>(t : T) {}  // expected-note {{'init(t:)' declared here}}
 }
 GenericCtor<Int>()  // expected-error{{missing argument for parameter 't' in call}}
 
@@ -137,7 +137,7 @@ variadics1(x: 1, y: 2, 1, 2, 3)
 // Using various (out-of-order)
 variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed argument #1}} {{12-25=x: 6}} {{27-31=1, 2, 3, 4, 5}}
 
-func variadics2(x: Int, y: Int = 2, z: Int...) { }
+func variadics2(x: Int, y: Int = 2, z: Int...) { } // expected-note {{'variadics2(x:y:z:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics2(x: 1, y: 2, z: 1)
@@ -200,7 +200,7 @@ variadics4()
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
 variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-16=x: 1}} {{18-22=z: 1}}
 
-func variadics5(_ x: Int, y: Int, _ z: Int...) { }
+func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{'variadics5(_:y:_:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -212,7 +212,7 @@ variadics5(1, y: 2, 1, 2, 3)
 variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed argument #2}} {{15-28=y: 7}} {{30-34=2, 3, 4, 5, 6}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
-func variadics6(x: Int..., y: Int = 2, z: Int) { }
+func variadics6(x: Int..., y: Int = 2, z: Int) { } // expected-note 4 {{'variadics6(x:y:z:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics6(x: 1, 2, 3, y: 0, z: 1)
@@ -241,11 +241,11 @@ func outOfOrder(_ a : Int, b: Int) {
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
 // simply # of arguments required.
-func missingargs1(x: Int, y: Int, z: Int) {}
+func missingargs1(x: Int, y: Int, z: Int) {} // expected-note {{'missingargs1(x:y:z:)' declared here}}
 
 missingargs1(x: 1, y: 2) // expected-error{{missing argument for parameter 'z' in call}}
 
-func missingargs2(x: Int, y: Int, _ z: Int) {}
+func missingargs2(x: Int, y: Int, _ z: Int) {} // expected-note {{'missingargs2(x:y:_:)' declared here}}
 missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in call}}
 
 // -------------------------------------------

@@ -552,7 +552,7 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var e3 = Empty(Float(d))
 }
 
-struct Rule {
+struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
   var target: String
   var dependencies: String
 }
@@ -814,8 +814,8 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(_ x: Int, _ y: Int, _ z: String = "") {}
-    func g<T>(_ x: T, _ y: T, _ z: String = "") {}
+    func f(_ x: Int, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
+    func g<T>(_ x: T, _ y: T, _ z: String = "") {} // expected-note 2 {{'g' declared here}}
 
     f(1) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
@@ -838,7 +838,7 @@ func r23185177(_ x: P?) -> [String] {
 
 // <rdar://problem/22913570> Miscompile: wrong argument parsing when calling a function in swift2.0
 func r22913570() {
-  func f(_ from: Int = 0, to: Int) {}
+  func f(_ from: Int = 0, to: Int) {} // expected-note {{'f(_:to:)' declared here}}
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 

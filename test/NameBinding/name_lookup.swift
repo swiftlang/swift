@@ -12,7 +12,7 @@ class ThisBase1 {
     set {}
   }
 
-  func baseFunc0() {}
+  func baseFunc0() {} // expected-note 2 {{'baseFunc0()' declared here}}
   func baseFunc1(_ a: Int) {}
 
   subscript(i: Int) -> Double {
@@ -58,7 +58,7 @@ class ThisDerived1 : ThisBase1 {
     set {}
   }
 
-  func derivedFunc0() {}
+  func derivedFunc0() {}  // expected-note {{'derivedFunc0()' declared here}}
   func derivedFunc1(_ a: Int) {}
 
   subscript(i: Double) -> Int {
@@ -349,7 +349,7 @@ extension ThisBase1 {
     set {}
   }
 
-  func baseExtFunc0() {}
+  func baseExtFunc0() {} // expected-note 2 {{'baseExtFunc0()' declared here}}
 
   var baseExtStaticVar: Int // expected-error {{extensions may not contain stored properties}} // expected-note 2 {{did you mean 'baseExtStaticVar'?}}
 
@@ -381,7 +381,7 @@ extension ThisDerived1 {
     set {}
   }
 
-  func derivedExtFunc0() {}
+  func derivedExtFunc0() {} // expected-note {{'derivedExtFunc0()' declared here}}
 
   var derivedExtStaticVar: Int // expected-error {{extensions may not contain stored properties}}
 

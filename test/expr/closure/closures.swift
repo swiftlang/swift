@@ -36,7 +36,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
-  var testfunc : ((), Int) -> Int
+  var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
 
   funcdecl5(1, 2) // recursion.

@@ -346,7 +346,7 @@ f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 class CurriedClass {
   func method1() {}
   func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
-  func method3(_ a: Int, b : Int) {}
+  func method3(_ a: Int, b : Int) {}  // expected-note 5 {{'method3(_:b:)' declared here}}
 }
 
 let c = CurriedClass()
