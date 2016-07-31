@@ -1337,21 +1337,27 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     self._buffer.count = newCount
   }
 
+%if Self == 'ArraySlice':
   /// Removes and returns the last element of the array.
   ///
   /// The array must not be empty.
   ///
   /// - Returns: The element that was removed.
-  @discardableResult
-  public mutating func removeLast() -> Element {
+  public mutating func _customRemoveLast() -> Element? {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
-    let i = count
+    // FIXME(performance): if `self` is uniquely referenced, we should remove
+    // the element as shown below (this will deallocate the element and
+    // decrease memory use).  If `self` is not uniquely refeneced, the code
+    // below will make a copy of the storage, which is wasteful.  Instead, we
+    // should just shrink the view without allocating new storage.
+    let i = endIndex
     // We don't check for overflow in `i - 1` because `i` is known to be
     // positive.
     let result = self[i &- 1]
     self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
     return result
   }
+%end
 
   /// Inserts a new element at the specified position.
   ///
@@ -2129,6 +2135,16 @@ extension ContiguousArray {
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     return removeLast()
+  }
+}
+
+extension ArraySlice {
+  public // @testable
+  init(_startIndex: Int) {
+    self.init(
+      _buffer: _Buffer(
+        ContiguousArray()._buffer,
+        shiftedToStartIndex: _startIndex))
   }
 }
 
