@@ -781,8 +781,15 @@ ArrayTestSuite.test("${array_type}/AssociatedTypes") {
 }
 % end
 
-% for array_type in all_array_types:
-%     collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
+func ArraySliceWithNonZeroStartIndex<T>(_ elements: [T]) -> ArraySlice<T> {
+  var r = ArraySlice<T>(_startIndex: 1000)
+  r.append(contentsOf: elements)
+  expectEqual(1000, r.startIndex)
+  return r
+}
+
+% for array_type in all_array_types + ['ArraySliceWithNonZeroStartIndex']:
+%   collection_or_slice = 'Slice' if 'Slice' in array_type else 'Collection'
 
 do {
   // `Array`, `ArraySlice`, and `ContiguousArrayBuffer` have no expectation of
@@ -793,6 +800,7 @@ do {
 
   // Test MutableCollectionType conformance with value type elements.
   ArrayTestSuite.addMutableRandomAccessCollectionTests(
+    "${array_type}.",
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -815,6 +823,7 @@ do {
 
   // Test MutableCollectionType conformance with reference type elements.
   ArrayTestSuite.addMutableRandomAccessCollectionTests(
+    "${array_type}.",
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },
@@ -843,6 +852,7 @@ do {
 
   // Test RangeReplaceableCollectionType conformance with value type elements.
   ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
+    "${array_type}.",
     makeCollection: { (elements: [OpaqueValue<Int>]) in
       return ${array_type}(elements)
     },
@@ -858,6 +868,7 @@ do {
 
   // Test RangeReplaceableCollectionType conformance with reference type elements.
   ArrayTestSuite.addRangeReplaceableRandomAccess${collection_or_slice}Tests(
+    "${array_type}.",
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${array_type}(elements)
     },

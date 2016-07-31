@@ -536,10 +536,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -1198,10 +1199,12 @@ extension TestSuite {
     ${testConstraints('BidirectionalCollection')} {
 
     var testNamePrefix = testNamePrefix
-    if checksAdded.contains(#function) {
+
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addCollectionTests(${forwardTestArgs})
 
@@ -1515,10 +1518,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addBidirectionalCollectionTests(${forwardTestArgs})
     
@@ -1568,10 +1572,11 @@ extension TestSuite {
   ) where
     ${testConstraints(collectionForTraversal(Traversal))} {
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     func toCollection(_ r: CountableRange<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })

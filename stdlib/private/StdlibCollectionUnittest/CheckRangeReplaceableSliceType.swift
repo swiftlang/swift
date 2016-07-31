@@ -43,10 +43,11 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addRangeReplaceableCollectionTests(
       testNamePrefix,
@@ -177,10 +178,11 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addRangeReplaceableSliceTests(
       testNamePrefix,
@@ -324,10 +326,11 @@ extension TestSuite {
     var testNamePrefix = testNamePrefix
 
     // Don't run the same tests twice.
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addRangeReplaceableBidirectionalSliceTests(
       testNamePrefix,
