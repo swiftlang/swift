@@ -55,7 +55,6 @@ syn keyword swiftDefinitionModifier
 
 syn keyword swiftIdentifierKeyword
       \ Self
-      \ dynamicType
       \ metatype
       \ self
       \ super

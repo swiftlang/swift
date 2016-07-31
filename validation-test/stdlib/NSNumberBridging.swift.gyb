@@ -97,7 +97,7 @@ NSNumberTests.test("Bool.init(_: NSNumber)") {
 }
 
 func isTypePreservingNSNumber(_ n: NSNumber) -> Bool {
-  let className = NSStringFromClass(n.dynamicType)
+  let className = NSStringFromClass(type(of: n))
   return className.range(of: "_SwiftTypePreservingNSNumber") != nil
 }
 
@@ -119,7 +119,7 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber.init(coder:)")
   .code {
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
-  let _SwiftTypePreservingNSNumberType: NSNumber.Type = n.dynamicType
+  let _SwiftTypePreservingNSNumberType: NSNumber.Type = type(of: n)
   let coder = NSKeyedUnarchiver(forReadingWith: Data([0]))
   expectCrashLater()
   _ = _SwiftTypePreservingNSNumberType.init(coder: coder)
@@ -261,11 +261,11 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   expectEmpty(explicitNSNumber._toCustomAnyHashable())
   expectTrue(
     Set(["__NSCFNumber", "__NSCFBoolean"]).contains(
-      String(describing: AnyHashable(explicitNSNumber).base.dynamicType)))
+      String(describing: type(of: AnyHashable(explicitNSNumber).base))))
   expectEqual(AnyHashable(explicitNSNumber), AnyHashable(explicitNSNumber))
 
   let ah = AnyHashable(bridgedNSNumber)
-  expectEqual("${Self}", String(describing: ah.base.dynamicType))
+  expectEqual("${Self}", String(describing: type(of: ah.base)))
 %   if Self in ['Float', 'Double', 'CGFloat']:
   // FIXME: remove special cases for floating point when we fix their
   // conformances to Equatable.

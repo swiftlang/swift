@@ -1240,7 +1240,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
       if (isSelfInitUse(VMI))
         Kind = DIUseKind::SelfInit;
       else
-        // Otherwise, this is a simple reference to "dynamicType", which is
+        // Otherwise, this is a simple reference to "type(of:)", which is
         // always fine, even if self is uninitialized.
         continue;
     }
@@ -1386,7 +1386,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
           if (isSelfInitUse(VMI))
             Kind = DIUseKind::SelfInit;
           else
-            // Otherwise, this is a simple reference to "dynamicType", which is
+            // Otherwise, this is a simple reference to "type(of:)", which is
             // always fine, even if self is uninitialized.
             continue;
         }

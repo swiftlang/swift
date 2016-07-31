@@ -1912,7 +1912,17 @@ public:
   bool diagnoseCalleeResultContextualConversionError();
 
 private:
-    
+  /// Check the specified closure to see if it is a multi-statement closure with
+  /// an uninferred type.  If so, diagnose the problem with an error and return
+  /// true.
+  bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
+
+  /// Emit an error message about an unbound generic parameter existing, and
+  /// emit notes referring to the target of a diagnostic, e.g., the function
+  /// or parameter being used.
+  void diagnoseUnboundArchetype(ArchetypeType *archetype,
+                                ConstraintLocator *targetLocator);
+
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
@@ -2862,7 +2872,7 @@ namespace {
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
     llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
-    llvm::DenseSet<Decl*> InvalidDecls;
+    llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -2899,19 +2909,18 @@ namespace {
               !(expr->getType() && expr->getType()->is<ErrorType>()))
             return { false, expr };
 
-          // If a ClosureExpr's parameter list has types on the decls, and the
-          // types and remove them so that they'll get regenerated from the
+          // If a ClosureExpr's parameter list has types on the decls, then
+          // remove them so that they'll get regenerated from the
           // associated TypeLocs or resynthesized as fresh typevars.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
             for (auto P : *CE->getParameters())
               if (P->hasType()) {
                 TS->ParamDeclTypes[P] = P->getType();
                 P->overwriteType(Type());
+                TS->PossiblyInvalidDecls.insert(P);
                 
-                if (P->isInvalid()) {
+                if (P->isInvalid())
                   P->setInvalid(false);
-                  TS->InvalidDecls.insert(P);
-                }
               }
           
           // If we have a CollectionExpr with a type checked SemanticExpr,
@@ -2973,15 +2982,15 @@ namespace {
       for (auto CSE : CollectionSemanticExprs)
         CSE.first->setSemanticExpr(CSE.second);
       
-      if (!InvalidDecls.empty())
-        for (auto D : InvalidDecls)
-          D->setInvalid();
+      if (!PossiblyInvalidDecls.empty())
+        for (auto D : PossiblyInvalidDecls)
+          D->setInvalid(D->getType()->is<ErrorType>());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
       TypeLocTypes.clear();
       PatternTypes.clear();
-      InvalidDecls.clear();
+      PossiblyInvalidDecls.clear();
     }
     
     // On destruction, if a type got wiped out, reset it from null to its
@@ -3013,9 +3022,9 @@ namespace {
         if (!paramDeclElt.first->hasType())
           paramDeclElt.first->setType(paramDeclElt.second);
 
-      if (!InvalidDecls.empty())
-        for (auto D : InvalidDecls)
-          D->setInvalid();
+      if (!PossiblyInvalidDecls.empty())
+        for (auto D : PossiblyInvalidDecls)
+          D->setInvalid(D->getType()->is<ErrorType>());
     }
   };
 }
@@ -6119,8 +6128,8 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 /// Check the specified closure to see if it is a multi-statement closure with
 /// an uninferred type.  If so, diagnose the problem with an error and return
 /// true.
-static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
-                                                   TypeChecker &tc) {
+bool FailureDiagnosis::
+diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
   if (closure->hasSingleExpressionBody() ||
       closure->hasExplicitResultType())
     return false;
@@ -6129,7 +6138,84 @@ static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
   if (!closureType || !isUnresolvedOrTypeVarType(closureType->getResult()))
     return false;
 
-  tc.diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
+  // Okay, we have a multi-statement closure expr that has no inferred result,
+  // type, in the context of a larger expression.  The user probably expected
+  // the compiler to infer the result type of the closure from the body of the
+  // closure, which Swift doesn't do for multi-statement closures.  Try to be
+  // helpful by digging into the body of the closure, looking for a return
+  // statement, and inferring the result type from it.  If we can figure that
+  // out, we can produce a fixit hint.
+  class ReturnStmtFinder : public ASTWalker {
+    SmallVectorImpl<ReturnStmt*> &returnStmts;
+  public:
+    ReturnStmtFinder(SmallVectorImpl<ReturnStmt*> &returnStmts)
+      : returnStmts(returnStmts) {}
+
+    // Walk through statements, so we find returns hiding in if/else blocks etc.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      // Keep track of any return statements we find.
+      if (auto RS = dyn_cast<ReturnStmt>(S))
+        returnStmts.push_back(RS);
+      return { true, S };
+    }
+    
+    // Don't walk into anything else, since they cannot contain statements
+    // that can return from the current closure.
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      return { false, E };
+    }
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+  };
+  
+  SmallVector<ReturnStmt*, 4> Returns;
+  closure->getBody()->walk(ReturnStmtFinder(Returns));
+  
+  // If we found a return statement inside of the closure expression, then go
+  // ahead and type check the body to see if we can determine a type.
+  for (auto RS : Returns) {
+    llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, closure);
+    
+    // Otherwise, we're ok to type check the subexpr.
+    auto returnedExpr =
+      typeCheckChildIndependently(RS->getResult(),
+                                  TCC_AllowUnresolvedTypeVariables);
+    
+    // If we found a type, presuppose it was the intended result and insert a
+    // fixit hint.
+    if (returnedExpr && returnedExpr->getType() &&
+        !isUnresolvedOrTypeVarType(returnedExpr->getType())) {
+      
+      std::string resultType = returnedExpr->getType()->getString();
+      
+      // If there is a location for an 'in' token, then the argument list was
+      // specified somehow but no return type was.  Insert a "-> ReturnType "
+      // before the in token.
+      if (closure->getInLoc().isValid()) {
+        diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
+          .fixItInsert(closure->getInLoc(), "-> " + resultType + " ");
+        return true;
+      }
+      
+      // Otherwise, the closure must take zero arguments.  We know this
+      // because the if one or more argument is specified, a multi-statement
+      // closure *must* name them, or explicitly ignore them with "_ in".
+      //
+      // As such, we insert " () -> ReturnType in " right after the '{' that
+      // starts the closure body.
+      auto insertString = " () -> " + resultType + " " + "in ";
+      diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
+        .fixItInsertAfter(closure->getBody()->getLBraceLoc(), insertString);
+      return true;
+    }
+  }
+  
+  diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
   return true;
 }
 
@@ -6137,11 +6223,9 @@ static bool checkMultistatementClosureForAmbiguity(ClosureExpr *closure,
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
-static void diagnoseUnboundArchetype(Expr *overallExpr,
-                                     ArchetypeType *archetype,
-                                     ConstraintLocator *targetLocator,
-                                     ConstraintSystem &cs) {
-  auto &tc = cs.getTypeChecker();
+void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
+                                            ConstraintLocator *targetLocator) {
+  auto &tc = CS->getTypeChecker();
   auto anchor = targetLocator->getAnchor();
 
   // The archetype may come from the explicit type in a cast expression.
@@ -6163,10 +6247,10 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
   // has no inferred type, due to being a multiline closure.  Check to see if
   // this is the case and (if so), speculatively diagnose that as the problem.
   bool didDiagnose = false;
-  overallExpr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
+  expr->forEachChildExpr([&](Expr *subExpr) -> Expr*{
     auto closure = dyn_cast<ClosureExpr>(subExpr);
     if (!didDiagnose && closure)
-      didDiagnose = checkMultistatementClosureForAmbiguity(closure, tc);
+      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
     
     return subExpr;
   });
@@ -6176,8 +6260,7 @@ static void diagnoseUnboundArchetype(Expr *overallExpr,
   
   // Otherwise, emit an error message on the expr we have, and emit a note
   // about where the archetype came from.
-  tc.diagnose(overallExpr->getLoc(), diag::unbound_generic_parameter,
-              archetype);
+  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
   
   // If we have an anchor, drill into it to emit a
   // "note: archetype declared here".
@@ -6249,7 +6332,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     // Only diagnose archetypes that don't have a parent, i.e., ones
     // that correspond to generic parameters.
     if (archetype && !archetype->getParent()) {
-      diagnoseUnboundArchetype(expr, archetype, tv->getImpl().getLocator(),*CS);
+      diagnoseUnboundArchetype(archetype, tv->getImpl().getLocator());
       return;
     }
     continue;
@@ -6260,7 +6343,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
     // If this is a multi-statement closure with no explicit result type, emit
     // a note to clue the developer in.
-    if (checkMultistatementClosureForAmbiguity(CE, CS->getTypeChecker()))
+    if (diagnoseAmbiguousMultiStatementClosure(CE))
       return;
 
     diagnose(E->getLoc(), diag::cannot_infer_closure_type)
@@ -6311,8 +6394,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   E->forEachChildExpr([&](Expr *subExpr) -> Expr*{
     auto closure = dyn_cast<ClosureExpr>(subExpr);
     if (!didDiagnose && closure)
-      didDiagnose = checkMultistatementClosureForAmbiguity(closure,
-                                                          CS->getTypeChecker());
+      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
     
     return subExpr;
   });

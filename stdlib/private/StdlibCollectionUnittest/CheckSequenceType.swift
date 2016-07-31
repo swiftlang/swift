@@ -1469,10 +1469,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(S.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     func makeWrappedSequence(_ elements: [OpaqueValue<Int>]) -> S {
       return makeSequence(elements.map(wrapValue))
@@ -1789,9 +1790,9 @@ self.test("\(testNamePrefix).first/semantics") {
       test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
       found,
       stackTrace: SourceLocStack().with(test.loc))
-    if test.expected != nil {
+    if let expectedIdentity = test.expected {
       expectEqual(
-        test.expected, (found as? MinimalEquatableValue)?.identity,
+        test.expected, extractValueFromEquatable(found!).identity,
         "find() should find only the first element matching its predicate")
     }
   }

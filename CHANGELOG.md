@@ -2,6 +2,14 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 
 Swift 3.0
 ---------
+* [SE-0096](https://github.com/apple/swift-evolution/blob/master/proposals/0096-dynamictype.md):
+
+  The `dynamicType` keyword has been removed from Swift.  In its place a new
+  primitive function `type(of:)` has been added to the language.  Existing code
+  that uses the `.dynamicType` member to retrieve the type of an expression 
+  should migrate to this new primitive.  Code that is using `.dynamicType` in 
+  conjunction with `sizeof` should migrate to the `MemoryLayout` structure provided by
+  [SE-0101](https://github.com/apple/swift-evolution/blob/master/proposals/0101-standardizing-sizeof-naming.md).
 
 * [SE-0111](https://github.com/apple/swift-evolution/blob/master/proposals/0111-remove-arg-label-type-significance.md):
 

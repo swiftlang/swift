@@ -168,7 +168,7 @@ struct CC {}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer closure return type in current context}}
+  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{11-11= () -> Int in }}
     _ = $0
     return 1
   }
@@ -211,7 +211,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer closure return type in current context}}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> (Thing) }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -220,7 +220,7 @@ let things = Thing().map { thing in  // expected-error {{unable to infer closure
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{unable to infer closure return type in current context}}
+  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> String in }}
     if true {
       return "foo"
     }
@@ -269,7 +269,7 @@ func f20371273() {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer closure return type in current context}}
+[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> Int }}
   _ in
   let r =  (1,2).0
   return r
@@ -306,4 +306,21 @@ func r22058555() {
     firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
   }
 }
+
+// <rdar://problem/20789423> Unclear diagnostic for multi-statement closure with no return type
+func r20789423() {
+  class C {
+    func f(_ value: Int) { }
+  }
+  
+  let p: C
+  print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
+  
+  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> String }}
+    print("a")
+    return "hi"
+  }
+  
+}
+
 

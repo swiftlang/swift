@@ -120,7 +120,7 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
   }
 
   class D {
-    final var array1 [Int] // 'array1' cannot be overridden by a computed property.
+    final var array1: [Int] // 'array1' cannot be overridden by a computed property.
     var array2: [Int]      // 'array2' *can* be overridden by a computed property.
   }
 
