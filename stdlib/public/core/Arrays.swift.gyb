@@ -1038,8 +1038,9 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     where S.Iterator.Element == Element {
 
     self = ${Self}(
-      _buffer: _Buffer(s._copyToContiguousArray()._buffer,
-      shiftedToStartIndex: 0))
+      _buffer: _Buffer(
+        s._copyToContiguousArray()._buffer,
+        shiftedToStartIndex: 0))
   }
 
   /// Creates a new array containing the specified number of a single, repeated
