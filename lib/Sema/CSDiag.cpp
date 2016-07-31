@@ -538,12 +538,17 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
     // If we found a decl for the UDE, check it.
     auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-    auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
-
-    // If the member isn't settable, then it is the problem: return it.
-    if (member) {
-      if (!member->isSettable(nullptr) ||
-          !member->isSetterAccessibleFrom(CS.DC))
+    
+    // If we can resolve a member, we can determine whether it is settable in
+    // this context.
+    if (auto *member = findResolvedMemberRef(loc, CS)) {
+      auto *memberVD = dyn_cast<VarDecl>(member);
+      
+      // If the member isn't a vardecl (e.g. its a funcdecl), or it isn't
+      // settable, then it is the problem: return it.
+      if (!memberVD ||
+          !member->isSettable(nullptr) ||
+          !memberVD->isSetterAccessibleFrom(CS.DC))
         return { expr, member };
     }
 
@@ -637,6 +642,22 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     else
       message = "subscript is immutable";
 
+    TC.diagnose(loc, diagID, message)
+      .highlight(immInfo.first->getSourceRange());
+    return;
+  }
+  
+  // If we're trying to set an unapplied method, say that.
+  if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
+    std::string message = "'";
+    message += VD->getName().str().str();
+    message += "'";
+    
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+      message += AFD->getImplicitSelfDecl() ? " is a method" : " is a function";
+    else
+      message += " is not settable";
+    
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
     return;
