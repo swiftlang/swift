@@ -119,10 +119,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addCollectionTests(
       testNamePrefix,
@@ -708,10 +709,11 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addMutableCollectionTests(
       testNamePrefix,
@@ -861,10 +863,11 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addMutableBidirectionalCollectionTests(
       testNamePrefix,

@@ -1469,10 +1469,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(S.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     func makeWrappedSequence(_ elements: [OpaqueValue<Int>]) -> S {
       return makeSequence(elements.map(wrapValue))
