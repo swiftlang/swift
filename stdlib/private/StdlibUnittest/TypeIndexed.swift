@@ -105,7 +105,7 @@ public func expectEqual<V: Comparable>(
   file: String = #file, line: UInt = #line
 ) {
   expectEqualsUnordered(
-    expected.map { (key: TypeIdentifier($0.0), value: $0.1) },
+    expected.map { (key: TypeIdentifier($0), value: $1) },
     actual.byType,
     message(), stackTrace: stackTrace) { $0 <=> $1 }
 }

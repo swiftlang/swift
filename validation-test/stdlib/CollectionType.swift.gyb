@@ -794,7 +794,7 @@ CollectionTypeTests.test("partition(by:)/dispatch") {
 
 CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") {
   var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
+  _ = tester._withUnsafeMutableBufferPointerIfSupported { _, _ in () }
   expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
 }
 

@@ -330,7 +330,7 @@ public struct Mirror {
     self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
-    let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }
+    let lazyChildren = children.lazy.map { Child(label: $0, value: $1) }
     self.children = Children(lazyChildren)
 
     self.displayStyle = displayStyle
@@ -440,7 +440,7 @@ extension Mirror {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
       if case let label as String = e {
-        position = children.index { $0.label == label } ?? children.endIndex
+        position = children.index { l, _ in l == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
         position = children.index(children.startIndex,

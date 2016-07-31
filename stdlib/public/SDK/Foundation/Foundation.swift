@@ -570,8 +570,8 @@ extension NSDictionary : ExpressibleByDictionaryLiteral {
     dictionaryLiteral elements: (NSCopying, AnyObject)...
   ) {
     self.init(
-      objects: elements.map { $0.1 },
-      forKeys: elements.map { $0.0 },
+      objects: elements.map { _, v in v },
+      forKeys: elements.map { k, _ in k },
       count: elements.count)
   }
 }

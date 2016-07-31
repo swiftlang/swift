@@ -43,7 +43,7 @@ CoreMediaTests.test("CMTime/Comparable") {
   func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
     return instances[i].0 <=> instances[j].0
   }
-  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+  checkComparable(instances.map { $1 }, oracle: comparisonOracle)
 }
 
 CoreMediaTests.test("CMTimeRange(start:duration:)") {
@@ -80,7 +80,7 @@ CoreMediaTests.test("CMTimeRange/Equatable") {
   func comparisonOracle(i: Int, j: Int) -> Bool {
     return instances[i].0 == instances[j].0
   }
-  checkEquatable(instances.map { $0.1 }, oracle: comparisonOracle)
+  checkEquatable(instances.map { $1 }, oracle: comparisonOracle)
 }
 
 runAllTests()

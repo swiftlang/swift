@@ -81,7 +81,7 @@ print("Dictionaries.")
 
 let a_dict = ["one" : A(1), "two" : A(2), "three" : A(3)]
 print("begin")
-a_dict.forEach { $0.1.preen() }
+a_dict.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1
@@ -91,7 +91,7 @@ print("end")
 
 let preening_dict_1 = a_dict as [String: Preening]
 print("begin")
-preening_dict_1.forEach { $0.1.preen() }
+preening_dict_1.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1
@@ -105,7 +105,7 @@ print(any_dict_1.count)
 
 let preening_dict_2 = any_dict_1 as! [String: Preening]
 print("begin")
-preening_dict_2.forEach { $0.1.preen() }
+preening_dict_2.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1
@@ -115,7 +115,7 @@ print("end")
 
 let preening_dict_3 = any_dict_1 as? [String: Preening]
 print("begin")
-preening_dict_3?.forEach { $0.1.preen() }
+preening_dict_3?.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1
@@ -125,7 +125,7 @@ print("end")
 
 let a_dict_2 = any_dict_1 as! [String: A]
 print("begin")
-a_dict_2.forEach { $0.1.preen() }
+a_dict_2.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1
@@ -135,7 +135,7 @@ print("end")
 
 let a_dict_3 = any_dict_1 as? [String: A]
 print("begin")
-a_dict_3?.forEach { $0.1.preen() }
+a_dict_3?.forEach { $1.preen() }
 print("end")
 // CHECK-NEXT: begin
 // CHECK-DAG: A1

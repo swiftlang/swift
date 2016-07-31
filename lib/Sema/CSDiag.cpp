@@ -5407,7 +5407,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       return true;
     }
 
-    if (CS->TC.coerceParameterListToType(params, CE, inferredArgType))
+    if (CS->TC.coerceParameterListToType(params, CE, fnType))
       return true;
 
     expectedResultType = fnType->getResult();
