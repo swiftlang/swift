@@ -514,6 +514,11 @@ Enumerators:
   SwiftName: CGColorRenderingIntent.saturation
 - Name: kCGMomentumScrollPhaseContinue
   SwiftName: CGMomentumScrollPhase.continuous
+- Name: kCGColorSpaceModelRGB
+  SwiftName: CGColorSpaceModel.rgb
+- Name: kCGColorSpaceModelCMYK
+  SwiftName: CGColorSpaceModel.cmyk
+
 # CGContext
 - Name: kCGBlendModeXOR
   SwiftName: CGBlendMode.xor
