@@ -35,30 +35,85 @@ func _toNSRange(_ r: Range<String.Index>) -> NSRange {
 }
 
 func _countFormatSpecifiers(_ a: String) -> Int {
-  // The implementation takes advantage of the fact that internal
-  // representation of String is UTF-16.  Because we only care about the ASCII
-  // percent character, we don't need to decode UTF-16.
-
-  let percentUTF16  = UTF16.CodeUnit(("%" as UnicodeScalar).value)
-  let notPercentUTF16: UTF16.CodeUnit = 0
-  var lastChar = notPercentUTF16 // anything other than % would work here
+  // The implementation takes advantage of the fact that the internal
+  // representation of String is UTF-16.  Because we only care about ASCII
+  // characters (percent, dollar, zero, and nine), we don't need to decode UTF-16.
+  
+  enum ScanState {
+    case noPercent
+    case seenPercent
+    case scanningDigits
+  }
+  
+  let percentUTF16 = UTF16.CodeUnit(("%" as UnicodeScalar).value)
+  let dollarUTF16  = UTF16.CodeUnit(("$" as UnicodeScalar).value)
+  let zeroUTF16    = UTF16.CodeUnit(("0" as UnicodeScalar).value)
+  let nineUTF16    = UTF16.CodeUnit(("9" as UnicodeScalar).value)
   var count = 0
-
+  var maxPosValue = 0
+  var posValue = 0
+  var state = ScanState.noPercent
+  var posMode = false
+  
   for c in a.utf16 {
-    if lastChar == percentUTF16 {
+    switch state {
+    case .noPercent:
+      if c == percentUTF16 {
+        state = .seenPercent
+      }
+      
+    case .seenPercent:
       if c == percentUTF16 {
         // a "%" following this one should not be taken as literal
-        lastChar = notPercentUTF16
+        state = .noPercent
+      }
+      else if c >= zeroUTF16 && c <= nineUTF16 {
+        posValue = Int(c) - Int(zeroUTF16)
+        state = .scanningDigits
       }
       else {
-        count += 1
-        lastChar = c
+        if posMode {
+          // error condition: non-positional format seen after positional format(s)
+          // FIXME: determine how to handle this error condition
+          // for now, ignore erroneous format item and continue
+        }
+        else {
+          count += 1
+        }
+        state = .noPercent
       }
-    } else {
-      lastChar = c
+      
+    case .scanningDigits:
+      if c == dollarUTF16 {
+        // switch to positional arguments mode (a POSIX extension)
+        posMode = true
+        if count > 0 {
+          // error condition: positional format seen after non-positional format(s)
+          // FIXME: determine how to handle this error condition
+          // for now, ignore erroneous format items and continue
+        }
+        count = 0
+        maxPosValue = posValue
+        state = .noPercent
+      }
+      else if c >= zeroUTF16 && c <= nineUTF16 {
+        posValue = posValue * 10 + (Int(c) - Int(zeroUTF16))
+      }
+      else {
+        if posMode {
+          // error condition: non-positional format seen after positional format(s)
+          // FIXME: determine how to handle this error condition
+          // for now, ignore erroneous format item and continue
+        }
+        else {
+          count += 1
+        }
+        state = .noPercent
+      }
     }
   }
-  return count
+  
+  return posMode ? maxPosValue : count
 }
 
 // We only need this for UnsafeMutablePointer, but there's not currently a way
