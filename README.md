@@ -70,6 +70,8 @@ compiler for C++14 support and create a symlink:
     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
 
+If you are building in a Virtual Machine, then make sure to setup memory to be at least 4GB and Disk space to be at least 80GB
+
 ### Getting Sources for Swift and Related Projects
 
 First create a directory for all of the swift sources:
@@ -165,6 +167,31 @@ Ninja:
 
     utils/build-script -r -t
 
+To build the default packages up to swift-package-manager:
+    
+    ./swift/utils/build-script -t
+
+If you get error about SwiftGlibc is missing:
+
+    Download and unzip the swift 3.0 package from https://swift.org/download
+    find -name "glibc.modulemap"
+    cp /path/to/glibc.modulemap ./build/Ninja-DebugAssert/swift-linux-x86_64/lib/swift/linux/x86_64
+    ./swift/utils/build-script -t
+
+Build the rest of the required packages:
+
+    ./swift/utils/build-script --lldb
+    ./swift/utils/build-script --libdispatch
+ 
+If you get the following error:
+
+    LLVM ERROR: Compiler-internal integrated REPL unimplemented for this platform; use the LLDB-enhanced REPL instead.
+ 
+ Then do the following:
+ 
+    swift-linux-x86_64/bin$ ln -s /path/to/lldb-linux-x86_64/bin/lldb lldb
+ 
+            
 ## Developing Swift in Xcode
 
 `build-script` can also generate Xcode projects:
