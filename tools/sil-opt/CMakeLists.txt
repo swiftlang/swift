@@ -1,4 +1,4 @@
-add_swift_executable(sil-opt
+add_swift_host_tool(sil-opt
   SILOpt.cpp
   LINK_LIBRARIES
     swiftFrontend
@@ -6,8 +6,3 @@ add_swift_executable(sil-opt
     swiftSILGen
     swiftSILOptimizer
 )
-
-swift_install_in_component(tools
-    TARGETS sil-opt
-    RUNTIME DESTINATION bin)
-

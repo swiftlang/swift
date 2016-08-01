@@ -1,4 +1,4 @@
-add_swift_executable(sil-extract
+add_swift_host_tool(sil-extract
   SILExtract.cpp
   LINK_LIBRARIES
     swiftFrontend
@@ -7,8 +7,3 @@ add_swift_executable(sil-extract
     swiftSerialization
     swiftClangImporter
 )
-
-swift_install_in_component(tools
-    TARGETS sil-extract
-    RUNTIME DESTINATION "bin")
-

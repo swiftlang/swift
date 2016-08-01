@@ -1874,3 +1874,23 @@ endmacro()
 macro(add_swift_lib_subdirectory name)
   add_llvm_subdirectory(SWIFT LIB ${name})
 endmacro()
+
+function(add_swift_host_tool executable)
+  cmake_parse_arguments(
+      ADDSWIFTHOSTTOOL # prefix
+      "" # options
+      "" # single-value args
+      "SWIFT_COMPONENT" # multi-value args
+      ${ARGN})
+
+  # Create the executable rule.
+  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
+
+  set_with_default(COMPONENT_TO_USE "${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}" DEFAULT tool)
+
+  # And then create the install rule for the executable so we install it into
+  # ./bin.
+  swift_install_in_component(${COMPONENT_TO_USE}
+    TARGETS ${executable}
+    RUNTIME DESTINATION bin)
+endfunction()
