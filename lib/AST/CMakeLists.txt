@@ -67,7 +67,7 @@ add_swift_library(swiftAST STATIC
     clangAPINotes
     clangBasic
 
-  COMPONENT_DEPENDS
+  LLVM_COMPONENT_DEPENDS
     bitreader bitwriter irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
