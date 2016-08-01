@@ -898,6 +898,15 @@ public struct ${Self}<Element>
   }
 %end
 
+%if Self == 'Array':
+  /// Creates an Array pointing to the same underlying storage
+  /// as a ContiguousArray.
+  public // @testable
+  init(_ other: ContiguousArray<Element>) {
+      self.init(_buffer: _Buffer(other._buffer, shiftedToStartIndex: 0))
+  }
+%end
+
   public var _buffer: _Buffer
 }
 
