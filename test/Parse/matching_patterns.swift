@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-experimental-patterns -I %S/Inputs -enable-source-import
+// RUN: %target-parse-verify-swift -I %S/Inputs -enable-source-import
 
 import imported_enums
 
@@ -235,57 +235,9 @@ struct S {
   func nonProperty() {}
 }
 
-struct T {}
 
-var s: S
 
-switch s {
-case S():
-  ()
-case S(stat: _): // expected-error{{cannot match type property 'stat' of type 'S' in a 'case' pattern}}
-  ()
-case S(x: 0, y: 0, comp: 0):
-  ()
-case S(w: 0): // expected-error{{property 'w' not found in type 'S'}}
-  ()
-case S(nonProperty: 0): // expected-error{{member 'nonProperty' of type 'S' is not a property}}
-  ()
-case S(0): // expected-error{{subpattern of a struct or class pattern must have a keyword name}}
-  ()
-case S(x: 0, 0): // expected-error{{subpattern of a struct or class pattern must have a keyword name}}
-  ()
 
-case T(): // expected-error{{type 'T' of pattern does not match deduced type 'S'}}
-  ()
-}
-
-struct SG<A> { var x: A }
-
-var sgs: SG<S>
-
-switch sgs {
-case SG(x: S()):
-  ()
-case SG<S>(x: S()):
-  ()
-case SG<T>(x: T()): // expected-error{{type 'SG<T>' of pattern does not match deduced type 'SG<S>'}}
-  ()
-}
-
-func sg_generic<B : Equatable>(_ sgb: SG<B>, b: B) {
-  switch sgb {
-  case SG(x: b):
-    ()
-  }
-}
-
-typealias NonNominal = (foo: Int, bar: UnicodeScalar)
-var nn = NonNominal.self
-
-switch nn {
-case NonNominal(): // expected-error{{non-nominal type 'NonNominal' (aka '(foo: Int, bar: UnicodeScalar)') cannot be used with property pattern syntax}}
-  ()
-}
 
 // Tuple patterns.
 

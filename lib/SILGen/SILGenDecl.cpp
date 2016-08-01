@@ -918,10 +918,6 @@ struct InitializationForPattern
   InitializationPtr visitExprPattern(ExprPattern *P) {
     return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
   }
-  InitializationPtr visitNominalTypePattern(NominalTypePattern *P) {
-    P->dump();
-    llvm_unreachable("pattern not supported in let/else yet");
-  }
 };
 
 } // end anonymous namespace

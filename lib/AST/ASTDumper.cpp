@@ -310,17 +310,6 @@ namespace {
       }
       OS << ')';
     }
-    void visitNominalTypePattern(NominalTypePattern *P) {
-      printCommon(P, "pattern_nominal") << ' ';
-      P->getCastTypeLoc().getType().print(OS);
-      // FIXME: We aren't const-correct.
-      for (auto &elt : P->getMutableElements()) {
-        OS << '\n';
-        OS.indent(Indent) << elt.getPropertyName() << ": ";
-        printRec(elt.getSubPattern());
-      }
-      OS << ')';
-    }
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';

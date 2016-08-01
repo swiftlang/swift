@@ -1413,16 +1413,6 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
   return P;
 }
 
-Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
-  for (auto &elt : P->getMutableElements()) {
-    if (Pattern *newSub = doIt(elt.getSubPattern()))
-      elt.setSubPattern(newSub);
-    else
-      return nullptr;
-  }
-  return P;
-}
-
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
   if (!P->hasSubPattern())
     return P;

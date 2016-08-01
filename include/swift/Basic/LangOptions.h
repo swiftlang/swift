@@ -136,9 +136,6 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
-    
-    /// \brief Enable experimental "switch" pattern-matching features.
-    bool EnableExperimentalPatterns = false;
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;

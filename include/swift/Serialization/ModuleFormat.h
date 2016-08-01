@@ -1073,20 +1073,6 @@ namespace decls_block {
     BCFixed<1>   // implicit?
   >;
 
-  using NominalTypePatternLayout = BCRecordLayout<
-    NOMINAL_TYPE_PATTERN,
-    TypeIDField, // type
-    BCVBR<5>, // number of elements
-    BCFixed<1>  // implicit?
-    // The elements trail the record.
-  >;
-
-  using NominalTypePatternEltLayout = BCRecordLayout<
-    NOMINAL_TYPE_PATTERN_ELT,
-    DeclIDField // property
-    // The element pattern trails the record.
-  >;
-
   using VarPatternLayout = BCRecordLayout<
     VAR_PATTERN,
     BCFixed<1>, // isLet?

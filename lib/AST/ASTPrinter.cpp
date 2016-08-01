@@ -1377,20 +1377,6 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
 
-  case PatternKind::NominalType: {
-    auto type = cast<NominalTypePattern>(pattern);
-    type->getCastTypeLoc().getType().print(Printer, Options);
-    Printer << "(";
-    interleave(type->getElements().begin(), type->getElements().end(),
-               [&](const NominalTypePattern::Element &elt) {
-                 Printer << elt.getPropertyName().str() << ":";
-                 printPattern(elt.getSubPattern());
-               }, [&] {
-                 Printer << ", ";
-               });
-    break;
-  }
-
   case PatternKind::EnumElement: {
     auto elt = cast<EnumElementPattern>(pattern);
     // FIXME: Print element expr.

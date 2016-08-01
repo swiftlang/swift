@@ -223,9 +223,6 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
-def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
-  HelpText<"Enable experimental 'switch' pattern matching features">;
-
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;

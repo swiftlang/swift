@@ -2456,21 +2456,6 @@ ERROR(condition_optional_element_pattern_not_valid_type,none,
       (Type))
 ERROR(enum_element_pattern_not_member_of_enum,none,
       "enum case '%0' is not a member of type %1", (StringRef, Type))
-ERROR(nominal_type_pattern_not_nominal_type,none,
-      "non-nominal type %0 cannot be used with property pattern syntax", (Type))
-ERROR(nominal_type_pattern_type_mismatch,none,
-      "type %0 of pattern does not match deduced type %1", (Type, Type))
-ERROR(nominal_type_pattern_property_not_found,none,
-      "property '%0' not found in type %1", (StringRef, Type))
-ERROR(nominal_type_pattern_property_ambiguous,none,
-      "property name '%0' in type %1 is ambiguous", (StringRef, Type))
-ERROR(nominal_type_pattern_not_property,none,
-      "member '%0' of type %1 is not a property", (StringRef, Type))
-ERROR(nominal_type_pattern_static_property,none,
-      "cannot match type property '%0' of type %1 in a 'case' pattern",
-      (StringRef, Type))
-ERROR(nominal_type_subpattern_without_property_name,none,
-      "subpattern of a struct or class pattern must have a keyword name", ())
 ERROR(ambiguous_enum_pattern_type,none,
       "generic enum type %0 is ambiguous without explicit generic parameters "
       "when matching value of type %1", (Type, Type))

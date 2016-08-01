@@ -60,12 +60,6 @@ public:
       return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
     case PatternKind::Named:
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
-
-    case PatternKind::NominalType: {
-      for (auto &elt : cast<NominalTypePattern>(Pat)->getElements())
-        checkPattern(elt.getSubPattern(), Reason);
-      return;
-    }
     case PatternKind::EnumElement: {
       auto *OP = cast<EnumElementPattern>(Pat);
       if (OP->hasSubPattern())
