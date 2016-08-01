@@ -480,14 +480,15 @@ internal func _makeBridgeObject(
   )
 }
 
+@_silgen_name("_swift_class_getSuperclass")
+internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
+
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
 @inline(__always)
 public // @testable
 func _getSuperclass(_ t: AnyClass) -> AnyClass? {
-  return unsafeBitCast(
-    _swift_class_getSuperclass(unsafeBitCast(t, to: OpaquePointer.self)),
-    to: AnyClass.self)
+  return _swift_class_getSuperclass(t)
 }
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
