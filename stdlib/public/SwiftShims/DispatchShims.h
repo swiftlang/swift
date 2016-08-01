@@ -40,10 +40,12 @@ namespace swift { extern "C" {
 
 typedef unsigned long __swift_shims_dispatch_block_flags_t;
 typedef unsigned int __swift_shims_qos_class_t;
+typedef __swift_uint64_t __swift_shims_dispatch_time_t;
 typedef void (^__swift_shims_dispatch_block_t)(void);
 typedef id __swift_shims_dispatch_queue_t;
 typedef id __swift_shims_dispatch_group_t;
 typedef id __swift_shims_dispatch_data_t;
+typedef id __swift_shims_dispatch_source_t;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 SWIFT_DISPATCH_RETURNS_RETAINED
@@ -91,8 +93,25 @@ void _swift_dispatch_sync(
 		__swift_shims_dispatch_block_t block);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_barrier_async(
+		__swift_shims_dispatch_queue_t queue,
+		__swift_shims_dispatch_block_t block);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_dispatch_group_async(
 		__swift_shims_dispatch_group_t group,
+		__swift_shims_dispatch_queue_t queue,
+		__swift_shims_dispatch_block_t block);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_group_notify(
+		__swift_shims_dispatch_group_t group,
+		__swift_shims_dispatch_queue_t queue,
+		__swift_shims_dispatch_block_t block);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_after(
+		__swift_shims_dispatch_time_t when,
 		__swift_shims_dispatch_queue_t queue,
 		__swift_shims_dispatch_block_t block);
 
@@ -117,6 +136,21 @@ unsigned int
 _swift_dispatch_data_apply(
 		__swift_shims_dispatch_data_t data, 
 		__swift_shims_dispatch_data_applier SWIFT_DISPATCH_NOESCAPE applier);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_source_set_event_handler(
+		__swift_shims_dispatch_source_t source,
+		__swift_shims_dispatch_block_t SWIFT_DISPATCH_NULLABLE block);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_source_set_cancel_handler(
+		__swift_shims_dispatch_source_t source,
+		__swift_shims_dispatch_block_t SWIFT_DISPATCH_NULLABLE block);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_dispatch_source_set_registration_handler(
+		__swift_shims_dispatch_source_t source,
+		__swift_shims_dispatch_block_t SWIFT_DISPATCH_NULLABLE block);
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
