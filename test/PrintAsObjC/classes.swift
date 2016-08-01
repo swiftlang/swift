@@ -108,6 +108,8 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * _Nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
 // CHECK-NEXT: - (nonnull instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithMoreFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -120,6 +122,39 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   convenience init?(boolean b: ObjCBool) { self.init() }
 
   init(forFun: ()) { }
+
+  init(moreFun: ()) { }
+
+  init(evenMoreFun: ()) { }
+}
+
+// CHECK-LABEL: @interface InheritedInitializers
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithMoreFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initForFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class InheritedInitializers : Initializers {
+  override init() {
+    super.init()
+  }
+
+  private convenience init(float f: Float) { self.init() }
+
+  private override init(moreFun: ()) { super.init() }
+}
+
+// CHECK-LABEL: @interface InheritedInitializersAgain
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+@objc class InheritedInitializersAgain : InheritedInitializers {
+  override init() {
+    super.init()
+  }
+
+  init(evenMoreFun: ()) { super.init() }
 }
 
 // NEGATIVE-NOT: NotObjC
