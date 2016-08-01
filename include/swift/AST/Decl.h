@@ -3731,7 +3731,7 @@ enum class AccessStrategy : unsigned char {
 /// Information about a behavior instantiated by a storage declaration.
 ///
 /// TODO: Accessors, composed behaviors
-struct BehaviorRecord {
+struct alignas(1 << 3) BehaviorRecord {
   // The behavior name.
   TypeRepr *ProtocolName;
   // The parameter expression, if any.
@@ -3838,7 +3838,7 @@ private:
   struct GetSetRecord;
   
   /// This is stored immediately before the GetSetRecord.
-  struct AddressorRecord {
+  struct alignas(1 << 3) AddressorRecord {
     FuncDecl *Address = nullptr;        // User-defined address accessor
     FuncDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
 
@@ -3850,7 +3850,7 @@ private:
   void configureAddressorRecord(AddressorRecord *record,
                                FuncDecl *addressor, FuncDecl *mutableAddressor);
 
-  struct GetSetRecord {
+  struct alignas(1 << 3) GetSetRecord {
     SourceRange Braces;
     FuncDecl *Get = nullptr;       // User-defined getter
     FuncDecl *Set = nullptr;       // User-defined setter
