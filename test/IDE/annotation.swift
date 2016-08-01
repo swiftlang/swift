@@ -328,3 +328,16 @@ func test_defer() {
     test_defer()
   }
 }
+
+func test_arg_tuple1(_: Int, _: Int) {}
+func test_arg_tuple2(p1: Int, _: Int) {}
+func test_arg_tuple3(_: Int, p2: Int) {}
+func test_arg_tuple4(p1: Int, p2: Int) {}
+// CHECK: <Func@[[@LINE-4]]:6>test_arg_tuple1</Func>(0,0)
+test_arg_tuple1(0,0)
+// CHECK: <Func@[[@LINE-5]]:6>test_arg_tuple2</Func>(<Func@[[@LINE-5]]:6#p1>p1</Func>:0,0)
+test_arg_tuple2(p1:0,0)
+// CHECK: <Func@[[@LINE-6]]:6>test_arg_tuple3</Func>(0,<Func@[[@LINE-6]]:6#p2>p2</Func>:0)
+test_arg_tuple3(0,p2:0)
+// CHECK: <Func@[[@LINE-7]]:6>test_arg_tuple4</Func>(<Func@[[@LINE-7]]:6#p1>p1</Func>:0,<Func@[[@LINE-7]]:6#p2>p2</Func>:0)
+test_arg_tuple4(p1:0,p2:0)
