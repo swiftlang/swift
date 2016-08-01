@@ -1850,6 +1850,10 @@ details of the setups of other systems or automated environments.""")
         help="enable Undefined Behavior Sanitizer",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "--enable-tsan",
+        help="enable Thread Sanitizer",
+        action=arguments.action.optional_bool)
+    parser.add_argument(
         "--clang-compiler-version",
         help="string that indicates a compiler version for Clang",
         type=arguments.type.clang_compiler_version,

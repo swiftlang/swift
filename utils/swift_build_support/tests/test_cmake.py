@@ -32,6 +32,7 @@ class CMakeTestCase(unittest.TestCase):
                          host_cxx="/path/to/clang++",
                          enable_asan=False,
                          enable_ubsan=False,
+                         enable_tsan=False,
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
@@ -84,6 +85,17 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
 
+    def test_common_options_tsan(self):
+        args = self.default_args()
+        args.enable_tsan = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZER=Thread",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
+
     def test_common_options_asan_ubsan(self):
         args = self.default_args()
         args.enable_asan = True
@@ -93,6 +105,31 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
+
+    def test_common_options_ubsan_tsan(self):
+        args = self.default_args()
+        args.enable_ubsan = True
+        args.enable_tsan = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZER=Undefined;Thread",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
+
+    def test_common_options_asan_ubsan_tsan(self):
+        args = self.default_args()
+        args.enable_asan = True
+        args.enable_ubsan = True
+        args.enable_tsan = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZER=Address;Undefined;Thread",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++"])
 
