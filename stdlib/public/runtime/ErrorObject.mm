@@ -79,15 +79,10 @@ using namespace swift;
 - (NSDictionary*)userInfo {
   auto error = (const SwiftError*)self;
   auto userInfo = error->userInfo.load(SWIFT_MEMORY_ORDER_CONSUME);
-  
-  if (userInfo) {
-    // Don't need to .retain.autorelease since it's immutable.
-    return (NSDictionary*)userInfo;
-  } else {
-    // -[NSError userInfo] never returns nil on OS X 10.8 or later.
-    NSDictionary *emptyDict = SWIFT_LAZY_CONSTANT(@{});
-    return emptyDict;
-  }
+  assert(userInfo
+         && "Error box used as NSError before initialization");
+  // Don't need to .retain.autorelease since it's immutable.
+  return (NSDictionary*)userInfo;
 }
 
 - (id)copyWithZone:(NSZone *)zone {
@@ -319,8 +314,11 @@ SWIFT_CC(swift)
 static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
-  // If we already have a domain set, then we've already initialized.
-  if (errorObject->domain.load(SWIFT_MEMORY_ORDER_CONSUME))
+  // If we already have a domain and userInfo set, then we've already
+  // initialized.
+  // FIXME: This might be overly strict; can we look only at the domain?
+  if (errorObject->domain.load(std::memory_order_acquire) &&
+      errorObject->userInfo.load(std::memory_order_acquire))
     return ns;
   
   // Otherwise, calculate the domain and code (TODO: and user info), and
@@ -333,6 +331,10 @@ static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
   NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
   NSDictionary *userInfo =
     swift_stdlib_getErrorUserInfoNSDictionary(value, type, witness);
+
+  // Never produce an empty userInfo dictionary.
+  if (!userInfo)
+    userInfo = SWIFT_LAZY_CONSTANT(@{});
 
   // The error code shouldn't change, so we can store it blindly, even if
   // somebody beat us to it. The store can be relaxed, since we'll do a
