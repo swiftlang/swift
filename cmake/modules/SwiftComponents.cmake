@@ -143,9 +143,14 @@ disjoint from SWIFT_INCLUDE_COMPONENTS and SWIFT_INSTALL_COMPONENTS")
   _swift_components_initialize(SWIFT_INSTALL_COMPONENTS INCLUDE BUILD INSTALL)
 endmacro()
 
+# TODO: Add a message optional argument?
+function(precondition_swift_is_defined_component component)
+  precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
+endfunction()
+
 function(_swift_component_is_in_set set_name component result_var_name)
   precondition(component)
-  precondition_list_contains_element(_SWIFT_DEFINED_COMPONENTS "${component}")
+  precondition_swift_is_defined_component("${component}")
   _translate_component_name_to_variable_form("${component}" var_name_piece)
   set("${result_var_name}" "${SWIFT_${set_name}_${var_name_piece}}" PARENT_SCOPE)
 endfunction()

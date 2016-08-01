@@ -1894,3 +1894,24 @@ function(add_swift_host_tool executable)
     TARGETS ${executable}
     RUNTIME DESTINATION bin)
 endfunction()
+
+function(add_swift_tool_symlink name)
+  cmake_parse_arguments(
+    ADDSWIFTSYMLINK # Prefix
+    "" # Flags
+    "TOOL;SWIFT_COMPONENT" # Single Arg Options
+    "" # Multi Arg Options
+    ${ARGN})
+  precondition(ADDSWIFTSYMLINK_TOOL
+    MESSAGE "Must specify a tool for arg ADDSWIFTSYMLINK_TOOL. \
+Argument: ${ADDSWIFTSYMLINK_TOOL}")
+  precondition_swift_is_defined_component("${ADDSWIFTSYMLINK_SWIFT_COMPONENT}")
+
+  add_custom_command(TARGET ${ADDSWIFTSYMLINK_TOOL} POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "${ADDSWIFTSYMLINK_TOOL}" "${symlink}"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+  swift_install_in_component(${SWIFT_COMPONENT}
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${symlink}"
+    DESTINATION "bin")
+endfunction()
