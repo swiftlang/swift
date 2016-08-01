@@ -423,9 +423,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // implicitly doing a static lookup into the parent declcontext.
       if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
         if (!DC->getParent()->isModuleScopeContext()) {
-          auto PBD = PBI->getBinding();
-          isTypeLookup = PBD->isStatic();
-          DC = DC->getParent();
+          if (auto PBD = PBI->getBinding()) {
+            isTypeLookup = PBD->isStatic();
+            DC = DC->getParent();
+          }
         }
       
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
