@@ -97,13 +97,15 @@ def run():
             l = line.rstrip('\n')
             m = error_pattern.match(l)
             if m:
-                file, line_num = map_line(m.group('file'), int(m.group('line')))
+                file, line_num = map_line(m.group('file'),
+                                          int(m.group('line')))
                 line = '%s:%s:%s:%s\n' % (
                     file, line_num, int(m.group(3)), m.group(4))
             else:
                 m = assertion_pattern.match(l)
                 if m:
-                    file, line_num = map_line(m.group('file'), int(m.group('line')))
+                    file, line_num = map_line(m.group('file'),
+                                              int(m.group('line')))
                     line = '%s%s%s%s%s\n' % (
                         m.group('head'), file, m.group('middle'), line_num,
                         m.group('tail'))

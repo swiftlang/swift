@@ -1278,11 +1278,13 @@ details of the setups of other systems or automated environments.""")
         help="build libdispatch",
         action=arguments.action.optional_bool,
         dest="build_libdispatch")
-    projects_group.add_argument("--playgroundlogger",
+    projects_group.add_argument(
+        "--playgroundlogger",
         help="build playgroundlogger",
         action="store_true",
         dest="build_playgroundlogger")
-    projects_group.add_argument("--playgroundsupport",
+    projects_group.add_argument(
+        "--playgroundsupport",
         help="build PlaygroundSupport",
         action="store_true",
         dest="build_playgroundsupport")
@@ -1846,6 +1848,10 @@ details of the setups of other systems or automated environments.""")
     parser.add_argument(
         "--enable-ubsan",
         help="enable Undefined Behavior Sanitizer",
+        action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--enable-tsan",
+        help="enable Thread Sanitizer",
         action=arguments.action.optional_bool)
     parser.add_argument(
         "--clang-compiler-version",
