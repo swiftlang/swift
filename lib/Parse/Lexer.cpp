@@ -833,7 +833,7 @@ void Lexer::lexDollarIdent() {
   }
 
   // We reserve $nonNumeric for persistent bindings in the debugger.
-  if(!isAllDigits) {
+  if (!isAllDigits) {
     if (!LangOpts.EnableDollarIdentifiers)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
