@@ -81,7 +81,7 @@ public class ManagedBuffer<Header, Element> {
   public final func withUnsafeMutablePointerToElements<R>(
     _ body: @noescape (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutablePointers { return try body($0.1) }
+    return try withUnsafeMutablePointers { return try body($1) }
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
@@ -267,7 +267,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   public func withUnsafeMutablePointerToElements<R>(
     _ body: @noescape (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    return try withUnsafeMutablePointers { return try body($0.1) }
+    return try withUnsafeMutablePointers { return try body($1) }
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`

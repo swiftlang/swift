@@ -39,4 +39,5 @@ var myTuple3 : (      String,     Int64) = ("C", 3)
 
 markUsed(myTuple1.Id)
 markUsed(myTuple2.Id)
-markUsed({ $0.1 }(myTuple3))
+func f(_ a: (String, Int64)) {}
+markUsed(f(myTuple3))

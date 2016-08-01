@@ -33,7 +33,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
-  func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  func6({($0, $1) + $0})    // // expected-error {{binary operator '+' cannot be applied to operands of type '(Int, Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
   var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
@@ -318,9 +318,6 @@ func r21375863() {
 // <rdar://problem/25993258>
 //   Don't crash if we infer a closure argument to have a tuple type containing inouts.
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
-func r25993258a() {
-  r25993258_helper { x in () } // expected-error {{named parameter has type '(inout Int, Int)' which includes nested inout parameters}}
-}
 func r25993258b() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _, _ in () }
 }

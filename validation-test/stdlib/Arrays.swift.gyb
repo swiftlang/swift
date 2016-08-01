@@ -748,7 +748,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
   // stride == 0.
   do {
     let input: ${array_type}<Void> = [ (), (), () ]
-    let result = input.map { (_) -> Void in return () }
+    let result = input.map { () }
     expectEqual(3, result.count)
   }
 

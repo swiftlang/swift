@@ -407,7 +407,7 @@ func _SequenceAlgorithms<S : Sequence>(x: S) {
   _ = x.minElement { _, _ in true } // expected-error {{'minElement' has been renamed to 'min(by:)'}} {{9-19=min}} {{none}}
   _ = x.maxElement { _, _ in true } // expected-error {{'maxElement' has been renamed to 'max(by:)'}} {{9-19=max}} {{none}}
   _ = x.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
-  _ = x.startsWith([]) { _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:by:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
+  _ = x.startsWith([]) { _, _ in true } // expected-error {{'startsWith(_:isEquivalent:)' has been renamed to 'starts(with:by:)'}} {{9-19=starts}} {{20-20=with: }} {{none}}
   _ = x.lexicographicalCompare([]) { _, _ in true } // expected-error {{'lexicographicalCompare(_:isOrderedBefore:)' has been renamed to 'lexicographicallyPrecedes(_:by:)'}} {{9-31=lexicographicallyPrecedes}}{{none}}
 }
 func _SequenceAlgorithms<S : Sequence>(x: S) where S.Iterator.Element : Comparable {
