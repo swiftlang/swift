@@ -45,6 +45,24 @@ internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    return NSObject()
+  }
+  public static func _forceBridgeFromObjectiveC(_ x: NSObject,
+                                                result: inout AnyHashable?) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(_ x: NSObject?) -> AnyHashable {
+    return AnyHashable("")
+ }
+}
+
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
