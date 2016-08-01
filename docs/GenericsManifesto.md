@@ -323,7 +323,7 @@ public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zer
   public typealias Element = (Iterators.Element...)                       // a tuple containing the element types of each iterator in Iterators
 
   var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators 
-  var reachedEnd: Bool = false
+  var reachedEnd = false
 
   public mutating func next() -> Element? {
     if reachedEnd { return nil }
