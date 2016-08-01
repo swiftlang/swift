@@ -23,7 +23,7 @@ import SwiftShims
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
-public class ManagedBuffer<Header, Element> {
+open class ManagedBuffer<Header, Element> {
 
   /// Create a new instance of the most-derived class, calling
   /// `factory` on the partially-constructed object to generate
