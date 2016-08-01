@@ -95,6 +95,14 @@ swift::_swift_dispatch_async(
 }
 
 void
+swift::_swift_dispatch_barrier_async(
+	      __swift_shims_dispatch_queue_t queue,
+	      __swift_shims_dispatch_block_t block)
+{
+	dispatch_barrier_async(cast(queue), cast(block));
+}
+
+void
 swift::_swift_dispatch_group_async(
 	__swift_shims_dispatch_group_t group,
 	__swift_shims_dispatch_queue_t queue,
@@ -104,11 +112,29 @@ swift::_swift_dispatch_group_async(
 }
 
 void
+swift::_swift_dispatch_group_notify(
+	__swift_shims_dispatch_group_t group,
+	__swift_shims_dispatch_queue_t queue,
+	__swift_shims_dispatch_block_t block)
+{
+	dispatch_group_notify((dispatch_group_t)group, cast(queue), cast(block));
+}
+
+void
 swift::_swift_dispatch_sync(
 	__swift_shims_dispatch_queue_t queue,
 	__swift_shims_dispatch_block_t block)
 {
 	dispatch_sync(cast(queue), cast(block));
+}
+
+void
+swift::_swift_dispatch_after(
+	__swift_shims_dispatch_time_t when,
+	__swift_shims_dispatch_queue_t queue,
+	__swift_shims_dispatch_block_t block)
+{
+	dispatch_after((dispatch_time_t)when, cast(queue), cast(block));
 }
 
 void
@@ -139,4 +165,28 @@ swift::_swift_dispatch_data_apply(
 	return dispatch_data_apply(data, ^bool(dispatch_data_t data, size_t off, const void *loc, size_t size){
 		return applier(data, off, loc, size);
 	});
+}
+
+void
+swift::_swift_dispatch_source_set_event_handler(
+	__swift_shims_dispatch_source_t source,
+	__swift_shims_dispatch_block_t block)
+{
+	dispatch_source_set_event_handler((dispatch_source_t)source, cast(block));
+}
+
+void
+swift::_swift_dispatch_source_set_cancel_handler(
+	__swift_shims_dispatch_source_t source,
+	__swift_shims_dispatch_block_t block)
+{
+	dispatch_source_set_cancel_handler((dispatch_source_t)source, cast(block));
+}
+
+void
+swift::_swift_dispatch_source_set_registration_handler(
+	__swift_shims_dispatch_source_t source,
+	__swift_shims_dispatch_block_t block)
+{
+	dispatch_source_set_registration_handler((dispatch_source_t)source, cast(block));
 }
