@@ -417,7 +417,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       ValueDecl *MetaBaseDecl = 0;
       GenericParamList *GenericParams = nullptr;
       Type ExtendedType;
-
+      bool isTypeLookup = false;
+      
+      // If this declcontext is an initializer for a static property, then we're
+      // implicitly doing a static lookup into the parent declcontext.
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+        if (!DC->getParent()->isModuleScopeContext()) {
+          auto PBD = PBI->getBinding();
+          isTypeLookup = PBD->isStatic();
+          DC = DC->getParent();
+        }
+      
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
         // Look for local variables; normally, the parser resolves these
         // for us, but it can't do the right thing inside local types.
@@ -511,6 +521,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           isCascadingUse = DC->isCascadingContextForLookup(false);
       }
 
+      // If this is implicitly a lookup into the static members, add a metatype
+      // wrapper.
+      if (isTypeLookup && ExtendedType)
+        ExtendedType = MetatypeType::get(ExtendedType, Ctx);
+      
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);

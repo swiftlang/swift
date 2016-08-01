@@ -501,3 +501,12 @@ class r23904262 {
   let y = x // expected-error {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 }
 
+
+// <rdar://problem/21677702> Static method reference in static var doesn't work
+class r21677702 {
+  static func method(value: Int) -> Int { return value }
+  static let x = method(value: 123)
+  static let y = method(123) // expected-error {{missing argument label 'value:' in call}}
+}
+
+
