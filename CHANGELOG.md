@@ -2,6 +2,15 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 
 Swift 3.0
 ---------
+* [SE-0107](https://github.com/apple/swift-evolution/blob/master/proposals/0107-unsaferawpointer.md)
+
+  An `Unsafe[Mutable]RawPointer` type has been introduced. It
+  replaces `Unsafe[Mutable]Pointer<Void>`. Conversion from
+  `UnsafePointer<T>` to `UnsafePointer<U>` has been
+  disallowed. `Unsafe[Mutable]RawPointer` provides an API for untyped
+  memory access, and an API for binding memory to a type. Binding
+  memory allows for safe conversion between pointer types.
+
 * [SE-0096](https://github.com/apple/swift-evolution/blob/master/proposals/0096-dynamictype.md):
 
   The `dynamicType` keyword has been removed from Swift.  In its place a new
