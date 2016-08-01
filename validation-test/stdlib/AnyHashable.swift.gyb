@@ -666,7 +666,7 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError).base") {
 }
 
 #if _runtime(_ObjC)
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError)/Hashable") {
+AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {
   let swiftErrors: [MinimalHashablePODSwiftError] = [
     .caseA, .caseA,
     .caseB, .caseB,
@@ -683,8 +683,42 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError)/Hashable") {
     equalityOracle: { $0 / 2 == $1 / 2 })
 }
 
-AnyHashableTests.test("AnyHashable(_SwiftNativeNSError).base") {
+AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError)).base") {
   let ah = AnyHashable(MinimalHashablePODSwiftError.caseA as NSError)
+  expectTrue(type(of: ah.base) is NSError.Type)
+}
+
+AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError))/Hashable") {
+  let swiftErrors: [MinimalHashableRCSwiftError] = [
+    .caseA(LifetimeTracked(1)), .caseA(LifetimeTracked(1)),
+    .caseA(LifetimeTracked(2)), .caseA(LifetimeTracked(2)),
+    .caseB(LifetimeTracked(1)), .caseB(LifetimeTracked(1)),
+    .caseB(LifetimeTracked(2)), .caseB(LifetimeTracked(2)),
+    .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
+    .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
+  ]
+  let nsErrors: [NSError] = swiftErrors.map { $0 as NSError }
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors.first!))
+  expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
+  expectFailure {
+    // FIXME(id-as-any): make NSError bridging consistent with Swift's notion
+    // of hashing and equality.
+    checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+  }
+  expectFailure {
+    // FIXME(id-as-any): make NSError bridging consistent with Swift's notion
+    // of hashing and equality.
+    checkHashable(
+      nsErrors.map(AnyHashable.init),
+      equalityOracle: { $0 / 2 == $1 / 2 })
+  }
+}
+
+AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError)).base") {
+  let ah = AnyHashable(
+    MinimalHashableRCSwiftError.caseA(LifetimeTracked(1)) as NSError)
   expectTrue(type(of: ah.base) is NSError.Type)
 }
 
