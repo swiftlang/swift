@@ -1113,6 +1113,7 @@ private:
     ValueDecl *Dcl = nullptr;
     TypeDecl *CtorTyRef = nullptr;
     ModuleEntity Mod;
+    Identifier ArgName;
     bool IsRef = true;
 
     SemanticSourceEntity(CharSourceRange Range,
@@ -1128,6 +1129,14 @@ private:
                          ModuleEntity Mod)
       : Range(Range),
         Mod(Mod) {}
+
+    SemanticSourceEntity(CharSourceRange Range,
+                         ValueDecl *Dcl,
+                         Identifier argName)
+      : Range(Range),
+        Dcl(Dcl),
+        ArgName(argName),
+        IsRef(true) {}
   };
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
@@ -1151,7 +1160,7 @@ private:
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override {
-    annotateSourceEntity({ Range, D, nullptr, /*IsRef=*/true });
+    annotateSourceEntity({ Range, D, Name });
     return true;
   }
 
@@ -1227,6 +1236,9 @@ private:
       if (Entity.Mod.isSystemModule())
         OS << 'i';
       OS << "Mod";
+    }
+    if (!Entity.ArgName.empty()) {
+      OS << "#" << Entity.ArgName.str();
     }
 
     OS << '>';
