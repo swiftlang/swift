@@ -516,3 +516,22 @@ class r16954496 {
   lazy var x: Array<(r16954496) -> () -> Void> = [bar]
 }
 
+
+
+// <rdar://problem/27413116> [Swift] Using static constant defined in enum when in switch statement doesnt compile
+enum MyEnum {
+  case one
+  case two
+  
+  static let kMyConstant = "myConstant"
+}
+
+switch "someString" {
+case MyEnum.kMyConstant: // this causes a compiler error
+  print("yay")
+case MyEnum.self.kMyConstant: // this works fine
+  print("hmm")
+default:
+  break
+}
+
