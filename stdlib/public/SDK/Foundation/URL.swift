@@ -499,7 +499,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
     public init?(string: String, relativeTo url: URL?) {
-        guard !string.isEmpty else { return nil }
+        guard !string.isEmpty || url != nil else { return nil }
         
         if let inner = NSURL(string: string, relativeTo: url) {
             _url = URL._converted(from: inner)
