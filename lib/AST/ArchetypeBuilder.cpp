@@ -1427,7 +1427,7 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
       // FIXME: Poor location information.
       // FIXME: Delay diagnostic until after type validation?
       Diags.diagnose(Req.getColonLoc(), diag::requires_not_suitable_archetype,
-                     0, Req.getSubjectLoc(), 0);
+                     0, Req.getSubjectLoc().getType(), 0);
       return true;
     }
 

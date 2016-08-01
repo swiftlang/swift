@@ -10,23 +10,21 @@ func inFunction() {
 }
 
 struct S0 {
-  func f() -> Self { } // expected-error{{struct method cannot return 'Self'; did you mean to use the struct type 'S0'?}}{{15-19=S0}}
+  func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{16-20=S0}}
+  func g(_ ds: Self) { } // okay
 }
 
 enum E0 {
-  func f() -> Self { } // expected-error{{enum method cannot return 'Self'; did you mean to use the enum type 'E0'?}}{{15-19=E0}}
+  func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{16-20=E0}}
+  func g(_ ds: Self) { } // okay
 }
 
 class C0 {
   func f() -> Self { } // okay
-
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
-
-  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func g(_ ds: Self) { } // okay
+  func h(_ ds: Self) -> Self { } // okay
 }
 
 protocol P0 {
@@ -73,7 +71,7 @@ class C1 {
     if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
+    var _: Self = self
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -82,14 +80,13 @@ class C1 {
   // Type methods have a self of type Self.Type.
   class func factory(_ b: Bool) -> Self {
     // Check directly.
-    var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
+    var _: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
-    // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
+    _ = C1(int: 5) as Self
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'}} expected-note {{did you mean 'self'?}}
+    return Self() // expected-error{{missing argument for parameter 'int' in call}}
   }
 }
 
