@@ -197,10 +197,15 @@ public extension DispatchQueue {
 		flags: DispatchWorkItemFlags = [], 
 		execute work: @escaping @convention(block) () -> Void) 
 	{
-		if group == nil && qos == .unspecified && flags.isEmpty {
+		if group == nil && qos == .unspecified {
 			// Fast-path route for the most common API usage
-			__dispatch_async(self, work)
-			return
+			if flags.isEmpty {
+				__dispatch_async(self, work)
+				return
+			} else if flags == .barrier {
+				__dispatch_barrier_async(self, work)
+				return
+			}
 		}
 
 		var block: @convention(block) () -> Void = work
