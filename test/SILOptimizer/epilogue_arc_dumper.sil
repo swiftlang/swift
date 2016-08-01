@@ -3,6 +3,7 @@
 import Builtin
 import Swift
 
+sil [fragile] @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
 
 /////////////////////
 // Data Structures //
@@ -24,6 +25,7 @@ bb0(%0 : $foo):
   %3 = tuple ()
   return %3 : $()
 }
+
 
 // CHECK-LABEL: START: multiblock_release_foo
 // CHECK: [[IN1:%.*]] = argument of bb0 : $foo
@@ -79,6 +81,42 @@ bb1:
 bb2:
   %3 = tuple ()
   return %3 : $()
+}
+
+// CHECK-LABEL: START: try_apply_test_release_in_both_terminator_blocks
+// CHECK: [[IN1:%.*]] = argument of bb0 : $Builtin.NativeObject
+// CHECK: strong_release [[IN1:%.*]] : $Builtin.NativeObject
+// CHECK: strong_release [[IN1:%.*]] : $Builtin.NativeObject
+// CHECK: FINISH: try_apply_test_release_in_both_terminator_blocks
+sil [fragile] @try_apply_test_release_in_both_terminator_blocks : $@convention(thin) (@owned Builtin.NativeObject) -> @error Error {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+
+bb1(%2 : $()):
+  strong_release %0 : $Builtin.NativeObject
+  return undef : $()
+
+bb2(%3 : $Error):
+  strong_release %0 : $Builtin.NativeObject
+  throw %3 : $Error
+}
+
+// CHECK-LABEL: START: try_apply_test_release_in_return_terminator_block
+// CHECK: [[IN1:%.*]] = argument of bb0 : $Builtin.NativeObject
+// CHECK-NOT: strong_release [[IN1:%.*]] : $Builtin.NativeObject
+// CHECK: FINISH: try_apply_test_release_in_return_terminator_block
+sil [fragile] @try_apply_test_release_in_return_terminator_block : $@convention(thin) (@owned Builtin.NativeObject) -> @error Error {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_throwing_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error
+  try_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error Error, normal bb1, error bb2
+
+bb1(%2 : $()):
+  strong_release %0 : $Builtin.NativeObject
+  return undef : $()
+
+bb2(%3 : $Error):
+  throw %3 : $Error
 }
 
 
