@@ -78,7 +78,6 @@ KNOWN_SETTINGS=(
     xctest-build-type           "Debug"          "the build variant for xctest"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
-    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
