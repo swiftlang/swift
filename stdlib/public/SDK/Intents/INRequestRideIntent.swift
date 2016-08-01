@@ -22,26 +22,18 @@ extension INRequestRideIntent {
     dropOffLocation: CLPlacemark? = nil,
     rideOptionName: INSpeakableString? = nil,
     partySize: Int? = nil,
-    paymentMethodName: INSpeakableString? = nil,
-    usesApplePayForPayment: Bool? = nil
+    paymentMethod: INPaymentMethod? = nil
   ) {
     self.init(__pickupLocation: pickupLocation,
       dropOffLocation: dropOffLocation,
       rideOptionName: rideOptionName,
       partySize: partySize.map { NSNumber(value: $0) },
-      paymentMethodName: paymentMethodName,
-      usesApplePayForPayment:
-        usesApplePayForPayment.map { NSNumber(value: $0) })
+      paymentMethod: paymentMethod)
   }
 
   @nonobjc
   public final var partySize: Int? {
     return __partySize?.intValue
-  }
-
-  @nonobjc
-  public final var usesApplePayForPayment: Bool? {
-    return __usesApplePayForPayment?.boolValue
   }
 }
 #endif

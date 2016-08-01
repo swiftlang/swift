@@ -146,7 +146,7 @@ case _:
   print("got something else")
 }
 
-let color = OSColor.black()
+let color = OSColor.black
 switch PlaygroundQuickLook(reflecting: color) {
 case .color(let color2 as OSColor) where color === color2:
   print("got the expected quick look color")

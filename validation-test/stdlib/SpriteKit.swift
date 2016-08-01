@@ -3,9 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// watchOS does not have SpriteKit.
-// UNSUPPORTED: OS=watchos
-
 import StdlibUnittest
 
 import Foundation
@@ -35,8 +32,7 @@ print("color \(r) \(g) \(b) \(a)")
 func f(_ c: NSColor) {
   print("colortastic")
 }
-#endif
-#if os(iOS) || os(tvOS)
+#elseif os(iOS) || os(tvOS) || os(watchOS)
 func f(_ c: UIColor) {
   print("colortastic")
 }
@@ -55,16 +51,28 @@ if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
   }
 
   SpriteKitTests.test("SKWarpGeometryGrid") {
-    var warpGrid = SKWarpGeometryGrid(columns: 3, rows: 4)
-    expectEqual(warpGrid.numberOfColumns, 3)
+    var warpGrid = SKWarpGeometryGrid(columns: 1, rows: 1)
+    expectEqual(warpGrid.numberOfColumns, 1) 
 
     expectEqual(warpGrid.sourcePosition(at: 0).x, 0.0)
-    warpGrid = warpGrid.replacingBySourcePositions(positions: [float2(30.0)])
-    expectEqual(warpGrid.sourcePosition(at: 0).x, 30.0)
+    warpGrid = warpGrid.replacingBySourcePositions(positions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)])
+    expectEqual(warpGrid.sourcePosition(at: 0).x, 1.0)
 
     expectEqual(warpGrid.destPosition(at: 0).x, 0.0)
-    warpGrid = warpGrid.replacingByDestinationPositions(positions: [float2(30.0)])
-    expectEqual(warpGrid.destPosition(at: 0).x, 30.0)
+    warpGrid = warpGrid.replacingByDestinationPositions(positions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)])
+    expectEqual(warpGrid.destPosition(at: 0).x, 1.0)
+
+    warpGrid = SKWarpGeometryGrid(columns: 1, rows: 1, sourcePositions: nil, destinationPositions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)])
+    expectEqual(warpGrid.destPosition(at: 0).x, 1.0)
+    expectEqual(warpGrid.sourcePosition(at: 0).x, 0.0)
+
+    warpGrid = SKWarpGeometryGrid(columns: 1, rows: 1, sourcePositions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)], destinationPositions: nil)
+    expectEqual(warpGrid.destPosition(at: 0).x, 0.0)
+    expectEqual(warpGrid.sourcePosition(at: 0).x, 1.0)
+
+    warpGrid = SKWarpGeometryGrid(columns: 1, rows: 1, sourcePositions: [float2(2.0), float2(1.0), float2(3.0), float2(4.0)], destinationPositions: [float2(1.0), float2(2.0), float2(3.0), float2(4.0)])
+    expectEqual(warpGrid.destPosition(at: 0).x, 1.0)
+    expectEqual(warpGrid.sourcePosition(at: 0).x, 2.0)
   }
 }
 
