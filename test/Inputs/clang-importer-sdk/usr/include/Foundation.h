@@ -1059,3 +1059,10 @@ static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availabi
 void acceptError(NSError * _Nonnull error);
 NSError * _Nonnull produceError(void);
 NSError * _Nullable produceOptionalError(void);
+
+extern NSString * const FictionalServerErrorDomain;
+
+typedef enum __attribute__((ns_error_domain(FictionalServerErrorDomain))) FictionalServerErrorCode : NSInteger {
+  FictionalServerErrorMeltedDown = 1
+} FictionalServerErrorCode;
+

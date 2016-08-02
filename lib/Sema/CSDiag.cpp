@@ -3456,7 +3456,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
-  case CTP_ThrowStmt:
+  case CTP_ThrowStmt: {
     if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
       diagnose(expr->getLoc(), diag::cannot_throw_nil);
       return true;
@@ -3465,14 +3465,42 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     if (isUnresolvedOrTypeVarType(exprType) ||
         exprType->isEqual(contextualType))
       return false;
-      
+
+    // If we tried to throw the error code of an error type, suggest object
+    // construction.
+    auto &TC = CS->getTypeChecker();
+    if (auto errorCodeProtocol =
+            TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
+      ProtocolConformance *conformance = nullptr;
+      if (TC.conformsToProtocol(expr->getType(), errorCodeProtocol, CS->DC,
+                                ConformanceCheckFlags::InExpression,
+                                &conformance) &&
+          conformance) {
+        Type errorCodeType = expr->getType();
+        Type errorType =
+          ProtocolConformance::getTypeWitnessByName(errorCodeType, conformance,
+                                                    TC.Context.Id_ErrorType,
+                                                    &TC)->getCanonicalType();
+        if (errorType) {
+          auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
+                               errorCodeType, errorType);
+          if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
+            diag.fixItInsert(unresolvedDot->getDotLoc(), "(");
+            diag.fixItInsertAfter(unresolvedDot->getEndLoc(), ")");
+          }
+          return true;
+        }
+      }
+    }
+
     // The conversion destination of throw is always ErrorType (at the moment)
     // if this ever expands, this should be a specific form like () is for
     // return.
     diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
       .highlight(expr->getSourceRange());
     return true;
-      
+  }
+
   case CTP_EnumCaseRawValue:
     diagID = diag::cannot_convert_raw_initializer_value;
     diagIDProtocol = diag::cannot_convert_raw_initializer_value;

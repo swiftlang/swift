@@ -281,6 +281,10 @@ ERROR(cannot_convert_to_return_type_nil,none,
 
 ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 does not conform to 'Error'", (Type))
+ERROR(cannot_throw_error_code,none,
+      "thrown error code type %0 does not conform to 'Error'; construct an %1 "
+      "instance", (Type, Type))
+
 ERROR(cannot_throw_nil,none,
       "cannot infer concrete Error for thrown 'nil' value", ())
 
