@@ -11,6 +11,7 @@ struct PlainStruct {}
 enum PlainEnum {}
 protocol PlainProtocol {} // expected-note {{protocol 'PlainProtocol' declared here}}
 
+enum ErrorEnum : Error { }
 
 @objc class Class_ObjC1 {}
 
@@ -1932,6 +1933,20 @@ class ClassThrows1 {
   @objc init?(radians: Double) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
 
   @objc init!(string: String) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+
+  @objc func fooWithErrorEnum1(x: ErrorEnum) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
+
+  // CHECK: {{^}} func fooWithErrorEnum2(x: ErrorEnum)
+  func fooWithErrorEnum2(x: ErrorEnum) {}
+
+  @objc func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{protocol composition involving 'Error' is not '@objc'}}
+
+  // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1)
+  func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
 }
 
 
