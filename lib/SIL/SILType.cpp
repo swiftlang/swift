@@ -465,8 +465,8 @@ static bool isBridgedErrorClass(SILModule &M,
     t = archetypeType->getSuperclass();
 
   // NSError (TODO: and CFError) can be bridged.
-  auto errorType = M.Types.getNSErrorType();
-  if (t && errorType && t->isEqual(errorType)) {
+  auto nsErrorType = M.Types.getNSErrorType();
+  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t, nullptr)) {
     return true;
   }
   

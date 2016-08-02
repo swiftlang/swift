@@ -582,4 +582,12 @@ ErrorBridgingTests.test("Customizing localization/recovery laziness") {
   }
 }
 
+class MyNSError : NSError {  }
+
+ErrorBridgingTests.test("NSError subclass identity") {
+  let myNSError: Error = MyNSError(domain: "MyNSError", code: 0, userInfo: [:])
+  let nsError = myNSError as NSError
+  expectTrue(type(of: nsError) == MyNSError.self)
+}
+
 runAllTests()
