@@ -15,12 +15,11 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Metadata.h"
-#include "../runtime/Private.h"
+#include "Private.h"
+#include "SwiftHashableSupport.h"
 
 using namespace swift;
-
-/// The name demangles to "protocol descriptor for Swift.Hashable".
-extern "C" const ProtocolDescriptor _TMps8Hashable;
+using namespace swift::hashable_support;
 
 namespace {
 struct HashableConformanceKey {
@@ -36,6 +35,9 @@ struct HashableConformanceEntry {
 
   /// The highest (closest to the root) type in the superclass chain
   /// that conforms to `Hashable`.
+  ///
+  /// Always non-NULL.  We don't cache negative responses so that we
+  /// don't have to deal with cache invalidation.
   const Metadata *baseTypeThatConformsToHashable;
 
   HashableConformanceEntry(HashableConformanceKey key,
@@ -59,16 +61,26 @@ struct HashableConformanceEntry {
 };
 } // end unnamed namesapce
 
+// FIXME(performance): consider merging this cache into the regular
+// protocol conformance cache.
 static Lazy<ConcurrentMap<HashableConformanceEntry>> HashableConformances;
 
-/// Find the base type that introduces the `Hashable` conformance.
-///
-/// - Precondition: `type` conforms to `Hashable` (not checked).
-static const Metadata *findHashableBaseType(const Metadata *type) {
+template<bool KnownToConformToHashable>
+LLVM_ATTRIBUTE_ALWAYS_INLINE
+static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
+  // Check the cache first.
   if (HashableConformanceEntry *entry =
           HashableConformances->find(HashableConformanceKey{type})) {
     return entry->baseTypeThatConformsToHashable;
   }
+  if (!KnownToConformToHashable &&
+      !swift_conformsToProtocol(type, &_TMps8Hashable)) {
+    // Don't cache the negative response because we don't invalidate
+    // this cache when a new conformance is loaded dynamically.
+    return nullptr;
+  }
+  // By this point, `type` is known to conform to `Hashable`.
+
   const Metadata *baseTypeThatConformsToHashable = type;
   while (true) {
     const Metadata *superclass =
@@ -82,6 +94,26 @@ static const Metadata *findHashableBaseType(const Metadata *type) {
   HashableConformances->getOrInsert(HashableConformanceKey{type},
                                     baseTypeThatConformsToHashable);
   return baseTypeThatConformsToHashable;
+}
+
+/// Find the base type that introduces the `Hashable` conformance.
+/// Because the provided type is known to conform to `Hashable`, this
+/// function always returns non-null.
+///
+/// - Precondition: `type` conforms to `Hashable` (not checked).
+const Metadata *swift::hashable_support::findHashableBaseTypeOfHashableType(
+    const Metadata *type) {
+  auto result =
+    findHashableBaseTypeImpl</*KnownToConformToHashable=*/ true>(type);
+  assert(result && "Known-hashable types should have a `Hashable` conformance.");
+  return result;
+}
+
+/// Find the base type that introduces the `Hashable` conformance.
+/// If `type` does not conform to `Hashable`, `nullptr` is returned.
+const Metadata *swift::hashable_support::findHashableBaseType(
+    const Metadata *type) {
+  return findHashableBaseTypeImpl</*KnownToConformToHashable=*/ false>(type);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -104,7 +136,8 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass: {
     _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
-        value, anyHashableResultPointer, findHashableBaseType(type),
+        value, anyHashableResultPointer,
+        findHashableBaseTypeOfHashableType(type),
         hashableWT);
     return;
   }

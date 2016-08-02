@@ -1642,11 +1642,6 @@ extern "C" const ProtocolDescriptor _TMps5Error;
 static const WitnessTable *findErrorWitness(const Metadata *srcType) {
   return swift_conformsToProtocol(srcType, &_TMps5Error);
 }
-
-static const Metadata *getNSErrorMetadata() {
-  return SWIFT_LAZY_CONSTANT(
-    swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
-}
 #endif
 
 /// Perform a dynamic cast from an existential type to some kind of
