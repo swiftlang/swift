@@ -131,7 +131,7 @@ namespace swift {
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 15000000;
+    unsigned SolverMemoryThreshold = 23068672; /* 22 * 1024 * 1024 */
 
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
