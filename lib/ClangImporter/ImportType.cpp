@@ -2709,10 +2709,3 @@ Type ClangImporter::Implementation::getNSCopyingType() {
 Type ClangImporter::Implementation::getNSObjectProtocolType() {
   return getNamedProtocolType(*this, "NSObject");
 }
-
-Type ClangImporter::Implementation::getCFStringRefType() {
-  if (auto decl = dyn_cast_or_null<TypeDecl>(importDeclByName("CFStringRef")))
-    return decl->getDeclaredType();
-  return Type();
-}
-
