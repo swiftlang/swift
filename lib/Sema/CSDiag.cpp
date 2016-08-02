@@ -3613,8 +3613,8 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   if (!srcFT || !destFT || !srcFT->isNoEscape() || destFT->isNoEscape())
     return false;
 
-  // Function types must be equivalent modulo @escaping
-  if (destFT != srcFT->withExtInfo(srcFT->getExtInfo().withNoEscape(false)))
+  // Function types must be equivalent modulo @escaping, @convention, etc.
+  if (destFT != srcFT->withExtInfo(destFT->getExtInfo()))
     return false;
 
   // Pick a specific diagnostic for the specific use

@@ -38,3 +38,11 @@ struct StoresClosure {
   }
 }
 
+func takesEscapingBlock(_ fn: @escaping @convention(block) () -> Void) {
+  fn()
+}
+func callEscapingWithNoEscapeBlock(_ fn: () -> Void) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{42-42=@escaping }}
+
+  takesEscapingBlock(fn) // expected-error{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
