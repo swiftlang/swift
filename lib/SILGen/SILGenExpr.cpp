@@ -1724,6 +1724,29 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                    ApplyOptions::None, None, None, C);
 }
 
+RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
+    SILLocation loc,
+    const PatternBindingEntry &entry,
+    ArrayRef<Substitution> subs,
+    CanType resultType,
+    AbstractionPattern origResultType,
+    SGFContext C) {
+
+  VarDecl *var = entry.getAnchoringVarDecl();
+  SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
+  auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
+  auto fnType = fnRef.getType().castTo<SILFunctionType>();
+
+  auto substFnType = fnType->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
+                                              subs);
+
+  return emitApply(loc, fnRef, subs, {},
+                   substFnType,
+                   origResultType,
+                   resultType,
+                   ApplyOptions::None, None, None, C);
+}
+
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
                                      TupleShuffleExpr *E,
                                      Initialization *outerTupleInit) {

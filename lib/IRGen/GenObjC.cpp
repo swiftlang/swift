@@ -512,6 +512,7 @@ namespace {
     Selector(SILDeclRef ref) {
       switch (ref.kind) {
       case SILDeclRef::Kind::DefaultArgGenerator:
+      case SILDeclRef::Kind::StoredPropertyInitializer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
       case SILDeclRef::Kind::GlobalGetter:

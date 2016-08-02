@@ -120,6 +120,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
   case SILDeclRef::Kind::IVarDestroyer:

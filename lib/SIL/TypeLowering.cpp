@@ -1671,6 +1671,27 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
 }
 
+/// Get the type of a stored property initializer, () -> T.
+static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
+                                                     TypeConverter &TC,
+                                                     VarDecl *VD,
+                                                     ASTContext &context) {
+  auto *DC = VD->getDeclContext();
+  CanType resultTy =
+      ArchetypeBuilder::mapTypeOutOfContext(
+          DC, VD->getParentInitializer()->getType())
+          ->getCanonicalType();
+  GenericSignature *sig = DC->getGenericSignatureOfContext();
+
+  if (sig)
+    return CanGenericFunctionType::get(sig->getCanonicalSignature(),
+                                       TupleType::getEmpty(context),
+                                       resultTy,
+                                       GenericFunctionType::ExtInfo());
+  
+  return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
+}
+
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -1868,8 +1889,12 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(*this,
-                                      cast<AbstractFunctionDecl>(vd),
-                                      c.defaultArgIndex, Context);
+                                               cast<AbstractFunctionDecl>(vd),
+                                               c.defaultArgIndex, Context);
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    return getStoredPropertyInitializerInterfaceType(*this,
+                                                     cast<VarDecl>(vd),
+                                                     Context);
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, false);
@@ -1926,6 +1951,12 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
   case SILDeclRef::Kind::DefaultArgGenerator:
     // Use the context generic parameters of the original declaration.
     return getConstantContextGenericParams(SILDeclRef(c.getDecl()));
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    // Use the context generic parameters of the containing type.
+    return {
+      c.getDecl()->getDeclContext()->getGenericParamsOfContext(),
+      nullptr,
+    };
   }
 }
 

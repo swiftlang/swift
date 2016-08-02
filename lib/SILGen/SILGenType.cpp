@@ -379,12 +379,15 @@ public:
   void visitEnumElementDecl(EnumElementDecl *ued) {}
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
-    // Emit initializers for static variables.
-    if (!pd->isStatic()) return;
-
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-      if (pd->getInit(i))
-        SGM.emitGlobalInitialization(pd, i);
+    // Emit initializers.
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+      if (pd->getInit(i)) {
+        if (pd->isStatic())
+          SGM.emitGlobalInitialization(pd, i);
+        else
+          SGM.emitStoredPropertyInitialization(pd, i);
+      }
+    }
   }
 
   void visitVarDecl(VarDecl *vd) {
@@ -472,17 +475,19 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    if (!pd->isStatic()) return;
-
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-      if (pd->getInit(i))
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+      if (pd->getInit(i)) {
+        assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);
+      }
+    }
   }
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasBehavior())
       SGM.emitPropertyBehavior(vd);
-    if (vd->isStatic() && vd->hasStorage()) {
+    if (vd->hasStorage()) {
+      assert(vd->isStatic() && "stored property in extension?!");
       ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
       NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
       return emitTypeMemberGlobalVariable(SGM, ext->getGenericParams(),

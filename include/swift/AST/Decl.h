@@ -1852,6 +1852,9 @@ public:
     InitCheckedAndRemoved.setInt(
       InitCheckedAndRemoved.getInt() | Flags::Checked);
   }
+
+  // Return the first variable initialized by this pattern.
+  VarDecl *getAnchoringVarDecl() const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set

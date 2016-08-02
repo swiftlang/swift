@@ -450,12 +450,12 @@ class DesignatedOverrides : Gizmo {
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridesc{{.*}}
   // CHECK-NOT: return
-  // CHECK: function_ref @_TFSiC{{.*}}
+  // CHECK: function_ref @_TIvC11objc_thunks19DesignatedOverrides1iSii : $@convention(thin) () -> Int
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo! , $@convention(objc_method) (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridesc{{.*}}
-  // CHECK: function_ref @_TFSiC{{.*}}
+  // CHECK: function_ref @_TIvC11objc_thunks19DesignatedOverrides1iSii : $@convention(thin) () -> Int
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 }

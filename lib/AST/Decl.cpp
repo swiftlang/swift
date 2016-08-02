@@ -949,6 +949,13 @@ void PatternBindingEntry::setInit(Expr *E) {
   }
 }
 
+VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
+  SmallVector<VarDecl *, 8> variables;
+  getPattern()->collectVariables(variables);
+  assert(variables.size() > 0);
+  return variables[0];
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
 

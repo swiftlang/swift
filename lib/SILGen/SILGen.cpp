@@ -877,6 +877,21 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
   });
 }
 
+void SILGenModule::
+emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
+  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
+  auto *var = pbdEntry.getAnchoringVarDecl();
+  auto *init = pbdEntry.getInit();
+
+  SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
+  emitOrDelayFunction(*this, constant, [this,constant,init](SILFunction *f) {
+    preEmitFunction(constant, init, f, init);
+    PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
+    SILGenFunction(*this, *f).emitGeneratorFunction(constant, init);
+    postEmitFunction(constant, f);
+  });
+}
+
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding,
                                                      unsigned pbdEntry) {

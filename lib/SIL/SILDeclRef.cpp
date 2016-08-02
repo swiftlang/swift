@@ -152,8 +152,11 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            "can only create ivar initializer/destroyer SILDeclRef for class");
     naturalUncurryLevel = 1;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-    assert((kind == Kind::GlobalAccessor || kind == Kind::GlobalGetter) &&
-           "can only create GlobalAccessor or GlobalGetter SILDeclRef for var");
+    assert((kind == Kind::GlobalAccessor ||
+            kind == Kind::GlobalGetter ||
+            kind == Kind::StoredPropertyInitializer) &&
+           "can only create GlobalAccessor, GlobalGetter or "
+           "StoredPropertyInitializer SILDeclRef for var");
 
     naturalUncurryLevel = 0;
     assert(!var->getDeclContext()->isLocalContext() &&
@@ -316,8 +319,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   
   // Enum constructors are essentially the same as thunks, they are
   // emitted by need and have shared linkage.
-  if (kind == Kind::EnumElement)
+  if (isEnumElement())
     return SILLinkage::Shared;
+
+  // Stored property initializers have hidden linkage, since they are
+  // not meant to be used from outside of their module.
+  if (isStoredPropertyInitializer())
+    return SILLinkage::Hidden;
 
   // Declarations imported from Clang modules have shared linkage.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
@@ -351,6 +359,9 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
 /// \brief True if the function should be treated as transparent.
 bool SILDeclRef::isTransparent() const {
   if (isEnumElement())
+    return true;
+
+  if (isStoredPropertyInitializer())
     return true;
 
   if (hasAutoClosureExpr())
@@ -576,11 +587,17 @@ static std::string mangleConstant(SILDeclRef c, StringRef prefix) {
     mangler.mangleGlobalGetterEntity(c.getDecl());
     return mangler.finalize();
 
-  //   entity ::= context 'e' index           // default arg generator
+  //   entity ::= context 'e' index               // default arg generator
   case SILDeclRef::Kind::DefaultArgGenerator:
     mangler.append(introducer);
     mangler.mangleDefaultArgumentEntity(cast<AbstractFunctionDecl>(c.getDecl()),
                                         c.defaultArgIndex);
+    return mangler.finalize();
+
+  //   entity ::= 'I' declaration 'i'             // stored property initializer
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    mangler.append(introducer);
+    mangler.mangleInitializerEntity(cast<VarDecl>(c.getDecl()));
     return mangler.finalize();
   }
 
