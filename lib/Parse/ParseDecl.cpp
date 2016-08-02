@@ -511,7 +511,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
     }
 
-    auto access = llvm::StringSwitch<Accessibility>(AttrName)
+    Accessibility access = llvm::StringSwitch<Accessibility>(AttrName)
       .Case("private", Accessibility::Private)
       .Case("public", Accessibility::Public)
       .Case("internal", Accessibility::Internal);

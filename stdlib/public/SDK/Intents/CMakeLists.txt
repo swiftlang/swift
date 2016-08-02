@@ -3,7 +3,6 @@ add_swift_library(swiftIntents IS_SDK_OVERLAY
   INBooleanResolutionResult.swift
   INDoubleResolutionResult.swift
   INIntegerResolutionResult.swift
-  INListRideOptionsIntentResponse.swift
   INRequestRideIntent.swift
   INSaveProfileInCarIntent.swift
   INSearchForPhotosIntentResponse.swift
@@ -14,7 +13,6 @@ add_swift_library(swiftIntents IS_SDK_OVERLAY
   INSetSeatSettingsInCarIntent.swift
   INStartPhotoPlaybackIntentResponse.swift
   INStartWorkoutIntent.swift
-  INTemperature.swift
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation CoreLocation
