@@ -13,6 +13,7 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-3{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-4{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -32,7 +33,7 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
 
   takesNoEscapeClosure(fn)  // ok
 
-  doesEscape(fn)                   // expected-error {{invalid conversion from non-escaping function of type '() -> Int' to potentially escaping function type '() -> Int'}}
+  doesEscape(fn)                   // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 }
@@ -254,8 +255,8 @@ func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] {
 
 func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
 func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int {
-  return { f in
-    bad(f)  // expected-error {{invalid conversion from non-escaping function of type '(Int) -> Int' to potentially escaping function type '(Int) -> Int'}}
+  return { f in // expected-note{{parameter 'f' is implicitly non-escaping}}
+    bad(f)  // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
   }
 }
 
