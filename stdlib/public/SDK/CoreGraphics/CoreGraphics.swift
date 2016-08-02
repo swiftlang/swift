@@ -14,6 +14,35 @@
 import Darwin
 
 //===----------------------------------------------------------------------===//
+// CGColor
+//===----------------------------------------------------------------------===//
+
+extension CGColor {
+  public var components: [CGFloat]? {
+    guard let pointer = self.__unsafeComponents else { return nil }
+    let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
+    return Array(buffer)
+  }
+
+#if os(macOS)
+  public class var white: CGColor
+   { return CGColor.__constantColor(for: CGColor.__whiteColorName)! }
+
+  public class var black: CGColor
+   { return CGColor.__constantColor(for: CGColor.__blackColorName)! }
+
+  public class var clear: CGColor
+   { return CGColor.__constantColor(for: CGColor.__clearColorName)! }
+#endif
+}
+
+extension CGColor: Equatable {}
+public func ==(lhs: CGColor, rhs: CGColor) -> Bool {
+  return lhs.__equalTo(rhs)
+}
+
+
+//===----------------------------------------------------------------------===//
 // CGGeometry
 //===----------------------------------------------------------------------===//
 
@@ -191,4 +220,3 @@ extension CGAffineTransform {
    get { return CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
  }
 }
-

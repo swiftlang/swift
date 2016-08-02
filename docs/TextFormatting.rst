@@ -334,7 +334,7 @@ ensure our proposed design doesn't rule out important directions of
 evolution.
 
 ``TextOutputStream`` Adapters
-.........................
+.............................
 
 Most text transformations can be expressed as adapters over generic
 ``TextOutputStream``\ s. For example, it's easy to imagine an upcasing

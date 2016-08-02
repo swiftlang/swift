@@ -108,6 +108,11 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
+
+  // FIXME: see <rdar://problem/25421818>
+  // We need to make sure LLVM preserve the value names because some swift 
+  // tests are relying on these right now.
+  CGO.DiscardValueNames =false;
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, HSI, PPO, CGO,
                                                 LLVMContext);
