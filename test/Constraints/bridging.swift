@@ -171,7 +171,7 @@ func dictionaryToNSDictionary() {
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
-  nsd = [BridgedStruct() : bcOpt] // expected-error{{value of type 'BridgedStruct' does not conform to expected dictionary key type 'NSCopying'}}
+  nsd = [BridgedStruct() : bcOpt]
   bcOpt = nil
   _ = nsd
 }

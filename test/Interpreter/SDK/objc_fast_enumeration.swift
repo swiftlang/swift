@@ -60,8 +60,8 @@ autoreleasepool {
 // CHECK: exited
 print("exited")
 
-var d : NSDictionary = [415 as NSNumber : "Giants" as NSString, 510 as NSNumber : "A's" as NSString]
-var d_m : NSMutableDictionary = [1415 as NSNumber : "Big Giants" as NSString, 11510 as NSNumber : "B's" as NSString]
+var d : NSDictionary = [415 : "Giants" , 510 : "A's"]
+var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
 for (key, value) in d {
