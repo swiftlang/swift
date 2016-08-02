@@ -81,7 +81,7 @@
 // CHECK-64: ==============
 
 // CHECK-64: - __C.MyCStruct:
-// CHECK-64: Size: 17
+// CHECK-64: Size: 24
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 24
 // CHECK-64: NumExtraInhabitants: 0
@@ -99,7 +99,7 @@
 // CHECK-64: NumExtraInhabitants: 0
 
 // CHECK-64: - __C.MyCStructWithBitfields:
-// CHECK-64: Size: 2
+// CHECK-64: Size: 4
 // CHECK-64: Alignment: 4
 // CHECK-64: Stride: 4
 // CHECK-64: NumExtraInhabitants: 0
