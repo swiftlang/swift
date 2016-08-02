@@ -51,6 +51,7 @@ set(SWIFT_API_NOTES_INPUTS
   WebKit
   XCTest
   XPC
+  os
 )
 
 if(NOT DEFINED SWIFT_API_NOTES_PATH)

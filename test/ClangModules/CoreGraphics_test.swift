@@ -113,15 +113,13 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
 // CHECK:   call void @CGContextTranslateCTM(%struct.CGContext* [[CONTEXT]], double {{1\.0+.*}}, double {{1\.0+.*}})
 
   context.clip(to: rect)
-  context.clip(to: &rect, count: 2)
   context.clip(to: rect, mask: image)
 // CHECK:   call void @CGContextClipToRect(%struct.CGContext* [[CONTEXT]], %struct.CGRect* byval nonnull align 8 %{{.*}})
-// CHECK:   call void @CGContextClipToRects(%struct.CGContext* [[CONTEXT]], %struct.CGRect* nonnull %rect, i64 2)
 // CHECK:   call void @CGContextClipToMask(%struct.CGContext* [[CONTEXT]], %struct.CGRect* byval nonnull align 8 %{{.*}}, %struct.CGImage* %{{.*}})
 
   var slice = CGRect.zero
   var remainder = CGRect.zero
-  rect.divided(slice: &slice, remainder: &remainder, atDistance: CGFloat(2.0),
+  rect.__divided(slice: &slice, remainder: &remainder, atDistance: CGFloat(2.0),
           from: edge)
   assert((slice, remainder) == rect.divided(atDistance: CGFloat(2.0),
                                             from: edge))

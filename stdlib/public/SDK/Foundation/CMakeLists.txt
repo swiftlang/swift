@@ -37,7 +37,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Hashing.m
   Thunks.mm
 
-  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch
+  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch os
   SWIFT_MODULE_DEPENDS_OSX XPC
   FRAMEWORK_DEPENDS Foundation)
 

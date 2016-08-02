@@ -253,8 +253,8 @@ Classes:
     SwiftName: enter(_:)
     MethodKind: Instance
   - Selector: 'stateForClass:'
-    SwiftName: state(for:)
     MethodKind: Instance
+    SwiftPrivate: true
 - Name: SKTileMapNode
   Methods:
   - Selector: 'tileMapNodesWithTileSet:columns:rows:tileSize:fromNoiseMap:tileTypeNoiseMapThresholds:'
