@@ -28,6 +28,7 @@ public extension DispatchQueue {
 		public let rawValue: UInt64
 		public init(rawValue: UInt64) { self.rawValue = rawValue }
 
+		public static let serial = Attributes(rawValue: 1<<0)
 		public static let concurrent = Attributes(rawValue: 1<<1)
 
 		@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
