@@ -1046,6 +1046,11 @@ extension String {
   public var uppercaseString: String {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "init(describing:)")
+  public init<T>(_: T) {
+    Builtin.unreachable()
+  }
 }
 
 extension Sequence where Iterator.Element == String {
