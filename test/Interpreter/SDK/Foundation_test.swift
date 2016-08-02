@@ -122,13 +122,13 @@ FoundationTestSuite.test("arrayConversions") {
 //===----------------------------------------------------------------------===//
 
 FoundationTestSuite.test("NSDictionary") {
-  var nsDict : NSDictionary = [1 as NSNumber : "Hello" as NSString, 2 as NSNumber : "World" as NSString]
-  assert((nsDict[1 as NSNumber]! as! NSString).isEqual("Hello"))
-  assert((nsDict[2 as NSNumber]! as! NSString).isEqual("World"))
+  var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
+  assert((nsDict[1]! as! NSString).isEqual("Hello"))
+  assert((nsDict[2]! as! NSString).isEqual("World"))
 
-  let nsMutableDict: NSMutableDictionary = ["Hello" as NSString : 1 as NSNumber, "World" as NSString : 2 as NSNumber]
-  assert((nsMutableDict["Hello" as NSString]! as AnyObject).isEqual(1))
-  assert((nsMutableDict["World" as NSString]! as AnyObject).isEqual(2))
+  let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2 as NSNumber]
+  assert((nsMutableDict["Hello"]! as AnyObject).isEqual(1))
+  assert((nsMutableDict["World"]! as AnyObject).isEqual(2))
 }
 
 //===----------------------------------------------------------------------===//
@@ -189,8 +189,8 @@ class ClassWithDtor : NSObject {
 FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
-  var dict: NSDictionary = ["status" as NSString: 200 as NSNumber, "people" as NSString: [["id" as NSString: 255 as NSNumber, "name" as NSString: ["first" as NSString: "John" as NSString, "last" as NSString: "Appleseed" as NSString] as NSDictionary] as NSDictionary] as NSArray] as NSDictionary
-  var dict2 = dict["people" as NSString].map { $0 as AnyObject }?[0] as! NSDictionary
+  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"] as NSDictionary] as NSDictionary] as NSArray]
+  var dict2 = dict["people"].flatMap { $0 as? NSArray }?[0] as! NSDictionary
   expectEqual("Optional(255)", String(describing: dict2["id" as NSString]))
 }
 

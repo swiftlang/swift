@@ -567,11 +567,12 @@ extension Array : _ObjectiveCBridgeable {
 
 extension NSDictionary : ExpressibleByDictionaryLiteral {
   public required convenience init(
-    dictionaryLiteral elements: (NSCopying, AnyObject)...
+    dictionaryLiteral elements: (Any, Any)...
   ) {
+    // FIXME: Unfortunate that the `NSCopying` check has to be done at runtime.
     self.init(
-      objects: elements.map { $0.1 },
-      forKeys: elements.map { $0.0 },
+      objects: elements.map { $0.1 as AnyObject },
+      forKeys: elements.map { $0.0 as AnyObject as! NSCopying },
       count: elements.count)
   }
 }
@@ -976,11 +977,38 @@ extension NSDictionary : Sequence {
     }
   }
 
+  // Bridging subscript.
+  @objc
+  public subscript(key: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
+    get {
+      // Deliberately avoid the subscript operator in case the dictionary
+      // contains non-copyable keys. This is rare since NSMutableDictionary
+      // requires them, but we don't want to paint ourselves into a corner.
+      return self.object(forKey: key)
+    }
+  }
+
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> Iterator {
     return Iterator(self)
+  }
+}
+
+extension NSMutableDictionary {
+  // Bridging subscript.
+  override public subscript(key: Any) -> Any? {
+    get {
+      return self.object(forKey: key)
+    }
+    @objc(_swift_setObject:forKeyedSubscript:)
+    set {
+      // FIXME: Unfortunate that the `NSCopying` check has to be done at
+      // runtime.
+      self.setObject(newValue, forKey: key as AnyObject as! NSCopying)
+    }
   }
 }
 
