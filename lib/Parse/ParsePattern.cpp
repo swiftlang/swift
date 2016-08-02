@@ -387,8 +387,10 @@ mapParsedParameters(Parser &parser,
     // If a type was provided, create the type for the parameter.
     if (auto type = paramInfo.Type) {
       // If 'inout' was specified, turn the type into an in-out type.
-      if (specifierKind == Parser::ParsedParameter::InOut)
+      if (specifierKind == Parser::ParsedParameter::InOut) {
         type = new (ctx) InOutTypeRepr(type, paramInfo.LetVarInOutLoc);
+        param->setInOut(true);
+      }
 
       param->getTypeLoc() = TypeLoc(type);
     } else if (paramContext != Parser::ParameterContextKind::Closure) {

@@ -139,6 +139,6 @@ struct BadFooable : Fooable {
   var foo: Foo { while true {} }
 }
 
-func bogusInOutError(d: inout Brunch<BadFooable>) {} // expected-error{{parameters may not have the 'var' specifier}}
+func bogusInOutError(d: inout Brunch<BadFooable>) {}
 // expected-error@-1{{'Brunch' requires the types '<<error type>>' and 'X' be equivalent}}
 

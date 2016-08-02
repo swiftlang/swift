@@ -781,7 +781,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   // If the param is not a 'let' and it is not an 'inout'.
   // It must be a 'var'. Provide helpful diagnostics like a shadow copy
   // in the function body to fix the 'var' attribute.
-  if (!decl->isLet() && !Ty->is<InOutType>()) {
+  if (!decl->isLet() && !decl->isInOut()) {
     auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
     diagnoseAndMigrateVarParameterToBody(decl, func, TC);
     decl->setInvalid();
@@ -828,8 +828,10 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
       param->overwriteType(type);
     
     checkTypeModifyingDeclAttributes(param);
-    if (param->getType()->is<InOutType>())
+    if (param->getType()->is<InOutType>()) {
+      param->setInOut(true);
       param->setLet(false);
+    }
   }
   
   return hadError;
@@ -1098,8 +1100,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       var->overwriteType(type);
 
     checkTypeModifyingDeclAttributes(var);
-    if (type->is<InOutType>())
+    if (type->is<InOutType>()) {
+      NP->getDecl()->setInOut(true);
       NP->getDecl()->setLet(false);
+    }
     if (var->getAttrs().hasAttribute<OwnershipAttr>())
       type = getTypeOfRValue(var, true);
     else if (!var->isInvalid())
@@ -1559,6 +1563,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
 
     if (!ty->isMaterializable()) {
       if (ty->is<InOutType>()) {
+        param->setInOut(true);
         param->setLet(false);
       } else if (param->hasName()) {
         diagnose(param->getStartLoc(),
