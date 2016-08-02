@@ -15,8 +15,8 @@
 #include "swift/Runtime/Config.h"
 
 extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKComponent * _Nullable
-GK_Swift_GKEntity_componentForClass(id NS_RELEASES_ARGUMENT __nonnull self_,
-                                    Class __nonnull componentClass) {
+GK_Swift_GKEntity_componentForClass(id NS_RELEASES_ARGUMENT _Nonnull self_,
+                                    Class _Nonnull componentClass) {
   GKEntity *entity = self_;
   id component = [[entity componentForClass:componentClass] retain];
   [self_ release];
@@ -24,8 +24,8 @@ GK_Swift_GKEntity_componentForClass(id NS_RELEASES_ARGUMENT __nonnull self_,
 }
 
 extern "C" SWIFT_CC(swift) NS_RETURNS_RETAINED GKState * _Nullable
-GK_Swift_GKStateMachine_stateForClass(id NS_RELEASES_ARGUMENT __nonnull self_,
-                                      Class __nonnull stateClass) {
+GK_Swift_GKStateMachine_stateForClass(id NS_RELEASES_ARGUMENT _Nonnull self_,
+                                      Class _Nonnull stateClass) {
   GKStateMachine *stateMachine = self_;
   id state = [[stateMachine stateForClass:stateClass] retain];
   [self_ release];

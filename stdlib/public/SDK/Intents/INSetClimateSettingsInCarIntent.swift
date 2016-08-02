@@ -26,7 +26,7 @@ extension INSetClimateSettingsInCarIntent {
     fanSpeedIndex: Int? = nil,
     fanSpeedPercentage: Int? = nil,
     relativeFanSpeedSetting: INRelativeSetting = .unknown,
-    temperature: INTemperature? = nil,
+    temperature: Measurement<UnitTemperature>? = nil,
     relativeTemperatureSetting: INRelativeSetting = .unknown,
     climateZone: INCarSeat = .unknown) {
     self.init(__enableFan: enableFan.map { NSNumber(value: $0) },
