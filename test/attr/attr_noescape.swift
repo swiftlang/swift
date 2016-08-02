@@ -10,9 +10,9 @@ func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {}
 
 
 func takesNoEscapeClosure(_ fn : () -> Int) {
-  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
-  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}}
-  // expected-note@-3{{parameter 'fn' is implicitly non-escaping}}
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-3{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok

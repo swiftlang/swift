@@ -472,7 +472,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (paramDecl && !isAutoClosure) {
         TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
                     paramDecl->getName())
-            .fixItInsert(paramDecl->getTypeLoc().getLoc(), "@escaping ");
+            .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
+                         "@escaping ");
       } else if (isAutoClosure)
         // TODO: add in a fixit for autoclosure
         TC.diagnose(DRE->getDecl()->getLoc(), diag::noescape_autoclosure,
