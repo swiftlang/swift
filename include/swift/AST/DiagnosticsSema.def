@@ -2751,7 +2751,8 @@ NOTE(not_objc_empty_protocol_composition,none,
 NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_error_protocol_composition,none,
-     "protocol composition involving 'Error' is not '@objc'", ())
+     "protocol composition involving 'Error' cannot be represented "
+     "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,none,
