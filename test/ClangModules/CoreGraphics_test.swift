@@ -5,6 +5,27 @@ import CoreGraphics
 
 // REQUIRES: OS=macosx
 
+// CHECK: [[SWITCHTABLE:@.*]] = private unnamed_addr constant [8 x i64] [i64 0, i64 12, i64 23, i64 34, i64 45, i64 55, i64 67, i64 71]
+
+// CHECK-LABEL: define i64 {{.*}}testEnums{{.*}} {
+public func testEnums(_ model: CGColorSpaceModel) -> Int {
+  switch model {
+     case .unknown : return 0
+     case .monochrome : return 12
+     case .rgb : return 23
+     case .cmyk : return 34
+     case .lab : return 45
+     case .deviceN : return 55
+     case .indexed : return 67
+     case .pattern : return 71
+
+     default: return 0
+  }
+// CHECK:   [[GEP:%.+]] = getelementptr inbounds [8 x i64], [8 x i64]* [[SWITCHTABLE]], i64 0, i64 %{{.*}}
+// CHECK:   [[LOAD:%.+]] = load i64, i64* [[GEP]], align 8
+// CHECK:   ret i64 [[LOAD]]
+}
+
 // CHECK-LABEL: define void {{.*}}rotationAround{{.*}} {
 // Get a transform that will rotate around a given offset
 public func rotationAround(offset: CGPoint, angle: CGFloat,
@@ -104,7 +125,7 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
           from: edge)
   assert((slice, remainder) == rect.divided(atDistance: CGFloat(2.0),
                                             from: edge))
-// CHECK:   call void @CGRectDivide(%struct.CGRect* byval nonnull align 8 %{{.*}}, %struct.CGRect* nonnull %slice, %struct.CGRect* nonnull %remainder, double {{2\.0+.*}}, i32 %{{.*}})
+// CHECK:   call void @CGRectDivide(%struct.CGRect* byval nonnull align 8 %{{.*}}, %struct.CGRect* nonnull %{{.*}}, %struct.CGRect* nonnull %{{.*}}, double {{2\.0+.*}}, i32 %{{.*}})
 //
 // CHECK:   ret void
 }
