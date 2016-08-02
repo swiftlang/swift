@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
@@ -37,14 +38,22 @@
 
 using namespace swift;
 
-static bool isNSObject(ASTContext &ctx, Type type) {
+static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     return classDecl->getName()
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
+  if (auto nomDecl = type->getAnyNominal()) {
+    return nomDecl->getName() == ctx.getIdentifier("AnyHashable") &&
+      nomDecl->getModuleContext() == ctx.getStdlibModule();
+  }
 
   return false;
+}
+
+static bool isAnyObjectOrAny(Type type) {
+  return type->isAnyObject() || type->isAny();
 }
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
@@ -125,6 +134,8 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   Accessibility minRequiredAccess;
   bool protocolMembersOptional = false;
 
+  Optional<Type> NSCopyingType;
+  
   friend ASTVisitor<ObjCPrinter>;
   friend TypeVisitor<ObjCPrinter>;
 
@@ -859,6 +870,8 @@ private:
     auto &ctx = swiftNominal->getASTContext();
     assert(objcClass);
 
+    Type rewrittenArgsBuf[2];
+
     // Detect when the type arguments correspond to the unspecialized
     // type, and clear them out. There is some type-specific hackery
     // here for:
@@ -867,12 +880,37 @@ private:
     //   NSDictionary<NSObject *, id> --> NSDictionary
     //   NSSet<id> --> NSSet
     if (!typeArgs.empty() &&
-        (!hasGenericObjCType(objcClass) ||
-         (swiftNominal == ctx.getArrayDecl() && typeArgs[0]->isAnyObject()) ||
-         (swiftNominal == ctx.getDictionaryDecl() &&
-          isNSObject(ctx, typeArgs[0]) && typeArgs[1]->isAnyObject()) ||
-         (swiftNominal == ctx.getSetDecl() && isNSObject(ctx, typeArgs[0])))) {
+        (!hasGenericObjCType(objcClass)
+         || (swiftNominal == ctx.getArrayDecl() &&
+             isAnyObjectOrAny(typeArgs[0]))
+         || (swiftNominal == ctx.getDictionaryDecl() &&
+             isNSObjectOrAnyHashable(ctx, typeArgs[0]) &&
+             isAnyObjectOrAny(typeArgs[1]))
+         || (swiftNominal == ctx.getSetDecl() &&
+             isNSObjectOrAnyHashable(ctx, typeArgs[0])))) {
       typeArgs = {};
+    }
+    
+    // Use the proper upper id<NSCopying> bound for Dictionaries with
+    // upper-bounded keys.
+    else if (swiftNominal == ctx.getDictionaryDecl() &&
+             isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
+      if (Module *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
+        if (!NSCopyingType) {
+          UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
+          auto type = lookup.getSingleTypeResult();
+          if (type && isa<ProtocolDecl>(type)) {
+            NSCopyingType = type->getDeclaredType();
+          } else {
+            NSCopyingType = Type();
+          }
+        }
+        if (*NSCopyingType) {
+          rewrittenArgsBuf[0] = *NSCopyingType;
+          rewrittenArgsBuf[1] = typeArgs[1];
+          typeArgs = rewrittenArgsBuf;
+        }
+      }
     }
 
     // Print the class type.
@@ -1119,12 +1157,17 @@ private:
     // Use the type as bridged to Objective-C unless the element type is itself
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
-    if (SD != ctx.getArrayDecl() &&
+    if (ty->isAny()) {
+      ty = ctx.getProtocol(KnownProtocolKind::AnyObject)
+        ->getDeclaredType();
+    } else if (SD != ctx.getArrayDecl() &&
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&
         !isSwiftNewtype(SD)) {
       ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
     }
+    
+    assert(ty && "unknown bridged type");
 
     print(ty, None);
   }

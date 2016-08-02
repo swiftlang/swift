@@ -16,7 +16,6 @@
 // RUN: FileCheck %s < %t/any_as_id.h
 
 // RUN: %check-in-clang %t/any_as_id.h
-// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/any_as_id.h
 
 import Foundation
 
@@ -25,33 +24,51 @@ import Foundation
 // CHECK-NEXT:  @interface AnyAsIdTest : NSObject
 class AnyAsIdTest : NSObject {
 
-// CHECK-NEXT:  - (void)takesId:(id _Nonnull)x;
-	func takesId(_ x: Any) {}
+// CHECK-NEXT:  - (NSArray * _Nonnull)arrayOfAny:(NSArray * _Nonnull)x;
+  func arrayOfAny(_ x: [Any]) -> [Any] { return x }
+// CHECK-NEXT:  - (NSArray * _Nullable)arrayOfAnyPerhaps:(NSArray * _Nonnull)x;
+  func arrayOfAnyPerhaps(_ x: [Any]) -> [Any]? { return x }
+
+// CHECK-NEXT:  - (NSDictionary * _Nonnull)dictionaryOfAny:(NSDictionary * _Nonnull)x;
+  func dictionaryOfAny(_ x: [AnyHashable: Any]) -> [AnyHashable: Any] { return x }
+// CHECK-NEXT:  - (void)dictionaryOfAnyKeys:(NSDictionary<id <NSCopying>, NSString *> * _Nonnull)x;
+  func dictionaryOfAnyKeys(_ x: [AnyHashable: String]) {}
+// CHECK-NEXT:  - (NSDictionary * _Nullable)dictionaryOfAnyMayhap:(NSDictionary * _Nonnull)x;
+  func dictionaryOfAnyMayhap(_ x: [AnyHashable: Any]) -> [AnyHashable: Any]? { return x }
+// CHECK-NEXT:  - (void)dictionaryOfAnyValues:(NSDictionary<NSString *, id> * _Nonnull)x;
+  func dictionaryOfAnyValues(_ x: [String: Any]) {}
 
 // CHECK-NEXT:  - (id _Nonnull)getAny;
   func getAny() -> Any { return 1 as Any }
-
-// CHECK-NEXT:  - (id _Nonnull)passThroughAny:(id _Nonnull)x;
-  func passThroughAny(_ x: Any) -> Any { return x }
-
-// CHECK-NEXT: - (id _Nonnull)unwrapAny:(id _Nullable)x;
-  func unwrapAny(_ x : Any?) -> Any { return x! }
-
+// CHECK-NEXT: - (id _Nullable)getAnyConstructively;
+  func getAnyConstructively() -> Any? { return Optional<Any>(1 as Any) }
 // CHECK-NEXT: - (id _Nullable)getAnyMaybe;
   func getAnyMaybe() -> Any? { return nil }
 // CHECK-NEXT: - (id _Nullable)getAnyProbably;
   func getAnyProbably() -> Any? { return 1 as Any }
+
+// CHECK-NEXT:  - (id _Nonnull)passThroughAny:(id _Nonnull)x;
+  func passThroughAny(_ x: Any) -> Any { return x }
 // CHECK-NEXT: - (id _Nullable)passThroughAnyMaybe:(id _Nullable)x;
   func passThroughAnyMaybe(_ x: Any?) -> Any? { return x }
-// CHECK-NEXT: - (id _Nullable)getAnyConstructively;
-  func getAnyConstructively() -> Any? { return Optional<Any>(1 as Any) }
+
+// CHECK-NEXT: - (void)setOfAny:(NSSet * _Nonnull)x;
+  func setOfAny(_ x: Set<AnyHashable>) {}
+
+// CHECK-NEXT:  - (void)takesId:(id _Nonnull)x;
+  func takesId(_ x: Any) {}
+
+// CHECK-NEXT: - (id _Nonnull)unwrapAny:(id _Nullable)x;
+  func unwrapAny(_ x : Any?) -> Any { return x! }
+
 // CHECK-NEXT: - (id _Nullable)wrapAny:(id _Nonnull)x;
   func wrapAny(_ x : Any) -> Any? { return x }
 
 // CHECK-NEXT:  - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-	/* implicit inherited init() */
+  /* implicit inherited init() */
+
 }
 // CHECK-NEXT:  @end
 
-
+extension NSArray { func forceToExist() {} }
 
