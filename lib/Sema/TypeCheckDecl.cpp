@@ -2113,11 +2113,7 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     return;
 
   // Only introduce 'dynamic' on declarations...
-  if (isa<ExtensionDecl>(D->getDeclContext())) {
-    // ...in extensions that don't override other declarations.
-    if (D->getOverriddenDecl())
-      return;
-  } else {
+  if (!isa<ExtensionDecl>(D->getDeclContext())) {
     // ...and in classes on decls marked @NSManaged.
     if (!D->getAttrs().hasAttribute<NSManagedAttr>())
       return;
