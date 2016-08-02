@@ -316,11 +316,6 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
-    // Force type lowering to lower the type, so that we have a chance to
-    // check for infinite value types even if there are no other references
-    // to this type.
-    SGM.Types.getTypeLowering(theType->getDeclaredTypeInContext());
-
     // Start building a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType))
       genVTable.emplace(SGM, theClass);
