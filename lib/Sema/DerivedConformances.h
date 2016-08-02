@@ -113,7 +113,8 @@ FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        NominalTypeDecl *typeDecl,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
-                                       bool isStatic = false);
+                                       bool isStatic,
+                                       bool isFinal);
 
 /// Declare a read-only property with an existing getter.
 std::pair<VarDecl *, PatternBindingDecl *>
@@ -124,7 +125,8 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
                                Type propertyInterfaceType,
                                Type propertyContextType,
                                FuncDecl *getterDecl,
-                               bool isStatic = false);
+                               bool isStatic,
+                               bool isFinal);
 
 
 /// Build a reference to the 'self' decl of a derived function.

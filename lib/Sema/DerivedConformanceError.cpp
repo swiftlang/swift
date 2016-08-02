@@ -150,7 +150,9 @@ static ValueDecl *deriveError_code(TypeChecker &tc, Decl *parentDecl,
 
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
-                                                 intTy, intTy);
+                                                 intTy, intTy,
+                                                 /*isStatic=*/false,
+                                                 /*isFinal=*/true);
   if (isa<EnumDecl>(nominal))
     getterDecl->setBodySynthesizer(&deriveBodyError_enum_code);
   else
@@ -161,7 +163,8 @@ static ValueDecl *deriveError_code(TypeChecker &tc, Decl *parentDecl,
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, nominal, C.Id_code_,
-                                     intTy, intTy, getterDecl);
+                                     intTy, intTy, getterDecl,
+                                     /*isStatic=*/false, /*isFinal=*/true);
   
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
@@ -231,7 +234,8 @@ static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
                                                  stringTy, stringTy,
-                                                 /*isStatic=*/true);
+                                                 /*isStatic=*/true,
+                                                 /*isFinal=*/true);
   getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
   
   // Define the property.
@@ -241,7 +245,8 @@ static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
     = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
                                      C.Id_nsErrorDomain,
                                      stringTy, stringTy,
-                                     getterDecl, /*isStatic=*/true);
+                                     getterDecl, /*isStatic=*/true,
+                                     /*isFinal=*/true);
   
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);

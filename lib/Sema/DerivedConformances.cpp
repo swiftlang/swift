@@ -106,7 +106,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  NominalTypeDecl *typeDecl,
                                                  Type propertyInterfaceType,
                                                  Type propertyContextType,
-                                                 bool isStatic) {
+                                                 bool isStatic,
+                                                 bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
   auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC, isStatic);
@@ -124,6 +125,12 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                      TypeLoc::withoutLoc(propertyContextType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+
+  // If this is supposed to be a final method, mark it as such.
+  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
+  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+      !getterDecl->isFinal())
+    getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the type of the getter.
   GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
@@ -171,7 +178,8 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                                                    Type propertyInterfaceType,
                                                    Type propertyContextType,
                                                    FuncDecl *getterDecl,
-                                                   bool isStatic) {
+                                                   bool isStatic,
+                                                   bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
@@ -184,6 +192,12 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                          SourceLoc());
   propDecl->setAccessibility(getterDecl->getFormalAccess());
   propDecl->setInterfaceType(propertyInterfaceType);
+
+  // If this is supposed to be a final property, mark it as such.
+  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
+  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+      !propDecl->isFinal())
+    propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
