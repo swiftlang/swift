@@ -32,7 +32,7 @@ extension Mirror {
     let nil_ = "nil"
     return "[" +
       children.lazy
-        .map { "\($0 ?? nil_): \(String(reflecting: $1))" }
+        .map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
         .joined(separator: ", ")
       + "]"
   }
@@ -158,7 +158,7 @@ mirrors.test("Legacy") {
   ]
   expectFalse(
     zip(x0, m.children).contains {
-      $0.value as! Int != $1.value as! Int
+      $0.0.value as! Int != $0.1.value as! Int
     })
 
   class B { let bx: Int = 0 }

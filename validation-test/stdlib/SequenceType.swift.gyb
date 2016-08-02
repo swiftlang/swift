@@ -265,7 +265,7 @@ SequenceTypeTests.test("enumerated()") {
     
     checkSequence(
       test.expected.map {
-        (offset: $0, element: OpaqueValue($1))
+        (offset: $0.0, element: OpaqueValue($0.1))
       } as [Element],
       result,
       resiliencyChecks: .none, sameValue: compareElements)

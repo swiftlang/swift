@@ -1537,9 +1537,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 /// TODO: These diagnostics should be a lot better now that we know this is
 /// all specific to closures.
 ///
-bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
-                                            AnyFunctionType *FN) {
-  Type paramListType = FN->getInput();
+bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
+                                            Type paramListType) {
   bool hadError = paramListType->is<ErrorType>();
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
@@ -1548,7 +1547,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
+      hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
                                         nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
@@ -1590,10 +1589,11 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
   if (!hadError && tupleTy->getNumElements() != P->size()) {
-    auto fnType = FunctionType::get(paramListType->getDesugaredType(),
-                                    FN->getResult());
-    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
-             fnType, tupleTy->getNumElements(), P->size());
+    if (P->size() == 1)
+      return handleParameter(P->get(0), paramListType);
+    
+    diagnose(P->getStartLoc(), diag::tuple_pattern_length_mismatch,
+             paramListType);
     hadError = true;
   }
 

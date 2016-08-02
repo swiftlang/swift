@@ -182,7 +182,7 @@ func testNSNumberGetValueAndObjCType(
   n.getValue(&a)
   n.getValue(&b)
   let ab = Array(zip(a, b))
-  let count = ab.index { $0 == 0xaa && $1 == 0xbb }!
+  let count = ab.index { $0.0 == 0xaa && $0.1 == 0xbb }!
   // Check that `getValue` does not overwrite more bytes than needed.
   expectEqual(expectedBytes.count, count)
   expectEqualSequence(expectedBytes, a[0..<count])

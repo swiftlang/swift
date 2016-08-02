@@ -192,7 +192,7 @@ extension r25271859 {
 }
 
 func f(a : r25271859<(Float, Int)>) {
-  a.map { f, _ in f }
+  a.map { $0.0 }
     .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
       print("hello") // comment this out and it runs, leave any form of print in and it doesn't
       return r25271859<String>()

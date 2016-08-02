@@ -2018,7 +2018,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "JP"
   ///     // Prints "GH"
   public var keys: LazyMapCollection<Dictionary, Key> {
-    return self.lazy.map { key, _ in key }
+    return self.lazy.map { $0.key }
   }
 
   /// A collection containing just the values of the dictionary.
@@ -2036,7 +2036,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///     // Prints "Japan"
   ///     // Prints "Ghana"
   public var values: LazyMapCollection<Dictionary, Value> {
-    return self.lazy.map { _, value in value }
+    return self.lazy.map { $0.value }
   }
 
   //

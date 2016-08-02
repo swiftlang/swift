@@ -29,6 +29,6 @@ func outerGeneric<T>(t: T, x: AnyObject) {
   // CHECK: func_decl "localFunction(tt:)" type='<T> (tt: TT) -> ()' {{.*}} captures=(<generic> )
   func localFunction(tt: TT) {}
 
-  // CHECK: closure_expr type='(T, T) -> ()' {{.*}} captures=(<generic> )
-  let _: (TT) -> () = { _, _ in }
+  // CHECK: closure_expr type='(TT) -> ()' {{.*}} captures=(<generic> )
+  let _: (TT) -> () = { _ in }
 }

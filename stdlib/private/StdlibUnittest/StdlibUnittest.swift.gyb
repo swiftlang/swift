@@ -2387,7 +2387,7 @@ public func expectEqualsUnordered<
   let x: [(T, T)] =
     expected.sorted(by: comparePairLess)
   let y: [(T, T)] =
-    actual.map { ($0, $1) }
+    actual.map { ($0.0, $0.1) }
       .sorted(by: comparePairLess)
 
   func comparePairEquals(_ lhs: (T, T), rhs: (key: T, value: T)) -> Bool {
