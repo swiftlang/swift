@@ -1274,25 +1274,14 @@ private:
     PCT = cast<ProtocolCompositionType>(canonicalComposition);
 
     // Dig out the protocols. If we see 'Error', record that we saw it.
-    bool hasError = false;
     SmallVector<ProtocolDecl *, 4> protos;
     for (auto protoTy : PCT->getProtocols()) {
       auto proto = protoTy->castTo<ProtocolType>()->getDecl();
-      if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
-        hasError = true;
-        continue;
-      }
-
       protos.push_back(proto);
     }
 
-    os << (isMetatype ? "Class"
-           : hasError ? "NSError"
-           : "id");
+    os << (isMetatype ? "Class" : "id");
     printProtocols(protos);
-
-    if (hasError && !isMetatype)
-      os << " *";
 
     printNullability(optionalKind);
   }
@@ -1808,10 +1797,9 @@ public:
 
     ASTContext &ctx = M.getASTContext();
 
-    auto protos = ED->getAllProtocols();
+    SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (std::find(protos.begin(), protos.end(), errorTypeProto) !=
-        protos.end()) {
+    if (ED->lookupConformance(&M, errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
                                        [](const EnumElementDecl *elem) {

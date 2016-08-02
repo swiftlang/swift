@@ -3187,13 +3187,25 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
       return;
     }
     // Find a protocol that is not @objc.
+    bool sawErrorProtocol = false;
     for (auto PD : Protocols) {
+      if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
+        sawErrorProtocol = true;
+        break;
+      }
+
       if (!PD->isObjC()) {
         diagnose(TypeRange.Start, diag::not_objc_protocol,
                  PD->getDeclaredType());
         return;
       }
     }
+
+    if (sawErrorProtocol) {
+      diagnose(TypeRange.Start, diag::not_objc_error_protocol_composition);
+      return;
+    }
+
     return;
   }
 
