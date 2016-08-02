@@ -209,3 +209,8 @@ class NoSemi {
   enum Bar { case bar }
   var foo: .Bar = .bar
 }
+
+func fnWithClosure(c: @escaping ()->()) {}
+func testescape(rec: ()->()) {
+  fnWithClosure { rec() }
+}
