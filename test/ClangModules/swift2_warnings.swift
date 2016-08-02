@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules) -emit-sil -I %S/Inputs/custom-modules -enable-strip-ns-prefix %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/../IDE/Inputs/custom-modules) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -13,7 +13,7 @@ func testOldTypeNames() {
 
   _ = NSPostingStyle(rawValue: 1) // expected-error{{'NSPostingStyle' has been renamed to 'NotificationQueue.PostingStyle'}}{{7-21=NotificationQueue.PostingStyle}}
 
-  _ = NSSoapDispenser<AnyObject>() // expected-error{{'NSSoapDispenser' has been renamed to 'SoapDispenser'}}{{7-22=SoapDispenser}}
+  _ = NSOperation() // expected-error{{'NSOperation' has been renamed to 'Operation'}}{{7-18=Operation}}
 }
 
 func testOldMethodNames(array: NSArray) {
@@ -42,13 +42,13 @@ func testOldEnumCaseNames(i: Int) -> XMLNode.Kind {
   }
 }
 
-func testOldOptionCaseNames(i: Int) -> RuncingOptions {
+func testOldOptionCaseNames(i: Int) -> NSRuncingOptions {
   switch i {
   case 0:
     return .EnableQuince // expected-error{{'EnableQuince' has been renamed to 'enableQuince'}}{{13-25=enableQuince}}
 
   case 1:
-    return RuncingOptions.EnableMince // expected-error{{'EnableMince' has been renamed to 'enableMince'}}{{27-38=enableMince}}
+    return NSRuncingOptions.EnableMince // expected-error{{'EnableMince' has been renamed to 'enableMince'}}{{29-40=enableMince}}
 
   default:
     return .enableQuince
@@ -96,9 +96,9 @@ class X : NSDocument {
   }
 }
 
-func makeCopy<T: NSWobbling>(thing: T) {} // expected-error {{'NSWobbling' has been renamed to 'Wobbling'}} {{18-28=Wobbling}} 
+func makeProgress<T: NSProgressReporting>(thing: T) {} // expected-error {{'NSProgressReporting' has been renamed to 'ProgressReporting'}} {{22-41=ProgressReporting}} 
 
-func useLowercasedEnumCase(x: RuncingMode) {
+func useLowercasedEnumCase(x: NSRuncingMode) {
   switch x {
     case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
     case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}

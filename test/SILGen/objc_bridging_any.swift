@@ -9,7 +9,7 @@ protocol CP: class {}
 struct KnownUnbridged {}
 
 // CHECK-LABEL: sil hidden @_TF17objc_bridging_any11passingToId
-func passingToId<T: CP, U>(receiver: IdLover,
+func passingToId<T: CP, U>(receiver: NSIdLover,
                            string: String,
                            nsString: NSString,
                            object: AnyObject,
@@ -22,7 +22,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
                            optionalA: String?,
                            optionalB: NSString?,
                            optionalC: Any?) {
-  // CHECK: bb0([[SELF:%.*]] : $IdLover,
+  // CHECK: bb0([[SELF:%.*]] : $NSIdLover,
   // CHECK: [[STRING:%.*]] : $String
   // CHECK: [[NSSTRING:%.*]] : $NSString
   // CHECK: [[OBJECT:%.*]] : $AnyObject
@@ -43,21 +43,21 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(string)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING]] : $NSString : $NSString, $AnyObject
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(nsString)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[CLASS_GENERIC]] : $T : $T, $AnyObject
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(classGeneric)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: apply [[METHOD]]([[OBJECT]], [[SELF]])
   receiver.takesId(object)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[CLASS_EXISTENTIAL]] : $CP
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[OPENED]]
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
@@ -65,7 +65,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
 
   // These cases perform a universal bridging conversion.
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $U
   // CHECK-NEXT: copy_addr [[GENERIC]] to [initialization] [[COPY]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
@@ -76,7 +76,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesId(generic)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $P
   // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
@@ -89,7 +89,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesId(existential)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
@@ -102,7 +102,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesId(any)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK: store [[KNOWN_UNBRIDGED]] to [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
@@ -110,7 +110,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(knownUnbridged)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<String>
   // CHECK: store [[OPT_STRING]] to [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
@@ -118,7 +118,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalA)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<NSString>
   // CHECK: store [[OPT_NSSTRING]] to [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
@@ -126,7 +126,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalB)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<Any>
   // CHECK: copy_addr [[OPT_ANY]] to [initialization] [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
@@ -138,7 +138,7 @@ func passingToId<T: CP, U>(receiver: IdLover,
 }
 
 // CHECK-LABEL: sil hidden @_TF17objc_bridging_any19passingToNullableId
-func passingToNullableId<T: CP, U>(receiver: IdLover,
+func passingToNullableId<T: CP, U>(receiver: NSIdLover,
                                    string: String,
                                    nsString: NSString,
                                    object: AnyObject,
@@ -161,7 +161,7 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
                                    optOptB: NSString??,
                                    optOptC: Any??)
 {
-  // CHECK: bb0([[SELF:%.*]] : $IdLover,
+  // CHECK: bb0([[SELF:%.*]] : $NSIdLover,
   // CHECK: [[STRING:%.*]] : $String,
   // CHECK: [[NSSTRING:%.*]] : $NSString
   // CHECK: [[OBJECT:%.*]] : $AnyObject
@@ -192,31 +192,31 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
   receiver.takesNullableId(string)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[NSSTRING]] : $NSString : $NSString, $AnyObject
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
   receiver.takesNullableId(nsString)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[OBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
   receiver.takesNullableId(object)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[CLASS_GENERIC]] : $T : $T, $AnyObject
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
   receiver.takesNullableId(classGeneric)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[CLASS_EXISTENTIAL]] : $CP
   // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref [[OPENED]]
   // CHECK: [[OPT_ANYOBJECT:%.*]] = enum {{.*}} [[ANYOBJECT]]
   // CHECK: apply [[METHOD]]([[OPT_ANYOBJECT]], [[SELF]])
   receiver.takesNullableId(classExistential)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $U
   // CHECK-NEXT: copy_addr [[GENERIC]] to [initialization] [[COPY]]
   // CHECK-NEXT: // function_ref _bridgeAnythingToObjectiveC
@@ -228,7 +228,7 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesNullableId(generic)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $P
   // CHECK-NEXT: copy_addr [[EXISTENTIAL]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*P to $*[[OPENED_TYPE:@opened.*P]],
@@ -242,7 +242,7 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesNullableId(existential)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
@@ -256,7 +256,7 @@ func passingToNullableId<T: CP, U>(receiver: IdLover,
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesNullableId(any)
 
-  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $IdLover,
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $KnownUnbridged
   // CHECK: store [[KNOWN_UNBRIDGED]] to [[TMP]]
   // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC

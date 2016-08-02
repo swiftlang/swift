@@ -165,9 +165,7 @@ MAP_STDLIB_TYPE("CFIndex", SignedWord, 0, "Int", false, DefineAndUse)
 
 // Foundation types.
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
-MAP_STDLIB_TYPE(
-  Impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSStringEncoding),
-  UnsignedWord, 0, "UInt", false, DoNothing)
+MAP_STDLIB_TYPE("NSStringEncoding", UnsignedWord, 0, "UInt", false, DoNothing)
 
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE

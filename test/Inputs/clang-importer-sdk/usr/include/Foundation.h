@@ -1030,8 +1030,14 @@ extern NSString *NSHTTPRequestKey;
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
 
-@interface NSSoapDispenser<Fragrance> : NSObject
+@interface NSOperation : NSObject
+@end
 
+@interface NSProgress : NSObject
+@end
+
+@protocol NSProgressReporting <NSObject>
+@property (readonly) NSProgress *progress;
 @end
 
 @interface NSIdLover: NSObject

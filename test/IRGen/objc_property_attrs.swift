@@ -10,7 +10,7 @@ import Foundation
 @objc protocol P { }
 @objc protocol Q { }
 
-class Foo: ManagedObject {
+class Foo: NSManagedObject {
   // -- POD types:
 
   // nonatomic, readonly, ivar b

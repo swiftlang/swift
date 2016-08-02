@@ -247,10 +247,6 @@ def enable_swift_newtype :
   Flag<["-"], "enable-swift-newtype">,
   HelpText<"Enable the swift_newtype attribute">;
 
-def enable_strip_ns_prefix :
-  Flag<["-"], "enable-strip-ns-prefix">,
-  HelpText<"Strip 'NS' prefix from Foundation entities">;
-
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
   HelpText<"Enable Fix-It based migration aids for Swift 3">;
