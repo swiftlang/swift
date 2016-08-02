@@ -209,3 +209,15 @@ class NoSemi {
   enum Bar { case bar }
   var foo: .Bar = .bar
 }
+
+func fnWithClosure(c: @escaping ()->()) {}
+func testescape(rec: ()->()) {
+  fnWithClosure { rec() }
+}
+
+protocol Prot1 {}
+protocol Prot2 {
+  associatedtype Ty = Prot1
+}
+class Cls1 : Prot1 {}
+func testwhere<T: Prot2 where T.Ty == Cls1>(_: T) {}
