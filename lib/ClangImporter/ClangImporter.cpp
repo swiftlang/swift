@@ -357,11 +357,20 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
 
+      // Request new APIs from AppKit.
+      "-DSWIFT_SDK_OVERLAY_APPKIT_EPOCH=2",
+
       // Request new APIs from Foundation.
       "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=8",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=3",
+
+      // Request new APIs from GameplayKit.
+      "-DSWIFT_SDK_OVERLAY_GAMEPLAYKIT_EPOCH=1",
+
+      // Request new APIs from SpriteKit.
+      "-DSWIFT_SDK_OVERLAY_SPRITEKIT_EPOCH=1",
 
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
@@ -374,6 +383,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       // Request new APIs from CoreGraphics.
       "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
+
+      // Request new APIs from UIKit.
+      "-DSWIFT_SDK_OVERLAY_UIKIT_EPOCH=2",
     });
 
     // Get the version of this compiler and pass it to

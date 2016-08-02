@@ -9,8 +9,9 @@
 
 import StdlibUnittest
 
+let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
-var SetTraps = TestSuite("SetTraps")
+var SetTraps = TestSuite("SetTraps" + testSuiteSuffix)
 
 SetTraps.test("RemoveInvalidIndex1")
   .skip(.custom(
