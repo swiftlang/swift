@@ -115,6 +115,46 @@ AnyHashableTests.test("AnyHashable(${wrapped}).base") {
 %   end
 % end
 
+AnyHashableTests.test("AnyHashable(mixed minimal hashables)/Hashable") {
+  var xs: [AnyHashable] = []
+
+% for wrapped in ['MinimalHashableValue', 'MinimalHashableClass']:
+  xs += (0...5).flatMap {
+    [ ${wrapped}($0, identity: 0),
+      ${wrapped}($0, identity: 1) ].map(AnyHashable.init)
+  }
+% end
+
+% for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
+  ${wrapped}_equalImpl.value = {
+    (lhs, rhs) in
+    if let lhs = lhs as? OpaqueValue<Int>,
+      let rhs = rhs as? OpaqueValue<Int> {
+      return lhs.value == rhs.value
+    }
+    return (lhs as! LifetimeTracked) == (rhs as! LifetimeTracked)
+  }
+  ${wrapped}_hashValueImpl.value = {
+    payload in
+    if let x = payload as? OpaqueValue<Int> {
+      return x.value
+    }
+    return (payload as! LifetimeTracked).value
+  }
+% end
+
+% for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
+%   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
+  xs += (0...5).flatMap {
+    [ ${wrapped}(${payload}($0), identity: 0),
+      ${wrapped}(${payload}($0), identity: 1) ].map(AnyHashable.init)
+  }
+%   end
+% end
+
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+}
+
 % for (kw, name) in [
 %   ('class', 'Class'),
 %   ('struct', 'PODStruct'),
@@ -606,7 +646,14 @@ enum MinimalHashableRCSwiftError : Error, Hashable {
   case caseC(LifetimeTracked)
 
   var hashValue: Int {
-    return 0
+    switch self {
+    case .caseA:
+      return 10
+    case .caseB:
+      return 20
+    case .caseC:
+      return 30
+    }
   }
 
   static func == (
@@ -672,15 +719,35 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftEr
     .caseB, .caseB,
     .caseC, .caseC,
   ]
-  let nsErrors: [NSError] = swiftErrors.map { $0 as NSError }
+  let nsErrors: [NSError] = swiftErrors.flatMap {
+    swiftError -> [NSError] in
+    let bridgedNSError = swiftError as NSError
+    return [
+      bridgedNSError,
+      NSError(domain: bridgedNSError.domain, code: bridgedNSError.code)
+    ]
+  }
   expectEqual(
     .objCClassWrapper,
-    SwiftRuntime.metadataKind(of: nsErrors.first!))
+    SwiftRuntime.metadataKind(of: nsErrors[0]))
   expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
-  checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // Swift errors compare equal to the `NSError`s that have the same domain
+    // and code.
+    return lhs / 4 == rhs / 4
+  }
+
+  checkHashable(nsErrors, equalityOracle: equalityOracle)
   checkHashable(
     nsErrors.map(AnyHashable.init),
-    equalityOracle: { $0 / 2 == $1 / 2 })
+    equalityOracle: equalityOracle)
+
+  // FIXME(id-as-any): run `checkHashable` on an array of mixed
+  // `AnyHashable(MinimalHashablePODSwiftError)` and
+  // `AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))`.  For
+  // this to succeed, we need to eagerly bridge Swift errors into the Swift
+  // representation when wrapped in `AnyHashable`.
 }
 
 AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError)).base") {
@@ -697,23 +764,59 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
     .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
     .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
   ]
-  let nsErrors: [NSError] = swiftErrors.map { $0 as NSError }
+  let nsErrors: [NSError] = swiftErrors.flatMap {
+    swiftError -> [NSError] in
+    let bridgedNSError = swiftError as NSError
+    return [
+      bridgedNSError,
+      NSError(domain: bridgedNSError.domain, code: bridgedNSError.code)
+    ]
+  }
+
   expectEqual(
     .objCClassWrapper,
-    SwiftRuntime.metadataKind(of: nsErrors.first!))
+    SwiftRuntime.metadataKind(of: nsErrors[0]))
   expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
-  expectFailure {
-    // FIXME(id-as-any): make NSError bridging consistent with Swift's notion
-    // of hashing and equality.
-    checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  expectEqual(
+    .objCClassWrapper,
+    SwiftRuntime.metadataKind(of: nsErrors[1]))
+  expectEqual("NSError", String(describing: type(of: nsErrors[1])))
+
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // Equality of bridged Swift errors takes the payload into account, so for
+    // a fixed X, Y, all `.caseX(LifetimeTracked(Y))` compare equal.
+    // They also compare equal to the `NSError`s that have the same domain
+    // and code.
+    if lhs / 4 == rhs / 4 {
+      return true
+    }
+    // `NSError`s that have the same domain and code as a bridged Swift
+    // error compare equal to all Swift errors with the same domain and code
+    // regardless of the payload.
+    if (lhs % 2 == 1 || rhs % 2 == 1) && (lhs / 8 == rhs / 8) {
+      return true
+    }
+    return false
   }
-  expectFailure {
-    // FIXME(id-as-any): make NSError bridging consistent with Swift's notion
-    // of hashing and equality.
-    checkHashable(
-      nsErrors.map(AnyHashable.init),
-      equalityOracle: { $0 / 2 == $1 / 2 })
-  }
+
+  // FIXME: transitivity is broken because pure `NSError`s can compare equal to
+  // Swift errors with payloads just based on the domain and code, and Swift
+  // errors with payloads don't compare equal when payloads differ.
+  checkHashable(
+    nsErrors,
+    equalityOracle: equalityOracle,
+    allowBrokenTransitivity: true)
+  checkHashable(
+    nsErrors.map(AnyHashable.init),
+    equalityOracle: equalityOracle,
+    allowBrokenTransitivity: true)
+
+  // FIXME(id-as-any): run `checkHashable` on an array of mixed
+  // `AnyHashable(MinimalHashableRCSwiftError)` and
+  // `AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError))`.  For
+  // this to succeed, we need to eagerly bridge Swift errors into the Swift
+  // representation when wrapped in `AnyHashable`.
 }
 
 AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftError)).base") {
