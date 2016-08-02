@@ -599,7 +599,8 @@ Footnotes
 
 .. [#] i.e. a direct load of a class's field or a direct call to a function.
 
-.. [#] Explain what COW is here.
+.. [#] An optimaization technique in which a copy to be made if and only if 
+        a modification happens to the original copy, otherwise a pointer will be given.
 
 .. [#] In certain cases the optimizer is able to via inlining and ARC
        optimization remove the retain, release causing no copy to occur.
