@@ -55,8 +55,11 @@ enum class Accessibility : uint8_t {
   FilePrivate,
   /// Internal access is limited to the current module.
   Internal,
-  /// Public access is not limited.
-  Public
+  /// Public access is not limited, but some capabilities may be
+  /// restricted outside of the current module.
+  Public,
+  /// Open access is not limited, and all capabilities are unrestricted.
+  Open,
 };
 
 enum class InlineKind : uint8_t {

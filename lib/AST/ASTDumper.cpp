@@ -568,6 +568,9 @@ namespace {
         case Accessibility::Public:
           OS << "public";
           break;
+        case Accessibility::Open:
+          OS << "open";
+          break;
         }
       }
 

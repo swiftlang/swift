@@ -6,69 +6,69 @@ public func getVersion() -> Int {
 #endif
 }
 
-public class Base {
+open class Base {
   public init() {}
-  public func method() -> String {
+  open func method() -> String {
     return "Base.method()"
   }
-  public class func classMethod() -> String {
+  open class func classMethod() -> String {
     return "Base.classMethod()"
   }
 }
 
-public class OtherBase {
+open class OtherBase {
   public init() {}
-  public func method() -> String {
+  open func method() -> String {
     return "OtherBase.method()"
   }
-  public class func classMethod() -> String {
+  open class func classMethod() -> String {
     return "OtherBase.classMethod()"
   }
 }
 
-public class InBetween : Base {
-  public override func method() -> String {
+open class InBetween : Base {
+  open override func method() -> String {
     return "InBetween.method()"
   }
-  public override class func classMethod() -> String {
+  open override class func classMethod() -> String {
     return "InBetween.classMethod()"
   }
 }
 
 #if BEFORE
-public class AddInterposingMethod : Base {}
+open class AddInterposingMethod : Base {}
 #else
-public class AddInterposingMethod : Base {
-  public override func method() -> String {
+open class AddInterposingMethod : Base {
+  open override func method() -> String {
     return "AddInterposingMethod.method()"
   }
-  public override class func classMethod() -> String {
+  open override class func classMethod() -> String {
     return "AddInterposingMethod.classMethod()"
   }
 }
 #endif
 
 #if BEFORE
-public class RemoveInterposingMethod : Base {
-  public override func method() -> String {
+open class RemoveInterposingMethod : Base {
+  open override func method() -> String {
     return "RemoveInterposingMethod.method()"
   }
-  public override class func classMethod() -> String {
+  open override class func classMethod() -> String {
     return "RemoveInterposingMethod.classMethod()"
   }
 }
 #else
-public class RemoveInterposingMethod : Base {}
+open class RemoveInterposingMethod : Base {}
 #endif
 
 #if BEFORE
-public class InsertSuperclass : Base {}
+open class InsertSuperclass : Base {}
 #else
-public class InsertSuperclass : InBetween {}
+open class InsertSuperclass : InBetween {}
 #endif
 
 #if BEFORE
-public class ChangeRoot : Base {}
+open class ChangeRoot : Base {}
 #else
-public class ChangeRoot : OtherBase {}
+open class ChangeRoot : OtherBase {}
 #endif

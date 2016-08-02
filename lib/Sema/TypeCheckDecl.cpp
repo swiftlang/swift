@@ -1315,6 +1315,11 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   else
     defaultAccess = Accessibility::Internal;
 
+  // Don't set the max or default accessibility to 'open'.  This should
+  // be diagnosed as invalid anyway.
+  defaultAccess = std::min(defaultAccess, Accessibility::Public);
+  maxAccess = std::min(maxAccess, Accessibility::Public);
+
   // Normally putting a public member in an internal extension is harmless,
   // because that member can never be used elsewhere. But if some of the types
   // in the signature are public, it could actually end up getting picked in
@@ -4114,9 +4119,12 @@ public:
           }
         }
 
+        bool isInvalidSuperclass = false;
+
         if (Super->isFinal()) {
           TC.diagnose(CD, diag::inheritance_from_final_class,
                       Super->getName());
+          // FIXME: should this really be skipping the rest of decl-checking?
           return;
         }
 
@@ -4133,12 +4141,38 @@ public:
         case ClassDecl::ForeignKind::CFType:
           TC.diagnose(CD, diag::inheritance_from_cf_class,
                       Super->getName());
+          isInvalidSuperclass = true;
           break;
         case ClassDecl::ForeignKind::RuntimeOnly:
           TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
+          isInvalidSuperclass = true;
           break;
         }
+
+        // Require the superclass to be open if this is outside its
+        // defining module.  But don't emit another diagnostic if we
+        // already complained about the class being inherently
+        // un-subclassable.
+        if (!isInvalidSuperclass &&
+            Super->getFormalAccess(CD->getDeclContext())
+              < Accessibility::Open &&
+            Super->getModuleContext() != CD->getModuleContext()) {
+          TC.diagnose(CD, diag::superclass_not_open, superclassTy);
+          isInvalidSuperclass = true;
+        }
+
+        // Require superclasses to be open if the subclass is open.
+        // This is a restriction we can consider lifting in the future,
+        // e.g. to enable a "sealed" superclass whose subclasses are all
+        // of one of several alternatives.
+        if (!isInvalidSuperclass &&
+            CD->getFormalAccess() == Accessibility::Open &&
+            Super->getFormalAccess() != Accessibility::Open) {
+          TC.diagnose(CD, diag::superclass_of_open_not_open, superclassTy);
+          TC.diagnose(Super, diag::superclass_here);
+        }
+
       }
 
       checkAccessibility(TC, CD);
@@ -5465,10 +5499,19 @@ public:
         }
       }
 
-      // Check accessibility.
+      auto overriddenAccess = matchDecl->getFormalAccess();
+
+      // Check that the override has the required accessibility.
+      // Overrides have to be at least as accessible as what they
+      // override, except:
+      //   - they don't have to be more accessible than their class and
+      //   - a final method may be public instead of open.
       // FIXME: Copied from TypeCheckProtocol.cpp.
       Accessibility requiredAccess =
-        std::min(classDecl->getFormalAccess(), matchDecl->getFormalAccess());
+        std::min(classDecl->getFormalAccess(), overriddenAccess);
+      if (requiredAccess == Accessibility::Open && decl->isFinal())
+        requiredAccess = Accessibility::Public;
+
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
       if (requiredAccess > Accessibility::Private &&
@@ -5488,8 +5531,7 @@ public:
         }
       }
       if (shouldDiagnose || shouldDiagnoseSetter) {
-        bool overriddenForcesAccess =
-          (requiredAccess == matchDecl->getFormalAccess());
+        bool overriddenForcesAccess = (requiredAccess == overriddenAccess);
         {
           auto diag = TC.diagnose(decl, diag::override_not_accessible,
                                   shouldDiagnoseSetter,
@@ -5498,6 +5540,18 @@ public:
           fixItAccessibility(diag, decl, requiredAccess, shouldDiagnoseSetter);
         }
         TC.diagnose(matchDecl, diag::overridden_here);
+      }
+
+      // Diagnose attempts to override a non-open method from outside its
+      // defining module.  This is not required for constructors, which are
+      // never really "overridden" in the intended sense here, because of
+      // course derived classes will change how the class is initialized.
+      if (matchDecl->getFormalAccess(decl->getDeclContext())
+            < Accessibility::Open &&
+          matchDecl->getModuleContext() != decl->getModuleContext() &&
+          !isa<ConstructorDecl>(decl)) {
+        TC.diagnose(decl, diag::override_of_non_open,
+                    decl->getDescriptiveKind());
       }
 
       bool mayHaveMismatchedOptionals =
@@ -6175,6 +6229,7 @@ public:
           desiredAccessScope = ED->getModuleContext();
           break;
         case Accessibility::Public:
+        case Accessibility::Open:
           desiredAccessScope = nullptr;
           break;
         }
@@ -6402,7 +6457,8 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getFormalAccess() < nominal->getFormalAccess()) {
+        if (CD->getFormalAccess() <
+            std::min(nominal->getFormalAccess(), Accessibility::Public)) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
           fixItAccessibility(diag, CD, nominal->getFormalAccess());

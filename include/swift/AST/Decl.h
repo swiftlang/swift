@@ -818,6 +818,13 @@ public:
   /// Whether this declaration is weak-imported.
   bool isWeakImported(ModuleDecl *fromModule) const;
 
+  /// Returns true if the nature of this declaration allows overrides.
+  /// Note that this does not consider whether it is final or whether
+  /// the class it's on is final.
+  ///
+  /// If this returns true, the decl can be safely casted to ValueDecl.
+  bool isPotentiallyOverridable() const;
+
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
@@ -2189,7 +2196,8 @@ public:
   Accessibility getFormalAccess(const DeclContext *useDC = nullptr) const {
     assert(hasAccessibility() && "accessibility not computed yet");
     Accessibility result = TypeAndAccess.getInt().getValue();
-    if (useDC && result == Accessibility::Internal)
+    if (useDC && (result == Accessibility::Internal ||
+                  result == Accessibility::Public))
       return getFormalAccessImpl(useDC);
     return result;
   }
@@ -6147,6 +6155,16 @@ inline ArrayRef<Requirement> ExtensionDecl::getGenericRequirements() const {
     return { };
 
   return GenericSig->getRequirements();
+}
+
+inline bool Decl::isPotentiallyOverridable() const {
+  if (isa<VarDecl>(this) ||
+      isa<SubscriptDecl>(this) ||
+      isa<FuncDecl>(this)) {
+    return getDeclContext()->getAsClassOrClassExtensionContext();
+  } else {
+    return false;
+  }
 }
 
 } // end namespace swift

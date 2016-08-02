@@ -274,6 +274,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
     case Accessibility::Internal:
       return SILFunction::InternalClass;
     case Accessibility::Public:
+    case Accessibility::Open:
       return SILFunction::PublicClass;
   }
 }

@@ -1384,23 +1384,17 @@ public:
     SmallVectorImpl<ProtocolConformance *> &Conformances) override;
 
   template <typename DeclTy, typename ...Targs>
-  DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
+  DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
+                                  Targs &&... Args) {
     assert(ClangN);
     void *DeclPtr = allocateMemoryForDecl<DeclTy>(SwiftContext, sizeof(DeclTy),
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (auto *param = dyn_cast<ParamDecl>(D)) {
-        param->setAccessibility(Accessibility::Private);
-        param->setSetterAccessibility(Accessibility::Private);
-      } else {
-        VD->setAccessibility(Accessibility::Public);
-        if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-          ASD->setSetterAccessibility(Accessibility::Public);
-      }
-    }
+    D->setAccessibility(access);
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
+      ASD->setSetterAccessibility(access);
     return D;
   }
 

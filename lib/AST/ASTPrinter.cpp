@@ -1146,6 +1146,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
     case Accessibility::Public:
       Printer << tok::kw_public;
       break;
+    case Accessibility::Open:
+      Printer.printKeyword("open");
+      break;
     }
     Printer << suffix << " ";
   }

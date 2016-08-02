@@ -176,6 +176,15 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr) {
+    // Reject combining 'final' with 'open'.
+    if (auto accessibility = D->getAttrs().getAttribute<AccessibilityAttr>()) {
+      if (accessibility->getAccess() == Accessibility::Open) {
+        TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
+                    D->getDescriptiveKind());
+        return;
+      }
+    }
+
     // Accept and remove the 'final' attribute from members of protocol
     // extensions.
     if (D->getDeclContext()->getAsProtocolExtensionContext()) {
@@ -1336,6 +1345,13 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    if (attr->getAccess() == Accessibility::Open) {
+      TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
+      return;
+    }
+
     Type extendedTy = extension->getExtendedType();
     Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
@@ -1351,7 +1367,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
     TC.computeDefaultAccessibility(extension);
     Accessibility maxAccess = extension->getMaxAccessibility();
-    if (attr->getAccess() > maxAccess) {
+    if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
       if (maxAccess == Accessibility::FilePrivate &&
           !TC.Context.LangOpts.EnableSwift3Private) {
         maxAccess = Accessibility::Private;
@@ -1378,6 +1394,15 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                               extAttr->getAccess());
       swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
+    }
+  }
+
+  if (attr->getAccess() == Accessibility::Open) {
+    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+        !attr->isInvalid()) {
+      TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
     }
   }
 }

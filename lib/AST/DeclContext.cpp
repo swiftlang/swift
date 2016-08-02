@@ -429,7 +429,7 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       // If the function is not externally visible, we will not be serializing
       // its body.
       if (!func->getDeclContext()->isLocalContext() &&
-          func->getEffectiveAccess() != Accessibility::Public)
+          func->getEffectiveAccess() < Accessibility::Public)
         break;
 
       // Bodies of public transparent and always-inline functions are

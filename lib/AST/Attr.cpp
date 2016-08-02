@@ -553,7 +553,10 @@ StringRef DeclAttribute::getAttrName() const {
       return "internal";
     case Accessibility::Public:
       return "public";
+    case Accessibility::Open:
+      return "open";
     }
+    llvm_unreachable("bad accessibility kind");
 
   case DAK_Ownership:
     switch (cast<OwnershipAttr>(this)->get()) {
@@ -562,6 +565,7 @@ StringRef DeclAttribute::getAttrName() const {
     case Ownership::Unowned:   return "unowned";
     case Ownership::Unmanaged: return "unowned(unsafe)";
     }
+    llvm_unreachable("bad ownership kind");
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:

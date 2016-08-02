@@ -1,4 +1,4 @@
-public class Base {
+open class Base {
   fileprivate func privateMethod() {}
 }
 

@@ -1661,6 +1661,7 @@ getActualAccessibility(uint8_t raw) {
   CASE(FilePrivate)
   CASE(Internal)
   CASE(Public)
+  CASE(Open)
 #undef CASE
   }
   return None;

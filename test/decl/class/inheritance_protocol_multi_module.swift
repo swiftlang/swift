@@ -6,9 +6,9 @@
 /* module Mod */
 
 public protocol MyProtocol  {}
-public class ClassLevel1: MyProtocol {
+open class ClassLevel1: MyProtocol {
     public init() {}
 }
-public class ClassLevel2: ClassLevel1 {
+open class ClassLevel2: ClassLevel1 {
     public override init () {}
 }

@@ -505,7 +505,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("fileprivate", Accessibility::FilePrivate)
       .Case("internal", Accessibility::Internal)
       .Case("public", Accessibility::Public)
-      .Case("open", Accessibility::Public); // FIXME: Actually implement this.
+      .Case("open", Accessibility::Open);
 
     if (access == Accessibility::FilePrivate &&
         !Context.LangOpts.EnableSwift3Private) {

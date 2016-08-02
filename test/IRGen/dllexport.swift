@@ -12,13 +12,13 @@ public protocol p {
   func f()
 }
 
-public class c {
+open class c {
   public init() { }
 }
 
 public var ci : c = c()
 
-public class d {
+open class d {
   private func m() -> Never {
     fatalError()
   }

@@ -141,6 +141,7 @@ class GlobalPropertyOpt {
         linkage = SILLinkage::Hidden;
         break;
       case Accessibility::Public:
+      case Accessibility::Open:
         linkage = SILLinkage::Public;
         break;
     }

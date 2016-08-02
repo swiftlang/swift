@@ -74,13 +74,13 @@ mustBridgeToSwiftValueBox(Module *M, CanType T) {
 static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
                                                  bool isWholeModuleOpts) {
   while (CD) {
-    // Public classes can always be extended
-    if (CD->getEffectiveAccess() == Accessibility::Public)
+    // Open classes can always be extended
+    if (CD->getEffectiveAccess() == Accessibility::Open)
       return true;
 
-    // Internal classes can be extended, if we are not in
+    // Internal and public classes can be extended, if we are not in
     // whole-module-optimization mode.
-    if (CD->getEffectiveAccess() == Accessibility::Internal &&
+    if (CD->getEffectiveAccess() >= Accessibility::Internal &&
         !isWholeModuleOpts)
       return true;
 

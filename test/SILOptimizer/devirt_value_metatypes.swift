@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
 
-public class A {
+open class A {
   @inline(never)
   class func foo() {
   }
@@ -22,12 +22,12 @@ public func testValueMetatype(_ x:A) {
     type(of: x).foo()
 }
 
-public class C {
+open class C {
   @inline(never)
   class func foo() -> Int { return 0 }
 }
 
-public class D : C {
+open class D : C {
   @inline(never)
   override class func foo() -> Int { return 1 }
 }

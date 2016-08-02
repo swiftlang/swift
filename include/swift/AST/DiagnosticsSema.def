@@ -989,6 +989,12 @@ ERROR(access_control_extension_more,none,
       "extension of %select{private|fileprivate|internal|PUBLIC}0 %1 cannot "
       "be declared %select{PRIVATE|fileprivate|internal|public}2",
       (Accessibility, DescriptiveDeclKind, Accessibility))
+ERROR(access_control_extension_open,none,
+      "extensions cannot use 'open' as their default access; use 'public'",
+      ())
+ERROR(access_control_open_bad_decl,none,
+      "only classes and overridable class members can be declared 'open';"
+      " use 'public'", ())
 
 ERROR(invalid_decl_attribute_simple,none,
       "attribute cannot be applied to declaration", ())
@@ -1514,6 +1520,10 @@ ERROR(override_not_accessible,none,
       "%select{its enclosing type|the declaration it overrides}2",
       (bool, DescriptiveDeclKind, bool))
 
+ERROR(override_of_non_open,none,
+      "overriding non-open %0 outside of its defining module",
+      (DescriptiveDeclKind))
+
 ERROR(method_does_not_override,none,
       "method does not override any method from its superclass", ())
 ERROR(property_does_not_override,none,
@@ -1603,6 +1613,8 @@ ERROR(override_mutable_covariant_subscript,none,
       (Type, Type))
 ERROR(decl_already_final,none,
       "static declarations are already final", ())
+ERROR(open_decl_cannot_be_final,none,
+      "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
 NOTE(decl_init_here,none,
      "initial value is here", ())
 
@@ -1622,6 +1634,12 @@ ERROR(inheritance_from_non_protocol,none,
   "inheritance from non-protocol type %0", (Type))
 ERROR(superclass_not_first,none,
   "superclass %0 must appear first in the inheritance clause", (Type))
+ERROR(superclass_not_open,none,
+  "cannot inherit from non-open class %0 outside of its defining module",
+  (Type))
+NOTE(superclass_here,none,"superclass is declared here", ())
+ERROR(superclass_of_open_not_open,none,
+  "superclass %0 of open class must be open", (Type))
 ERROR(circular_class_inheritance,none,
       "circular class inheritance %0", (StringRef))
 NOTE(class_here,none,

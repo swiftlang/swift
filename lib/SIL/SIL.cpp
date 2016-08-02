@@ -61,6 +61,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   switch (D->getEffectiveAccess()) {
   case Accessibility::Public:
+  case Accessibility::Open:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:
     // If we're serializing all function bodies, type metadata for internal

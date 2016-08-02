@@ -1227,7 +1227,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -1794,12 +1794,9 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   return resultLoc.isValid() ? resultLoc : getStartLoc();
 }
 
-/// Returns true if \p VD needs to be treated as publicly-accessible at the SIL,
-/// LLVM, and machine levels.
-///
-/// The most common causes of this are -enable-testing and versioned non-public
-/// declarations.
-static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+/// Returns true if \p VD needs to be treated as publicly-accessible
+/// at the SIL, LLVM, and machine levels due to being versioned.
+static bool isVersionedInternalDecl(const ValueDecl *VD) {
   assert(VD->getFormalAccess() == Accessibility::Internal);
 
   if (VD->getAttrs().hasAttribute<VersionedAttr>())
@@ -1810,10 +1807,26 @@ static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
       if (ASD->getAttrs().hasAttribute<VersionedAttr>())
         return true;
 
-  if (VD->getModuleContext()->isTestingEnabled())
-    return true;
-
   return false;
+}
+
+/// Return the accessibility of an internal or public declaration
+/// that's been testably imported.
+static Accessibility getTestableAccess(const ValueDecl *decl) {
+  // Non-final classes are considered open to @testable importers.
+  if (auto cls = dyn_cast<ClassDecl>(decl)) {
+    if (!cls->isFinal())
+      return Accessibility::Open;
+
+  // Non-final overridable class members are considered open to
+  // @testable importers.
+  } else if (decl->isPotentiallyOverridable()) {
+    if (!cast<ValueDecl>(decl)->isFinal())
+      return Accessibility::Open;
+  }
+
+  // Everything else is considered public.
+  return Accessibility::Public;
 }
 
 Accessibility ValueDecl::getEffectiveAccess() const {
@@ -1822,9 +1835,15 @@ Accessibility ValueDecl::getEffectiveAccess() const {
   // Handle @testable.
   switch (effectiveAccess) {
   case Accessibility::Public:
+    if (getModuleContext()->isTestingEnabled())
+      effectiveAccess = getTestableAccess(this);
+    break;
+  case Accessibility::Open:
     break;
   case Accessibility::Internal:
-    if (isInternalDeclEffectivelyPublic(this))
+    if (getModuleContext()->isTestingEnabled())
+      effectiveAccess = getTestableAccess(this);
+    else if (isVersionedInternalDecl(this))
       effectiveAccess = Accessibility::Public;
     break;
   case Accessibility::FilePrivate:
@@ -1856,13 +1875,14 @@ Accessibility ValueDecl::getEffectiveAccess() const {
 }
 
 Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert(getFormalAccess() == Accessibility::Internal &&
+  assert((getFormalAccess() == Accessibility::Internal ||
+          getFormalAccess() == Accessibility::Public) &&
          "should be able to fast-path non-internal cases");
   assert(useDC && "should fast-path non-scoped cases");
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
     if (useSF->hasTestableImport(getModuleContext()))
-      return Accessibility::Public;
-  return Accessibility::Internal;
+      return getTestableAccess(this);
+  return getFormalAccess();
 }
 
 const DeclContext *
@@ -1908,6 +1928,7 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   case Accessibility::Internal:
     return result->getParentModule();
   case Accessibility::Public:
+  case Accessibility::Open:
     return nullptr;
   }
 
@@ -1947,7 +1968,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.

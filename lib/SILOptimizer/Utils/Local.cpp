@@ -22,6 +22,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -2597,8 +2598,14 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (AFD->getEffectiveAccess()) {
-  case Accessibility::Public:
+  case Accessibility::Open:
     return false;
+  case Accessibility::Public:
+    if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
+      if (ctor->isRequired())
+	return false;
+    }
+    SWIFT_FALLTHROUGH;
   case Accessibility::Internal:
     return M.isWholeModule();
   case Accessibility::FilePrivate:
