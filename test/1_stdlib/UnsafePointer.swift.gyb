@@ -455,7 +455,7 @@ ${SelfName}TestSuite.test("Comparable") {
   func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
     return instances[i].0 <=> instances[j].0
   }
-  checkComparable(instances.map { $1 }, oracle: comparisonOracle)
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
 }
 
 % end

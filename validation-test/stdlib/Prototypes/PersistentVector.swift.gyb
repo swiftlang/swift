@@ -1997,7 +1997,7 @@ struct UnittestDictionary<Key : Equatable, Value> {
   }
 
   var keys: [Key] {
-    return _elements.map { k, _ in k }
+    return _elements.map { $0.0 }
   }
 }
 

@@ -9,7 +9,7 @@ _ = myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(_ x: (Int, Int) -> Int) {}
-foo({$0}) // expected-error{{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 were used in closure body}}
+foo({$0}) // expected-error{{cannot convert value of type '(Int, Int)' to closure result type 'Int'}}
 
 struct X {}
 func mySort(_ array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
@@ -121,8 +121,8 @@ var _: (Int,Int) -> Int = {$0+$1+$2}
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
 var _: (Int, Int, Int) -> Int = {$0+$1}
 
-// expected-error @+1 {{contextual closure type '() -> Int' expects 0 arguments, but 1 were used in closure body}}
-var _: () -> Int = {_ in 0}
+
+var _: () -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 2 were used in closure body}}
 var _: (Int) -> Int = {a,b in 0}
@@ -130,7 +130,6 @@ var _: (Int) -> Int = {a,b in 0}
 // expected-error @+1 {{contextual closure type '(Int) -> Int' expects 1 argument, but 3 were used in closure body}}
 var _: (Int) -> Int = {a,b,c in 0}
 
-// expected-error @+1 {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 were used in closure body}}
 var _: (Int, Int) -> Int = {a in 0}
 
 // expected-error @+1 {{contextual closure type '(Int, Int, Int) -> Int' expects 3 arguments, but 2 were used in closure body}}
@@ -203,7 +202,7 @@ func acceptNothingToInt (_: @noescape () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
   // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
-  // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 were used in closure body}}
+  // expected-error@-1{{cannot convert value of type '(_) -> Int' to expected argument type '() -> Int'}}
   // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
 
@@ -283,6 +282,13 @@ func rdar21078316() {
   var bar : [(String, String)]?
   bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
 }
+
+
+// <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
+var numbers = [1, 2, 3]
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
+
+
 
 // <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
 func foo20868864(_ callback: ([String]) -> ()) { }

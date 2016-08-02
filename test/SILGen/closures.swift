@@ -590,5 +590,5 @@ class GenericDerived<Ocean> : ConcreteBase {
 // Don't crash on this
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
-  r25993258_helper { _, _ in () }
+  r25993258_helper { _ in () }
 }

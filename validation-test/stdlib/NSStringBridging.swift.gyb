@@ -31,7 +31,7 @@ NSStringTests.test("AnyHashable(NSString) uses Swift String comparison rules") {
   let ah2 = AnyHashable(nss2)
   expectEqual("String", String(describing: type(of: ah1.base)))
   expectEqual("String", String(describing: type(of: ah2.base)))
-  checkHashable([ah1, ah2], equalityOracle: { _, _ in true })
+  checkHashable([ah1, ah2], equalityOracle: { _ in true })
 }
 
 runAllTests()

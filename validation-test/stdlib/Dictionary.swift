@@ -3916,7 +3916,7 @@ DictionaryTestSuite.test("popFirst") {
       2020: 2020,
       3030: 3030,
     ]
-    let expected = Array(d.map{($0, $1)})
+    let expected = Array(d.map{($0.0, $0.1)})
     while let element = d.popFirst() {
       popped.append(element)
     }
