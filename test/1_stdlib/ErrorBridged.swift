@@ -627,4 +627,17 @@ ErrorBridgingTests.test("Wrapped NSError identity") {
   }
 }
 
+extension Error {
+	func asNSError() -> NSError {
+		return self as NSError
+	}
+}
+
+// SR-1562
+ErrorBridgingTests.test("Error archetype identity") {
+  let myError = NSError(domain: "myErrorDomain", code: 0,
+                        userInfo: [ AnyHashable("one") : 1 ])
+  expectTrue(myError === myError.asNSError())
+}
+
 runAllTests()

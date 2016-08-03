@@ -241,6 +241,11 @@ extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
   public var _userInfo: Any? { return userInfo }
+
+  /// The "embedded" NSError is itself.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return self
+  }
 }
 
 extension CFError : Error {
@@ -254,6 +259,11 @@ extension CFError : Error {
 
   public var _userInfo: Any? {
     return CFErrorCopyUserInfo(self) as Any
+  }
+
+  /// The "embedded" NSError is itself.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return self
   }
 }
 
