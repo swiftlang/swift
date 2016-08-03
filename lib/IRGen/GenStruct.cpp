@@ -579,7 +579,6 @@ class ClangRecordLowering {
   const clang::ASTContext &ClangContext;
   const clang::ASTRecordLayout &ClangLayout;
   const Size TotalStride;
-  Size TotalSize;
   const Alignment TotalAlignment;
   SpareBitVector SpareBits;
 
@@ -595,9 +594,8 @@ public:
       ClangDecl(clangDecl), ClangContext(clangDecl->getASTContext()),
       ClangLayout(ClangContext.getASTRecordLayout(clangDecl)),
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
-      TotalSize(TotalStride),
       TotalAlignment(Alignment(ClangLayout.getAlignment().getQuantity())) {
-    SpareBits.reserve(TotalSize.getValue() * 8);
+    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
@@ -606,17 +604,12 @@ public:
     } else {
       collectStructFields();
     }
-
-    // Lots of layout will get screwed up if our structure claims more
-    // storage than we allocated to it.
-    assert(NextOffset == TotalSize && NextOffset <= TotalStride);
-    assert(TotalSize.roundUpToAlignment(TotalAlignment) == TotalStride);
   }
 
   const TypeInfo *createTypeInfo(llvm::StructType *llvmType) {
     llvmType->setBody(LLVMFields, /*packed*/ true);
     return ClangRecordTypeInfo::create(FieldInfos, NextExplosionIndex,
-                                       llvmType, TotalSize,
+                                       llvmType, TotalStride,
                                        std::move(SpareBits), TotalAlignment,
                                        ClangDecl);
   }
@@ -624,7 +617,7 @@ public:
 private:
   /// Collect all the fields of a union.
   void collectUnionFields() {
-    addOpaqueField(Size(0), TotalSize);
+    addOpaqueField(Size(0), TotalStride);
   }
 
   static bool isImportOfClangField(VarDecl *swiftField,
@@ -689,8 +682,14 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    // Treat this as the end of the value size.
-    TotalSize = NextOffset;
+    // We never take advantage of tail padding, because that would prevent
+    // us from passing the address of the object off to C, which is a pretty
+    // likely scenario for imported C types.
+    assert(NextOffset <= TotalStride);
+    assert(SpareBits.size() <= TotalStride.getValueInBits());
+    if (NextOffset < TotalStride) {
+      addPaddingField(TotalStride);
+    }
   }
 
   /// Place the next struct field at its appropriate offset.
