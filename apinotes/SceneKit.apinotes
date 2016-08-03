@@ -15,3 +15,98 @@ Protocols:
     SwiftPrivate: true
     MethodKind: Instance
 
+#
+# New wrapper types will be made for these typedefs, and we want to nest them
+#
+Typedefs:
+- Name: SCNGeometrySourceSemantic
+  SwiftName: SCNGeometrySource.Semantic
+- Name: SCNLightType
+  SwiftName: SCNLight.LightType
+- Name: SCNLightingModel
+  SwiftName: SCNMaterial.LightingModel
+- Name: SCNParticleProperty
+  SwiftName: SCNParticleSystem.ParticleProperty
+- Name: SCNPhysicsShapeOption
+  SwiftName: SCNPhysicsShape.Option
+- Name: SCNPhysicsShapeType
+  SwiftName: SCNPhysicsShape.ShapeType
+- Name: SCNPhysicsTestOption
+  SwiftName: SCNPhysicsWorld.TestOption
+- Name: SCNPhysicsTestSearchMode
+  SwiftName: SCNPhysicsWorld.TestSearchMode
+- Name: SCNSceneAttribute
+  SwiftName: SCNScene.Attribute
+- Name: SCNSceneSourceAnimationImportPolicy
+  SwiftName: SCNSceneSource.AnimationImportPolicy
+- Name: SCNSceneSourceLoadingOption
+  SwiftName: SCNSceneSource.LoadingOption
+- Name: SCNViewOption
+  SwiftName: SCNView.Option
+
+#
+# Name overrides for globals that we will be nesting onto our new wrapper types
+#
+Globals:
+- Name: SCNHitTestFirstFoundOnlyKey
+  SwiftName: SCNHitTestOption.firstFoundOnly
+- Name: SCNHitTestSortResultsKey
+  SwiftName: SCNHitTestOption.sortResults
+- Name: SCNHitTestClipToZRangeKey
+  SwiftName: SCNHitTestOption.clipToZRange
+- Name: SCNHitTestBackFaceCullingKey
+  SwiftName: SCNHitTestOption.backFaceCulling
+- Name: SCNHitTestBoundingBoxOnlyKey
+  SwiftName: SCNHitTestOption.boundingBoxOnly
+- Name: SCNHitTestIgnoreChildNodesKey
+  SwiftName: SCNHitTestOption.ignoreChildNodes
+- Name: SCNHitTestRootNodeKey
+  SwiftName: SCNHitTestOption.rootNode
+- Name: SCNHitTestIgnoreHiddenNodesKey
+  SwiftName: SCNHitTestOption.ignoreHiddenNodes
+- Name: SCNPhysicsShapeTypeKey
+  SwiftName: SCNPhysicsShape.Option.type
+- Name: SCNPhysicsShapeKeepAsCompoundKey
+  SwiftName: SCNPhysicsShape.Option.keepAsCompound
+- Name: SCNPhysicsShapeScaleKey
+  SwiftName: SCNPhysicsShape.Option.scale
+- Name: SCNPhysicsTestCollisionBitMaskKey
+  SwiftName: SCNPhysicsWorld.TestOption.collisionBitMask
+- Name: SCNPhysicsTestSearchModeKey
+  SwiftName: SCNPhysicsWorld.TestOption.searchMode
+- Name: SCNPhysicsTestBackfaceCullingKey
+  SwiftName: SCNPhysicsWorld.TestOption.backfaceCulling
+- Name: SCNSceneStartTimeAttributeKey
+  SwiftName: SCNScene.Attribute.startTime
+- Name: SCNSceneEndTimeAttributeKey
+  SwiftName: SCNScene.Attribute.endTime
+- Name: SCNSceneFrameRateAttributeKey
+  SwiftName: SCNScene.Attribute.frameRate
+- Name: SCNSceneUpAxisAttributeKey
+  SwiftName: SCNScene.Attribute.upAxis
+- Name: SCNSceneSourceCreateNormalsIfAbsentKey
+  SwiftName: SCNSceneSource.LoadingOption.createNormalsIfAbsent
+- Name: SCNSceneSourceCheckConsistencyKey
+  SwiftName: SCNSceneSource.LoadingOption.checkConsistency
+- Name: SCNSceneSourceFlattenSceneKey
+  SwiftName: SCNSceneSource.LoadingOption.flattenScene
+- Name: SCNSceneSourceUseSafeModeKey
+  SwiftName: SCNSceneSource.LoadingOption.useSafeMode
+- Name: SCNSceneSourceAssetDirectoryURLsKey
+  SwiftName: SCNSceneSource.LoadingOption.assetDirectoryURLs
+- Name: SCNSceneSourceOverrideAssetURLsKey
+  SwiftName: SCNSceneSource.LoadingOption.overrideAssetURLs
+- Name: SCNSceneSourceStrictConformanceKey
+  SwiftName: SCNSceneSource.LoadingOption.strictConformance
+- Name: SCNSceneSourceConvertUnitsToMetersKey
+  SwiftName: SCNSceneSource.LoadingOption.convertUnitsToMeters
+- Name: SCNSceneSourceConvertToYUpKey
+  SwiftName: SCNSceneSource.LoadingOption.convertToYUp
+- Name: SCNSceneSourceAnimationImportPolicyKey
+  SwiftName: SCNSceneSource.LoadingOption.animationImportPolicy
+- Name: SCNPreferredRenderingAPIKey
+  SwiftName: SCNView.Option.preferredRenderingAPI
+- Name: SCNPreferredDeviceKey
+  SwiftName: SCNView.Option.preferredDevice
+- Name: SCNPreferLowPowerDeviceKey
+  SwiftName: SCNView.Option.preferLowPowerDevice
