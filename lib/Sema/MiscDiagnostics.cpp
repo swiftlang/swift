@@ -99,6 +99,8 @@ static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
 ///   - 'self.init' and 'super.init' cannot be wrapped in a larger expression
 ///     or statement.
 ///   - Warn about promotions to optional in specific syntactic forms.
+///   - Error about collection literals that default to Any collections in
+///     invalid positions.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                          const DeclContext *DC,
@@ -238,10 +240,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
 
+      if (auto collection = dyn_cast<CollectionExpr>(E))
+        if (collection->isTypeDefaulted())
+          checkTypeDefaultedCollectionExpr(collection);
+
       // Record call arguments.
-      if (auto Call = dyn_cast<CallExpr>(Base)) {
+      if (auto Call = dyn_cast<CallExpr>(Base))
         CallArgs.insert(Call->getArg());
-      }
 
       if (auto *DRE = dyn_cast<DeclRefExpr>(Base)) {
         // Verify metatype uses.
@@ -380,6 +385,29 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       checkInvalidPartialApplication(E);
       return E;
     }
+
+    /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
+    /// an error if it was inferred to this type in an invalid context, which is
+    /// one in which the parent expression is not itself a collection literal.
+    void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
+      if (auto *ParentExpr = Parent.getAsExpr())
+        if (isa<CollectionExpr>(ParentExpr))
+          return;
+
+      // If the parent is a non-expression, or is not itself a literal, then
+      // produce an error with a fixit to add the type as an explicit
+      // annotation.
+      if (c->getNumElements() == 0)
+        TC.diagnose(c->getLoc(), diag::collection_literal_empty)
+          .highlight(c->getSourceRange());
+      else {
+        TC.diagnose(c->getLoc(), diag::collection_literal_heterogenous,
+                    c->getType())
+          .highlight(c->getSourceRange())
+          .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
+      }
+    }
+
 
     /// Scout out the specified destination of an AssignExpr to recursively
     /// identify DiscardAssignmentExpr in legal places.  We can only allow them
