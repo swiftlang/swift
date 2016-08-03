@@ -8,7 +8,7 @@
 import Foundation
 
 // Test overlain variadic methods.
-let expression = NSExpression(format: "(3 + 2)**2", "LLLL" as NSString, "BBBB" as NSString)
+let expression = NSExpression(format: "(3 + 2)**2", "LLLL", "BBBB")
 let result = expression.expressionValue(with: expression, context:nil) as! NSNumber
 let number = result.stringValue
 print(number)

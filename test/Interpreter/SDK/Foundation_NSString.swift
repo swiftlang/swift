@@ -135,8 +135,16 @@ testComparisons()
 // Test overlain variadic methods.
 // CHECK-LABEL: Variadic methods:
 print("Variadic methods:")
+// Check that it works with bridged Strings.
 // CHECK-NEXT: x y
-print(NSString(format: "%@ %@", "x" as NSString, "y" as NSString))
+print(NSString(format: "%@ %@", "x", "y"))
+// Check that it works with bridged Arrays and Dictionaries.
+// CHECK-NEXT: (
+// CHECK-NEXT:   x
+// CHECK-NEXT: ) {
+// CHECK-NEXT:   y = z;
+// CHECK-NEXT: }
+print(NSString(format: "%@ %@", ["x"], ["y": "z"]))
 // CHECK-NEXT: 1{{.*}}024,25
 print(NSString(
   format: "%g",
@@ -144,13 +152,13 @@ print(NSString(
   1024.25
 ))
 // CHECK-NEXT: x y z
-print(("x " as NSString).appendingFormat("%@ %@", "y" as NSString, "z" as NSString))
+print(("x " as NSString).appendingFormat("%@ %@", "y", "z"))
 // CHECK-NEXT: a b c
 let s = NSMutableString(string: "a ")
-s.appendFormat("%@ %@", "b" as NSString, "c" as NSString)
+s.appendFormat("%@ %@", "b", "c")
 print(s)
 
-let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q" as NSString, "r" as NSString)
+let m = NSMutableString.localizedStringWithFormat("<%@ %@>", "q", "r")
 // CHECK-NEXT: <q r>
 print(m)
 m.append(" lever")
