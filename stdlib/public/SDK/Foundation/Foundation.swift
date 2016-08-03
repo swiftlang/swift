@@ -1145,7 +1145,28 @@ extension NSSet {
   ///   receiver.
   @objc(_swiftInitWithSet_NSSet:)
   public convenience init(set anSet: NSSet) {
-    self.init(set: anSet as Set)
+    // FIXME(performance)(compiler limitation): we actually want to do just
+    // `self = anSet.copy()`, but Swift does not have factory
+    // initializers right now.
+    let numElems = anSet.count
+    let stride = MemoryLayout<Optional<UnsafeRawPointer>>.stride
+    let alignment = MemoryLayout<Optional<UnsafeRawPointer>>.alignment
+    let bufferSize = stride * numElems
+    assert(stride == MemoryLayout<AnyObject>.stride)
+    assert(alignment == MemoryLayout<AnyObject>.alignment)
+
+    let rawBuffer = UnsafeMutableRawPointer.allocate(
+      bytes: bufferSize, alignedTo: alignment)
+    defer {
+      rawBuffer.deallocate(bytes: bufferSize, alignedTo: alignment)
+      _fixLifetime(anSet)
+    }
+    let valueBuffer = rawBuffer.bindMemory(
+     to: Optional<UnsafeRawPointer>.self, capacity: numElems)
+
+    CFSetGetValues(anSet, valueBuffer)
+    let valueBufferForInit = rawBuffer.assumingMemoryBound(to: AnyObject.self)
+    self.init(objects: valueBufferForInit, count: numElems)
   }
 }
 
@@ -1158,9 +1179,46 @@ extension NSDictionary {
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {
-    self.init(dictionary: otherDictionary as Dictionary)
+    // FIXME(performance)(compiler limitation): we actually want to do just
+    // `self = otherDictionary.copy()`, but Swift does not have factory
+    // initializers right now.
+    let numElems = otherDictionary.count
+    let stride = MemoryLayout<AnyObject>.stride
+    let alignment = MemoryLayout<AnyObject>.alignment
+    let singleSize = stride * numElems
+    let totalSize = singleSize * 2
+    _sanityCheck(stride == MemoryLayout<NSCopying>.stride)
+    _sanityCheck(alignment == MemoryLayout<NSCopying>.alignment)
+
+    // Allocate a buffer containing both the keys and values.
+    let buffer = UnsafeMutableRawPointer.allocate(
+      bytes: totalSize, alignedTo: alignment)
+    defer {
+      buffer.deallocate(bytes: totalSize, alignedTo: alignment)
+      _fixLifetime(otherDictionary)
+    }
+
+    let valueBuffer = buffer.bindMemory(to: AnyObject.self, capacity: numElems)
+    let buffer2 = buffer + singleSize
+    let keyBuffer = buffer2.bindMemory(to: AnyObject.self, capacity: numElems)
+
+    _stdlib_NSDictionary_getObjects(
+      nsDictionary: otherDictionary,
+      objects: valueBuffer,
+      andKeys: keyBuffer)
+
+    let keyBufferCopying = buffer2.assumingMemoryBound(to: NSCopying.self)
+    self.init(objects: valueBuffer, forKeys: keyBufferCopying, count: numElems)
   }
 }
+
+@_silgen_name("__NSDictionaryGetObjects")
+func _stdlib_NSDictionary_getObjects(
+  nsDictionary: NSDictionary,
+  objects: UnsafeMutablePointer<AnyObject>?,
+  andKeys keys: UnsafeMutablePointer<AnyObject>?
+)
+
 
 //===----------------------------------------------------------------------===//
 // NSUndoManager
