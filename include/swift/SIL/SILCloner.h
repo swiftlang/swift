@@ -66,6 +66,14 @@ public:
   SILBuilder &getBuilder() { return Builder; }
 
 protected:
+  void beforeVisit(ValueBase *V) {
+    if (auto I = dyn_cast<SILInstruction>(V)) {
+      // Update the set of available opened archetypes with the opened
+      // archetypes used by the current instruction.
+     doPreProcess(I);
+    }
+  }
+
 #define VALUE(CLASS, PARENT) \
   void visit##CLASS(CLASS *I) {                                       \
     llvm_unreachable("SILCloner visiting non-instruction?");          \
@@ -380,9 +388,6 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I) {
-    // Update the set of available opened archetypes with the opened archetypes
-    // used by the current instruction.
-    doPreProcess(&*I);
     asImpl().visit(&*I);
   }
   // Iterate over successors to do the depth-first search.
