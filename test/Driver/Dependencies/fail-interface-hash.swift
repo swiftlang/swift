@@ -23,7 +23,7 @@
 // CHECK-SECOND: Handled bad.swift
 // CHECK-SECOND-NOT: Handled depends
 
-// CHECK-RECORD-DAG: "./bad.swift": !private [
+// CHECK-RECORD-DAG: "./bad.swift": !dirty [
 // CHECK-RECORD-DAG: "./main.swift": [
 // CHECK-RECORD-DAG: "./depends-on-main.swift": !dirty [
 // CHECK-RECORD-DAG: "./depends-on-bad.swift": [
