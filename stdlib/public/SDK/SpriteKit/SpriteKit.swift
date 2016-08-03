@@ -56,7 +56,7 @@ extension SKWarpGeometryGrid {
   ///
   /// - Parameter columns: the number of columns to initialize the SKWarpGeometryGrid with
   /// - Parameter rows: the number of rows to initialize the SKWarpGeometryGrid with
-  /// - Paremeter sourcePositions: the source positions for the SKWarpGeometryGrid to warp from
+  /// - Parameter sourcePositions: the source positions for the SKWarpGeometryGrid to warp from
   /// - Parameter destinationPositions: the destination positions for SKWarpGeometryGrid to warp to
   public convenience init(columns: Int, rows: Int, sourcePositions: [simd.float2] = [float2](), destinationPositions: [simd.float2] = [float2]()) {
     let requiredElementsCount = (columns + 1) * (rows + 1)
