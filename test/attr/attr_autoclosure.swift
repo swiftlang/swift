@@ -55,7 +55,9 @@ func overloadedEach<P: P2>(_ source: P, _ closure: @escaping () -> ()) {
 struct S : P2 {
   typealias Element = Int
   func each(_ closure: @autoclosure () -> ()) {
-    overloadedEach(self, closure) // expected-error {{invalid conversion from non-escaping function of type '@autoclosure () -> ()' to potentially escaping function type '() -> ()'}}
+    // expected-note@-1{{parameter 'closure' is implicitly non-escaping because it was declared @autoclosure}}
+
+    overloadedEach(self, closure) // expected-error {{passing non-escaping parameter 'closure' to function expecting an @escaping closure}}
   }
 }
 
@@ -87,7 +89,9 @@ class Sub : Super {
 func func12_sink(_ x: @escaping () -> Int) { }
 
 func func12a(_ x: @autoclosure () -> Int) {
-  func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}
+    // expected-note@-1{{parameter 'x' is implicitly non-escaping because it was declared @autoclosure}}
+
+  func12_sink(x) // expected-error {{passing non-escaping parameter 'x' to function expecting an @escaping closure}}
 }
 func func12b(_ x: @autoclosure(escaping) () -> Int) {
   func12_sink(x)

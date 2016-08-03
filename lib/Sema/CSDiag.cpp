@@ -3593,6 +3593,62 @@ addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
   return false;
 }
 
+/// Try to diagnose common errors involving implicitly non-escaping parameters
+/// of function type, giving more specific and simpler diagnostics, attaching
+/// notes on the parameter, and offering fixits to insert @escaping. Returns
+/// true if it detects and issues an error, false if it does nothing.
+static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
+                                                      Type dstType,
+                                                      ConstraintSystem *CS) {
+  assert(expr && CS);
+  // Need to be referencing a parameter of function type
+  auto declRef = dyn_cast<DeclRefExpr>(expr);
+  if (!declRef || !isa<ParamDecl>(declRef->getDecl()) ||
+      !declRef->getType()->is<FunctionType>())
+    return false;
+
+  // Must be from non-escaping function to escaping function
+  auto srcFT = srcType->getAs<FunctionType>();
+  auto destFT = dstType->getAs<FunctionType>();
+  if (!srcFT || !destFT || !srcFT->isNoEscape() || destFT->isNoEscape())
+    return false;
+
+  // Function types must be equivalent modulo @escaping, @convention, etc.
+  if (!destFT->isEqual(srcFT->withExtInfo(destFT->getExtInfo())))
+    return false;
+
+  // Pick a specific diagnostic for the specific use
+  auto paramDecl = cast<ParamDecl>(declRef->getDecl());
+  switch (CS->getContextualTypePurpose()) {
+  case CTP_CallArgument:
+    CS->TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
+                    paramDecl->getName());
+    break;
+  case CTP_AssignSource:
+    CS->TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
+                    paramDecl->getName());
+    break;
+
+  default:
+    CS->TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
+                    paramDecl->getName());
+    break;
+  }
+
+  // Give a note and fixit
+  InFlightDiagnostic note = CS->TC.diagnose(
+      paramDecl->getLoc(), srcFT->isAutoClosure() ? diag::noescape_autoclosure
+                                                  : diag::noescape_parameter,
+      paramDecl->getName());
+
+  if (!srcFT->isAutoClosure()) {
+    note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
+                     "@escaping ");
+  } // TODO: add in a fixit for autoclosure
+
+  return true;
+}
+
 bool FailureDiagnosis::diagnoseContextualConversionError() {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
@@ -3854,6 +3910,11 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       }
     }
   }
+
+  // Try for better/more specific diagnostics for non-escaping to @escaping
+  if (tryDiagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
+                                                CS))
+    return true;
 
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
