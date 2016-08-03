@@ -1633,3 +1633,20 @@ extension AnyHashable : _ObjectiveCBridgeable {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// CVarArg for bridged types
+//===----------------------------------------------------------------------===//
+
+extension CVarArg where Self: _ObjectiveCBridgeable {
+  /// Default implementation for bridgeable types.
+  public var _cVarArgEncoding: [Int] {
+    let object = self._bridgeToObjectiveC()
+    _autorelease(object)
+    return _encodeBitsAsWords(object)
+  }
+}
+
+extension String: CVarArg {}
+extension Array: CVarArg {}
+extension Dictionary: CVarArg {}
+extension Set: CVarArg {}
