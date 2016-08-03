@@ -2162,7 +2162,7 @@ public:
   unsigned getNumElements() const { return Elements.size(); }
 
   bool isTypeDefaulted() const { return IsTypeDefaulted; }
-  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = true; }
+  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = value; }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
