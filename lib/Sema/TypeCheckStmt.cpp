@@ -1347,8 +1347,15 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   // only one designated initializer.
   if (implicitlyGenerated) {
     auto superclassTy = ctor->getExtensionType();
-    NameLookupOptions lookupOptions
-      = defaultConstructorLookupOptions | NameLookupFlags::KnownPrivate;
+    auto lookupOptions = defaultConstructorLookupOptions;
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+
+    // If a constructor is only visible as a witness for a protocol
+    // requirement, it must be an invalid override. Also, protocol
+    // extensions cannot yet define designated initializers.
+    lookupOptions -= NameLookupFlags::ProtocolMembers;
+    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+
     for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
                                              lookupOptions)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member.Decl);

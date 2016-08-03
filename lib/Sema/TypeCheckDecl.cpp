@@ -5369,8 +5369,18 @@ public:
       }
 
       if (members.empty()) {
-        NameLookupOptions lookupOptions =
-            defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+        auto lookupOptions = defaultMemberLookupOptions;
+
+        // Class methods cannot override declarations only
+        // visible via dynamic dispatch.
+        lookupOptions -= NameLookupFlags::DynamicLookup;
+
+        // Class methods cannot override declarations only
+        // visible as protocol requirements or protocol
+        // extension members.
+        lookupOptions -= NameLookupFlags::ProtocolMembers;
+        lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+
         members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
                                   name, lookupOptions);
       }

@@ -1110,13 +1110,17 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     }
   } else {
     // Variable/function/subscript requirements.
-    auto metaType = MetatypeType::get(Adoptee);
-    auto candidates = TC.lookupMember(DC, metaType, req->getFullName());
+    auto lookupOptions = defaultMemberTypeLookupOptions;
+    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+
+    auto candidates = TC.lookupMember(DC, Adoptee, req->getFullName(),
+                                      lookupOptions);
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TC.lookupMember(DC, metaType, req->getName());
+      candidates = TC.lookupMember(DC, Adoptee, req->getName(),
+                                   lookupOptions);
       *ignoringNames = true;
     }
 
@@ -1960,12 +1964,12 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     TypeLoc::withoutLoc(type),
                                                     /*genericparams*/nullptr, 
                                                     DC);
-    Type metaType = MetatypeType::get(type);
     aliasDecl->computeType();
     aliasDecl->setImplicit();
     if (type->is<ErrorType>())
       aliasDecl->setInvalid();
-    if (metaType->hasArchetype()) {
+    if (type->hasArchetype()) {
+      Type metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
     }
@@ -2498,11 +2502,9 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
-  auto metaType = MetatypeType::get(Adoptee);
-
   // Look for a member type with the same name as the associated type.
-  auto candidates = TC.lookupMemberType(DC, metaType, assocType->getName(),
-                                        None);
+  auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
+                                        /*lookupOptions=*/None);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
