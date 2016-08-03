@@ -3,6 +3,52 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0113](https://github.com/apple/swift-evolution/blob/master/proposals/0113-rounding-functions-on-floatingpoint.md)
+
+  The following two methods were added to `FloatingPoint`:
+
+  ```swift
+  func rounded(_ rule: FloatingPointRoundingRule) -> Self
+  mutating func round( _ rule: FloatingPointRoundingRule)
+  ```
+
+  These bind the IEEE 754 roundToIntegral operations. They provide the
+  functionality of the C / C++ `round()`, `ceil()`, `floor()`, and `trunc()`
+  functions and other rounding operations as well.
+
+  As a follow-on to the work of SE-0113 and SE-0067, the following
+  mathematical operations in the `Darwin.C` and `glibc` modules now operate
+  on any type conforming to `FloatingPoint`: `fabs`, `sqrt`, `fma`,
+  `remainder`, `fmod`, `ceil`, `floor`, `round`, and `trunc`.
+
+  See also the changes associated with SE-0067.
+
+* [SE-0067](https://github.com/apple/swift-evolution/blob/master/proposals/0067-floating-point-protocols.md)
+
+  The `FloatingPoint` protocol has been expanded to include most IEEE 754
+  required operations. A number of useful properties have been added to the
+  protocol as well, representing quantities like the largest finite value or
+  the smallest positive normal value (these correspond to the macros such as
+  FLT_MAX defined in C).
+
+  While almost all of the changes are additive, there are four changes that
+  will impact existing code:
+
+  - The `%` operator is no longer available for `FloatingPoint` types. It
+  was difficult to use correctly, and its semantics did not actually match
+  those of the corresponding integer operation, making it something of an
+  attractive nuisance. The new method `formTruncatingRemainder(dividingBy:)`
+  provides the old semantics if they are needed.
+
+  - The static property `.NaN` has been renamed `.nan`.
+
+  - The static property `.quietNaN` was redundant and has been removed. Use
+  `.nan` instead.
+
+  - The predicate `isSignaling` has been renamed `isSignalingNaN`.
+
+  See also the changes associated with SE-0113.
+
 * [SE-0111](https://github.com/apple/swift-evolution/blob/master/proposals/0111-remove-arg-label-type-significance.md):
 
   Argument labels have been removed from Swift function types. Instead, they are
