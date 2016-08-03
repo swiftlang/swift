@@ -483,7 +483,6 @@ int Compilation::performJobsImpl() {
             break;
           SWIFT_FALLTHROUGH;
         case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            llvm::errs() << "DOWNSTREAM " << ReturnCode << "\n";
           DepGraph.markTransitive(Dependents, FinishedCmd);
           break;
         }
