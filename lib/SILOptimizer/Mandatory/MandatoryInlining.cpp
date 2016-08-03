@@ -199,7 +199,7 @@ getCalleeFunction(FullApplySite AI, bool &IsThick,
       // If we find the load instruction first, then the load is loading from
       // a non-initialized alloc; this shouldn't really happen but I'm not
       // making any assumptions
-      if (static_cast<SILInstruction*>(I) == LI)
+      if (&*I == LI)
         return nullptr;
       if ((SI = dyn_cast<StoreInst>(I)) && SI->getDest() == PBI) {
         // We found a store that we know dominates the load; now ensure there
