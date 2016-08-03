@@ -590,4 +590,41 @@ ErrorBridgingTests.test("NSError subclass identity") {
   expectTrue(type(of: nsError) == MyNSError.self)
 }
 
+ErrorBridgingTests.test("Wrapped NSError identity") {
+  let nsError = NSError(domain: NSCocoaErrorDomain,
+                   code: NSFileNoSuchFileError,
+                   userInfo: [
+                     AnyHashable(NSFilePathErrorKey) : "/dev/null",
+                     AnyHashable(NSStringEncodingErrorKey): /*ASCII=*/1,
+                   ])
+
+  let error: Error = nsError
+  let nsError2: NSError = error as NSError
+  expectTrue(nsError === nsError2)
+
+  // Extracting the NSError via the runtime.
+  let cocoaErrorAny: Any = error as! CocoaError
+  let nsError3: NSError = cocoaErrorAny as! NSError
+  expectTrue(nsError === nsError3)
+
+  if let cocoaErrorAny2: Any = error as? CocoaError {
+    let nsError4: NSError = cocoaErrorAny2 as! NSError
+    expectTrue(nsError === nsError4)
+  } else {
+    expectUnreachable()
+  }
+
+  // Extracting the NSError via direct call.
+  let cocoaError = error as! CocoaError
+  let nsError5: NSError = cocoaError as NSError
+  expectTrue(nsError === nsError5)
+
+  if let cocoaError2 = error as? CocoaError {
+    let nsError6: NSError = cocoaError as NSError
+    expectTrue(nsError === nsError6)
+  } else {
+    expectUnreachable()
+  }
+}
+
 runAllTests()
