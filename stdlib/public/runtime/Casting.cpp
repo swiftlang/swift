@@ -2006,21 +2006,23 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
 }
 
 #if SWIFT_OBJC_INTEROP
-// @_silgen_name("swift_stdlib_getErrorEmbeddedNSError")
-// public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: UnsafePointer<T>)
-//   -> AnyObject?
+// @_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
+// public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
+///    _ x: UnsafePointer<T>) -> AnyObject?
 SWIFT_CC(swift)
-extern "C" id swift_stdlib_getErrorEmbeddedNSError(const OpaqueValue *error,
-                                                   const Metadata *T,
-                                                   const WitnessTable *Error);
+extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
+                const OpaqueValue *error,
+                const Metadata *T,
+                const WitnessTable *Error);
 
 static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
                                     const WitnessTable *srcErrorWitness,
                                     DynamicCastFlags flags) {
   // Check whether there is an embedded error.
-  if (auto embedded = swift_stdlib_getErrorEmbeddedNSError(src, srcType,
-                                                           srcErrorWitness)) {
+  if (auto embedded =
+          swift_stdlib_getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                       srcErrorWitness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       srcType->vw_destroy(src);
 
