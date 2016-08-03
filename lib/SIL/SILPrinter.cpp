@@ -322,6 +322,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "!defaultarg" << "." << defaultArgIndex;
     break;
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    OS << "!propertyinit";
+    break;
   }
   if (uncurryLevel != 0)
     OS << (isDot ? '.' : '!')  << uncurryLevel;

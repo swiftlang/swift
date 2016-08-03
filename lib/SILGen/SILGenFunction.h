@@ -572,9 +572,11 @@ public:
   /// Generates code to initialize instance variables from their
   /// initializers.
   ///
+  /// \param dc The DeclContext containing the current function.
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param nominal The type whose members are being initialized.
-  void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
+  void emitMemberInitializers(DeclContext *dc, VarDecl *selfDecl,
+                              NominalTypeDecl *nominal);
 
   /// Emit a method that initializes the ivars of a class.
   void emitIVarInitializer(SILDeclRef ivarInitializer);
@@ -597,7 +599,7 @@ public:
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
-  // Generate a nullary function that returns the given value.
+  /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
@@ -1230,6 +1232,14 @@ public:
                                         CanType resultType,
                                         AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
+
+  RValue emitApplyOfStoredPropertyInitializer(
+      SILLocation loc,
+      const PatternBindingEntry &entry,
+      ArrayRef<Substitution> subs,
+      CanType resultType,
+      AbstractionPattern origResultType,
+      SGFContext C);
 
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
