@@ -4,12 +4,13 @@ Swift 3.0
 ---------
 * [SE-0107](https://github.com/apple/swift-evolution/blob/master/proposals/0107-unsaferawpointer.md)
 
-  An `Unsafe[Mutable]RawPointer` type has been introduced. It
-  replaces `Unsafe[Mutable]Pointer<Void>`. Conversion from
-  `UnsafePointer<T>` to `UnsafePointer<U>` has been
-  disallowed. `Unsafe[Mutable]RawPointer` provides an API for untyped
-  memory access, and an API for binding memory to a type. Binding
-  memory allows for safe conversion between pointer types.
+  An `Unsafe[Mutable]RawPointer` type has been introduced. It replaces
+  `Unsafe[Mutable]Pointer<Void>`. Conversion from `UnsafePointer<T>`
+  to `UnsafePointer<U>` has been disallowed. `Unsafe[Mutable]RawPointer`
+  provides an API for untyped memory access, and an API for binding memory
+  to a type. Binding memory allows for safe conversion between pointer types.
+  See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
+  `withMemoryRebound(to:capacity:)`.
 
 * [SE-0096](https://github.com/apple/swift-evolution/blob/master/proposals/0096-dynamictype.md):
 
