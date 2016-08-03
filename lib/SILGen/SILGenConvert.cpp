@@ -539,7 +539,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         ManagedValue concreteValue = F(SGFContext());
         ManagedValue potentialNSError =
           emitApplyOfLibraryIntrinsic(loc,
-                                      SGM.getGetErrorEmbeddedNSErrorValue(loc),
+                                      SGM.getGetErrorEmbeddedNSError(loc),
                                       ctx.AllocateCopy(substitutions),
                                       { concreteValue },
                                       SGFContext())

@@ -124,7 +124,7 @@ extension Error {
   // CHECK-LABEL: sil hidden @_TFE10objc_errorPs5Error16convertToNSErrorfT_CSo7NSError
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
 	func convertToNSError() -> NSError {
-    // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @swift_stdlib_getErrorEmbeddedNSErrorValue 
+    // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @swift_stdlib_getErrorEmbeddedNSError
     // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]
     // CHECK: [[HAS_EMBEDDED_RESULT:%[0-9]+]] = select_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>
     // CHECK: cond_br [[HAS_EMBEDDED_RESULT]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]

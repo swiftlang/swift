@@ -149,15 +149,15 @@ public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T
   return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
-@_silgen_name("swift_stdlib_getErrorEmbeddedNSError")
-public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: UnsafePointer<T>)
--> AnyObject? {
+@_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
+public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
+    _ x: UnsafePointer<T>) -> AnyObject? {
   return x.pointee._getEmbeddedNSError()
 }
 
 /// FIXME: Quite unfortunate to have both of these.
-@_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorValue")
-public func _stdlib_getErrorEmbeddedNSErrorValue<T : Error>(_ x: T)
+@_silgen_name("swift_stdlib_getErrorEmbeddedNSError")
+public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: T)
 -> AnyObject? {
   return x._getEmbeddedNSError()
 }
