@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -parse -emit-objc-header-path %t/enums.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -parse -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/enums.h
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
@@ -21,6 +21,8 @@ import Foundation
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo;
 // CHECK-NEXT: - (void)acceptPlainEnum:(enum NSMalformedEnumMissingTypedef)_;
 // CHECK-NEXT: - (enum ObjcEnumNamed)takeAndReturnRenamedEnum:(enum ObjcEnumNamed)foo;
+// CHECK-NEXT: - (void)acceptTopLevelImportedWithA:(enum TopLevelRaw)a b:(TopLevelEnum)b c:(TopLevelOptions)c d:(TopLevelTypedef)d e:(TopLevelAnon)e;
+// CHECK-NEXT: - (void)acceptMemberImportedWithA:(enum MemberRaw)a b:(enum MemberEnum)b c:(MemberOptions)c d:(enum MemberTypedef)d e:(MemberAnon)e ee:(MemberAnon2)ee;
 // CHECK: @end
 @objc class AnEnumMethod {
   @objc func takeAndReturnEnum(_ foo: FooComments) -> NegativeValues {
@@ -30,6 +32,9 @@ import Foundation
   @objc func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
     return .A
   }
+
+  @objc func acceptTopLevelImported(a: TopLevelRaw, b: TopLevelEnum, c: TopLevelOptions, d: TopLevelTypedef, e: TopLevelAnon) {}
+  @objc func acceptMemberImported(a: Wrapper.Raw, b: Wrapper.Enum, c: Wrapper.Options, d: Wrapper.Typedef, e: Wrapper.Anon, ee: Wrapper.Anon2) {}
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed") {
