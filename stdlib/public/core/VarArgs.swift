@@ -107,7 +107,7 @@ public func getVaList(_ args: [CVarArg]) -> CVaListPointer {
 }
 #endif
 
-public func _encodeBitsAsWords<T : CVarArg>(_ x: T) -> [Int] {
+public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
     count: (MemoryLayout<T>.size + MemoryLayout<Int>.size - 1) / MemoryLayout<Int>.size)
