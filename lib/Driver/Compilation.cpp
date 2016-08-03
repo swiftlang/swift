@@ -456,6 +456,70 @@ int Compilation::performJobsImpl() {
         llvm::errs() << Output;
     }
 
+    // In order to handle both old dependencies that have disappeared and new
+    // dependencies that have arisen, we need to reload the dependency file.
+    // Do this whether or not the build succeeded.
+    SmallVector<const Job *, 16> Dependents;
+    if (getIncrementalBuildEnabled()) {
+      const CommandOutput &Output = FinishedCmd->getOutput();
+      StringRef DependenciesFile =
+        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+      if (!DependenciesFile.empty() &&
+          (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE)) {
+        bool wasCascading = DepGraph.isMarked(FinishedCmd);
+
+        switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+        case DependencyGraphImpl::LoadResult::HadError:
+          if (ReturnCode == EXIT_SUCCESS) {
+            disableIncrementalBuild();
+            for (const Job *Cmd : DeferredCommands)
+              scheduleCommandIfNecessaryAndPossible(Cmd);
+            DeferredCommands.clear();
+            Dependents.clear();
+          } // else, let the next build handle it.
+          break;
+        case DependencyGraphImpl::LoadResult::UpToDate:
+          if (!wasCascading)
+            break;
+          SWIFT_FALLTHROUGH;
+        case DependencyGraphImpl::LoadResult::AffectsDownstream:
+            llvm::errs() << "DOWNSTREAM " << ReturnCode << "\n";
+          DepGraph.markTransitive(Dependents, FinishedCmd);
+          break;
+        }
+      } else {
+        // If there's a crash, assume the worst.
+        switch (FinishedCmd->getCondition()) {
+        case Job::Condition::NewlyAdded:
+          // The job won't be treated as newly added next time. Conservatively
+          // mark it as affecting other jobs, because some of them may have
+          // completed already.
+          DepGraph.markTransitive(Dependents, FinishedCmd);
+          break;
+        case Job::Condition::Always:
+          // This applies to non-incremental tasks as well, but any incremental
+          // task that shows up here has already been marked.
+          break;
+        case Job::Condition::RunWithoutCascading:
+          // If this file changed, it might have been a non-cascading change and
+          // it might not. Unfortunately, the interface hash has been updated or
+          // compromised, so we don't actually know anymore; we have to
+          // conservatively assume the changes could affect other files.
+          DepGraph.markTransitive(Dependents, FinishedCmd);
+          break;
+        case Job::Condition::CheckDependencies:
+          // If the only reason we're running this is because something else
+          // changed, then we can trust the dependency graph as to whether it's
+          // a cascading or non-cascading change. That is, if whatever /caused/
+          // the error isn't supposed to affect other files, and whatever
+          // /fixes/ the error isn't supposed to affect other files, then
+          // there's no need to recompile any other inputs. If either of those
+          // are false, we /do/ need to recompile other inputs.
+          break;
+        }
+      }
+    }
+
     if (ReturnCode != EXIT_SUCCESS) {
       // The task failed, so return true without performing any further
       // dependency analysis.
@@ -481,39 +545,10 @@ int Compilation::performJobsImpl() {
     // might have been blocked.
     markFinished(FinishedCmd);
 
-    // In order to handle both old dependencies that have disappeared and new
-    // dependencies that have arisen, we need to reload the dependency file.
-    if (getIncrementalBuildEnabled()) {
-      const CommandOutput &Output = FinishedCmd->getOutput();
-      StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
-      if (!DependenciesFile.empty()) {
-        SmallVector<const Job *, 16> Dependents;
-        bool wasCascading = DepGraph.isMarked(FinishedCmd);
-
-        switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
-        case DependencyGraphImpl::LoadResult::HadError:
-          disableIncrementalBuild();
-          for (const Job *Cmd : DeferredCommands)
-            scheduleCommandIfNecessaryAndPossible(Cmd);
-          DeferredCommands.clear();
-          Dependents.clear();
-          break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
-          if (!wasCascading)
-            break;
-          SWIFT_FALLTHROUGH;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
-          DepGraph.markTransitive(Dependents, FinishedCmd);
-          break;
-        }
-
-        for (const Job *Cmd : Dependents) {
-          DeferredCommands.erase(Cmd);
-          noteBuilding(Cmd, "because of dependencies discovered later");
-          scheduleCommandIfNecessaryAndPossible(Cmd);
-        }
-      }
+    for (const Job *Cmd : Dependents) {
+      DeferredCommands.erase(Cmd);
+      noteBuilding(Cmd, "because of dependencies discovered later");
+      scheduleCommandIfNecessaryAndPossible(Cmd);
     }
 
     return TaskFinishedResponse::ContinueExecution;

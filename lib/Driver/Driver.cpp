@@ -1604,36 +1604,40 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
     return;
   }
 
-  if (!alwaysRebuildDependents) {
-    // Default all non-newly added files to being rebuilt without cascading.
-    J->setCondition(Job::Condition::RunWithoutCascading);
-  }
-
+  bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (llvm::sys::fs::status(input, inputStatus))
-    return;
-
-  J->setInputModTime(inputStatus.getLastModificationTime());
-  if (J->getInputModTime() != inputInfo.previousModTime)
-    return;
+  if (!llvm::sys::fs::status(input, inputStatus)) {
+    J->setInputModTime(inputStatus.getLastModificationTime());
+    hasValidModTime = true;
+  }
 
   Job::Condition condition;
-  switch (inputInfo.status) {
-  case CompileJobAction::InputInfo::UpToDate:
-    if (!llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+  if (!hasValidModTime || J->getInputModTime() != inputInfo.previousModTime) {
+    if (alwaysRebuildDependents ||
+        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
+      condition = Job::Condition::Always;
+    } else {
       condition = Job::Condition::RunWithoutCascading;
-    else
-      condition = Job::Condition::CheckDependencies;
-    break;
-  case CompileJobAction::InputInfo::NeedsCascadingBuild:
-    condition = Job::Condition::Always;
-    break;
-  case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
-    condition = Job::Condition::RunWithoutCascading;
-    break;
-  case CompileJobAction::InputInfo::NewlyAdded:
-    llvm_unreachable("handled above");
+    }
+  } else {
+    switch (inputInfo.status) {
+    case CompileJobAction::InputInfo::UpToDate:
+      if (!llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+        condition = Job::Condition::RunWithoutCascading;
+      else
+        condition = Job::Condition::CheckDependencies;
+      break;
+    case CompileJobAction::InputInfo::NeedsCascadingBuild:
+      condition = Job::Condition::Always;
+      break;
+    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+      condition = Job::Condition::RunWithoutCascading;
+      break;
+    case CompileJobAction::InputInfo::NewlyAdded:
+      llvm_unreachable("handled above");
+    }
   }
+
   J->setCondition(condition);
 }
 

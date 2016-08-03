@@ -37,10 +37,15 @@
 
 // RUN: %S/Inputs/touch.py 443865900 %t/*
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=FILE-REMOVED
-// FILE-REMOVED: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// FILE-REMOVED: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// FILE-REMOVED: inputs: ["./main.swift"], output: {{[{].*[}]$}}
+// FILE-REMOVED: inputs: ["./other.swift"], output: {{[{].*[}]$}}
 // FILE-REMOVED-NOT: yet-another.swift
 
 
 // RUN: echo '{version: "bogus", inputs: {"./main.swift": [443865900, 0], "./other.swift": !private [443865900, 0], "./yet-another.swift": !dirty [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=MUST-EXEC
+// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=INVALID-RECORD
+
+// INVALID-RECORD-NOT: warning
+// INVALID-RECORD: inputs: ["./main.swift"], output: {{[{].*[}]$}}
+// INVALID-RECORD: inputs: ["./other.swift"], output: {{[{].*[}]$}}
+// INVALID-RECORD: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
