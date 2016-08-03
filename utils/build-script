@@ -1449,6 +1449,7 @@ details of the setups of other systems or automated environments.""")
         const=False,
         dest="lldb_assertions")
 
+    # FIXME: This should be one option using a choices.
     cmake_generator_group = parser.add_argument_group(
         title="Select the CMake generator")
     cmake_generator_group.add_argument(
