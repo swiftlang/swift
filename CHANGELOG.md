@@ -2,6 +2,12 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 
 Swift 3.0
 ---------
+* [SE-0115](https://github.com/apple/swift-evolution/blob/master/proposals/0115-literal-syntax-protocols.md)
+
+  To clarify the role of `*LiteralConvertible` protocols, they have 
+  been renamed to `ExpressibleBy*Literal`.  No requirements of these 
+  protocols have changed.
+
 * [SE-0107](https://github.com/apple/swift-evolution/blob/master/proposals/0107-unsaferawpointer.md)
 
   An `Unsafe[Mutable]RawPointer` type has been introduced. It
