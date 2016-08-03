@@ -108,3 +108,13 @@ class MyNSError : NSError {
 func eraseMyNSError() -> Error {
   return MyNSError()
 }
+
+// CHECK-LABEL: sil hidden @_TF10objc_error25eraseFictionalServerErrorFT_Ps5Error_
+func eraseFictionalServerError() -> Error {
+  // CHECK-NOT: return
+  // CHECK: [[NSERROR_GETTER:%[0-9]+]] = function_ref @_TFVSC20FictionalServerErrorg8_nsErrorCSo7NSError
+  // CHECK: [[NSERROR:%[0-9]+]] = apply [[NSERROR_GETTER]]
+  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR]]
+  // CHECK: return [[ERROR]]
+  return FictionalServerError(.meltedDown)
+}
