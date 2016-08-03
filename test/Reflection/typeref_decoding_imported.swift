@@ -25,7 +25,7 @@
 // CHECK-32: ==============
 
 // CHECK-32: - __C.MyCStruct:
-// CHECK-32: Size: 9
+// CHECK-32: Size: 12
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 12
 // CHECK-32: NumExtraInhabitants: 0
@@ -43,7 +43,7 @@
 // CHECK-32: NumExtraInhabitants: 0
 
 // CHECK-i386: - __C.MyCStructWithBitfields:
-// CHECK-i386: Size: 2
+// CHECK-i386: Size: 4
 // CHECK-i386: Alignment: 4
 // CHECK-i386: Stride: 4
 // CHECK-i386: NumExtraInhabitants: 0
