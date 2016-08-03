@@ -16,6 +16,12 @@ func callEscapingWithNoEscape(_ fn: () -> Int) {
   let _ = fn // expected-error{{non-escaping parameter 'fn' may only be called}}
 }
 
+typealias IntSugar = Int
+func callSugared(_ fn: () -> IntSugar) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{24-24=@escaping }}
+
+  takesEscaping(fn) // expected-error{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
 
 struct StoresClosure {
   var closure : () -> Int
