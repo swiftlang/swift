@@ -24,7 +24,6 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   IndexSetThunks.m
   Measurement.swift
   Notification.swift
-  NotificationThunks.m
   NSStringEncodings.swift
   PersonNameComponents.swift
   TypePreservingNSNumber.mm
@@ -32,7 +31,6 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   URLComponents.swift
   URLRequest.swift
   UUID.swift
-  UserInfo.swift
   Hashing.swift
   Hashing.m
   Thunks.mm
