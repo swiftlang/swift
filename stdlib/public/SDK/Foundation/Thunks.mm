@@ -212,3 +212,13 @@ NS_Swift_performErrorRecoverySelector(_Nullable id delegate, SEL selector,
                                       void *_Nullable contextInfo) {
   objc_msgSend(delegate, selector, success, contextInfo);
 }
+
+// -- NSDictionary
+SWIFT_CC(swift)
+extern "C" void
+__NSDictionaryGetObjects(NSDictionary *_Nonnull nsDictionary,
+                         id *objects, id *keys) {
+  [nsDictionary getObjects:objects andKeys:keys];
+  [nsDictionary release];
+}
+
