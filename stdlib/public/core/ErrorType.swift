@@ -155,6 +155,13 @@ public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: UnsafePointer<T>)
   return x.pointee._getEmbeddedNSError()
 }
 
+/// FIXME: Quite unfortunate to have both of these.
+@_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorValue")
+public func _stdlib_getErrorEmbeddedNSErrorValue<T : Error>(_ x: T)
+-> AnyObject? {
+  return x._getEmbeddedNSError()
+}
+
 @_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
 public func _stdlib_getErrorDefaultUserInfo(_ error: Error) -> AnyObject?
 
