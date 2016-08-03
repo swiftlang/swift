@@ -95,3 +95,16 @@ func testProduceOptionalError() -> Error? {
   // CHECK: function_ref @swift_convertNSErrorToError
   return produceOptionalError();
 }
+
+class MyNSError : NSError {
+  override init() {
+    super.init(domain: "MyNSError", code: 0, userInfo: [:])
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error14eraseMyNSError
+// CHECK-NOT: return
+// CHECK: init_existential_ref
+func eraseMyNSError() -> Error {
+  return MyNSError()
+}
