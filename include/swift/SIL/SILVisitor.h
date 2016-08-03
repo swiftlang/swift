@@ -31,7 +31,15 @@ class SILVisitor {
 public:
   ImplClass &asImpl() { return static_cast<ImplClass &>(*this); }
 
+  // Peform any required pre-processing before visiting.
+  // Sub-classes can override it to provide their custom
+  // pre-processing steps.
+  void beforeVisit(ValueBase *V) {
+  }
+
   ValueRetTy visit(ValueBase *V) {
+    asImpl().beforeVisit(V);
+
     switch (V->getKind()) {
 #define VALUE(CLASS, PARENT)                                \
   case ValueKind::CLASS:                                    \
