@@ -4913,6 +4913,25 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
+static bool shouldAddMutating(ASTContext &Ctx, const Expr *Fn,
+                              const Expr* Arg) {
+  auto *TypeExp = dyn_cast<TypeExpr>(Fn);
+  auto *ParenExp = dyn_cast<ParenExpr>(Arg);
+  if (!TypeExp || !ParenExp)
+    return false;
+  auto InitType = TypeExp->getInstanceType();
+  auto ArgType = ParenExp->getSubExpr()->getType();
+  if (InitType.isNull() || ArgType.isNull())
+    return false;
+  if (auto *InitNom = InitType->getAnyNominal()) {
+    if (auto *ArgNom = ArgType->getAnyNominal()) {
+      return InitNom == Ctx.getUnsafeMutablePointerDecl() &&
+        ArgNom == Ctx.getUnsafePointerDecl();
+    }
+  }
+  return false;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
@@ -5226,6 +5245,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   } else {
     diagnose(fnExpr->getLoc(), diag::cannot_call_with_params,
              overloadName, argString, isInitializer);
+  }
+
+
+  if (shouldAddMutating(CS->DC->getASTContext(), fnExpr, argExpr)) {
+    diagnose(fnExpr->getLoc(), diag::pointer_init_add_mutating).fixItInsert(
+      dyn_cast<ParenExpr>(argExpr)->getSubExpr()->getStartLoc(), "mutating: ");
   }
   
   // Did the user intend on invoking a different overload?
