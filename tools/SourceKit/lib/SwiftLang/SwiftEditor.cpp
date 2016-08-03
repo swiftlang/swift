@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// TODO: Properply document methods
+
 #include "SwiftASTManager.h"
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
@@ -50,8 +52,9 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   }
 
   // Filter out lexer errors for placeholders.
-  if (Info.ID == diag::lex_editor_placeholder.ID)
-    return;
+  if (Info.ID == diag::lex_editor_placeholder.ID) {
+      return;
+  }
 
   if (Loc.isInvalid()) {
     if (Kind == DiagnosticKind::Error)
@@ -166,9 +169,9 @@ SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
 
   Queue.dispatchSync([&]{
     auto It = Docs.find(FilePath);
-    if (It != Docs.end())
-      EditorDoc = It->second.DocRef;
-   });
+    if (It != Docs.end()) {
+          EditorDoc = It->second.DocRef;
+   }});
 
   return EditorDoc;
 }
