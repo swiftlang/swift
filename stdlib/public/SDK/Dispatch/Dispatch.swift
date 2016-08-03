@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Dispatch
+import SwiftShims
 
 /// dispatch_assert
 
@@ -132,15 +133,15 @@ public extension DispatchGroup {
 	public func notify(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], queue: DispatchQueue, execute work: @escaping @convention(block) () -> ()) {
 		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
-			__dispatch_group_notify(self, queue, item._block)
+			_swift_dispatch_group_notify(self, queue, item._block)
 		} else {
-			__dispatch_group_notify(self, queue, work)
+			_swift_dispatch_group_notify(self, queue, work)
 		}
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func notify(queue: DispatchQueue, work: DispatchWorkItem) {
-		__dispatch_group_notify(self, queue, work._block)
+		_swift_dispatch_group_notify(self, queue, work._block)
 	}
 
 	public func wait() {
