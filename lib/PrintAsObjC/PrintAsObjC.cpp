@@ -97,9 +97,13 @@ static StringRef getNameForObjC(const ValueDecl *VD,
   if (customNamesOnly)
     return StringRef();
 
-  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl()))
+  if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
     if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
       return II->getName();
+    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
+      if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
+        return anonTypedef->getIdentifier()->getName();
+  }
 
   return VD->getName().str();
 }
