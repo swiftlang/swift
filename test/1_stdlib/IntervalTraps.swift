@@ -20,8 +20,9 @@
 
 import StdlibUnittest
 
+let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
-var IntervalTraps = TestSuite("IntervalTraps")
+var IntervalTraps = TestSuite("IntervalTraps" + testSuiteSuffix)
 
 IntervalTraps.test("HalfOpen")
   .skip(.custom(

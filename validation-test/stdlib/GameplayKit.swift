@@ -22,15 +22,15 @@ class OtherTestComponent : GKComponent {}
 class TestState1 : GKState {}
 class TestState2 : GKState {}
 
-GamePlayKitTests.test("GKEntity.componentForClass()") {
+GamePlayKitTests.test("GKEntity.component(ofType)") {
   let entity = GKEntity()
   entity.addComponent(TestComponent())
 
   do {
     var componentForTestComponent =
-      entity.componentForClass(TestComponent.self)
+      entity.component(ofType: TestComponent.self)
     var componentForOtherTestComponent_nil =
-      entity.componentForClass(OtherTestComponent.self)
+      entity.component(ofType: OtherTestComponent.self)
 
     expectNotEmpty(componentForTestComponent)
     expectType(Optional<TestComponent>.self, &componentForTestComponent)
@@ -38,14 +38,14 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
     expectEmpty(componentForOtherTestComponent_nil)
   }
 
-  entity.removeComponent(for: TestComponent.self)
+  entity.removeComponent(ofType: TestComponent.self)
   entity.addComponent(OtherTestComponent())
 
   do {
     var componentForOtherTestComponent =
-      entity.componentForClass(OtherTestComponent.self)
+      entity.component(ofType: OtherTestComponent.self)
     var componentForTestComponent_nil =
-      entity.componentForClass(TestComponent.self)
+      entity.component(ofType: TestComponent.self)
 
     expectNotEmpty(componentForOtherTestComponent)
     expectType(Optional<OtherTestComponent>.self, &componentForOtherTestComponent)
@@ -54,16 +54,16 @@ GamePlayKitTests.test("GKEntity.componentForClass()") {
   }
 }
 
-GamePlayKitTests.test("GKStateMachine.stateForClass()") {
+GamePlayKitTests.test("GKStateMachine.state(forClass:)") {
   do {
     // Construct a state machine with a custom subclass as the only state.
     let stateMachine = GKStateMachine(
       states: [TestState1()])
 
     var stateForTestState1 =
-      stateMachine.stateForClass(TestState1.self)
+      stateMachine.state(forClass: TestState1.self)
     var stateForTestState2_nil =
-      stateMachine.stateForClass(TestState2.self)
+      stateMachine.state(forClass: TestState2.self)
 
     expectNotEmpty(stateForTestState1)
     expectType(Optional<TestState1>.self, &stateForTestState1)
@@ -77,9 +77,9 @@ GamePlayKitTests.test("GKStateMachine.stateForClass()") {
       states: [TestState2()])
 
     var stateForTestState2 =
-      stateMachine.stateForClass(TestState2.self)
+      stateMachine.state(forClass: TestState2.self)
     var stateForTestState1_nil =
-      stateMachine.stateForClass(TestState1.self)
+      stateMachine.state(forClass: TestState1.self)
 
     expectNotEmpty(stateForTestState2)
     expectType(Optional<TestState2>.self, &stateForTestState2)
