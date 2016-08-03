@@ -364,7 +364,7 @@ public:
                                         PrecedenceGroupDecl *right) const;
 
   /// Retrieve the declaration of Swift.Error.
-  NominalTypeDecl *getErrorDecl() const;
+  ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.

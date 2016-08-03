@@ -946,7 +946,8 @@ public:
                             const TypeLowering &existentialTL,
                             ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F);
+                            llvm::function_ref<ManagedValue (SGFContext)> F,
+                            bool allowEmbeddedNSError = true);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
