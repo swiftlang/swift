@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://27226313
+// REQUIRES: optimized_stdlib
+
 import Dispatch
 import Foundation
 import StdlibUnittest
