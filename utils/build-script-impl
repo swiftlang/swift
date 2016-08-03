@@ -220,6 +220,19 @@ KNOWN_SETTINGS=(
     android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
+    cmark-cmake-options                ""        "CMake options used for all cmark targets"
+    ninja-cmake-options                ""        "CMake options used for all ninja targets"
+    foundation-cmake-options           ""        "CMake options used for all foundation targets"
+    libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
+    llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
+    lldb-cmake-options                 ""        "CMake options used for all lldb targets"
+    llvm-cmake-options                 ""        "CMake options used for all llvm targets"
+    ninja-cmake-options                ""        "CMake options used for all ninja targets"
+    swift-cmake-options                ""        "CMake options used for all swift targets"
+    swiftpm-cmake-options              ""        "CMake options used for all swiftpm targets"
+    xctest-cmake-options               ""        "CMake options used for all xctest targets"
+    playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
+    playgroundlogger-cmake-options     ""        "CMake options used for all playgroundlogger targets"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
@@ -1910,6 +1923,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
         llvm_build_dir=$(build_directory ${host} llvm)
         module_cache="${build_dir}/module-cache"
+
+        # Add any specific cmake options specified by build-script
+        product_cmake_options_name=$(to_varname "${product}")_CMAKE_OPTIONS
+        product_cmake_options=(${!product_cmake_options_name}) # convert to array
+        cmake_options+=("${product_cmake_options[@]}")
 
         case ${product} in
             cmark)

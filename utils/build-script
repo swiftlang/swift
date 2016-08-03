@@ -591,6 +591,21 @@ class BuildScriptInvocation(object):
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
 
+        # Compute any product specific cmake arguments.
+        for product_class in self.compute_product_classes():
+            product_name = product_class.product_name()
+            product = product_class(
+                args=args,
+                toolchain=self.toolchain,
+                source_dir=self.workspace.source_dir(product_name),
+                # FIXME: This is incorrect
+                build_dir=self.workspace.build_dir(args.host_target, product_name))
+            impl_args += [
+                "--%s-cmake-options=%s" % (
+                    product_name,
+                    ' '.join(pipes.quote(opt) for opt in product.cmake_options))
+            ]
+
         if args.build_stdlib_deployment_targets:
             impl_args += [
                 "--build-stdlib-deployment-targets", " ".join(
