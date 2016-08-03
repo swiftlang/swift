@@ -496,6 +496,11 @@ extension _ErrorCodeProtocol where Self._ErrorType: _BridgedStoredNSError {
 }
 
 extension _BridgedStoredNSError {
+  /// Retrieve the embedded NSError from a bridged, stored NSError.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return _nsError
+  }
+
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs._nsError.isEqual(rhs._nsError)
   }

@@ -114,11 +114,22 @@ public protocol Error {
   var _domain: String { get }
   var _code: Int { get }
   var _userInfo: Any? { get }
+
+#if _runtime(_ObjC)
+  func _getEmbeddedNSError() -> AnyObject?
+#endif
 }
 
 #if _runtime(_ObjC)
-// Helper functions for the C++ runtime to have easy access to domain,
-// code, and userInfo as Objective-C values.
+extension Error {
+  /// Default implementation: there is no embedded NSError.
+  public func _getEmbeddedNSError() -> AnyObject? { return nil }
+}
+#endif
+
+#if _runtime(_ObjC)
+// Helper functions for the C++ runtime to have easy access to embedded error,
+// domain, code, and userInfo as Objective-C values.
 @_silgen_name("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
@@ -136,6 +147,12 @@ public func _stdlib_getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
 public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
   return x.pointee._userInfo.map { $0 as AnyObject }
+}
+
+@_silgen_name("swift_stdlib_getErrorEmbeddedNSError")
+public func _stdlib_getErrorEmbeddedNSError<T : Error>(_ x: UnsafePointer<T>)
+-> AnyObject? {
+  return x.pointee._getEmbeddedNSError()
 }
 
 @_silgen_name("swift_stdlib_getErrorDefaultUserInfo")

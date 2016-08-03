@@ -455,6 +455,57 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   for (auto conformance : conformances)
     SGM.useConformance(conformance);
 
+  // If we're erasing to the 'Error' type, and the concrete type conforms to the
+  // _BridgedStoredNSError protocol, call the _nsError witness getter to extract
+  // the NSError directly.
+  auto &ctx = getASTContext();
+  if (existentialTL.getSemanticType().getSwiftRValueType()->getAnyNominal() ==
+        ctx.getErrorDecl()) {
+    auto conformance =
+      SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+    auto nsError = ctx.getNSErrorDecl();
+    if (conformance && nsError && SGM.getNSErrorConformanceToError()) {
+      CanType nsErrorType =
+        nsError->getDeclaredInterfaceType()->getCanonicalType();
+      if (auto witness =
+            conformance->getWitness(SGM.getNSErrorRequirement(loc), nullptr)) {
+        // Create a reference to the getter witness.
+        SILDeclRef getter =
+          getGetterDeclRef(cast<VarDecl>(witness.getDecl()),
+                           /*isDirectAccessorUse=*/true);
+        
+        // Compute the substitutions.
+        ArrayRef<Substitution> substitutions =
+          concreteFormalType->gatherAllSubstitutions(
+          SGM.SwiftModule, nullptr);
+
+        // Emit the erasure, through the getter to _nsError.
+        ProtocolConformanceRef nsErrorConformances[1] = {
+          ProtocolConformanceRef(SGM.getNSErrorConformanceToError())
+        };
+
+        return emitExistentialErasure(
+            loc, nsErrorType,
+            getTypeLowering(nsErrorType),
+            existentialTL,
+            ctx.AllocateCopy(nsErrorConformances),
+            C,
+            [&](SGFContext innerC) -> ManagedValue {
+              // Call the getter.
+              return emitGetAccessor(loc, getter, substitutions,
+                                     ArgumentSource(loc,
+                                                    RValue(*this, loc,
+                                                           concreteFormalType,
+                                                           F(SGFContext()))),
+                                     /*isSuper=*/false,
+                                     /*isDirectAccessorUse=*/true,
+                                     RValue(), innerC)
+                .getAsSingleValue(*this, loc);
+            });
+      }
+    }
+  }
+
   switch (existentialTL.getLoweredType().getObjectType()
             .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {
   case ExistentialRepresentation::None:
