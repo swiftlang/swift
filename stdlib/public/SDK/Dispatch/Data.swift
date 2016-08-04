@@ -70,7 +70,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	}
 
 	public func withUnsafeBytes<Result, ContentType>(
-		body: @noescape (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
+		body: (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
 	{
 		var ptr: UnsafeRawPointer? = nil
 		var size = 0
@@ -82,7 +82,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	}
 
 	public func enumerateBytes(
-		block: @noescape (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void) 
+		block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Int, _ stop: inout Bool) -> Void) 
 	{
 		_swift_dispatch_data_apply(__wrapped) { (_, offset: Int, ptr: UnsafeRawPointer, size: Int) in
             let bytePtr = ptr.bindMemory(to: UInt8.self, capacity: size)

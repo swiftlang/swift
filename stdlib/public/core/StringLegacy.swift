@@ -339,7 +339,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character,
   /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(_ predicate: @noescape (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     let rng = unicodeScalars

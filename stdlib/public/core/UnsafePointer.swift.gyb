@@ -368,7 +368,7 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
-    _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+    _ body: (UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer {
