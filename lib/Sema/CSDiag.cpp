@@ -4913,6 +4913,9 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
+/// When initializing UnsafeMutablePointer from a given UnsafePointer, we need
+/// to insert "mutating:" label before the argument to ensure the correct
+/// intializer gets called. This function checks if we need to add the label.
 static bool shouldAddMutating(ASTContext &Ctx, const Expr *Fn,
                               const Expr* Arg) {
   auto *TypeExp = dyn_cast<TypeExpr>(Fn);
@@ -5250,7 +5253,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   if (shouldAddMutating(CS->DC->getASTContext(), fnExpr, argExpr)) {
     diagnose(fnExpr->getLoc(), diag::pointer_init_add_mutating).fixItInsert(
-      dyn_cast<ParenExpr>(argExpr)->getSubExpr()->getStartLoc(), "mutating: ");
+      cast<ParenExpr>(argExpr)->getSubExpr()->getStartLoc(), "mutating: ");
   }
   
   // Did the user intend on invoking a different overload?
