@@ -3579,15 +3579,21 @@ static bool tryIntegerCastFixIts(InFlightDiagnostic &diag,
 static bool
 addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                    Type fromType, Type toType, Expr *expr) {
-  if (CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
-      SourceLoc(), SourceRange(), SourceRange(), [](Type T) { return false; },
-      true) != CheckedCastKind::Unresolved) {
+  CheckedCastKind Kind =
+    CS->getTypeChecker().typeCheckCheckedCast(fromType, toType, CS->DC,
+                                              SourceLoc(), SourceRange(),
+                                              SourceRange(),
+                                              [](Type T) { return false; },
+                                              /*suppressDiagnostics*/ true);
+  if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
     toType->print(OS);
     diag.fixItInsert(Lexer::getLocForEndOfToken(CS->DC->getASTContext().SourceMgr,
                                                 expr->getEndLoc()),
-                     (llvm::Twine(" as! ") + OS.str()).str());
+                     (llvm::Twine(Kind == CheckedCastKind::Coercion ? " as " :
+                                                                      " as! ") +
+                      OS.str()).str());
     return true;
   }
   return false;
