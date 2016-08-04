@@ -704,7 +704,7 @@ func closure_LU_LL(x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
 @available(*, unavailable, renamed: "after(arg:fn:)")
 func closure_LL_LL(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
 @available(*, unavailable, renamed: "after(arg:fn:)")
-func closure_UU_LL_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+func closure_UU_LL_ne(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
 
 @available(*, unavailable, renamed: "after(arg:_:)")
 func closure_UU_LU(_ x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
@@ -713,7 +713,7 @@ func closure_LU_LU(x: Int, _ closure: () -> Int) {} // expected-note 2 {{here}}
 @available(*, unavailable, renamed: "after(arg:_:)")
 func closure_LL_LU(x: Int, y: () -> Int) {} // expected-note 2 {{here}}
 @available(*, unavailable, renamed: "after(arg:_:)")
-func closure_UU_LU_ne(_ x: Int, _ y: @noescape () -> Int) {} // expected-note 2 {{here}}
+func closure_UU_LU_ne(_ x: Int, _ y: () -> Int) {} // expected-note 2 {{here}}
 
 func testTrailingClosure() {
   closure_U_L { 0 } // expected-error {{'closure_U_L' has been renamed to 'after(fn:)'}} {{3-14=after}} {{none}}
