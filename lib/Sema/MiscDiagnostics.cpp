@@ -240,10 +240,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       while (auto Conv = dyn_cast<ImplicitConversionExpr>(Base))
         Base = Conv->getSubExpr();
 
-      if (auto collection = dyn_cast<CollectionExpr>(E))
-        if (collection->isTypeDefaulted())
-          checkTypeDefaultedCollectionExpr(collection);
-
       // Record call arguments.
       if (auto Call = dyn_cast<CallExpr>(Base))
         CallArgs.insert(Call->getArg());
@@ -390,10 +386,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// an error if it was inferred to this type in an invalid context, which is
     /// one in which the parent expression is not itself a collection literal.
     void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
-      if (auto *ParentExpr = Parent.getAsExpr())
-        if (isa<CollectionExpr>(ParentExpr))
-          return;
-
       // If the parent is a non-expression, or is not itself a literal, then
       // produce an error with a fixit to add the type as an explicit
       // annotation.
@@ -703,6 +695,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
   DiagnoseWalker Walker(TC, DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
+
+  // Diagnose uses of collection literals with defaulted types at the top
+  // level.
+  if (auto collection
+        = dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+    if (collection->isTypeDefaulted()) {
+      Walker.checkTypeDefaultedCollectionExpr(
+        const_cast<CollectionExpr *>(collection));
+    }
+  }
 }
 
 

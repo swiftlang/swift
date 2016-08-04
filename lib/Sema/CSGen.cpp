@@ -1728,6 +1728,13 @@ namespace {
                            LocatorPathElt::getTupleElement(index++)));
       }
 
+      // The array element type defaults to 'Any'.
+      if (auto elementTypeVar = arrayElementTy->getAs<TypeVariableType>()) {
+        CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
+                         tc.Context.TheAnyType, locator);
+        CS.ArrayElementTypeVariables[expr] = elementTypeVar;
+      }
+
       return arrayTy;
     }
 
@@ -1848,6 +1855,26 @@ namespace {
                              expr,
                              LocatorPathElt::getTupleElement(index++)));
       }
+
+      // The dictionary key type defaults to 'AnyHashable'.
+      auto keyTypeVar = dictionaryKeyTy->getAs<TypeVariableType>();
+      if (keyTypeVar && tc.Context.getAnyHashableDecl()) {
+        auto anyHashable = tc.Context.getAnyHashableDecl();
+        tc.validateDecl(anyHashable);
+        CS.addConstraint(ConstraintKind::Defaultable, dictionaryKeyTy,
+                         anyHashable->getDeclaredInterfaceType(), locator);
+      }
+
+      // The dictionary value type defaults to 'Any'.
+      auto valueTypeVar = dictionaryValueTy->getAs<TypeVariableType>();
+      if (valueTypeVar) {
+        CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
+                         tc.Context.TheAnyType, locator);
+      }
+
+      // Record key/value type variables.
+      if (keyTypeVar || valueTypeVar)
+        CS.DictionaryElementTypeVariables[expr] = { keyTypeVar, valueTypeVar };
 
       return dictionaryTy;
     }

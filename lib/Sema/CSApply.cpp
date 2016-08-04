@@ -2711,6 +2711,14 @@ namespace {
 
       expr->setSemanticExpr(result);
       expr->setType(arrayTy);
+
+      // If the array element type was defaulted, note that in the expression.
+      auto elementTypeVariable = cs.ArrayElementTypeVariables.find(expr);
+      if (elementTypeVariable != cs.ArrayElementTypeVariables.end()) {
+        if (solution.DefaultedTypeVariables.count(elementTypeVariable->second))
+          expr->setIsTypeDefaulted();
+      }
+
       return expr;
     }
 
@@ -2780,6 +2788,18 @@ namespace {
 
       expr->setSemanticExpr(result);
       expr->setType(dictionaryTy);
+
+      // If the dictionary key or value type was defaulted, note that in the
+      // expression.
+      auto elementTypeVariable = cs.DictionaryElementTypeVariables.find(expr);
+      if (elementTypeVariable != cs.DictionaryElementTypeVariables.end()) {
+        if (solution.DefaultedTypeVariables.count(
+              elementTypeVariable->second.first) ||
+            solution.DefaultedTypeVariables.count(
+              elementTypeVariable->second.second))
+          expr->setIsTypeDefaulted();
+      }
+
       return expr;
     }
 
