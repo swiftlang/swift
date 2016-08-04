@@ -1367,10 +1367,7 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     if (parsed.isMember()) {
       diag.fixItReplace(call->getFn()->getSourceRange(), parsed.ContextName);
 
-    } else {
-      auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn());
-      if (!dotCall)
-        return;
+    } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
 
       SourceLoc removeLoc = dotCall->getDotLoc();
       if (removeLoc.isInvalid())
