@@ -58,6 +58,16 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
+
+  if(SWIFT_RUNTIME_USE_SANITIZERS)
+    list(FIND SWIFT_RUNTIME_USE_SANITIZERS "Thread" THREAD_INDEX)
+    if(NOT THREAD_INDEX EQUAL -1)
+      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS
+        " -fsanitize=thread")
+      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+        LINK_FLAGS " -fsanitize=thread")
+    endif()
+  endif()
 endfunction()
 
 
