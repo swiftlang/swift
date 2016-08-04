@@ -2476,7 +2476,13 @@ public:
     printRec(T->getBase());
     OS << ')';
   }
-  
+
+  void visitProtocolTypeRepr(ProtocolTypeRepr *T) {
+    printCommon(T, "type_protocol") << '\n';
+    printRec(T->getBase());
+    OS << ')';
+  }
+
   void visitInOutTypeRepr(InOutTypeRepr *T) {
     printCommon(T, "type_inout") << '\n';
     printRec(T->getBase());
