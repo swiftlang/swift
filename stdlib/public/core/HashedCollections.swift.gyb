@@ -1265,14 +1265,8 @@ func _impossible<T>(_:T.Type) -> T {
 }
 
 func _unsafeUpcast<T, U>(_ x: T, to: U.Type) -> U {
-#if False
-  // disabled temporarily to speculatively work around a supposed optimizer bug
-  // that is triggering ASAN failures.
   _sanityCheck(x is U)
   return x as? U ?? _impossible(U.self)
-#else
-  return x as! U
-#endif
 }
 
 /// Perform a non-bridged upcast that always succeeds.
