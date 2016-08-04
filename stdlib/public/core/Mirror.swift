@@ -385,6 +385,8 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 ///
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
+// FIXME(ABI): this protocol should be “non-open” and you shouldn't be able to
+// create conformances.
 public protocol MirrorPath {}
 extension IntMax : MirrorPath {}
 extension Int : MirrorPath {}
