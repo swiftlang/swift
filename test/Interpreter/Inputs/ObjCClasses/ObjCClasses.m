@@ -132,3 +132,22 @@ static int _value = 0;
   return _objects.count;
 }
 @end
+
+static unsigned counter = 0;
+
+@implementation NSLifetimeTracked
+
++ (id) allocWithZone:(NSZone *)zone {
+  counter++;
+  return [super allocWithZone:zone];
+}
+
+- (void) dealloc {
+  counter--;
+}
+
++ (unsigned) count {
+  return counter;
+}
+
+@end
