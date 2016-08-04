@@ -523,6 +523,7 @@ namespace {
   enum class LiteralBindingKind : unsigned char {
     None,
     Collection,
+    Float,
     Atom,
   };
 
@@ -537,7 +538,16 @@ namespace {
     AllowedBindingKind Kind;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;    
+    Optional<ProtocolDecl *> DefaultedProtocol;
+
+    /// Whether this is a binding that comes from a 'Defaultable' constraint.
+    bool IsDefaultableBinding = false;
+
+    PotentialBinding(Type type, AllowedBindingKind kind,
+                     Optional<ProtocolDecl *> defaultedProtocol = None,
+                     bool isDefaultableBinding = false)
+      : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
+        IsDefaultableBinding(isDefaultableBinding) { }
   };
 
   struct PotentialBindings {
@@ -556,25 +566,35 @@ namespace {
     /// Whether this type variable is only bound above by existential types.
     bool SubtypeOfExistentialType = false;
 
+    /// The number of defaultable bindings.
+    unsigned NumDefaultableBindings = 0;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
       return !Bindings.empty();
+    }
+
+    /// Whether there are any non-defaultable bindings.
+    bool hasNonDefaultableBindings() const {
+      return Bindings.size() > NumDefaultableBindings;
     }
 
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x, 
                           const PotentialBindings &y) {
-      return std::make_tuple(x.FullyBound,
+      return std::make_tuple(!x.hasNonDefaultableBindings(),
+                             x.FullyBound,
                              x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
-                             -x.Bindings.size())
-        < std::make_tuple(y.FullyBound,
+                             -(x.Bindings.size() - x.NumDefaultableBindings))
+        < std::make_tuple(!y.hasNonDefaultableBindings(),
+                          y.FullyBound,
                           y.SubtypeOfExistentialType,
                           static_cast<unsigned char>(y.LiteralBinding),
                           y.InvolvesTypeVariables,
-                          -y.Bindings.size());
+                          -(y.Bindings.size() - y.NumDefaultableBindings));
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -583,6 +603,10 @@ namespace {
       case KnownProtocolKind::ExpressibleByArrayLiteral:
       case KnownProtocolKind::ExpressibleByStringInterpolation:
         LiteralBinding = LiteralBindingKind::Collection;
+        break;
+
+      case KnownProtocolKind::ExpressibleByFloatLiteral:
+        LiteralBinding = LiteralBindingKind::Float;
         break;
 
       default:
@@ -672,7 +696,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   PotentialBindings result;
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
-  bool hasDefaultableConstraint = false;
+  SmallVector<Constraint *, 2> defaultableConstraints;
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
@@ -709,7 +733,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
-      hasDefaultableConstraint = true;
+      defaultableConstraints.push_back(constraint);
       continue;
 
     case ConstraintKind::Disjunction:
@@ -985,17 +1009,14 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
   }
 
-  // If we haven't found any other bindings yet, go ahead and consider
-  // the defaulting constraints.
-  if (result.Bindings.empty() && hasDefaultableConstraint) {
-    for (Constraint *constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Defaultable)
-        continue;
+  /// Add defaultable constraints last.
+  for (auto constraint : defaultableConstraints) {
+    Type type = constraint->getSecondType();
+    if (!exactTypes.insert(type->getCanonicalType()).second)
+      continue;
 
-      result.Bindings.push_back({constraint->getSecondType(),
-                                 AllowedBindingKind::Exact,
-                                 None});
-    }
+    ++result.NumDefaultableBindings;
+    result.Bindings.push_back({type, AllowedBindingKind::Exact, None, true});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1062,7 +1083,12 @@ static bool tryTypeVariableBindings(
       log <<"\n";
     }
 
-    for (auto binding : bindings) {
+    for (const auto &binding : bindings) {
+      // If this is a defaultable binding and we have found any solutions,
+      // don't explore the default binding.
+      if (binding.IsDefaultableBinding && anySolved)
+        continue;
+
       auto type = binding.BindingType;
 
       // If the type variable can't bind to an lvalue, make sure the
