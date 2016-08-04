@@ -2738,7 +2738,16 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     return result;
   }
   
-  if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+  // Handle metatypes. Class metatypes bridge to their class object.
+  if (isa<ExistentialMetatypeMetadata>(srcType)
+      || isa<MetatypeMetadata>(srcType)) {
+    const Metadata *srcMetatypeValue;
+    memcpy(&srcMetatypeValue, src, sizeof(srcMetatypeValue));
+    
+    if (isa<ClassMetadata>(srcMetatypeValue)
+        || isa<ObjCClassWrapperMetadata>(srcMetatypeValue))
+      return (id)srcMetatypeValue->getClassObject();
+  } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
       srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);

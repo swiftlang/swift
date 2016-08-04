@@ -103,6 +103,17 @@ func metatypeCanBeDynamicallyCast(original: Int.Type,
   expectTrue(original == bridged as! Int.Type)
   expectTrue(original == bridged as! Any.Type)
 }
+func metatypeCanBeDynamicallyCast(original: CFString.Type,
+                                  bridged: AnyObject) {
+  expectTrue(original == bridged as! CFString.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+func metatypeCanBeDynamicallyCastGenerically<T>(original: T.Type,
+                                                bridged: AnyObject) {
+  expectTrue(original == bridged as! T.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+
 
 func guineaPigFunction() -> Int {
   return 1738
@@ -114,17 +125,37 @@ func functionCanBeDynamicallyCast(original: () -> Int,
   expectEqual(original(), try! (bridged as! () throws -> Int)())
 }
 
+func classMetatypePreservesIdentity<T: AnyObject>(original: T.Type,
+                                                  bridged: AnyObject) {
+  expectTrue(original as AnyObject === bridged)
+  expectTrue(original as AnyObject.Type as AnyObject === bridged)
+  expectTrue(original as Any.Type as AnyObject === bridged)
+}
+
+func classMetatypePreservesIdentityGenerically<T>(original: T.Type,
+                                                  bridged: AnyObject) {
+  expectTrue(original as AnyObject === bridged)
+  expectTrue(original as Any.Type as AnyObject === bridged)
+}
+
 // We want to exhaustively check all paths through the bridging and dynamic
 // casting infrastructure, so expand out test cases that wrap the different
 // interesting bridging cases in different kinds of existential container.
 %{
 testCases = [
-  ("classes",        "LifetimeTracked(0)", "bridgedObjectPreservesIdentity",           True),
-  ("strings",        '"vitameatavegamin"', "stringBridgesToEqualNSString",             True),
-  ("unbridged type", "KnownUnbridged()",   "boxedTypeRoundTripsThroughDynamicCasting", True),
-  ("tuple",          '(1, "2")',           "tupleCanBeDynamicallyCast",                False),
-  ("metatype",       'Int.self',           "metatypeCanBeDynamicallyCast",             False),
-  ("function",       'guineaPigFunction',  "functionCanBeDynamicallyCast",             False),
+  ("classes",                "LifetimeTracked(0)",   "bridgedObjectPreservesIdentity",            True),
+  ("strings",                '"vitameatavegamin"',   "stringBridgesToEqualNSString",              True),
+  ("unbridged type",         "KnownUnbridged()",     "boxedTypeRoundTripsThroughDynamicCasting",  True),
+  ("tuple",                  '(1, "2")',             "tupleCanBeDynamicallyCast",                 False),
+  ("metatype",               'Int.self',             "metatypeCanBeDynamicallyCast",              False),
+  ("generic metatype",       'Int.self',             "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("CF metatype",            'CFString.self',        "metatypeCanBeDynamicallyCast",              False),
+  ("generic CF metatype",    'CFString.self',        "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("class metatype",         'LifetimeTracked.self', "classMetatypePreservesIdentity",            False),
+  ("objc metatype",          'NSObject.self',        "classMetatypePreservesIdentity",            False),
+  ("generic class metatype", 'LifetimeTracked.self', "classMetatypePreservesIdentityGenerically", False),
+  ("generic objc metatype",  'NSObject.self',        "classMetatypePreservesIdentityGenerically", False),
+  ("function",               'guineaPigFunction',    "functionCanBeDynamicallyCast",              False),
 ]
 }%
 
