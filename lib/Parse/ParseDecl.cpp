@@ -1542,6 +1542,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Loc, diag::attr_escaping_conflicts_noescape);
       return false;
     }
+
+    // @noescape is deprecated and no longer used
+    diagnose(Loc, diag::attr_noescape_deprecated)
+      .fixItRemove({Attributes.AtLoc,Loc});
+
     break;
   case TAK_escaping:
     // You can't specify @noescape and @escaping together.

@@ -1219,7 +1219,7 @@ WARNING(attr_autoclosure_escaping_deprecated,none,
         "@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead",
         ())
 WARNING(attr_noescape_deprecated,none,
-        "@noescape is the default and is deprecated; omit it",
+        "@noescape is the default and is deprecated",
         ())
 
 // convention
