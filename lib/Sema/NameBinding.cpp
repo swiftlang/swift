@@ -227,7 +227,10 @@ void NameBinder::addImport(
                    /*resolver*/nullptr, &SF);
 
     if (decls.empty()) {
-      diagnose(ID, diag::no_decl_in_module)
+      diagnose(ID, diag::decl_does_not_exist_in_module,
+               static_cast<unsigned>(ID->getImportKind()),
+               declPath.front().first,
+               ID->getModulePath().front().first)
         .highlight(SourceRange(declPath.front().second,
                                declPath.back().second));
       return;

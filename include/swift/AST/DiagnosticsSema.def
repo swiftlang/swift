@@ -592,8 +592,10 @@ ERROR(unsupported_existential_type,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
 
-ERROR(no_decl_in_module,none,
-      "no such decl in module", ())
+ERROR(decl_does_not_exist_in_module,none,
+      "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}0 "
+      "%1 does not exist in module %2",
+      (/*ImportKind*/ unsigned, Identifier, Identifier))
 ERROR(imported_decl_is_wrong_kind,none,
       "%0 was imported as '%1', but is a "
       "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}2",
