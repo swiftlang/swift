@@ -753,10 +753,33 @@ func testTrailingClosure() {
   closure_UU_LU_ne(1, { 0 }) // expected-error {{'closure_UU_LU_ne' has been renamed to 'after(arg:_:)'}} {{3-19=after}} {{20-20=arg: }} {{none}}
 }
 
+@available(*, unavailable, renamed: "after(x:)")
+func defaultUnnamed(_ a: Int = 1) {} // expected-note 2 {{here}}
 @available(*, unavailable, renamed: "after(x:y:)")
-func variadic1(a: Int ..., b: Int = 0) {} // expected-note {{here}}
+func defaultBeforeRequired(a: Int = 1, b: Int) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "after(x:y:z:)")
+func defaultPlusTrailingClosure(a: Int = 1, b: Int = 2, c: () -> Void) {} // expected-note 3 {{here}}
+
+func testDefaults() {
+  defaultUnnamed() // expected-error {{'defaultUnnamed' has been renamed to 'after(x:)'}} {{3-17=after}} {{none}}
+  defaultUnnamed(1) // expected-error {{'defaultUnnamed' has been renamed to 'after(x:)'}} {{3-17=after}} {{18-18=x: }} {{none}}
+  defaultBeforeRequired(b: 5) // expected-error {{'defaultBeforeRequired(a:b:)' has been renamed to 'after(x:y:)'}} {{3-24=after}} {{25-26=y}} {{none}}
+  defaultPlusTrailingClosure {} // expected-error {{'defaultPlusTrailingClosure(a:b:c:)' has been renamed to 'after(x:y:z:)'}} {{3-29=after}} {{none}}
+  defaultPlusTrailingClosure(c: {}) // expected-error {{'defaultPlusTrailingClosure(a:b:c:)' has been renamed to 'after(x:y:z:)'}} {{3-29=after}} {{30-31=z}} {{none}}
+  defaultPlusTrailingClosure(a: 1) {} // expected-error {{'defaultPlusTrailingClosure(a:b:c:)' has been renamed to 'after(x:y:z:)'}} {{3-29=after}} {{30-31=x}} {{none}}
+}
+
+@available(*, unavailable, renamed: "after(x:y:)")
+func variadic1(a: Int ..., b: Int = 0) {} // expected-note 2 {{here}}
+@available(*, unavailable, renamed: "after(x:y:)")
+func variadic2(a: Int, _ b: Int ...) {} // expected-note {{here}}
+@available(*, unavailable, renamed: "after(x:_:y:z:)")
+func variadic3(_ a: Int, b: Int ..., c: String = "", d: String) {} // expected-note 2 {{here}}
 
 func testVariadic() {
-  // FIXME: fix-it should be: {{1-9=newFn7}} {{10-11=x}} {{none}}
-  variadic1(a: 1, 1) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{none}}
+  variadic1(a: 1, 2) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{13-14=x}} {{none}}
+  variadic1(a: 1, 2, b: 3) // expected-error {{'variadic1(a:b:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{13-14=x}} {{22-23=y}} {{none}}
+  variadic2(a: 1, 2, 3) // expected-error {{'variadic2(a:_:)' has been renamed to 'after(x:y:)'}} {{3-12=after}} {{13-14=x}} {{19-19=y: }} {{none}}
+  variadic3(1, b: 2, 3, d: "test") // expected-error {{'variadic3(_:b:c:d:)' has been renamed to 'after(x:_:y:z:)'}} {{3-12=after}} {{13-13=x: }} {{16-19=}} {{25-26=z}} {{none}}
+  variadic3(1, d:"test") // expected-error {{'variadic3(_:b:c:d:)' has been renamed to 'after(x:_:y:z:)'}} {{3-12=after}} {{13-13=x: }} {{16-17=z}} {{none}}
 }
