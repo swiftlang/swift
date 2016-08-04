@@ -70,23 +70,27 @@ struct AutoclosureEscapeTest {
 }
 
 // @autoclosure(escaping)
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{13-34=}} {{38-38=@autoclosure(escaping) }}
+// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{13-34=}} {{38-38=@autoclosure @escaping }}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
 func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
-
+  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{17-38=@autoclosure @escaping }}
 
 class Super {
   func f1(_ x: @autoclosure(escaping) () -> ()) { }
+    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{17-38=@autoclosure @escaping }}
   func f2(_ x: @autoclosure(escaping) () -> ()) { } // expected-note {{potential overridden instance method 'f2' here}}
+    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{17-38=@autoclosure @escaping }}
   func f3(x: @autoclosure () -> ()) { }
 }
 
 class Sub : Super {
   override func f1(_ x: @autoclosure(escaping)() -> ()) { }
+    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{26-47=@autoclosure @escaping }}
   override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}}
   override func f3(_ x: @autoclosure(escaping) () -> ()) { }  // expected-error{{does not override any method}}
+    // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{26-47=@autoclosure @escaping }}
 }
 
 func func12_sink(_ x: @escaping () -> Int) { }
@@ -97,7 +101,14 @@ func func12a(_ x: @autoclosure () -> Int) {
   func12_sink(x) // expected-error {{passing non-escaping parameter 'x' to function expecting an @escaping closure}}
 }
 func func12b(_ x: @autoclosure(escaping) () -> Int) {
-  func12_sink(x)
+  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{20-41=@autoclosure @escaping }}
+  func12_sink(x) // ok
+}
+func func12c(_ x: @autoclosure @escaping () -> Int) {
+  func12_sink(x) // ok
+}
+func func12d(_ x: @escaping @autoclosure () -> Int) {
+  func12_sink(x) // ok
 }
 
 class TestFunc12 {
@@ -121,15 +132,27 @@ enum AutoclosureFailableOf<T> {
 
 let _ : (@autoclosure () -> ()) -> ()
 let _ : (@autoclosure(escaping) () -> ()) -> ()
+  // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{11-32=@autoclosure @escaping }}
 
 // escaping is the name of param type
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
-
 
 // Migration
 // expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{16-28=}} {{32-32=@autoclosure }}
 func migrateAC(@autoclosure _: () -> ()) { }
 
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{17-39=}} {{43-43=@autoclosure(escaping) }}
+// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{17-39=}} {{43-43=@autoclosure @escaping }}
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
+
+func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
+
+func callAutoclosureWithNoEscape(_ fn: () -> Int) {
+  takesAutoclosure(1+1) // ok
+}
+func callAutoclosureWithNoEscape_2(_ fn: () -> Int) {
+  takesAutoclosure(fn()) // ok
+}
+func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
+  takesAutoclosure(fn()) // ok
+}
 
