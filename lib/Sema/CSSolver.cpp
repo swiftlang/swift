@@ -1011,21 +1011,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   return result;
 }
 
-void ConstraintSystem::getComputedBindings(TypeVariableType *tvt,
-                                               SmallVectorImpl<Type> &bindings) {
-  // If the type variable is fixed, look no further.
-  if (auto fixedType = tvt->getImpl().getFixedType(nullptr)) {
-    bindings.push_back(fixedType);
-    return;
-  }
-  
-  PotentialBindings potentialBindings = getPotentialBindings(*this, tvt);
-  
-  for (auto binding : potentialBindings.Bindings) {
-    bindings.push_back(binding.BindingType);
-  }
-}
-
 /// \brief Try each of the given type variable bindings to find solutions
 /// to the given constraint system.
 ///
