@@ -9,6 +9,7 @@ var FixedPoint = TestSuite("FixedPoint")
 %{
 
 import gyb
+from SwiftIntTypes import all_integer_types
 
 test_bit_patterns = [
   0x0000000000000000,
@@ -60,6 +61,32 @@ def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
             bit_pattern ^ (bit_pattern >> 32), word_bits, True)
 
 }%
+
+//===----------------------------------------------------------------------===//
+// 'Int.Stride' type
+//===----------------------------------------------------------------------===//
+
+FixedPoint.test("Integers.Stride") {
+#if arch(i386) || arch(arm)
+
+% for self_ty in all_integer_types(32):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+% for self_ty in all_integer_types(64):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#else
+
+_UnimplementedError()
+
+#endif
+}
 
 //===----------------------------------------------------------------------===//
 // 'Int(truncatingBitPattern:)' initializer
