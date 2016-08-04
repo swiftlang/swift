@@ -1121,7 +1121,6 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
-  selfDecl->setInOut(selfTy->is<InOutType>());
   selfDecl->overwriteType(selfTy);
   
   // Install the self type on the Parameter that contains it.  This ensures that
