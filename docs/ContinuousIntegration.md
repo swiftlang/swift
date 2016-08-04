@@ -44,7 +44,7 @@ A smoke test on macOS does the following:
 
 1. Builds LLVM/Clang incrementally.
 2. Builds Swift clean.
-3. Builds the standard library only for macOS. Simulator standard libraries and
+3. Builds the standard library clean only for macOS. Simulator standard libraries and
    device standard libraries are not built.
 4. lldb is not built.
 5. The test and validation-test targets are run only for macOS. The optimized
