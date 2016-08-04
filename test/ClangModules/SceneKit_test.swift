@@ -1,6 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import SceneKit
 import Foundation
