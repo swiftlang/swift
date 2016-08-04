@@ -164,6 +164,13 @@ enum class ImportTypeKind {
   /// considered CF-audited.
   Property,
 
+  /// \brief Import the type of an ObjC property accessor marked 'weak',
+  /// 'assign', or 'unsafe_unretained'.
+  ///
+  /// Like Property, but doesn't allow bridging to a value type, since that
+  /// would discard the ownership.
+  PropertyWithReferenceSemantics,
+
   /// \brief Import the underlying type of an enum.
   ///
   /// This provides special treatment for 'NSUInteger'.

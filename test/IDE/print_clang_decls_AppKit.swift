@@ -34,8 +34,7 @@
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
 // APPKIT-NEXT: var title: String
 // APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString?
-// TODO: Weak properties should not be bridged.
-// APPKIT-NEXT: var target: Any!
+// APPKIT-NEXT: weak var target: @sil_weak AnyObject!
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
 // APPKIT: extension NSNotification.Name {

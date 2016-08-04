@@ -1020,6 +1020,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
+  case ImportTypeKind::PropertyWithReferenceSemantics:
   case ImportTypeKind::BridgedValue:
     return true;
   }
@@ -1044,6 +1045,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
+  case ImportTypeKind::PropertyWithReferenceSemantics:
     return true;
   }
 }
@@ -1265,13 +1267,16 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // If we have a bridged Objective-C type and we are allowed to
   // bridge, do so.
-  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind))
+  if (hint == ImportHint::ObjCBridged && canBridgeTypes(importKind) &&
+      importKind != ImportTypeKind::PropertyWithReferenceSemantics) {
     // id and Any can be bridged without Foundation. There would be
     // bootstrapping issues with the ObjectiveC module otherwise.
     if (hint.BridgedType->isAny()
         || impl.tryLoadFoundationModule()
-        || impl.ImportForwardDeclarations)
+        || impl.ImportForwardDeclarations) {
       importedType = hint.BridgedType;
+    }
+  }
 
   if (!importedType)
     return importedType;
@@ -1396,8 +1401,38 @@ bool ClangImporter::Implementation::shouldAllowNSUIntegerAsInt(
 Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl,
        bool isFromSystemModule) {
+  const auto assignOrUnsafeUnretained =
+      clang::ObjCPropertyDecl::OBJC_PR_assign |
+      clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained;
+
+  ImportTypeKind importKind;
+  // HACK: Accessibility decls are always imported using bridged types,
+  // because they're inconsistent between properties and methods.
+  if (isAccessibilityDecl(decl)) {
+    importKind = ImportTypeKind::Property;
+  } else {
+    switch (decl->getSetterKind()) {
+    case clang::ObjCPropertyDecl::Assign:
+      // If it's readonly, this might just be returned as a default.
+      if (decl->isReadOnly() &&
+          (decl->getPropertyAttributes() & assignOrUnsafeUnretained) == 0) {
+        importKind = ImportTypeKind::Property;
+      } else {
+        importKind = ImportTypeKind::PropertyWithReferenceSemantics;
+      }
+      break;
+    case clang::ObjCPropertyDecl::Retain:
+    case clang::ObjCPropertyDecl::Copy:
+      importKind = ImportTypeKind::Property;
+      break;
+    case clang::ObjCPropertyDecl::Weak:
+      importKind = ImportTypeKind::PropertyWithReferenceSemantics;
+      break;
+    }
+  }
+
   OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
-  return importType(decl->getType(), ImportTypeKind::Property,
+  return importType(decl->getType(), importKind,
                     shouldAllowNSUIntegerAsInt(isFromSystemModule, decl),
                     /*isFullyBridgeable*/ true, optionality);
 }
