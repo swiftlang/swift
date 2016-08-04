@@ -709,6 +709,14 @@ bool ConstraintSystem::isSetType(Type type) {
   return false;
 }
 
+bool ConstraintSystem::isAnyHashableType(Type type) {
+  if (auto sType = type->getAs<StructType>()) {
+    return sType->getDecl() == TC.Context.getAnyHashableDecl();
+  }
+
+  return false;
+}
+
 Type ConstraintSystem::openBindingType(Type type, 
                                        ConstraintLocatorBuilder locator) {
   Type result = openType(type, locator);
