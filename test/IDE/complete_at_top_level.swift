@@ -349,7 +349,7 @@ func resyncParserB6() {}
 for i in [] {
   #^TOP_LEVEL_STMT_6^#
 // TOP_LEVEL_STMT_6: Begin completions
-// TOP_LEVEL_STMT_6: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// TOP_LEVEL_STMT_6: Decl[LocalVar]/Local: i[#Any#]{{; name=.+$}}
 // TOP_LEVEL_STMT_6: End completions
 }
 

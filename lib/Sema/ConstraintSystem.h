@@ -599,6 +599,9 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
 
+  /// The type variables that were bound via a Defaultable constraint.
+  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
+
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(TypeChecker &tc, Type type) const;
@@ -997,6 +1000,23 @@ private:
   SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
     OpenedExistentialTypes;
 
+public:
+  /// The type variables that were bound via a Defaultable constraint.
+  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
+
+  /// The type variable used to describe the element type of the given array
+  /// literal.
+  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
+    ArrayElementTypeVariables;
+
+
+  /// The type variables used to describe the key and value types of the given
+  /// dictionary literal.
+  llvm::SmallDenseMap<DictionaryExpr *,
+                      std::pair<TypeVariableType *, TypeVariableType *>>
+    DictionaryElementTypeVariables;
+
+private:
   /// \brief Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs);
@@ -1121,6 +1141,9 @@ public:
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
+
+    /// The length of \c DefaultedTypeVariables.
+    unsigned numDefaultedTypeVariables;
 
     /// The previous score.
     Score PreviousScore;
