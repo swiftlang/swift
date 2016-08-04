@@ -2588,6 +2588,26 @@ RValue SILGenFunction::emitSubstToOrigValue(SILLocation loc, RValue &&v,
 }
 
 ManagedValue
+SILGenFunction::emitMaterializedRValueAsOrig(Expr *expr,
+                                             AbstractionPattern origType) {  
+  // Create a temporary.
+  auto &origTL = getTypeLowering(origType, expr->getType());
+  auto temporary = emitTemporary(expr, origTL);
+
+  // Emit the reabstracted r-value.
+  auto result =
+    emitRValueAsOrig(expr, origType, origTL, SGFContext(temporary.get()));
+
+  // Force the result into the temporary.
+  if (!result.isInContext()) {
+    temporary->copyOrInitValueInto(*this, expr, result, /*init*/ true);
+    temporary->finishInitialization(*this);
+  }
+
+  return temporary->getManagedAddress();
+}
+
+ManagedValue
 SILGenFunction::emitRValueAsOrig(Expr *expr, AbstractionPattern origPattern,
                                  const TypeLowering &origTL, SGFContext ctxt) {
   auto outputSubstType = expr->getType()->getCanonicalType();
