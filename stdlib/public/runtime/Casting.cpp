@@ -2675,11 +2675,22 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
     swift_unknownRetain(srcObject);
   }
 
+  // The extra byte is for the tag.
+  auto targetSize = targetType->getValueWitnesses()->size + 1;
+  auto targetAlignMask = targetType->getValueWitnesses()->getAlignmentMask();
+
   // Object that frees a buffer when it goes out of scope.
   struct FreeBuffer {
     void *Buffer = nullptr;
-    ~FreeBuffer() { free(Buffer); }
-  } freeBuffer;
+    size_t size, alignMask;
+    FreeBuffer(size_t size, size_t alignMask) :
+      size(size), alignMask(alignMask) {}
+
+    ~FreeBuffer() {
+      if (Buffer)
+        swift_slowDealloc(Buffer, size, alignMask);
+    }
+  } freeBuffer{targetSize, targetAlignMask};
 
   // Allocate a buffer to store the T? returned by bridging.
   // The extra byte is for the tag.
@@ -2691,7 +2702,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
     optDestBuffer = inlineBuffer;
   } else {
     // Allocate a buffer.
-    optDestBuffer = malloc(targetType->getValueWitnesses()->size);
+    optDestBuffer = swift_slowAlloc(targetSize, targetAlignMask);
     freeBuffer.Buffer = optDestBuffer;
   }
 
