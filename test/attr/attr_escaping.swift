@@ -5,6 +5,7 @@
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
+ // expected-warning@-1{{@noescape is the default and is deprecated}} {{29-39=}}
 
 func takesEscaping(_ fn: @escaping () -> Int) {} // ok
 
@@ -69,15 +70,4 @@ func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
 }
 
-func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
-
-func callAutoclosureWithNoEscape(_ fn: () -> Int) {
-  takesAutoclosure(1+1) // ok
-}
-func callAutoclosureWithNoEscape_2(_ fn: () -> Int) {
-  takesAutoclosure(fn()) // ok
-}
-func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
-  takesAutoclosure(fn()) // ok
-}
 
