@@ -104,3 +104,16 @@ bb0:
   dealloc_stack %1 : $*S
   return %6 : $AnyObject
 }
+
+// CHECK-LABEL: sil @destroy_source_of_removed_cast
+// CHECK: destroy_addr %0
+sil @destroy_source_of_removed_cast : $@convention(thin) (@in AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %2 = alloc_stack $Int
+  unconditional_checked_cast_addr take_always AnyObject in %0 : $*AnyObject to Int in %2 : $*Int
+  %3 = load %2 : $*Int
+  dealloc_stack %2 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
