@@ -227,7 +227,7 @@ func throwsFuncParam(_ fn: () throws -> ()) { }
 func throwsFuncParam(_ fn: () -> ()) { }
 
 // @noescape
-func noescape(x: @noescape (Int) -> Int) { } // expected-note{{previously declared}}
+func noescape(x: (Int) -> Int) { } // expected-note{{previously declared}}
 func noescape(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
 
 // @autoclosure

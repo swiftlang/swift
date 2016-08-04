@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-func no_escape(_ you_say_price_of_my_love_is: @noescape () -> ()) {}
+func no_escape(_ you_say_price_of_my_love_is: () -> ()) {}
 func do_escape(_ not_a_price_you_are_willing_to_pay: @escaping () -> ()) {}
 
 struct you_cry_in_your_tea {
@@ -21,7 +21,7 @@ func remember(line: inout String) -> () -> Void {
         line = "I'm your man"
     }
     no_escape(despite_our_estrangement)
-    do_escape(despite_our_estrangement) // expected-error {{nested function with an implicitly captured inout parameter can only be used as a @noescape argument}}
+    do_escape(despite_our_estrangement) // expected-error {{nested function with an implicitly captured inout parameter can only be used as a argument}}
 
     return despite_our_estrangement // expected-error {{nested function cannot capture inout parameter and escape}}
 }

@@ -24,14 +24,14 @@ case Error(Error)
     self = .Error(error)
   }
   
-  func map<U>(_ transform: @noescape (Value) -> U) -> Result<U> {
+  func map<U>(_ transform: (Value) -> U) -> Result<U> {
     switch self {
     case .Success(let x): return .Success(transform(x))
     case .Error(let e): return .Error(e)
     }
   }
 
-  func flatMap<U>(_ transform: @noescape (Value) -> Result<U>) -> Result<U> {
+  func flatMap<U>(_ transform: (Value) -> Result<U>) -> Result<U> {
     switch self {
     case .Success(let x): return transform(x)
     case .Error(let e): return .Error(e)
