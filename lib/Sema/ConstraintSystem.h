@@ -2067,11 +2067,6 @@ public:
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
   
-  /// \brief Obtain the specializations computed for a type variable. This is
-  /// useful when emitting diagnostics for computed type variables.
-  void getComputedBindings(TypeVariableType *tvt,
-                           SmallVectorImpl<Type> &bindings);
-  
   /// Extract the base type from an array or slice type.
   /// \param type The array type to inspect.
   /// \returns the base type of the array.
