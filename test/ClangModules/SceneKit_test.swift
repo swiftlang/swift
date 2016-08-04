@@ -95,3 +95,50 @@ func testRenames() {
   let _ = SCNPreferLowPowerDeviceKey
     // expected-error@-1{{'SCNPreferLowPowerDeviceKey' has been renamed to 'SCNView.Option.preferLowPowerDevice'}}
 }
+
+@available(macOS 10.11, *)
+func useRenamedValues() {
+  let _ = SCNGeometrySource.Semantic.self
+  let _ = SCNLight.LightType.self
+  let _ = SCNMaterial.LightingModel.self
+  let _ = SCNParticleSystem.ParticleProperty.self
+  let _ = SCNPhysicsShape.Option.self
+  let _ = SCNPhysicsShape.ShapeType.self
+  let _ = SCNPhysicsWorld.TestOption.self
+  let _ = SCNPhysicsWorld.TestSearchMode.self
+  let _ = SCNScene.Attribute.self
+  let _ = SCNSceneSource.AnimationImportPolicy.self
+  let _ = SCNSceneSource.LoadingOption.self
+  let _ = SCNView.Option.self
+  let _ = SCNHitTestOption.firstFoundOnly
+  let _ = SCNHitTestOption.sortResults
+  let _ = SCNHitTestOption.clipToZRange
+  let _ = SCNHitTestOption.backFaceCulling
+  let _ = SCNHitTestOption.boundingBoxOnly
+  let _ = SCNHitTestOption.ignoreChildNodes
+  let _ = SCNHitTestOption.rootNode
+  let _ = SCNHitTestOption.ignoreHiddenNodes
+  let _ = SCNPhysicsShape.Option.type
+  let _ = SCNPhysicsShape.Option.keepAsCompound
+  let _ = SCNPhysicsShape.Option.scale
+  let _ = SCNPhysicsWorld.TestOption.collisionBitMask
+  let _ = SCNPhysicsWorld.TestOption.searchMode
+  let _ = SCNPhysicsWorld.TestOption.backfaceCulling
+  let _ = SCNScene.Attribute.startTime
+  let _ = SCNScene.Attribute.endTime
+  let _ = SCNScene.Attribute.frameRate
+  let _ = SCNScene.Attribute.upAxis
+  let _ = SCNSceneSource.LoadingOption.createNormalsIfAbsent
+  let _ = SCNSceneSource.LoadingOption.checkConsistency
+  let _ = SCNSceneSource.LoadingOption.flattenScene
+  let _ = SCNSceneSource.LoadingOption.useSafeMode
+  let _ = SCNSceneSource.LoadingOption.assetDirectoryURLs
+  let _ = SCNSceneSource.LoadingOption.overrideAssetURLs
+  let _ = SCNSceneSource.LoadingOption.strictConformance
+  let _ = SCNSceneSource.LoadingOption.convertUnitsToMeters
+  let _ = SCNSceneSource.LoadingOption.convertToYUp
+  let _ = SCNSceneSource.LoadingOption.animationImportPolicy
+  let _ = SCNView.Option.preferredRenderingAPI
+  let _ = SCNView.Option.preferredDevice
+  let _ = SCNView.Option.preferLowPowerDevice
+}
