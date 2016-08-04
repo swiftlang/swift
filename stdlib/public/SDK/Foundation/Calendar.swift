@@ -805,7 +805,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     }
     
     @available(*, unavailable, message: "use nextWeekend(startingAfter:matching:matchingPolicy:repeatedTimePolicy:direction:using:) instead")
-    public func enumerateDates(startingAfter start: Date, matching comps: DateComponents, options opts: NSCalendar.Options = [], using block: @noescape (Date?, Bool, UnsafeMutablePointer<ObjCBool>) -> Swift.Void) { fatalError() }
+    public func enumerateDates(startingAfter start: Date, matching comps: DateComponents, options opts: NSCalendar.Options = [], using block: (Date?, Bool, UnsafeMutablePointer<ObjCBool>) -> Swift.Void) { fatalError() }
     
     /// Computes the dates which match (or most closely match) a given set of components, and calls the closure once for each of them, until the enumeration is stopped.
     ///
@@ -825,7 +825,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter direction: Which direction in time to search. The default value is `.forward`, which means later in time.
     /// - parameter block: A closure that is called with search results.
     @available(iOS 8.0, *)
-    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: @noescape (_ result: Date?, _ exactMatch: Bool, _ stop: inout Bool) -> Void) {
+    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: (_ result: Date?, _ exactMatch: Bool, _ stop: inout Bool) -> Void) {
         _handle.map {
             $0.enumerateDates(startingAfter: start, matching: components, options: Calendar._toCalendarOptions(matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy, direction: direction)) { (result, exactMatch, stop) in
                 var stopv = false

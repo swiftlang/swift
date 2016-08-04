@@ -279,7 +279,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   /// will result in undefined behavior.
   @_semantics("self_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointer<Result>(
-    _ body: @noescape (OpaquePointer) throws -> Result
+    _ body: (OpaquePointer) throws -> Result
   ) rethrows -> Result {
     let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
     defer {
@@ -295,7 +295,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @_semantics("pair_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointerPair<Result>(
     _ rhs: _NSContiguousString,
-    _ body: @noescape (OpaquePointer, OpaquePointer) throws -> Result
+    _ body: (OpaquePointer, OpaquePointer) throws -> Result
   ) rethrows -> Result {
     let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
     let rhsAsPointer = unsafeBitCast(rhs, to: OpaquePointer.self)

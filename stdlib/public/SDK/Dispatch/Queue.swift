@@ -111,7 +111,7 @@ public extension DispatchQueue {
 		}
 	}
 
-	public class func concurrentPerform(iterations: Int, execute work: @noescape (Int) -> Void) {
+	public class func concurrentPerform(iterations: Int, execute work: (Int) -> Void) {
 		_swift_dispatch_apply_current(UInt32(iterations), work)
 	}
 
@@ -221,13 +221,13 @@ public extension DispatchQueue {
 		}
 	}
 
-	private func _syncBarrier(block: @noescape () -> ()) {
+	private func _syncBarrier(block: () -> ()) {
 		__dispatch_barrier_sync(self, block)
 	}
 
 	private func _syncHelper<T>(
-		fn: (@noescape () -> ()) -> (), 
-		execute work: @noescape () throws -> T, 
+		fn: (() -> ()) -> (), 
+		execute work: () throws -> T, 
 		rescue: ((Error) throws -> (T))) rethrows -> T 
 	{
 		var result: T?
@@ -250,7 +250,7 @@ public extension DispatchQueue {
 	private func _syncHelper<T>(
 		fn: (DispatchWorkItem) -> (), 
 		flags: DispatchWorkItemFlags,
-		execute work: @noescape () throws -> T,
+		execute work: () throws -> T,
 		rescue: ((Error) throws -> (T))) rethrows -> T 
 	{
 		var result: T?
@@ -270,11 +270,11 @@ public extension DispatchQueue {
 		}
 	}
 
-	public func sync<T>(execute work: @noescape () throws -> T) rethrows -> T {
+	public func sync<T>(execute work: () throws -> T) rethrows -> T {
 		return try self._syncHelper(fn: sync, execute: work, rescue: { throw $0 })
 	}
 
-	public func sync<T>(flags: DispatchWorkItemFlags, execute work: @noescape () throws -> T) rethrows -> T {
+	public func sync<T>(flags: DispatchWorkItemFlags, execute work: () throws -> T) rethrows -> T {
 		if flags == .barrier {
 			return try self._syncHelper(fn: _syncBarrier, execute: work, rescue: { throw $0 })
 		} else if #available(OSX 10.10, iOS 8.0, *), !flags.isEmpty {

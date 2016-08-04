@@ -224,28 +224,28 @@ public struct ${Self}<
   }
 
   public func map<T>(
-    _ transform: @noescape (Base.Iterator.Element) throws -> T
+    _ transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     Log.map[selfType] += 1
     return try base.map(transform)
   }
 
   public func filter(
-    _ isIncluded: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
     return try base.filter(isIncluded)
   }
 
   public func forEach(
-    _ body: @noescape (Base.Iterator.Element) throws -> Void
+    _ body: (Base.Iterator.Element) throws -> Void
   ) rethrows {
     Log.forEach[selfType] += 1
     try base.forEach(body)
   }
   
   public func first(
-    where predicate: @noescape (Base.Iterator.Element) throws -> Bool
+    where predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> Base.Iterator.Element? {
     Log.first[selfType] += 1
     return try base.first(where: predicate)
@@ -276,7 +276,7 @@ public struct ${Self}<
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Base.Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Log.split[selfType] += 1
     return try base.split(
@@ -296,7 +296,7 @@ public struct ${Self}<
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     Log._preprocessingPass[selfType] += 1
     return try base._preprocessingPass(preprocess)
@@ -443,14 +443,14 @@ public struct ${Self}<
 
 %     if Kind == 'MutableCollection':
   public mutating func partition(
-    by belongsInSecondPartition: @noescape (Iterator.Element) throws -> Bool
+    by belongsInSecondPartition: (Iterator.Element) throws -> Bool
   ) rethrows -> Index {
     Log.partitionBy[selfType] += 1
     return try base.partition(by: belongsInSecondPartition)
   }
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
@@ -650,7 +650,7 @@ public struct ${Self}<
   }
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
