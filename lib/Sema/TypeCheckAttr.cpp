@@ -1662,9 +1662,11 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   }
   
   // This decl attribute has been moved to being a type attribute.
-  diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
-    .fixItRemove(attrRemovalRange) 
-    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  if (!attr->isImplicit()) {
+    diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
+        .fixItRemove(attrRemovalRange)
+        .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  }
 
   // Stop if we've already applied this attribute.
   if (FTy->isNoEscape())
