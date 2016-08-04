@@ -404,6 +404,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[bridge-to-objc]";
   case ConversionRestrictionKind::BridgeFromObjC:
     return "[bridge-from-objc]";
+  case ConversionRestrictionKind::HashableToAnyHashable:
+    return "[hashable-to-anyhashable]";
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
     return "[cf-toll-free-bridge-to-objc]";
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:

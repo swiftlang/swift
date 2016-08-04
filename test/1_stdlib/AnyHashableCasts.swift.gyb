@@ -1,0 +1,78 @@
+// RUN: rm -rf %t  &&  mkdir %t
+//
+// RUN: %gyb %s -o %t/AnyHashableCasts.swift
+// RUN: %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out
+// RUN: %target-run %t.out
+// RUN: %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
+// RUN: %target-run %t.out.optimized
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+var AnyHashableCasts = TestSuite("AnyHashableCasts")
+
+protocol Implemented {}
+protocol Unimplemented {}
+extension Int : Implemented {}
+
+func opaqueCast<T, U>(_ lhs: T, _ rhs: U.Type) -> U? {
+  return lhs as? U
+}
+
+func matches<T: Equatable>(_ lhs: T, _ rhs: T) -> Bool {
+  return lhs == rhs
+}
+
+func matches<T: Equatable, U>(_ lhs: U, _ rhs: T) -> Bool {
+  if let x = lhs as? T {
+    return x == rhs
+  } else {
+    return false
+  }
+}
+
+%{
+testCases = [
+  ("5", "AnyHashable", "Int", "5"),
+  ("5", "AnyHashable", "Any", "5"),
+  ("5", "AnyHashable", "Implemented", "5"),
+  ("5", "AnyHashable", "Unimplemented", False),
+  ("5", "Int", "AnyHashable", "5"),
+  ("5", "Any", "AnyHashable", "5"),
+  ("AnyHashable(5)", "Any", "Int", "5")
+]
+}%
+
+% for valueExpr, coercedType, castType, expected in testCases:
+AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
+  do {
+    let x = ${valueExpr}
+    let y : ${coercedType} = x
+    if let z = y as? ${castType} {
+%if expected:
+      expectTrue(matches(z, ${expected}))
+%else:
+      expectUnreachable()
+%end
+    } else {
+%if expected:
+      expectUnreachable()
+%end
+    }
+
+    if let z = opaqueCast(y, (${castType}).self) {
+%if expected:
+      expectTrue(matches(z, ${expected}))
+%else:
+      expectUnreachable()
+%end
+    } else {
+%if expected:
+      expectUnreachable()
+%end    
+    }
+  }
+}
+% end
+
+runAllTests()

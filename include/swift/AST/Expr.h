@@ -3017,12 +3017,36 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Erasure;
   }
 };
 
+/// AnyHashableErasureExpr - Perform type erasure by converting a value
+/// to AnyHashable type.
+///
+/// The type of the sub-expression should always be a type that implements
+/// the Hashable protocol.
+class AnyHashableErasureExpr : public ImplicitConversionExpr {
+  ProtocolConformanceRef Conformance;
+
+public:
+  AnyHashableErasureExpr(Expr *subExpr, Type type,
+                         ProtocolConformanceRef conformance)
+    : ImplicitConversionExpr(ExprKind::AnyHashableErasure, subExpr, type),
+      Conformance(conformance) {}
+
+  /// \brief Retrieve the mapping specifying how the type of the
+  /// subexpression conforms to the Hashable protocol.
+  ProtocolConformanceRef getConformance() const {
+    return Conformance;
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AnyHashableErasure;
+  }
+};
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr : public Expr {

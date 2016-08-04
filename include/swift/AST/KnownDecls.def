@@ -68,6 +68,8 @@ FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
 FUNC_DECL(BridgeAnythingToObjectiveC,
           "_bridgeAnythingToObjectiveC")
 
+FUNC_DECL(ConvertToAnyHashable, "_convertToAnyHashable")
+
 FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
