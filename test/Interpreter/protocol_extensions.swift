@@ -44,7 +44,7 @@ for (index, element) in ["a", "b", "c"].myEnumerated() {
 
 extension Sequence {
   final public func myReduce<T>(
-    _ initial: T, combine: @noescape (T, Self.Iterator.Element) -> T
+    _ initial: T, combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
     for value in self {

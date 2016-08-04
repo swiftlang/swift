@@ -29,7 +29,7 @@
 
 func global1(_: ()->()) {}
 func global2(label: ()->()) {}
-func global3(_: @noescape () throws -> ()) rethrows {}
+func global3(_: () throws -> ()) rethrows {}
 func global4(x: Int = 0, y: Int = 2, _: ()->()) {}
 func nonTrivial1(_: (Int) -> ()) {}
 func nonTrivial2(_: () -> Int) {}

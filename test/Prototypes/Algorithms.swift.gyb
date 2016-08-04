@@ -256,7 +256,7 @@ extension MutableCollection where Self: RandomAccessCollection,
   /// the source index for each movement.
   @inline(__always)
   internal mutating func _rotateCycle(start: Index,
-    transform sourceForIndex: @noescape (Index) -> Index)
+    transform sourceForIndex: (Index) -> Index)
   {
     let tmp = self[start]
     var (i, j) = (start, sourceForIndex(start))
