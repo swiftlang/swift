@@ -5304,6 +5304,27 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                                              isBridged);
     }
 
+    case ConversionRestrictionKind::HashableToAnyHashable: {
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+            = cs.lookThroughImplicitlyUnwrappedOptionalType(expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+      }
+
+      // Find the conformance of the source type to Hashable.
+      auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
+      ProtocolConformance *conformance;
+      bool conforms = tc.conformsToProtocol(expr->getType(), hashable, cs.DC,
+                                            ConformanceCheckFlags::InExpression,
+                                            &conformance);
+      assert(conforms && "must conform to Hashable");
+      (void)conforms;
+      ProtocolConformanceRef conformanceRef(hashable, conformance);
+
+      return new (tc.Context) AnyHashableErasureExpr(expr, toType,
+                                                     conformanceRef);
+    }
+
     case ConversionRestrictionKind::DictionaryUpcast: {
       // Look through implicitly unwrapped optionals.
       if (auto objTy
