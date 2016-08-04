@@ -125,14 +125,31 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   return false;
 }
 
-static void findNominals(llvm::MapVector<const NominalTypeDecl *, bool> &found,
-                         DeclRange members) {
+static void findNominalsAndOperators(
+    llvm::MapVector<const NominalTypeDecl *, bool> &foundNominals,
+    llvm::SmallVectorImpl<const FuncDecl *> &foundOperators,
+    DeclRange members) {
   for (const Decl *D : members) {
+    auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      continue;
+
+    if (VD->hasAccessibility() &&
+        VD->getFormalAccess() <= Accessibility::FilePrivate) {
+      continue;
+    }
+
+    if (VD->getFullName().isOperator()) {
+      foundOperators.push_back(cast<FuncDecl>(VD));
+      continue;
+    }
+
     auto nominal = dyn_cast<NominalTypeDecl>(D);
     if (!nominal)
       continue;
-    found[nominal] |= true;
-    findNominals(found, nominal->getMembers());
+    foundNominals[nominal] |= true;
+    findNominalsAndOperators(foundNominals, foundOperators,
+                             nominal->getMembers());
   }
 }
 
@@ -209,6 +226,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   out << "### Swift dependencies file v0 ###\n";
 
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
   llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
 
   out << "provides-top-level:\n";
@@ -243,7 +261,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         }
       }
       extendedNominals[NTD] |= !justMembers;
-      findNominals(extendedNominals, ED->getMembers());
+      findNominalsAndOperators(extendedNominals, memberOperatorDecls,
+                               ED->getMembers());
       break;
     }
 
@@ -270,7 +289,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
       extendedNominals[NTD] |= true;
-      findNominals(extendedNominals, NTD->getMembers());
+      findNominalsAndOperators(extendedNominals, memberOperatorDecls,
+                               NTD->getMembers());
       break;
     }
 
@@ -305,6 +325,10 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
       llvm_unreachable("cannot appear at the top level of a file");
     }
   }
+
+  // This is also part of "provides-top-level".
+  for (auto *operatorFunction : memberOperatorDecls)
+    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
 
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
