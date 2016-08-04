@@ -7,6 +7,7 @@ import Foundation
 
 // Test out some explicit renames of typedefs and globals, which are now new
 // wrapper types with nestest values.
+@available(macOS 10.11, *)
 func testRenames() {
   let _ = SCNGeometrySourceSemantic
     // expected-error@-1{{'SCNGeometrySourceSemantic' has been renamed to 'SCNGeometrySource.Semantic'}}
