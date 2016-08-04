@@ -651,6 +651,19 @@ ErrorBridgingTests.test("Error archetype identity") {
      === myError)
   expectTrue(conditionalCast(myError, to: Error.self)! as NSError
      === myError)
+
+  let nsError = NSError(domain: NSCocoaErrorDomain,
+                        code: NSFileNoSuchFileError,
+                        userInfo: [
+                          AnyHashable(NSFilePathErrorKey) : "/dev/null",
+                          AnyHashable(NSStringEncodingErrorKey): /*ASCII=*/1,
+                        ])
+  let cocoaError = nsError as Error as! CocoaError
+  expectTrue(cocoaError.asNSError() === nsError)
+  expectTrue(unconditionalCast(cocoaError, to: Error.self) as NSError
+    === nsError)
+  expectTrue(conditionalCast(cocoaError, to: Error.self)! as NSError
+    === nsError)
 }
 
 runAllTests()
