@@ -52,3 +52,32 @@ func callEscapingWithNoEscapeBlock(_ fn: () -> Void) {
 
   takesEscapingBlock(fn) // expected-error{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
+
+func takesEscapingAutoclosure(_ fn: @autoclosure @escaping () -> Int) {}
+
+func callEscapingAutoclosureWithNoEscape(_ fn: () -> Int) {
+  takesEscapingAutoclosure(1+1)
+}
+func callEscapingAutoclosureWithNoEscape_2(_ fn: () -> Int) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
+
+  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
+}
+func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
+  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
+
+  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
+}
+
+func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
+
+func callAutoclosureWithNoEscape(_ fn: () -> Int) {
+  takesAutoclosure(1+1) // ok
+}
+func callAutoclosureWithNoEscape_2(_ fn: () -> Int) {
+  takesAutoclosure(fn()) // ok
+}
+func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
+  takesAutoclosure(fn()) // ok
+}
+

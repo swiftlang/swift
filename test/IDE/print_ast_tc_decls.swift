@@ -1293,8 +1293,8 @@ public func ParamAttrs1(a : @autoclosure () -> ()) {
   a()
 }
 
-// PASS_PRINT_AST: public func ParamAttrs2(a: @autoclosure(escaping) () -> ())
-public func ParamAttrs2(a : @autoclosure(escaping) () -> ()) {
+// PASS_PRINT_AST: public func ParamAttrs2(a: @autoclosure @escaping () -> ())
+public func ParamAttrs2(a : @autoclosure @escaping () -> ()) {
   a()
 }
 

@@ -156,7 +156,7 @@ typealias MyAlias2<A, B> = MyAlias<A, B>
 
 func paramAutoclosureNoescape1(@noescape _ msg: ()->String) {}
 func paramAutoclosureNoescape2(@autoclosure _ msg: ()->String) {}
-func paramAutoclosureNoescape3(@autoclosure(escaping) _ msg: ()->String) {}
+func paramAutoclosureNoescape3(@autoclosure @escaping _ msg: ()->String) {}
 
 func paramDefaultPlaceholder(_ f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
 

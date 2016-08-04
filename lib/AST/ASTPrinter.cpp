@@ -3746,7 +3746,7 @@ public:
       if (info.isNoEscape())
         Printer << "@autoclosure ";
       else
-        Printer << "@autoclosure(escaping) ";
+        Printer << "@autoclosure @escaping ";
     } else if (inParameterPrinting) {
       if (!info.isNoEscape()) {
         Printer << "@escaping ";
