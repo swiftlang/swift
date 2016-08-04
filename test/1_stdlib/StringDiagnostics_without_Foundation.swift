@@ -27,5 +27,5 @@ func testStringCollectionTypes(s: String) {
 struct NotLosslessStringConvertible {}
 
 func testStringInitT() {
-  _ = String(NotLosslessStringConvertible()) // expected-error{{'init' has been renamed to 'init(describing:)}}
+  _ = String(NotLosslessStringConvertible()) // expected-error{{'init' has been renamed to 'init(describing:)}}{{14-14=describing: }}
 }
