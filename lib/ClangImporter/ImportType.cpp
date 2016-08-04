@@ -1020,7 +1020,6 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
-  case ImportTypeKind::PropertyAccessor:
   case ImportTypeKind::BridgedValue:
     return true;
   }
@@ -1045,7 +1044,6 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::CFRetainedOutParameter:
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
-  case ImportTypeKind::PropertyAccessor:
     return true;
   }
 }
@@ -1091,8 +1089,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // 'void' can only be imported as a function result type.
   if (hint == ImportHint::Void &&
       (importKind == ImportTypeKind::AuditedResult ||
-       importKind == ImportTypeKind::Result ||
-       importKind == ImportTypeKind::PropertyAccessor)) {
+       importKind == ImportTypeKind::Result)) {
     return impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
   }
 
@@ -2173,9 +2170,7 @@ Type ClangImporter::Implementation::importMethodType(
   //     returning CF types as a workaround for ARC not managing CF
   //     objects
   ImportTypeKind resultKind;
-  if (kind == SpecialMethodKind::PropertyAccessor)
-    resultKind = ImportTypeKind::PropertyAccessor;
-  else if (isObjCMethodResultAudited(clangDecl))
+  if (isObjCMethodResultAudited(clangDecl))
     resultKind = ImportTypeKind::AuditedResult;
   else
     resultKind = ImportTypeKind::Result;
@@ -2335,12 +2330,6 @@ Type ClangImporter::Implementation::importMethodType(
       swiftParamTy = getOptionalType(getNSCopyingType(),
                                      ImportTypeKind::Parameter,
                                      optionalityOfParam);
-    } else if (kind == SpecialMethodKind::PropertyAccessor) {
-      swiftParamTy = importType(paramTy,
-                                ImportTypeKind::PropertyAccessor,
-                                allowNSUIntegerAsIntInParam,
-                                /*isFullyBridgeable*/true,
-                                optionalityOfParam);
     } else {
       ImportTypeKind importKind = ImportTypeKind::Parameter;
       if (param->hasAttr<clang::CFReturnsRetainedAttr>())

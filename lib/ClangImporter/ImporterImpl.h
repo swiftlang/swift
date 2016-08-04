@@ -164,11 +164,6 @@ enum class ImportTypeKind {
   /// considered CF-audited.
   Property,
 
-  /// \brief Import the type of an ObjC property accessor.
-  ///
-  /// This behaves exactly like Property except that it accepts Void.
-  PropertyAccessor,
-
   /// \brief Import the underlying type of an enum.
   ///
   /// This provides special treatment for 'NSUInteger'.
