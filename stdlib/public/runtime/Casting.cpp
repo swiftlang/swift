@@ -2772,7 +2772,28 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     return result;
   }
   
-  if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+  // Handle metatypes.
+  if (isa<ExistentialMetatypeMetadata>(srcType)
+      || isa<MetatypeMetadata>(srcType)) {
+    const Metadata *srcMetatypeValue;
+    memcpy(&srcMetatypeValue, src, sizeof(srcMetatypeValue));
+    
+    // Class metatypes bridge to their class object.
+    if (isa<ClassMetadata>(srcMetatypeValue)
+        || isa<ObjCClassWrapperMetadata>(srcMetatypeValue)) {
+      return (id)srcMetatypeValue->getClassObject();
+    
+    // ObjC protocols bridge to their Protocol object.
+    } else if (auto existential
+               = dyn_cast<ExistentialTypeMetadata>(srcMetatypeValue)) {
+      if (existential->isObjC() && existential->Protocols.NumProtocols == 1) {
+        // Though they're statically-allocated globals, Protocol inherits
+        // NSObject's default refcounting behavior so must be retained.
+        auto protocolObj = (id)existential->Protocols[0];
+        return objc_retain(protocolObj);
+      }
+    }
+  } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
       srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
