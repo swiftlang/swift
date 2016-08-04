@@ -7,7 +7,7 @@ import Foundation
 
 // Dynamic subscripting of NSArray, dynamic method dispatch
 // CHECK: {{^3$}}
-var array : AnyObject = [1 as NSNumber, 2 as NSNumber, 3 as NSNumber, 4 as NSNumber, 5 as NSNumber] as NSArray
+var array : AnyObject = [1, 2, 3, 4, 5] as NSArray
 print((array[2] as AnyObject).description)
 
 // Dynamic subscripting on an array using an object (fails)
@@ -21,7 +21,7 @@ if optVal1 != nil {
 
 // Dynamic subscripting of NSDictionary, dynamic method dispatch
 // CHECK: {{^2$}}
-var nsdict : NSDictionary = ["Hello" as NSString : 1 as NSNumber, "World" as NSString : 2 as NSNumber]
+var nsdict : NSDictionary = ["Hello" : 1, "World" : 2]
 var dict : AnyObject = nsdict
 print(((dict["World" as NSString]!)! as AnyObject).description)
 

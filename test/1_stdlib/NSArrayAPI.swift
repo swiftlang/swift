@@ -12,13 +12,13 @@ var NSArrayAPI = TestSuite("NSArrayAPI")
 
 NSArrayAPI.test("mixed types with AnyObject") {
   do {
-    let result: AnyObject = [1 as NSNumber, "two" as NSString] as NSArray
-    let expect: NSArray = [1 as NSNumber, "two" as NSString]
+    let result: AnyObject = [1, "two"] as NSArray
+    let expect: NSArray = [1, "two"]
     expectEqual(expect, result as! NSArray)
   }
   do {
-    let result: AnyObject = [1 as NSNumber, 2 as NSNumber] as NSArray
-    let expect: NSArray = [1 as NSNumber, 2 as NSNumber]
+    let result: AnyObject = [1, 2] as NSArray
+    let expect: NSArray = [1, 2]
     expectEqual(expect, result as! NSArray)
   }
 }
