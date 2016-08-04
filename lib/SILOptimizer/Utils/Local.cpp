@@ -1597,6 +1597,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 SILInstruction *
 CastOptimizer::
 optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+                     CastConsumptionKind ConsumptionKind,
                      bool isConditional,
                      SILValue Src,
                      SILValue Dest,
@@ -1679,16 +1680,77 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     Src = Builder.createLoad(Loc, Src);
   }
 
-  if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+  // Compensate different owning conventions of the replaced cast instruction
+  // and the inserted convertion function.
+  bool needRetainBeforeCall = false;
+  bool needReleaseAfterCall = false;
+  bool needReleaseInSucc = false;
+  switch (ParamTypes[0].getConvention()) {
+    case ParameterConvention::Direct_Guaranteed:
+      switch (ConsumptionKind) {
+        case CastConsumptionKind::TakeAlways:
+          needReleaseAfterCall = true;
+          break;
+        case CastConsumptionKind::TakeOnSuccess:
+          needReleaseInSucc = true;
+          break;
+        case CastConsumptionKind::CopyOnSuccess:
+          // Conservatively insert a retain/release pair around the conversion
+          // function because the conversion function could decrement the
+          // (global) reference count of the source object.
+          //
+          // %src = load %global_var
+          // apply %conversion_func(@guaranteed %src)
+          //
+          // sil conversion_func {
+          //    %old_value = load %global_var
+          //    store %something_else, %global_var
+          //    strong_release %old_value
+          // }
+          needRetainBeforeCall = true;
+          needReleaseAfterCall = true;
+          break;
+      }
+      break;
+    case ParameterConvention::Direct_Owned:
+      // The Direct_Owned case is only handled for completeness. Currently this
+      // cannot appear, because the _bridgeToObjectiveC protocol witness method
+      // always receives the this pointer (= the source) as guaranteed.
+      switch (ConsumptionKind) {
+        case CastConsumptionKind::TakeAlways:
+          break;
+        case CastConsumptionKind::TakeOnSuccess:
+          needRetainBeforeCall = true;
+          needReleaseInSucc = true;
+          break;
+        case CastConsumptionKind::CopyOnSuccess:
+          needRetainBeforeCall = true;
+          break;
+      }
+      break;
+    case ParameterConvention::Direct_Unowned:
+      break;
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Direct_Deallocating:
+      llvm_unreachable("unsupported convention for bridging conversion");
+  }
+
+  if (needRetainBeforeCall)
     Builder.createRetainValue(Loc, Src, Atomicity::Atomic);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
 
-  if (ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
+  if (needReleaseAfterCall) {
     Builder.createReleaseValue(Loc, Src, Atomicity::Atomic);
-
+  } else if (needReleaseInSucc) {
+    SILBuilder SuccBuilder(SuccessBB->begin());
+    SuccBuilder.createReleaseValue(Loc, Src, Atomicity::Atomic);
+  }
   SILInstruction *NewI = NewAI;
 
   if (Dest) {
@@ -1721,6 +1783,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 SILInstruction *
 CastOptimizer::
 optimizeBridgedCasts(SILInstruction *Inst,
+                     CastConsumptionKind ConsumptionKind,
                      bool isConditional,
                      SILValue Src,
                      SILValue Dest,
@@ -1786,7 +1849,8 @@ optimizeBridgedCasts(SILInstruction *Inst,
           target, BridgedSourceTy, BridgedTargetTy, SuccessBB, FailureBB);
     } else {
       // This is a Swift to ObjC cast
-      return optimizeBridgedSwiftToObjCCast(Inst, isConditional, Src, Dest, source,
+      return optimizeBridgedSwiftToObjCCast(Inst, ConsumptionKind,
+          isConditional, Src, Dest, source,
           target, BridgedSourceTy, BridgedTargetTy, SuccessBB, FailureBB);
     }
   }
@@ -1863,7 +1927,8 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     // To apply the bridged optimizations, we should
     // ensure that types are not existential,
     // and that not both types are classes.
-    BridgedI = optimizeBridgedCasts(Inst, true, Src, Dest, SourceType,
+    BridgedI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
+                                    true, Src, Dest, SourceType,
                                     TargetType, SuccessBB, FailureBB);
 
     if (!BridgedI) {
@@ -1975,7 +2040,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       auto Src = Inst->getOperand();
       auto Dest = SILValue();
       // To apply the bridged casts optimizations.
-      auto BridgedI = optimizeBridgedCasts(Inst, false, Src, Dest, SourceType,
+      auto BridgedI = optimizeBridgedCasts(Inst,
+          CastConsumptionKind::CopyOnSuccess, false, Src, Dest, SourceType,
           TargetType, nullptr, nullptr);
 
       if (BridgedI) {
@@ -2290,8 +2356,9 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
     auto SourceType = LoweredSourceType.getSwiftRValueType();
     auto TargetType = LoweredTargetType.getSwiftRValueType();
     auto Src = Inst->getOperand();
-    auto NewI = optimizeBridgedCasts(Inst, false, Src, SILValue(), SourceType,
-        TargetType, nullptr, nullptr);
+    auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::CopyOnSuccess,
+                                     false, Src, SILValue(), SourceType,
+                                     TargetType, nullptr, nullptr);
     if (NewI) {
       ReplaceInstUsesAction(Inst, NewI);
       EraseInstAction(Inst);
@@ -2406,14 +2473,25 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
     }
 
     if (ResultNotUsed) {
+      switch (Inst->getConsumptionKind()) {
+        case CastConsumptionKind::TakeAlways:
+        case CastConsumptionKind::TakeOnSuccess: {
+          SILBuilder B(Inst);
+          B.createDestroyAddr(Inst->getLoc(), Inst->getSrc());
+          break;
+        }
+        case CastConsumptionKind::CopyOnSuccess:
+          break;
+      }
       EraseInstAction(Inst);
       WillSucceedAction();
       return nullptr;
     }
 
     // Try to apply the bridged casts optimizations
-    auto NewI = optimizeBridgedCasts(Inst, false, Src, Dest, SourceType,
-                                         TargetType, nullptr, nullptr);
+    auto NewI = optimizeBridgedCasts(Inst, Inst->getConsumptionKind(),
+                                     false, Src, Dest, SourceType,
+                                     TargetType, nullptr, nullptr);
     if (NewI) {
         WillSucceedAction();
         return nullptr;
