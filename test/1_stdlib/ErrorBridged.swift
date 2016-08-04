@@ -582,4 +582,75 @@ ErrorBridgingTests.test("Customizing localization/recovery laziness") {
   }
 }
 
+class MyNSError : NSError {  }
+
+ErrorBridgingTests.test("NSError subclass identity") {
+  let myNSError: Error = MyNSError(domain: "MyNSError", code: 0, userInfo: [:])
+  let nsError = myNSError as NSError
+  expectTrue(type(of: nsError) == MyNSError.self)
+}
+
+ErrorBridgingTests.test("Wrapped NSError identity") {
+  let nsError = NSError(domain: NSCocoaErrorDomain,
+                   code: NSFileNoSuchFileError,
+                   userInfo: [
+                     AnyHashable(NSFilePathErrorKey) : "/dev/null",
+                     AnyHashable(NSStringEncodingErrorKey): /*ASCII=*/1,
+                   ])
+
+  let error: Error = nsError
+  let nsError2: NSError = error as NSError
+  expectTrue(nsError === nsError2)
+
+  // Extracting the NSError via the runtime.
+  let cocoaErrorAny: Any = error as! CocoaError
+  let nsError3: NSError = cocoaErrorAny as! NSError
+  expectTrue(nsError === nsError3)
+
+  if let cocoaErrorAny2: Any = error as? CocoaError {
+    let nsError4: NSError = cocoaErrorAny2 as! NSError
+    expectTrue(nsError === nsError4)
+  } else {
+    expectUnreachable()
+  }
+
+  // Extracting the NSError via direct call.
+  let cocoaError = error as! CocoaError
+  let nsError5: NSError = cocoaError as NSError
+  expectTrue(nsError === nsError5)
+
+  if let cocoaError2 = error as? CocoaError {
+    let nsError6: NSError = cocoaError as NSError
+    expectTrue(nsError === nsError6)
+  } else {
+    expectUnreachable()
+  }
+}
+
+extension Error {
+	func asNSError() -> NSError {
+		return self as NSError
+	}
+}
+
+func unconditionalCast<T>(_ x: Any, to: T.Type) -> T {
+  return x as! T
+}
+
+func conditionalCast<T>(_ x: Any, to: T.Type) -> T? {
+  return x as? T
+}
+
+// SR-1562
+ErrorBridgingTests.test("Error archetype identity") {
+  let myError = NSError(domain: "myErrorDomain", code: 0,
+                        userInfo: [ AnyHashable("one") : 1 ])
+  expectTrue(myError === myError.asNSError())
+
+  expectTrue(unconditionalCast(myError, to: Error.self) as NSError
+     === myError)
+  expectTrue(conditionalCast(myError, to: Error.self)! as NSError
+     === myError)
+}
+
 runAllTests()

@@ -95,3 +95,53 @@ func testProduceOptionalError() -> Error? {
   // CHECK: function_ref @swift_convertNSErrorToError
   return produceOptionalError();
 }
+
+class MyNSError : NSError {
+  override init() {
+    super.init(domain: "MyNSError", code: 0, userInfo: [:])
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error14eraseMyNSError
+// CHECK-NOT: return
+// CHECK: init_existential_ref
+func eraseMyNSError() -> Error {
+  return MyNSError()
+}
+
+// CHECK-LABEL: sil hidden @_TF10objc_error25eraseFictionalServerErrorFT_Ps5Error_
+func eraseFictionalServerError() -> Error {
+  // CHECK-NOT: return
+  // CHECK: [[NSERROR_GETTER:%[0-9]+]] = function_ref @_TFVSC20FictionalServerErrorg8_nsErrorCSo7NSError
+  // CHECK: [[NSERROR:%[0-9]+]] = apply [[NSERROR_GETTER]]
+  // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[NSERROR]]
+  // CHECK: return [[ERROR]]
+  return FictionalServerError(.meltedDown)
+}
+
+// SR-1562
+extension Error {
+  // CHECK-LABEL: sil hidden @_TFE10objc_errorPs5Error16convertToNSErrorfT_CSo7NSError
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*Self)
+	func convertToNSError() -> NSError {
+    // CHECK: [[GET_EMBEDDED_FN:%[0-9]+]] = function_ref @swift_stdlib_getErrorEmbeddedNSError
+    // CHECK: [[EMBEDDED_RESULT_OPT:%[0-9]+]] = apply [[GET_EMBEDDED_FN]]
+    // CHECK: [[HAS_EMBEDDED_RESULT:%[0-9]+]] = select_enum [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>
+    // CHECK: cond_br [[HAS_EMBEDDED_RESULT]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+
+    // CHECK: [[SUCCESS]]:
+    // CHECK: [[EMBEDDED_RESULT:%[0-9]+]] = unchecked_enum_data [[EMBEDDED_RESULT_OPT]] : $Optional<AnyObject>, #Optional.some!enumelt.1
+    // CHECK: [[EMBEDDED_NSERROR:%[0-9]+]] = unchecked_ref_cast [[EMBEDDED_RESULT]] : $AnyObject to $NSError
+    // CHECK: [[ERROR:%[0-9]+]] = init_existential_ref [[EMBEDDED_NSERROR]] : $NSError : $NSError, $Error
+    // CHECK: br [[CONTINUATION:bb[0-9]+]]([[ERROR]] : $Error)
+
+    // CHECK: [[FAILURE]]:
+    // CHECK: [[ERROR_BOX:%[0-9]+]] = alloc_existential_box $Error, $Self
+    // CHECK: [[ERROR_PROJECTED:%[0-9]+]] = project_existential_box $Self in [[ERROR_BOX]] : $Error
+    // CHECK: copy_addr [[SELF]] to [initialization] [[ERROR_PROJECTED]] : $*Self
+    // CHECK: br [[CONTINUATION]]([[ERROR_BOX]] : $Error)
+
+    // CHECK: [[CONTINUATION]]([[ERROR_ARG:%[0-9]+]] : $Error):
+		return self as NSError
+	}
+}

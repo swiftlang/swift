@@ -450,10 +450,158 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             const TypeLowering &existentialTL,
                             ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F) {
+                            llvm::function_ref<ManagedValue (SGFContext)> F,
+                            bool allowEmbeddedNSError) {
   // Mark the needed conformances as used.
   for (auto conformance : conformances)
     SGM.useConformance(conformance);
+
+  // If we're erasing to the 'Error' type, we might be able to get an NSError
+  // representation more efficiently.
+  auto &ctx = getASTContext();
+  auto nsError = ctx.getNSErrorDecl();
+  if (allowEmbeddedNSError && nsError &&
+      existentialTL.getSemanticType().getSwiftRValueType()->getAnyNominal() ==
+        ctx.getErrorDecl()) {
+    // Check whether the concrete type conforms to the _BridgedStoredNSError
+    // protocol. In that case, call the _nsError witness getter to extract the
+    // NSError directly.
+    auto conformance =
+      SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+
+    CanType nsErrorType =
+      nsError->getDeclaredInterfaceType()->getCanonicalType();
+
+    ProtocolConformanceRef nsErrorConformances[1] = {
+      ProtocolConformanceRef(SGM.getNSErrorConformanceToError())
+    };
+
+    if (conformance && nsError && SGM.getNSErrorConformanceToError()) {
+      if (auto witness =
+            conformance->getWitness(SGM.getNSErrorRequirement(loc), nullptr)) {
+        // Create a reference to the getter witness.
+        SILDeclRef getter =
+          getGetterDeclRef(cast<VarDecl>(witness.getDecl()),
+                           /*isDirectAccessorUse=*/true);
+        
+        // Compute the substitutions.
+        ArrayRef<Substitution> substitutions =
+          concreteFormalType->gatherAllSubstitutions(
+          SGM.SwiftModule, nullptr);
+
+        // Emit the erasure, through the getter to _nsError.
+        return emitExistentialErasure(
+            loc, nsErrorType,
+            getTypeLowering(nsErrorType),
+            existentialTL,
+            ctx.AllocateCopy(nsErrorConformances),
+            C,
+            [&](SGFContext innerC) -> ManagedValue {
+              // Call the getter.
+              return emitGetAccessor(loc, getter, substitutions,
+                                     ArgumentSource(loc,
+                                                    RValue(*this, loc,
+                                                           concreteFormalType,
+                                                           F(SGFContext()))),
+                                     /*isSuper=*/false,
+                                     /*isDirectAccessorUse=*/true,
+                                     RValue(), innerC)
+                .getAsSingleValue(*this, loc);
+            });
+      }
+    }
+
+    // Check whether the concrete type is an archetype. If so, call the
+    // _getEmbeddedNSError() witness to try to dig out the embedded NSError.
+    if (auto archetypeType = concreteFormalType->getAs<ArchetypeType>()) {
+      if (std::find(archetypeType->getConformsTo().begin(),
+                       archetypeType->getConformsTo().end(),
+                       ctx.getErrorDecl())
+            != archetypeType->getConformsTo().end()) {
+        auto contBB = createBasicBlock();
+        auto isNotPresentBB = createBasicBlock();
+        auto isPresentBB = createBasicBlock();
+
+        SILValue existentialResult =
+          contBB->createBBArg(existentialTL.getLoweredType());
+
+        ProtocolConformanceRef trivialErrorConformances[1] = {
+          ProtocolConformanceRef(ctx.getErrorDecl())
+        };
+
+        Substitution substitutions[1] = {
+          Substitution(concreteFormalType,
+                       ctx.AllocateCopy(trivialErrorConformances))
+        };
+
+        // Call swift_stdlib_getErrorEmbeddedNSError to attempt to extract an
+        // NSError from the value.
+        ManagedValue concreteValue = F(SGFContext());
+        ManagedValue potentialNSError =
+          emitApplyOfLibraryIntrinsic(loc,
+                                      SGM.getGetErrorEmbeddedNSError(loc),
+                                      ctx.AllocateCopy(substitutions),
+                                      { concreteValue },
+                                      SGFContext())
+            .getAsSingleValue(*this, loc);
+
+        // Check whether we got an NSError back.
+        SILValue hasNSError =
+          emitDoesOptionalHaveValue(loc, potentialNSError.getValue());
+
+        B.createCondBranch(loc, hasNSError, isPresentBB, isNotPresentBB);
+
+        // If we did get an NSError, emit the existential erasure from that
+        // NSError.
+        B.emitBlock(isPresentBB);
+        SILValue branchArg;
+        {
+          // Don't allow cleanups to escape the conditional block.
+          FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
+          
+          // Emit the existential erasure from the NSError.
+          branchArg = emitExistentialErasure(
+              loc, nsErrorType,
+              getTypeLowering(nsErrorType),
+              existentialTL,
+              ctx.AllocateCopy(nsErrorConformances),
+              C,
+              [&](SGFContext innerC) -> ManagedValue {
+                // Pull the NSError object out of the optional result.
+                auto &inputTL = getTypeLowering(potentialNSError.getType());
+                auto nsErrorValue =
+                  emitUncheckedGetOptionalValueFrom(loc, potentialNSError,
+                                                    inputTL);
+
+
+                // Perform an unchecked cast down to NSError, because it was typed
+                // as 'AnyObject' for layering reasons.
+                return ManagedValue(B.createUncheckedRefCast(
+                                      loc,
+                                      nsErrorValue.getValue(),
+                                      getLoweredType(nsErrorType)),
+                                    nsErrorValue.getCleanup());
+
+              }).forward(*this);
+        }
+        B.createBranch(loc, contBB, branchArg);
+
+        // If we did not get an NSError, just directly emit the existential
+        // (recursively).
+        B.emitBlock(isNotPresentBB);
+        branchArg = emitExistentialErasure(loc, concreteFormalType, concreteTL,
+                                           existentialTL, conformances,
+                                           SGFContext(), F,
+                                           /*allowEmbeddedNSError=*/false)
+                      .forward(*this);
+        B.createBranch(loc, contBB, branchArg);
+
+        // Continue.
+        B.emitBlock(contBB);
+        return emitManagedRValueWithCleanup(existentialResult, existentialTL);
+      }
+    }
+  }
 
   switch (existentialTL.getLoweredType().getObjectType()
             .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {

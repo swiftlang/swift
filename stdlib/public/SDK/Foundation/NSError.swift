@@ -241,6 +241,11 @@ extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
   public var _userInfo: Any? { return userInfo }
+
+  /// The "embedded" NSError is itself.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return self
+  }
 }
 
 extension CFError : Error {
@@ -254,6 +259,11 @@ extension CFError : Error {
 
   public var _userInfo: Any? {
     return CFErrorCopyUserInfo(self) as Any
+  }
+
+  /// The "embedded" NSError is itself.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return self
   }
 }
 
@@ -496,6 +506,11 @@ extension _ErrorCodeProtocol where Self._ErrorType: _BridgedStoredNSError {
 }
 
 extension _BridgedStoredNSError {
+  /// Retrieve the embedded NSError from a bridged, stored NSError.
+  public func _getEmbeddedNSError() -> AnyObject? {
+    return _nsError
+  }
+
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs._nsError.isEqual(rhs._nsError)
   }

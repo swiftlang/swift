@@ -71,4 +71,6 @@ FUNC_DECL(BridgeAnythingToObjectiveC,
 FUNC_DECL(DidEnterMain, "_stdlib_didEnterMain")
 FUNC_DECL(DiagnoseUnexpectedNilOptional, "_diagnoseUnexpectedNilOptional")
 
+FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
+
 #undef FUNC_DECL

@@ -872,6 +872,16 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype) {
   }
   }
 }
+
+// @_silgen_name("swift_stdlib_getErrorEmbeddedNSErrorIndirect")
+// public func _stdlib_getErrorEmbeddedNSErrorIndirect<T : Error>(
+///    _ x: UnsafePointer<T>) -> AnyObject?
+SWIFT_CC(swift)
+extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
+                const OpaqueValue *error,
+                const Metadata *T,
+                const WitnessTable *Error);
+
 #endif
 
 /// Perform a dynamic cast to an existential type.
@@ -1040,7 +1050,20 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                               targetType->Protocols,
                               &errorWitness))
       return _fail(src, srcType, targetType, flags, srcDynamicType);
-    
+
+#if SWIFT_OBJC_INTEROP
+    // Check whether there is an embedded NSError. If so, use that for our Error
+    // representation.
+    if (auto embedded =
+          swift_stdlib_getErrorEmbeddedNSErrorIndirect(srcDynamicValue,
+                                                       srcDynamicType,
+                                                       errorWitness)) {
+      *destBoxAddr = reinterpret_cast<SwiftError*>(embedded);
+      maybeDeallocateSourceAfterSuccess();
+      return true;
+    }
+#endif
+
     BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
                                        srcDynamicValue,
                /*isTake*/ canTake && (flags & DynamicCastFlags::TakeOnSuccess));
@@ -2010,10 +2033,21 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
                                     const WitnessTable *srcErrorWitness,
                                     DynamicCastFlags flags) {
+  // Check whether there is an embedded NSError.
+  if (auto embedded =
+          swift_stdlib_getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                       srcErrorWitness)) {
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      srcType->vw_destroy(src);
+
+    return embedded;
+  }
+
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
   return swift_bridgeErrorToNSError((SwiftError*)errorBox.first);
 }
+
 #endif
 
 namespace {
