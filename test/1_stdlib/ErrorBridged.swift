@@ -633,11 +633,24 @@ extension Error {
 	}
 }
 
+func unconditionalCast<T>(_ x: Any, to: T.Type) -> T {
+  return x as! T
+}
+
+func conditionalCast<T>(_ x: Any, to: T.Type) -> T? {
+  return x as? T
+}
+
 // SR-1562
 ErrorBridgingTests.test("Error archetype identity") {
   let myError = NSError(domain: "myErrorDomain", code: 0,
                         userInfo: [ AnyHashable("one") : 1 ])
   expectTrue(myError === myError.asNSError())
+
+  expectTrue(unconditionalCast(myError, to: Error.self) as NSError
+     === myError)
+  expectTrue(conditionalCast(myError, to: Error.self)! as NSError
+     === myError)
 }
 
 runAllTests()
