@@ -12,6 +12,7 @@
 
 %{
 from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
 
 import StdlibUnittest
@@ -666,12 +667,7 @@ public struct ${Self}<
 //===----------------------------------------------------------------------===//
 
 public func expectCustomizable<T : Wrapper>(
-  _: T, _ counters: TypeIndexed<Int>,
-  //===--- TRACE boilerplate ----------------------------------------------===//
-  _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = #file, line: UInt = #line
+  _: T, _ counters: TypeIndexed<Int>, ${TRACE}
 ) where
   T : LoggingType,
   T.Base : Wrapper, T.Base : LoggingType,
@@ -683,12 +679,7 @@ public func expectCustomizable<T : Wrapper>(
 }
 
 public func expectNotCustomizable<T : Wrapper>(
-  _: T, _ counters: TypeIndexed<Int>,
-  //===--- TRACE boilerplate ----------------------------------------------===//
-  _ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
-  file: String = #file, line: UInt = #line
+  _: T, _ counters: TypeIndexed<Int>, ${TRACE}
 ) where
   T : LoggingType,
   T.Base : Wrapper, T.Base : LoggingType,
