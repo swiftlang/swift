@@ -42,21 +42,25 @@ We describe each in detail below:
 
 A smoke test on macOS does the following:
 
-1. Builds the compiler incrementally.
-2. Builds the standard library only for macOS. Simulator standard libraries and
+1. Builds LLVM/Clang incrementally.
+2. Builds Swift clean.
+3. Builds the standard library only for macOS. Simulator standard libraries and
    device standard libraries are not built.
-3. lldb is not built.
-4. The test and validation-test targets are run only for macOS. The optimized
+4. lldb is not built.
+5. The test and validation-test targets are run only for macOS. The optimized
    version of these tests are not run.
 
 A smoke test on Linux does the following:
 
-1. Builds the compiler incrementally.
-2. Builds the standard library incrementally.
-3. lldb is built incrementally.
-4. The swift test and validation-test targets are run. The optimized version of these
+1. Builds LLVM/Clang incrementally.
+2. Builds Swift clean.
+3. Builds the standard library clean.
+4. lldb is built incrementally.
+5. Foundation, SwiftPM, LLBuild, XCTest are built.
+6. The swift test and validation-test targets are run. The optimized version of these
    tests are not run.
-5. lldb is tested.
+7. lldb is tested.
+8. Foundation, SwiftPM, LLBuild, XCTest are tested.
 
 ### Validation Testing
 
@@ -91,8 +95,10 @@ A validation test on Linux does the following:
 2. Builds the compiler.
 3. Builds the standard library.
 4. lldb is built.
-5. Run the swift test and validation-test targets with and without optimization.
-6. lldb is tested.
+5. Builds Foundation, SwiftPM, LLBuild, XCTest
+6. Run the swift test and validation-test targets with and without optimization.
+7. lldb is tested.
+8. Foundation, SwiftPM, LLBuild, XCTest are tested.
 
 ### Benchmarking
 
