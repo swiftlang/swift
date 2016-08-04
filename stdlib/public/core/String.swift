@@ -483,7 +483,7 @@ extension String {
     Encoding: UnicodeCodec
   >(
     _ encoding: Encoding.Type,
-    into processCodeUnit: @noescape (Encoding.CodeUnit) -> Void
+    into processCodeUnit: (Encoding.CodeUnit) -> Void
   ) {
     return _core.encode(encoding, into: processCodeUnit)
   }

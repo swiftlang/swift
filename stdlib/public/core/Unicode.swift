@@ -131,7 +131,7 @@ public protocol UnicodeCodec {
   ///     time.
   static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   )
 
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
@@ -374,7 +374,7 @@ public struct UTF8 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -571,7 +571,7 @@ public struct UTF16 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
@@ -671,7 +671,7 @@ public struct UTF32 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
@@ -717,7 +717,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
-  into processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
+  into processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool
   where
   Input : IteratorProtocol,
