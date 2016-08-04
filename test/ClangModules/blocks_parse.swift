@@ -15,8 +15,8 @@ someNSString.enumerateLines({ useString($0) })
 
 accepts_block(/*not a block=*/()) // expected-error{{cannot convert value of type '()' to expected argument type 'my_block_t' (aka '() -> ()'}}
 
-func testNoEscape(f: @noescape @convention(block) () -> Void, nsStr: NSString,
-                  fStr: @noescape (String!) -> Void) {
+func testNoEscape(f: @convention(block) () -> Void, nsStr: NSString,
+                  fStr: (String!) -> Void) {
   accepts_noescape_block(f)
   accepts_noescape_block(f)
 

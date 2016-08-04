@@ -357,7 +357,7 @@ testImplicitlyUnwrappedFunctionParameter(nil)
 /** Miscellaneous bugs **/
 
 // rdar://problem/21967164 - Non-throwing closures are incorrectly marked as throwing in rethrow contexts
-func rt1(predicate: @noescape () throws -> ()) rethrows { }
+func rt1(predicate: () throws -> ()) rethrows { }
 rt1 { }
 
 func rt2(_ predicate: () throws -> ()) rethrows { }

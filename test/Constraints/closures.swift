@@ -198,7 +198,7 @@ struct S<T> {
 }
 
 // Make sure we cannot infer an () argument from an empty parameter list.
-func acceptNothingToInt (_: @noescape () -> Int) {}
+func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
   // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
