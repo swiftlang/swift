@@ -70,13 +70,13 @@ func _XCTRunThrowableBlock(_ block: @noescape () throws -> Void) -> _XCTThrowabl
   if let blockError = blockErrorOptional {
     return .failedWithError(error: blockError)
   } else if d.count > 0 {
-    let t: String = d["type" as NSString] as! String
+    let t: String = d["type"] as! String
     
     if t == "objc" {
       return .failedWithException(
-        className: d["className" as NSString] as! String,
-        name: d["name" as NSString] as! String,
-        reason: d["reason" as NSString] as! String)
+        className: d["className"] as! String,
+        name: d["name"] as! String,
+        reason: d["reason"] as! String)
     } else {
       return .failedWithUnknownException
     }

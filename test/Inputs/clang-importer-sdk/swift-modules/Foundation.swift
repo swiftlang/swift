@@ -327,3 +327,17 @@ public extension _BridgedStoredNSError
     self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
   }
 }
+
+extension NSDictionary {
+  public subscript(_: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
+    get { fatalError() }
+  }
+}
+extension NSMutableDictionary {
+  public override subscript(_: Any) -> Any? {
+    get { fatalError() }
+    @objc(_swift_setObject:forKeyedSubscript:)
+    set { }
+  }
+}
