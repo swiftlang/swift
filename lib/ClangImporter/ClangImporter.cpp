@@ -856,22 +856,28 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
   for (const auto &macro : pp.macros(false)) {
     // Find the local history of this macro directive.
     clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
-    if (!MD) continue;
 
     // Walk the history.
     for (; MD; MD = MD->getPrevious()) {
-      // Check whether we have a macro defined in this module.
-      auto info = pp.getMacroInfo(macro.first);
-      if (!info || info->isFromASTFile() || info->isBuiltinMacro()) continue;
+      // Don't look at any definitions that are followed by undefs.
+      // FIXME: This isn't quite correct across explicit submodules -- one
+      // submodule might define a macro, while another defines and then
+      // undefines the same macro. If they are processed in that order, the
+      // history will have the undef at the end, and we'll miss the first
+      // definition.
+      if (isa<clang::UndefMacroDirective>(MD))
+        break;
 
       // Only interested in macro definitions.
       auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
       if (!defMD) continue;
 
+      // Is this definition from this module?
+      auto info = defMD->getInfo();
+      if (!info || info->isFromASTFile()) continue;
+
       // If we hit a builtin macro, we're done.
-      if (auto info = defMD->getInfo()) {
-        if (info->isBuiltinMacro()) break;
-      }
+      if (info->isBuiltinMacro()) break;
 
       // If we hit a macro with invalid or predefined location, we're done.
       auto loc = defMD->getLocation();
@@ -882,7 +888,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
       // Add this entry.
       auto name = importMacroName(macro.first, info, clangCtx);
       if (name.empty()) continue;
-      table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
+      table.addEntry(name, info, clangCtx.getTranslationUnitDecl(), &pp);
     }
   }
 }
