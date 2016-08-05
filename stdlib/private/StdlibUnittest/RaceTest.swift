@@ -47,7 +47,7 @@ import Glibc
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(invoking code: @noescape () -> Void) {
+func autoreleasepool(invoking code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()

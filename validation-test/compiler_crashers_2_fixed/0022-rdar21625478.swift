@@ -20,11 +20,11 @@ public protocol MySequence {
   var underestimatedCount: Int { get }
 
   func map<T>(
-    _ transform: @noescape (Iterator.Element) -> T
+    _ transform: (Iterator.Element) -> T
   ) -> [T]
 
   func filter(
-    _ isIncluded: @noescape (Iterator.Element) -> Bool
+    _ isIncluded: (Iterator.Element) -> Bool
   ) -> [Iterator.Element]
 
   func _customContainsEquatableElement(
@@ -32,7 +32,7 @@ public protocol MySequence {
   ) -> Bool?
 
   func _preprocessingPass<R>(
-    _ preprocess: @noescape (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R?
 
   func _copyToNativeArrayBuffer()
@@ -48,13 +48,13 @@ extension MySequence {
   }
 
   public func map<T>(
-    _ transform: @noescape (Iterator.Element) -> T
+    _ transform: (Iterator.Element) -> T
   ) -> [T] {
     return []
   }
 
   public func filter(
-    _ isIncluded: @noescape (Iterator.Element) -> Bool
+    _ isIncluded: (Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     return []
   }
@@ -66,7 +66,7 @@ extension MySequence {
   }
 
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     return nil
   }
@@ -111,7 +111,7 @@ extension MyCollection {
     return startIndex == endIndex
   }
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     return preprocess(self)
   }
@@ -249,14 +249,14 @@ extension LoggingSequenceType
   }
 
   public func map<T>(
-    _ transform: @noescape (Base.Iterator.Element) -> T
+    _ transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     Log.map[selfType] += 1
     return base.map(transform)
   }
 
   public func filter(
-    _ isIncluded: @noescape (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
     return base.filter(isIncluded)
@@ -273,7 +273,7 @@ extension LoggingSequenceType
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }

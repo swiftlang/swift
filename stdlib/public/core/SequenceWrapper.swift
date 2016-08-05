@@ -67,7 +67,7 @@ extension Sequence
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
   public func map<T>(
-    _ transform: @noescape (Base.Iterator.Element) throws -> T
+    _ transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
@@ -88,7 +88,7 @@ extension Sequence
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ isIncluded: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(isIncluded)
   }
@@ -103,7 +103,7 @@ extension Sequence
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }

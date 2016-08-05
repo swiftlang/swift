@@ -102,7 +102,7 @@ extension Collection {
   ///
   /// - SeeAlso: `index(of:)`
   public func index(
-    where predicate: @noescape (${IElement}) throws -> Bool
+    where predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
     while i != self.endIndex {
@@ -144,7 +144,7 @@ orderingExplanation = """\
 
 extension MutableCollection {
   public mutating func partition(
-    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+    by belongsInSecondPartition: (${IElement}) throws -> Bool
   ) rethrows -> Index {
 
     var pivot = startIndex
@@ -172,7 +172,7 @@ extension MutableCollection {
 
 extension MutableCollection where Self : BidirectionalCollection {
   public mutating func partition(
-    by belongsInSecondPartition: @noescape (${IElement}) throws -> Bool
+    by belongsInSecondPartition: (${IElement}) throws -> Bool
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (baseAddress, count) -> Int in
@@ -334,7 +334,7 @@ ${orderingExplanation}
   /// ${'- MutatingVariant: sort' if Self == 'MutableCollection' else ''}
   public func sorted(
     by areInIncreasingOrder:
-      @noescape (${IElement}, ${IElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
   ) -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sort(by: areInIncreasingOrder)
@@ -445,7 +445,7 @@ ${orderingExplanation}
   ///   `false`.
   public mutating func sort(
     by areInIncreasingOrder:
-      @noescape (${IElement}, ${IElement}) -> Bool
+      (${IElement}, ${IElement}) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
       (Iterator.Element, Iterator.Element) -> Bool
@@ -569,7 +569,7 @@ ${subscriptCommentPost}
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, message: "call partition(by:)")
   public mutating func partition(
-    isOrderedBefore: @noescape (${IElement}, ${IElement}) -> Bool
+    isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) -> Index {
     Builtin.unreachable()
   }
@@ -611,7 +611,7 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(by:)")
   public mutating func sortInPlace(
-    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) -> Bool
+    _ isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
     Builtin.unreachable()
   }
@@ -627,7 +627,7 @@ extension Collection where ${IElement} : Equatable {
 extension Collection {
   @available(*, unavailable, renamed: "index(where:)")
   public func indexOf(
-    _ predicate: @noescape (${IElement}) throws -> Bool
+    _ predicate: (${IElement}) throws -> Bool
   ) rethrows -> Index? {
     Builtin.unreachable()
   }

@@ -329,7 +329,7 @@ public struct _StringCore {
   /// Write the string, in the given encoding, to output.
   func encode<Encoding: UnicodeCodec>(
     _ encoding: Encoding.Type,
-    into processCodeUnit: @noescape (Encoding.CodeUnit) -> Void)
+    into processCodeUnit: (Encoding.CodeUnit) -> Void)
   {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {

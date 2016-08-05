@@ -29,7 +29,7 @@ internal final class _EmptyArrayStorage
 
 #if _runtime(_ObjC)
   override func _withVerbatimBridgedUnsafeBuffer<R>(
-    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
@@ -76,7 +76,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   final override func _withVerbatimBridgedUnsafeBuffer<R>(
-    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> R
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     var result: R? = nil
     try self._withVerbatimBridgedUnsafeBufferImpl {
@@ -88,7 +88,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal func _withVerbatimBridgedUnsafeBufferImpl(
-    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> Void
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     _sanityCheckFailure(
       "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
@@ -111,7 +111,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal final override func _withVerbatimBridgedUnsafeBufferImpl(
-    _ body: @noescape (UnsafeBufferPointer<AnyObject>) throws -> Void
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       let count = __manager.header.count
@@ -264,7 +264,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   public func withUnsafeBufferPointer<R>(
-    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(UnsafeBufferPointer(start: firstElementAddress,
@@ -274,7 +274,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(

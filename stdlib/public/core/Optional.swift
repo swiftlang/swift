@@ -158,7 +158,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   public func map<U>(
-    _ transform: @noescape (Wrapped) throws -> U
+    _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
     switch self {
     case .some(let y):
@@ -188,7 +188,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   public func flatMap<U>(
-    _ transform: @noescape (Wrapped) throws -> U?
+    _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
     case .some(let y):

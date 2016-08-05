@@ -5,7 +5,7 @@
 
 // LValues are direct values, too. They are reference types, though.
 
-func Close(_ fn: @noescape () -> Int64) { fn() }
+func Close(_ fn: () -> Int64) { fn() }
 typealias MyFloat = Float
 
 // CHECK: define hidden void @_TF5inout13modifyFooHeap

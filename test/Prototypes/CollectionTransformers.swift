@@ -236,7 +236,7 @@ struct _ForkJoinMutex {
     _mutex.deallocate(capacity: 1)
   }
 
-  func withLock<Result>(_ body: @noescape () -> Result) -> Result {
+  func withLock<Result>(_ body: () -> Result) -> Result {
     if pthread_mutex_lock(_mutex) != 0 {
       fatalError("pthread_mutex_lock")
     }
@@ -704,7 +704,7 @@ final public class ForkJoinPool {
   }
 
   internal func _tryCreateThread(
-    _ makeTask: @noescape () -> ForkJoinTaskBase?
+    _ makeTask: () -> ForkJoinTaskBase?
   ) -> Bool {
     var success = false
     var oldNumThreads = _totalThreads.load()

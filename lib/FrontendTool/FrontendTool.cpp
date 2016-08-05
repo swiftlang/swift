@@ -629,8 +629,11 @@ private:
         Info.ID == diag::noescape_autoclosure.ID ||
         Info.ID == diag::where_inside_brackets.ID ||
         Info.ID == diag::selector_construction_suggest.ID ||
-        Info.ID == diag::selector_literal_deprecated_suggest.ID)
+        Info.ID == diag::selector_literal_deprecated_suggest.ID ||
+        Info.ID == diag::attr_noescape_deprecated.ID ||
+        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID)
       return true;
+
     return false;
   }
 
