@@ -2401,6 +2401,32 @@ diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
   return;
 }
 
+/// When a user refers a enum case with a wrong member name, we try to find a enum
+/// element whose name differs from the wrong name only in convention; meaning their
+/// lower case counterparts are identical.
+///   - DeclName is valid when such a correct case is found; invalid otherwise.
+static DeclName
+findCorrectEnumCaseName(MetatypeType *MetaTy, LookupResult &Result,
+                        DeclName memberName) {
+  if (!memberName.isSimpleName())
+    return DeclName();
+  if (MetaTy->getInstanceType()->getKind() != TypeKind::Enum)
+    return DeclName();
+  std::vector<DeclName> candidates;
+  for (auto &correction : Result) {
+    DeclName correctName = correction.Decl->getFullName();
+    if (!correctName.isSimpleName())
+      continue;
+    if (correction.Decl->getKind() != DeclKind::EnumElement)
+      continue;
+    if (0 == correctName.getBaseName().str().
+          compare_lower(memberName.getBaseName().str()))
+      candidates.push_back(correctName);
+  }
+  if (1 == candidates.size())
+    return candidates.front();
+  return DeclName();
+}
 
 /// Given a result of name lookup that had no viable results, diagnose the
 /// unviable ones.
@@ -2426,10 +2452,17 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       diagnose(loc, diag::type_not_subscriptable, baseObjTy)
         .highlight(baseRange);
     } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
+      tryTypoCorrection();
+      if (DeclName rightName = findCorrectEnumCaseName(MTT, correctionResults,
+                                                       memberName)) {
+        diagnose(loc, diag::could_not_find_enum_case, MTT->getInstanceType(),
+          memberName, rightName).fixItReplace(nameLoc.getBaseNameLoc(),
+                                              rightName.getBaseName().str());
+        return;
+      }
       diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      tryTypoCorrection();
     } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)

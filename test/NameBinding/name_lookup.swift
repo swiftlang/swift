@@ -522,7 +522,8 @@ class r16954496 {
 enum MyEnum {
   case one
   case two
-  
+  case oneTwoThree
+
   static let kMyConstant = "myConstant"
 }
 
@@ -535,3 +536,8 @@ default:
   break
 }
 
+func foo() {
+  _ = MyEnum.One // expected-error {{enum type 'MyEnum' has no case 'One'; do you mean 'one'}}{{14-17=one}}
+  _ = MyEnum.Two // expected-error {{enum type 'MyEnum' has no case 'Two'; do you mean 'two'}}{{14-17=two}}
+  _ = MyEnum.OneTwoThree // expected-error {{enum type 'MyEnum' has no case 'OneTwoThree'; do you mean 'oneTwoThree'}}{{14-25=oneTwoThree}}
+}
