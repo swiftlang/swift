@@ -251,6 +251,18 @@ UnicodeTrie.test("GraphemeClusterSegmentation/Unicode_8_0_0") {
       SourceLocStack().withCurrentLoc())
 }
 
+UnicodeTrie.test("GraphemeClusterSegmentation/Unicode_9_0_0") {
+  // Verify that we are using Unicode 9.0.0+ data tables.
+
+  // In Unicode 8.0.0, this sequence was segmented into two grapheme clusters.
+  //
+  // U+1F466 BOY
+  // U+1F3FB EMOJI MODIFIER TYPE 1-2
+  checkGraphemeClusterSegmentation(
+      [ 0, 2 ],
+      scalars: [ 0x1F466, 0x1F3FB ],
+      SourceLocStack().withCurrentLoc())
+}
 
 runAllTests()
 
