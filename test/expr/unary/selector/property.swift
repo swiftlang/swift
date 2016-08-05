@@ -37,7 +37,7 @@ class ObjCClass {
     let _ = #selector(setter: myConstant) // expected-error {{argument of '#selector(setter:)' refers to non-settable let 'myConstant'}}
     let _ = #selector(setter: myComputedReadOnlyProperty) // expected-error {{argument of '#selector(setter:)' refers to non-settable var 'myComputedReadOnlyProperty'}}
 
-    let _ = #selector(myClassFunc) // expected-error{{use of unresolved identifier 'myClassFunc'}}
+    let _ = #selector(myClassFunc) // expected-error{{static member 'myClassFunc' cannot be used on instance of type 'ObjCClass'}}
   }
 
   class func classMethod() {
@@ -173,7 +173,7 @@ class InstanceStaticTestClass {
 
   @objc static func staticMethod() {}
 
-  @objc func instanceMethod() {} // expected-note {{did you mean 'instanceMethod'?}}
+  @objc func instanceMethod() {}
 
   @objc func instanceAndStaticMethod() {}
   @objc class func instanceAndStaticMethod() {}
@@ -205,8 +205,8 @@ class InstanceStaticTestClass {
     let _ = #selector(instanceMethod)
 
     let _ = #selector(getter: staticProperty) // expected-error{{static member 'staticProperty' cannot be used on instance of type 'InstanceStaticTestClass'}}
-    let _ = #selector(classMethod) // expected-error{{use of unresolved identifier 'classMethod'}}
-    let _ = #selector(staticMethod) // expected-error{{use of unresolved identifier 'staticMethod'}}
+    let _ = #selector(classMethod) // expected-error{{static member 'classMethod' cannot be used on instance of type 'InstanceStaticTestClass'}}
+    let _ = #selector(staticMethod) // expected-error{{static member 'staticMethod' cannot be used on instance of type 'InstanceStaticTestClass'}}
 
     let _ = #selector(instanceAndStaticMethod)
   }

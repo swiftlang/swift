@@ -96,7 +96,8 @@ private enum Bar<T> {
 
   mutating func value() -> T {
     switch self {
-    case E(let x): // expected-error{{invalid pattern}}
+    // FIXME: Should diagnose here that '.' needs to be inserted, but E has an ErrorType at this point
+    case E(let x):
       return x.value
     }
   }

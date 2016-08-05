@@ -175,7 +175,7 @@ public struct CGFloat {
   }
 
   public var magnitude: CGFloat {
-    return CGFloat(abs(native))
+    return CGFloat(Swift.abs(native))
   }
 
   public mutating func negate() {

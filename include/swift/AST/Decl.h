@@ -288,11 +288,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// once (either in its declaration, or once later), making it immutable.
     unsigned IsLet : 1;
 
-    /// \brief Whether this is an 'inout' parameter; this is preferable
-    /// to checking if the parameter type is an InOutType, because invalid
-    /// inout parameters have an error type.
-    unsigned IsInOut : 1;
-
     /// \brief Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
     /// binding.  This happens in cases like "for i in ...", switch cases, etc.
@@ -306,7 +301,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// a.storage for lazy var a is a decl that cannot be accessed.
     unsigned IsUserAccessible : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
   class EnumElementDeclBitfields {
@@ -4250,7 +4245,6 @@ protected:
     VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
-    VarDeclBits.IsInOut = false;
     VarDeclBits.IsDebuggerVar = false;
     VarDeclBits.HasNonPatternBindingInit = false;
     setType(Ty);
@@ -4347,10 +4341,6 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
-
-  /// Is this an 'inout' parameter?
-  bool isInOut() const { return VarDeclBits.IsInOut; }
-  void setInOut(bool InOut) { VarDeclBits.IsInOut = InOut; }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern

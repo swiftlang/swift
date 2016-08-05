@@ -261,9 +261,14 @@ case (1, 2, 3):
   ()
 
 // patterns in expression-only positions are errors.
-case +++(_, var d, 3): // expected-error{{invalid pattern}}
+case +++(_, var d, 3):
+// expected-error@-1{{'+++' is not a prefix unary operator}}
   ()
-case (_, var e, 3) +++ (1, 2, 3): // expected-error{{invalid pattern}}
+case (_, var e, 3) +++ (1, 2, 3):
+// expected-error@-1{{binary operator '+++' cannot be applied to operands of type '(_, <<error type>>, Int)' and '(Int, Int, Int)'}}
+// expected-note@-2{{expected an argument list of type '((Int, Int, Int), (Int, Int, Int))'}}
+// expected-error@-3{{'var' binding pattern cannot appear in an expression}}
+// expected-error@-4{{'var' binding pattern cannot appear in an expression}}
   ()
 }
 
