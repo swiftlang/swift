@@ -470,6 +470,7 @@ class CastOptimizer {
   /// into a bridged ObjC type.
   SILInstruction *
   optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,
@@ -531,6 +532,7 @@ public:
   /// May change the control flow.
   SILInstruction *
   optimizeBridgedCasts(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,

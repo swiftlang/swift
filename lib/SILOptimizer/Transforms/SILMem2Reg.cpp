@@ -156,7 +156,7 @@ class MemoryToRegisters {
   SILBuilder B;
 
   /// \brief Check if the AllocStackInst \p ASI is only written into.
-  bool isWriteOnlyAllocation(AllocStackInst *ASI, bool Promoted = false);
+  bool isWriteOnlyAllocation(AllocStackInst *ASI);
 
   /// \brief Promote all of the AllocStacks in a single basic block in one
   /// linear scan. Note: This function deletes all of the users of the
@@ -242,8 +242,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
 }
 
 /// Returns true if the AllocStack is only stored into.
-bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
-                                              bool Promoted) {
+bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
   // For all users of the AllocStack:
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI) {
     SILInstruction *II = UI->getUser();
@@ -259,14 +258,8 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
 
     // If we haven't already promoted the AllocStack, we may see
     // DebugValueAddr uses.
-    if (!Promoted && isa<DebugValueAddrInst>(II))
+    if (isa<DebugValueAddrInst>(II))
       continue;
-
-    // Destroys of loadable types can be rewritten as releases, so
-    // they are fine.
-    if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
-      if (!Promoted && DAI->getOperand()->getType().isLoadable(DAI->getModule()))
-        continue;
 
     // Can't do anything else with it.
     DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
@@ -874,8 +867,7 @@ bool MemoryToRegisters::run() {
       StackAllocationPromoter(ASI, DT, DomTreeLevels, B).run();
 
       // Make sure that all of the allocations were promoted into registers.
-      assert(isWriteOnlyAllocation(ASI, /* Promoted =*/ true) &&
-             "Non-write uses left behind");
+      assert(isWriteOnlyAllocation(ASI) && "Non-write uses left behind");
       // ... and erase the allocation.
       eraseUsesOfInstruction(ASI);
 
