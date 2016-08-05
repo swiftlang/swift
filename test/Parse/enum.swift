@@ -453,14 +453,17 @@ struct SE0036_Auxiliary {}
 enum SE0036 {
   case A
   case B(SE0036_Auxiliary)
+  case C(SE0036_Auxiliary)
 
   static func staticReference() {
     _ = A
+    _ = self.A
     _ = SE0036.A
   }
 
   func staticReferenceInInstanceMethod() {
     _ = A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{9-9=SE0036.}}
+    _ = self.A // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{none}}
     _ = SE0036.A
   }
 
@@ -468,6 +471,7 @@ enum SE0036 {
     switch SE0036.A {
     case A: break
     case B(_): break
+    case C(let x): _ = x; break
     }
   }
 
@@ -475,6 +479,7 @@ enum SE0036 {
     switch self {
     case A: break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
     case B(_): break // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{10-10=.}}
+    case C(let x): _ = x; break // expected-error {{invalid pattern}}
     }
   }
 
@@ -482,6 +487,7 @@ enum SE0036 {
     switch SE0036.A {
     case SE0036.A: break
     case SE0036.B(_): break
+    case SE0036.C(let x): _ = x; break
     }
   }
 
@@ -489,6 +495,7 @@ enum SE0036 {
     switch self {
     case .A: break
     case .B(_): break
+    case .C(let x): _ = x; break
     }
   }
 
@@ -496,6 +503,7 @@ enum SE0036 {
     switch SE0036.A {
     case .A: break
     case .B(_): break
+    case .C(let x): _ = x; break
     }
   }
 
@@ -514,7 +522,11 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=SE0036_Generic.}}
+    case A(_): break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
+    }
+
+    switch self {
+    case .A(let a): print(a)
     }
 
     switch self {

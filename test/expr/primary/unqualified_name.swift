@@ -29,7 +29,7 @@ struct S0 {
     _ = self.f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{19-20=}}{{25-26=}}
     _ = self.f2(_:`let`:)
 
-    _ = f3(_:y:z:) // expected-error{{static member 'f3(_:y:z:)' cannot be used on instance of type 'S0'}}
+    _ = f3(_:y:z:) // expected-error{{static member 'f3(_:y:z:)' cannot be used on instance of type 'S0'}}{{9-9=S0.}}
   }
 
   static func testStaticS0() {
