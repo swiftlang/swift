@@ -17,7 +17,9 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-
+#if _runtime(_ObjC)
+import Foundation
+#endif
 
 let CastsTests = TestSuite("Casts")
 
@@ -45,5 +47,48 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
     let err: Error = ErrClass()
     bar(err)
 }
+
+extension Int : P {}
+
+#if _runtime(_ObjC)
+extension CFBitVector : P {
+  static func makeImmutable(from values: Array<UInt8>) -> CFBitVector {
+    return CFBitVectorCreate(/*allocator:*/ nil, values, values.count * 8)
+  }
+}
+
+extension CFMutableBitVector {
+  static func makeMutable(from values: Array<UInt8>) -> CFMutableBitVector {
+    return CFBitVectorCreateMutableCopy(
+      /*allocator:*/ nil,
+      /*capacity:*/ 0,
+      CFBitVector.makeImmutable(from: values))
+  }
+}
+
+func isP<T>(_ t: T) -> Bool {
+  return t is P
+}
+
+CastsTests.test("Dynamic casts of CF types to protocol existentials") {
+  expectTrue(isP(10 as Int))
+
+  // FIXME: SR-2289: dynamic casting of CF types to protocol existentials
+  // should work, but there is a bug in the runtime that prevents them from
+  // working.
+  if !_isDebugAssertConfiguration() {
+    // FIXME: this test should not crash.  It currently crashes in optimized
+    // mode because the optimizer assumes that the type conforms, but then the
+    // runtime disagrees.
+    expectCrashLater()
+  }
+  expectFailure {
+    expectTrue(isP(CFBitVector.makeImmutable(from: [10, 20])))
+  }
+  expectFailure {
+    expectTrue(isP(CFMutableBitVector.makeMutable(from: [10, 20])))
+  }
+}
+#endif
 
 runAllTests()
