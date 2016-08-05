@@ -5693,6 +5693,11 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     return result;
   };
   auto createInvalid = [&] {
+    // Use the last consumed token location as the rbrace to satisfy
+    // the AST invariant about a decl's source range including all of
+    // its components.
+    if (!rbraceLoc.isValid()) rbraceLoc = PreviousLoc;
+
     auto result = create();
     result->setInvalid();
     return makeParserErrorResult(result);
