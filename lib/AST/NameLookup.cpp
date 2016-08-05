@@ -556,15 +556,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
-        bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
         bool FoundAny = false;
         for (auto Result : Lookup) {
-          // If we're looking into an instance, skip static functions.
-          if (!isMetatypeType &&
-              isa<FuncDecl>(Result) &&
-              cast<FuncDecl>(Result)->isStatic())
-            continue;
-
           // Classify this declaration.
           FoundAny = true;
 
@@ -574,12 +567,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               Results.push_back(UnqualifiedLookupResult(Result));
             else
               Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
-            continue;
-          } else if (auto FD = dyn_cast<FuncDecl>(Result)) {
-            if (FD->isStatic() && !isMetatypeType)
-              continue;
-          } else if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(UnqualifiedLookupResult(BaseDecl, Result));
             continue;
           }
 
