@@ -38,6 +38,7 @@ add_swift_library(swiftAST STATIC
   SourceEntityWalker.cpp
   Substitution.cpp
   Type.cpp
+  TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
