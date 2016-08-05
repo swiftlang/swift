@@ -85,6 +85,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
+  CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoKind) {
   case IRGenDebugInfoKind::None:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
@@ -140,14 +141,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   auto &opts = irgen.Opts;
 
-  // If the command line contains an explicit request about whether to add
-  // LLVM value names, honor it.  Otherwise, add value names only if the
-  // final result is textual LLVM assembly.
-  if (opts.HasValueNamesSetting) {
-    EnableValueNames = opts.ValueNames;
-  } else {
-    EnableValueNames = (opts.OutputKind == IRGenOutputKind::LLVMAssembly);
-  }
+  EnableValueNames = opts.shouldProvideValueNames();
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
