@@ -19,10 +19,10 @@ struct D {
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.Int2048, 2
 // CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:      [[FN:%.*]] = function_ref @_TFSdCfT20_builtinFloatLiteralBf80__Sd : $@convention(method) (Builtin.FPIEEE80, @thin Double.Type) -> Double
+// CHECK:      [[FN:%.*]] = function_ref @_TFSdCfT20_builtinFloatLiteralBf{{64|80}}__Sd : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
-// CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE80, 0x4000E000000000000000
-// CHECK-NEXT: [[RIGHT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE80, @thin Double.Type) -> Double
+// CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
+// CHECK-NEXT: [[RIGHT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ([[LEFT]] : $Int, [[RIGHT]] : $Double)
 // CHECK-NEXT: return [[RESULT]] : $(Int, Double)
 
