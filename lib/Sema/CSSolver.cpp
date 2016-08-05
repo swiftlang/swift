@@ -692,8 +692,38 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
   cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
 
-  // Consider each of the constraints related to this type variable.
   PotentialBindings result;
+  Optional<unsigned> lastSupertypeIndex;
+
+  // Local function to add a potential binding to the list of bindings,
+  // coalescing supertype bounds when we are able to compute the meet.
+  auto addPotentialBinding = [&](PotentialBinding binding) {
+    // If this is a non-defaulted supertype binding, check whether we can
+    // combine it with another supertype binding by computing the 'meet' of the
+    // types.
+    if (binding.Kind == AllowedBindingKind::Supertypes &&
+        !binding.BindingType->hasTypeVariable() &&
+        !binding.DefaultedProtocol &&
+        !binding.IsDefaultableBinding) {
+      if (lastSupertypeIndex) {
+        // Can we compute a meet?
+        auto &lastBinding = result.Bindings[*lastSupertypeIndex];
+        if (auto meet =
+                Type::meet(lastBinding.BindingType, binding.BindingType)) {
+          // Replace the last supertype binding with the meet. We're done.
+          lastBinding.BindingType = *meet;
+          return;
+        }
+      }
+
+      // Record this as the most recent supertype index.
+      lastSupertypeIndex = result.Bindings.size();
+    }
+
+    result.Bindings.push_back(std::move(binding));
+  };
+
+  // Consider each of the constraints related to this type variable.
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
   SmallVector<Constraint *, 2> defaultableConstraints;
@@ -767,8 +797,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           continue;
 
         result.foundLiteralBinding(constraint->getProtocol());
-        result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getProtocol()});
+        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getProtocol()});
         continue;
       }
 
@@ -794,8 +824,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (!matched) {
         result.foundLiteralBinding(constraint->getProtocol());
         exactTypes.insert(defaultType->getCanonicalType());
-        result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getProtocol()});
+        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getProtocol()});
       }
 
       continue;
@@ -935,10 +965,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      result.Bindings.push_back({type, kind, None});
+      addPotentialBinding({type, kind, None});
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      result.Bindings.push_back({alternateType, kind, None});
+      addPotentialBinding({alternateType, kind, None});
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -1016,7 +1046,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     ++result.NumDefaultableBindings;
-    result.Bindings.push_back({type, AllowedBindingKind::Exact, None, true});
+    addPotentialBinding({type, AllowedBindingKind::Exact, None, true});
   }
 
   // Determine if the bindings only constrain the type variable from above with

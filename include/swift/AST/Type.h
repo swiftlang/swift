@@ -183,7 +183,30 @@ public:
 
   /// Get the canonical type, or return null if the type is null.
   CanType getCanonicalTypeOrNull() const; // in Types.h
-  
+
+  /// Computes the meet between two types.
+  ///
+  /// The meet of two types is the most specific type that is a supertype of
+  /// both \c type1 and \c type2. For example, given a simple class hierarchy as
+  /// follows:
+  ///
+  /// \code
+  /// class A { }
+  /// class B : A { }
+  /// class C : A { }
+  /// class D { }
+  /// \endcode
+  ///
+  /// The meet of B and C is A, the meet of A and B is A. However, there is no
+  /// meet of D and A (or D and B, or D and C) because there is no common
+  /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
+  /// to find a common type.
+  /// 
+  /// \returns the meet of the two types, if there is a concrete type that can
+  /// express the meet, or \c None of the only meet would be a more-general
+  /// existential type (e.g., \c Any).
+  static Optional<Type> meet(Type type1, Type type2);
+
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
   void operator==(Type T) const = delete;
@@ -432,6 +455,7 @@ public:
     return Signature;
   }
 };
+
 } // end namespace swift
 
 namespace llvm {
