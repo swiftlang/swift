@@ -284,9 +284,9 @@ func _MemoryLayout<T>(t: T) {
   _ = sizeof(T.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-21=>.size}} {{none}}
   _ = alignof(T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{16-22=>.alignment}} {{none}}
   _ = strideof(T.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{17-23=>.stride}} {{none}}
-  _ = sizeofValue(T.self) // expected-error {{'sizeofValue' has been replaced by 'MemoryLayout.size(ofValue:)'}} {{7-18=MemoryLayout.size}} {{19-19=ofValue: }} {{none}}
-  _ = alignofValue(T.self) // expected-error {{'alignofValue' has been replaced by 'MemoryLayout.alignment(ofValue:)'}} {{7-19=MemoryLayout.alignment}} {{20-20=ofValue: }} {{none}}
-  _ = strideofValue(T.self) // expected-error {{'strideofValue' has been replaced by 'MemoryLayout.stride(ofValue:)'}} {{7-20=MemoryLayout.stride}} {{21-21=ofValue: }} {{none}}
+  _ = sizeofValue(t) // expected-error {{'sizeofValue' has been replaced by 'MemoryLayout.size(ofValue:)'}} {{7-18=MemoryLayout.size}} {{19-19=ofValue: }} {{none}}
+  _ = alignofValue(t) // expected-error {{'alignofValue' has been replaced by 'MemoryLayout.alignment(ofValue:)'}} {{7-19=MemoryLayout.alignment}} {{20-20=ofValue: }} {{none}}
+  _ = strideofValue(t) // expected-error {{'strideofValue' has been replaced by 'MemoryLayout.stride(ofValue:)'}} {{7-20=MemoryLayout.stride}} {{21-21=ofValue: }} {{none}}
 }
 
 func _Mirror() {
