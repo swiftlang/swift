@@ -276,13 +276,8 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
 
-  if (Attrs.isDeprecatedAutoclosureEscaping) {
-    // Deprecated:
-    Printer << "@autoclosure(escaping) ";
-  } else {
-    if (Attrs.has(TAK_autoclosure)) Printer << "@autoclosure ";
-    if (Attrs.has(TAK_escaping))    Printer << "@escaping ";
-  }
+  if (Attrs.has(TAK_autoclosure)) Printer << "@autoclosure ";
+  if (Attrs.has(TAK_escaping))    Printer << "@escaping ";
 
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";

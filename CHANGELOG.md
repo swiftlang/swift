@@ -6,9 +6,9 @@ Swift 3.0
 * [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
 
   Closure parameters are non-escaping by default, rather than explicitly being
-  annotated @noescape. Use @escaping to say that a closure parameter may escape.
-  @autoclosure(escaping) is now spelled @autoclosure @escaping. @noescape and
-  @autoclosure(escaping) are deprecated.
+  annotated `@noescape`. Use `@escaping` to say that a closure parameter may
+  escape. `@autoclosure(escaping)` is now spelled `@autoclosure @escaping`.
+  `@noescape` and `@autoclosure(escaping)` are deprecated.
 
 * [SE-0115](https://github.com/apple/swift-evolution/blob/master/proposals/0115-literal-syntax-protocols.md)
 

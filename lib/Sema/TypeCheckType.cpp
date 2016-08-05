@@ -1889,8 +1889,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     bool defaultNoEscape = false;
-    if (isFunctionParam && !attrs.has(TAK_escaping) &&
-        !attrs.isDeprecatedAutoclosureEscaping) {
+    if (isFunctionParam && !attrs.has(TAK_escaping)) {
       defaultNoEscape = isDefaultNoEscapeContext(DC);
     }
 
