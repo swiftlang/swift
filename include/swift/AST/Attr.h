@@ -52,9 +52,6 @@ public:
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
 
-  /// For the deprecated @autoclosure(escaping) syntax
-  bool isDeprecatedAutoclosureEscaping = false;
-
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
 

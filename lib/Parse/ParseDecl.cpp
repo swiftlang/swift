@@ -1512,8 +1512,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_autoclosure:
     // Handle @autoclosure(escaping)
     if (isAutoclosureEscaping) {
-      Attributes.isDeprecatedAutoclosureEscaping = true;
-
       // @noescape @autoclosure(escaping) makes no sense.
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
@@ -1522,25 +1520,22 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
             .fixItReplace({Loc, autoclosureEscapingRightParenLoc},
                           "@autoclosure @escaping ");
       }
+      Attributes.setAttr(TAK_escaping, Loc);
     } else if (Attributes.has(TAK_noescape)) {
       diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
     }
     break;
 
   case TAK_noescape:
-    // You can't specify @noescape and @autoclosure(escaping) together, and
-    // @noescape after @autoclosure is redundant.
-    if (Attributes.has(TAK_autoclosure) &&
-        Attributes.isDeprecatedAutoclosureEscaping) {
-      diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
-      return false;
-    } else if (Attributes.has(TAK_autoclosure)) {
-      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
-    }
     // You can't specify @noescape and @escaping together.
     if (Attributes.has(TAK_escaping)) {
       diagnose(Loc, diag::attr_escaping_conflicts_noescape);
       return false;
+    }
+
+    // @noescape after @autoclosure is redundant.
+    if (Attributes.has(TAK_autoclosure)) {
+      diagnose(Loc, diag::attr_noescape_implied_by_autoclosure);
     }
 
     // @noescape is deprecated and no longer used
