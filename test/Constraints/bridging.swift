@@ -264,7 +264,7 @@ func rdar19831698() {
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
-  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[_]'}}
+  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }

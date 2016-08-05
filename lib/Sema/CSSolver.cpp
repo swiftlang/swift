@@ -191,6 +191,10 @@ Solution ConstraintSystem::finalize(
     solution.OpenedExistentialTypes.insert(openedExistential);
   }
 
+  // Remember the defaulted type variables.
+  solution.DefaultedTypeVariables.insert(DefaultedTypeVariables.begin(),
+                                         DefaultedTypeVariables.end());
+
   return solution;
 }
 
@@ -246,6 +250,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
     OpenedExistentialTypes.push_back(openedExistential);
   }
+
+  // Register the defaulted type variables.
+  DefaultedTypeVariables.append(solution.DefaultedTypeVariables.begin(),
+                                solution.DefaultedTypeVariables.end());
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
@@ -445,6 +453,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
+  numDefaultedTypeVariables = cs.DefaultedTypeVariables.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -501,6 +510,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
+  // Remove any defaulted type variables.
+  truncate(cs.DefaultedTypeVariables, numDefaultedTypeVariables);
+  
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
@@ -1182,6 +1194,12 @@ static bool tryTypeVariableBindings(
                        typeVar,
                        type,
                        typeVar->getImpl().getLocator());
+
+      // If this was from a defaultable binding note that.
+      if (binding.IsDefaultableBinding) {
+        cs.DefaultedTypeVariables.push_back(typeVar);
+      }
+
       if (!cs.solveRec(solutions, allowFreeTypeVariables))
         anySolved = true;
 
