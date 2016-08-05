@@ -1980,6 +1980,10 @@ struct TargetValueMetadata : public TargetMetadata<Runtime> {
     return (asWords + Description->GenericParams.Offset);
   }
 
+  const TargetNominalTypeDescriptor<Runtime> *getDescription() const {
+    return Description.get();
+  }
+
   StoredPointer offsetToDescriptorOffset() const {
     return offsetof(TargetValueMetadata<Runtime>, Description);
   }

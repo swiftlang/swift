@@ -41,10 +41,10 @@ func foo10(p : P1) {
 
 func foo11(a : [AnyHashable]) {}
 func foo12(b : [NSObject]) {
-  foo11(a : b) // expected-error {{cannot convert value of type '[NSObject]' to expected argument type '[AnyHashable]'}} {{14-14= as [AnyHashable]}}
+  foo11(a : b)
 }
 
 func foo13(a : [AnyHashable : Any]) {}
 func foo14(b : [NSObject : AnyObject]) {
-  foo13(a : b ) // expected-error {{cannot convert value of type '[NSObject : AnyObject]' to expected argument type '[AnyHashable : Any]'}} {{14-14= as [AnyHashable : Any]}}
+  foo13(a : b)
 }

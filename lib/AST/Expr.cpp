@@ -462,6 +462,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(MetatypeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CollectionUpcastConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(Erasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(AnyHashableErasure, getSubExpr);
   PASS_THROUGH_REFERENCE(DerivedToBase, getSubExpr);
   PASS_THROUGH_REFERENCE(ArchetypeToSuper, getSubExpr);
   PASS_THROUGH_REFERENCE(InjectIntoOptional, getSubExpr);
@@ -754,6 +755,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::MetatypeConversion:
   case ExprKind::CollectionUpcastConversion:
   case ExprKind::Erasure:
+  case ExprKind::AnyHashableErasure:
   case ExprKind::DerivedToBase:
   case ExprKind::ArchetypeToSuper:
   case ExprKind::InjectIntoOptional:

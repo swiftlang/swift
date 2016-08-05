@@ -1636,16 +1636,28 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
     
-    // Implicit collection conversions.
+    // Special implicit nominal conversions.
     if (kind >= TypeMatchKind::Conversion) {      
+      // Array -> Array.
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
+      // Dictionary -> Dictionary.
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::DictionaryUpcast);
+      // Set -> Set.
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
+      // T -> AnyHashable.
+      } else if (isAnyHashableType(desugar2)) {
+        // Don't allow this in operator contexts or we'll end up allowing
+        // 'T() == U()' for unrelated T and U that just happen to be Hashable.
+        // We can remove this special case when we implement operator hiding.
+        if (kind != TypeMatchKind::OperatorArgumentConversion) {
+          conversionsOrFixes.push_back(
+            ConversionRestrictionKind::HashableToAnyHashable);
+        }
       }
     }
   }
@@ -4069,6 +4081,39 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
     // The source base type must be a subtype of the destination base type.
     return matchTypes(baseType1, baseType2, TypeMatchKind::Subtype, subFlags,
+                      locator);
+  }
+
+  // T1 <c T2 && T2 : Hashable ===> T1 <c AnyHashable
+  case ConversionRestrictionKind::HashableToAnyHashable: {
+    // We never want to do this if the LHS is already AnyHashable.
+    if (isAnyHashableType(type1->getRValueType())) {
+      return SolutionKind::Error;
+    }
+
+    addContextualScore();
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    if (worseThanBestSolution()) {
+      return SolutionKind::Error;
+    }
+
+    auto hashableProtocol =
+      TC.Context.getProtocol(KnownProtocolKind::Hashable);
+    if (!hashableProtocol)
+      return SolutionKind::Error;
+
+    auto constraintLocator = getConstraintLocator(locator);
+    auto tv = createTypeVariable(constraintLocator, TVO_PrefersSubtypeBinding);
+    
+    addConstraint(
+      Constraint::create(*this,
+                         ConstraintKind::ConformsTo,
+                         tv, hashableProtocol->getDeclaredType(),
+                         DeclName(),
+                         FunctionRefKind::Compound,
+                         constraintLocator));
+
+    return matchTypes(type1, tv, TypeMatchKind::Conversion, subFlags,
                       locator);
   }
 
