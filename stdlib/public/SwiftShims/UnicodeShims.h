@@ -54,7 +54,7 @@ extern const struct _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadataTy
 _swift_stdlib_GraphemeClusterBreakPropertyTrieMetadata;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-extern const __swift_uint16_t *
+extern const __swift_uint32_t *
 _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix;
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
