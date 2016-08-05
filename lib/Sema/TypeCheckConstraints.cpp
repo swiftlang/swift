@@ -2944,6 +2944,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::SetDowncastBridged;
   }
 
+  if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
+    return CheckedCastKind::ValueCast;
+  }
+
   // If the destination type is a subtype of the source type, we have
   // a downcast.
   if (isSubtypeOf(toType, fromType, dc)) {

@@ -45,6 +45,7 @@ internal protocol _AnyHashableBox {
   var _hashValue: Int { get }
 
   var _base: Any { get }
+  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
 }
 
 internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
@@ -74,6 +75,13 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 
   internal var _base: Any {
     return _baseHashable
+  }
+
+  internal
+  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
+    guard let value = _baseHashable as? T else { return false }
+    result.initialize(to: value)
+    return true;
   }
 }
 
@@ -134,6 +142,15 @@ public struct AnyHashable {
   ///     print(unwrappedMessage) // prints "hello"
   public var base: Any {
     return _box._base
+  }
+
+  /// Perform a downcast directly on the internal boxed representation.
+  ///
+  /// This avoids the intermediate re-boxing we would get if we just did
+  /// a downcast on `base`.
+  internal
+  func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
+    return _box._downCastConditional(into: result)
   }
 }
 
@@ -196,3 +213,24 @@ func _stdlib_makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 )
 
+@_silgen_name("_swift_convertToAnyHashable")
+public // COMPILER_INTRINSIC
+func _convertToAnyHashable<H : Hashable>(_ value: H) -> AnyHashable {
+  return AnyHashable(value)
+}
+
+@_silgen_name("_swift_convertToAnyHashableIndirect")
+public // COMPILER_INTRINSIC (actually, called from the runtime)
+func _convertToAnyHashableIndirect<H : Hashable>(
+  _ value: H,
+  _ target: UnsafeMutablePointer<AnyHashable>) {
+  target.initialize(to: AnyHashable(value))
+}
+
+@_silgen_name("_swift_anyHashableDownCastConditionalIndirect")
+public // COMPILER_INTRINSIC (actually, called from the runtime)
+func _anyHashableDownCastConditionalIndirect<T>(
+  _ value: UnsafePointer<AnyHashable>,
+  _ target: UnsafeMutablePointer<T>) -> Bool {
+  return value.pointee._downCastConditional(into: target)
+}

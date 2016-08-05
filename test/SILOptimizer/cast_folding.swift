@@ -772,6 +772,31 @@ public func test35() {
   }
 }
 
+// Check that we do not eliminate casts from AnyHashable to a type that
+// implements Hashable.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding6test36
+// CHECK: checked_cast_addr_br take_always AnyHashable in {{.*}} to Int
+@inline(never)
+public func test36(ah: AnyHashable) {
+  if let _ = ah as? Int {
+    print("success")
+  } else {
+    print("failure")
+  }
+}
+
+// Check that we do not eliminate casts to AnyHashable from an opaque type
+// that might implement Hashable.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding6test37
+// CHECK: checked_cast_addr_br take_always T in {{.*}} to AnyHashable
+@inline(never)
+public func test37<T>(ah: T) {
+  if let _ = ah as? AnyHashable {
+    print("success")
+  } else {
+    print("failure")
+  }
+}
 
 
 print("test0=\(test0())")

@@ -1499,6 +1499,9 @@ public:
   /// \brief Determine if the type in question is a Set<T>.
   bool isSetType(Type t);
 
+  /// \brief Determine if the type in question is AnyHashable.
+  bool isAnyHashableType(Type t);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.

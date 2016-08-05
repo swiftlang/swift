@@ -173,6 +173,45 @@ classifyDynamicCastToProtocol(CanType source,
   return DynamicCastFeasibility::MaySucceed;
 }
 
+static DynamicCastFeasibility
+classifyDynamicCastFromProtocol(ModuleDecl *M, CanType source, CanType target,
+                                bool isWholeModuleOpts) {
+  assert(source.isExistentialType() &&
+         "source should be an existential type");
+
+  if (source == target)
+    return DynamicCastFeasibility::WillSucceed;
+
+  // Casts from class existential into a non-class can never succeed.
+  if (source->isClassExistentialType() &&
+      !target.isAnyExistentialType() &&
+      !target.getClassOrBoundGenericClass() &&
+      !isa<ArchetypeType>(target) &&
+      !mayBridgeToObjectiveC(M, target)) {
+    assert((target.getEnumOrBoundGenericEnum() ||
+            target.getStructOrBoundGenericStruct() ||
+            isa<TupleType>(target) ||
+            isa<SILFunctionType>(target) ||
+            isa<FunctionType>(target) ||
+            isa<MetatypeType>(target)) &&
+           "Target should be an enum, struct, tuple, metatype or function type");
+    return DynamicCastFeasibility::WillFail;
+  }
+
+  // TODO: maybe prove that certain conformances are impossible?
+
+  return DynamicCastFeasibility::MaySucceed;
+}
+
+/// Returns the existential type associated with the Hashable
+/// protocol, if it can be found.
+static CanType getHashableExistentialType(Module *M) {
+  auto hashable =
+    M->getASTContext().getProtocol(KnownProtocolKind::Hashable);
+  if (!hashable) return CanType();
+  return hashable->getDeclaredType()->getCanonicalType();
+}
+
 /// Check if a given type conforms to _BridgedToObjectiveC protocol.
 bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
@@ -263,21 +302,11 @@ swift::classifyDynamicCast(Module *M,
         target.isExistentialType())
       return classifyDynamicCastToProtocol(source, target, isWholeModuleOpts);
 
-    // Casts from class existential into a non-class can never succeed.
-    if (source->isClassExistentialType() &&
-        !target.isAnyExistentialType() &&
-        !target.getClassOrBoundGenericClass() &&
-        !isa<ArchetypeType>(target) &&
-        !mayBridgeToObjectiveC(M, target)) {
-      assert((target.getEnumOrBoundGenericEnum() ||
-              target.getStructOrBoundGenericStruct() ||
-              isa<TupleType>(target) ||
-              isa<SILFunctionType>(target) ||
-              isa<FunctionType>(target) ||
-              isa<MetatypeType>(target)) &&
-             "Target should be an enum, struct, tuple, metatype or function type");
-      return DynamicCastFeasibility::WillFail;
-    }
+    // Check conversions from protocol types to non-protocol types.
+    if (source.isExistentialType() &&
+        !target.isExistentialType())
+      return classifyDynamicCastFromProtocol(M, source, target,
+                                             isWholeModuleOpts);
 
     return DynamicCastFeasibility::MaySucceed;
   }
@@ -540,7 +569,6 @@ swift::classifyDynamicCast(Module *M,
   // Check for a viable collection cast.
   if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
     if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
-
       // Both types have to be the same kind of collection.
       auto typeDecl = sourceStruct->getDecl();
       if (typeDecl == targetStruct->getDecl()) {
@@ -567,6 +595,30 @@ swift::classifyDynamicCast(Module *M,
           return atWorst(atBest(keyFeasibility, valueFeasibility),
                          DynamicCastFeasibility::MaySucceed);
         }
+      }
+    }
+  }
+
+  // Casts from AnyHashable.
+  if (auto sourceStruct = dyn_cast<StructType>(source)) {
+    if (sourceStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+      if (auto hashable = getHashableExistentialType(M)) {
+        // Succeeds if Hashable can be cast to the target type.
+        return classifyDynamicCastFromProtocol(M, hashable, target,
+                                               isWholeModuleOpts);
+      }
+    }
+  }
+
+  // Casts to AnyHashable.
+  if (auto targetStruct = dyn_cast<StructType>(target)) {
+    if (targetStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+      // Succeeds if the source type can be dynamically cast to Hashable.
+      // Hashable is not actually a legal existential type right now, but
+      // the check doesn't care about that.
+      if (auto hashable = getHashableExistentialType(M)) {
+        return classifyDynamicCastToProtocol(source, hashable,
+                                             isWholeModuleOpts);
       }
     }
   }
