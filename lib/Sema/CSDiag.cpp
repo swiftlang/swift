@@ -1948,10 +1948,13 @@ private:
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
   
-  /// Diagnose the lookup of an enum element as instance member where only a
-  /// static member is allowed
-  void diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
-                                        SourceLoc loc);
+  /// Diagnose the lookup of an static member or enum element as instance member.
+  void diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
+                                          Expr *baseExpr,
+                                          DeclName memberName,
+                                          DeclNameLoc nameLoc,
+                                          ValueDecl *member,
+                                          SourceLoc loc);
 
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
@@ -2338,12 +2341,54 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
 }
 
 void FailureDiagnosis::
-diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
-                                 SourceLoc loc) {
-  auto diag = diagnose(loc, diag::could_not_use_enum_element_on_instance,
-                       enumElementDecl->getName());
-  auto parentEnum = enumElementDecl->getParentEnum();
-  auto enumMetatype = parentEnum->getType()->castTo<AnyMetatypeType>();
+diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
+                                   Expr *baseExpr,
+                                   DeclName memberName,
+                                   DeclNameLoc nameLoc,
+                                   ValueDecl *member,
+                                   SourceLoc loc) {
+  SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
+
+  // If the base of the lookup is a protocol metatype, suggest
+  // to replace the metatype with 'Self'
+  // error saying the lookup cannot be on a protocol metatype
+  if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
+    auto Diag = diagnose(loc,
+                         diag::could_not_use_type_member_on_protocol_metatype,
+                         baseObjTy, memberName);
+    Diag.highlight(baseRange).highlight(nameLoc.getSourceRange());
+
+    // See through function decl context
+    if (auto parent = CS->DC->getInnermostTypeContext()) {
+      // If we are in a protocol extension of 'Proto' and we see
+      // 'Proto.static', suggest 'Self.static'
+      if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
+        if (extensionContext->getDeclaredType()->getCanonicalType()
+            == metatypeTy->getInstanceType()->getCanonicalType()) {
+          Diag.fixItReplace(baseRange, "Self");
+        }
+      }
+    }
+
+    return;
+  }
+
+  // Otherwise the static member lookup was invalid because it was
+  // called on an instance
+  Optional<InFlightDiagnostic> Diag;
+
+  if (isa<EnumElementDecl>(member))
+    Diag.emplace(diagnose(loc, diag::could_not_use_enum_element_on_instance,
+                          memberName));
+  else
+    Diag.emplace(diagnose(loc, diag::could_not_use_type_member_on_instance,
+                          baseObjTy, memberName));
+
+  Diag->highlight(nameLoc.getSourceRange());
+
+  // No fix-it if the lookup was qualified
+  if (baseExpr && !baseExpr->isImplicit())
+    return;
 
   // Determine the contextual type of the expression
   Type contextualType;
@@ -2355,8 +2400,8 @@ diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
 
   // Try to provide a fix-it that only contains a '.'
   if (contextualType) {
-    if (enumMetatype->getInstanceType()->isEqual(contextualType)) {
-      diag.fixItInsert(loc, ".");
+    if (baseObjTy->isEqual(contextualType)) {
+      Diag->fixItInsert(loc, ".");
       return;
     }
   }
@@ -2382,8 +2427,8 @@ diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
           // If the rhs of '~=' is the enum type, a single dot suffixes
           // since the type can be inferred
           Type secondArgType = binaryExpr->getArg()->getElement(1)->getType();
-          if (secondArgType->isEqual(enumMetatype->getInstanceType())) {
-            diag.fixItInsert(loc, ".");
+          if (secondArgType->isEqual(baseObjTy)) {
+            Diag->fixItInsert(loc, ".");
             return;
           }
         }
@@ -2392,12 +2437,14 @@ diagnoseEnumInstanceMemberLookup(EnumElementDecl *enumElementDecl,
   }
 
   // Fall back to a fix-it with a full type qualifier
-  SmallString<32> enumTypeName;
-  llvm::raw_svector_ostream typeNameStream(enumTypeName);
-  typeNameStream << parentEnum->getName();
-  typeNameStream << ".";
+  auto nominal =
+      member->getDeclContext()
+      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  SmallString<32> typeName;
+  llvm::raw_svector_ostream typeNameStream(typeName);
+  typeNameStream << nominal->getName() << ".";
 
-  diag.fixItInsert(loc, typeNameStream.str());
+  Diag->fixItInsert(loc, typeNameStream.str());
   return;
 }
 
@@ -2461,8 +2508,12 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   // because there is exactly one candidate!) diagnose this.
   bool sameProblem = true;
   auto firstProblem = result.UnviableCandidates[0].second;
-  for (auto cand : result.UnviableCandidates)
+  ValueDecl *member = nullptr;
+  for (auto cand : result.UnviableCandidates) {
+    if (member == nullptr)
+      member = cand.first;
     sameProblem &= cand.second == firstProblem;
+  }
   
   auto instanceTy = baseObjTy;
   if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
@@ -2527,48 +2578,11 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                instanceTy, memberName)
         .highlight(baseRange).highlight(nameLoc.getSourceRange());
       return;
-            
+
     case MemberLookupResult::UR_TypeMemberOnInstance:
-      if (instanceTy->isExistentialType() && baseObjTy->is<AnyMetatypeType>()) {
-        // If the base of the lookup is an existential metatype, emit an
-        // error saying the lookup cannot be on a protocol metatype
-        auto Diag = diagnose(loc, diag::could_not_use_type_member_on_existential,
-                             baseObjTy, memberName);
-        Diag.highlight(baseRange).highlight(nameLoc.getSourceRange());
-
-        // See through function decl context
-        if (auto parent = CS->DC->getParent())
-        // If we are in a protocol extension of 'Proto' and we see
-        // 'Proto.static', suggest 'Self.static'
-        if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
-          if (extensionContext->getDeclaredType()->getCanonicalType()
-              == instanceTy->getCanonicalType()) {
-            Diag.fixItReplace(baseRange, "Self");
-          }
-        }
-
-      } else {
-        // Otherwise the static member lookup was invalid because it was
-        // called on an instance
-        
-        // Handle enum element lookup on instance type
-        auto lookThroughBaseObjTy = baseObjTy->lookThroughAllAnyOptionalTypes();
-        if (lookThroughBaseObjTy->is<EnumType>()
-            || lookThroughBaseObjTy->is<BoundGenericEnumType>()) {
-          for (auto cand : result.UnviableCandidates) {
-            ValueDecl *decl = cand.first;
-            if (auto enumElementDecl = dyn_cast<EnumElementDecl>(decl)) {
-              diagnoseEnumInstanceMemberLookup(enumElementDecl, loc);
-              return;
-            }
-          }
-        }
-        
-        // Provide diagnostic other static member lookups on instance type
-        diagnose(loc, diag::could_not_use_type_member_on_instance,
-                 baseObjTy, memberName)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      }
+      diagnoseTypeMemberOnInstanceLookup(baseObjTy, baseExpr,
+                                         memberName, nameLoc,
+                                         member, loc);
       return;
         
     case MemberLookupResult::UR_MutatingMemberOnRValue:

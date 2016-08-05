@@ -96,7 +96,7 @@ ERROR(could_not_use_type_member_on_instance,none,
 ERROR(could_not_use_enum_element_on_instance,none,
       "enum element %0 cannot be referenced as an instance member",
       (DeclName))
-ERROR(could_not_use_type_member_on_existential,none,
+ERROR(could_not_use_type_member_on_protocol_metatype,none,
       "static member %1 cannot be used on protocol metatype %0",
       (Type, DeclName))
 ERROR(could_not_use_instance_member_on_type,none,
