@@ -31,6 +31,22 @@ func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
 typealias OtherFileAliasForSecret = OtherFileSecretTypeWrapper.SecretType
 
 prefix operator *** {}
+prefix operator ~~~~~ {}
+
+prefix operator ****
+infix operator *****
+infix operator ******
+protocol Starry {
+  static prefix func ****(arg: Self)
+  static func *****(lhs: Self, rhs: Int)
+  static func ******(lhs: Int, rhs: Self)
+}
+// Deliberately does not conform to Starry.
+struct Flyswatter {
+  static prefix func ****(arg: Flyswatter) {}
+  static func *****(lhs: Flyswatter, rhs: Int) {}
+  static func ******(lhs: Int, rhs: Flyswatter) {}
+}
 
 typealias ExpressibleByOtherFileAliasForFloatLiteral = ExpressibleByFloatLiteral
 
