@@ -120,9 +120,9 @@ var wcurried1 = w.curried
 var wcurried2 = w.curried(0)
 var wcurriedFull : () = w.curried(0)(1)
 
-// Member of enum Type
+// Member of enum type
 func enumMetatypeMember(_ opt: Int?) {
-  opt.none // expected-error{{static member 'none' cannot be used on instance of type 'Int?'}}
+  opt.none // expected-error{{enum element 'none' cannot be referenced as an instance member}}
 }
 
 ////
@@ -310,6 +310,10 @@ protocol StaticP {
 extension StaticP {
   func bar() {
     _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+
+    func nested() {
+      _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{11-18=Self}}
+    }
   }
 }
 
