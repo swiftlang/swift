@@ -176,20 +176,13 @@ If you get error about SwiftGlibc is missing:
     Download and unzip the swift 3.0 package from https://swift.org/download
     find -name "glibc.modulemap"
     cp /path/to/glibc.modulemap ./build/Ninja-DebugAssert/swift-linux-x86_64/lib/swift/linux/x86_64
-    ./swift/utils/build-script -t
+    
+## Toolchain
 
-Build the rest of the required packages:
+To build the toolchain:
 
-    ./swift/utils/build-script --lldb
-    ./swift/utils/build-script --libdispatch
- 
-If you get the following error:
-
-    LLVM ERROR: Compiler-internal integrated REPL unimplemented for this platform; use the LLDB-enhanced REPL instead.
- 
- Then do the following:
- 
-    swift-linux-x86_64/bin$ ln -s /path/to/lldb-linux-x86_64/bin/lldb lldb
+1. Update `utils/build-presets.init` file, in case of Linux then update section `[preset: buildbot_linux]`
+2. Run `utils/build-toolchain local.swift`
  
             
 ## Developing Swift in Xcode
