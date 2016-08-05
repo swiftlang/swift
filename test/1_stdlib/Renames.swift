@@ -522,18 +522,17 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   x.initialize(e) // expected-error {{'initialize' has been renamed to 'initialize(to:)'}} {{5-15=initialize}} {{16-16=to: }} {{none}}
   x.destroy() // expected-error {{'destroy()' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{none}}
   x.destroy(1) // expected-error {{'destroy' has been renamed to 'deinitialize(count:)'}} {{5-12=deinitialize}} {{13-13=count: }} {{none}}
-  x.initialize(with: e) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{5-15=initialize}}
+  x.initialize(with: e) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{5-15=initialize}} {{16-20=to}} {{none}}
 
   let ptr1 = UnsafeMutablePointer<T>(allocatingCapacity: 1) // expected-error {{'init(allocatingCapacity:)' is unavailable: use 'UnsafeMutablePointer.allocate(capacity:)'}} {{none}}
-  ptr1.initialize(with: e, count: 1) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}}
+  ptr1.initialize(with: e, count: 1) // expected-error {{'initialize(with:count:)' has been renamed to 'initialize(to:count:)'}} {{8-18=initialize}} {{19-23=to}} {{none}}
   let ptr2 = UnsafeMutablePointer<T>.allocate(capacity: 1)
-  ptr2.initializeFrom(ptr1, count: 1) // expected-error {{'initializeFrom(_:count:)' has been renamed to 'initialize(from:count:)'}}
-  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
-  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
-  ptr2.assignBackwardFrom(ptr1, count: 1) // expected-error {{'assignBackwardFrom(_:count:)' has been renamed to 'assign(from:count:)'}}
-  ptr1.moveAssignFrom(ptr2, count: 1) // expected-error {{'moveAssignFrom(_:count:)' has been renamed to 'moveAssign(from:count:)'}}
-  ptr2.moveInitializeFrom(ptr1, count: 1) // expected-error {{'moveInitializeFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
-  ptr1.moveInitializeBackwardFrom(ptr1, count: 1) // expected-error {{'moveInitializeBackwardFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}}
+  ptr2.initializeFrom(ptr1, count: 1) // expected-error {{'initializeFrom(_:count:)' has been renamed to 'initialize(from:count:)'}} {{8-22=initialize}} {{23-23=from: }} {{none}}
+  ptr1.assignFrom(ptr2, count: 1) // expected-error {{'assignFrom(_:count:)' has been renamed to 'assign(from:count:)'}} {{8-18=assign}} {{19-19=from: }} {{none}}
+  ptr2.assignBackwardFrom(ptr1, count: 1) // expected-error {{'assignBackwardFrom(_:count:)' has been renamed to 'assign(from:count:)'}} {{8-26=assign}} {{27-27=from: }} {{none}}
+  ptr1.moveAssignFrom(ptr2, count: 1) // expected-error {{'moveAssignFrom(_:count:)' has been renamed to 'moveAssign(from:count:)'}} {{8-22=moveAssign}} {{23-23=from: }} {{none}}
+  ptr2.moveInitializeFrom(ptr1, count: 1) // expected-error {{'moveInitializeFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}} {{8-26=moveInitialize}} {{27-27=from: }} {{none}}
+  ptr1.moveInitializeBackwardFrom(ptr1, count: 1) // expected-error {{'moveInitializeBackwardFrom(_:count:)' has been renamed to 'moveInitialize(from:count:)'}} {{8-34=moveInitialize}} {{35-35=from: }} {{none}}
   ptr1.deinitialize(count:1)
   ptr1.deallocateCapacity(1) // expected-error {{'deallocateCapacity' has been renamed to 'deallocate(capacity:)'}} {{8-26=deallocate}} {{27-27=capacity: }} {{none}}
   ptr2.deallocate(capacity: 1)
