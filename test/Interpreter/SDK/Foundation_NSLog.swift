@@ -19,5 +19,5 @@ testNSLog()
 // CHECK: 1 is the loneliest number that you'll ever do
 NSLog(
   "%@ is the loneliest number that you'll ever %@", 
-  NSNumber(value: 1), "do" as NSString
+  NSNumber(value: 1), "do"
 )
