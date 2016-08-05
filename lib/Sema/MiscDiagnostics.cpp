@@ -1406,11 +1406,53 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
   });
 
   if (auto args = dyn_cast<TupleShuffleExpr>(argExpr)) {
-    if (!args->getVariadicArgs().empty()) {
-      // FIXME: Support variadic arguments.
+    argExpr = args->getSubExpr();
+
+    // Coerce the `argumentLabelIDs` to the user supplied arguments.
+    // e.g:
+    //   @available(.., renamed: "new(w:x:y:z:)")
+    //   func old(a: Int, b: Int..., c: String="", d: Int=0){}
+    //   old(a: 1, b: 2, 3, 4, d: 5)
+    // coerce
+    //   argumentLabelIDs = {"w", "x", "y", "z"}
+    // to
+    //   argumentLabelIDs = {"w", "x", "", "", "z"}
+    auto elementMap = args->getElementMapping();
+    if (elementMap.size() != argumentLabelIDs.size()) {
+      // Mismatched lengths; give up.
       return;
     }
-    argExpr = args->getSubExpr();
+    auto I = argumentLabelIDs.begin();
+    for (auto shuffleIdx : elementMap) {
+      switch (shuffleIdx) {
+      case TupleShuffleExpr::DefaultInitialize:
+      case TupleShuffleExpr::CallerDefaultInitialize:
+        // Defaulted: remove param label of it.
+        I = argumentLabelIDs.erase(I);
+        break;
+      case TupleShuffleExpr::Variadic: {
+        auto variadicArgsNum = args->getVariadicArgs().size();
+        if (variadicArgsNum == 0) {
+          // No arguments: Remove param label of it.
+          I = argumentLabelIDs.erase(I);
+        } else if (variadicArgsNum == 1) {
+          // One argument: Just advance.
+          ++I;
+        } else {
+          // Two or more arguments: Insert empty labels after the first one.
+          I = argumentLabelIDs.insert(++I, --variadicArgsNum, Identifier());
+          I += variadicArgsNum;
+        }
+        break;
+      }
+      default:
+        // Normal: Just advance.
+        assert(shuffleIdx == (I - argumentLabelIDs.begin()) &&
+               "SE-0060 guarantee");
+        ++I;
+        break;
+      }
+    }
   }
 
   if (auto args = dyn_cast<TupleExpr>(argExpr)) {
