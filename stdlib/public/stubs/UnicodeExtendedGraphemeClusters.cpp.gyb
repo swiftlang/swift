@@ -132,7 +132,7 @@ const uint16_t _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl[] 
 };
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const uint16_t *_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix =
+const uint32_t *_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix =
     _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl;
 
 // ${'Local Variables'}:
