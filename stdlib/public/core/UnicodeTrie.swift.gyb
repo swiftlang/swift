@@ -212,7 +212,7 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
 }
 
 internal struct _UnicodeExtendedGraphemeClusterSegmenter {
-  let _noBoundaryRulesMatrix: UnsafePointer<UInt16>
+  let _noBoundaryRulesMatrix: UnsafePointer<UInt32>
 
   init() {
     _noBoundaryRulesMatrix =
@@ -233,7 +233,7 @@ internal struct _UnicodeExtendedGraphemeClusterSegmenter {
       _ gcb2: _GraphemeClusterBreakPropertyRawValue
   ) -> Bool {
     let ruleRow = _noBoundaryRulesMatrix[Int(gcb1.rawValue)]
-    return (ruleRow & (1 << UInt16(gcb2.rawValue))) == 0
+    return (ruleRow & (1 << UInt32(gcb2.rawValue))) == 0
   }
 }
 
