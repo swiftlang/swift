@@ -13,7 +13,7 @@
 /// Contains tests for conversions between types which shouldn't trap.
 ///
 // -----------------------------------------------------------------------------
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
