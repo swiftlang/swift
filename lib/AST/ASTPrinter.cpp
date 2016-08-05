@@ -3742,16 +3742,11 @@ public:
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (Options.SkipAttributes)
       return;
-    if (info.isAutoClosure()) {
-      if (info.isNoEscape())
-        Printer << "@autoclosure ";
-      else
-        Printer << "@autoclosure @escaping ";
-    } else if (inParameterPrinting) {
-      if (!info.isNoEscape()) {
-        Printer << "@escaping ";
-      }
-    }
+
+    if (info.isAutoClosure())
+      Printer << "@autoclosure ";
+    if (inParameterPrinting && !info.isNoEscape())
+      Printer << "@escaping ";
 
     if (Options.PrintFunctionRepresentationAttrs) {
       // TODO: coalesce into a single convention attribute.
