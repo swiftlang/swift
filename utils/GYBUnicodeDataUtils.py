@@ -521,8 +521,8 @@ def get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_table):
             for second in second_list:
                 rules_matrix[first][second] = action
 
-    # Make sure we can pack one row of the matrix into a 'uint16_t'.
-    assert(len(any_value) <= 16)
+    # Make sure we can pack one row of the matrix into a 'uint32_t'.
+    assert(len(any_value) <= 32)
 
     result = []
     for first in any_value:
