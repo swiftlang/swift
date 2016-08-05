@@ -247,10 +247,8 @@ class ResolvePattern : public ASTVisitor<ResolvePattern,
 public:
   TypeChecker &TC;
   DeclContext *DC;
-  bool &DiagnosedError;
   
-  ResolvePattern(TypeChecker &TC, DeclContext *DC, bool &DiagnosedError)
-    : TC(TC), DC(DC), DiagnosedError(DiagnosedError) {}
+  ResolvePattern(TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
   
   // Convert a subexpression to a pattern if possible, or wrap it in an
   // ExprPattern.
@@ -258,24 +256,9 @@ public:
     if (Pattern *p = visit(E))
       return p;
     
-    foundUnknownExpr(E);
-    
     return new (TC.Context) ExprPattern(E, nullptr, nullptr);
   }
   
-  void foundUnknownExpr(Expr *E) {
-    // If we find unresolved pattern, diagnose this as an illegal pattern.  Sema
-    // does later checks for UnresolvedPatternExpr's in arbitrary places, but
-    // rejecting these early is good because we can provide better up-front
-    // diagnostics and can recover better from it.
-    if (!UnresolvedPatternFinder::hasAny(E) || DiagnosedError) return;
-    
-    TC.diagnose(E->getStartLoc(), diag::invalid_pattern)
-      .highlight(E->getSourceRange());
-    DiagnosedError = true;
-  }
-  
-
   // Handle productions that are always leaf patterns or are already resolved.
 #define ALWAYS_RESOLVED_PATTERN(Id) \
   Pattern *visit##Id##Pattern(Id##Pattern *P) { return P; }
@@ -295,7 +278,7 @@ public:
     
     // If the var pattern has no variables bound underneath it, then emit a
     // warning that the var/let is pointless.
-    if (!DiagnosedError && !P->isImplicit()) {
+    if (!P->isImplicit()) {
       bool HasVariable = false;
       P->forEachVariable([&](VarDecl *VD) { HasVariable = true; });
       
@@ -328,7 +311,6 @@ public:
     Pattern *exprAsPattern = visit(P->getSubExpr());
     // If we failed, keep the ExprPattern as is.
     if (!exprAsPattern) {
-      foundUnknownExpr(P->getSubExpr());
       P->setResolved(true);
       return P;
     }
@@ -606,10 +588,7 @@ public:
 /// disambiguate semantics-dependent pattern forms.
 Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
                                      bool isStmtCondition) {
-  bool DiagnosedError = false;
-  P = ResolvePattern(*this, DC, DiagnosedError).visit(P);
-
-  if (DiagnosedError) return nullptr;
+  P = ResolvePattern(*this, DC).visit(P);
 
   // If the entire pattern is "(pattern_expr (type_expr SomeType))", then this
   // is an invalid pattern.  If it were actually a value comparison (with ~=)
