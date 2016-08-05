@@ -3388,7 +3388,13 @@ namespace {
     }
     
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
-      llvm_unreachable("should have been eliminated during name binding");
+      // If we end up here, we should have diagnosed somewhere else
+      // already.
+      if (!SuppressDiagnostics) {
+        cs.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
+                       expr->getSubPattern()->getKind());
+      }
+      return expr;
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {

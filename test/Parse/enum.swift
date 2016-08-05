@@ -479,7 +479,7 @@ enum SE0036 {
     switch self {
     case A: break // expected-error {{enum element 'A' cannot be referenced as an instance member}} {{10-10=.}}
     case B(_): break // expected-error {{enum element 'B' cannot be referenced as an instance member}} {{10-10=.}}
-    case C(let x): _ = x; break // expected-error {{invalid pattern}}
+    case C(let x): _ = x; break // expected-error {{enum element 'C' cannot be referenced as an instance member}} {{10-10=.}}
     }
   }
 
