@@ -116,7 +116,7 @@ public func spawnChild(_ args: [String])
 
     // If execve() encountered an error, we write the errno encountered to the
     // parent write pipe.
-    let errnoSize = MemoryLayout._ofInstance(errno).size
+    let errnoSize = MemoryLayout.size(ofValue: errno)
     var execveErrno = errno
     let writtenBytes = withUnsafePointer(to: &execveErrno) {
       write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)

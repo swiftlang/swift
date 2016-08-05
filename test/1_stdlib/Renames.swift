@@ -284,9 +284,6 @@ func _MemoryLayout<T>(t: T) {
   _ = sizeof(T.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-21=>.size}} {{none}}
   _ = alignof(T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{16-22=>.alignment}} {{none}}
   _ = strideof(T.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{17-23=>.stride}} {{none}}
-  _ = sizeofValue(t) // expected-error {{'sizeofValue' is unavailable: use MemoryLayout<T>.size instead.}} {{7-21=MemoryLayout<T>.size}} {{none}}
-  _ = alignofValue(t) // expected-error {{'alignofValue' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-22=MemoryLayout<T>.alignment}} {{none}}
-  _ = strideofValue(t) // expected-error {{'strideofValue' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-23=MemoryLayout<T>.stride}} {{none}}
 }
 
 func _Mirror() {

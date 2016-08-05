@@ -325,9 +325,9 @@ SetTestSuite.test("AssociatedTypes") {
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
 #if arch(i386) || arch(arm)
-  expectEqual(4, MemoryLayout._ofInstance(s).size)
+  expectEqual(4, MemoryLayout.size(ofValue: s))
 #else
-  expectEqual(8, MemoryLayout._ofInstance(s).size)
+  expectEqual(8, MemoryLayout.size(ofValue: s))
 #endif
 }
 

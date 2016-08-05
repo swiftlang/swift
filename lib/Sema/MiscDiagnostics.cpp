@@ -2145,9 +2145,6 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
       .Case("sizeof", {"size", false})
       .Case("alignof", {"alignment", false})
       .Case("strideof", {"stride", false})
-      .Case("sizeofValue", {"size", true})
-      .Case("alignofValue", {"alignment", true})
-      .Case("strideofValue", {"stride", true})
       .Default({});
 
   if (KindValue.first.empty())
@@ -2162,7 +2159,7 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 
   auto subject = args->getSubExpr();
   if (!isValue) {
-    // sizeof(x.dynamicType) is equivalent to sizeofValue(x)
+    // sizeof(type(of: x)) is equivalent to sizeofValue(x)
     if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
       subject = DTE->getBase();
       isValue = true;
@@ -2179,14 +2176,14 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   if (isValue) {
     auto valueType = subject->getType()->getRValueType();
     if (!valueType || valueType->is<ErrorType>()) {
-        // If we dont have good argument, We cannot emit fix-it.
-        return true;
+      // If we don't have a suitable argument, we cannot emit a fix-it.
+      return true;
     }
 
     // NOTE: We are destructively replacing the source text here.
-    // For instance, `sizeof(x.doSomethig())` => `MemoryLayout<T>.size` where
-    // T is return type of `doSomething()`. If that function have any
-    // side effects, it will break the source.
+    // `sizeof(type(of: doSomething()))` => `MemoryLayout<T>.size`, where T is
+    // the return type of `doSomething()`. If that function has any side
+    // effects, this replacement will break the source.
     diag.fixItReplace(call->getSourceRange(),
       (Prefix + valueType->getString() + Suffix + Kind).str());
   } else {
