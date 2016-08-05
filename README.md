@@ -72,7 +72,7 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-First create a directory for all of the swift sources:
+First create a directory for all of the Swift sources:
 
     mkdir swift-source
     cd swift-source
