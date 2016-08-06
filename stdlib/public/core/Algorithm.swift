@@ -73,7 +73,7 @@ public struct EnumeratedIterator<
   internal var _base: Base
   internal var _count: Int
 
-  /// Initialize from a `Base` iterator.
+  /// Create from a `Base` iterator.
   internal init(_base: Base) {
     self._base = _base
     self._count = 0
@@ -104,7 +104,7 @@ public struct EnumeratedIterator<
 public struct EnumeratedSequence<Base : Sequence> : Sequence {
   internal var _base: Base
 
-  /// Initialize from a `Base` sequence.
+  /// Create from a `Base` sequence.
   internal init(_base: Base) {
     self._base = _base
   }
