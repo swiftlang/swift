@@ -260,7 +260,7 @@ ${equivalenceExplanation}
   ///     print(b.starts(with: a))
   ///     // Prints "true"
   ///
-  /// Passing an sequence with no elements or an empty collection as
+  /// Passing a sequence with no elements or an empty collection as
   /// `possiblePrefix` always results in `true`.
   ///
   ///     print(b.starts(with: []))
