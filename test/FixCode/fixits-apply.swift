@@ -196,7 +196,7 @@ protocol NonObjCProtocol {}
 
 @IBDesignable extension SomeProt {}
 
-func attrNowOnType(@noescape foo: ()->()) {}
+func attrNowOnType(foo: ()->()) {}
 
 class InitDynType {
   init() {}

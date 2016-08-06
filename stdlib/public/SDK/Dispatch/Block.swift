@@ -43,9 +43,9 @@ public class DispatchWorkItem {
 			qos.qosClass.rawValue.rawValue, Int32(qos.relativePriority), block)
 	}
 
-	// Used by DispatchQueue.synchronously<T> to provide a @noescape path through
+	// Used by DispatchQueue.synchronously<T> to provide a path through
 	// dispatch_block_t, as we know the lifetime of the block in question.
-	internal init(flags: DispatchWorkItemFlags = [], noescapeBlock: @noescape () -> ()) {
+	internal init(flags: DispatchWorkItemFlags = [], noescapeBlock: () -> ()) {
 		_block = _swift_dispatch_block_create_noescape(flags.rawValue, noescapeBlock)
 	}
 

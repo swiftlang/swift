@@ -320,7 +320,7 @@ internal struct _Buffer32 {
 % end
 
   mutating func withBytes<Result>(
-    _ body: @noescape (UnsafeMutablePointer<UInt8>) throws -> Result
+    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
     return try withUnsafeMutablePointer(to: &self) {
@@ -336,7 +336,7 @@ internal struct _Buffer72 {
 % end
 
   mutating func withBytes<Result>(
-    _ body: @noescape (UnsafeMutablePointer<UInt8>) throws -> Result
+    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
     return try withUnsafeMutablePointer(to: &self) {

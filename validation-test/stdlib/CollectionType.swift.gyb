@@ -105,7 +105,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
     return try _data.filter(isIncluded)
@@ -119,7 +119,7 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
-  _ isIncluded: @noescape (OpaqueValue<Int>) -> Bool
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(isIncluded)
   expectType([OpaqueValue<Int>].self, &result)
@@ -128,7 +128,7 @@ func callStaticCollectionFilter(
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
-  _ isIncluded: @noescape (OpaqueValue<Int>) -> Bool
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(isIncluded)
   expectType([OpaqueValue<Int>].self, &result)
@@ -137,7 +137,7 @@ func callStaticCollectionFilter(
 
 func callGenericCollectionFilter<S : Collection>(
   _ sequence: S,
-  _ isIncluded: @noescape (S.Iterator.Element) -> Bool
+  _ isIncluded: (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
   var result = sequence.filter(isIncluded)
   expectType(Array<S.Iterator.Element>.self, &result)
@@ -241,7 +241,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -255,7 +255,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -264,7 +264,7 @@ func callStaticCollectionMap<T>(
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -273,7 +273,7 @@ func callStaticCollectionMap<T>(
 
 func callGenericCollectionMap<C : Collection, T>(
   _ collection: C,
-  transform: @noescape (C.Iterator.Element) -> T
+  transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)

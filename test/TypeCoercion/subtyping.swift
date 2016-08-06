@@ -14,8 +14,8 @@ struct IsPrintable1 : CustomStringConvertible {
   func print() {}
 }
 
-func accept_creates_Printable (_: @noescape () -> CustomStringConvertible) {}
-func accept_creates_FormattedPrintable (_: @noescape () -> FormattedPrintable) {}
+func accept_creates_Printable (_: () -> CustomStringConvertible) {}
+func accept_creates_FormattedPrintable (_: () -> FormattedPrintable) {}
 
 func fp_to_p(_ fp: FormattedPrintable) -> CustomStringConvertible { return fp; }
 func p_to_fp(_ p: CustomStringConvertible) -> FormattedPrintable { }

@@ -226,9 +226,9 @@ func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration o
 func throwsFuncParam(_ fn: () throws -> ()) { }
 func throwsFuncParam(_ fn: () -> ()) { }
 
-// @noescape
-func noescape(x: @noescape (Int) -> Int) { } // expected-note{{previously declared}}
-func noescape(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
+// @escaping
+func escaping(x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(x:)'}}
 
 // @autoclosure
 func autoclosure(f: () -> Int) { }

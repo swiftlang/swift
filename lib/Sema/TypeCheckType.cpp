@@ -1889,15 +1889,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     bool defaultNoEscape = false;
-    // TODO: Get rid of the need for checking autoclosure, by refactoring
-    // special autoclosure knowledge to just as "isEscaping" or similar.
-    if (isFunctionParam && !attrs.has(TAK_autoclosure)) {
-      // Closure params default to non-escaping
-      if (attrs.has(TAK_noescape)) {
-        // FIXME: diagnostic to tell user this is redundant and drop it
-      } else if (!attrs.has(TAK_escaping)) {
-        defaultNoEscape = isDefaultNoEscapeContext(DC);
-      }
+    if (isFunctionParam && !attrs.has(TAK_escaping)) {
+      defaultNoEscape = isDefaultNoEscapeContext(DC);
+    }
+
+    if (isFunctionParam && attrs.has(TAK_noescape) &&
+        isDefaultNoEscapeContext(DC)) {
+      // FIXME: diagnostic to tell user this is redundant and drop it
     }
 
     // Resolve the function type directly with these attributes.

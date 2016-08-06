@@ -68,7 +68,7 @@ open class ManagedBuffer<Header, Element> {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToHeader<R>(
-    _ body: @noescape (UnsafeMutablePointer<Header>) throws -> R
+    _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutablePointers { (v, e) in return try body(v) }
   }
@@ -79,7 +79,7 @@ open class ManagedBuffer<Header, Element> {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    _ body: @noescape (UnsafeMutablePointer<Element>) throws -> R
+    _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutablePointers { return try body($0.1) }
   }
@@ -90,7 +90,7 @@ open class ManagedBuffer<Header, Element> {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    _ body: @noescape (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
+    _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
     return try ManagedBufferPointer(self).withUnsafeMutablePointers(body)
   }
@@ -254,7 +254,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToHeader<R>(
-    _ body: @noescape (UnsafeMutablePointer<Header>) throws -> R
+    _ body: (UnsafeMutablePointer<Header>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutablePointers { (v, e) in return try body(v) }
   }
@@ -265,7 +265,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    _ body: @noescape (UnsafeMutablePointer<Element>) throws -> R
+    _ body: (UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
     return try withUnsafeMutablePointers { return try body($0.1) }
   }
@@ -276,7 +276,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    _ body: @noescape (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
+    _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(_nativeBuffer) }
     return try body(_headerPointer, _elementPointer)

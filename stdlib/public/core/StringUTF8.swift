@@ -408,7 +408,7 @@ extension String {
   }
 
   internal func _withUnsafeBufferPointerToUTF8<R>(
-    _ body: @noescape (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
+    _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
     let ptr = _contiguousUTF8
     if ptr != nil {
