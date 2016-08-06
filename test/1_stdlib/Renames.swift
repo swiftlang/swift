@@ -4,8 +4,8 @@
 func _Algorithm<I : IteratorProtocol, S : Sequence>(i: I, s: S) {
   func fn1(_: EnumerateGenerator<I>) {} // expected-error {{'EnumerateGenerator' has been renamed to 'EnumeratedIterator'}} {{15-33=EnumeratedIterator}} {{none}}
   func fn2(_: EnumerateSequence<S>) {} // expected-error {{'EnumerateSequence' has been renamed to 'EnumeratedSequence'}} {{15-32=EnumeratedSequence}} {{none}}
-  _ = EnumeratedIterator(i) // expected-error {{use the 'enumerated()' method on the sequence}} {{none}}
-  _ = EnumeratedSequence(s) // expected-error {{use the 'enumerated()' method on the sequence}} {{none}}
+  _ = EnumeratedIterator(i) // expected-error {{Call 'enumerated().makeIterator()' on the sequence.}} {{none}}
+  _ = EnumeratedSequence(s) // expected-error {{Use the 'enumerated()' method on the sequence.}} {{none}}
 }
 
 func _Arrays<T>(e: T) {
