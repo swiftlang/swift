@@ -2460,8 +2460,6 @@ ERROR(cannot_infer_type_for_pattern,none,
       "type annotation missing in pattern", ())
 ERROR(refutable_pattern_requires_initializer,none,
       "pattern matching requires an initializer value to match against", ())
-ERROR(invalid_pattern,none,
-      "invalid pattern", ())
 WARNING(var_pattern_didnt_bind_variables,none,
         "'%0' pattern has no effect; sub-pattern didn't bind any variables",
         (StringRef))
