@@ -1106,8 +1106,6 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
 // Type-of expressions.
-ERROR(expr_typeof_expected_lparen,PointsToFirstBadToken,
-      "expected '(' following 'type'", ())
 ERROR(expr_typeof_expected_label_of,PointsToFirstBadToken,
       "expected argument label 'of:' within 'type(...)'", ())
 ERROR(expr_typeof_expected_expr,PointsToFirstBadToken,

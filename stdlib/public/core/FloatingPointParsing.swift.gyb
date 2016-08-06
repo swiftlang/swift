@@ -102,7 +102,7 @@ extension ${Self} : LosslessStringConvertible {
   ///       // n?.isNaN == true
   ///       // n?.sign == .minus
   ///
-  ///   An NaN value may also include a payload in parentheses following the
+  ///   A NaN value may also include a payload in parentheses following the
   ///   `"nan"` keyword. The payload consists of a sequence of decimal digits,
   ///   or the characters `0X` or `0x` followed by a sequence of hexadecimal
   ///   digits. If the payload contains any other characters, it is ignored.
