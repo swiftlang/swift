@@ -9,4 +9,7 @@
 // CHECK-elf-DAG: -lswiftCore
 // CHECK-elf-DAG: -lempty
 
+// CHECK-coff-DAG: -lswiftCore
+// CHECK-coff-DAG: -lempty
+
 import empty
