@@ -898,6 +898,9 @@ void NominalTypeDecl::addedMember(Decl *member) {
 
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
+    if (getExtendedType()->is<ErrorType>())
+      return;
+
     auto nominal = getExtendedType()->getAnyNominal();
     if (nominal->LookupTable.getPointer()) {
       // Make sure we have the complete list of extensions.
