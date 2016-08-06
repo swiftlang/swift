@@ -180,7 +180,7 @@ bb0(%0 : $AnNSArray):
 
 // CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
 // CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveC
-// CHECK: retain_value
+// CHECK-NOT: retain
 // CHECK: apply
 // CHECK: release_value
 // CHECK: upcast %{{.*}} : $NSArray to $NSObject
