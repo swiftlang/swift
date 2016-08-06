@@ -6,3 +6,4 @@
 // REQUIRES: autolink-extract
 
 // CHECK-elf: -lswiftCore
+// CHECK-coff: -lswiftCore

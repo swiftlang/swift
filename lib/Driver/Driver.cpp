@@ -1316,7 +1316,8 @@ void Driver::buildActions(const ToolChain &TC,
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     auto *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
 
-    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+        TC.getTriple().isOSCygMing()) {
       // On ELF platforms there's no built in autolinking mechanism, so we
       // pull the info we need from the .o files directly and pass them as an
       // argument input file to the linker.
