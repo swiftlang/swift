@@ -214,10 +214,12 @@ extension OptionSet where Element == Self {
     return self.isSuperset(of: member)
   }
   
-  /// Inserts the given element into the option set if it is not already a
-  /// member.
+  /// Adds the given element to the option set if it is not already a member.
   ///
-  /// For example:
+  /// In the following example, the `.secondDay` shipping option is added to
+  /// the `freeOptions` option set if `purchasePrice` is greating than 50. For
+  /// the `ShippingOptions` declaration, see the `OptionSet` protocol
+  /// discussion.
   ///
   ///     let purchasePrice = 87.55
   ///
@@ -249,7 +251,10 @@ extension OptionSet where Element == Self {
   
   /// Removes the given element and all elements subsumed by the given element.
   ///
-  /// For example:
+  /// In the following example, the `.priority` shipping option is removed from
+  /// the `options` option set. Attempting to remove the same shipping option
+  /// a second time results in `nil`, because `options` no longer contains
+  /// `.priority` as a member.
   ///
   ///     var options: ShippingOptions = [.secondDay, .priority]
   ///     let priorityOption = options.remove(.priority)
@@ -259,11 +264,11 @@ extension OptionSet where Element == Self {
   ///     print(options.remove(.priority))
   ///     // Prints "nil"
   ///
-  /// In the following example, the `.express` element is passed to
-  /// `remove(_:)`. Although `.express` is not a member of `options`,
-  /// `.express` subsumes the remaining `.secondDay` element of the option
-  /// set. Therefore, `options` is emptied and the intersection between
-  /// `.express` and `options` is returned.
+  /// In the next example, the `.express` element is passed to `remove(_:)`.
+  /// Although `.express` is not a member of `options`, `.express` subsumes
+  /// the remaining `.secondDay` element of the option set. Therefore,
+  /// `options` is emptied and the intersection between `.express` and
+  /// `options` is returned.
   ///
   ///     let expressOption = options.remove(.express)
   ///     print(expressOption == .express)

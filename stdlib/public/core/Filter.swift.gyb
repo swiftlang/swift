@@ -187,7 +187,7 @@ public struct ${Self}<
 
   public typealias IndexDistance = Base.IndexDistance
 
-  /// Construct an instance containing the elements of `base` that
+  /// Creates an instance containing the elements of `base` that
   /// satisfy `isIncluded`.
   public // @testable
   init(
@@ -256,7 +256,7 @@ public struct ${Self}<
   }
 %   end
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.

@@ -27,65 +27,69 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Implements conformance to the public protocol `_Pointer`.
   public let _rawValue: Builtin.RawPointer
 
-  /// Construct ${a_Self} from another ${a_Self}.
+  /// Creates ${a_Self} from another `${Self}`.
   @_transparent
   public init(_ other: Unsafe${Mutable}RawPointer) {
     self = other
   }
 
-  /// Construct ${a_Self} from another ${a_Self}.
+  /// Creates ${a_Self} from another `${Self}`.
   ///
-  /// Returns nil if `other` is nil.
+  /// Returns `nil` if `other` is `nil`.
   @_transparent
   public init?(_ other: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = other else { return nil }
     self = unwrapped
   }
 
-  /// Convert a builtin raw pointer to ${a_Self}.
+  /// Converts a builtin raw pointer to ${a_Self}.
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
-  /// Convert an opaque pointer to ${a_Self}.
+  /// Converts an opaque pointer to ${a_Self}.
   @_transparent
   public init(_ other: OpaquePointer) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an opaque pointer to ${a_Self}.
+  /// Converts an opaque pointer to ${a_Self}.
   ///
-  /// Returns nil if `from` is nil.
+  /// Returns `nil` if `from` is `nil`.
   @_transparent
   public init?(_ other: OpaquePointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
-  /// Convert a pattern of bits to ${a_Self}.
+  /// Converts a pattern of bits to ${a_Self}.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert a pattern of bits to ${a_Self}.
+  /// Converts a pattern of bits to ${a_Self}.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert an Unsafe${Mutable}Pointer to ${a_Self}.
+  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
   @_transparent
   public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an Unsafe${Mutable}Pointer to ${a_Self}.
+  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
   ///
-  /// Returns nil if `other` is nil.
+  /// Returns `nil` if `other` is `nil`.
   @_transparent
   public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -93,45 +97,45 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Convert an UnsafeRawPointer to ${a_Self}.
+  /// Converts an UnsafeRawPointer to ${a_Self}.
   @_transparent
   public init(mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an UnsafeRawPointer to ${a_Self}.
+  /// Converts an UnsafeRawPointer to ${a_Self}.
   ///
-  /// Returns nil if `other` is nil.
+  /// Returns `nil` if `other` is `nil`.
   @_transparent
   public init?(mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 %  else: # !mutable
-  /// Convert an UnsafeMutableRawPointer to ${a_Self}.
+  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
   @_transparent
   public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an UnsafeMutableRawPointer to ${a_Self}.
+  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
   ///
-  /// Returns nil if `other` is nil.
+  /// Returns `nil` if `other` is `nil`.
   @_transparent
   public init?(_ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
     _rawValue = unwrapped._rawValue
   }
 
-  /// Convert an UnsafeMutablePointer to ${a_Self}.
+  /// Converts an UnsafeMutablePointer to ${a_Self}.
   @_transparent
   public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
   }
 
-  /// Convert an UnsafeMutablePointer to ${a_Self}.
+  /// Converts an UnsafeMutablePointer to ${a_Self}.
   ///
-  /// Returns nil if `other` is nil.
+  /// Returns `nil` if `other` is `nil`.
   @_transparent
   public init?<T>(_ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -140,7 +144,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 %  end # !mutable
 
 %  if mutable:
-  /// Allocate and point at uninitialized memory for `size` bytes with
+  /// Allocates and points at uninitialized memory for `size` bytes with
   /// `alignedTo` alignment.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
@@ -151,25 +155,22 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 %  end # mutable
 
-  /// Deallocate uninitialized memory allocated for `bytes` number of bytes with
-  /// `alignedTo` alignment.
+  /// Deallocates uninitialized memory allocated for `bytes` number of bytes
+  /// with `alignedTo` alignment.
   ///
   /// - Precondition: The memory is not initialized.
-  ///
   /// - Postcondition: The memory has been deallocated.
   public func deallocate(bytes: Int, alignedTo: Int) {
     Builtin.deallocRaw(
       _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
   }
   
-  /// Binding the allocated memory to type `T`.
-  /// Returns an Unsafe${Mutable}Pointer<T> to the bound memory at `self`.
-  ///  
-  /// - Precondition: The memory is uninitialized.
+  /// Binds the allocated memory to type `T` and returns an
+  /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
   ///
+  /// - Precondition: The memory is uninitialized.
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
   ///   through `self` + `count` * `MemoryLayout<T>.stride`
-  ///
   /// - Warning: Binding memory to a type is potentially undefined if the
   ///   memory is ever accessed as an unrelated type.
   @_transparent
@@ -180,7 +181,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
   }
 
-  /// Convert from ${a_Self} to Unsafe${Mutable}Pointer<T> given that
+  /// Converts from ${a_Self} to Unsafe${Mutable}Pointer<T> given that
   /// the region of memory starting at `self` is already bound to type `T`.
   ///
   /// - Precondition: The memory is bound to 'T' starting at `self` for some
@@ -194,8 +195,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Initialize this memory location `self + strideof(T) * index`
-  /// with `count` consecutive copies `value`, and bind the
+  /// Initializes this memory location `self + strideof(T) * index`
+  /// with `count` consecutive copies of `value` and binds the
   /// initialized memory to type `T`.
   ///
   /// Returns an `UnsafeMutablePointer<T>` to this memory.
@@ -233,29 +234,24 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initialize memory starting at `self` with `count` `T` values
-  /// beginning at `source`, and bind the initialized memory to type
-  /// `T`.
+  /// Initializes memory starting at `self` with `count` `T` values beginning
+  /// at `source` and binds the initialized memory to type `T`.
   ///
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
   /// - Precondition: `count >= 0`
-  ///
   /// - Precondition: The memory regions `source..<source + count` and
   ///   `self..<self + count * MemoryLayout<T>.stride` do not overlap.
-  ///
-  /// - Precondition: The memory at `self..<self + count * MemoryLayout<T>.stride`
-  ///   is uninitialized, and the `T` values at `source..<source + count` are
-  ///   initialized.
-  ///
-  /// - Precondition: The underlying pointer is properly aligned for
-  ///                 accessing `T`.
-  ///
-  /// - Postcondition: The memory at `self..<self + count * MemoryLayout<T>.stride`
-  ///   is bound to type `T`.
-  ///
-  /// - Postcondition: The `T` values at `self..<self + count *
-  ///   MemoryLayout<T>.stride` and `source..<source + count` are initialized.
+  /// - Precondition: The memory at
+  ///   `self..<self + count * MemoryLayout<T>.stride` is uninitialized, and
+  ///   the `T` values at `source..<source + count` are initialized.
+  /// - Precondition: The underlying pointer is properly aligned for accessing
+  ///   `T`.
+  /// - Postcondition: The memory at
+  ///   `self..<self + count * MemoryLayout<T>.stride` is bound to type `T`.
+  /// - Postcondition: The `T` values at
+  ///   `self..<self + count * MemoryLayout<T>.stride` and
+  ///   `source..<source + count` are initialized.
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, from source: UnsafePointer<T>, count: Int
@@ -279,8 +275,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initialize memory starting at `self` with the elements of
-  /// `source`, and bind the initialized memory to type `T`.
+  /// Initializes memory starting at `self` with the elements of
+  /// `source` and binds the initialized memory to type `T`.
   ///
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
@@ -305,9 +301,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     return UnsafeMutablePointer(_rawValue)
   }
 
-  /// Initialize memory starting at `self` with `count` `T` values
-  /// beginning at `source`, bind the initialized memory to type `T`,
-  /// and return the source memory to an uninitialized state.
+  /// Initializes memory starting at `self` with `count` `T` values
+  /// beginning at `source`, binds the initialized memory to type `T`,
+  /// and returns the source memory to an uninitialized state.
   ///
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
@@ -358,7 +354,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 %  end # mutable
 
-  /// Read raw bytes from memory at `self + offset` and construct a
+  /// Reads raw bytes from memory at `self + offset` and constructs a
   /// value of type `T`.
   ///
   /// - Precondition: The underlying pointer plus `offset` is properly
@@ -375,7 +371,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   }
 
 %  if mutable:
-  /// Store a value's bytes into raw memory at `self + offset`.
+  /// Stores a value's bytes into raw memory at `self + offset`.
   ///  
   /// - Precondition: The underlying pointer plus `offset` is properly
   ///   aligned for storing type `T`.
@@ -423,7 +419,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
     }
   }
   
-  /// Copy `count` bytes from `source` into memory at `self`.
+  /// Copies `count` bytes from `source` into memory at `self`.
   ///  
   /// - Precondition: `count` is non-negative.
   ///
@@ -450,24 +446,22 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   // Protocol conformance
   //
 
-  /// The hash value.
+  /// The pointer's hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
   public var hashValue: Int {
     return Int(bitPattern: self)
   }
 
-  /// Return `x - self`.
+  /// Returns `x - self`.
   public func distance(to x: ${Self}) -> Int {
     return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
         Builtin.ptrtoint_Word(_rawValue)))
   }
 
-  /// Return `self + n`.
+  /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
     return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
   }
@@ -487,7 +481,7 @@ public func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }

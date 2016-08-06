@@ -51,10 +51,10 @@ extension LazyCollectionProtocol where Elements == Self {
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
 public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
-  /// The type of the underlying collection
+  /// The type of the underlying collection.
   public typealias Elements = Base
 
-  /// The underlying collection
+  /// The underlying collection.
   public var elements: Elements { return _base }
 
   /// A type that represents a valid position in the collection.
@@ -63,7 +63,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
   
-  /// Construct an instance with `base` as its underlying Collection
+  /// Creates an instance with `base` as its underlying Collection
   /// instance.
   internal init(_base: Base) {
     self._base = _base
@@ -134,7 +134,7 @@ extension ${Self} : ${TraversalCollection} {
     return _base.index(after: i)
   }
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
@@ -150,7 +150,7 @@ extension ${Self} : ${TraversalCollection} {
     return ${Slice}(base: _base, bounds: bounds).lazy
   }
   
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
   public var isEmpty: Bool {
     return _base.isEmpty
   }
