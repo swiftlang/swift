@@ -2410,20 +2410,20 @@ findCorrectEnumCaseName(MetatypeType *MetaTy, LookupResult &Result,
                         DeclName memberName) {
   if (!memberName.isSimpleName())
     return DeclName();
-  if (MetaTy->getInstanceType()->getKind() != TypeKind::Enum)
+  if (!MetaTy->getInstanceType()->is<EnumType>())
     return DeclName();
   std::vector<DeclName> candidates;
   for (auto &correction : Result) {
     DeclName correctName = correction.Decl->getFullName();
     if (!correctName.isSimpleName())
       continue;
-    if (correction.Decl->getKind() != DeclKind::EnumElement)
+    if (!isa<EnumElementDecl>(correction.Decl))
       continue;
-    if (0 == correctName.getBaseName().str().
-          compare_lower(memberName.getBaseName().str()))
+    if (correctName.getBaseName().str().
+          compare_lower(memberName.getBaseName().str()) == 0)
       candidates.push_back(correctName);
   }
-  if (1 == candidates.size())
+  if (candidates.size() == 1)
     return candidates.front();
   return DeclName();
 }
