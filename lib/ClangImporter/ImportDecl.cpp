@@ -6087,7 +6087,7 @@ namespace {
 
     Decl *
     VisitObjCCompatibleAliasDecl(const clang::ObjCCompatibleAliasDecl *decl) {
-      // Import Objective-C’s @compatibility_alias as typealias.
+      // Import Objective-C's @compatibility_alias as typealias.
       EffectiveClangContext effectiveContext(decl->getDeclContext()->getRedeclContext());
       auto dc = Impl.importDeclContextOf(decl, effectiveContext);
       if (!dc) return nullptr;
