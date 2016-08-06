@@ -72,14 +72,14 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-First create a directory for all of the swift sources:
+First create a directory for all of the Swift sources:
 
     mkdir swift-source
     cd swift-source
 
 **Note:** This is important since update-checkout (see below) checks out
-repositories next to the swift source directory. This means that if one clones
-swift and has other unrelated repositories, update-checkout may not clone those
+repositories next to the Swift source directory. This means that if one clones
+Swift and has other unrelated repositories, update-checkout may not clone those
 repositories and will update them instead.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
@@ -138,7 +138,7 @@ it next to the other projects and it will be bootstrapped automatically:
 The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for iOS, running tests after builds, and more. It also
-supports presets which you can define for common combinations of build options.
+supports presets, which you can define for common combinations of build options.
 
 To find out more:
 
