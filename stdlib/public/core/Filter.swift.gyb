@@ -12,7 +12,6 @@
 
 %{
 from gyb_stdlib_support import (
-    TRAVERSALS,
     collectionForTraversal,
     sliceTypeName
 )
