@@ -722,7 +722,7 @@ Type ConstraintSystem::openBindingType(Type type,
   Type result = openType(type, locator);
   
   if (isArrayType(type)) {
-    auto boundStruct = cast<BoundGenericStructType>(type.getPointer());
+    auto boundStruct = type->getAs<BoundGenericStructType>();
     if (auto replacement = getTypeChecker().getArraySliceType(
                              SourceLoc(), boundStruct->getGenericArgs()[0])) {
       return replacement;

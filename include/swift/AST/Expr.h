@@ -2140,6 +2140,10 @@ class CollectionExpr : public Expr {
 
   Expr *SemanticExpr = nullptr;
 
+  /// True if the type of this collection expr was inferred by the collection
+  /// fallback type, like [Any].
+  bool IsTypeDefaulted = false;
+
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
                  MutableArrayRef<Expr*> Elements,
@@ -2156,6 +2160,9 @@ public:
   Expr *getElement(unsigned i) const { return Elements[i]; }
   void setElement(unsigned i, Expr *E) { Elements[i] = E; }
   unsigned getNumElements() const { return Elements.size(); }
+
+  bool isTypeDefaulted() const { return IsTypeDefaulted; }
+  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = value; }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }

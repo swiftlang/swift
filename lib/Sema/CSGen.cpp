@@ -1728,12 +1728,18 @@ namespace {
                            LocatorPathElt::getTupleElement(index++)));
       }
 
+      // The array element type defaults to 'Any'.
+      if (auto elementTypeVar = arrayElementTy->getAs<TypeVariableType>()) {
+        CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
+                         tc.Context.TheAnyType, locator);
+        CS.ArrayElementTypeVariables[expr] = elementTypeVar;
+      }
+
       return arrayTy;
     }
 
     static bool isMergeableValueKind(Expr *expr) {
-      return isa<CollectionExpr>(expr) ||
-             isa<StringLiteralExpr>(expr) || isa<IntegerLiteralExpr>(expr) ||
+      return isa<StringLiteralExpr>(expr) || isa<IntegerLiteralExpr>(expr) ||
              isa<FloatLiteralExpr>(expr);
     }
 
@@ -1811,16 +1817,22 @@ namespace {
               auto keyTyvar2 = tty2->getElementTypes()[0]->
                                 getAs<TypeVariableType>();
 
-              mergedKey = mergeRepresentativeEquivalenceClasses(CS, 
+              auto keyExpr1 = cast<TupleExpr>(element1)->getElements()[0];
+              auto keyExpr2 = cast<TupleExpr>(element2)->getElements()[0];
+
+              if (keyExpr1->getKind() == keyExpr2->getKind() &&
+                  isMergeableValueKind(keyExpr1)) {
+                mergedKey = mergeRepresentativeEquivalenceClasses(CS,
                             keyTyvar1, keyTyvar2);
+              }
 
               auto valueTyvar1 = tty1->getElementTypes()[1]->
                                   getAs<TypeVariableType>();
               auto valueTyvar2 = tty2->getElementTypes()[1]->
                                   getAs<TypeVariableType>();
 
-              auto elemExpr1 = dyn_cast<TupleExpr>(element1)->getElements()[1];
-              auto elemExpr2 = dyn_cast<TupleExpr>(element2)->getElements()[1];
+              auto elemExpr1 = cast<TupleExpr>(element1)->getElements()[1];
+              auto elemExpr2 = cast<TupleExpr>(element2)->getElements()[1];
 
               if (elemExpr1->getKind() == elemExpr2->getKind() &&
                 isMergeableValueKind(elemExpr1)) {
@@ -1848,6 +1860,26 @@ namespace {
                              expr,
                              LocatorPathElt::getTupleElement(index++)));
       }
+
+      // The dictionary key type defaults to 'AnyHashable'.
+      auto keyTypeVar = dictionaryKeyTy->getAs<TypeVariableType>();
+      if (keyTypeVar && tc.Context.getAnyHashableDecl()) {
+        auto anyHashable = tc.Context.getAnyHashableDecl();
+        tc.validateDecl(anyHashable);
+        CS.addConstraint(ConstraintKind::Defaultable, dictionaryKeyTy,
+                         anyHashable->getDeclaredInterfaceType(), locator);
+      }
+
+      // The dictionary value type defaults to 'Any'.
+      auto valueTypeVar = dictionaryValueTy->getAs<TypeVariableType>();
+      if (valueTypeVar) {
+        CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
+                         tc.Context.TheAnyType, locator);
+      }
+
+      // Record key/value type variables.
+      if (keyTypeVar || valueTypeVar)
+        CS.DictionaryElementTypeVariables[expr] = { keyTypeVar, valueTypeVar };
 
       return dictionaryTy;
     }

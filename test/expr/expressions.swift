@@ -675,15 +675,15 @@ func unusedExpressionResults() {
 //===----------------------------------------------------------------------===//
 
 func arrayLiterals() { 
-  var a = [1,2,3]
-  var b : [Int] = []
-  var c = []  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
+  let _ = [1,2,3]
+  let _ : [Int] = []
+  let _ = []  // expected-error {{empty collection literal requires an explicit type}}
 }
 
 func dictionaryLiterals() {
-  var a = [1 : "foo",2 : "bar",3 : "baz"]
-  var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
+  let _ = [1 : "foo",2 : "bar",3 : "baz"]
+  let _: Dictionary<Int, String> = [:]
+  let _ = [:]  // expected-error {{empty collection literal requires an explicit type}}
 }
 
 func invalidDictionaryLiteral() {
