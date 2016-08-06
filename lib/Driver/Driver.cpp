@@ -1612,20 +1612,13 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
   }
 
   Job::Condition condition;
-  if (!hasValidModTime || J->getInputModTime() != inputInfo.previousModTime) {
-    if (alwaysRebuildDependents ||
-        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
-      condition = Job::Condition::Always;
-    } else {
-      condition = Job::Condition::RunWithoutCascading;
-    }
-  } else {
+  if (hasValidModTime && J->getInputModTime() == inputInfo.previousModTime) {
     switch (inputInfo.status) {
     case CompileJobAction::InputInfo::UpToDate:
-      if (!llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
-        condition = Job::Condition::RunWithoutCascading;
-      else
+      if (llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
         condition = Job::Condition::CheckDependencies;
+      else
+        condition = Job::Condition::RunWithoutCascading;
       break;
     case CompileJobAction::InputInfo::NeedsCascadingBuild:
       condition = Job::Condition::Always;
@@ -1635,6 +1628,13 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
       break;
     case CompileJobAction::InputInfo::NewlyAdded:
       llvm_unreachable("handled above");
+    }
+  } else {
+    if (alwaysRebuildDependents ||
+        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
+      condition = Job::Condition::Always;
+    } else {
+      condition = Job::Condition::RunWithoutCascading;
     }
   }
 

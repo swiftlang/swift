@@ -44,5 +44,5 @@ if (os.path.basename(primaryFile) == 'bad.swift' or
     else:
         sys.exit(129)
 
-dir = os.path.dirname(os.path.abspath(__file__))
-execfile(os.path.join(dir, "update-dependencies.py"))
+execDir = os.path.dirname(os.path.abspath(__file__))
+execfile(os.path.join(execDir, "update-dependencies.py"))
