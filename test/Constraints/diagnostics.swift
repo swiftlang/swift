@@ -412,7 +412,7 @@ CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'Cu
 
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
-  case Red // expected-note 2 {{did you mean 'Red'?}}
+  case Red
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
@@ -446,8 +446,8 @@ let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to a
 let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
 let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-var someColor : Color = .red // expected-error {{type 'Color' has no member 'red'}}
-someColor = .red  // expected-error {{type 'Color' has no member 'red'}}
+var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; do you mean 'Red'}}
+someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; do you mean 'Red'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
