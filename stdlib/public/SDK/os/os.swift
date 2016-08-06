@@ -27,8 +27,9 @@ public func os_log(
 		// Since dladdr is in libc, it is safe to unsafeBitCast
                 // the cstring argument type.
 		let str = unsafeBitCast(buf.baseAddress!, to: UnsafePointer<Int8>.self)
-		let valist = getVaList(args)
-		_swift_os_log(dso, log, type, str, valist)
+		withVaList(args) { valist in
+		  _swift_os_log(dso, log, type, str, valist)
+    }
 	}
 }
 
