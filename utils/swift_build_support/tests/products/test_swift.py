@@ -11,7 +11,6 @@
 
 import argparse
 import os
-import platform
 import shutil
 import sys
 import tempfile
@@ -24,7 +23,6 @@ except ImportError:
     from io import StringIO
 
 from swift_build_support import shell
-from swift_build_support import xcrun
 from swift_build_support.products import Swift
 from swift_build_support.toolchain import host_toolchain
 from swift_build_support.workspace import Workspace
