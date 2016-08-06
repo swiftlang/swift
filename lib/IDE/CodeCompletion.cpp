@@ -3019,12 +3019,6 @@ public:
                                 optionSetType, conformances);
   }
 
-  bool isOptionSet(Type Ty) {
-    return Ty &&
-           Ty->getNominalOrBoundGenericNominal() &&
-           isOptionSetDecl(Ty->getNominalOrBoundGenericNominal());
-  }
-
   void getTupleExprCompletions(TupleType *ExprType) {
     unsigned Index = 0;
     for (auto TupleElt : ExprType->getElements()) {
