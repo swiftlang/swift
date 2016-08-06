@@ -1948,7 +1948,7 @@ private:
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
   
-  /// Diagnose the lookup of an static member or enum element as instance member.
+  /// Diagnose the lookup of a static member or enum element as instance member.
   void diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
                                           Expr *baseExpr,
                                           DeclName memberName,
