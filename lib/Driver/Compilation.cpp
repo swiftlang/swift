@@ -464,57 +464,72 @@ int Compilation::performJobsImpl() {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
         Output.getAdditionalOutputForType(types::TY_SwiftDeps);
-      if (!DependenciesFile.empty() &&
-          (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE)) {
-        bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-        switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
-        case DependencyGraphImpl::LoadResult::HadError:
-          if (ReturnCode == EXIT_SUCCESS) {
-            disableIncrementalBuild();
-            for (const Job *Cmd : DeferredCommands)
-              scheduleCommandIfNecessaryAndPossible(Cmd);
-            DeferredCommands.clear();
-            Dependents.clear();
-          } // else, let the next build handle it.
-          break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
-          if (!wasCascading)
-            break;
-          SWIFT_FALLTHROUGH;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
-          DepGraph.markTransitive(Dependents, FinishedCmd);
-          break;
-        }
+      if (DependenciesFile.empty()) {
+        // If this job doesn't track dependencies, it must always be run.
+        // Note: In theory CheckDependencies makes sense as well (for a leaf
+        // node in the dependency graph), and maybe even NewlyAdded (for very
+        // coarse dependencies that always affect downstream nodes), but we're
+        // not using either of those right now, and this logic should probably
+        // be revisited when we are.
+        assert(FinishedCmd->getCondition() == Job::Condition::Always);
       } else {
-        // If there's a crash, assume the worst.
-        switch (FinishedCmd->getCondition()) {
-        case Job::Condition::NewlyAdded:
-          // The job won't be treated as newly added next time. Conservatively
-          // mark it as affecting other jobs, because some of them may have
-          // completed already.
-          DepGraph.markTransitive(Dependents, FinishedCmd);
-          break;
-        case Job::Condition::Always:
-          // This applies to non-incremental tasks as well, but any incremental
-          // task that shows up here has already been marked.
-          break;
-        case Job::Condition::RunWithoutCascading:
-          // If this file changed, it might have been a non-cascading change and
-          // it might not. Unfortunately, the interface hash has been updated or
-          // compromised, so we don't actually know anymore; we have to
-          // conservatively assume the changes could affect other files.
-          DepGraph.markTransitive(Dependents, FinishedCmd);
-          break;
-        case Job::Condition::CheckDependencies:
-          // If the only reason we're running this is because something else
-          // changed, then we can trust the dependency graph as to whether it's
-          // a cascading or non-cascading change. That is, if whatever /caused/
-          // the error isn't supposed to affect other files, and whatever
-          // /fixes/ the error isn't supposed to affect other files, then
-          // there's no need to recompile any other inputs. If either of those
-          // are false, we /do/ need to recompile other inputs.
-          break;
+        // If we have a dependency file /and/ the frontend task exited normally,
+        // we can be discerning about what downstream files to rebuild.
+        if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
+          bool wasCascading = DepGraph.isMarked(FinishedCmd);
+
+          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          case DependencyGraphImpl::LoadResult::HadError:
+            if (ReturnCode == EXIT_SUCCESS) {
+              disableIncrementalBuild();
+              for (const Job *Cmd : DeferredCommands)
+                scheduleCommandIfNecessaryAndPossible(Cmd);
+              DeferredCommands.clear();
+              Dependents.clear();
+            } // else, let the next build handle it.
+            break;
+          case DependencyGraphImpl::LoadResult::UpToDate:
+            if (!wasCascading)
+              break;
+            SWIFT_FALLTHROUGH;
+          case DependencyGraphImpl::LoadResult::AffectsDownstream:
+            DepGraph.markTransitive(Dependents, FinishedCmd);
+            break;
+          }
+        } else {
+          // If there's an abnormal exit (a crash), assume the worst.
+          switch (FinishedCmd->getCondition()) {
+          case Job::Condition::NewlyAdded:
+            // The job won't be treated as newly added next time. Conservatively
+            // mark it as affecting other jobs, because some of them may have
+            // completed already.
+            DepGraph.markTransitive(Dependents, FinishedCmd);
+            break;
+          case Job::Condition::Always:
+            // Any incremental task that shows up here has already been marked;
+            // we didn't need to wait for it to finish to start downstream
+            // tasks.
+            assert(DepGraph.isMarked(FinishedCmd));
+            break;
+          case Job::Condition::RunWithoutCascading:
+            // If this file changed, it might have been a non-cascading change
+            // and it might not. Unfortunately, the interface hash has been
+            // updated or compromised, so we don't actually know anymore; we
+            // have to conservatively assume the changes could affect other
+            // files.
+            DepGraph.markTransitive(Dependents, FinishedCmd);
+            break;
+          case Job::Condition::CheckDependencies:
+            // If the only reason we're running this is because something else
+            // changed, then we can trust the dependency graph as to whether
+            // it's a cascading or non-cascading change. That is, if whatever
+            // /caused/ the error isn't supposed to affect other files, and
+            // whatever /fixes/ the error isn't supposed to affect other files,
+            // then there's no need to recompile any other inputs. If either of
+            // those are false, we /do/ need to recompile other inputs.
+            break;
+          }
         }
       }
     }
