@@ -1,3 +1,4 @@
+
 // RUN: %target-parse-verify-swift
 
 // Test various tuple constraints.
@@ -61,6 +62,7 @@ any = (label: 4)
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
 any.1 // expected-error{{value of type 'Any' has no member '1'}}
+// expected-note@-1{{cast 'Any' to 'AnyObject' or more specific type to access members}}
 
 // Fun with tuples
 protocol PosixErrorReturn {
