@@ -48,9 +48,9 @@
                     "open" "associatedtype")
                   'words) . font-lock-keyword-face)
    ;; Statements
-   `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case" "default"
-                    "throw" "try" "catch")
+   `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
+                    "return" "break" "continue" "fallthrough"  "switch" "case"
+                    "default" "throw" "defer" "try" "catch")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
