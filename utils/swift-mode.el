@@ -48,6 +48,11 @@
                     "open" "associatedtype" "get" "set" "willSet" "didSet"
                     "inout" "indirect" "final")
                   'words) . font-lock-keyword-face)
+   ;; Operators
+   `("\\b\\(\\(pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
+   ;; Infix operator attributes
+   `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
+                  'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
                     "return" "break" "continue" "fallthrough"  "switch" "case"
