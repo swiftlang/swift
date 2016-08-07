@@ -75,6 +75,9 @@ ERROR(could_not_find_type_member,none,
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
 
+NOTE(any_as_anyobject_fixit, none,
+     "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
+
 ERROR(expected_argument_in_contextual_member,none,
       "contextual member %0 expects argument of type %1", (DeclName, Type))
 
