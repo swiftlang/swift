@@ -61,6 +61,9 @@ any = (label: 4)
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
 any.1 // expected-error{{value of type 'Any' has no member '1'}}
+// expected-note@-1{{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+any = (5.0, 6.0) as (Float, Float)
+_ = (any as! (Float, Float)).1
 
 // Fun with tuples
 protocol PosixErrorReturn {
