@@ -31,6 +31,7 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/ELFObjectFile.h"
 
 using namespace swift;
@@ -106,32 +107,44 @@ public:
   }
 };
 
-// Look inside the binary 'Bin' and append any linker flags found in its
-// ".swift1_autolink_entries" section to 'LinkerFlags'. If 'Bin' is an archive,
-// recursively look inside all children within the archive. Return 'true' if
-// there was an error, and 'false' otherwise.
+/// Look inside the object file 'ObjectFile' and append any linker flags found in
+/// its ".swift1_autolink_entries" section to 'LinkerFlags'.
+static void
+extractLinkerFlagsFromObjectFile(const llvm::object::ObjectFile *ObjectFile,
+                                 std::vector<std::string> &LinkerFlags) {
+  // Search for the section we hold autolink entries in
+  for (auto &Section : ObjectFile->sections()) {
+    llvm::StringRef SectionName;
+    Section.getName(SectionName);
+    if (SectionName == ".swift1_autolink_entries") {
+      llvm::StringRef SectionData;
+      Section.getContents(SectionData);
+
+      // entries are null-terminated, so extract them and push them into
+      // the set.
+      llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
+      SectionData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
+                        /*KeepEmpty=*/false);
+      for (const auto &Flag : SplitFlags)
+        LinkerFlags.push_back(Flag);
+    }
+  }
+}
+
+/// Look inside the binary 'Bin' and append any linker flags found in its
+/// ".swift1_autolink_entries" section to 'LinkerFlags'. If 'Bin' is an archive,
+/// recursively look inside all children within the archive. Return 'true' if
+/// there was an error, and 'false' otherwise.
 static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                CompilerInstance &Instance,
                                StringRef BinaryFileName,
                                std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
-    // Search for the section we hold autolink entries in
-    for (auto &Section : ObjectFile->sections()) {
-      llvm::StringRef SectionName;
-      Section.getName(SectionName);
-      if (SectionName == ".swift1_autolink_entries") {
-        llvm::StringRef SectionData;
-        Section.getContents(SectionData);
-
-        // entries are null-terminated, so extract them and push them into
-        // the set.
-        llvm::SmallVector<llvm::StringRef, 4> SplitFlags;
-        SectionData.split(SplitFlags, llvm::StringRef("\0", 1), -1,
-                          /*KeepEmpty=*/false);
-        for (const auto &Flag : SplitFlags)
-          LinkerFlags.push_back(Flag);
-      }
-    }
+    extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags);
+    return false;
+  } else if (auto *ObjectFile =
+                 llvm::dyn_cast<llvm::object::COFFObjectFile>(Bin)) {
+    extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags);
     return false;
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     for (const auto &Child : Archive->children()) {
