@@ -16,7 +16,7 @@ import has_accessibility
 #endif
 
 // This deliberately has the wrong import kind.
-import var has_accessibility.zz // expected-error {{no such decl in module}}
+import var has_accessibility.zz // expected-error {{variable 'zz' does not exist in module 'has_accessibility'}}
 
 func markUsed<T>(_ t: T) {}
 
