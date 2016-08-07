@@ -58,6 +58,10 @@
                     "return" "break" "continue" "fallthrough"  "switch" "case"
                     "default" "throw" "defer" "try" "catch")
                   'words) . font-lock-keyword-face)
+   ;; Decl modifier keywords
+   `(,(regexp-opt '("convenience" "dynamic" "mutating" "nonmutating" "optional"
+                    "required" "weak" "unowned" "safe" "unsafe")
+                  'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
    ;; Special Variables
