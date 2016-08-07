@@ -501,7 +501,7 @@ extension Array : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray() as AnyObject, to: NSArray.self)
+    return unsafeBitCast(self._bridgeToObjectiveCImpl(), to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(

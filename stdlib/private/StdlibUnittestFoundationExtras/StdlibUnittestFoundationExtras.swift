@@ -82,6 +82,7 @@ internal func _stdlib_NSArray_getObjects(
   rangeLength: Int)
 
 extension NSArray {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
   ) {
@@ -101,6 +102,7 @@ func _stdlib_NSDictionary_getObjects(
 )
 
 extension NSDictionary {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
     andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
