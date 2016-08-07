@@ -44,8 +44,9 @@
    `(,(regexp-opt '("class" "init" "deinit" "extension" "fileprivate" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "lazy" "where"
-                    "private" "public" "internal" "override" "throws"
-                    "open" "associatedtype")
+                    "private" "public" "internal" "override" "throws" "rethrows"
+                    "open" "associatedtype" "get" "set" "willSet" "didSet"
+                    "inout" "indirect" "final")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
