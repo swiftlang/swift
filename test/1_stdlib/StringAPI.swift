@@ -323,6 +323,22 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
+//[SR-1988] Ranges of String.UTF16View.Index have negative count
+StringTests.test("String.UTF16View.Index-count") {
+  let str = "How many elements do I contain?".utf16
+  let indices: Range = str.startIndex ..< str.endIndex
+  expectEqual(indices.count , 31)
+  expectTrue(indices.count >= 0)
+  
+  let blank = "".utf16
+  let blankindices: Range = blank.startIndex ..< blank.endIndex
+  expectEqual(indices.count , 0)
+  
+  let one = "1".utf16
+  let oneindices: Range = one.startIndex ..< one.endIndex
+  expectEqual(indices.count , 1)
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {
