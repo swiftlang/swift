@@ -2523,6 +2523,17 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           diagnose(loc, diag::did_you_mean_raw_type);
           return; // Always prefer this over typo corrections.
         }
+      } else if (baseObjTy->isAny()) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
+          auto NameStr = DRE->getDecl()->getName().str();
+          SmallVector<char, 1> NameBuf;
+          StringRef prefix = ("(" + NameStr).toStringRef(NameBuf);
+          StringRef suffix = "as AnyObject)";
+          diagnose(loc, diag::any_as_anyobject_fixit)
+            .fixItInsert(baseExpr->getStartLoc(), prefix)
+            .fixItInsertAfter(baseExpr->getEndLoc(), suffix);
+          return;
+        }
       }
     }
 

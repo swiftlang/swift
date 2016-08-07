@@ -219,3 +219,9 @@ uopt.wibble!()
 // Should not be able to see private or internal @objc methods.
 uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
 uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
+
+let anyValue: Any = X()
+_ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}{{5-6=(}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or more specific type to access members}}
+_ = (anyValue as AnyObject).bar()
+_ = (anyValue as! X).bar()
