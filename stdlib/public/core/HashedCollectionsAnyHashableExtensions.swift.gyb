@@ -28,16 +28,6 @@ extension AnyHashable : _AnyHashableProtocol {}
 // properly expressed in the language.
 extension Set {
   @inline(__always)
-  internal func _concreteElement_contains(_ member: Element) -> Bool {
-    return contains(member)
-  }
-
-  @inline(__always)
-  internal func _concreteElement_index(of member: Element) -> Index? {
-    return index(of: member)
-  }
-
-  @inline(__always)
   internal mutating func _concreteElement_insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
@@ -61,18 +51,6 @@ extension Set {
 
 // FIXME(ABI)(compiler limitation): replace with `where Element == AnyHashable`.
 extension Set where Element : _AnyHashableProtocol {
-  public func contains<ConcreteElement : Hashable>(
-    _ member: ConcreteElement
-  ) -> Bool {
-    return _concreteElement_contains(AnyHashable(member) as! Element)
-  }
-
-  public func index<ConcreteElement : Hashable>(
-    of member: ConcreteElement
-  ) -> SetIndex<Element>? {
-    return _concreteElement_index(of: AnyHashable(member) as! Element)
-  }
-
   public mutating func insert<ConcreteElement : Hashable>(
     _ newMember: ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
@@ -107,11 +85,6 @@ extension Set where Element : _AnyHashableProtocol {
 // FIXME: remove these trampolines when extensions below can be
 // properly expressed in the language.
 extension Dictionary {
-  @inline(__always)
-  internal func _concreteKey_index(forKey key: Key) -> Index? {
-    return index(forKey: key)
-  }
-
   internal subscript(_concreteKey key: Key) -> Value? {
     @inline(__always)
     get {
@@ -138,12 +111,6 @@ extension Dictionary {
 
 // FIXME(ABI)(compiler limitation): replace with `where Element == AnyHashable`.
 extension Dictionary where Key : _AnyHashableProtocol {
-  public func index<ConcreteKey : Hashable>(forKey key: ConcreteKey)
-    -> DictionaryIndex<Key, Value>?
-  {
-    return _concreteKey_index(forKey: AnyHashable(key) as! Key)
-  }
-
   public subscript(_ key: _Hashable) -> Value? {
     // FIXME(ABI)(compiler limitation): replace this API with a
     // generic subscript.
