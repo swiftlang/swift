@@ -97,6 +97,7 @@ public protocol Streamable {
   /// stream.
   func write<Target : TextOutputStream>(to target: inout Target)
 }
+typealias TextOutputStreamable = Streamable
 
 /// A type with a customized textual representation.
 ///
