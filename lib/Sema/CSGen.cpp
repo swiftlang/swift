@@ -2632,9 +2632,7 @@ namespace {
     Type visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If there are UnresolvedPatterns floating around after name binding,
       // they are pattern productions in invalid positions.
-      CS.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
-                     expr->getSubPattern()->getKind());
-      return Type();
+      return ErrorType::get(CS.getASTContext());
     }
 
     /// Get the type T?
