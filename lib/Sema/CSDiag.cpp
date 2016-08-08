@@ -2621,6 +2621,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         
     case MemberLookupResult::UR_Inaccessible: {
       auto decl = result.UnviableCandidates[0].first;
+      // FIXME: What if the unviable candidates have different levels of access?
       diagnose(nameLoc, diag::candidate_inaccessible, decl->getName(),
                decl->getFormalAccess());
       for (auto cand : result.UnviableCandidates)
