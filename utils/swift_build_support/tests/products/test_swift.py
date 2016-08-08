@@ -75,4 +75,5 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(swift.cmake_options, ['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread'])
+        self.assertEqual(swift.cmake_options,
+                         ['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread'])

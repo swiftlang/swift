@@ -599,11 +599,13 @@ class BuildScriptInvocation(object):
                 toolchain=self.toolchain,
                 source_dir=self.workspace.source_dir(product_name),
                 # FIXME: This is incorrect
-                build_dir=self.workspace.build_dir(args.host_target, product_name))
+                build_dir=self.workspace.build_dir(
+                    args.host_target, product_name))
+            cmake_opts = product.cmake_options
             impl_args += [
                 "--%s-cmake-options=%s" % (
                     product_name,
-                    ' '.join(pipes.quote(opt) for opt in product.cmake_options))
+                    ' '.join(pipes.quote(opt) for opt in cmake_opts))
             ]
 
         if args.build_stdlib_deployment_targets:
