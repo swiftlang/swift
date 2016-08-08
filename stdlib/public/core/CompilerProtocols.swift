@@ -613,6 +613,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///           String(stringInterpolationSegment: " cookies: $"),
 ///           String(stringInterpolationSegment: price * number),
 ///           String(stringInterpolationSegment: "."))
+@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public protocol ExpressibleByStringInterpolation {
   /// Creates an instance by concatenating the given values.
   ///
