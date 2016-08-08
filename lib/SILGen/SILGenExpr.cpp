@@ -2328,8 +2328,13 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((isNullableTypeInC(M, subscript->getElementType())
-            || subscript->getElementType()->hasArchetype())
+    // The subscript element type is an interface type. Map it into context
+    // so we can properly gauge reference-ness.
+    auto elementType =
+      ArchetypeBuilder::mapTypeIntoContext(subscript,
+                                           subscript->getElementType());
+    assert((isNullableTypeInC(M, elementType)
+            || elementType->hasArchetype())
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
   }
