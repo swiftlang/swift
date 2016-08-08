@@ -39,7 +39,8 @@ namespace {
     DeclContext *DC;
     NameLookupOptions Options;
     bool ConsiderProtocolMembers;
-    bool SearchingFromProtoExt = false;
+    bool SearchingFromProtoExt;
+    bool IsMemberLookup;
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
@@ -50,10 +51,11 @@ namespace {
   public:
     LookupResultBuilder(TypeChecker &tc, LookupResult &result, DeclContext *dc,
                         NameLookupOptions options, bool considerProtocolMembers,
-                        bool searchingFromProtoExt)
+                        bool searchingFromProtoExt, bool isMemberLookup)
       : TC(tc), Result(result), DC(dc), Options(options),
         ConsiderProtocolMembers(considerProtocolMembers),
-        SearchingFromProtoExt(searchingFromProtoExt) { }
+        SearchingFromProtoExt(searchingFromProtoExt),
+        IsMemberLookup(isMemberLookup) { }
 
     ~LookupResultBuilder() {
       // If any of the results have a base, we need to remove
@@ -62,7 +64,8 @@ namespace {
       // but there are weird assumptions about the results of unqualified
       // name lookup, e.g., that a local variable not having a type indicates
       // that it hasn't been seen yet.
-      if (std::find_if(Result.begin(), Result.end(),
+      if (!IsMemberLookup &&
+          std::find_if(Result.begin(), Result.end(),
                        [](const LookupResult::Result &found) {
                          return found.Base != nullptr;
                        }) == Result.end())
@@ -207,7 +210,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     = options.contains(NameLookupFlags::ProtocolMembers);
   LookupResultBuilder builder(*this, result, dc, options,
                               considerProtocolMembers,
-                              searchingFromProtoExt);
+                              searchingFromProtoExt,
+                              /*memberLookup*/false);
   for (const auto &found : lookup.Results) {
     // Determine which type we looked through to find this result.
     Type foundInType;
@@ -279,7 +283,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
     LookupResultBuilder builder(*this, result, dc, options,
                                 considerProtocolMembers,
-                                false);
+                                /*protocol extension*/false,
+                                /*member lookup*/true);
     SmallVector<ValueDecl *, 4> lookupResults;
     dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
