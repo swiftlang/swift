@@ -319,12 +319,16 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are validating the type for SIL.
   TR_SILType = 0x10,
 
+  /// Whether we are parsing a SIL file.  Not the same as TR_SILType,
+  /// because the latter is not set if we're parsing an AST type.
+  TR_SILMode = 0x20,
+
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
-  TR_FunctionInput = 0x20,
+  TR_FunctionInput = 0x40,
 
   /// Whether this is the immediate input type to a function type,
-  TR_ImmediateFunctionInput = 0x40,
+  TR_ImmediateFunctionInput = 0x80,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.

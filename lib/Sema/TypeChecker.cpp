@@ -674,12 +674,25 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   bool isSILType, DeclContext *DC,
+                                   DeclContext *DC,
+                                   bool ProduceDiagnostics) {
+  return performTypeLocChecking(Ctx, T,
+                                /*isSILMode=*/false,
+                                /*isSILType=*/false,
+                                DC, ProduceDiagnostics);
+}
+
+bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
+                                   bool isSILMode,
+                                   bool isSILType,
+                                   DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
 
   // Fine to have unbound generic types.
   options |= TR_AllowUnboundGenerics;
+  if (isSILMode)
+    options |= TR_SILMode;
   if (isSILType)
     options |= TR_SILType;
 

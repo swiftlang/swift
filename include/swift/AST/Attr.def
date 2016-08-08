@@ -40,6 +40,7 @@ TYPE_ATTR(escaping)
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
 TYPE_ATTR(box)
+TYPE_ATTR(dynamic_self)
 TYPE_ATTR(sil_unowned)
 TYPE_ATTR(sil_unmanaged)
 TYPE_ATTR(sil_weak)

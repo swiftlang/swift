@@ -426,8 +426,7 @@ private:
     DeclContext *dc = getNotionalDC();
 
     TypeLoc loc(repr);
-    if (performTypeLocChecking(Ctx, loc, /*SILType*/ false, dc,
-                               /*diagnose*/ false))
+    if (performTypeLocChecking(Ctx, loc, dc, /*diagnose*/ false))
       return Type();
 
     return loc.getType();
