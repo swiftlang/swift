@@ -106,3 +106,20 @@ function(is_build_type_with_debuginfo build_type result_var_name)
     message(FATAL_ERROR "Unknown build type: ${build_type}")
   endif()
 endfunction()
+
+# Set variable to value if value is not null or false. Otherwise set variable to
+# default_value.
+function(set_with_default variable value)
+  cmake_parse_argument(
+    SWD
+    ""
+    "DEFAULT"
+    "" ${ARGN})
+  precondition(SWD_DEFAULT
+    MESSAGE "Must specify a default argument")
+  if (value)
+    set(${variable} ${value} PARENT_SCOPE)
+  else()
+    set(${variable} ${SWD_DEFAULT} PARENT_SCOPE)
+  endif()
+endfunction()

@@ -31,7 +31,7 @@ add_sourcekit_library(SourceKitSwiftLang
       clangAST
       clangAPINotes
       clangBasic
-  COMPONENT_DEPENDS ${LLVM_TARGETS_TO_BUILD}
+  LLVM_COMPONENT_DEPENDS ${LLVM_TARGETS_TO_BUILD}
       bitreader
       bitwriter
       debuginfodwarf

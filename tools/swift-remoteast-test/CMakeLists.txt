@@ -1,4 +1,4 @@
-add_swift_executable(swift-remoteast-test
+add_swift_host_tool(swift-remoteast-test
   swift-remoteast-test.cpp
   LINK_LIBRARIES
     swiftFrontendTool

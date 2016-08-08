@@ -1,4 +1,4 @@
-add_swift_executable(swift-ide-test
+add_swift_host_tool(swift-ide-test
   swift-ide-test.cpp
   ModuleAPIDiff.cpp
   XMLValidator.cpp
@@ -14,11 +14,6 @@ if(SWIFT_HAVE_LIBXML)
   target_link_libraries(swift-ide-test ${LIBXML2_LIBRARIES})
   add_definitions(-DSWIFT_HAVE_LIBXML="1")
 endif()
-
-swift_install_in_component(tools
-    TARGETS swift-ide-test
-    RUNTIME DESTINATION bin)
-
 
 # Create a symlink for swift-api-dump.py in the bin directory
 add_custom_command(TARGET swift-ide-test POST_BUILD

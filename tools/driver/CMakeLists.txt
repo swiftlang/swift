@@ -1,4 +1,4 @@
-add_swift_executable(swift
+add_swift_host_tool(swift
   api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
@@ -6,17 +6,10 @@ add_swift_executable(swift
   LINK_LIBRARIES
     swiftDriver
     swiftFrontendTool
+  SWIFT_COMPONENT compiler
 )
 
 target_link_libraries(swift edit)
-
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swiftc"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-add_custom_command(TARGET swift POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-autolink-extract"
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
@@ -38,12 +31,9 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
 endif()
 
-swift_install_in_component(compiler
-    TARGETS swift
-    RUNTIME DESTINATION "bin")
-swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
-    DESTINATION "bin")
-swift_install_in_component(autolink-driver
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
-    DESTINATION "bin")
+add_swift_tool_symlink(swiftc
+  TOOL swift
+  SWIFT_COMPONENT compiler)
+add_swift_tool_symlink(swift-autolink-extract
+  TOOL swift
+  SWIFT_COMPONENT autolink-driver)
