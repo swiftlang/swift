@@ -21,12 +21,11 @@ class Swift(product.Product):
         # Add any runtime sanitizer arguments.
         self.cmake_options.extend(self._compute_runtime_use_sanitizer())
 
-
     def _compute_runtime_use_sanitizer(self):
         sanitizer_list = []
         if self.args.enable_tsan_runtime:
             sanitizer_list += ['Thread']
         if len(sanitizer_list) == 0:
             return []
-        return ["-DSWIFT_RUNTIME_USE_SANITIZERS=%s" % \
-            ";".join(sanitizer_list)]
+        return ["-DSWIFT_RUNTIME_USE_SANITIZERS=%s" %
+                ";".join(sanitizer_list)]
