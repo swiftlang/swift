@@ -1158,9 +1158,6 @@ public:
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
-  /// \brief Retrieve the CFStringRef typealias.
-  Type getCFStringRefType();
-
   /// \brief Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesNSObjectBound(Type type);
