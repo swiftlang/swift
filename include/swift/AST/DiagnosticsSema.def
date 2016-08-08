@@ -2201,7 +2201,7 @@ ERROR(cannot_partially_specialize_generic_function,none,
      "cannot partially specialize a generic function", ())
 
 WARNING(use_of_void_pointer,none,
-"Unsafe%0Pointer<Void> is deprecated; use Unsafe%0RawPointer instead", (StringRef))
+"Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,

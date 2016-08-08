@@ -423,8 +423,7 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
     return false;
   IsMutable = BGT->getDecl() == Ctx.getUnsafeMutablePointerDecl();
   assert(BGT->getGenericArgs().size() == 1);
-  auto CanTy = BGT->getGenericArgs().front()->getCanonicalType();
-  return CanTy->isVoid();
+  return BGT->getGenericArgs().front()->isVoid();
 }
 
 Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
