@@ -70,8 +70,8 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         } else if rhs.object != nil {
             return false
         }
-        if let lhsUserInfo = lhs.userInfo {
-            if let rhsUserInfo = rhs.userInfo {
+        if lhs.userInfo != nil {
+            if rhs.userInfo != nil {
                 // user info must be compared in the object form since the userInfo in swift is not comparable
                 return lhs._bridgeToObjectiveC() == rhs._bridgeToObjectiveC()
             } else {
