@@ -1513,7 +1513,8 @@ function(add_swift_library name)
               add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
                   ${lipo_target}
                   ${lipo_target_static})
-              if(NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest")
+              if((NOT "${name}" STREQUAL "swiftStdlibCollectionUnittest") AND
+                 (NOT "${name}" STREQUAL "swiftStdlibUnicodeUnittest"))
                 add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
                     ${lipo_target}
                     ${lipo_target_static})
