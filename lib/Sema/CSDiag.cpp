@@ -2524,13 +2524,10 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           return; // Always prefer this over typo corrections.
         }
       } else if (baseObjTy->isAny()) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(baseExpr)) {
-          auto name = DRE->getDecl()->getName().str().str();
-          std::string replacement = "(" + name + " as AnyObject)";
-          diagnose(loc, diag::any_as_anyobject_fixit)
-            .fixItReplace(baseExpr->getSourceRange(), replacement);
-          return;
-        }
+        diagnose(loc, diag::any_as_anyobject_fixit)
+          .fixItInsert(baseExpr->getStartLoc(), "(")
+          .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
+        return;
       }
     }
 
