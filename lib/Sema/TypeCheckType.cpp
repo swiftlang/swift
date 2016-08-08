@@ -408,6 +408,10 @@ Type TypeChecker::resolveTypeInContext(
   return ErrorType::get(Context);
 }
 
+/// This function checks if a bound generic type is UnsafePointer<Void> or
+/// UnsafeMutablePointer<Void>. For these two type representations, we should
+/// warn users that they are deprecated and replace them with more handy
+/// UnsafeRawPointer and UnsafeMutableRawPointer, respectively.
 static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   if (Ty.isNull())
     return false;
