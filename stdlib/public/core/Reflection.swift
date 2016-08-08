@@ -151,7 +151,7 @@ public protocol _Mirror {
   var summary: String { get }
 
   /// A rich representation of `value` for an IDE, or `nil` if none is supplied.
-  var quickLookObject: PlaygroundQuickLook? { get }
+  var quickLookObject: _PlaygroundQuickLook? { get }
 
   /// How `value` should be presented in an IDE.
   var disposition: _MirrorDisposition { get }
@@ -428,7 +428,7 @@ struct _OpaqueMirror : _Mirror {
     _preconditionFailure("no children")
   }
   var summary: String { return data.summary }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .aggregate }
 }
 
@@ -459,7 +459,7 @@ internal struct _TupleMirror : _Mirror {
     return _getTupleChild(i, data)
   }
   var summary: String { return "(\(count) elements)" }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .tuple }
 }
 
@@ -485,7 +485,7 @@ struct _StructMirror : _Mirror {
   var summary: String {
     return _typeName(valueType)
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .`struct` }
 }
 
@@ -523,7 +523,7 @@ struct _EnumMirror : _Mirror {
     }
     return typeName
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .`enum` }
 }
 
@@ -544,7 +544,7 @@ internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
   return _swift_NSObject_isImpl(object, kindOf: `class` as AnyObject)
 }
 
-func _getClassPlaygroundQuickLook(_ object: AnyObject) -> PlaygroundQuickLook? {
+func _getClassPlaygroundQuickLook(_ object: AnyObject) -> _PlaygroundQuickLook? {
   if _is(object, kindOf: "NSNumber") {
     let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
     switch UInt8(number.objCType[0]) {
@@ -598,7 +598,7 @@ struct _ClassMirror : _Mirror {
   var summary: String {
     return _typeName(valueType)
   }
-  var quickLookObject: PlaygroundQuickLook? {
+  var quickLookObject: _PlaygroundQuickLook? {
 #if _runtime(_ObjC)
     let object = _swift_ClassMirror_quickLookObject(data)
     return _getClassPlaygroundQuickLook(object)
@@ -628,7 +628,7 @@ struct _ClassSuperMirror : _Mirror {
   var summary: String {
     return _typeName(data.metadata)
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
   var disposition: _MirrorDisposition { return .`class` }
 }
 
@@ -651,7 +651,7 @@ struct _MetatypeMirror : _Mirror {
   var summary: String {
     return _typeName(data._loadValue(ofType: Any.Type.self))
   }
-  var quickLookObject: PlaygroundQuickLook? { return nil }
+  var quickLookObject: _PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?
   var disposition: _MirrorDisposition { return .aggregate }

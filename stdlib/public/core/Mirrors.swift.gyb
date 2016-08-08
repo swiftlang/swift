@@ -44,8 +44,8 @@ extension ${Type[0]} : CustomReflectable {
   }
 }
 
-extension ${Type[0]} : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension ${Type[0]} : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return ${Type[1]}(${Type[2]})
   }
 }

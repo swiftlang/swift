@@ -597,7 +597,7 @@ internal extension Mirror {
 //===--- QuickLooks -------------------------------------------------------===//
 
 /// The sum of types that can be used as a Quick Look representation.
-public enum PlaygroundQuickLook {
+public enum _PlaygroundQuickLook {
   /// Plain text.
   case text(String)
 
@@ -667,11 +667,11 @@ public enum PlaygroundQuickLook {
   case _raw([UInt8], String)
 }
 
-extension PlaygroundQuickLook {
+extension _PlaygroundQuickLook {
   /// Initialize for the given `subject`.
   ///
   /// If the dynamic type of `subject` conforms to
-  /// `CustomPlaygroundQuickLookable`, returns the result of calling
+  /// `_CustomPlaygroundQuickLookable`, returns the result of calling
   /// its `customPlaygroundQuickLook` property.  Otherwise, returns
   /// a `PlaygroundQuickLook` synthesized for `subject` by the
   /// language.  Note that in some cases the result may be
@@ -682,7 +682,7 @@ extension PlaygroundQuickLook {
   ///   `Mirror`.  In general, though, the observability of such
   ///   mutations is unspecified.
   public init(reflecting subject: Any) {
-    if let customized = subject as? CustomPlaygroundQuickLookable {
+    if let customized = subject as? _CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
     }
     else if let customized = subject as? _DefaultCustomPlaygroundQuickLookable {
@@ -704,21 +704,21 @@ extension PlaygroundQuickLook {
 /// A Quick Look can be created for an instance of any type by using the
 /// `PlaygroundQuickLook(reflecting:)` initializer. If you are not satisfied
 /// with the representation supplied for your type by default, you can make it
-/// conform to the `CustomPlaygroundQuickLookable` protocol and provide a
+/// conform to the `_CustomPlaygroundQuickLookable` protocol and provide a
 /// custom `PlaygroundQuickLook` instance.
-public protocol CustomPlaygroundQuickLookable {
+public protocol _CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for this instance.
   ///
   /// If this type has value semantics, the `PlaygroundQuickLook` instance
   /// should be unaffected by subsequent mutations.
-  var customPlaygroundQuickLook: PlaygroundQuickLook { get }
+  var customPlaygroundQuickLook: _PlaygroundQuickLook { get }
 }
 
 
 // A workaround for <rdar://problem/25971264>
 // FIXME(ABI)
 public protocol _DefaultCustomPlaygroundQuickLookable {
-  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
+  var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook { get }
 }
 
 //===--- General Utilities ------------------------------------------------===//
@@ -945,6 +945,8 @@ extension Mirror : CustomReflectable {
 @available(*, unavailable, renamed: "MirrorPath")
 public typealias MirrorPathType = MirrorPath
 
-// Staging so we can move the official declarations into PlaygroundSupport
-public typealias _CustomPlaygroundQuickLookable = CustomPlaygroundQuickLookable
-public typealias _PlaygroundQuickLook = PlaygroundQuickLook
+@available(*, deprecated, message: "it has been moved to the 'PlaygroundSupport' module. Please 'import PlaygroundSupport'")
+public typealias CustomPlaygroundQuickLookable = _CustomPlaygroundQuickLookable
+
+@available(*, deprecated, message: "it has been moved to the 'PlaygroundSupport' module. Please 'import PlaygroundSupport'")
+public typealias PlaygroundQuickLook = _PlaygroundQuickLook

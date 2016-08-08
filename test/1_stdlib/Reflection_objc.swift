@@ -78,7 +78,7 @@ dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 //    associated enum tag.
 
 // CHECK-NEXT: got the expected quick look text
-switch PlaygroundQuickLook(reflecting: "woozle wuzzle" as NSString) {
+switch _PlaygroundQuickLook(reflecting: "woozle wuzzle" as NSString) {
 case .text("woozle wuzzle"):
   print("got the expected quick look text")
 case _:
@@ -87,14 +87,14 @@ case _:
 
 // CHECK-NEXT: foobar
 let somesubclassofnsstring = ("foo" + "bar") as NSString
-switch PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
+switch _PlaygroundQuickLook(reflecting: somesubclassofnsstring) {
   case .text(let text): print(text)
   default: print("not the expected quicklook")
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
 let astr = NSAttributedString(string: "yizzle pizzle")
-switch PlaygroundQuickLook(reflecting: astr) {
+switch _PlaygroundQuickLook(reflecting: astr) {
 case .attributedString(let astr2 as NSAttributedString)
 where astr == astr2:
   print("got the expected quick look attributed string")
@@ -103,7 +103,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look int
-switch PlaygroundQuickLook(reflecting: Int.max as NSNumber) {
+switch _PlaygroundQuickLook(reflecting: Int.max as NSNumber) {
 case .int(+Int64(Int.max)):
   print("got the expected quick look int")
 case _:
@@ -111,7 +111,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look uint
-switch PlaygroundQuickLook(reflecting: NSNumber(value: UInt64.max)) {
+switch _PlaygroundQuickLook(reflecting: NSNumber(value: UInt64.max)) {
 case .uInt(UInt64.max):
   print("got the expected quick look uint")
 case _:
@@ -119,7 +119,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look double
-switch PlaygroundQuickLook(reflecting: 22.5 as NSNumber) {
+switch _PlaygroundQuickLook(reflecting: 22.5 as NSNumber) {
 case .double(22.5):
   print("got the expected quick look double")
 case _:
@@ -127,7 +127,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look float
-switch PlaygroundQuickLook(reflecting: Float32(1.25)) {
+switch _PlaygroundQuickLook(reflecting: Float32(1.25)) {
 case .float(1.25):
   print("got the expected quick look float")
 case _:
@@ -139,7 +139,7 @@ case _:
 // CHECK-NEXT: got the expected quick look bezier path
 
 let image = OSImage(contentsOfFile:CommandLine.arguments[1])!
-switch PlaygroundQuickLook(reflecting: image) {
+switch _PlaygroundQuickLook(reflecting: image) {
 case .image(let image2 as OSImage) where image === image2:
   print("got the expected quick look image")
 case _:
@@ -147,7 +147,7 @@ case _:
 }
 
 let color = OSColor.black
-switch PlaygroundQuickLook(reflecting: color) {
+switch _PlaygroundQuickLook(reflecting: color) {
 case .color(let color2 as OSColor) where color === color2:
   print("got the expected quick look color")
 case _:
@@ -155,7 +155,7 @@ case _:
 }
 
 let path = OSBezierPath()
-switch PlaygroundQuickLook(reflecting: path) {
+switch _PlaygroundQuickLook(reflecting: path) {
 case .bezierPath(let path2 as OSBezierPath) where path === path2:
   print("got the expected quick look bezier path")
 case _:
@@ -260,7 +260,7 @@ class HasStringQLO : CanaryBase {
 
 func testQLO<T : CanaryBase>(_ type: T.Type) {
   autoreleasepool {
-    _ = PlaygroundQuickLook(reflecting: type.init())
+    _ = _PlaygroundQuickLook(reflecting: type.init())
   }
 }
 

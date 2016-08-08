@@ -217,12 +217,12 @@ public extension CGPoint {
   }
 }
 
-extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGPoint : CustomReflectable, _CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .point(Double(x), Double(y))
   }
 }
@@ -265,7 +265,7 @@ public extension CGSize {
   }
 }
 
-extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGSize : CustomReflectable, _CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -273,7 +273,7 @@ extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .size(Double(width), Double(height))
   }
 }
@@ -359,7 +359,7 @@ public extension CGRect {
   }
 }
 
-extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
+extension CGRect : CustomReflectable, _CustomPlaygroundQuickLookable {
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -367,7 +367,7 @@ extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .rectangle(
       Double(origin.x), Double(origin.y),
       Double(size.width), Double(size.height))

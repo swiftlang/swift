@@ -1175,8 +1175,8 @@ extension NSURL : _HasCustomAnyHashableRepresentation {
     }
 }
 
-extension URL : CustomPlaygroundQuickLookable {
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension URL : _CustomPlaygroundQuickLookable {
+    public var customPlaygroundQuickLook: _PlaygroundQuickLook {
         return .url(absoluteString)
     }
 }

@@ -495,7 +495,7 @@ extension Unsafe${Mutable}RawPointer : CustomReflectable {
   }
 }
 
-extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
+extension Unsafe${Mutable}RawPointer : _CustomPlaygroundQuickLookable {
   var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(
@@ -505,7 +505,7 @@ extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
     : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
 }

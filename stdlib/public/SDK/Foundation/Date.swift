@@ -270,7 +270,7 @@ extension NSDate : _HasCustomAnyHashableRepresentation {
     }
 }
 
-extension Date : CustomPlaygroundQuickLookable {
+extension Date : _CustomPlaygroundQuickLookable {
     var summary: String {
         let df = DateFormatter()
         df.dateStyle = .medium
@@ -278,7 +278,7 @@ extension Date : CustomPlaygroundQuickLookable {
         return df.string(from: self)
     }
     
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    public var customPlaygroundQuickLook: _PlaygroundQuickLook {
         return .text(summary)
     }
 }

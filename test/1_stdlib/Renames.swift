@@ -546,3 +546,6 @@ func _VarArgs() {
 func _Zip<S1 : Sequence, S2: Sequence>(_: S1, _: S2) {
   _ = Zip2Sequence<S1, S2>.Generator.self // expected-error {{'Generator' has been renamed to 'Iterator'}} {{28-37=Iterator}} {{none}}
 }
+
+typealias CPQL = CustomPlaygroundQuickLookable // expected-error {{'CustomPlaygroundQuickLookable' is deprecated: it has been moved to the 'PlaygroundSupport' module. Please 'import PlaygroundSupport'}}
+typealias PQL = PlaygroundQuickLook // expected-error {{'PlaygroundQuickLook' is deprecated: it has been moved to the 'PlaygroundSupport' module. Please 'import PlaygroundSupport'}}
