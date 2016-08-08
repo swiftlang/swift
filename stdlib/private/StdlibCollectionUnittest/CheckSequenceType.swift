@@ -1792,7 +1792,7 @@ self.test("\(testNamePrefix).first/semantics") {
       stackTrace: SourceLocStack().with(test.loc))
     if let expectedIdentity = test.expected {
       expectEqual(
-        test.expected, extractValueFromEquatable(found!).identity,
+        expectedIdentity, extractValueFromEquatable(found!).identity,
         "find() should find only the first element matching its predicate")
     }
   }
