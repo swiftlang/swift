@@ -51,7 +51,7 @@
    `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
    `(,(regexp-opt '("willSet" "didSet") 'words) . font-lock-keyword-face)
    ;; Operators
-   `("\\b\\(\\(pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
+   `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
    `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
                   'words) . font-lock-keyword-face)
