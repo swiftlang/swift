@@ -408,6 +408,21 @@ Type TypeChecker::resolveTypeInContext(
   return ErrorType::get(Context);
 }
 
+static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
+  if (Ty.isNull())
+    return false;
+  auto *BGT = Ty->getAs<BoundGenericType>();
+  if (!BGT)
+    return false;
+  if (BGT->getDecl() != Ctx.getUnsafePointerDecl() &&
+      BGT->getDecl() != Ctx.getUnsafeMutablePointerDecl())
+    return false;
+  IsMutable = BGT->getDecl() == Ctx.getUnsafeMutablePointerDecl();
+  assert(BGT->getGenericArgs().size() == 1);
+  auto CanTy = BGT->getGenericArgs().front()->getCanonicalType();
+  return CanTy->isVoid();
+}
+
 Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
@@ -473,8 +488,18 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   for (auto tyR : genericArgs)
     args.push_back(tyR);
 
-  return applyUnboundGenericArguments(type, genericDecl, loc, dc, args,
-                                      isGenericSignature, resolver);
+  auto result = applyUnboundGenericArguments(type, genericDecl, loc, dc, args,
+                                             isGenericSignature, resolver);
+  bool isMutablePointer;
+  if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
+    if (isMutablePointer)
+      diagnose(loc, diag::use_of_void_pointer, type, "Mutable").
+        fixItReplace(generic->getSourceRange(), "UnsafeMutableRawPointer");
+    else
+      diagnose(loc, diag::use_of_void_pointer, type, "").
+        fixItReplace(generic->getSourceRange(), "UnsafeRawPointer");
+  }
+  return result;
 }
 
 /// Apply generic arguments to the given type.
