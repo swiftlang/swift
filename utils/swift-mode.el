@@ -45,9 +45,11 @@
                     "import" "let" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "lazy" "where"
                     "private" "public" "internal" "override" "throws" "rethrows"
-                    "open" "associatedtype" "get" "set" "willSet" "didSet"
-                    "inout" "indirect" "final")
+                    "open" "associatedtype" "inout" "indirect" "final")
                   'words) . font-lock-keyword-face)
+   ;; Variable decl keywords
+   `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
+   `(,(regexp-opt '("willSet" "didSet") 'words) . font-lock-keyword-face)
    ;; Operators
    `("\\b\\(\\(pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
