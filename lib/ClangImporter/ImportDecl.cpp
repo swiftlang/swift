@@ -4832,6 +4832,9 @@ namespace {
       auto elementTy
         = getter->getInterfaceType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>()->getResult();
+      auto elementContextTy
+        = getter->getType()->castTo<AnyFunctionType>()->getResult()
+          ->castTo<AnyFunctionType>()->getResult();
 
       // Local function to mark the setter unavailable.
       auto makeSetterUnavailable = [&] {
@@ -4934,7 +4937,7 @@ namespace {
                                       getOverridableAccessibility(dc),
                                       name, decl->getLoc(), bodyParams,
                                       decl->getLoc(),
-                                      TypeLoc::withoutLoc(elementTy), dc);
+                                      TypeLoc::withoutLoc(elementContextTy),dc);
 
       /// Record the subscript as an alternative declaration.
       Impl.AlternateDecls[associateWithSetter ? setter : getter] = subscript;

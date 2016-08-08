@@ -726,6 +726,7 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
+      OS << " element=" << SD->getElementType()->getCanonicalType();
       printAccessors(SD);
       OS << ')';
     }
