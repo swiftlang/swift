@@ -14,8 +14,6 @@
 # Utility code for later in this template
 #
 
-from string import maketrans, capitalize
-
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
@@ -36,25 +34,8 @@ binaryArithmetic = {
     struct(operator='*', name='multiplied',  mutatingName='multiply', firstArg='by', llvmName='mul', kind='*'),
     struct(operator='/', name='divided',     mutatingName='divide',   firstArg='by', llvmName='div', kind='/'),
   ],
-  'BinaryInteger' : [
-    struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
-  ],
 }
 
-binaryBitwise = [
-    struct(operator='&', name='bitwiseAnd', llvmName='and'),
-    struct(operator='|', name='bitwiseOr', llvmName='or'),
-    struct(operator='^', name='bitwiseXor', llvmName='xor'),
-]
-
-maskingShifts = [
-    struct(
-      operator='&>>', nonMaskingOperator='>>', description='right shift',
-      name='maskingShiftRight', llvmName=lambda s:['lshr','ashr'][s]),
-    struct(
-      operator='&<<', nonMaskingOperator='<<', description='left shift',
-      name='maskingShiftLeft', llvmName=lambda _: 'shl'),
-]
 }%
 
 infix operator &<< : BitwiseShiftPrecedence
@@ -64,10 +45,9 @@ infix operator &>>= : AssignmentPrecedence
 
 //===----------------------------------------------------------------------===//
 //===--- Bits for the Stdlib ----------------------------------------------===//
-//===----------------------------------------------------------------------===//
 
 
-//FIXME(integers): This should go in the stdlib separately, probably.
+//FIXME: This should go in the stdlib separately, probably.
 extension ExpressibleByIntegerLiteral
   where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.
@@ -102,8 +82,8 @@ extension ExpressibleByIntegerLiteral
 /// be preferred to the `abs(_)` function, whose return value is of the same
 /// type as its argument.
 public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
-  // FIXME(integers): implement
-  //init?<T : BinaryInteger>(exactly source: T)
+  // FIXME: implement
+  //init?<T : Integer>(exactly source: T)
 
   // FIXME(ABI): should be just Arithmetic
   associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
@@ -128,7 +108,7 @@ extension Arithmetic {
   }
 }
 
-% for Protocol in binaryArithmetic:
+% for Protocol in ['Arithmetic']:
 extension ${Protocol} {
 %   for x in binaryArithmetic[Protocol]:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
