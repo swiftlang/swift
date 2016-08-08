@@ -52,10 +52,10 @@ for developers to want to handle errors from different operations in
 the same basic way, either by reporting the error to the user or
 passing the error back to their own clients.
 
-These errors will be the focus on this proposal.
+These errors will be the focus of this proposal.
 
 The final two classes of error are outside the scope of this proposal.
-A **universal error** is theoretically recoverable, but by its nature
+A **universal error** is theoretically recoverable, but by its nature,
 the language can't help the programmer anticipate where it will come
 from.  A **logic failure** arises from a programmer mistake and should
 not be recoverable at all.  In our system, these kinds of errors are
@@ -305,7 +305,7 @@ generalized ``do`` statement::
 As with ``switch`` statements, Swift makes an effort to understand
 whether catch clauses are exhaustive.  If it can determine it is, then
 the compiler considers the error to be handled.  If not, the error
-automatically propagates out out of scope, either to a lexically
+automatically propagates out of scope, either to a lexically
 enclosing ``catch`` clause or out of the containing function (which must
 be marked ``throws``).
 
@@ -327,7 +327,7 @@ the type::
   }
 
 The ``enum`` provides a namespace of errors, a list of possible errors
-within that namespace, and optional values to attach to each option.
+within that namespace and optional values to attach to each option.
 
 Note that this corresponds very cleanly to the ``NSError`` model of an
 error domain, an error code, and optional user data.  We expect to
@@ -534,7 +534,7 @@ For other sentinel cases, we can consider adding a new clang attribute
 to indicate to the compiler what the sentinel is:
 
 * There are several APIs returning ``NSInteger`` or ``NSUInteger``.  At
-  least some of these return 0 on error, but that doesn't seem like a
+  least some of these return 0 on the error, but that doesn't seem like a
   reasonable general assumption.
 
 * ``AVFoundation`` provides a couple methods returning
@@ -691,7 +691,7 @@ can throw, and so it must also be marked with ``try``::
   }
 
 This marking feels redundant.  We want functions like
-``autoreleasepool`` to feel like statements, but marks inside builtin
+``autoreleasepool`` to feel like statements, but marks inside built-in
 statements like ``if`` don't require the outer statement to be marked.
 It would be better if the compiler didn't require the outer ``try``.
 
