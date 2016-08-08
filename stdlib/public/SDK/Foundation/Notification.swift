@@ -13,12 +13,6 @@
 @_exported import Foundation // Clang module
 
 
-@_silgen_name("__NSNotificationCreate")
-internal func __NSNotificationCreate(_ name: NSString, _ object: AnyObject?, _ userInfo: AnyObject?) -> NSNotification
-
-@_silgen_name("__NSNotificationUserInfo")
-internal func __NSNotificationUserInfo(_ notif: NSNotification) -> AnyObject?
-
 /**
  `Notification` encapsulates information broadcast to observers via a `NotificationCenter`.
 */
@@ -34,12 +28,12 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     public var object: Any?
     
     /// Storage for values or objects related to this notification.
-    public var userInfo: [String : Any]?
+    public var userInfo: [AnyHashable : Any]?
     
     /// Initialize a new `Notification`.
     ///
     /// The default value for `userInfo` is nil.
-    public init(name: Name, object: Any? = nil, userInfo: [String : Any]? = nil) {
+    public init(name: Name, object: Any? = nil, userInfo: [AnyHashable : Any]? = nil) {
         self.name = name
         self.object = object
         self.userInfo = userInfo
@@ -61,8 +55,6 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     public typealias Name = NSNotification.Name
 
     /// Compare two notifications for equality.
-    ///
-    /// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
     public static func ==(lhs: Notification, rhs: Notification) -> Bool {
         if lhs.name.rawValue != rhs.name.rawValue {
             return false
@@ -80,10 +72,8 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         }
         if let lhsUserInfo = lhs.userInfo {
             if let rhsUserInfo = rhs.userInfo {
-                if lhsUserInfo.count != rhsUserInfo.count {
-                    return false
-                }
-                return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
+                // user info must be compared in the object form since the userInfo in swift is not comparable
+                return lhs._bridgeToObjectiveC() == rhs._bridgeToObjectiveC()
             } else {
                 return false
             }
@@ -116,11 +106,7 @@ extension Notification : _ObjectiveCBridgeable {
     
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSNotification {
-        if let info = userInfo {
-            return __NSNotificationCreate(name.rawValue as NSString, object.map { $0 as AnyObject }, _NSUserInfoDictionary.bridgeValue(from: info))
-        }
-
-        return NSNotification(name: name, object: object, userInfo: nil)    
+        return NSNotification(name: name, object: object, userInfo: userInfo)
     }
     
     public static func _forceBridgeFromObjectiveC(_ x: NSNotification, result: inout Notification?) {
@@ -130,18 +116,7 @@ extension Notification : _ObjectiveCBridgeable {
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ x: NSNotification, result: inout Notification?) -> Bool {
-        if let userInfo = __NSNotificationUserInfo(x) {
-            if let info : [String : Any]? = _NSUserInfoDictionary.bridgeReference(from: userInfo) {
-                result = Notification(name: x.name, object: x.object, userInfo: info)
-                return true
-            } else {
-                result = nil
-                return false // something terrible went wrong...
-            }
-        } else {
-            result = Notification(name: x.name, object: x.object, userInfo: nil)
-        }
-        
+        result = Notification(name: x.name, object: x.object, userInfo: x.userInfo)
         return true
     }
 
