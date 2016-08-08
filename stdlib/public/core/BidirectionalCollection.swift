@@ -16,6 +16,7 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `BidirectionalCollection` protocol instead, because it has a more complete
 /// interface.
+@available(*, deprecated, renamed: "BidirectionalCollection")
 public protocol BidirectionalIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
