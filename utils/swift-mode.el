@@ -53,8 +53,8 @@
    ;; Operators
    `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
    ;; Keywords that begin with a number sign
-   `("#\\(available\\|else\\|elseif\\|end\\|if\\)\\b" . font-lock-string-face)
-   `("#\\(column\\|file\\|function\\|line\\|selector\\)\\b" . font-lock-keyword-face)
+   `("#\\(if\\|endif\\|elseif\\|else\\|available\\)\\b" . font-lock-string-face)
+   `("#\\(file\\|line\\|column\\|function\\|selector\\)\\b" . font-lock-keyword-face)
    ;; Infix operator attributes
    `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
                   'words) . font-lock-keyword-face)
