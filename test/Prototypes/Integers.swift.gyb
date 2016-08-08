@@ -695,7 +695,7 @@ extension UnsignedInteger {
       x /= 10
       buf.append(
         UnicodeScalar(
-          ascii0 + Swift.Int(Word(extendingOrTruncating: r)._storage)))
+          ascii0 + Swift.Int(Word(extendingOrTruncating: r)._storage))!)
     }
     while x != 0
     return String(buf.reversed().lazy.map { Character($0) })
@@ -748,7 +748,7 @@ public protocol SignedInteger : Integer, SignedArithmetic {
 
 extension SignedInteger {
   public var description: String {
-    let base = String(absoluteValue)
+    let base = String(describing: absoluteValue)
     return self < 0 ? "-" + base : base
   }
 
@@ -1313,7 +1313,7 @@ extension FixedWidthInteger {
         hexDigits[Swift.Int(lowUWord._storage) & 0xF],
         at: result.startIndex
       )
-      x.replaceUWord(0, with: lowUWord & ~0xF)
+      _ = x.replaceUWord(0, with: lowUWord & ~0xF)
       x /= 16
       nibbles += 1
     }
@@ -1340,10 +1340,10 @@ func expectEqual<T : FixedWidthInteger>(
   if expected != actual {
     expectationFailure(
       "expected: \(String(reflecting: expected))"
-      + " (of type \(String(reflecting: expected.dynamicType)))\n"
+      + " (of type \(String(reflecting: type(of: expected)))\n"
       + "  = \(expected.hex)\n"
       + "actual: \(String(reflecting: actual))"
-      + " (of type \(String(reflecting: actual.dynamicType)))\n"
+      + " (of type \(String(reflecting: type(of: actual)))\n"
       + "  = \(actual.hex)\n",
       trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -1467,9 +1467,9 @@ tests.test("Simple-Bitwise") {
   expectEqual(-0b100_1001 as Int8 >> 1, -0b10_0101)
   expectEqual(0b1011_0111 as UInt8 >> 1, 0b0101_1011)
 
-  expectEqual(0b1011_0111 as UInt8 & 0b0110_1110, 0b0010_0110)
-  expectEqual(0b1011_0111 as UInt8 | 0b0110_1110, 0xFF)
-  expectEqual(0b1011_0111 as UInt8 ^ 0b0110_1110, 0b1101_1001)
+  expectEqual((0b1011_0111 as UInt8) & 0b0110_1110, 0b0010_0110)
+  expectEqual((0b1011_0111 as UInt8) | 0b0110_1110, 0xFF)
+  expectEqual((0b1011_0111 as UInt8) ^ 0b0110_1110, 0b1101_1001)
 }
 
 tests.test("MinMax") {
@@ -1734,8 +1734,8 @@ tests.test("SmartBitShift/Unconstrained/Left/UInt16") {
 
 tests.test("Basics") {
 
-  expectEqual(sizeof(Word.self), sizeof(Swift.Int.self))
-  expectEqual(sizeof(DWord.self), 2 * sizeof(Swift.Int.self))
+  expectEqual(MemoryLayout<Word>.size, MemoryLayout<Swift.Int>.size)
+  expectEqual(MemoryLayout<DWord>.size, 2 * MemoryLayout<Swift.Int>.size)
 
   typealias I8 = UInt8
   let b8: I8 = 0b1_0_11_0_111
