@@ -2,10 +2,6 @@
 
 // Test availability attributes on UnsafePointer initializers.
 // Assume the original source contains no UnsafeRawPointer types.
-//
-// TODO:
-// - implement the Unsafe[Mutable]Pointer<Void> to Unsafe[Mutable]RawPointer rename
-// - test multiple fix-its per line: type rename + initializer rename/diagnostic
 func unsafePointerConversionAvailability(
   mrp: UnsafeMutableRawPointer,
   rp: UnsafeRawPointer,
@@ -35,7 +31,6 @@ func unsafePointerConversionAvailability(
   _ = UnsafeRawPointer(umps)
   _ = UnsafeRawPointer(ups)
 
-  // FIXME: All of these should yield a fix-it to rename
   // UnsafeMutablePointer<Void> to UnsafeMutableRawPointer(umpv)
   _ = UnsafeMutablePointer<Void>(rp) // expected-warning 3 {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}} expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Void>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{}}
   _ = UnsafeMutablePointer<Void>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Void>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{}} expected-warning 3 {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
@@ -46,7 +41,6 @@ func unsafePointerConversionAvailability(
   _ = UnsafeMutablePointer<Void>(umps) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(ups)  // expected-error {{'init' has been renamed to 'init(mutating:)'}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
 
-  // FIXME: All of these should yield a fix-it to rename
   // UnsafePointer<Void> to UnsafeRawPointer(umpv)
   _ = UnsafePointer<Void>(rp)  // expected-error {{cannot invoke initializer for type 'UnsafePointer<Void>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{}} expected-warning 3 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafePointer<Void>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{}} expected-warning 3 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
@@ -57,11 +51,8 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Void>(umps) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(ups) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
 
-  // FIXME: Conversion from UnsafePointer<Void> or UnsafeRawPointer to a typed
-  // pointer should have a diagnostic: 'init' is unavailable: Conversion
-  // restricted. Use 'assumingMemoryBound(to:)' or 'bindMemory(to:capacity:)'
-  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{}}
-  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{}}
+  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.}} expected-note {{}}
+  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.}} expected-note {{}}
   _ = UnsafeMutablePointer<Int>(umpv) // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafeMutablePointer<Int>(upv)  // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafeMutablePointer<Int>(umpi)
@@ -69,8 +60,8 @@ func unsafePointerConversionAvailability(
   _ = UnsafeMutablePointer<Int>(umps) // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafeMutablePointer<Int>(ups)  // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
 
-  _ = UnsafePointer<Int>(rp)  // expected-error {{cannot invoke initializer for type 'UnsafePointer<Int>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{}}
-  _ = UnsafePointer<Int>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{}}
+  _ = UnsafePointer<Int>(rp)  // expected-error {{cannot invoke initializer for type 'UnsafePointer<Int>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.}} expected-note {{}}
+  _ = UnsafePointer<Int>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.}} expected-note {{}}
   _ = UnsafePointer<Int>(umpv) // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafePointer<Int>(upv)  // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
   _ = UnsafePointer<Int>(umpi)

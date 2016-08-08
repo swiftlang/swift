@@ -53,7 +53,7 @@ internal protocol _MutableBoxing : ReferenceConvertible {
 
 extension _MutableBoxing {
     @inline(__always)
-    mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape(ReferenceType) -> ReturnType) -> ReturnType {
+    mutating func _applyMutation<ReturnType>(_ whatToDo : (ReferenceType) -> ReturnType) -> ReturnType {
         // Only create a new box if we are not uniquely referenced
         if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._pointer

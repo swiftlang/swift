@@ -532,7 +532,7 @@ extension ${Self} {
     "use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.")
   public init?<U>(_ from : UnsafePointer<U>?) { Builtin.unreachable(); return nil }
 
-% if mutable:
+ % if mutable:
   @available(*, unavailable, renamed: "init(mutating:)")
   public init(_ from : UnsafePointer<Pointee>) { Builtin.unreachable() }
 

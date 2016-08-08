@@ -210,8 +210,9 @@ ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
 
-NOTE(pointer_init_add_mutating,none,
-     "do you want to add 'mutating'", ())
+NOTE(pointer_init_to_type,none,
+      "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
+
 ERROR(expected_do_in_statement,none,
       "expected 'do' keyword to designate a block of statements", ())
 
