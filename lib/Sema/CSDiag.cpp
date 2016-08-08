@@ -4954,26 +4954,37 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
-/// When initializing UnsafeMutablePointer from a given UnsafePointer, we need
-/// to insert "mutating:" label before the argument to ensure the correct
-/// intializer gets called. This function checks if we need to add the label.
-static bool shouldAddMutating(ASTContext &Ctx, const Expr *Fn,
-                              const Expr* Arg) {
+/// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
+/// issue a diagnostic that refers to the API for binding memory to a type.
+static bool isCastToTypedPointer(ASTContext &Ctx, const Expr *Fn,
+                                 const Expr* Arg) {
   auto *TypeExp = dyn_cast<TypeExpr>(Fn);
   auto *ParenExp = dyn_cast<ParenExpr>(Arg);
   if (!TypeExp || !ParenExp)
     return false;
+
   auto InitType = TypeExp->getInstanceType();
   auto ArgType = ParenExp->getSubExpr()->getType();
   if (InitType.isNull() || ArgType.isNull())
     return false;
-  if (auto *InitNom = InitType->getAnyNominal()) {
-    if (auto *ArgNom = ArgType->getAnyNominal()) {
-      return InitNom == Ctx.getUnsafeMutablePointerDecl() &&
-        ArgNom == Ctx.getUnsafePointerDecl();
-    }
+
+  auto *InitNom = InitType->getAnyNominal();
+  if (!InitNom)
+    return false;
+
+  if (InitNom != Ctx.getUnsafeMutablePointerDecl()
+      && InitNom != Ctx.getUnsafePointerDecl()) {
+    return false;
   }
-  return false;
+  auto *ArgNom = ArgType->getAnyNominal();
+  if (!ArgNom)
+    return false;
+
+  if (ArgNom != Ctx.getUnsafeMutableRawPointerDecl()
+      && ArgNom != Ctx.getUnsafeRawPointerDecl()) {
+    return false;
+  }
+  return true;
 }
 
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
@@ -5291,10 +5302,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              overloadName, argString, isInitializer);
   }
 
-
-  if (shouldAddMutating(CS->DC->getASTContext(), fnExpr, argExpr)) {
-    diagnose(fnExpr->getLoc(), diag::pointer_init_add_mutating).fixItInsert(
-      cast<ParenExpr>(argExpr)->getSubExpr()->getStartLoc(), "mutating: ");
+  if (isCastToTypedPointer(CS->DC->getASTContext(), fnExpr, argExpr)) {
+    diagnose(fnExpr->getLoc(), diag::pointer_init_to_type)
+      .highlight(argExpr->getSourceRange());
   }
   
   // Did the user intend on invoking a different overload?
