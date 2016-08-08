@@ -497,10 +497,10 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
     if (isMutablePointer)
-      diagnose(loc, diag::use_of_void_pointer, type, "Mutable").
+      diagnose(loc, diag::use_of_void_pointer, "Mutable").
         fixItReplace(generic->getSourceRange(), "UnsafeMutableRawPointer");
     else
-      diagnose(loc, diag::use_of_void_pointer, type, "").
+      diagnose(loc, diag::use_of_void_pointer, "").
         fixItReplace(generic->getSourceRange(), "UnsafeRawPointer");
   }
   return result;
