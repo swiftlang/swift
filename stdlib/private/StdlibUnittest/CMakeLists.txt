@@ -15,6 +15,7 @@ add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   # filename.
   StdlibUnittest.swift.gyb
 
+  CheckStrideable.swift.gyb
   InspectValue.cpp
   InspectValue.swift
   InterceptTraps.cpp
