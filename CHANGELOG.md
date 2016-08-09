@@ -3,6 +3,38 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-125)(https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
+
+  The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
+  have been removed. The function `isKnownUniquelyReferenced()` should be called
+  instead. The class `NonObjectiveCBase` which classes using
+  `isUniquelyReferenced()` needed to inherit from was removed.
+
+  The method `ManagedBufferPointer.holdsUniqueReference` was renamed to
+  `ManagedBufferPointer.isUniqueReference`.
+
+  ```swift
+  // old
+  class SwiftKlazz : NonObjectiveCBase {}
+  expectTrue(isUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.holdsUniqueReference() {
+    print("not unique")
+  }
+
+
+  // new
+  class SwiftKlazz {}
+  expectTrue(isKnownUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.isUniqueReference() {
+    print("not unique")
+  }
+
+  ```
+
 * [SE-124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
 
   The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
