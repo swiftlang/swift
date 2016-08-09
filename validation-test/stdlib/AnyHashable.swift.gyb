@@ -88,6 +88,29 @@ AnyHashableTests.test("AnyHashable(${wrapped}).base") {
 }
 % end
 
+#if _runtime(_ObjC)
+AnyHashableTests.test("AnyHashable(MinimalHashableValue, SwiftValue(MinimalHashableValue))/Hashable") {
+  let xs = (0...5).flatMap {
+    [ MinimalHashableValue($0, identity: 0),
+      MinimalHashableValue($0, identity: 1) ]
+  }
+  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+
+  let boxedXs = xs.flatMap {
+    [ AnyHashable($0),
+      AnyHashable(_bridgeAnythingToObjectiveC($0) as! NSObject) ]
+  }
+  for x in boxedXs {
+    expectEqual(
+      "MinimalHashableValue",
+      String(describing: type(of: x.base)))
+  }
+  checkHashable(
+    boxedXs,
+    equalityOracle: { $0 / 4 == $1 / 4 })
+}
+#endif
+
 % for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
 AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {

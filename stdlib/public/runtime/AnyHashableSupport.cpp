@@ -16,6 +16,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Metadata.h"
 #include "Private.h"
+#include "SwiftValue.h"
 #include "SwiftHashableSupport.h"
 
 using namespace swift;
@@ -126,7 +127,7 @@ extern "C" void _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
-  const OpaqueValue *value,
+  OpaqueValue *value,
   const void *anyHashableResultPointer,
   const Metadata *type,
   const WitnessTable *hashableWT
@@ -135,6 +136,32 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass: {
+#if SWIFT_OBJC_INTEROP
+    id srcObject;
+    memcpy(&srcObject, value, sizeof(id));
+    // Do we have a SwiftValue?
+    if (SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject)) {
+      // If so, extract the boxed value and try to cast it.
+      const Metadata *unboxedType;
+      const OpaqueValue *unboxedValue;
+      std::tie(unboxedType, unboxedValue) =
+          getValueFromSwiftValue(srcSwiftValue);
+
+      if (auto unboxedHashableWT =
+              swift_conformsToProtocol(type, &_TMps8Hashable)) {
+        ValueBuffer unboxedCopyBuf;
+        auto unboxedValueCopy = unboxedType->vw_initializeBufferWithCopy(
+            &unboxedCopyBuf, const_cast<OpaqueValue *>(unboxedValue));
+        _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
+            unboxedValueCopy, anyHashableResultPointer, unboxedType,
+            unboxedHashableWT);
+        unboxedType->vw_deallocateBuffer(&unboxedCopyBuf);
+        type->vw_destroy(value);
+        return;
+      }
+    }
+#endif
+
     _swift_stdlib_makeAnyHashableUsingDefaultRepresentation(
         value, anyHashableResultPointer,
         findHashableBaseTypeOfHashableType(type),
