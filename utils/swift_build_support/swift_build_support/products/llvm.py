@@ -14,4 +14,12 @@ from . import product
 
 
 class LLVM(product.Product):
-    pass
+
+    def __init__(self, args, toolchain, source_dir, build_dir):
+        product.Product.__init__(self, args, toolchain, source_dir,
+                                 build_dir)
+
+        # Add the cmake option for LLVM_TARGETS_TO_BUILD.
+        self.cmake_options.extend([
+            '-DLLVM_TARGETS_TO_BUILD=%s' % args.llvm_targets_to_build
+        ])

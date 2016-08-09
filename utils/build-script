@@ -598,14 +598,20 @@ class BuildScriptInvocation(object):
                 args=args,
                 toolchain=self.toolchain,
                 source_dir=self.workspace.source_dir(product_name),
-                # FIXME: This is incorrect
+                # FIXME: This is incorrect since it always assumes the host
+                # target I think?
                 build_dir=self.workspace.build_dir(
                     args.host_target, product_name))
             cmake_opts = product.cmake_options
+
+            # FIXME: We should be using pipes.quote here but we run into issues
+            # with build-script-impl/cmake not being happy with all of the extra
+            # "'" in the strings. To fix this easily, we really need to just
+            # invoke cmake from build-script directly rather than futzing with
+            # build-script-impl. This makes even more sense since there really
+            # isn't a security issue here.
             impl_args += [
-                "--%s-cmake-options=%s" % (
-                    product_name,
-                    ' '.join(pipes.quote(opt) for opt in cmake_opts))
+                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
             ]
 
         if args.build_stdlib_deployment_targets:
@@ -1805,6 +1811,13 @@ details of the setups of other systems or automated environments.""")
              "multiple such module_regexp flag pairs. All semicolons in flags "
              "must be escaped with a '\\'",
         action="append", dest="extra_swift_args", default=[])
+
+    llvm_group = parser.add_argument_group(
+        title="Build settings specific for LLVM")
+    llvm_group.add_argument(
+        '--llvm-targets-to-build',
+        help='LLVM target generators to build',
+        default="X86;ARM;AArch64;PowerPC;SystemZ")
 
     android_group = parser.add_argument_group(
         title="Build settings for Android")
