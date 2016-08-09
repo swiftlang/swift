@@ -310,7 +310,7 @@ func _Optional<T>(x: T) {
 func _TextOutputStream() {
   func fn<S : OutputStreamType>(_: S) {} // expected-error {{'OutputStreamType' has been renamed to 'TextOutputStream'}} {{15-31=TextOutputStream}} {{none}}
 }
-func _TextOutputStream<S : Streamable, O : TextOutputStream>(s: S, o: O) {
+func _TextOutputStream<S : TextOutputStreamable, O : TextOutputStream>(s: S, o: O) {
   var o = o
   s.writeTo(&o) // expected-error {{'writeTo' has been renamed to 'write(to:)'}} {{5-12=write}} {{13-13=to: }} {{none}}
 }
