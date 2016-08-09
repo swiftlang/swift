@@ -1092,10 +1092,10 @@ postfix operator <*>
 // PASS_2500-LABEL: {{^}}postfix operator <*>{{$}}
 
 protocol d2600_ProtocolWithOperator1 {
-  static postfix func <*>(_: Int)
+  static postfix func <*>(_: Self)
 }
 // PASS_2500: {{^}}protocol d2600_ProtocolWithOperator1 {{{$}}
-// PASS_2500-NEXT: {{^}}  postfix static func <*>(_: Int){{$}}
+// PASS_2500-NEXT: {{^}}  postfix static func <*>(_: Self){{$}}
 // PASS_2500-NEXT: {{^}}}{{$}}
 
 struct d2601_TestAssignment {}
