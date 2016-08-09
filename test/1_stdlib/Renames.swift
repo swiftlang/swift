@@ -14,7 +14,7 @@ func _Arrays<T>(e: T) {
   // _ = Array(count: 1, repeatedValue: e) // xpected-error {{Please use init(repeating:count:) instead}} {{none}}
   // The actual error is: {{argument 'repeatedValue' must precede argument 'count'}}
 
-  var a = ContiguousArray<T>() // expected-warning {{'ContiguousArray' is deprecated: renamed to 'Array'}} expected-note {{use 'Array' instead}}
+  var a = ContiguousArray<T>()
   _ = a.removeAtIndex(0) // expected-error {{'removeAtIndex' has been renamed to 'remove(at:)'}} {{9-22=remove}} {{23-23=at: }} {{none}}
   _ = a.replaceRange(0..<1, with: []) // expected-error {{'replaceRange(_:with:)' has been renamed to 'replaceSubrange(_:with:)'}} {{9-21=replaceSubrange}} {{none}}
   _ = a.appendContentsOf([]) // expected-error {{'appendContentsOf' has been renamed to 'append(contentsOf:)'}} {{9-25=append}} {{26-26=contentsOf: }} {{none}}
