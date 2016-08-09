@@ -3,6 +3,23 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
+
+  The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
+  to be spelled with an explicit `bitPattern` label.
+
+  ```swift
+  let x: ObjectIdentifier = ...
+
+  // old
+  let u = UInt(x)
+  let i = Int(x)
+
+  // new
+  let u = UInt(bitPattern: x)
+  let i = Int(bitPattern: x)
+  ```
+
 * [SE-120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
 
   The collection methods `partition()` and `partition(isOrderedBefore:)` have
