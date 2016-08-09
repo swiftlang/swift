@@ -1218,15 +1218,15 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
     }
 
-    // case nil is equivalent to .None when switching on Optionals.
+    // case nil is equivalent to .none when switching on Optionals.
     OptionalTypeKind Kind;
     if (type->getAnyOptionalObjectType(Kind)) {
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
-        Identifier Name = Context.getIdentifier("None");
         auto *NoneEnumElement = Context.getOptionalNoneDecl(Kind);
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
-                                             NLE->getLoc(), NLE->getLoc(), Name,
+                                             NLE->getLoc(), NLE->getLoc(),
+                                             NoneEnumElement->getName(),
                                              NoneEnumElement, nullptr, false);
         return coercePatternToType(P, dc, type, options, resolver);
       }
