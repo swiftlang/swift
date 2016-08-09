@@ -1,5 +1,3 @@
-// REQUIRES: se_0111_complete
-
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 | FileCheck %s -check-prefix=TOP_LEVEL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OBJ_DOT_1 | FileCheck %s -check-prefix=OBJ_DOT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FREE_FUNC_1 | FileCheck %s -check-prefix=FREE_FUNC_1

@@ -1,5 +1,3 @@
-// REQUIRES: se_0111_complete
-
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | FileCheck %s -check-prefix=EXPECT_OINT
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | FileCheck %s -check-prefix=ARG-NAME1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | FileCheck %s -check-prefix=ARG-NAME2
