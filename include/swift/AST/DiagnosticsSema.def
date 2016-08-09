@@ -638,6 +638,9 @@ ERROR(nonstatic_operator_in_type,none,
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
+ERROR(operator_in_unrelated_type,none,
+      "member operator %2%select{| of protocol %0}1 must have at least one "
+      "argument of type %select{%0|'Self'}1", (Type, bool, DeclName))
 
 // Precedence groups
 ERROR(ambiguous_precedence_groups,none,

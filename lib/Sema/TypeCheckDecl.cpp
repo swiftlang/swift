@@ -4592,6 +4592,48 @@ public:
     return type->getAs<AnyFunctionType>();
   }
 
+  void checkMemberOperator(FuncDecl *FD) {
+    // Check that member operators reference the type of 'Self'.
+    if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
+
+    auto selfNominal =
+      FD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!selfNominal) return;
+
+    // Check the parameters for a reference to 'Self'.
+    bool isProtocol = isa<ProtocolDecl>(selfNominal);
+    for (auto param : *FD->getParameterList(1)) {
+      auto paramType = param->getInterfaceType();
+      if (!paramType) break;
+
+      // Look through 'inout'.
+      paramType = paramType->getInOutObjectType();
+
+      // Look through a metatype reference, if there is one.
+      if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
+        paramType = metatypeType->getInstanceType();
+
+      // Is it the same nominal type?
+      if (paramType->getAnyNominal() == selfNominal) return;
+
+      if (isProtocol) {
+        // For a protocol, is it the 'Self' type parameter?
+        if (auto genericParam = paramType->getAs<GenericTypeParamType>())
+          if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+            return;
+
+        // ... or the 'Self' archetype?
+        if (auto archetype = paramType->getAs<ArchetypeType>())
+          if (archetype->getSelfProtocol() == selfNominal) return;
+      }
+    }
+
+    // We did not find 'Self'. Complain.
+    TC.diagnose(FD, diag::operator_in_unrelated_type,
+                FD->getDeclContext()->getDeclaredTypeInContext(),
+                isProtocol, FD->getFullName());
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->hasBody()) {
@@ -4739,6 +4781,9 @@ public:
           }
         }
       }
+
+      if (FD->isOperator())
+        checkMemberOperator(FD);
 
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
 
