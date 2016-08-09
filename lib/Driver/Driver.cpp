@@ -95,6 +95,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
+  .Case("swift-format", DriverKind::SwiftFormat)
   .Default(None);
   
   if (Kind.hasValue())
@@ -2014,6 +2015,7 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
+  case DriverKind::SwiftFormat:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }
