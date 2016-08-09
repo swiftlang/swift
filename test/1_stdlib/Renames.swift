@@ -374,11 +374,13 @@ func _Repeat<E>(e: E) {
 }
 
 func _Reverse<C : BidirectionalCollection>(c: C) {
-  _ = ReversedCollection(c) // expected-error {{'init' is unavailable: use the 'reversed()' method on the collection}} {{none}}
+  _ = ReverseCollection(c) // expected-error {{'ReverseCollection' has been renamed to 'ReversedCollection'}} {{7-24=ReversedCollection}} {{none}}
+  _ = ReversedCollection(c) // expected-error {{'init' has been replaced by instance method 'BidirectionalCollection.reversed()'}} {{7-25=c.reversed}} {{26-27=}} {{none}}
   _ = c.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
 }
 func _Reverse<C : RandomAccessCollection>(c: C) {
-  _ = ReversedRandomAccessCollection(c) // expected-error {{'init' is unavailable: use the 'reversed()' method on the collection}} {{none}}
+  _ = ReverseRandomAccessCollection(c) // expected-error {{'ReverseRandomAccessCollection' has been renamed to 'ReversedRandomAccessCollection'}} {{7-36=ReversedRandomAccessCollection}} {{none}}
+  _ = ReversedRandomAccessCollection(c) // expected-error {{'init' has been replaced by instance method 'RandomAccessCollection.reversed()'}} {{7-37=c.reversed}} {{38-39=}} {{none}}
   _ = c.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
 }
 func _Reverse<C : LazyCollectionProtocol>(c: C) where C : BidirectionalCollection, C.Elements : BidirectionalCollection {
