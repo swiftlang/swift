@@ -14,9 +14,9 @@ NSDecimalNumberTests.test("AnyHashable containing Foundation.Decimal") {
     NSDecimalNumber(string: "20.0"),
   ]
   let anyHashables = values.map(AnyHashable.init)
-  expectEqual("Decimal", String(describing: type(of: anyHashables[0].base)))
-  expectEqual("Decimal", String(describing: type(of: anyHashables[1].base)))
-  expectEqual("Decimal", String(describing: type(of: anyHashables[2].base)))
+  expectEqual(Decimal.self, type(of: anyHashables[0].base))
+  expectEqual(Decimal.self, type(of: anyHashables[1].base))
+  expectEqual(Decimal.self, type(of: anyHashables[2].base))
   expectNotEqual(anyHashables[0], anyHashables[1])
   expectEqual(anyHashables[1], anyHashables[2])
 }
