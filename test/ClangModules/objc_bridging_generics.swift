@@ -212,6 +212,17 @@ extension AnimalContainer {
     y.apexPredator = x
   }
 
+  func doesntUseGenericParam5(y: T) {
+    var x = y
+    x = y
+    _ = x
+  }
+  func doesntUseGenericParam6(y: T?) {
+    var x = y
+    x = y
+    _ = x
+  }
+
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamA(_ x: T) {
     _ = T(noise: x) // expected-note{{used here}}
