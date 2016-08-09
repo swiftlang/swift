@@ -98,6 +98,15 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         action="append")
     parser.add_argument("--branch",
         help="Obtain Sources for specific branch")
+    parser.add_argument(
+        '--reset-to-remote',
+        help='Reset each branch to the remote state.',
+        action='store_true')
+    parser.add_argument(
+        '--clean',
+        help='Clean unrelated files from each repository.',
+        action='store_true')
+
     args = parser.parse_args()
 
     clone = args.clone
