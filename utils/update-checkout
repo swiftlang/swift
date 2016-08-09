@@ -193,9 +193,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         dest='skip_repository_list',
         action="append")
     parser.add_argument(
-        "--branch",
-        help='Obtain Sources for specific branch',
-        metavar='BRANCH',
+        "--scheme", "--branch",
+        help='Use branches from the specified branch-scheme',
+        metavar='BRANCH-SCHEME',
         dest='scheme')
     parser.add_argument(
         '--reset-to-remote',
