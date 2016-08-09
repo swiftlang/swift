@@ -221,6 +221,33 @@ Swift 3.0
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
   prefix and suffix of all strings.
 
+* [SE-128](https://github.com/apple/swift-evolution/blob/master/proposals/0128-unicodescalar-failable-initializer.md)
+
+  Some UnicodeScalar initializers (ones that are non-failable) now returns an Optional, 
+  i.e., in case a UnicodeScalar can not be constructed, nil is returned.
+
+  ```swift
+  // Old
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  let ucode = UnicodeScalar(codepoint) // Program crashes at this point.
+  string.append(ucode)
+  ``` 
+
+  After marking the initializer as failable, users can write code like this and the
+  program will execute fine even if the codepoint isn't valid.
+
+  ```swift
+  // New 
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  if let ucode = UnicodeScalar(codepoint) {
+    string.append(ucode)
+  } else {
+    // do something else
+  }
+  ``` 
+
 * [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
   The `protocol<...>` composition construct has been removed. In its
   place, an infix type operator `&` has been introduced.
