@@ -543,6 +543,7 @@ func _VarArgs() {
   func fn2(_: VaListBuilder) {} // expected-error {{'VaListBuilder' is unavailable}} {{none}}
 }
 
-func _Zip<S1 : Sequence, S2: Sequence>(_: S1, _: S2) {
+func _Zip<S1 : Sequence, S2: Sequence>(s1: S1, s2: S2) {
+  _ = Zip2Sequence(s1, s2) // expected-error {{use zip(_:_:) free function instead}} {{none}}
   _ = Zip2Sequence<S1, S2>.Generator.self // expected-error {{'Generator' has been renamed to 'Iterator'}} {{28-37=Iterator}} {{none}}
 }
