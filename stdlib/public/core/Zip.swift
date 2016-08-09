@@ -139,3 +139,10 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   internal let _sequence1: Sequence1
   internal let _sequence2: Sequence2
 }
+
+extension Zip2Sequence {
+  @available(*, unavailable, message: "use zip(_:_:) free function instead")
+  public init(_ sequence1: Sequence1, _ sequence2: Sequence2) {
+    Builtin.unreachable()
+  }
+}
