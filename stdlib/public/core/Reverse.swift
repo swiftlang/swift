@@ -353,15 +353,23 @@ extension LazyCollectionProtocol
   }
 }
 
+@available(*, unavailable, renamed: "ReversedCollection")
+public typealias ReverseCollection<Base : BidirectionalCollection> =
+  ReversedCollection<Base>
+
+@available(*, unavailable, renamed: "ReversedRandomAccessCollection")
+public typealias ReverseRandomAccessCollection<Base : RandomAccessCollection> =
+  ReversedRandomAccessCollection<Base>
+
 extension ReversedCollection {
-  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
+  @available(*, unavailable, renamed: "BidirectionalCollection.reversed(self:)")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
 }
 
 extension ReversedRandomAccessCollection {
-  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
+  @available(*, unavailable, renamed: "RandomAccessCollection.reversed(self:)")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
