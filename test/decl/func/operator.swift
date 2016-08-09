@@ -214,29 +214,125 @@ extension S0 {
 }
 
 struct S1 {
-  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
 }
 
 extension S1 {
-  func %%%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {
-  static func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  static func %%%(lhs: C0, rhs: C0) -> C0 { return lhs }
 }
 
 class C1 {
-  final func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  final func %%%(lhs: C1, rhs: C1) -> C1 { return lhs }
 }
 
 final class C2 {
-  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs }
+  class func %%%(lhs: C2, rhs: C2) -> C2 { return lhs }
 }
 
 class C3 {
-  class func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in non-final class 'C3' must be 'final'}}{{3-3=final }}
+  class func %%%(lhs: C3, rhs: C3) -> C3 { return lhs } // expected-error{{operator '%%%' declared in non-final class 'C3' must be 'final'}}{{3-3=final }}
 }
 
 class C4 {
-  func %%%(lhs: S0, rhs: S0) -> S0 { return lhs } // expected-error{{operator '%%%' declared in type 'C4' must be 'static'}}{{3-3=static }}
+  func %%%(lhs: C4, rhs: C4) -> C4 { return lhs } // expected-error{{operator '%%%' declared in type 'C4' must be 'static'}}{{3-3=static }}
+}
+
+struct Unrelated { }
+
+struct S2 {
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
+  // expected-error@-1{{member operator '%%%' must have at least one argument of type 'S2'}}
+
+  // Okay: refers to S2
+  static func %%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: inout S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: inout S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: S2) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: inout S2) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: S2.Type) -> Unrelated { }
+  static func %%%(lhs: Unrelated, rhs: inout S2.Type) -> Unrelated { }
+}
+
+extension S2 {
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2 { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> S2.Type { }
+  // expected-error@-1{{member operator '%%%%' must have at least one argument of type 'S2'}}
+
+  // Okay: refers to S2
+  static func %%%%(lhs: S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout S2, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout S2.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: S2) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout S2) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: S2.Type) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout S2.Type) -> Unrelated { }
+}
+
+protocol P2 {
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type
+  // expected-error@-1{{member operator '%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  // Okay: refers to Self
+  static func %%%(lhs: Self, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: inout Self, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: Self.Type, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: inout Self.Type, rhs: Unrelated) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: Self) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: inout Self) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: Self.Type) -> Unrelated
+  static func %%%(lhs: Unrelated, rhs: inout Self.Type) -> Unrelated
+}
+
+extension P2 {
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  static func %%%%(lhs: Unrelated, rhs: Unrelated) -> Self.Type { }
+  // expected-error@-1{{member operator '%%%%' of protocol 'P2' must have at least one argument of type 'Self'}}
+
+  // Okay: refers to Self
+  static func %%%%(lhs: Self, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout Self, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Self.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: inout Self.Type, rhs: Unrelated) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: Self) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout Self) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: Self.Type) -> Unrelated { }
+  static func %%%%(lhs: Unrelated, rhs: inout Self.Type) -> Unrelated { }
+}
+
+protocol P3 {
+  // Okay: refers to P3
+  static func %%%(lhs: P3, rhs: Unrelated) -> Unrelated
+}
+
+extension P3 {
+  // Okay: refers to P3
+  static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
 }
