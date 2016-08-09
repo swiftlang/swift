@@ -181,6 +181,16 @@ extension P {
 
 protocol ClassP : class {
   func bas(_ x: Int)
+  func quux(_ x: Int)
+}
+
+class ClassC : ClassP {
+  func bas(_ x: Int) {}
+}
+
+extension ClassP {
+  func quux(_ x: Int) {}
+  func bing(_ x: Int) {}
 }
 
 func generic<T: P>(_ t: T) {
@@ -241,6 +251,14 @@ func genericClassP<T: ClassP>(_ t: T) {
   let _: (T) -> (Int) -> () = id(T.bas)
   let _: (Int) -> () = id(T.bas(t))
   let _: () = id(T.bas(t)(1))
+}
+
+func genericClassC<C : ClassC>(_ c: C) {
+  // Make sure that we can find members of protocol extensions
+  // on a class-bound archetype
+  let _ = c.bas(123)
+  let _ = c.quux(123)
+  let _ = c.bing(123)
 }
 
 ////
