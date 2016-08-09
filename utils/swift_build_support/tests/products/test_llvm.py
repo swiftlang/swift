@@ -47,6 +47,7 @@ class LLVMTestCase(unittest.TestCase):
         # Setup args
         self.args = argparse.Namespace(
             llvm_targets_to_build='X86;ARM;AArch64;PowerPC;SystemZ',
+            llvm_assertions='true',
             darwin_deployment_version_osx='10.9')
 
         # Setup shell
@@ -77,3 +78,23 @@ class LLVMTestCase(unittest.TestCase):
         expected_targets = 'X86;ARM;AArch64;PowerPC;SystemZ'
         expected_arg = '-DLLVM_TARGETS_TO_BUILD=%s' % expected_targets
         self.assertTrue(expected_arg in llvm.cmake_options)
+
+    def test_llvm_enable_assertions(self):
+        self.args.llvm_assertions = True
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=true' in
+                        llvm.cmake_options)
+
+        self.args.llvm_assertions = False
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=false' in
+                        llvm.cmake_options)
+
