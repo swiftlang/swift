@@ -98,3 +98,22 @@ public protocol Hashable : _Hashable, Equatable {
   var hashValue: Int { get }
 }
 
+public enum _RuntimeHelpers {}
+
+extension _RuntimeHelpers {
+  @_silgen_name("swift_stdlib_Hashable_isEqual_indirect")
+  public static func Hashable_isEqual_indirect<T : Hashable>(
+    _ lhs: UnsafePointer<T>,
+    _ rhs: UnsafePointer<T>
+  ) -> Bool {
+    return lhs.pointee == rhs.pointee
+  }
+
+  @_silgen_name("swift_stdlib_Hashable_hashValue_indirect")
+  public static func Hashable_hashValue_indirect<T : Hashable>(
+    _ value: UnsafePointer<T>
+  ) -> Int {
+    return value.pointee.hashValue
+  }
+}
+

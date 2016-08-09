@@ -232,9 +232,8 @@ extension Hashable {
 /// Returns a default (non-custom) representation of `self`
 /// as `AnyHashable`.
 ///
-/// Completely ignores the
-/// `_HasCustomAnyHashableRepresentation` conformance, if
-/// any.
+/// Completely ignores the `_HasCustomAnyHashableRepresentation`
+/// conformance, if it exstis.
 @_silgen_name("_swift_stdlib_makeAnyHashableUsingDefaultRepresentation")
 public // COMPILER_INTRINSIC (actually, called from the runtime)
 func _stdlib_makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
@@ -260,7 +259,8 @@ func _convertToAnyHashable<H : Hashable>(_ value: H) -> AnyHashable {
 public // COMPILER_INTRINSIC (actually, called from the runtime)
 func _convertToAnyHashableIndirect<H : Hashable>(
   _ value: H,
-  _ target: UnsafeMutablePointer<AnyHashable>) {
+  _ target: UnsafeMutablePointer<AnyHashable>
+) {
   target.initialize(to: AnyHashable(value))
 }
 
@@ -268,6 +268,7 @@ func _convertToAnyHashableIndirect<H : Hashable>(
 public // COMPILER_INTRINSIC (actually, called from the runtime)
 func _anyHashableDownCastConditionalIndirect<T>(
   _ value: UnsafePointer<AnyHashable>,
-  _ target: UnsafeMutablePointer<T>) -> Bool {
+  _ target: UnsafeMutablePointer<T>
+) -> Bool {
   return value.pointee._downCastConditional(into: target)
 }
