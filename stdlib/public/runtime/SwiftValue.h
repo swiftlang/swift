@@ -23,7 +23,6 @@
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
-#endif
 
 // SwiftValue is an Objective-C class, but we shouldn't interface with it
 // directly as such. Keep the type opaque.
@@ -48,12 +47,11 @@ const Metadata *getSwiftValueTypeMetadata(SwiftValue *v);
 std::pair<const Metadata *, const OpaqueValue *>
 getValueFromSwiftValue(SwiftValue *v);
 
-#if SWIFT_OBJC_INTEROP
 /// Return the object reference as a SwiftValue* if it is a SwiftValue instance,
 /// or nil if it is not.
 SwiftValue *getAsSwiftValue(id object);
-#endif
 
-}
+} // namespace swift
+#endif
 
 #endif
