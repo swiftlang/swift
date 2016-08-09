@@ -3736,6 +3736,12 @@ public:
   }
 
   void visitDynamicSelfType(DynamicSelfType *T) {
+    if (Options.PrintInSILBody) {
+      Printer << "@dynamic_self ";
+      visit(T->getSelfType());
+      return;
+    }
+
     Printer.printTypeRef(T, T->getASTContext().Id_Self);
   }
 

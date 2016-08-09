@@ -118,7 +118,7 @@ namespace {
     llvm::function_ref<void(Type)> ParsedTypeCallback;
 
 
-    bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
+    bool performTypeLocChecking(TypeLoc &T, bool IsSILType = true);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -770,11 +770,13 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   return false;
 }
 
-bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSIL) {
+bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
-  return swift::performTypeLocChecking(P.Context, T, /*SIL*/ IsSIL, &P.SF);
+  return swift::performTypeLocChecking(P.Context, T,
+                                       /*isSILMode=*/true,
+                                       IsSILType, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -814,7 +816,7 @@ bool SILParser::parseASTType(CanType &result) {
   ParserResult<TypeRepr> parsedType = P.parseType();
   if (parsedType.isNull()) return true;
   TypeLoc loc = parsedType.get();
-  if (performTypeLocChecking(loc, false))
+  if (performTypeLocChecking(loc, /*isSILType=*/ false))
     return true;
   result = loc.getType()->getCanonicalType();
   // Invoke the callback on the parsed type.
@@ -1371,7 +1373,7 @@ bool SILParser::parseApplySubstitutions(
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
-    if (performTypeLocChecking(Ty, false))
+    if (performTypeLocChecking(Ty, /*isSILType=*/ false))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -2875,7 +2877,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       }
     }
 
-    if (performTypeLocChecking(Ty, false))
+    if (performTypeLocChecking(Ty, /*isSILType=*/ false))
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -4272,7 +4274,7 @@ bool SILParser::parseSpecConformanceSubstitutions(
     if (TyR.isNull())
       return true;
     TypeLoc Ty = TyR.get();
-    if (performTypeLocChecking(Ty, false))
+    if (performTypeLocChecking(Ty, /*isSILType=*/ false))
       return true;
     parsed.push_back({Loc, Ty.getType()});
   } while (P.consumeIf(tok::comma));
@@ -4326,7 +4328,7 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
   if (TyR.isNull())
     return nullptr;
   TypeLoc Ty = TyR.get();
-  if (performTypeLocChecking(Ty, false))
+  if (performTypeLocChecking(Ty, /*isSILType=*/ false))
     return nullptr;
   auto ConformingTy = Ty.getType();
 
@@ -4520,7 +4522,9 @@ bool Parser::parseSILWitnessTable() {
         if (TyR.isNull())
           return true;
         TypeLoc Ty = TyR.get();
-        if (swift::performTypeLocChecking(Context, Ty, false, &SF))
+        if (swift::performTypeLocChecking(Context, Ty,
+                                          /*isSILMode=*/ false,
+                                          /*isSILType=*/ false, &SF))
           return true;
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{

@@ -436,6 +436,7 @@ public:
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
+    PrintState.ASTOptions.PrintForSIL = true;
   }
 
   ID getID(const SILBasicBlock *B);

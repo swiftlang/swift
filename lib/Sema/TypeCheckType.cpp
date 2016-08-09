@@ -1724,6 +1724,20 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   llvm_unreachable("all cases should be handled");
 }
 
+static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
+  OptionalTypeKind OTK;
+  if (auto metatypeTy = ty->getAs<MetatypeType>()) {
+    return MetatypeType::get(
+        rebuildWithDynamicSelf(Context, metatypeTy->getInstanceType()),
+        metatypeTy->getRepresentation());
+  } else if (auto optionalTy = ty->getAnyOptionalObjectType(OTK)) {
+    return OptionalType::get(
+        OTK, rebuildWithDynamicSelf(Context, optionalTy));
+  } else {
+    return DynamicSelfType::get(ty, Context);
+  }
+}
+
 Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
                                          TypeResolutionOptions options) {
   // Copy the attributes, since we're about to start hacking on them.
@@ -2018,7 +2032,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     ty = SILBoxType::get(ty->getCanonicalType());
     attrs.clearAttribute(TAK_box);
   }
-  
+
+  // In SIL *only*, allow @dynamic_self to specify a dynamic Self type.
+  if ((options & TR_SILMode) && attrs.has(TAK_dynamic_self)) {
+    ty = rebuildWithDynamicSelf(TC.Context, ty);
+    attrs.clearAttribute(TAK_dynamic_self);
+  }
+
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
     if (attrs.has((TypeAttrKind)i))
       TC.diagnose(attrs.getLoc((TypeAttrKind)i),
