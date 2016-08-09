@@ -38,8 +38,8 @@ cs = ds // expected-error{{cannot assign value of type 'ArraySlice<D>' to type '
 ds = cs // expected-error{{cannot assign value of type 'ArraySlice<C>' to type 'ArraySlice<D>'}}
 
 // ContiguousArray<T>
-var cna: ContiguousArray<C> = [c1]
-var dna: ContiguousArray<D> = [d1]
+var cna: ContiguousArray<C> = [c1] // expected-warning {{'ContiguousArray' is deprecated: renamed to 'Array'}} expected-note {{use 'Array' instead}}
+var dna: ContiguousArray<D> = [d1] // expected-warning {{'ContiguousArray' is deprecated: renamed to 'Array'}} expected-note {{use 'Array' instead}}
 
 cna = dna // expected-error{{cannot assign value of type 'ContiguousArray<D>' to type 'ContiguousArray<C>'}}
 dna = cna // expected-error{{cannot assign value of type 'ContiguousArray<C>' to type 'ContiguousArray<D>'}}

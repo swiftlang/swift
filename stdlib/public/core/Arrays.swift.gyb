@@ -448,6 +448,9 @@ ${SelfDocComment}
 % if Self != 'ArraySlice':
 @_fixed_layout
 %end
+% if Self == 'ContiguousArray':
+@available(*, deprecated, renamed: "Array")
+%end
 public struct ${Self}<Element>
   : RandomAccessCollection,
     MutableCollection,
