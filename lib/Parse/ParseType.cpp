@@ -711,6 +711,12 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         else
           diag.fixItReplace(SourceRange(firstNameLoc), "_");
       }
+
+      if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
+        // Form the named parameter type representation.
+        ElementsR[i] = new (Context) NamedTypeRepr(secondName, ElementsR[i],
+                                                   secondNameLoc, firstNameLoc);
+      }
     }
   }
 
