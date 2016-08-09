@@ -743,15 +743,6 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
         auto ptrTy = ctx.getObjCObjectPointerType(clangType);
         return ctx.getCanonicalType(ptrTy);
       }
-    } else if (decl == IGM.Context.getBoolDecl()) {
-      // FIXME: Handle _Bool and DarwinBoolean.
-      auto &ctx = IGM.getClangASTContext();
-      auto &TI = ctx.getTargetInfo();
-      // FIXME: Figure out why useSignedCharForObjCBool() returns
-      // 'true' on Linux
-      if (IGM.ObjCInterop && TI.useSignedCharForObjCBool()) {
-        return ctx.SignedCharTy;
-      }
     }
   }
 
