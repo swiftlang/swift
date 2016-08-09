@@ -2464,10 +2464,15 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
       Feasibility == DynamicCastFeasibility::MaySucceed) {
 
     bool ResultNotUsed = isa<AllocStackInst>(Dest);
+    DestroyAddrInst *DestroyDestInst = nullptr;
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
       if (isa<DeallocStackInst>(User) || User == Inst)
         continue;
+      if (isa<DestroyAddrInst>(User) && !DestroyDestInst) {
+        DestroyDestInst = cast<DestroyAddrInst>(User);
+        continue;
+      }
       ResultNotUsed = false;
       break;
     }
@@ -2483,6 +2488,8 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
         case CastConsumptionKind::CopyOnSuccess:
           break;
       }
+      if (DestroyDestInst)
+        EraseInstAction(DestroyDestInst);
       EraseInstAction(Inst);
       WillSucceedAction();
       return nullptr;
