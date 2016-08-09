@@ -2524,6 +2524,11 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           diagnose(loc, diag::did_you_mean_raw_type);
           return; // Always prefer this over typo corrections.
         }
+      } else if (baseObjTy->isAny()) {
+        diagnose(loc, diag::any_as_anyobject_fixit)
+          .fixItInsert(baseExpr->getStartLoc(), "(")
+          .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
+        return;
       }
     }
 

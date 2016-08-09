@@ -219,3 +219,14 @@ uopt.wibble!()
 // Should not be able to see private or internal @objc methods.
 uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
 uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
+
+let anyValue: Any = X()
+_ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{13-13= as AnyObject)}}
+_ = (anyValue as AnyObject).bar()
+_ = (anyValue as! X).bar()
+
+var anyDict: [String : Any] = Dictionary<String, Any>()
+anyDict["test"] = anyValue
+_ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{21-21= as AnyObject)}}
