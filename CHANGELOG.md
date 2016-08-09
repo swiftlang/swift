@@ -3,6 +3,24 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
+
+  The collection methods `partition()` and `partition(isOrderedBefore:)` have
+  been removed from Swift. They were replaced by the method `partition(by:)`
+  which takes an unary predicate.
+
+  Calls to the `partition()` method can be replaced by the following code.
+
+  ```swift
+  // old
+  let p = c.partition()
+
+  // new
+  let p = c.first.flatMap({ first in
+      c.partition(by: { $0 >= first })
+  }) ?? c.startIndex
+  ```
+
 * [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
 
   Closure parameters are non-escaping by default, rather than explicitly being
