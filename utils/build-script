@@ -60,6 +60,10 @@ def main_preset():
     parser.add_argument("--distcc",
         help="use distcc",
         action="store_true")
+    parser.add_argument("-j", "--jobs",
+        help="the number of parallel build jobs to use",
+        type=int,
+        dest="build_jobs")
     parser.add_argument("preset_substitutions_raw",
         help="'name=value' pairs that are substituted in the preset",
         nargs="*",
@@ -96,6 +100,8 @@ def main_preset():
     build_script_args += preset_args
     if args.distcc:
         build_script_args += [ "--distcc" ]
+    if args.build_jobs:
+        build_script_args += ["--jobs", str(args.build_jobs)]
 
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to " +
