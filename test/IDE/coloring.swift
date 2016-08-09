@@ -278,6 +278,10 @@ func test4(inout a: Int) {
   // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 
+// CHECK: <kw>func</kw> test4b(a: <kw>inout</kw> <type>Int</type>) {{{$}}
+func test4b(a: inout Int) {
+}
+
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
 class MySubClass : MyCls {
     // CHECK: <attr-builtin>override</attr-builtin> <kw>func</kw> foo(x: <type>Int</type>) {}
