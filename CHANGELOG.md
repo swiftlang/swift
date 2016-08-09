@@ -3,6 +3,73 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-125)(https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
+
+  The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
+  have been removed. The function `isKnownUniquelyReferenced()` should be called
+  instead. The class `NonObjectiveCBase` which classes using
+  `isUniquelyReferenced()` needed to inherit from was removed.
+
+  The method `ManagedBufferPointer.holdsUniqueReference` was renamed to
+  `ManagedBufferPointer.isUniqueReference`.
+
+  ```swift
+  // old
+  class SwiftKlazz : NonObjectiveCBase {}
+  expectTrue(isUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.holdsUniqueReference() {
+    print("not unique")
+  }
+
+
+  // new
+  class SwiftKlazz {}
+  expectTrue(isKnownUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.isUniqueReference() {
+    print("not unique")
+  }
+
+  ```
+
+* [SE-124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
+
+  The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
+  to be spelled with an explicit `bitPattern` label.
+
+  ```swift
+  let x: ObjectIdentifier = ...
+
+  // old
+  let u = UInt(x)
+  let i = Int(x)
+
+  // new
+  let u = UInt(bitPattern: x)
+  let i = Int(bitPattern: x)
+  ```
+
+* [SE-120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
+
+  The collection methods `partition()` and `partition(isOrderedBefore:)` have
+  been removed from Swift. They were replaced by the method `partition(by:)`
+  which takes an unary predicate.
+
+  Calls to the `partition()` method can be replaced by the following code.
+
+  ```swift
+  // old
+  let p = c.partition()
+
+  // new
+  let p = c.first.flatMap({ first in
+      c.partition(by: { $0 >= first })
+  }) ?? c.startIndex
+  ```
+
 * [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
 
   Closure parameters are non-escaping by default, rather than explicitly being
