@@ -9,24 +9,44 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
-# ----------------------------------------------------------------------------
-#
-# This is a wrapper for the swift compiler.
-# It invokes the compiler multiple times and checks if the output object file
-# is only written a single time.
-# The main purpose of the check is to ensure that the compiler is
-# deterministic.
-#
-# ----------------------------------------------------------------------------
+"""
+check-incremental: Check if incremental compilation works.
+
+This is a wrapper for the Swift compiler.  It invokes the compiler
+multiple times and checks if the output object file is only written once.
+The main purpose of the check is to ensure that the compiler is
+deterministic.
+"""
+
+from __future__ import print_function
 
 import os
 import subprocess
 import sys
 
 
+VERBOSE = False
+NUM_ITERATIONS = 4
+
+
+def compile_and_stat(compile_args, output_file):
+    """Perform a compilation using ``compile_args``, and return a tuple
+    (md5sum, last modified time) for ``output_file`` after the
+    compilation has finished.
+    """
+    subprocess.check_call(compile_args)
+
+    md5 = subprocess.check_output(["md5", "-q", output_file])
+    mtime = os.path.getmtime(output_file)
+
+    if VERBOSE:
+        print("  time = {}".format(md5))
+        print("  md5 = " + mtime)
+
+    return (md5, mtime)
+
+
 def main():
-    verbose = False
-    num_iterations = 4
 
     write_obj_file = False
     next_arg_is_output = False
@@ -48,33 +68,20 @@ def main():
         return
 
     new_args = sys.argv[1:]
-    subprocess.check_call(new_args)
 
-    if verbose:
-        print "Reference compilation of " + output_file + ":"
+    if VERBOSE:
+        print("Reference compilation of " + output_file + ":")
 
-    reference_md5 = subprocess.check_output(["md5", "-q", output_file])
-    reference_time = os.path.getmtime(output_file)
-
-    if verbose:
-        print "  time = {}".format(reference_time)
-        print "  md5 = " + reference_md5
+    reference_md5, reference_time = compile_and_stat(new_args, output_file)
 
     subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
 
-    for iteration in range(0, num_iterations):
+    for iteration in range(1, NUM_ITERATIONS + 1):
 
-        if verbose:
-            print "Iteration {}:".format(iteration)
+        if VERBOSE:
+            print("Iteration {}:".format(iteration))
 
-        subprocess.check_call(new_args)
-
-        second_md5 = subprocess.check_output(["md5", "-q", output_file])
-        second_time = os.path.getmtime(output_file)
-
-        if verbose:
-            print "  time = {}".format(second_time)
-            print "  md5 = " + second_md5
+        second_md5, second_time = compile_and_stat(new_args, output_file)
 
         # This is the most important check: is the output file exactly the
         # same.
@@ -88,4 +95,5 @@ def main():
             sys.exit("file re-written: " + output_file)
 
 
-main()
+if __name__ == '__main__':
+    main()
