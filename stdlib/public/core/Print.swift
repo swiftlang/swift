@@ -50,7 +50,7 @@
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
 ///
-/// - SeeAlso: `debugPrint(_:separator:terminator:)`, `Streamable`,
+/// - SeeAlso: `debugPrint(_:separator:terminator:)`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -113,7 +113,7 @@ public func print(
 ///   - terminator: The string to print after all items have been printed. The
 ///     default is a newline (`"\n"`).
 ///
-/// - SeeAlso: `print(_:separator:terminator:)`, `Streamable`,
+/// - SeeAlso: `print(_:separator:terminator:)`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -174,7 +174,7 @@ public func debugPrint(
 ///
 /// - SeeAlso: `print(_:separator:terminator:)`,
 ///   `debugPrint(_:separator:terminator:to:)`, `TextOutputStream`,
-///   `Streamable`, `CustomStringConvertible`, `CustomDebugStringConvertible`
+///   `TextOutputStreamable`, `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
@@ -225,7 +225,7 @@ public func print<Target : TextOutputStream>(
 ///     item.
 ///
 /// - SeeAlso: `debugPrint(_:separator:terminator:)`,
-///   `print(_:separator:terminator:to:)`, `TextOutputStream`, `Streamable`,
+///   `print(_:separator:terminator:to:)`, `TextOutputStream`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target : TextOutputStream>(
