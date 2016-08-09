@@ -29,6 +29,7 @@
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
+#include "SwiftHashableSupport.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "stddef.h"
 #if SWIFT_OBJC_INTEROP
@@ -40,6 +41,7 @@
 #include <type_traits>
 
 using namespace swift;
+using namespace swift::hashable_support;
 using namespace metadataimpl;
 
 #if SWIFT_OBJC_INTEROP
@@ -905,19 +907,6 @@ static bool isAnyHashableType(const Metadata *type) {
   return false;
 }
 
-SWIFT_CC(swift)
-extern "C"
-void _swift_convertToAnyHashableIndirect(OpaqueValue *source,
-                                         OpaqueValue *destination,
-                                         const Metadata *sourceType,
-                                         const WitnessTable *sourceConformance);
-
-SWIFT_CC(swift)
-extern "C"
-bool _swift_anyHashableDownCastConditionalIndirect(OpaqueValue *source,
-                                                   OpaqueValue *destination,
-                                                   const Metadata *targetType);
-
 /// Perform a dynamic cast from a nominal type to AnyHashable.
 static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
                                       OpaqueValue *source,
@@ -925,8 +914,8 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
                                       const Metadata *targetType,
                                       DynamicCastFlags flags) {
   // Look for a conformance to Hashable.
-  auto hashableConformance =
-    swift_conformsToProtocol(sourceType, &_TMps8Hashable);
+  auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
+      swift_conformsToProtocol(sourceType, &_TMps8Hashable));
 
   // If we don't find one, the cast fails.
   if (!hashableConformance) {

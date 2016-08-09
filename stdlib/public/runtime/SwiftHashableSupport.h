@@ -26,13 +26,24 @@ struct HashableWitnessTable;
 
 /// Calls `Equatable.==` through a `Hashable` (not Equatable!) witness
 /// table.
+SWIFT_CC(swift)
 extern "C" bool swift_stdlib_Hashable_isEqual_indirect(
     const void *lhsValue, const void *rhsValue, const Metadata *type,
     const HashableWitnessTable *wt);
 
 /// Calls `Hashable.hashValue.get` through a `Hashable` witness table.
+SWIFT_CC(swift)
 extern "C" intptr_t swift_stdlib_Hashable_hashValue_indirect(
     const void *value, const Metadata *type, const HashableWitnessTable *wt);
+
+SWIFT_CC(swift)
+extern "C" void _swift_convertToAnyHashableIndirect(
+    OpaqueValue *source, OpaqueValue *destination, const Metadata *sourceType,
+    const HashableWitnessTable *sourceConformance);
+
+SWIFT_CC(swift)
+extern "C" bool _swift_anyHashableDownCastConditionalIndirect(
+    OpaqueValue *source, OpaqueValue *destination, const Metadata *targetType);
 
 /// Find the base type that introduces the `Hashable` conformance.
 /// Because the provided type is known to conform to `Hashable`, this
