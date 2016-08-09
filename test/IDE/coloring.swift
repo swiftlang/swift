@@ -273,10 +273,14 @@ func test3(o: AnyObject) {
   let x = o as! MyCls
 }
 
-// CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
+// CHECK: <kw>func</kw> test4(inout a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
   // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
+
+// CHECK: <kw>func</kw> test4b(a: <kw>inout</kw> <type>Int</type>) {{{$}}
+func test4b(a: inout Int) {
+}
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
 class MySubClass : MyCls {
@@ -501,6 +505,13 @@ let file = #fileLiteral(resourceName: "cloud.png")
 let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
 // CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
 
+let rgb = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1),
+           #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1),
+           #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)]
+// CHECK: <kw>let</kw> rgb = [<object-literal>#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)</object-literal>,
+// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)</object-literal>,
+// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)</object-literal>]
+
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 
@@ -508,6 +519,14 @@ func keywordAsLabel1(in: Int) {}
 // CHECK: <kw>func</kw> keywordAsLabel1(in: <type>Int</type>) {}
 func keywordAsLabel2(for: Int) {}
 // CHECK: <kw>func</kw> keywordAsLabel2(for: <type>Int</type>) {}
+func keywordAsLabel3(if: Int, for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel3(if: <type>Int</type>, for: <type>Int</type>) {}
+func keywordAsLabel4(_: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel4(<kw>_</kw>: <type>Int</type>) {}
+func keywordAsLabel5(_: Int, for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel5(<kw>_</kw>: <type>Int</type>, for: <type>Int</type>) {}
+func keywordAsLabel6(if let: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel6(if <kw>let</kw>: <type>Int</type>) {}
 
 func foo1() {
 // CHECK: <kw>func</kw> foo1() {
@@ -515,6 +534,15 @@ func foo1() {
 // CHECK: keywordAsLabel1(in: <int>1</int>)
   keywordAsLabel2(for: 1)
 // CHECK: keywordAsLabel2(for: <int>1</int>)
+  keywordAsLabel3(if: 1, for: 2)
+// CHECK: keywordAsLabel3(if: <int>1</int>, for: <int>2</int>)
+  keywordAsLabel5(1, for: 2)
+// CHECK: keywordAsLabel5(<int>1</int>, for: <int>2</int>)
+
+  _ = (if: 0, for: 2)
+// CHECK: <kw>_</kw> = (if: <int>0</int>, for: <int>2</int>)
+  _ = (_: 0, _: 2)
+// CHECK: <kw>_</kw> = (<kw>_</kw>: <int>0</int>, <kw>_</kw>: <int>2</int>)
 }
 
 // Keep this as the last test
