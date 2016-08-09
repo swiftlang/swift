@@ -159,5 +159,13 @@ class r21949448 {
 // SE-0066 - Standardize function type argument syntax to require parentheses
 let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
 
-
-
+func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{15-34=UnsafeRawPointer}}
+func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{15-39=UnsafeMutableRawPointer}}
+class C {
+  func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{17-36=UnsafeRawPointer}}
+  func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{17-41=UnsafeMutableRawPointer}}
+  func foo3() {
+    let _ : UnsafePointer<Void> // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{13-32=UnsafeRawPointer}}
+    let _ : UnsafeMutablePointer<Void> // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{13-39=UnsafeMutableRawPointer}}
+  }
+}

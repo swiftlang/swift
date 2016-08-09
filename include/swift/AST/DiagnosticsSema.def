@@ -2201,6 +2201,9 @@ NOTE(generic_type_declared_here,none,
 ERROR(cannot_partially_specialize_generic_function,none,
      "cannot partially specialize a generic function", ())
 
+WARNING(use_of_void_pointer,none,
+"Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
+
 // Ambiguities
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclName))
