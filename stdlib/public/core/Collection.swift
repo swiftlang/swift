@@ -1691,7 +1691,7 @@ extension Collection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "Removed in Swift 3. Please use underestimatedCount property.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }

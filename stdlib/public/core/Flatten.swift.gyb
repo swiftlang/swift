@@ -444,7 +444,7 @@ extension FlattenSequence {
 
 % for traversal in ('Forward', 'Bidirectional'):
 extension Flatten${collectionForTraversal(traversal)} {
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
