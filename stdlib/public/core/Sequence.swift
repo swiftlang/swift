@@ -1257,7 +1257,7 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "it became a property 'underestimatedCount'")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
