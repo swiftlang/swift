@@ -9,7 +9,7 @@ import Foundation
 // Test out some explicit renames of typedefs and globals, which are now new
 // wrapper types with nestest values.
 @available(macOS 10.11, *)
-func testRenames() {
+func testNestingRenames() {
   let _ = SCNGeometrySourceSemantic
     // expected-error@-1{{'SCNGeometrySourceSemantic' has been renamed to 'SCNGeometrySource.Semantic'}}
   let _ = SCNLightType
@@ -98,6 +98,7 @@ func testRenames() {
     // expected-error@-1{{'SCNPreferLowPowerDeviceKey' has been renamed to 'SCNView.Option.preferLowPowerDevice'}}
 }
 
+// All OK
 @available(macOS 10.11, *)
 func useRenamedValues() {
   let _ = SCNGeometrySource.Semantic.self
@@ -143,4 +144,94 @@ func useRenamedValues() {
   let _ = SCNView.Option.preferredRenderingAPI
   let _ = SCNView.Option.preferredDevice
   let _ = SCNView.Option.preferLowPowerDevice
+}
+
+// All OK
+@available(macOS 10.12, *)
+func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
+                    timeInterval: TimeInterval, vec3: SCNVector3, node: SCNNode,
+                    audioSource: SCNAudioSource, animatable: SCNAnimatable,
+                    lookAtConstraint: SCNLookAtConstraint, mat4: SCNMatrix4,
+                    particleSystem: SCNParticleSystem, event: SCNParticleEvent,
+                    stage: SCNParticleModifierStage, animation: CAAnimation,
+                    bindingBlock: SCNBindingBlock, material: SCNMaterial,
+                    bufferBindingBlock: SCNBufferBindingBlock, vec4: SCNVector4,
+                    eventBlock: SCNParticleEventBlock, morpher: SCNMorpher,
+                    modifierBlock: SCNParticleModifierBlock, scene: SCNScene,
+                    physicsBehavior: SCNPhysicsBehavior, geometry: SCNGeometry,
+                    physicsBody: SCNPhysicsBody, sceneSource: SCNSceneSource,
+                    physicsWorld: SCNPhysicsWorld, point: CGPoint,
+                    physicsShape: SCNPhysicsShape, shadable: SCNShadable,
+                    voidPtr: UnsafeMutablePointer<Void>, program: SCNProgram,
+                    renderer: SCNSceneRenderer, bufferStream: SCNBufferStream,
+                    bufferFrequency: SCNBufferFrequency,
+                    semantic: SCNGeometrySource.Semantic,
+                    prop: SCNParticleSystem.ParticleProperty) {
+  actionable.runAction(action)
+  actionable.runAction(action, completionHandler: {})
+  actionable.runAction(action, forKey: "key", completionHandler: {})
+
+  let _ = SCNAction.rotateTo(x: 1.0, y: 2.0, z: 3.0, duration: timeInterval,
+                             usesShortestUnitArc: false)
+  let _ = SCNAction.rotate(by: 1.0, around: vec3, duration: timeInterval)
+  let _ = SCNAction.fadeIn(duration: timeInterval)
+  let _ = SCNAction.fadeOut(duration: timeInterval)
+  let _ = SCNAction.wait(duration: timeInterval)
+  let _ = SCNAction.wait(duration: timeInterval, withRange: timeInterval)
+  let _ = SCNAction.customAction(duration: timeInterval,
+                                 action: { (a, b) in () })
+  let _ = SCNAction.playAudio(audioSource, waitForCompletion: false)
+
+  animatable.addAnimation(animation, forKey: "key")
+  let _ = animatable.isAnimationPaused(forKey: "key")
+  let _ = animatable.setAnimationSpeed(1.0, forKey: "key")
+
+  let _ = lookAtConstraint.isGimbalLockEnabled
+  let _ = SCNIKConstraint.inverseKinematicsConstraint(chainRootNode: node)
+
+  let _ = geometry.material(named: "mat")
+  let _ = geometry.getGeometrySources(for: semantic)
+  let geoSrc = SCNGeometrySource(data: data, semantic: semantic, vectorCount: 2,
+                                 usesFloatComponents: false,
+                                 componentsPerVector: 3,
+                                 bytesPerComponent: 11, dataOffset: -2,
+                                 dataStride: -3)
+  let _ = geoSrc.usesFloatComponents
+
+  let _ = material.lightingModel
+  let _ = morpher.weight(forTargetAt: 1)
+  let _ = node.hitTestWithSegment(from: vec3, to: vec3, options: [:])
+
+  let _ = particleSystem.isAffectedByGravity
+  let _ = particleSystem.isAffectedByPhysicsFields
+  particleSystem.handle(event, forProperties: [prop], handler: eventBlock)
+  particleSystem.addModifier(forProperties: [prop], at: stage,
+                             modifier: modifierBlock)
+  particleSystem.removeModifiers(at: stage)
+  scene.addParticleSystem(particleSystem, transform: mat4)
+
+  physicsBody.applyForce(vec3, asImpulse: false)
+  physicsBody.applyForce(vec3, at: vec3, asImpulse: false)
+  physicsBody.applyTorque(vec4, asImpulse: false)
+  let _ = SCNPhysicsField.noiseField(smoothness: 1.0, animationSpeed: 1.0)
+  let _ = SCNPhysicsField.turbulenceField(smoothness: 1.0, animationSpeed: 1.0)
+  physicsWorld.addBehavior(physicsBehavior)
+  physicsWorld.removeBehavior(physicsBehavior)
+  let _ = physicsWorld.rayTestWithSegment(from: vec3, to: vec3, options: [:])
+  let _ = physicsWorld.contactTestBetween(physicsBody, physicsBody,
+                                          options: [:])
+  let _ = physicsWorld.contactTest(with: physicsBody, options: [:])
+  let _ = physicsWorld.convexSweepTest(with: physicsShape, from: mat4, to: mat4)
+
+  let _ = renderer.isNode(node, insideFrustumOf: node)
+  let _ = renderer.nodesInsideFrustum(of: node)
+  renderer.prepare([], completionHandler: { b in ()})
+  let _ = sceneSource.identifiersOfEntries(withClass: SCNNode.self)
+
+  bufferStream.writeBytes(voidPtr, count: 2)
+
+  shadable.handleBinding!(ofSymbol: "sym", handler: bindingBlock)
+  shadable.handleUnbinding!(ofSymbol: "sym", handler: bindingBlock)
+  program.handleBinding(ofBufferNamed: "str", frequency: bufferFrequency,
+                        handler: bufferBindingBlock)
 }
