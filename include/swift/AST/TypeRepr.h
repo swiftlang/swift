@@ -580,24 +580,37 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A named element of a tuple type.
+/// \brief A named element of a tuple type or a named parameter of a function
+/// type.
 /// \code
-///   (x: Foo = 0)
+///   (x: Foo)
+///   (_ x: Foo) -> ()
 /// \endcode
 class NamedTypeRepr : public TypeRepr {
   Identifier Id;
   TypeRepr *Ty;
   SourceLoc IdLoc;
+  SourceLoc UnderscoreLoc;
 
 public:
+  /// Used for a named element of a tuple type.
   NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc)
     : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc) {
+  }
+  /// Used for a named parameter of a function type.
+  NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc,
+                SourceLoc underscoreLoc)
+    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc),
+      UnderscoreLoc(underscoreLoc) {
   }
 
   bool hasName() const { return !Id.empty(); }
   Identifier getName() const { return Id; }
   TypeRepr *getTypeRepr() const { return Ty; }
   SourceLoc getNameLoc() const { return IdLoc; }
+  SourceLoc getUnderscoreLoc() const { return UnderscoreLoc; }
+
+  bool isNamedParameter() const { return UnderscoreLoc.isValid(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Named;
@@ -605,7 +618,9 @@ public:
   static bool classof(const NamedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return IdLoc; }
+  SourceLoc getStartLocImpl() const {
+    return UnderscoreLoc.isValid() ? UnderscoreLoc : IdLoc;
+  }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;

@@ -198,7 +198,7 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
   return new (Ctx) NamedTypeRepr(T->getName(), visit(T->getTypeRepr()),
-                                 T->getNameLoc());
+                                 T->getNameLoc(), T->getUnderscoreLoc());
 }
 
 TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
@@ -411,9 +411,19 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
 void NamedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (!Id.empty()) {
-    Printer.printName(Id, PrintNameContext::TupleElement);
+  if (isNamedParameter()) {
+    // Printing empty Identifier is same as printing '_'.
+    Printer.printName(Identifier(), PrintNameContext::FunctionParameterExternal);
+    if (!Id.empty()) {
+      Printer << " ";
+      Printer.printName(Id, PrintNameContext::FunctionParameterLocal);
+    }
     Printer << ": ";
+  } else {
+    if (!Id.empty()) {
+      Printer.printName(Id, PrintNameContext::TupleElement);
+      Printer << ": ";
+    }
   }
   printTypeRepr(Ty, Printer, Opts);
 }
