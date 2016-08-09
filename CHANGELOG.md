@@ -3,7 +3,7 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
-* [SE-125)(https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
+* [SE-125](https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
   have been removed. The function `isKnownUniquelyReferenced()` should be called
