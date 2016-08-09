@@ -110,20 +110,20 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %   end # for in all_integer_types (Other)
 
 %   for other_type in all_floating_point_types():
-%    Other = "Float" + str(other_type.bits)
-%    otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
-%    otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
+%     Other = "Float" + str(other_type.bits)
+%     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
+%     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
 
-%    if Other == 'Float80':
+%     if Other == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
-%    end
+%     end
 
-%    for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
+%     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
         
-%     if testValue < otherMin or testValue > otherMax: 
-%       # Can't construct `other` value to test from, do nothing and continue.
+%       if testValue < otherMin or testValue > otherMax: 
+%         # Can't construct `other` value to test from, do nothing and continue.
 
-%     elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
+%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
 
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
@@ -137,19 +137,19 @@ FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=$
   expectEmpty(${Self}(exactly: input))
 }
 
-%     else:
+%       else:
 
-%      if testValue > selfMax:
+%         if testValue > selfMax:
 FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
 .crashOutputMatches(getTooLargeMessage()).code {
   expectCrashLater()
-%      elif testValue < selfMin:
+%         elif testValue < selfMin:
 FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
 .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
-%      else:
+%         else:
 FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
-%      end
+%         end
   let input = get${Other}(${testValue})
   var result = ${Self}(input)
   var resultConvertedBack = ${Other}(result)
@@ -160,12 +160,12 @@ FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testVal
   let input = get${Other}(${testValue})
   expectEmpty(${Self}(exactly: input))
 }
-%     end
-%    end # for in testValues
+%       end
+%     end # for in testValues
 
 // Test Always-Trapping conversions.
 
-%   if not selfSigned:
+%     if not selfSigned:
 
 FloatingPointConversionTraps.test("${Self}/${Other}/negative")
   .crashOutputMatches(getTooSmallMessage()).code {
@@ -177,7 +177,7 @@ FloatingPointConversionFailures.test("${Self}/${Other}/negative") {
   expectEmpty(${Self}(exactly: get${Other}(-123.0)))
 }
 
-%   end
+%     end
 
 FloatingPointConversionTraps.test("${Self}/${Other}/+inf")
   .crashOutputMatches(getInfiniteOrNaNMessage()).code {
@@ -209,11 +209,11 @@ FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
   expectEmpty(${Self}(exactly: get${Other}(${Other}.nan)))
 }
 
-%   if Other == 'Float80':
+%     if Other == 'Float80':
 #endif
-%   end
+%     end
 
-%  end # for in all_floating_point_types (Other)
+%   end # for in all_floating_point_types (Other)
 % end # for in all_integer_types (Self)
 
 """)
