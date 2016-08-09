@@ -1138,6 +1138,7 @@ void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
 
 void IRGenFunction::emitNativeUnownedInit(llvm::Value *value,
                                           Address dest) {
+  value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
   Builder.CreateStore(value, dest);
   emitNativeUnownedRetain(value);
@@ -1145,6 +1146,7 @@ void IRGenFunction::emitNativeUnownedInit(llvm::Value *value,
 
 void IRGenFunction::emitNativeUnownedAssign(llvm::Value *value,
                                             Address dest) {
+  value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
   dest = Builder.CreateStructGEP(dest, 0, Size(0));
   auto oldValue = Builder.CreateLoad(dest);
   Builder.CreateStore(value, dest);
