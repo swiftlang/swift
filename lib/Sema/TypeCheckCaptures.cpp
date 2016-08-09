@@ -397,8 +397,10 @@ public:
     // doesn't require its type metadata.
     if (auto declRef = dyn_cast<DeclRefExpr>(E))
       return (!declRef->getDecl()->isObjC()
-              && !E->getType()->hasRetainablePointerRepresentation()
-              && !E->getType()->is<AnyMetatypeType>());
+              && !E->getType()->getLValueOrInOutObjectType()
+                              ->hasRetainablePointerRepresentation()
+              && !E->getType()->getLValueOrInOutObjectType()
+                              ->is<AnyMetatypeType>());
 
     // Loading classes or metatypes doesn't require their metadata.
     if (isa<LoadExpr>(E))
@@ -487,6 +489,11 @@ public:
     if (isa<ClassMetatypeToObjectExpr>(E)
         || isa<ExistentialMetatypeToObjectExpr>(E))
       return false;
+    
+    // Assigning an object doesn't require type metadata.
+    if (auto assignment = dyn_cast<AssignExpr>(E))
+      return !assignment->getSrc()->getType()
+        ->hasRetainablePointerRepresentation();
 
     return true;
   }
