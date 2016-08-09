@@ -38,7 +38,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
-        shell.call(["git", "fetch"], echo=True)
+        shell.call(["git", "fetch", "--recurse-submodules=yes"], echo=True)
 
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
