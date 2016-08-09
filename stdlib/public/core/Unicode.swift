@@ -19,14 +19,18 @@
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
 public enum UnicodeDecodingResult {
-  @swift3_migration(renamed="ScalarValue")
+  @swift3_migration(renamed="scalarValue")
   case Result(UnicodeScalar)
+
+  @swift3_migration(renamed="emptyInput")
   case EmptyInput
+
+  @swift3_migration(renamed="error")
   case Error
 
   /// Returns `true` if `self` indicates no more unicode scalars are
   /// available.
-  @swift3_migration(renamedToProperty="isEmptyInput")
+  @swift3_migration(message="Use 'x == .emptyInput' instead")
   @warn_unused_result
   public func isEmptyInput() -> Bool {
     switch self {
@@ -449,6 +453,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
+  @swift3_migration(renamed="encode(_:into:)")
   public static func encode(
     input: UnicodeScalar,
     @noescape output put: (CodeUnit) -> Void
@@ -690,7 +695,7 @@ public struct UTF32 : UnicodeCodecType {
 /// - parameter stopOnError: Causes encoding to stop when an encoding
 ///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
 ///   replacement characters are inserted for each detected error.
-@swift3_migration(renamed="transcode(_:_:_:_:stoppingOnError:)")
+@swift3_migration(message="use 'transcode(_:from:to:stoppingOnError:into:)' and reorder arguments accordingly")
 public func transcode<
   Input : GeneratorType,
   InputEncoding : UnicodeCodecType,
@@ -926,6 +931,7 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
+  @swift3_migration(message="use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)' and reorder arguments accordingly")
   @warn_unused_result
   public static func measure<
       Encoding : UnicodeCodecType, Input : GeneratorType

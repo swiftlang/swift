@@ -508,7 +508,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
-  @swift3_migration(renamed="init(repeating:count:)")
+  @swift3_migration(message="Renamed to init(repeating:count:) and reordered parameters")
   @_semantics("array.init")
   public init(count: Int, repeatedValue: Element) {
     var p: UnsafeMutablePointer<Element>
@@ -691,6 +691,7 @@ extension ${Self} : _ArrayType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
+  @swift3_migration(renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
       S : SequenceType
       where S.Generator.Element == Element
@@ -703,6 +704,7 @@ extension ${Self} : _ArrayType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
+  @swift3_migration(renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
       C : CollectionType
       where C.Generator.Element == Element
@@ -738,7 +740,7 @@ extension ${Self} : _ArrayType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt(_:)")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Int) -> Element {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())

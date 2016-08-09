@@ -81,7 +81,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var _rawValue: Builtin.RawPointer
 
   /// Construct a `nil` instance.
-  @available(*, deprecated, message="init() will be removed in Swift 3.  Use `nil` instead")
+  @available(*, deprecated, message="COpaquePointer() initializer will be removed in Swift 3.  Use `nil` instead")
   @swift3_migration(message="use `nil` instead")
   @_transparent
   public init() {

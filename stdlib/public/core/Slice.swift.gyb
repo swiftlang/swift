@@ -62,7 +62,7 @@ public struct Slice<Base : Indexable> : CollectionType {
   /// Create a view into collection `base` that allows access within `bounds`.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(message="it will be removed in Swift 3.  Use the slicing syntax.")
+  @swift3_migration(message="Use the slicing syntax instead.")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the slicing syntax.")
   public init(base: Base, bounds: Range<Index>) {
     self._base = base
@@ -117,7 +117,7 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
     }
   }
 
-  @swift3_migration(message="it will be removed in Swift 3.  Use the slicing syntax.")
+  @swift3_migration(message="Use the slicing syntax instead.")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the slicing syntax.")
   public init(base: Base, bounds: Range<Index>) {
     self._base = base

@@ -17,7 +17,10 @@ public enum ImplicitlyUnwrappedOptional<Wrapped>
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.
 
+  @swift3_migration(renamed="none")
   case None
+
+  @swift3_migration(renamed="some")
   case Some(Wrapped)
 
   @available(*, unavailable, renamed="Wrapped")

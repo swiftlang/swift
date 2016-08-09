@@ -69,7 +69,11 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// - Complexity: O(`elements.count`).
   ///
   /// ${orderingRequirement}
+%   if preds:
+  @swift3_migration(renamed="min(by:)")
+%   else:
   @swift3_migration(renamed="min")
+%   end
   @warn_unused_result
   public func minElement(
 %   if preds:
@@ -92,7 +96,11 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - Complexity: O(`elements.count`).
   ///   ${orderingRequirement}
+%   if preds:
+  @swift3_migration(renamed="max(by:)")
+%   else:
   @swift3_migration(renamed="max")
+%   end
   @warn_unused_result
   public func maxElement(
 %   if preds:
@@ -142,6 +150,11 @@ else:
   rethrows_ = ""
 }%
   ${comment}
+%   if preds:
+  @swift3_migration(renamed="starts(with:by:)")
+%   else:
+  @swift3_migration(renamed="starts(with:)")
+%   end
   @warn_unused_result
   public func startsWith<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
@@ -196,6 +209,7 @@ else:
 
   ${comment}
   @warn_unused_result
+  @swift3_migration(renamed="elementsEqual(_:by:)")
   public func elementsEqual<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
@@ -264,6 +278,7 @@ else:
 
   ${comment}
   @warn_unused_result
+  @swift3_migration(renamed="lexicographicallyPrecedes(_:by:)")
   public func lexicographicalCompare<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
@@ -319,6 +334,7 @@ extension SequenceType where Generator.Element : Equatable {
 extension SequenceType {
   /// Returns `true` iff an element in `self` satisfies `predicate`.
   @warn_unused_result
+  @swift3_migration(renamed="contains(where:)")
   public func contains(
     @noescape predicate: (${GElement}) throws -> Bool
   ) rethrows -> Bool {
@@ -342,6 +358,7 @@ extension SequenceType {
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
   @warn_unused_result
+  @swift3_migration(renamed="reduce(_:_:)")
   public func reduce<T>(
     initial: T, @noescape combine: (T, ${GElement}) throws -> T
   ) rethrows -> T {

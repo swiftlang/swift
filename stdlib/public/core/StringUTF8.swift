@@ -381,6 +381,7 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -393,6 +394,7 @@ extension String.UTF8View.Index {
   ///
   /// - Requires: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
@@ -404,6 +406,7 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.utf8.indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     characters: String

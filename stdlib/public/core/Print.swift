@@ -81,6 +81,7 @@ public func debugPrint(
 ///
 /// - SeeAlso: `debugPrint`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
+@swift3_migration(renamed="print(_:separator:terminator:to:)")
 @inline(__always)
 public func print<Target: OutputStreamType>(
   items: Any...,
@@ -102,6 +103,7 @@ public func print<Target: OutputStreamType>(
 ///
 /// - SeeAlso: `print`, `Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
+@swift3_migration(renamed="debugPrint(_:separator:terminator:to:)")
 @inline(__always)
 public func debugPrint<Target: OutputStreamType>(
   items: Any...,

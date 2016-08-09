@@ -80,7 +80,7 @@ public protocol SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   @warn_unused_result
   func generate() -> Generator
 
@@ -181,7 +181,7 @@ public protocol SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="Call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   func split(maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Generator.Element) throws -> Bool
@@ -212,7 +212,7 @@ public protocol SequenceType {
 extension SequenceType
   where Self.Generator == Self, Self : GeneratorType {
 
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> Self {
     return self
   }
@@ -401,7 +401,7 @@ extension SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:omitEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="Call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
@@ -522,7 +522,7 @@ extension SequenceType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
-  @swift3_migration(message="call 'split(_:maxSplits:omitEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
+  @swift3_migration(message="Call 'split(separator:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
   @warn_unused_result
   public func split(
     separator: Generator.Element,
