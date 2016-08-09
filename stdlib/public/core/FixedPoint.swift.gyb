@@ -535,7 +535,11 @@ extension ${Self} {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
-  /// Creates a ${Self} whose value is `value` rounded towards zero.
+  /// Creates a new instance by rounding the given floating-point value toward
+  /// zero.
+  ///
+  /// - Parameter other: A floating-point value. When `other` is rounded toward
+  ///   zero, the result must be within the range `${Self}.min...${Self}.max`.
   @_transparent
   public init(_ value: ${Src}) {
     _precondition(value.isFinite,
