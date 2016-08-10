@@ -253,8 +253,10 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
 
   @objc public // @testable
-  func _fastCStringContents() -> UnsafeMutablePointer<Int8>? {
-    guard _core.elementWidth == 1 else {
+  func _fastCStringContents(
+    _ nullTerminationRequired: Bool
+  ) -> UnsafeMutablePointer<Int8>? {
+    guard !nullTerminationRequired && _core.elementWidth == 1 else {
       return nil
     }
     return _core._baseAddress?.assumingMemoryBound(to: Int8.self)

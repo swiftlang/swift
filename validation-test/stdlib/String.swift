@@ -6,6 +6,7 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 import StdlibUnicodeUnittest
+import StdlibUnittestFoundationExtras
 
 #if _runtime(_ObjC)
 import Foundation  // For NSRange
@@ -1000,29 +1001,42 @@ StringTests.test(
 #endif
 }
 
-StringTests.test("String._fastCStringContents()")
-  .skip(.nativeRuntime("_NSContiguousString undefined without _runtime(_ObjC)"))
-  .code {
 #if _runtime(_ObjC)
+StringTests.test("String._fastCStringContents()") {
   // ASCII tests
-  for i in (0..<128) {
-    let cs = _NSContiguousString(String(UnicodeScalar(i)!)._core)
-    expectNotEqual(cs._fastCStringContents(), nil)
+  for i in 0..<128 {
+    // Non-nil check is sufficient to guarantee the string is ASCII
+    let s = NSString(UnicodeScalar(i)!)
+    let contents = s.available_fastCStringContents(false)
+    expectNotEqual(contents, nil)
+    
+    // Disregard NUL for equality checks
+    guard i != 0 else {
+      continue
+    }
+
+    let str = NSString(bytes: contents!, length: 1, .utf8)!
+    expectEqual(s, str)
   }
   // Random tests
-  for x in 0..<100 {
-    let s = randomGraphemeCluster(0, x)
-    let cs = _NSContiguousString(s._core)
-    expectNotEqual(cs._fastCStringContents(), nil)
+  for x in 1..<100 {
+    let s = randomGraphemeCluster(0, 9)
+    let cs = s as NSString
+    guard let contents = cs.available_fastCStringContents(false) else {
+      continue
+    }
+ 
+    // Slice tests
+    if !s.isEmpty {
+      let slice = s[0..<s.index(before: s.endIndex)] as NSString
+      expectEqual(slice.available_fastCStringContents(false), nil)
+    }
   }
   // UTF-16 test
   let str = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")! as String
-  expectEqual(_NSContiguousString(str._core)._fastCStringContents(), nil)
-
-#else
-  expectUnreachable()
-#endif
+  expectEqual(_NSContiguousString(str._core).available_fastCStringContents(false), nil)
 }
+#endif
 
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc

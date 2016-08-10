@@ -670,10 +670,10 @@ public let utf16Tests = [
   ],
 ]
 
-// Single Unicode scalars that occupy a variety of bits in UTF-8.
-//
-// These scalars should be "base characters" with regards to their position in
-// a grapheme cluster.
+/// Single Unicode scalars that occupy a variety of bits in UTF-8.
+///
+/// These scalars should be "base characters" with regards to their position in
+/// a grapheme cluster.
 public let baseScalars: [UnicodeScalar] = [
   // U+0065 LATIN SMALL LETTER E
   "\u{0065}",
@@ -712,8 +712,8 @@ public let baseScalars: [UnicodeScalar] = [
   "\u{10b9c4}",
 ]
 
-// Single Unicode scalars that are "continuing characters" with regards to
-// their position in a grapheme cluster.
+/// Single Unicode scalars that are "continuing characters" with regards to
+/// their position in a grapheme cluster.
 public let continuingScalars: [UnicodeScalar] = [
   // U+0300 COMBINING GRAVE ACCENT
   "\u{0300}",
@@ -729,10 +729,6 @@ public let continuingScalars: [UnicodeScalar] = [
 ]
 
 public func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
-  guard minSize > 0 else {
-    return ""
-  }
-
   let n = pickRandom((minSize + 1)..<maxSize)
   var result = String(pickRandom(baseScalars))
   for _ in 0..<n {

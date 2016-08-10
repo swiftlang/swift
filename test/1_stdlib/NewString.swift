@@ -5,6 +5,7 @@
 
 import Foundation
 import Swift
+import StdlibUnittestFoundationExtras
 
 // ==== Tests =====
 
@@ -115,8 +116,7 @@ func nonASCII() {
   print("  \(repr(nsSliceUTF16))")
 
   // CHECK-NEXT: fast C-String contents: nil
-  let cntgStr = unsafeBitCast(nsSliceUTF16, to: _NSContiguousString.self)
-  print("fast C-String contents: \(cntgStr._fastCStringContents())")
+  print("fast C-String contents: \(nsSliceUTF16.available_fastCStringContents(false))")
 
   // Check that we can recover the original buffer
   // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))

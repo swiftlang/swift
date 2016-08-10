@@ -27,3 +27,9 @@ swift_stdlib_NSDictionary_getObjects(NSDictionary *_Nonnull nsDictionary,
   [nsDictionary release];
 }
 
+extern "C" const char *
+swift_stdlib_NSString__fastCStringContents(NSString *_Nonnull nsString,
+                                           BOOL nullTerminationRequired) {
+  return [nsString _fastCStringContents:nullTerminationRequired];
+}
+
