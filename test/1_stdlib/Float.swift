@@ -1,14 +1,18 @@
-// RUN: rm -rf %t &&mkdir %t
+// RUN: rm -rf %t && mkdir %t
 // RUN: cp %s %t/main.swift
 
 // RUN: echo "typealias TestFloat = Float" > %t/float_type.swift
 // RUN: %target-build-swift %t/main.swift %t/float_type.swift -o %t/float.out
-// RUN: %target-run %t/float.out | FileCheck %s
+// RUN: %target-run %t/float.out
 
 // RUN: echo "typealias TestFloat = Double" > %t/double_type.swift
 // RUN: %target-build-swift %t/main.swift %t/double_type.swift -o %t/double.out
-// RUN: %target-run %t/double.out | FileCheck %s
+// RUN: %target-run %t/double.out
 // REQUIRES: executable_test
+
+import StdlibUnittest
+
+var FloatTests = TestSuite("Float")
 
 //===---
 // Helpers
@@ -36,7 +40,7 @@ func checkNormal(_ normal: TestFloat) {
   _precondition(!normal.isSignalingNaN)
 }
 
-func testNormal() {
+FloatTests.test("normal") {
   let positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
   _precondition(positiveNormal.sign == .plus)
@@ -53,11 +57,7 @@ func testNormal() {
   _precondition(negativeNormal != positiveNormal)
   _precondition(positiveNormal == -negativeNormal)
   _precondition(negativeNormal == -positiveNormal)
-
-  print("testNormal done")
 }
-testNormal()
-// CHECK: testNormal done
 
 //===---
 // Zeroes
@@ -73,7 +73,7 @@ func checkZero(_ zero: TestFloat) {
   _precondition(!zero.isSignalingNaN)
 }
 
-func testZero() {
+FloatTests.test("zero") {
   let plusZero = noinlinePlusZero()
   checkZero(plusZero)
   _precondition(plusZero.sign == .plus)
@@ -90,11 +90,7 @@ func testZero() {
   _precondition(minusZero == -0.0)
   _precondition(minusZero == plusZero)
   _precondition(minusZero == minusZero)
-
-  print("testZero done")
 }
-testZero()
-// CHECK: testZero done
 
 //===---
 // Subnormals
@@ -118,7 +114,8 @@ func asUInt64(_ a: UInt32) -> UInt64 {
   return UInt64(a)
 }
 
-func testSubnormal() {
+#if !arch(arm)
+FloatTests.test("subnormal") {
   var iterations: Int
   switch asUInt64(TestFloat.RawSignificand.max) {
     case UInt64.max:
@@ -145,16 +142,8 @@ func testSubnormal() {
   _precondition(negativeSubnormal.sign == .minus)
   _precondition(negativeSubnormal.floatingPointClass == .negativeSubnormal)
   _precondition(negativeSubnormal != -0.0)
-
-  print("testSubnormal done")
 }
-
-#if arch(arm)
-  print("testSubnormal done")
-#else
-  testSubnormal()
 #endif
-// CHECK: testSubnormal done
 
 //===---
 // Infinities
@@ -170,7 +159,7 @@ func checkInf(_ inf: TestFloat) {
   _precondition(!inf.isSignalingNaN)
 }
 
-func testInf() {
+FloatTests.test("infinity") {
   var stdlibPlusInf = TestFloat.infinity
   checkInf(stdlibPlusInf)
   _precondition(stdlibPlusInf.sign == .plus)
@@ -196,11 +185,7 @@ func testInf() {
 
   _precondition(stdlibPlusInf != computedMinusInf)
   _precondition(stdlibMinusInf != computedPlusInf)
-
-  print("testInf done")
 }
-testInf()
-// CHECK: testInf done
 
 //===---
 // NaNs
@@ -231,7 +216,7 @@ func checkSNaN(_ snan: TestFloat) {
 #endif
 }
 
-func testNaN() {
+FloatTests.test("nan") {
   var stdlibDefaultNaN = TestFloat.nan
   checkQNaN(stdlibDefaultNaN)
 
@@ -240,11 +225,7 @@ func testNaN() {
 
   var stdlibSNaN = TestFloat.signalingNaN
   checkSNaN(stdlibSNaN)
-  print("testNaN done")
 }
-testNaN()
-// CHECK: testNaN done
 
-print("all done.")
-// CHECK: all done.
+runAllTests()
 
