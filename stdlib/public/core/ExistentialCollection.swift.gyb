@@ -957,7 +957,7 @@ extension AnyIterator {
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
 
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }

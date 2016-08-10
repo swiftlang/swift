@@ -61,7 +61,7 @@ func _Collection() {
 func _Collection<C : Collection>(c: C) {
   func fn<T : Collection, U>(_: T, _: U) where T.Generator == U {} // expected-error {{'T' does not have a member type named 'Generator'; did you mean 'Iterator'?}} {{50-59=Iterator}} {{none}} 
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Removed in Swift 3. Please use underestimatedCount property.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
   _ = c.split(1) { _ in return true} // expected-error {{split(maxSplits:omittingEmptySubsequences:whereSeparator:) instead}} {{none}}
 }
 
@@ -120,16 +120,16 @@ func _ExistentialCollection<T>(i: AnyIterator<T>) {
   _ = anyGenerator { i.next() } // expected-error {{'anyGenerator' has been replaced by 'AnyIterator.init(_:)'}} {{7-19=AnyIterator}} {{none}}
 }
 func _ExistentialCollection<T>(s: AnySequence<T>) {
-  _ = s.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = s.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 func _ExistentialCollection<T>(c: AnyCollection<T>) {
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 func _ExistentialCollection<T>(c: AnyBidirectionalCollection<T>) {
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 func _ExistentialCollection<T>(c: AnyRandomAccessCollection<T>) {
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 func _ExistentialCollection<C : _AnyCollectionProtocol>(c: C) {
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
@@ -178,10 +178,10 @@ func _Flatten<T>(s: FlattenSequence<T>) {
   _ = s.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
 }
 func _Flatten<T>(c: FlattenCollection<T>) {
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 func _Flatten<T>(c: FlattenBidirectionalCollection<T>) {
-  _ = c.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: Please use underestimatedCount property instead.}} {{none}}
+  _ = c.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
 }
 
 func _FloatingPoint() {
@@ -374,11 +374,13 @@ func _Repeat<E>(e: E) {
 }
 
 func _Reverse<C : BidirectionalCollection>(c: C) {
-  _ = ReversedCollection(c) // expected-error {{'init' is unavailable: use the 'reversed()' method on the collection}} {{none}}
+  _ = ReverseCollection(c) // expected-error {{'ReverseCollection' has been renamed to 'ReversedCollection'}} {{7-24=ReversedCollection}} {{none}}
+  _ = ReversedCollection(c) // expected-error {{'init' has been replaced by instance method 'BidirectionalCollection.reversed()'}} {{7-25=c.reversed}} {{26-27=}} {{none}}
   _ = c.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
 }
 func _Reverse<C : RandomAccessCollection>(c: C) {
-  _ = ReversedRandomAccessCollection(c) // expected-error {{'init' is unavailable: use the 'reversed()' method on the collection}} {{none}}
+  _ = ReverseRandomAccessCollection(c) // expected-error {{'ReverseRandomAccessCollection' has been renamed to 'ReversedRandomAccessCollection'}} {{7-36=ReversedRandomAccessCollection}} {{none}}
+  _ = ReversedRandomAccessCollection(c) // expected-error {{'init' has been replaced by instance method 'RandomAccessCollection.reversed()'}} {{7-37=c.reversed}} {{38-39=}} {{none}}
   _ = c.reverse() // expected-error {{'reverse()' has been renamed to 'reversed()'}} {{9-16=reversed}} {{none}}
 }
 func _Reverse<C : LazyCollectionProtocol>(c: C) where C : BidirectionalCollection, C.Elements : BidirectionalCollection {
@@ -395,7 +397,7 @@ func _Sequence() {
 }
 func _Sequence<S : Sequence>(s: S) {
   _ = s.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
-  _ = s.underestimateCount() // expected-error {{'underestimateCount()' is unavailable: it became a property 'underestimatedCount'}} {{none}}
+  _ = s.underestimateCount() // expected-error {{'underestimateCount()' has been replaced by 'underestimatedCount'}} {{9-27=underestimatedCount}} {{27-29=}} {{none}}
   _ = s.split(1, allowEmptySlices: true) { _ in true } // expected-error {{'split(_:allowEmptySlices:isSeparator:)' is unavailable: call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument}} {{none}}
 }
 func _Sequence<S : Sequence>(s: S, e: S.Iterator.Element) where S.Iterator.Element : Equatable {
@@ -543,6 +545,7 @@ func _VarArgs() {
   func fn2(_: VaListBuilder) {} // expected-error {{'VaListBuilder' is unavailable}} {{none}}
 }
 
-func _Zip<S1 : Sequence, S2: Sequence>(_: S1, _: S2) {
+func _Zip<S1 : Sequence, S2: Sequence>(s1: S1, s2: S2) {
+  _ = Zip2Sequence(s1, s2) // expected-error {{use zip(_:_:) free function instead}} {{none}}
   _ = Zip2Sequence<S1, S2>.Generator.self // expected-error {{'Generator' has been renamed to 'Iterator'}} {{28-37=Iterator}} {{none}}
 }

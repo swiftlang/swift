@@ -185,8 +185,8 @@ public struct ReversedRandomAccessIndex<
 public struct ReversedRandomAccessCollection<
   Base : RandomAccessCollection
 > : RandomAccessCollection {
-  // FIXME: swift-3-indexing-model: tests for ReverseRandomAccessIndex and
-  // ReverseRandomAccessCollection.
+  // FIXME: swift-3-indexing-model: tests for ReversedRandomAccessIndex and
+  // ReversedRandomAccessCollection.
 
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -262,7 +262,7 @@ extension BidirectionalCollection {
   /// order.
   ///
   /// You can reverse a collection without allocating new space for its
-  /// elements by calling this `reversed()` method. A `ReverseCollection`
+  /// elements by calling this `reversed()` method. A `ReversedCollection`
   /// instance wraps an underlying collection and provides access to its
   /// elements in reverse order. This example prints the characters of a
   /// string in reverse order:
@@ -294,7 +294,7 @@ extension RandomAccessCollection {
   ///
   /// You can reverse a collection without allocating new space for its
   /// elements by calling this `reversed()` method. A
-  /// `ReverseRandomAccessCollection` instance wraps an underlying collection
+  /// `ReversedRandomAccessCollection` instance wraps an underlying collection
   /// and provides access to its elements in reverse order. This example
   /// prints the elements of an array in reverse order:
   ///
@@ -351,15 +351,23 @@ extension LazyCollectionProtocol
   }
 }
 
+@available(*, unavailable, renamed: "ReversedCollection")
+public typealias ReverseCollection<Base : BidirectionalCollection> =
+  ReversedCollection<Base>
+
+@available(*, unavailable, renamed: "ReversedRandomAccessCollection")
+public typealias ReverseRandomAccessCollection<Base : RandomAccessCollection> =
+  ReversedRandomAccessCollection<Base>
+
 extension ReversedCollection {
-  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
+  @available(*, unavailable, renamed: "BidirectionalCollection.reversed(self:)")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
 }
 
 extension ReversedRandomAccessCollection {
-  @available(*, unavailable, message: "use the 'reversed()' method on the collection")
+  @available(*, unavailable, renamed: "RandomAccessCollection.reversed(self:)")
   public init(_ base: Base) {
     Builtin.unreachable()
   }
