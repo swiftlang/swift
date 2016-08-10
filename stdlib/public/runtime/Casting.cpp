@@ -2261,11 +2261,11 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
 }
 
 /******************************************************************************/
-/***************************** Bridging SwiftValue ****************************/
+/**************************** Bridging _SwiftValue ****************************/
 /******************************************************************************/
 
 #if SWIFT_OBJC_INTEROP
-/// Try to unbox a SwiftValue box to perform a dynamic cast.
+/// Try to unbox a _SwiftValue box to perform a dynamic cast.
 static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                           OpaqueValue *src,
                                           const Metadata *srcType,
@@ -2283,8 +2283,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   id srcObject;
   memcpy(&srcObject, src, sizeof(id));
   
-  // Do we have a SwiftValue?
-  SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject);
+  // Do we have a _SwiftValue?
+  _SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject);
   if (!srcSwiftValue)
     return false;
   
@@ -2483,7 +2483,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     return unwrapResult.success;
 
 #if SWIFT_OBJC_INTEROP
-  // A class or AnyObject reference may point at a boxed SwiftValue.
+  // A class or AnyObject reference may point at a boxed _SwiftValue.
   if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
                                     targetType, flags)) {
     return true;
