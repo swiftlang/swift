@@ -283,7 +283,7 @@ public enum _DebuggerSupport {
     }
   }
 
-  public static func stringForPrintObject(_ value: Any) -> String {
+  @_semantics("stdlib_binary_only") public static func stringForPrintObject(_ value: Any) -> String {
     var maxItemCounter = Int.max
     var refs = Set<ObjectIdentifier>()
     var targetStream = ""
