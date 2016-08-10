@@ -10,7 +10,7 @@ add_swift_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   # filename.
   StdlibUnicodeUnittest.swift
 
-  SWIFT_MODULE_DEPENDS StdlibUnittest
+  SWIFT_MODULE_DEPENDS SwiftPrivate StdlibUnittest
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   TARGET_SDKS ALL_POSIX_PLATFORMS
   INSTALL_IN_COMPONENT stdlib-experimental)
