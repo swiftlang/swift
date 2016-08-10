@@ -360,6 +360,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns the `Index` of a given member, or `nil` if the member is not
   /// present in the set.
+  @swift3_migration(renamed="index(of:)")
   @warn_unused_result
   public func indexOf(member: Element) -> Index? {
     return _variantStorage.indexForKey(member)
@@ -376,7 +377,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the member referenced by the given index.
-  @swift3_migration(renamed="removeAt")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Index) -> Element {
     return _variantStorage.removeAtIndex(index)
   }
@@ -418,7 +419,7 @@ public struct Set<Element : Hashable> :
   /// Returns a generator over the members.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> SetGenerator<Element> {
     return _variantStorage.generate()
   }
@@ -467,6 +468,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns `true` if the set is a subset of a finite sequence as a `Set`.
   @warn_unused_result
+  @swift3_migration(renamed="isSubset(of:)")
   public func isSubsetOf<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
@@ -478,6 +480,7 @@ public struct Set<Element : Hashable> :
   /// Returns `true` if the set is a subset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
+  @swift3_migration(renamed="isStrictSubset(of:)")
   public func isStrictSubsetOf<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
@@ -488,6 +491,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns `true` if the set is a superset of a finite sequence as a `Set`.
   @warn_unused_result
+  @swift3_migration(renamed="isSuperset(of:)")
   public func isSupersetOf<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
@@ -498,6 +502,7 @@ public struct Set<Element : Hashable> :
   /// Returns `true` if the set is a superset of a finite sequence as a `Set`
   /// but not equal.
   @warn_unused_result
+  @swift3_migration(renamed="isStrictSuperset(of:)")
   public func isStrictSupersetOf<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
@@ -507,6 +512,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns `true` if no members in the set are in a finite sequence as a `Set`.
   @warn_unused_result
+  @swift3_migration(renamed="isDisjoint(with:)")
   public func isDisjointWith<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
@@ -530,6 +536,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// Inserts elements of a finite sequence into this `Set`.
+  @swift3_migration(renamed="formUnion(_:)")
   public mutating func unionInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -541,6 +548,7 @@ public struct Set<Element : Hashable> :
   /// Returns a new set with elements in this set that do not occur
   /// in a finite sequence.
   @warn_unused_result
+  @swift3_migration(renamed="subtracting(_:)")
   public func subtract<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
@@ -550,6 +558,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// Removes all members in the set that occur in a finite sequence.
+  @swift3_migration(renamed="subtract(_:)")
   public mutating func subtractInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -560,6 +569,7 @@ public struct Set<Element : Hashable> :
 
   /// Returns a new set with elements common to this set and a finite sequence.
   @warn_unused_result
+  @swift3_migration(renamed="intersection(_:)")
   public func intersect<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
@@ -574,6 +584,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// Removes any members of this set that aren't also in a finite sequence.
+  @swift3_migration(renamed="formIntersection(_:)")
   public mutating func intersectInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -596,6 +607,7 @@ public struct Set<Element : Hashable> :
   /// Returns a new set with elements that are either in the set or a finite
   /// sequence but do not occur in both.
   @warn_unused_result
+  @swift3_migration(renamed="symmetricDifference(_:)")
   public func exclusiveOr<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Set<Element> {
@@ -607,6 +619,7 @@ public struct Set<Element : Hashable> :
   /// For each element of a finite sequence, removes it from the set if it is a
   /// common element, otherwise adds it to the set. Repeated elements of the
   /// sequence will be ignored.
+  @swift3_migration(renamed="formSymmetricDifference(_:)")
   public mutating func exclusiveOrInPlace<
     S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
@@ -958,7 +971,7 @@ public struct Dictionary<Key : Hashable, Value> :
   internal typealias _Self = Dictionary<Key, Value>
   internal typealias _VariantStorage = _VariantDictionaryStorage<Key, Value>
   internal typealias _NativeStorage = _NativeDictionaryStorage<Key, Value>
-  @swift3_migration(message="(key: Key, value: Value)")
+  @swift3_migration(message="labels were added to the tuple: '(key: Key, value: Value)'")
   public typealias Element = (Key, Value)
   public typealias Index = DictionaryIndex<Key, Value>
 
@@ -1036,6 +1049,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Returns the `Index` for the given key, or `nil` if the key is not
   /// present in the dictionary.
+  @swift3_migration(renamed="index(forKey:)")
   @warn_unused_result
   public func indexForKey(key: Key) -> Index? {
     // Complexity: amortized O(1) for native storage, O(N) when wrapping an
@@ -1087,7 +1101,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(index: Index) -> Element {
     return _variantStorage.removeAtIndex(index)
   }
@@ -1095,6 +1109,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Remove a given key and the associated value from the dictionary.
   /// Returns the value that was removed, or `nil` if the key was not present
   /// in the dictionary.
+  @swift3_migration(renamed="removeValue(forKey:)")
   public mutating func removeValueForKey(key: Key) -> Value? {
     return _variantStorage.removeValueForKey(key)
   }
@@ -1132,7 +1147,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Returns a generator over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> DictionaryGenerator<Key, Value> {
     return _variantStorage.generate()
   }

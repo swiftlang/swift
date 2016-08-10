@@ -308,6 +308,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   }
 
   /// Append the elements of `newElements` to `self`.
+  @swift3_migration(renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
       S : SequenceType
       where S.Generator.Element == Character

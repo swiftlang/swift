@@ -256,11 +256,13 @@ extension ${Self} : FloatingPointType {
   }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   public static var NaN: ${Self} {
     return quietNaN
   }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   public static var quietNaN: ${Self} {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
@@ -330,6 +332,7 @@ extension ${Self} : FloatingPointType {
   }
 
   /// `true` iff `self` is a signaling NaN.
+  @swift3_migration(renamed="isSignalingNaN")
   public var isSignaling: Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded
@@ -605,6 +608,7 @@ extension ${Self} : Strideable {
   /// `other`.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="distance(to:)")
   @_transparent public
   func distanceTo(other: ${Self}) -> ${Self} {
     return other - self
@@ -614,6 +618,7 @@ extension ${Self} : Strideable {
   /// `n`.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="advanced(by:)")
   @_transparent public
   func advancedBy(amount: ${Self}) -> ${Self} {
     return self + amount

@@ -49,8 +49,8 @@ public struct ${Self}<@swift3_migration(renamed="Pointee") Memory>
   public var _rawValue : Builtin.RawPointer
 
   /// Construct a null pointer.
-  @available(*, deprecated, message="init() will be removed in Swift 3.  Use `nil` instead")
-  @swift3_migration(message="use `nil` instead")
+  @available(*, deprecated, message="${Self}() initializer will be removed in Swift 3.  Use `nil` instead")
+  @swift3_migration(message="Use `nil` instead")
   @_transparent
   public init() {
     self._rawValue = _nilRawPointer
@@ -171,7 +171,7 @@ ${comment}
   ///
   /// - Postcondition: The memory is initialized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  @swift3_migration(renamed="initializePointee(_:)")
+  @swift3_migration(renamed="initialize(to:)")
   public func initialize(newvalue: Memory) {
     Builtin.initialize(newvalue, _rawValue)
   }
@@ -186,7 +186,6 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="take()")
   @warn_unused_result
   public func move() -> Memory {
     return Builtin.take(_rawValue)
@@ -315,7 +314,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="deinitializePointee()")
+  @swift3_migration(renamed="deinitialize()")
   public func destroy() {
     Builtin.destroy(Memory.self, _rawValue)
   }
@@ -325,7 +324,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  @swift3_migration(renamed="deinitializePointee(count:)")
+  @swift3_migration(renamed="deinitialize(count:)")
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(Memory.self, _rawValue, count._builtinWordValue)
@@ -518,7 +517,7 @@ public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
 /// any other types; it makes a decent parameter to
 /// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
 /// pointer arithmetic.
-@swift3_migration(message="it will be removed in Swift 3")
+@swift3_migration(message="Unavailable in Swift 3")
 @available(*, deprecated, message="it will be removed in Swift 3")
 public struct RawByte {
   let _inaccessible: UInt8

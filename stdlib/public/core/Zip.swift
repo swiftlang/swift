@@ -84,7 +84,7 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> Generator {
     return Generator(
       _sequence1.generate(),

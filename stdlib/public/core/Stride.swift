@@ -25,6 +25,7 @@ public protocol Strideable : Comparable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
   ///   stronger semantic guarantee.
+  @swift3_migration(renamed="distance(to:)")
   @warn_unused_result
   func distanceTo(other: Self) -> Stride
 
@@ -35,6 +36,7 @@ public protocol Strideable : Comparable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
   ///   provides a stronger semantic guarantee.
+  @swift3_migration(renamed="advanced(by:)")
   @warn_unused_result
   func advancedBy(n: Stride) -> Self
 }
@@ -152,7 +154,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> StrideToGenerator<Element> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -175,7 +177,7 @@ extension Strideable {
   /// Returns the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
-  @swift3_migration(renamed="strideTo(_:by:)")
+  @swift3_migration(message="Use stride(from:to:by:) free function instead")
   @warn_unused_result
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     return StrideTo(start: self, end: end, stride: stride)
@@ -229,7 +231,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator()")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> StrideThroughGenerator<Element> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)
@@ -253,7 +255,7 @@ extension Strideable {
   /// the progression less than or equal to `end`.
   ///
   /// - Note: There is no guarantee that `end` is an element of the sequence.
-  @swift3_migration(renamed="strideThrough(_:by:)")
+  @swift3_migration(message="Use stride(from:through:by:) free function instead")
   @warn_unused_result
   public func stride(
     through end: Self, by stride: Stride

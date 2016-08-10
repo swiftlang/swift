@@ -37,6 +37,7 @@ extension CollectionType where ${GElement} : Equatable {
   /// `value` is not found.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="index(of:)")
   @warn_unused_result
   public func indexOf(element: ${GElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
@@ -57,6 +58,7 @@ extension CollectionType {
   /// corresponding value, or `nil` if such value is not found.
   ///
   /// - Complexity: O(`self.count`).
+  @swift3_migration(renamed="index(where:)")
   @warn_unused_result
   public func indexOf(
     @noescape predicate: (${GElement}) throws -> Bool
@@ -127,6 +129,7 @@ extension MutableCollectionType where Index : RandomAccessIndexType {
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
+  @swift3_migration(message="Slice the collection using the range, and call partition(by:)")
   public mutating func partition(
     range: Range<Index>,
     isOrderedBefore: (${GElement}, ${GElement}) -> Bool
@@ -141,6 +144,7 @@ extension MutableCollectionType
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
+  @swift3_migration(message="Slice the collection using the range, and call partition(by:) with an appropriate closure.")
   public mutating func partition(range: Range<Index>) -> Index {
 
 %   end
@@ -232,7 +236,7 @@ ${sortDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @swift3_migration(renamed="sorted")
+  @swift3_migration(renamed="sorted(by:)")
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
@@ -282,7 +286,7 @@ ${sortInPlaceDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  @swift3_migration(renamed="sort")
+  @swift3_migration(renamed="sort(by:)")
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
