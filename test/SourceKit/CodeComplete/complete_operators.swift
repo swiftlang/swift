@@ -1,11 +1,11 @@
 // XFAIL: broken_std_regex
-// RUN: %complete-test -tok=INT_OPERATORS %s | FileCheck %s
-// RUN: %complete-test -add-inner-results -tok=INT_OPERATORS_INNER %s | FileCheck %s -check-prefix=INNER
-// RUN: %complete-test -raw -hide-none -tok=INT_OPERATORS %s | FileCheck %s -check-prefix=RAW
-// RUN: %complete-test -tok=BOOL_OPERATORS %s | FileCheck %s -check-prefix=BOOL
-// RUN: %complete-test -tok=OPT_OPERATORS %s | FileCheck %s -check-prefix=OPT
-// RUN: %complete-test -tok=KNOWN_OPERATORS_1 %s | FileCheck %s -check-prefix=KNOWN
-// RUN: %complete-test -tok=KNOWN_OPERATORS_2 %s | FileCheck %s -check-prefix=KNOWN
+// RUN: %complete-test -tok=INT_OPERATORS %s | %FileCheck %s
+// RUN: %complete-test -add-inner-results -tok=INT_OPERATORS_INNER %s | %FileCheck %s -check-prefix=INNER
+// RUN: %complete-test -raw -hide-none -tok=INT_OPERATORS %s | %FileCheck %s -check-prefix=RAW
+// RUN: %complete-test -tok=BOOL_OPERATORS %s | %FileCheck %s -check-prefix=BOOL
+// RUN: %complete-test -tok=OPT_OPERATORS %s | %FileCheck %s -check-prefix=OPT
+// RUN: %complete-test -tok=KNOWN_OPERATORS_1 %s | %FileCheck %s -check-prefix=KNOWN
+// RUN: %complete-test -tok=KNOWN_OPERATORS_2 %s | %FileCheck %s -check-prefix=KNOWN
 
 struct MyInt {
   var bigPowers: Int { return 1 }

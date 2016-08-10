@@ -43,7 +43,7 @@ func foo() {
 // RUN: %sourcekitd-test -req=format -line=20 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=21 -length=1 %s >>%t.response
 
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "    bar("
 // CHECK: key.sourcetext: "        "

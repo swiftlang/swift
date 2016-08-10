@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-swiftc_driver -emit-module -o %t -module-name Empty -module-link-name swiftEmpty %S/../Inputs/empty.swift
-// RUN: %target-swiftc_driver %s -I %t -emit-ir | FileCheck %s
+// RUN: %target-swiftc_driver %s -I %t -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 

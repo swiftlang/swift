@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
-// RUN: FileCheck %s -check-prefix=GLOBAL < %t.ll
-// RUN: FileCheck %s < %t.ll
+// RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
+// RUN: %FileCheck %s < %t.ll
 // REQUIRES: CPU=x86_64
 
 protocol P {}

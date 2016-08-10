@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 // RUN: %target-build-swift %s 2> %t.warnings.txt
-// RUN: FileCheck -check-prefix=CHECK-WARNINGS %s < %t.warnings.txt
+// RUN: %FileCheck -check-prefix=CHECK-WARNINGS %s < %t.warnings.txt
 
 import StdlibUnittest
 

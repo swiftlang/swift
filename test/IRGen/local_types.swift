@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/local_types_helper.swift -o %t
 // RUN: %target-swift-frontend -emit-ir -parse-as-library %s -I %t > %t.ll
-// RUN: FileCheck %s < %t.ll
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.ll
+// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 
 // XFAIL: linux
 

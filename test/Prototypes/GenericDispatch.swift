@@ -15,7 +15,7 @@
 //  prototype to which we can refer when building the standard library.
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // CHECK: testing...

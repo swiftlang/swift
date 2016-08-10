@@ -2,20 +2,20 @@
 // RUN: %target-swift-frontend -emit-module -enable-testing -o %t %S/Inputs/complete_testable_helper.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL -I %t > %t.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL -check-prefix=TOP_LEVEL-ALL < %t.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL-NEG -check-prefix=TOP_LEVEL-ALL-NEG < %t.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL -check-prefix=TOP_LEVEL-ALL < %t.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL-NEG -check-prefix=TOP_LEVEL-ALL-NEG < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL -I %t -D TESTABLE > %t.testable.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL-TESTABLE -check-prefix=TOP_LEVEL-ALL < %t.testable.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL-TESTABLE-NEG -check-prefix=TOP_LEVEL-ALL-NEG < %t.testable.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL-TESTABLE -check-prefix=TOP_LEVEL-ALL < %t.testable.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL-TESTABLE-NEG -check-prefix=TOP_LEVEL-ALL-NEG < %t.testable.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER -I %t > %t.txt
-// RUN: FileCheck %s -check-prefix=MEMBER -check-prefix=MEMBER-ALL < %t.txt
-// RUN: FileCheck %s -check-prefix=MEMBER-NEG -check-prefix=MEMBER-ALL-NEG < %t.txt
+// RUN: %FileCheck %s -check-prefix=MEMBER -check-prefix=MEMBER-ALL < %t.txt
+// RUN: %FileCheck %s -check-prefix=MEMBER-NEG -check-prefix=MEMBER-ALL-NEG < %t.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER -I %t -D TESTABLE > %t.testable.txt
-// RUN: FileCheck %s -check-prefix=MEMBER-TESTABLE -check-prefix=MEMBER-ALL < %t.testable.txt
-// RUN: FileCheck %s -check-prefix=MEMBER-TESTABLE-NEG -check-prefix=MEMBER-ALL-NEG < %t.testable.txt
+// RUN: %FileCheck %s -check-prefix=MEMBER-TESTABLE -check-prefix=MEMBER-ALL < %t.testable.txt
+// RUN: %FileCheck %s -check-prefix=MEMBER-TESTABLE-NEG -check-prefix=MEMBER-ALL-NEG < %t.testable.txt
 
 #if TESTABLE
 @testable import complete_testable_helper

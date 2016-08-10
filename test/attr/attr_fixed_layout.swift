@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -parse -dump-ast -enable-resilience %s 2>&1 | FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: %target-swift-frontend -parse -dump-ast %s 2>&1 | FileCheck --check-prefix=RESILIENCE-OFF %s
+// RUN: %target-swift-frontend -parse -dump-ast -enable-resilience %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: %target-swift-frontend -parse -dump-ast %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
 
 //
 // Public types with @_fixed_layout are always fixed layout

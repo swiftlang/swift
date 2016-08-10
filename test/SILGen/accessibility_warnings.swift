@@ -1,5 +1,5 @@
 // RUN: %target-parse-verify-swift
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // This file tests that the AST produced after fixing accessibility warnings
 // is valid according to SILGen and the verifiers.

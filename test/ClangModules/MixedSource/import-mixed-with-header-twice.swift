@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../Inputs/custom-modules -I %t -parse %s -verify
 
 // RUN: rm %t/mixed-target/header.h
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -I %S/../Inputs/custom-modules -parse %s 2>&1 | FileCheck %s -check-prefix=USE-SERIALIZED-HEADER
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -I %S/../Inputs/custom-modules -parse %s 2>&1 | %FileCheck %s -check-prefix=USE-SERIALIZED-HEADER
 
 // XFAIL: linux
 

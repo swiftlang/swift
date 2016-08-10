@@ -1,8 +1,8 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.A -always-argument-labels > %t.printed.A.txt
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.B -always-argument-labels > %t.printed.B.txt
 
-// RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
-// RUN: FileCheck %s -check-prefix=PRINTB -strict-whitespace < %t.printed.B.txt
+// RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
+// RUN: %FileCheck %s -check-prefix=PRINTB -strict-whitespace < %t.printed.B.txt
 
 // PRINT: struct Struct1 {
 // PRINT-NEXT:   var x: Double

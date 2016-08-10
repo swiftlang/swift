@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-ir -import-cf-types | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // REQUIRES: objc_interop

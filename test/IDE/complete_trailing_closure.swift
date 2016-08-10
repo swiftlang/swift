@@ -1,29 +1,29 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=GLOBAL_1 > %t
-// RUN: FileCheck %s -check-prefix=GLOBAL_1 < %t
-// RUN: FileCheck %s -check-prefix=NONTRIVIAL < %t
+// RUN: %FileCheck %s -check-prefix=GLOBAL_1 < %t
+// RUN: %FileCheck %s -check-prefix=NONTRIVIAL < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=METHOD_1 > %t
-// RUN: FileCheck %s -check-prefix=METHOD_1 < %t
-// RUN: FileCheck %s -check-prefix=NONTRIVIAL < %t
+// RUN: %FileCheck %s -check-prefix=METHOD_1 < %t
+// RUN: %FileCheck %s -check-prefix=NONTRIVIAL < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=METHOD_2 > %t
-// RUN: FileCheck %s -check-prefix=GLOBAL_1 < %t
-// RUN: FileCheck %s -check-prefix=METHOD_1 < %t
-// RUN: FileCheck %s -check-prefix=NONTRIVIAL < %t
+// RUN: %FileCheck %s -check-prefix=GLOBAL_1 < %t
+// RUN: %FileCheck %s -check-prefix=METHOD_1 < %t
+// RUN: %FileCheck %s -check-prefix=NONTRIVIAL < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=METHOD_3 > %t
-// RUN: FileCheck %s -check-prefix=METHOD_1 < %t
-// RUN: FileCheck %s -check-prefix=NONTRIVIAL < %t
+// RUN: %FileCheck %s -check-prefix=METHOD_1 < %t
+// RUN: %FileCheck %s -check-prefix=NONTRIVIAL < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=STATIC_METHOD_1 > %t
-// RUN: FileCheck %s -check-prefix=STATIC_METHOD_1 < %t
+// RUN: %FileCheck %s -check-prefix=STATIC_METHOD_1 < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=METHOD_4 > %t
-// RUN: FileCheck %s -check-prefix=METHOD_4 < %t
-// RUN: FileCheck %s -check-prefix=NONTRIVIAL < %t
+// RUN: %FileCheck %s -check-prefix=METHOD_4 < %t
+// RUN: %FileCheck %s -check-prefix=NONTRIVIAL < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=CLASS_METHOD_1 > %t
-// RUN: FileCheck %s -check-prefix=CLASS_METHOD_1 < %t
+// RUN: %FileCheck %s -check-prefix=CLASS_METHOD_1 < %t
 
 // NONTRIVIAL-NOT: nonTrivial{{.*}} {|}
 

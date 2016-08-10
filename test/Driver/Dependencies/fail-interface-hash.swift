@@ -3,7 +3,7 @@
 // RUN: rm -rf %t && cp -r %S/Inputs/fail-interface-hash/ %t
 // RUN: touch -t 201401240005 %t/*
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST %s
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // CHECK-FIRST-NOT: warning
 // CHECK-FIRST: Handled main.swift
@@ -15,8 +15,8 @@
 // RUN: cp -r %S/Inputs/fail-interface-hash/*.swiftdeps %t
 
 // RUN: touch -t 201401240006 %t/bad.swift %t/main.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies-bad.py -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-SECOND %s
-// RUN: FileCheck -check-prefix=CHECK-RECORD %s < %t/main~buildrecord.swiftdeps
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies-bad.py -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./depends-on-main.swift ./depends-on-bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
+// RUN: %FileCheck -check-prefix=CHECK-RECORD %s < %t/main~buildrecord.swiftdeps
 
 // CHECK-SECOND: Handled main.swift
 // CHECK-SECOND-NOT: Handled depends

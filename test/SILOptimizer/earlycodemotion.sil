@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking -disable-with-critical-edge=1 | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -early-codemotion -retain-sinking -disable-with-critical-edge=1 | %FileCheck %s
 
 import Builtin
 

@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) %s -import-objc-header %S/Inputs/bridging-header.h -parse -emit-objc-header-path %t/pragma-clang.h
 // RUN: %check-in-clang -fsyntax-only -Werror %t/pragma-clang.h
-// RUN: FileCheck %s < %t/pragma-clang.h
+// RUN: %FileCheck %s < %t/pragma-clang.h
 
 // REQUIRES: objc_interop
 

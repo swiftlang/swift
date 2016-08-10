@@ -1,5 +1,5 @@
 // RUN: %target-parse-verify-swift
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 struct S<T> {}
 

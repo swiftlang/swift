@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | FileCheck %s
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | %FileCheck %s
 
 typealias FunctionTypealias = (Int, Int) -> Bool
 typealias OptionalFunctionTypealias = ((Int, Int) -> Bool)?

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -g -emit-ir %s | %FileCheck %s
 
 // Verify that variables bound in the foreach statements are in distinct scopes.
 let values = [1, 2, 3]

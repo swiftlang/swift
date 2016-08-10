@@ -1,29 +1,29 @@
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_1 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_2 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_3 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_GENERIC_1 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
-// RUN: FileCheck %s -check-prefix=PATTERN_IS_GENERIC_1 < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=PATTERN_IS_GENERIC_1 < %t.types.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PATTERN_IS_GENERIC_2 > %t.types.txt
-// RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
-// RUN: FileCheck %s -check-prefix=PATTERN_IS_GENERIC_2 < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
+// RUN: %FileCheck %s -check-prefix=PATTERN_IS_GENERIC_2 < %t.types.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PATTERN_IS | FileCheck %s -check-prefix=AFTER_PATTERN_IS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PATTERN_IS | %FileCheck %s -check-prefix=AFTER_PATTERN_IS
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_1 | FileCheck %s -check-prefix=MULTI_PATTERN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_2 | FileCheck %s -check-prefix=MULTI_PATTERN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_3 | FileCheck %s -check-prefix=MULTI_PATTERN_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_4 | FileCheck %s -check-prefix=MULTI_PATTERN_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_1 | %FileCheck %s -check-prefix=MULTI_PATTERN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_2 | %FileCheck %s -check-prefix=MULTI_PATTERN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_3 | %FileCheck %s -check-prefix=MULTI_PATTERN_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_4 | %FileCheck %s -check-prefix=MULTI_PATTERN_4
 
 
 //===--- Helper types that are used in this test

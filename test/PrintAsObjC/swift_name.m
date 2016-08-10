@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %S/../Inputs/empty.swift -parse -emit-objc-header-path %t/empty.h
-// RUN: %clang -E -fobjc-arc -fmodules -isysroot %clang-importer-sdk-path -I %t %s | FileCheck %s
+// RUN: %clang -E -fobjc-arc -fmodules -isysroot %clang-importer-sdk-path -I %t %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

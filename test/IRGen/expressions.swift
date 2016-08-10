@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -parse-stdlib -disable-access-control | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

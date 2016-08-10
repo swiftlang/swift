@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/circularity.h -emit-module -o %t %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/circularity.h -parse-as-library %t/circularity.swiftmodule -parse -emit-objc-header-path %t/circularity.h
 
-// RUN: FileCheck %s < %t/circularity.h
+// RUN: %FileCheck %s < %t/circularity.h
 
 // RUN: %check-in-clang %t/circularity.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/circularity.h

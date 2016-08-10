@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
 
 // rdar://problem/27781174
 // XFAIL: *

@@ -6,7 +6,7 @@ class C {
 
 C().
 
-// RUN: %sourcekitd-test -req=complete -pos=7:5 %s -- %s | FileCheck %s
+// RUN: %sourcekitd-test -req=complete -pos=7:5 %s -- %s | %FileCheck %s
 
 // CHECK:      key.kind: source.lang.swift.decl.function.method.instance,
 // CHECK-NEXT: key.name: "foo(:)",

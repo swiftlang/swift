@@ -2,18 +2,18 @@
 // RUN: %target-swift-frontend -parse -verify %t_no_errors.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=TOP_LEVEL_0 > %t
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_0 < %t
-// RUN: FileCheck %s -check-prefix=NEGATIVE_TOP_LEVEL_0 < %t
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_0 < %t
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_TOP_LEVEL_0 < %t
 
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=TOP_LEVEL_1 > %t.generic
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_0 < %t.generic
-// RUN: FileCheck %s -check-prefix=GENERIC_PARAM_0 < %t.generic
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=K_QUALIFIED_0 | FileCheck %s -check-prefix=K_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | FileCheck %s -check-prefix=L_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | FileCheck %s -check-prefix=NEGATIVE_L_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_L_0 | FileCheck %s -check-prefix=INSIDE_L_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_M_0 | FileCheck %s -check-prefix=INSIDE_M_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ALIAS_CONSTRUCTOR_0 | FileCheck %s -check-prefix=ALIAS_CONSTRUCTOR_0
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_0 < %t.generic
+// RUN: %FileCheck %s -check-prefix=GENERIC_PARAM_0 < %t.generic
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=K_QUALIFIED_0 | %FileCheck %s -check-prefix=K_QUALIFIED_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | %FileCheck %s -check-prefix=L_QUALIFIED_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | %FileCheck %s -check-prefix=NEGATIVE_L_QUALIFIED_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_L_0 | %FileCheck %s -check-prefix=INSIDE_L_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_M_0 | %FileCheck %s -check-prefix=INSIDE_M_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ALIAS_CONSTRUCTOR_0 | %FileCheck %s -check-prefix=ALIAS_CONSTRUCTOR_0
 
 struct A {
   // implicit init()

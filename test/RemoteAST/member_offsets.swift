@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test %s | FileCheck %s
+// RUN: %target-swift-remoteast-test %s | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 
