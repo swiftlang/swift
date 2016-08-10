@@ -31,6 +31,13 @@ namespace swift {
   class TypeChecker;
   class ValueDecl;
 
+/// Returns the access level associated with \p accessScope, for diagnostic
+/// purposes.
+///
+/// \sa ValueDecl::getFormalAccessScope
+Accessibility
+accessibilityFromScopeForDiagnostics(const DeclContext *accessScope);
+
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                      const DeclContext *DC,

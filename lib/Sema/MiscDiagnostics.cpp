@@ -3603,6 +3603,20 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 // Utility functions
 //===----------------------------------------------------------------------===//
 
+
+Accessibility
+swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
+  if (!accessScope)
+    return Accessibility::Public;
+  if (isa<ModuleDecl>(accessScope))
+    return Accessibility::Internal;
+  if (accessScope->isModuleScopeContext() &&
+      accessScope->getASTContext().LangOpts.EnableSwift3Private) {
+    return Accessibility::FilePrivate;
+  }
+  return Accessibility::Private;
+}
+
 void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
                                Accessibility desiredAccess, bool isForSetter) {
   StringRef fixItString;
@@ -3615,7 +3629,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   }
 
   DeclAttributes &attrs = VD->getAttrs();
-  DeclAttribute *attr;
+  AbstractAccessibilityAttr *attr;
   if (isForSetter) {
     attr = attrs.getAttribute<SetterAccessibilityAttr>();
     cast<AbstractStorageDecl>(VD)->overwriteSetterAccessibility(desiredAccess);
@@ -3643,10 +3657,18 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
     diag.fixItRemove(attr->Range);
 
   } else if (attr) {
-    // This uses getLocation() instead of getRange() because we don't want to
-    // replace the "(set)" part of a setter attribute.
-    diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
-    attr->setInvalid();
+    // If the formal access already matches the desired access, the problem
+    // must be in a parent scope. Don't emit a fix-it.
+    // FIXME: It's also possible for access to already be /broader/ than what's
+    // desired, in which case the problem is also in a parent scope. However,
+    // this function is sometimes called to make access narrower, so assuming
+    // that a broader scope is acceptable breaks some diagnostics.
+    if (attr->getAccess() != desiredAccess) {
+      // This uses getLocation() instead of getRange() because we don't want to
+      // replace the "(set)" part of a setter attribute.
+      diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+      attr->setInvalid();
+    }
 
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
     if (auto PBD = var->getParentPatternBinding())

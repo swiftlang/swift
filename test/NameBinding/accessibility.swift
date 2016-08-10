@@ -96,9 +96,10 @@ protocol MethodProto {
 }
 
 extension OriginallyEmpty : MethodProto {}
-extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 #if !ACCESS_DISABLED
+extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
+
 extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}}
 #endif
 
@@ -108,9 +109,10 @@ protocol TypeProto {
 }
 
 extension OriginallyEmpty {}
+#if !ACCESS_DISABLED
 extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-#if !ACCESS_DISABLED
+
 extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
 #endif
 
