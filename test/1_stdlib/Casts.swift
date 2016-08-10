@@ -70,18 +70,16 @@ func isP<T>(_ t: T) -> Bool {
   return t is P
 }
 
-CastsTests.test("Dynamic casts of CF types to protocol existentials") {
+CastsTests.test("Dynamic casts of CF types to protocol existentials")
+  .skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This test behaves unpredictably in optimized mode."))
+  .code {
   expectTrue(isP(10 as Int))
 
   // FIXME: SR-2289: dynamic casting of CF types to protocol existentials
   // should work, but there is a bug in the runtime that prevents them from
   // working.
-  if !_isDebugAssertConfiguration() {
-    // FIXME: this test should not crash.  It currently crashes in optimized
-    // mode because the optimizer assumes that the type conforms, but then the
-    // runtime disagrees.
-    expectCrashLater()
-  }
   expectFailure {
     expectTrue(isP(CFBitVector.makeImmutable(from: [10, 20])))
   }
