@@ -229,6 +229,14 @@ const Metadata *getNSErrorMetadata();
 
 #endif
 
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_sizeof_SwiftError;
+
 } // namespace swift
 
 #endif

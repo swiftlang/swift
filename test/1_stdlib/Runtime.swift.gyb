@@ -9,6 +9,11 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+import Glibc
+#endif
 
 @_silgen_name("swift_demangle")
 public
@@ -494,6 +499,35 @@ Runtime.test("Struct layout with reference storage types") {
 
   // Make sure malkovich lives long enough.
   print(malkovich)
+}
+
+Runtime.test("SwiftError layout constants for LLDB") {
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
+#elseif os(Linux)
+  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+#else
+  _UnimplementedError()
+#endif
+
+  let offsetof_SwiftError_typeMetadata =
+    dlsym(RTLD_DEFAULT, "_swift_lldb_offsetof_SwiftError_typeMetadata")!
+  let sizeof_SwiftError =
+    dlsym(RTLD_DEFAULT, "_swift_lldb_sizeof_SwiftError")!
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if arch(i386) || arch(arm)
+  expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
+  expectEqual(36, sizeof_SwiftError.load(as: UInt.self))
+#else
+  expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
+  expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
+#endif
+#elseif os(Linux)
+  expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
+  expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
+#else
+  _UnimplementedError()
+#endif
 }
 
 var Reflection = TestSuite("Reflection")
