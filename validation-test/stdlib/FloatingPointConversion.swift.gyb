@@ -11,27 +11,29 @@
 import StdlibUnittest
 
 %{
-
-floatNameToSignificandBits = { 'Float32':24, 'Float64':53, 'Float80':64 }
-
+from SwiftFloatingPointTypes import all_floating_point_types
 }%
 
 var FloatingPointConversionTruncations = TestSuite("FloatingPointToFloatingPointConversionTruncations")
 var FloatingPointConversionFailures = TestSuite("FloatingPointToFloatingPointConversionFailures")
 
-% for Self, selfSignificandBits in floatNameToSignificandBits.iteritems():
+%  for self_type in all_floating_point_types():
+%   SelfSignificandBits = self_type.bits
+%   Self = self_type.stdlib_name
 
 %  if Self == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %  end
 
-%  for OtherFloat, otherSignificandBits in floatNameToSignificandBits.iteritems():
+%  for other_type in all_floating_point_types():
+%   OtherSignificandBits = other_type.bits
+%   OtherFloat = other_type.stdlib_name
 
 %   if OtherFloat == 'Float80':
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %   end
 
-%   if otherSignificandBits <= selfSignificandBits:
+%   if OtherSignificandBits <= SelfSignificandBits:
 
 FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
   .forEach(in: [
@@ -85,7 +87,7 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion")
   ]) {
   input in
   let result = ${Self}(exactly: input)
-%   if otherSignificandBits <= selfSignificandBits:
+%   if OtherSignificandBits <= SelfSignificandBits:
   if let result = expectNotEmpty(result) {
     // FIXME: we should have a stronger postcondition here.
     expectEqual(input, ${OtherFloat}(result))
@@ -107,12 +109,12 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuc
 #endif
 %   end
 
-%  end # for in floatNameToSignificandBits (Other)
+%  end # for in all_floating_point_types (Other)
 
 %  if Self == 'Float80':
 #endif
 %  end
 
-% end # for in floatNameToSignificandBits (Self)
+% end # for in all_floating_point_types (Self)
 
 runAllTests()
