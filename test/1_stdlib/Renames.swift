@@ -266,6 +266,16 @@ func _LazySequence<S : LazySequenceProtocol>(s: S) {
   _ = s.array // expected-error {{'array' is unavailable: Please use Array initializer instead.}} {{none}}
 }
 
+func _LifetimeManager<T>(x: T) {
+  var x = x
+  _ = withUnsafeMutablePointer(&x) { _ in } // expected-error {{'withUnsafeMutablePointer' has been renamed to 'withUnsafeMutablePointer(to:_:)'}} {{7-31=withUnsafeMutablePointer}} {{32-32=to: }} {{none}}
+  _ = withUnsafeMutablePointers(&x, &x) { _, _ in } // expected-error {{'withUnsafeMutablePointers' is unavailable: use nested withUnsafeMutablePointer(to:_:) instead}} {{none}}
+  _ = withUnsafeMutablePointers(&x, &x, &x) { _, _, _ in } // expected-error {{'withUnsafeMutablePointers' is unavailable: use nested withUnsafeMutablePointer(to:_:) instead}} {{none}}
+  _ = withUnsafePointer(&x) { _ in } // expected-error {{'withUnsafePointer' has been renamed to 'withUnsafePointer(to:_:)'}} {7-24=withUnsafePointer}} {{25-25=to: }} {{none}}
+  _ = withUnsafePointers(&x, &x) { _, _ in } // expected-error {{'withUnsafePointers' is unavailable: use nested withUnsafePointer(to:_:) instead}} {{none}}
+  _ = withUnsafePointers(&x, &x, &x) { _, _, _ in } // expected-error {{'withUnsafePointers' is unavailable: use nested withUnsafePointer(to:_:) instead}} {{none}}
+}
+
 func _ManagedBuffer<V, E>(x: ManagedBufferPointer<V, E>) {
   _ = x.allocatedElementCount // expected-error {{'allocatedElementCount' has been renamed to 'capacity'}} {{9-30=capacity}} {{none}}
 }
