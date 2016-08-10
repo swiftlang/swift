@@ -240,6 +240,11 @@ func _Index() {
   func fn3<T : RandomAccessIndexType>(_: T) {} // expected-error {{'RandomAccessIndexType' has been renamed to 'Strideable'}} {{16-37=Strideable}} {{none}}
 }
 
+func _InputStream() {
+  _ = readLine(stripNewline: true) // expected-error {{'readLine(stripNewline:)' has been renamed to 'readLine(strippingNewline:)'}} {{7-15=readLine}} {{16-28=strippingNewline}} {{none}}
+  _ = readLine() // ok
+}
+
 func _IntegerArithmetic() {
   func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'IntegerArithmetic'}} {{16-37=IntegerArithmetic}} {{none}}
   func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumber'}} {{16-32=SignedNumber}} {{none}}
