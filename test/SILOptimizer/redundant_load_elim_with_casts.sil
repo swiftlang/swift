@@ -1,5 +1,12 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim
-// FIXME: This test is not FileCheck'd
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | FileCheck -check-prefix=CHECK-FUTURE %s
+//
+// FIXME: Contains tests which are handled by old RLE, but not current one. Mostly due to casting. Eventually we probably should
+// handle these cases if they turn out to be important. 
+//
+// The problem is the current RLE uses type projection tree/path to model fields in an object. This makes it difficult for it to
+// reason about casts, i.e. 1 memory with different types.
+//
+// Tracked by rdar://23023366
 
 import Builtin
 
@@ -59,7 +66,7 @@ struct Wrapper {
   var value : Builtin.Int32
 }
 
-// CHECK-LABEL: sil @tbaa_class_alias_nonclass
+// CHECK-FUTURE: sil @tbaa_class_alias_nonclass
 // CHECK: strong_retain [[RET:%[0-9]+]]
 // CHECK: strong_retain [[RET]]
 // CHECK: return
@@ -79,7 +86,7 @@ bb0(%0 : $B, %1 : $*Agg1):
 }
 
 // FIXME: When RLE uses TBAA it should remove the second load.
-// CHECK-LABEL: sil @tbaa_struct
+// CHECK-FUTURE: sil @tbaa_struct
 // CHECK: load
 // CHECK: store
 // CHECK: load
@@ -96,7 +103,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
 }
 
 // Even with TBAA, RLE should not remove the second load.
-// CHECK-LABEL: sil @tbaa_bind_memory
+// CHECK-FUTURE: sil @tbaa_bind_memory
 // CHECK: load
 // CHECK: bind_memory
 // CHECK: store
@@ -118,7 +125,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
 }
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
@@ -161,7 +168,7 @@ struct IntPtr {
 // source type is known to be greater or equal to the size of the
 // destination type.
 //
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_nopromote : $@convention(thin) (@inout IntPtr) -> () {
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_nopromote : $@convention(thin) (@inout IntPtr) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $*IntPtr)
 // CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
 // CHECK: [[CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT]] : $*IntPtr to $*Builtin.Int32
@@ -185,7 +192,7 @@ bb0(%0 : $*IntPtr):
 // compatible with heap references, but does not have reference
 // semantics b/c it is a trivial type. We currently do not handle such a case.
 
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
@@ -221,7 +228,7 @@ bb0(%0 : $Optional<B>):
 }
 
 // *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
-// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
+// CHECK-FUTURE: sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
 // CHECK: bb0(
 
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.Int32
@@ -256,7 +263,7 @@ bb0(%0 : $*Optional<A>):
 // compatible with heap references, but does not have reference
 // semantics b/c it is a trivial type. We currently do not handle such a case.
 
-// CHECK-LABEL: sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
+// CHECK-FUTURE: sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
 // CHECK: bb0({{%[0-9]+}} : $*Optional<B>):
 // CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.Int32
 // CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
@@ -287,7 +294,7 @@ bb0(%0 : $*Optional<B>):
 }
 
 // Don't bitcast differently sized structs.
-// CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
 // CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: return
 sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@convention(thin) (C) -> () {
@@ -303,7 +310,7 @@ bb0(%0 : $C):
 
 
 /// Make sure that we don't crash and don't optimize here.
-// CHECK-LABEL: sil @covering_store_with_unchecked_addr : $@convention(thin) (C, C) -> () {
+// CHECK-FUTURE: sil @covering_store_with_unchecked_addr : $@convention(thin) (C, C) -> () {
 // CHECK-NOT: unchecked_trivial_bit_cast
 // CHECK: unchecked_addr_cast
 // CHECK-NOT: unchecked_trivial_bit_cast
@@ -338,7 +345,7 @@ bb3:
 /// 4. %5 can write to memory, so we try to check if it can alias %0#1. We look
 /// up the load that was erased and will use it in a memory unsafe way.
 //
-// CHECK-LABEL: sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
+// CHECK-FUTURE: sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
 // CHECK-NOT: load
 // CHECK-NOT: {{%.*}} = store
 sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
@@ -361,7 +368,7 @@ sil @mutator : $@convention(method) (@inout HoldsRef) -> ()
 
 // Ensure we don't forward the stored value from the switch_enum
 // branches past the inout appearance of the stored-to location.
-// CHECK-LABEL: sil @bad_store_forward
+// CHECK-FUTURE: sil @bad_store_forward
 sil @bad_store_forward : $@convention(thin) (@guaranteed Optional<HoldsRef>) -> () {
 // CHECK: bb0
 bb0(%0 : $Optional<HoldsRef>):
@@ -409,7 +416,7 @@ bb3:
 // We internally use a map vector to represent stores. This means that when we iterate over
 // the stores it should be in insertion order. Use this to test whether or not we only set
 // the no-dependency bit if we do not forward a load.
-// CHECK-LABEL: sil @test_unchecked_addr_cast_3
+// CHECK-FUTURE: sil @test_unchecked_addr_cast_3
 // CHECK: bb0([[ARG1:%.*]] : $D, [[ARG2:%.*]] : $D):
 // CHECK-NEXT: [[BOX1:%.*]] = alloc_stack $D
 // CHECK-NEXT: [[BOX2:%.*]] = alloc_stack $D
@@ -441,7 +448,7 @@ typealias I32 = Builtin.Int32
 // ((A, B), C) -> (A, B) is safe
 // ((A, B), C) -> (A, B, C) is NOT safe
 //
-// CHECK-LABEL: sil @unchecked_addr_cast_tuple_promote
+// CHECK-FUTURE: sil @unchecked_addr_cast_tuple_promote
 // CHECK: bb0(%0 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32), %1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)):
 // CHECK: load %0 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32)
 // CHECK: alloc_stack $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
@@ -512,7 +519,7 @@ bb0(%0 : $*(I32, I32, I32), %1 : $*((I32, I32), I32)):
 // ((A, B), C) -> (A, B) is safe
 // ((A, B), C) -> (A, B, C) is NOT safe
 //
-// CHECK-LABEL: sil @forward_tuple_elements
+// CHECK-FUTURE: sil @forward_tuple_elements
 // CHECK: tuple_element_addr
 // CHECK: tuple_element_addr
 // CHECK: tuple_element_addr
