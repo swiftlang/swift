@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | FileCheck -check-prefix=CHECK-FUTURE
-// FIXME: Contains tests which are not handled by old RLE, but not current one. Mostly due to casting. Eventually we probably should
-// handle these cases if they turn out to be important. 
+// FIXME: Contains tests which are handled by old load forwarding, but not current one. Mostly due to casting. Eventually we
+// probably should handle these cases if they turn out to be important. 
 // Tracked by rdar://23023366
 
 import Builtin
