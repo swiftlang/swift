@@ -220,7 +220,7 @@ public:
 
         Output.replace(Offset, Length, Formatted);
         Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));
-        Replacements.insert(
+        Replacements.add(
             clang::tooling::Replacement(Filename, Offset, Length, Formatted));
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
