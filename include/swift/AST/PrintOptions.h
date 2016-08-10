@@ -425,6 +425,7 @@ struct PrintOptions {
     result.AbstractAccessors = false;
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
+    result.PreferTypeRepr = false;
     return result;
   }
 
