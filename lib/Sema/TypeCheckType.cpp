@@ -888,7 +888,11 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       comp->getIdentifier() == TC.Context.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-    
+
+    // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+    // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+    // while the 'Self' type is more than just a reference to a TypeDecl.
+
     return func->getDynamicSelf();
   }
 
@@ -2447,13 +2451,17 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     elementOptions |= TR_FunctionInput;
   
   for (auto tyR : repr->getElements()) {
-    if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
+    NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR);
+    if (namedTyR && !(options & TR_ImmediateFunctionInput)) {
       Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
       if (!ty || ty->is<ErrorType>()) return ty;
 
       elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
     } else {
-      Type ty = resolveType(tyR, elementOptions);
+      // FIXME: Preserve and serialize parameter names in function types, maybe
+      // with a new sugar type.
+      Type ty = resolveType(namedTyR ? namedTyR->getTypeRepr() : tyR,
+                            elementOptions);
       if (!ty || ty->is<ErrorType>()) return ty;
 
       elements.push_back(TupleTypeElt(ty));

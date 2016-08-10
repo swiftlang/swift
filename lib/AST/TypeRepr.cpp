@@ -198,7 +198,7 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
   return new (Ctx) NamedTypeRepr(T->getName(), visit(T->getTypeRepr()),
-                                 T->getNameLoc());
+                                 T->getNameLoc(), T->getUnderscoreLoc());
 }
 
 TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
@@ -276,13 +276,26 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
 
-  if (Attrs.has(TAK_autoclosure)) Printer << "@autoclosure ";
-  if (Attrs.has(TAK_escaping))    Printer << "@escaping ";
+  if (Attrs.has(TAK_autoclosure)) {
+    Printer.printAttrName("@autoclosure");
+    Printer << " ";
+  }
+  if (Attrs.has(TAK_escaping)) {
+    Printer.printAttrName("@escaping");
+    Printer << " ";
+  }
 
-  if (Attrs.has(TAK_thin))         Printer << "@thin ";
-  if (Attrs.has(TAK_thick))        Printer << "@thick ";
+  if (Attrs.has(TAK_thin)) {
+    Printer.printAttrName("@thin");
+    Printer << " ";
+  }
+  if (Attrs.has(TAK_thick)) {
+    Printer.printAttrName("@thick");
+    Printer << " ";
+  }
   if (Attrs.convention.hasValue()) {
-    Printer << "@convention(" << Attrs.convention.getValue() << ") ";
+    Printer.printAttrName("@convention");
+    Printer << "(" << Attrs.convention.getValue() << ") ";
   }
 }
 
@@ -411,9 +424,19 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
 void NamedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (!Id.empty()) {
-    Printer.printName(Id, PrintNameContext::TupleElement);
+  if (isNamedParameter()) {
+    // Printing empty Identifier is same as printing '_'.
+    Printer.printName(Identifier(), PrintNameContext::FunctionParameterExternal);
+    if (!Id.empty()) {
+      Printer << " ";
+      Printer.printName(Id, PrintNameContext::FunctionParameterLocal);
+    }
     Printer << ": ";
+  } else {
+    if (!Id.empty()) {
+      Printer.printName(Id, PrintNameContext::TupleElement);
+      Printer << ": ";
+    }
   }
   printTypeRepr(Ty, Printer, Opts);
 }

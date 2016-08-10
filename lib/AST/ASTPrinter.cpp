@@ -2516,8 +2516,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     });
   if (decl->hasType()) {
     Printer << ": ";
-    // Use the non-repr external type, but reuse the TypeLoc printing code.
-    printTypeLoc(TypeLoc::withoutLoc(decl->getType()));
+    auto tyLoc = decl->getTypeLoc();
+    if (!tyLoc.getTypeRepr())
+      tyLoc = TypeLoc::withoutLoc(decl->getType());
+    printTypeLoc(tyLoc);
   }
 
   printAccessors(decl);
@@ -2777,10 +2779,19 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Type ResultTy = decl->getResultType();
       if (ResultTy && !ResultTy->isVoid()) {
+        TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+        if (!ResultTyLoc.getTypeRepr())
+          ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+        // FIXME: Hacky way to workaround the fact that 'Self' as return
+        // TypeRepr is not getting 'typechecked'. See
+        // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
+        if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
+          if (simId->getIdentifier().str() == "Self")
+            ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+        }
         Printer << " -> ";
-        // Use the non-repr external type, but reuse the TypeLoc printing code.
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-        printTypeLoc(TypeLoc::withoutLoc(ResultTy));
+        printTypeLoc(ResultTyLoc);
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
       }
     }
@@ -3233,6 +3244,9 @@ void Decl::print(raw_ostream &os) const {
   options.FunctionDefinitions = true;
   options.TypeDefinitions = true;
   options.VarInitializers = true;
+  // FIXME: Move all places where SIL printing is happening to explicit options.
+  // For example, see \c ProjectionPath::print.
+  options.PreferTypeRepr = false;
 
   print(os, options);
 }
@@ -3749,10 +3763,14 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (info.isAutoClosure())
-      Printer << "@autoclosure ";
-    if (inParameterPrinting && !info.isNoEscape())
-      Printer << "@escaping ";
+    if (info.isAutoClosure()) {
+      Printer.printAttrName("@autoclosure");
+      Printer << " ";
+    }
+    if (inParameterPrinting && !info.isNoEscape()) {
+      Printer.printAttrName("@escaping");
+      Printer << " ";
+    }
 
     if (Options.PrintFunctionRepresentationAttrs) {
       // TODO: coalesce into a single convention attribute.
