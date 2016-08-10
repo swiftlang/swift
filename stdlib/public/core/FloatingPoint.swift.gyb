@@ -167,8 +167,8 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint: Comparable, Arithmetic,
-  SignedNumber, Strideable {
+public protocol FloatingPoint: Comparable, ExpressibleByIntegerLiteral,
+  SignedNumber, AbsoluteValuable, Strideable {
 
   /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
@@ -1952,12 +1952,6 @@ extension BinaryFloatingPoint {
     return Other(self).totalOrder(with: other)
   }
   */
-}
-
-/// Returns the absolute value of `x`.
-@_transparent
-public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
-  return x.magnitude
 }
 
 @available(*, unavailable, renamed: "FloatingPoint")

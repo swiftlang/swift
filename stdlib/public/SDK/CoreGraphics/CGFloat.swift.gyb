@@ -174,8 +174,8 @@ public struct CGFloat {
     return CGFloat(native.nextUp)
   }
 
-  public var magnitude: CGFloat {
-    return CGFloat(abs(native))
+  public static func abs(_ x: CGFloat) -> CGFloat {
+    return CGFloat(NativeType.abs(x.native))
   }
 
   public mutating func negate() {
@@ -294,11 +294,6 @@ extension CGFloat {
 
   @available(*, unavailable, renamed: "greatestFiniteMagnitude")
   public static var max: CGFloat {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
-  public static func abs(_ x: CGFloat) -> CGFloat {
     fatalError("unavailable")
   }
 }

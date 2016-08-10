@@ -808,7 +808,7 @@ extension ${Self} : Hashable {
   }
 }
 
-extension ${Self} : Arithmetic {
+extension ${Self} : AbsoluteValuable {
   /// The magnitude of this value.
   ///
   /// For any value `x`, `x.magnitude.sign` is `.plus`. If `x` is not NaN,
@@ -832,8 +832,8 @@ extension ${Self} : Arithmetic {
   ///
   /// - SeeAlso: `abs(_:)`
   @_transparent
-  public var magnitude: ${Self} {
-    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(_value))
+  public static func abs(_ x: ${Self}) -> ${Self} {
+    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }
 
@@ -1126,13 +1126,4 @@ extension ${Self} {
 %     end
 %   end
 }
-
-
-extension ${Self} {
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
-  public static func abs(_ x: ${Self}) -> ${Self} {
-    fatalError("unavailable")
-  }
-}
-
 % end # for (bits, signed) in allInts()

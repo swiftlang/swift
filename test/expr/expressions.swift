@@ -759,7 +759,7 @@ func testParenExprInTheWay() {
   if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
   if !(x & 4.0) {}  // expected-error {{no '&' candidates produce the expected contextual result type 'Bool'}}
-  //expected-note @-1 {{overloads for '&' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, T, Self}}
+  //expected-note @-1 {{overloads for '&' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int}}
 
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
