@@ -269,10 +269,10 @@ bb0(%0 : $*T):
   return %t : $()
 }
 
-//CHECK-LABEL: branch
+//CHECK-LABEL: xbranch
 //CHECK-NOT: copy_addr
 //CHECK: return
-sil hidden @branch : $@convention(thin) <T> (@in T, Bool) -> () {
+sil hidden @xbranch : $@convention(thin) <T> (@in T, Bool) -> () {
 bb0(%0 : $*T, %1 : $Bool):
   %2 = struct_extract %1 : $Bool, #Bool._value     // user: %3
   cond_br %2, bb1, bb2                            // id: %3
