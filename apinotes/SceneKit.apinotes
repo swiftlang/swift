@@ -64,52 +64,54 @@ Globals:
   SwiftName: SCNHitTestOption.rootNode
 - Name: SCNHitTestIgnoreHiddenNodesKey
   SwiftName: SCNHitTestOption.ignoreHiddenNodes
+# FIXME: All of these are on nested types, which is not supported by swift_name
+# yet. Once it is, make these fully qualified
 - Name: SCNPhysicsShapeTypeKey
-  SwiftName: SCNPhysicsShape.Option.type
+  SwiftName: type
 - Name: SCNPhysicsShapeKeepAsCompoundKey
-  SwiftName: SCNPhysicsShape.Option.keepAsCompound
+  SwiftName: keepAsCompound
 - Name: SCNPhysicsShapeScaleKey
-  SwiftName: SCNPhysicsShape.Option.scale
+  SwiftName: scale
 - Name: SCNPhysicsTestCollisionBitMaskKey
-  SwiftName: SCNPhysicsWorld.TestOption.collisionBitMask
+  SwiftName: collisionBitMask
 - Name: SCNPhysicsTestSearchModeKey
-  SwiftName: SCNPhysicsWorld.TestOption.searchMode
+  SwiftName: searchMode
 - Name: SCNPhysicsTestBackfaceCullingKey
-  SwiftName: SCNPhysicsWorld.TestOption.backfaceCulling
+  SwiftName: backfaceCulling
 - Name: SCNSceneStartTimeAttributeKey
-  SwiftName: SCNScene.Attribute.startTime
+  SwiftName: startTime
 - Name: SCNSceneEndTimeAttributeKey
-  SwiftName: SCNScene.Attribute.endTime
+  SwiftName: endTime
 - Name: SCNSceneFrameRateAttributeKey
-  SwiftName: SCNScene.Attribute.frameRate
+  SwiftName: frameRate
 - Name: SCNSceneUpAxisAttributeKey
-  SwiftName: SCNScene.Attribute.upAxis
+  SwiftName: upAxis
 - Name: SCNSceneSourceCreateNormalsIfAbsentKey
-  SwiftName: SCNSceneSource.LoadingOption.createNormalsIfAbsent
+  SwiftName: createNormalsIfAbsent
 - Name: SCNSceneSourceCheckConsistencyKey
-  SwiftName: SCNSceneSource.LoadingOption.checkConsistency
+  SwiftName: checkConsistency
 - Name: SCNSceneSourceFlattenSceneKey
-  SwiftName: SCNSceneSource.LoadingOption.flattenScene
+  SwiftName: flattenScene
 - Name: SCNSceneSourceUseSafeModeKey
-  SwiftName: SCNSceneSource.LoadingOption.useSafeMode
+  SwiftName: useSafeMode
 - Name: SCNSceneSourceAssetDirectoryURLsKey
-  SwiftName: SCNSceneSource.LoadingOption.assetDirectoryURLs
+  SwiftName: assetDirectoryURLs
 - Name: SCNSceneSourceOverrideAssetURLsKey
-  SwiftName: SCNSceneSource.LoadingOption.overrideAssetURLs
+  SwiftName: overrideAssetURLs
 - Name: SCNSceneSourceStrictConformanceKey
-  SwiftName: SCNSceneSource.LoadingOption.strictConformance
+  SwiftName: strictConformance
 - Name: SCNSceneSourceConvertUnitsToMetersKey
-  SwiftName: SCNSceneSource.LoadingOption.convertUnitsToMeters
+  SwiftName: convertUnitsToMeters
 - Name: SCNSceneSourceConvertToYUpKey
-  SwiftName: SCNSceneSource.LoadingOption.convertToYUp
+  SwiftName: convertToYUp
 - Name: SCNSceneSourceAnimationImportPolicyKey
-  SwiftName: SCNSceneSource.LoadingOption.animationImportPolicy
+  SwiftName: animationImportPolicy
 - Name: SCNPreferredRenderingAPIKey
-  SwiftName: SCNView.Option.preferredRenderingAPI
+  SwiftName: preferredRenderingAPI
 - Name: SCNPreferredDeviceKey
-  SwiftName: SCNView.Option.preferredDevice
+  SwiftName: preferredDevice
 - Name: SCNPreferLowPowerDeviceKey
-  SwiftName: SCNView.Option.preferLowPowerDevice
+  SwiftName: preferLowPowerDevice
 
 #
 # API Renaming
