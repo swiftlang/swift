@@ -855,7 +855,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     Pattern *subPattern = TP->getSubPattern();
     if (coercePatternToType(subPattern, dc, P->getType(),
-                            options|TR_FromNonInferredPattern, resolver))
+                            options|TR_FromNonInferredPattern, resolver,
+                            TP->getTypeLoc()))
       hadError = true;
     else {
       TP->setSubPattern(subPattern);
@@ -994,7 +995,12 @@ static bool coercePatternViaConditionalDowncast(TypeChecker &tc,
 /// Perform top-down type coercion on the given pattern.
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
-                                      GenericTypeResolver *resolver) {
+                                      GenericTypeResolver *resolver,
+                                      TypeLoc tyLoc) {
+  if (tyLoc.isNull()) {
+    tyLoc = TypeLoc::withoutLoc(type);
+  }
+
   TypeResolutionOptions subOptions = options - TR_EnumPatternPayload;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
@@ -1088,7 +1094,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     else if (!var->isInvalid())
       type = var->getType();
     P->setType(type);
-    
+    var->getTypeLoc() = tyLoc;
+    var->getTypeLoc().setType(var->getType());
+
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", or optional thereof, emit a diagnostic.  In the first 2 cases, the
     // coder probably forgot a cast and expected a concrete type.  In the later

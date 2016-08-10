@@ -1644,6 +1644,35 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   auto topLocator = cs.getConstraintLocator(semanticExpr);
   referencedDecl = solution.resolveLocatorToDecl(topLocator);
 
+  if (!referencedDecl.getDecl()) {
+    // Do another check in case we have a curried call from binding a function
+    // reference to a variable, for example:
+    //
+    //   class C {
+    //     func instanceFunc(p1: Int, p2: Int) {}
+    //   }
+    //   func t(c: C) {
+    //     C.instanceFunc(c)#^COMPLETE^#
+    //   }
+    //
+    // We need to get the referenced function so we can complete the argument
+    // labels. (Note that the requirement to have labels in the curried call
+    // seems inconsistent with the removal of labels from function types.
+    // If this changes the following code could be removed).
+    if (auto *CE = dyn_cast<CallExpr>(semanticExpr)) {
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(CE->getFn())) {
+        if (isa<TypeExpr>(UDE->getBase())) {
+          auto udeLocator = cs.getConstraintLocator(UDE);
+          auto udeRefDecl = solution.resolveLocatorToDecl(udeLocator);
+          if (auto *FD = dyn_cast_or_null<FuncDecl>(udeRefDecl.getDecl())) {
+            if (FD->isInstanceMember())
+              referencedDecl = udeRefDecl;
+          }
+        }
+      }
+    }
+  }
+
   // Recover the original type if needed.
   recoverOriginalType();
   return exprType;

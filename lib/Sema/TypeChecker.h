@@ -1378,7 +1378,8 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                            TypeResolutionOptions options,
-                           GenericTypeResolver *resolver = nullptr);
+                           GenericTypeResolver *resolver = nullptr,
+                           TypeLoc tyLoc = TypeLoc());
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 

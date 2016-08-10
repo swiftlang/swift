@@ -1,5 +1,3 @@
-// REQUIRES: se_0111_complete
-
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_DOT_3 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
@@ -9,11 +7,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_2 | FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_NO_DOT_1 | FileCheck %s -check-prefix=FOO_STRUCT_NO_DOT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF1 | FileCheck %s -check-prefix=CF1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF2 | FileCheck %s -check-prefix=CF2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF3 | FileCheck %s -check-prefix=CF3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CF4 | FileCheck %s -check-prefix=CF4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_0 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_1
@@ -25,11 +18,6 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_OVERLOADED_FUNC_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_1 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_2 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_3 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_CURRIED_FUNC_4 | FileCheck %s -check-prefix=IMPLICITLY_CURRIED_CURRIED_FUNC_4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_1 | FileCheck %s -check-prefix=IN_SWITCH_CASE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SWITCH_CASE_2 | FileCheck %s -check-prefix=IN_SWITCH_CASE
@@ -69,8 +57,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_3 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_OVERLOADED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_OVERLOADED_FUNCTION_CALL_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_CURRIED_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_CURRIED_FUNCTION_CALL_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1
 
@@ -242,28 +228,6 @@ struct FooStruct {
   }
 
   mutating
-  func curriedVoidFunc1()() {}
-  mutating
-  func curriedVoidFunc2()(a: Int) {}
-  mutating
-  func curriedVoidFunc3(_ a: Int)() {}
-  mutating
-  func curriedVoidFunc4(_ a: Int)(b: Int) {}
-  mutating
-  func curriedVoidFunc5(_ a: Int)(b: Int, _: (Float, Double)) {}
-
-  mutating
-  func curriedStringFunc1()() -> String {}
-  mutating
-  func curriedStringFunc2()(a: Int) -> String {}
-  mutating
-  func curriedStringFunc3(_ a: Int)() -> String {}
-  mutating
-  func curriedStringFunc4(_ a: Int)(b: Int) -> String {}
-  mutating
-  func curriedStringFunc5(_ a: Int)(b: Int, _: (Float, Double)) -> String {}
-
-  mutating
   func selectorVoidFunc1(_ a: Int, b x: Float) {}
   mutating
   func selectorVoidFunc2(_ a: Int, b x: Float, c y: Double) {}
@@ -351,16 +315,6 @@ var fooObject: FooStruct
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc1()[#() -> Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc2()[#(a: Int) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc3({#(a): Int#})[#() -> Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc4({#(a): Int#})[#(b: Int) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc5({#(a): Int#})[#(b: Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc1()[#() -> String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc2()[#(a: Int) -> String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc3({#(a): Int#})[#() -> String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc4({#(a): Int#})[#(b: Int) -> String#]{{; name=.+$}}
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc5({#(a): Int#})[#(b: Int, (Float, Double)) -> String#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
@@ -396,16 +350,6 @@ var fooObject: FooStruct
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}, {#Int#}][#Double#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc1()[#() -> Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc2()[#(a: Int) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc3({#(a): Int#})[#() -> Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc4({#(a): Int#})[#(b: Int) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc5({#(a): Int#})[#(b: Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc1()[#() -> String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc2()[#(a: Int) -> String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc3({#(a): Int#})[#() -> String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc4({#(a): Int#})[#(b: Int) -> String#]{{; name=.+$}}
-// FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc5({#(a): Int#})[#(b: Int, (Float, Double)) -> String#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
@@ -436,16 +380,6 @@ var fooObject: FooStruct
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#self: &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#self: &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#self: &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc1({#self: &FooStruct#})[#() -> () -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc2({#self: &FooStruct#})[#() -> (a: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc3({#self: &FooStruct#})[#(Int) -> () -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc4({#self: &FooStruct#})[#(Int) -> (b: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedVoidFunc5({#self: &FooStruct#})[#(Int) -> (b: Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc1({#self: &FooStruct#})[#() -> () -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc2({#self: &FooStruct#})[#() -> (a: Int) -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc3({#self: &FooStruct#})[#(Int) -> () -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc4({#self: &FooStruct#})[#(Int) -> (b: Int) -> String#]{{; name=.+$}}
-// FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: curriedStringFunc5({#self: &FooStruct#})[#(Int) -> (b: Int, (Float, Double)) -> String#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#self: &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#self: &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#self: &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
@@ -493,16 +427,6 @@ var fooObject: FooStruct
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#self: &FooStruct#})[#(Int) -> Int#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .overloadedInstanceFunc2({#self: &FooStruct#})[#(Double) -> Int#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .builderFunc1({#self: &FooStruct#})[#(Int) -> FooStruct#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc1({#self: &FooStruct#})[#() -> () -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc2({#self: &FooStruct#})[#() -> (a: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc3({#self: &FooStruct#})[#(Int) -> () -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc4({#self: &FooStruct#})[#(Int) -> (b: Int) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedVoidFunc5({#self: &FooStruct#})[#(Int) -> (b: Int, (Float, Double)) -> Void#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc1({#self: &FooStruct#})[#() -> () -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc2({#self: &FooStruct#})[#() -> (a: Int) -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc3({#self: &FooStruct#})[#(Int) -> () -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc4({#self: &FooStruct#})[#(Int) -> (b: Int) -> String#]{{; name=.+$}}
-// FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .curriedStringFunc5({#self: &FooStruct#})[#(Int) -> (b: Int, (Float, Double)) -> String#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc1({#self: &FooStruct#})[#(Int, b: Float) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc2({#self: &FooStruct#})[#(Int, b: Float, c: Double) -> Void#]{{; name=.+$}}
 // FOO_STRUCT_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .selectorVoidFunc3({#self: &FooStruct#})[#(Int, b: (Float, Double)) -> Void#]{{; name=.+$}}
@@ -571,28 +495,6 @@ func testMetatypeExprWithoutDot() {
   FooStruct#^FOO_STRUCT_NO_DOT_1^#
 }
 
-func testCurriedFunc() {
-  fooObject.curriedVoidFunc1()#^CF1^#
-// CF1: Begin completions
-// CF1-NEXT: Pattern/ExprSpecific: ()[#Void#]{{; name=.+$}}
-// CF1-NEXT: End completions
-
-  fooObject.curriedVoidFunc2()#^CF2^#
-// CF2: Begin completions
-// CF2-NEXT: Pattern/ExprSpecific: ({#a: Int#})[#Void#]{{; name=.+$}}
-// CF2-NEXT: End completions
-
-  fooObject.curriedVoidFunc3(42)#^CF3^#
-// CF3: Begin completions
-// CF3-NEXT: Pattern/ExprSpecific: ()[#Void#]{{; name=.+$}}
-// CF3-NEXT: End completions
-
-  fooObject.curriedVoidFunc4(42)#^CF4^#
-// CF4: Begin completions
-// CF4-NEXT: Pattern/ExprSpecific: ({#b: Int#})[#Void#]{{; name=.+$}}
-// CF4-NEXT: End completions
-}
-
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
@@ -601,27 +503,27 @@ func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
 
   FooStruct.instanceFunc1(&fs)#^IMPLICITLY_CURRIED_FUNC_1^#
 // IMPLICITLY_CURRIED_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_FUNC_1-NEXT: Pattern/ExprSpecific: ({#Int#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_1-NEXT: Pattern/ExprSpecific: ({#(a): Int#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_FUNC_1-NEXT: End completions
 
   FooStruct.instanceFunc2(&fs)#^IMPLICITLY_CURRIED_FUNC_2^#
 // IMPLICITLY_CURRIED_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_FUNC_2-NEXT: Pattern/ExprSpecific: ({#Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_FUNC_2-NEXT: Pattern/ExprSpecific: ({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_FUNC_2-NEXT: End completions
 
   FooStruct.varargInstanceFunc0(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_0^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_0: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Pattern/ExprSpecific: ({#Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: Pattern/ExprSpecific: ({#(v): Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_0-NEXT: End completions
 
   FooStruct.varargInstanceFunc1(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_1^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Pattern/ExprSpecific: ({#Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: Pattern/ExprSpecific: ({#(a): Float#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_1-NEXT: End completions
 
   FooStruct.varargInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_VARARG_FUNC_2^#
 // IMPLICITLY_CURRIED_VARARG_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Pattern/ExprSpecific: ({#Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
+// IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: Pattern/ExprSpecific: ({#(a): Float#}, {#b: Double#}, {#v: Int...#})[#Void#]{{; name=.+$}}
 // IMPLICITLY_CURRIED_VARARG_FUNC_2-NEXT: End completions
 
   // This call is ambiguous, and the expression is invalid.
@@ -635,26 +537,6 @@ func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.overloadedInstanceFunc2(&fs)#^IMPLICITLY_CURRIED_OVERLOADED_FUNC_2^#
 // IMPLICITLY_CURRIED_OVERLOADED_FUNC_2: found code completion token
 // IMPLICITLY_CURRIED_OVERLOADED_FUNC_2-NOT: Begin completions
-
-  FooStruct.curriedVoidFunc1(&fs)#^IMPLICITLY_CURRIED_CURRIED_FUNC_1^#
-// IMPLICITLY_CURRIED_CURRIED_FUNC_1: Begin completions
-// IMPLICITLY_CURRIED_CURRIED_FUNC_1-NEXT: Pattern/ExprSpecific: ()[#() -> ()#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_CURRIED_FUNC_1-NEXT: End completions
-
-  FooStruct.curriedVoidFunc2(&fs)#^IMPLICITLY_CURRIED_CURRIED_FUNC_2^#
-// IMPLICITLY_CURRIED_CURRIED_FUNC_2: Begin completions
-// IMPLICITLY_CURRIED_CURRIED_FUNC_2-NEXT: Pattern/ExprSpecific: ()[#(a: Int) -> ()#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_CURRIED_FUNC_2-NEXT: End completions
-
-  FooStruct.curriedVoidFunc3(&fs)#^IMPLICITLY_CURRIED_CURRIED_FUNC_3^#
-// IMPLICITLY_CURRIED_CURRIED_FUNC_3: Begin completions
-// IMPLICITLY_CURRIED_CURRIED_FUNC_3-NEXT: Pattern/ExprSpecific: ({#Int#})[#() -> ()#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_CURRIED_FUNC_3-NEXT: End completions
-
-  FooStruct.curriedVoidFunc4(&fs)#^IMPLICITLY_CURRIED_CURRIED_FUNC_4^#
-// IMPLICITLY_CURRIED_CURRIED_FUNC_4: Begin completions
-// IMPLICITLY_CURRIED_CURRIED_FUNC_4-NEXT: Pattern/ExprSpecific: ({#Int#})[#(b: Int) -> ()#]{{; name=.+$}}
-// IMPLICITLY_CURRIED_CURRIED_FUNC_4-NEXT: End completions
 }
 
 //===---
@@ -901,14 +783,6 @@ func testInsideOverloadedFunctionCall1() {
 // INSIDE_OVERLOADED_FUNCTION_CALL_1: End completions
 }
 
-func testInsideCurriedFunctionCall1() {
-  var a = FooStruct()
-  a.curriedVoidFunc4(42)(#^INSIDE_CURRIED_FUNCTION_CALL_1^#
-// INSIDE_CURRIED_FUNCTION_CALL_1: Begin completions
-// INSIDE_CURRIED_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific: ['(']{#b: Int#})[#Void#]{{; name=.+$}}
-// INSIDE_CURRIED_FUNCTION_CALL_1: End completions
-}
-
 func testInsideFunctionCallOnClassInstance1(_ a: FooClass) {
   a.fooClassInstanceFunc1(#^INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1^#
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: Begin completions
@@ -922,7 +796,7 @@ func testInsideFunctionCallOnClassInstance1(_ a: FooClass) {
 
 class FuncTypeVars {
   var funcVar1: () -> Double
-  var funcVar2: (a: Int) -> Double
+  var funcVar2: (a: Int) -> Double // adding the label is erroneous.
 }
 
 var funcTypeVarsObject: FuncTypeVars
@@ -935,8 +809,8 @@ func testFuncTypeVars() {
 
   funcTypeVarsObject.funcVar2#^VF2^#
 // VF2: Begin completions
-// VF2-NEXT: Pattern/ExprSpecific: ({#a: Int#})[#Double#]{{; name=.+$}}
-// VF2-NEXT: BuiltinOperator/None:         = {#(a: Int) -> Double##(a: Int) -> Double#}[#Void#]
+// VF2-NEXT: Pattern/ExprSpecific: ({#Int#})[#Double#]{{; name=.+$}}
+// VF2-NEXT: BuiltinOperator/None:         = {#(Int) -> Double##(Int) -> Double#}[#Void#]
 // VF2-NEXT: End completions
 }
 

@@ -4253,6 +4253,9 @@ protected:
     setType(Ty);
   }
 
+  /// This is the type specified, including location information.
+  TypeLoc typeLoc;
+
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
@@ -4267,6 +4270,9 @@ public:
   bool isUserAccessible() const {
     return VarDeclBits.IsUserAccessible;
   }
+  
+  TypeLoc &getTypeLoc() { return typeLoc; }
+  TypeLoc getTypeLoc() const { return typeLoc; }
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
@@ -4398,9 +4404,6 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc LetVarInOutLoc;
 
-  /// This is the type specified, including location information.
-  TypeLoc typeLoc;
-  
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
   
@@ -4434,9 +4437,6 @@ public:
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
 
   SourceLoc getLetVarInOutLoc() const { return LetVarInOutLoc; }
-  
-  TypeLoc &getTypeLoc() { return typeLoc; }
-  TypeLoc getTypeLoc() const { return typeLoc; }
 
   bool isTypeLocImplicit() const { return IsTypeLocImplicit; }
   void setIsTypeLocImplicit(bool val) { IsTypeLocImplicit = val; }
