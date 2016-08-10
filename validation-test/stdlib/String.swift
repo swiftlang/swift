@@ -5,6 +5,7 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
+import StdlibUnicodeUnittest
 
 #if _runtime(_ObjC)
 import Foundation  // For NSRange
@@ -679,9 +680,9 @@ StringTests.test("COW/replaceSubrange/end") {
   }
 }
 
-func asciiString<
-  S: Sequence where S.Iterator.Element == Character
->(_ content: S) -> String {
+func asciiString<S: Sequence>(_ content: S) -> String 
+  where S.Iterator.Element == Character
+{
   var s = String()
   s.append(contentsOf: content)
   expectEqual(1, s._core.elementWidth)
@@ -999,6 +1000,30 @@ StringTests.test(
 #endif
 }
 
+StringTests.test("String._fastCStringContents()")
+  .skip(.nativeRuntime("_NSContiguousString undefined without _runtime(_ObjC)"))
+  .code {
+#if _runtime(_ObjC)
+  // ASCII tests
+  for i in (0..<128) {
+    let cs = _NSContiguousString(String(UnicodeScalar(i)!)._core)
+    expectNotEqual(cs._fastCStringContents(), nil)
+  }
+  // Random tests
+  for x in 0..<100 {
+    let s = randomGraphemeCluster(0, x)
+    let cs = _NSContiguousString(s._core)
+    expectNotEqual(cs._fastCStringContents(), nil)
+  }
+  // UTF-16 test
+  let str = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")! as String
+  expectEqual(_NSContiguousString(str._core)._fastCStringContents(), nil)
+
+#else
+  expectUnreachable()
+#endif
+}
+
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
@@ -1248,10 +1273,10 @@ StringTests.test("String.append(_: Character)") {
 
 internal func decodeCString<
   C : UnicodeCodec
-  where
-  C.CodeUnit : UnsignedInteger
 >(_ s: String, as codec: C.Type)
-  -> (result: String, repairsMade: Bool)? {
+  -> (result: String, repairsMade: Bool)?
+  where C.CodeUnit : UnsignedInteger  
+{
   let units = s.unicodeScalars.map({ $0.value }) + [0]
   return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
