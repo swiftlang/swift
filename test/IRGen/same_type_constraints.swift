@@ -22,3 +22,14 @@ public class C1<T: Equatable> { }
 public class C2<T: Equatable, U: P where T == U.Foo>: C1<T> {}
 
 // CHECK: define{{( protected)?}} void @_TFC21same_type_constraints2C1D
+
+public protocol DataType {}
+
+public protocol E {
+  associatedtype Data: DataType
+}
+
+public class GenericKlazz<T: DataType, R: E> : E where R.Data == T
+{
+  public typealias Data = T
+}
