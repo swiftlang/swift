@@ -421,10 +421,8 @@ int doDumpHeapInstance(const char *BinaryFilename) {
             return EXIT_SUCCESS;
           break;
         case Existential: {
-          static const char Name[] = "_TtP_";
           swift_typeref_t AnyTR
-            = swift_reflection_typeRefForMangledTypeName(RC,
-              Name, sizeof(Name)-1);
+            = swift_reflection_typeRefForMangledTypeName(RC, "_TtP_", 5);
 
           printf("Reflecting an existential.\n");
           if (!reflectExistential(RC, Pipe, AnyTR))
@@ -432,10 +430,9 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           break;
         }
         case ErrorExistential: {
-          static const char ErrorName[] = "_TtPs5Error_";
           swift_typeref_t ErrorTR
             = swift_reflection_typeRefForMangledTypeName(RC,
-              ErrorName, sizeof(ErrorName)-1);
+              "_TtPs5Error_", 21);
           printf("Reflecting an error existential.\n");
           if (!reflectExistential(RC, Pipe, ErrorTR))
             return EXIT_SUCCESS;
