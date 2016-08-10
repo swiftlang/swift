@@ -1145,10 +1145,15 @@ protocol d2700_ProtocolWithAssociatedType1 {
   func returnsTA1() -> TA1
 }
 
-// PASS_COMMON: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
-// PASS_COMMON-NEXT: {{^}}  associatedtype TA1{{$}}
-// PASS_COMMON-NEXT: {{^}}  func returnsTA1() -> Self.TA1{{$}}
-// PASS_COMMON-NEXT: {{^}}}{{$}}
+// PREFER_TYPE_PRINTING: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
+// PREFER_TYPE_PRINTING-NEXT: {{^}}  associatedtype TA1{{$}}
+// PREFER_TYPE_PRINTING-NEXT: {{^}}  func returnsTA1() -> Self.TA1{{$}}
+// PREFER_TYPE_PRINTING-NEXT: {{^}}}{{$}}
+
+// PREFER_TYPEREPR_PRINTING: {{^}}protocol d2700_ProtocolWithAssociatedType1 {{{$}}
+// PREFER_TYPEREPR_PRINTING-NEXT: {{^}}  associatedtype TA1{{$}}
+// PREFER_TYPEREPR_PRINTING-NEXT: {{^}}  func returnsTA1() -> TA1{{$}}
+// PREFER_TYPEREPR_PRINTING-NEXT: {{^}}}{{$}}
 
 struct d2800_ProtocolWithAssociatedType1Impl : d2700_ProtocolWithAssociatedType1 {
   func returnsTA1() -> Int {

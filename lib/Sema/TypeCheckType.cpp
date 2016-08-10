@@ -888,7 +888,11 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       comp->getIdentifier() == TC.Context.Id_Self) {
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
-    
+
+    // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+    // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+    // while the 'Self' type is more than just a reference to a TypeDecl.
+
     return func->getDynamicSelf();
   }
 

@@ -276,13 +276,26 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
 
-  if (Attrs.has(TAK_autoclosure)) Printer << "@autoclosure ";
-  if (Attrs.has(TAK_escaping))    Printer << "@escaping ";
+  if (Attrs.has(TAK_autoclosure)) {
+    Printer.printAttrName("@autoclosure");
+    Printer << " ";
+  }
+  if (Attrs.has(TAK_escaping)) {
+    Printer.printAttrName("@escaping");
+    Printer << " ";
+  }
 
-  if (Attrs.has(TAK_thin))         Printer << "@thin ";
-  if (Attrs.has(TAK_thick))        Printer << "@thick ";
+  if (Attrs.has(TAK_thin)) {
+    Printer.printAttrName("@thin");
+    Printer << " ";
+  }
+  if (Attrs.has(TAK_thick)) {
+    Printer.printAttrName("@thick");
+    Printer << " ";
+  }
   if (Attrs.convention.hasValue()) {
-    Printer << "@convention(" << Attrs.convention.getValue() << ") ";
+    Printer.printAttrName("@convention");
+    Printer << "(" << Attrs.convention.getValue() << ") ";
   }
 }
 

@@ -2583,7 +2583,9 @@ private:
     }
 
     if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
-      reDecl->print(Stream, PrintOptions());
+      PrintOptions POpts;
+      POpts.PreferTypeRepr = false;
+      reDecl->print(Stream, POpts);
     } else {
       Stream << "FAILURE";
     }

@@ -42,7 +42,7 @@ func resyncParser2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- %s | FileCheck -check-prefix=CHECK4 %s
 // CHECK4: source.lang.swift.decl.var.instance (8:7-8:10)
 // CHECK4: bad
-// CHECK4: <Declaration>var bad: &lt;&lt;error type&gt;&gt;</Declaration>
+// CHECK4: <Declaration>var bad: IDontExist</Declaration>
 
 // RUN: %sourcekitd-test -req=cursor -pos=7:12 %s -- %s | FileCheck -check-prefix=EMPTY %s
 // RUN: %sourcekitd-test -req=cursor -pos=9:7 %s -- %s | FileCheck -check-prefix=EMPTY %s
