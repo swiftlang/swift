@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | not FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | FileCheck %s
+
+// rdar://problem/27781174
+// XFAIL: *
 
 // FIXME: Existential devirtualization needs to be updated to work with
 // open_existential_addr instructions. rdar://problem/18506660
