@@ -299,8 +299,12 @@ public struct _StringCore {
     // Always dereference two bytes, but when elements are 8 bits we
     // multiply the high byte by 0.
     // FIXME(performance): use masking instead of multiplication.
+#if _endian(little)
     return UTF16.CodeUnit(p.pointee)
       + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
+#else
+    return _highByteMultiplier == 0 ? UTF16.CodeUnit(p.pointee) : UTF16.CodeUnit((p + 1).pointee) + UTF16.CodeUnit(p.pointee) * _highByteMultiplier
+#endif
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
