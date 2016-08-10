@@ -243,13 +243,13 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
       getStdlibModule(dc)->lookupValue({}, Context.getIdentifier("Bool"),
                                        NLKind::QualifiedLookup, results);
       if (results.size() != 1) {
-        diagnose(SourceLoc(), diag::bool_type_broken);
+        diagnose(SourceLoc(), diag::broken_bool);
         return Type();
       }
 
       auto tyDecl = dyn_cast<TypeDecl>(results.front());
       if (!tyDecl) {
-        diagnose(SourceLoc(), diag::bool_type_broken);
+        diagnose(SourceLoc(), diag::broken_bool);
         return Type();
       }
 

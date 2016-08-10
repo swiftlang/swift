@@ -3025,8 +3025,19 @@ bool TypeChecker::isRepresentableInObjC(
       // Functions that return nothing (void) can be throwing; they indicate
       // failure with a 'false' result.
       kind = ForeignErrorConvention::ZeroResult;
-      errorResultType = Context.getObjCBoolDecl()
-                          ->getDeclaredInterfaceType()->getCanonicalType();
+      NominalTypeDecl *boolDecl = Context.getObjCBoolDecl();
+      // On Linux, we might still run @objc tests even though there's
+      // no ObjectiveC Foundation, so use Swift.Bool instead of crapping
+      // out.
+      if (boolDecl == nullptr)
+        boolDecl = Context.getBoolDecl();
+
+      if (boolDecl == nullptr) {
+        diagnose(AFD->getLoc(), diag::broken_bool);
+        return false;
+      }
+
+      errorResultType = boolDecl->getDeclaredType()->getCanonicalType();
     } else if (!resultType->getAnyOptionalObjectType() &&
                isBridgedToObjectiveCClass(dc, resultType)) {
       // Functions that return a (non-optional) type bridged to Objective-C
