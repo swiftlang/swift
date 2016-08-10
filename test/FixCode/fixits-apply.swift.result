@@ -78,6 +78,16 @@ func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
 
+struct SomeName : RawRepresentable {
+  init(_ rawValue: String) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "" }
+}
+func testPassSomeName(_: SomeName) {}
+func testConvertSomeName(s: String) {
+  testPassSomeName(SomeName(rawValue: "\(s)}"))
+}
+
 enum MyEnumType : UInt32 {
   case invalid
 }
