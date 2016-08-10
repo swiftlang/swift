@@ -321,11 +321,11 @@ def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
   Flags<[SwiftFormatOption]>,
   HelpText<"Use tabs for indentation.">;
 
-def inplace : Flag<["-"], "inplace">, Group<code_formatting_Group>,
+def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
   Flags<[SwiftFormatOption]>,
   HelpText<"Overwrite input file with formatted file.">;
 
-def tab_width : Separate<["-"], "tabwidth">, Group<code_formatting_Group>,
+def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
   Flags<[SwiftFormatOption]>,
   HelpText<"Width of tab character.">, MetaVarName<"<n>">;
 
@@ -333,7 +333,7 @@ def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>
   Flags<[SwiftFormatOption]>,
   HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
 
-def line_ranges : Separate<["-"], "line-ranges">, Group<code_formatting_Group>,
+def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
   Flags<[SwiftFormatOption]>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;

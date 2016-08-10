@@ -120,7 +120,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_use_tabs))
       UseTabs = true;
 
-    if (ParsedArgs.getLastArg(OPT_inplace))
+    if (ParsedArgs.getLastArg(OPT_in_place))
       InPlace = true;
 
     if (const Arg *A = ParsedArgs.getLastArg(OPT_tab_width))
@@ -133,7 +133,7 @@ public:
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(ParsedArgs), A->getValue());
 
-    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_line_ranges),
+    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_line_range),
                                    ParsedArgs.filtered_end()))
       LineRanges.push_back(A->getValue());
 

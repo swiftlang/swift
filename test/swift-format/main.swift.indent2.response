@@ -4,7 +4,7 @@
 // RUN: diff -u %s.indent2.response %t.response
 // RUN: %swift-format -use-tabs %s >%t.response
 // RUN: diff -u %s.tabs.response %t.response
-// RUN: %swift-format -line-ranges 12:18 %s >%t.response
+// RUN: %swift-format -line-range 12:18 %s >%t.response
 // RUN: diff -u %s.lines.response %t.response
 
 import Foundation
