@@ -2,6 +2,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_generics
 
 protocol P {}
 protocol CP: class {}
@@ -497,4 +498,14 @@ class IndexForAnySubscript {}
 func dynamicLookup(x: AnyObject) {
   _ = x.anyProperty
   _ = x[IndexForAnySubscript()]
+}
+
+extension GenericClass {
+  // CHECK-LABEL: sil hidden @_TFE17objc_bridging_anyCSo12GenericClass23pseudogenericAnyErasurefT1xx_P_
+  func pseudogenericAnyErasure(x: T) -> Any {
+    // CHECK: [[ANY_BUF:%.*]] = init_existential_addr %0 : $*Any, $AnyObject
+    // CHECK: [[ANYOBJECT:%.*]] = init_existential_ref %1 : $T : $T, $AnyObject
+    // CHECK: store [[ANYOBJECT]] to [[ANY_BUF]]
+    return x
+  }
 }
