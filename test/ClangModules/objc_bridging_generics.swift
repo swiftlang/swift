@@ -133,9 +133,8 @@ extension GenericClass {
   func usesGenericParamG(_ x: T) {
     _ = T.self // expected-note{{used here}}
   }
-  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
-  func usesGenericParamH(_ x: T) {
-    _ = x as Any // expected-note{{used here}}
+  func doesntUseGenericParamH(_ x: T) {
+    _ = x as Any
   }
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamI(_ y: T.Type) {
@@ -181,14 +180,13 @@ extension AnimalContainer {
     _ = #selector(y.create)
   }
 
-  // TODO: 'Any' bridging should not require reifying generic params.
-  func doesntUseGenericParam2(_ x: T, _ y: T.Type) { // expected-error{{cannot access the class's generic parameters}}
+  func doesntUseGenericParam2(_ x: T, _ y: T.Type) {
     let a = x.another()
     _ = a.another()
     _ = x.another().another()
 
     _ = type(of: x).create().another()
-    _ = type(of: x).init(noise: x).another() // expected-note{{here}}
+    _ = type(of: x).init(noise: x).another()
     _ = y.create().another()
     _ = y.init(noise: x).another()
     _ = y.init(noise: x.another()).another()
@@ -257,9 +255,8 @@ extension AnimalContainer {
 }
 
 extension PettableContainer {
-  // TODO: Any erasure shouldn't use generic parameter metadata.
-  func doesntUseGenericParam(_ x: T, _ y: T.Type) { // expected-error{{cannot access the class's generic parameters}}
-    _ = type(of: x).init(fur: x).other() // expected-note{{here}}
+  func doesntUseGenericParam(_ x: T, _ y: T.Type) {
+    _ = type(of: x).init(fur: x).other()
     _ = type(of: x).adopt().other()
     _ = y.init(fur: x).other()
     _ = y.adopt().other()

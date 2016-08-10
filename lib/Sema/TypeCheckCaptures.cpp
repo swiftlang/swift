@@ -477,6 +477,14 @@ public:
       if (E->getType()->isObjCExistentialType()
           || E->getType()->is<AnyMetatypeType>())
         return false;
+      
+      // We also special case Any erasure in pseudogeneric contexts
+      // not to rely on concrete type metadata by erasing from AnyObject
+      // as a waypoint.
+      if (E->getType()->isAny()
+          && erasure->getSubExpr()->getType()->is<ArchetypeType>())
+        return false;
+
       // Erasure to a Swift protocol always captures the type metadata from
       // its subexpression.
       checkType(erasure->getSubExpr()->getType(),
@@ -484,6 +492,7 @@ public:
       return true;
     }
 
+    
     // Converting an @objc metatype to AnyObject doesn't require type
     // metadata.
     if (isa<ClassMetatypeToObjectExpr>(E)
