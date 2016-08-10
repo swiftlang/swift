@@ -240,6 +240,11 @@ func _Index() {
   func fn3<T : RandomAccessIndexType>(_: T) {} // expected-error {{'RandomAccessIndexType' has been renamed to 'Strideable'}} {{16-37=Strideable}} {{none}}
 }
 
+func _InputStream() {
+  _ = readLine(stripNewline: true) // expected-error {{'readLine(stripNewline:)' has been renamed to 'readLine(strippingNewline:)'}} {{7-15=readLine}} {{16-28=strippingNewline}} {{none}}
+  _ = readLine() // ok
+}
+
 func _IntegerArithmetic() {
   func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'IntegerArithmetic'}} {{16-37=IntegerArithmetic}} {{none}}
   func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumber'}} {{16-32=SignedNumber}} {{none}}
@@ -264,6 +269,16 @@ func _LazySequence() {
 }
 func _LazySequence<S : LazySequenceProtocol>(s: S) {
   _ = s.array // expected-error {{'array' is unavailable: Please use Array initializer instead.}} {{none}}
+}
+
+func _LifetimeManager<T>(x: T) {
+  var x = x
+  _ = withUnsafeMutablePointer(&x) { _ in } // expected-error {{'withUnsafeMutablePointer' has been renamed to 'withUnsafeMutablePointer(to:_:)'}} {{7-31=withUnsafeMutablePointer}} {{32-32=to: }} {{none}}
+  _ = withUnsafeMutablePointers(&x, &x) { _, _ in } // expected-error {{'withUnsafeMutablePointers' is unavailable: use nested withUnsafeMutablePointer(to:_:) instead}} {{none}}
+  _ = withUnsafeMutablePointers(&x, &x, &x) { _, _, _ in } // expected-error {{'withUnsafeMutablePointers' is unavailable: use nested withUnsafeMutablePointer(to:_:) instead}} {{none}}
+  _ = withUnsafePointer(&x) { _ in } // expected-error {{'withUnsafePointer' has been renamed to 'withUnsafePointer(to:_:)'}} {7-24=withUnsafePointer}} {{25-25=to: }} {{none}}
+  _ = withUnsafePointers(&x, &x) { _, _ in } // expected-error {{'withUnsafePointers' is unavailable: use nested withUnsafePointer(to:_:) instead}} {{none}}
+  _ = withUnsafePointers(&x, &x, &x) { _, _, _ in } // expected-error {{'withUnsafePointers' is unavailable: use nested withUnsafePointer(to:_:) instead}} {{none}}
 }
 
 func _ManagedBuffer<V, E>(x: ManagedBufferPointer<V, E>) {

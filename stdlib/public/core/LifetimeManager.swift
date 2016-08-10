@@ -95,3 +95,50 @@ public func withUnsafePointer<T, Result>(
 {
   Builtin.unreachable()
 }
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: @noescape (
+    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, A2, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: @noescape (
+    UnsafeMutablePointer<A0>,
+    UnsafeMutablePointer<A1>,
+    UnsafeMutablePointer<A2>
+  ) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
+public func withUnsafePointers<A0, A1, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
+public func withUnsafePointers<A0, A1, A2, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: (
+    UnsafePointer<A0>,
+    UnsafePointer<A1>,
+    UnsafePointer<A2>
+  ) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
