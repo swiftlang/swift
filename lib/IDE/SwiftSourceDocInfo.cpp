@@ -24,15 +24,15 @@ swift::ide::parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
   size_t ColonIdx = LineCol.find(':');
   if (ColonIdx == StringRef::npos) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
   if (LineCol.substr(0, ColonIdx).getAsInteger(10, Line)) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
   if (LineCol.substr(ColonIdx+1).getAsInteger(10, Col)) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
 
