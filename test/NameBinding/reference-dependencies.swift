@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
-// RUN: FileCheck %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
 // CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"

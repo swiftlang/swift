@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | FileCheck %s
+// RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
 // rdar://problem/27781189
 // XFAIL: *

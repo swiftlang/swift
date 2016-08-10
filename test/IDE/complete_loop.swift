@@ -1,10 +1,10 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_1 | FileCheck %s -check-prefix=LOOP_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_1 | %FileCheck %s -check-prefix=LOOP_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_2 > %t.loop2.txt
-// RUN: FileCheck %s -check-prefix=LOOP_2 < %t.loop2.txt
-// RUN: FileCheck %s -check-prefix=LOOP_2_NEGATIVE < %t.loop2.txt
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_3 | FileCheck %s -check-prefix=LOOP_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_4 | FileCheck %s -check-prefix=LOOP_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_5 | FileCheck %s -check-prefix=LOOP_5
+// RUN: %FileCheck %s -check-prefix=LOOP_2 < %t.loop2.txt
+// RUN: %FileCheck %s -check-prefix=LOOP_2_NEGATIVE < %t.loop2.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_3 | %FileCheck %s -check-prefix=LOOP_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_4 | %FileCheck %s -check-prefix=LOOP_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_5 | %FileCheck %s -check-prefix=LOOP_5
 
 class Gen {
 	func IntGen() -> Int { return 0 }

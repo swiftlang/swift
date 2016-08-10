@@ -1,19 +1,19 @@
-// RUN: not %swift -repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
-// RUN: not %swift_driver -repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
-// RUN: not %swift_driver -lldb-repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
-// RUN: not %swift_driver -deprecated-integrated-repl %s 2>&1 | FileCheck -check-prefix=REPL_NO_FILES %s
+// RUN: not %swift -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
+// RUN: not %swift_driver -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
+// RUN: not %swift_driver -lldb-repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
+// RUN: not %swift_driver -deprecated-integrated-repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
 
 // REPL_NO_FILES: REPL mode requires no input files
 
 
-// RUN: %swift_driver -deprecated-integrated-repl -### | FileCheck -check-prefix=INTEGRATED %s
+// RUN: %swift_driver -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 
 // INTEGRATED: swift -frontend -repl
 // INTEGRATED: -module-name REPL
 
 
-// RUN: %swift_driver -lldb-repl -### | FileCheck -check-prefix=LLDB %s
-// RUN: %swift_driver -lldb-repl -DA,B,C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -### | FileCheck -check-prefix=LLDB-OPTS %s
+// RUN: %swift_driver -lldb-repl -### | %FileCheck -check-prefix=LLDB %s
+// RUN: %swift_driver -lldb-repl -DA,B,C -DD -L /path/to/libraries -L /path/to/more/libraries -F /path/to/frameworks -lsomelib -framework SomeFramework -sdk / -I "this folder" -module-name Test -### | %FileCheck -check-prefix=LLDB-OPTS %s
 
 // LLDB: lldb{{"?}} "--repl=
 // LLDB-NOT: -module-name
@@ -38,13 +38,13 @@
 // like the Xcode installation environment. We use hard links to make sure
 // the Swift driver really thinks it's been moved.
 
-// RUN: %swift_driver -repl -### | FileCheck -check-prefix=INTEGRATED %s
-// RUN: %swift_driver -### | FileCheck -check-prefix=INTEGRATED %s
+// RUN: %swift_driver -repl -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %swift_driver -### | %FileCheck -check-prefix=INTEGRATED %s
 
 // RUN: rm -rf %t
 // RUN: mkdir -p %t/usr/bin/
 // RUN: touch %t/usr/bin/lldb
 // RUN: chmod +x %t/usr/bin/lldb
 // RUN: ln %swift_driver_plain %t/usr/bin/swift
-// RUN: %t/usr/bin/swift -repl -### | FileCheck -check-prefix=LLDB %s
-// RUN: %t/usr/bin/swift -### | FileCheck -check-prefix=LLDB %s
+// RUN: %t/usr/bin/swift -repl -### | %FileCheck -check-prefix=LLDB %s
+// RUN: %t/usr/bin/swift -### | %FileCheck -check-prefix=LLDB %s

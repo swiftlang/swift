@@ -1,26 +1,26 @@
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
 // RUN: %target-swift-frontend -verify -parse %t_no_errors.swift
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_1 | FileCheck %s -check-prefix=DEFAULT_ARGS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_2 | FileCheck %s -check-prefix=DEFAULT_ARGS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_3 | FileCheck %s -check-prefix=DEFAULT_ARGS_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_4 | FileCheck %s -check-prefix=DEFAULT_ARGS_4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_5 | FileCheck %s -check-prefix=DEFAULT_ARGS_5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_6 | FileCheck %s -check-prefix=DEFAULT_ARGS_6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_7 | FileCheck %s -check-prefix=DEFAULT_ARGS_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_1 | %FileCheck %s -check-prefix=DEFAULT_ARGS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_2 | %FileCheck %s -check-prefix=DEFAULT_ARGS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_3 | %FileCheck %s -check-prefix=DEFAULT_ARGS_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_4 | %FileCheck %s -check-prefix=DEFAULT_ARGS_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_5 | %FileCheck %s -check-prefix=DEFAULT_ARGS_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_6 | %FileCheck %s -check-prefix=DEFAULT_ARGS_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_7 | %FileCheck %s -check-prefix=DEFAULT_ARGS_7
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_8 > %t
-// RUN: FileCheck %s -check-prefix=DEFAULT_ARGS_8 < %t
-// RUN: FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_8 < %t
+// RUN: %FileCheck %s -check-prefix=DEFAULT_ARGS_8 < %t
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_8 < %t
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARGS_9 > %t
-// RUN: FileCheck %s -check-prefix=DEFAULT_ARGS_9 < %t
-// RUN: FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_9 < %t
+// RUN: %FileCheck %s -check-prefix=DEFAULT_ARGS_9 < %t
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_9 < %t
 //
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_1 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_3 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_1 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_3 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
 
 func freeFuncWithDefaultArgs1(
     _ a: Int, b: Int = 42, file: String = #file, line: Int = #line,

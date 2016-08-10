@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OPTIONAL_1 | FileCheck %s -check-prefix=FOO_OPTIONAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OPTIONAL_1 | %FileCheck %s -check-prefix=FOO_OPTIONAL_1
 
 struct Bar {
 }

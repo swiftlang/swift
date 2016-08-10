@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t
-// RUN: cat %t | FileCheck %s --check-prefix=CHECK1
-// RUN: cat %t | FileCheck %s --check-prefix=CHECK2
-// RUN: cat %t | FileCheck %s --check-prefix=CHECK3
+// RUN: cat %t | %FileCheck %s --check-prefix=CHECK1
+// RUN: cat %t | %FileCheck %s --check-prefix=CHECK2
+// RUN: cat %t | %FileCheck %s --check-prefix=CHECK3
 
 func used<T>(_ t: T) {}
 

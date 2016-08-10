@@ -1,70 +1,70 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.toplevel.txt
+// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.toplevel.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_1 > %t.members1.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members1.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members1.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members1.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members1.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2a.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
 // FIXME: filter?
-// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2a.txt
+// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2a.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2b.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
 // FIXME: filter?
-// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2b.txt
+// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2b.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_3 > %t.members3.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
 // FIXME: filter?
-// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members3.txt
+// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members3.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_4 > %t.members4.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_4 < %t.members4.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members4.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_4 < %t.members4.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members4.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_5 > %t.members5.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_5 < %t.members5.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members5.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_5 < %t.members5.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members5.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_6 > %t.members6.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_6 < %t.members6.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members6.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_6 < %t.members6.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members6.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_7 > %t.members7.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_7 < %t.members7.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members7.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_7 < %t.members7.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members7.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_8 > %t.members8.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_8 < %t.members8.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members8.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_8 < %t.members8.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members8.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_9 > %t.members9.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_9 < %t.members9.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members9.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_9 < %t.members9.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members9.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_10 > %t.members10.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
-// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
+// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
+// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | %FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | FileCheck %s -check-prefix=POSTFIX_OPTIONAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | %FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | %FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | %FileCheck %s -check-prefix=POSTFIX_OPTIONAL
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_1 > %t
-// RUN: FileCheck %s -check-prefix=INFIX_INT < %t
-// RUN: FileCheck %s -check-prefix=NEGATIVE_INFIX_INT < %t
+// RUN: %FileCheck %s -check-prefix=INFIX_INT < %t
+// RUN: %FileCheck %s -check-prefix=NEGATIVE_INFIX_INT < %t
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_2 | FileCheck %s -check-prefix=INFIX_LVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | FileCheck %s -check-prefix=INFIX_STRING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | FileCheck %s -check-prefix=INFIX_EXT_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_2 | %FileCheck %s -check-prefix=INFIX_LVALUE_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | %FileCheck %s -check-prefix=INFIX_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | %FileCheck %s -check-prefix=INFIX_EXT_STRING
 
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE: End completions

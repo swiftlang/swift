@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | %FileCheck %s
 
 // Check the CapturePropagation specialized the reabstraction thunk.
 

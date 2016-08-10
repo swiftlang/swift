@@ -5,8 +5,8 @@
 // RUN: %target-swift-frontend -emit-module -module-name FooSwiftModuleOverlay %S/Inputs/foo_swift_module_overlay.swift -I %t -o %t
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 -I %t > %t.txt
-// RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.txt
-// RUN: FileCheck %s -check-prefix=NO_DUPLICATES < %t.txt
+// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.txt
+// RUN: %FileCheck %s -check-prefix=NO_DUPLICATES < %t.txt
 
 // TOP_LEVEL_1: Begin completions
 // TOP_LEVEL_1-DAG: Decl[FreeFunction]/OtherModule[FooSwiftModuleOverlay]:     overlayedFoo()[#Void#]{{; name=.+$}}

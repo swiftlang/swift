@@ -60,7 +60,7 @@
 // CHECK-DAG: simple.o: MD5=[[SIMPLE2_MD5:[0-9a-f]+]]
 // CHECK-DAG: simple.o: prev MD5=[[SIMPLE_MD5]] recompiling
 
-// RUN: FileCheck %s < %t/log
+// RUN: %FileCheck %s < %t/log
 
 // REQUIRES: asserts
 

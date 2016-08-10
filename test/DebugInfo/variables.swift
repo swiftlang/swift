@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o - | %FileCheck %s
 
 // Ensure that the debug info we're emitting passes the back end verifier.
-// RUN: %target-swift-frontend %s -g -S -o - | FileCheck %s --check-prefix ASM-%target-object-format
+// RUN: %target-swift-frontend %s -g -S -o - | %FileCheck %s --check-prefix ASM-%target-object-format
 // ASM-macho: .section __DWARF,__debug_info
 // ASM-elf: .section .debug_info,"",{{[@%]}}progbits
 

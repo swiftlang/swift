@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-experimental-nested-generic-types -parse-as-library %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-experimental-nested-generic-types -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-sil -O -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-ir -enable-experimental-nested-generic-types -parse-as-library %s > /dev/null

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 
 //CHECK: [readonly] @func1

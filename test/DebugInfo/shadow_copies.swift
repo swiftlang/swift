@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -Onone -emit-ir -g -o - | %FileCheck %s
 
 class ClassA
 {

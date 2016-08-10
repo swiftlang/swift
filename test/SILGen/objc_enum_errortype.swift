@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -import-objc-header %S/Inputs/objc_enum_errortype.h | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -import-objc-header %S/Inputs/objc_enum_errortype.h | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-extract -module-name="Swift" -func="_TFVs1X4testfT_T_" | FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-extract -module-name="Swift" -func="_TFVs1X4testfT_T_" | FileCheck %s -check-prefix=SIB-CHECK
+// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -sil-serialize-all -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-extract -module-name="Swift" -func="_TFVs1X4testfT_T_" | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-extract -module-name="Swift" -func="_TFVs1X4testfT_T_" | %FileCheck %s -check-prefix=SIB-CHECK
 
 // CHECK: import Builtin
 // CHECK: import Swift

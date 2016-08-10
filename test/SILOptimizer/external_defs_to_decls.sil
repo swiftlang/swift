@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -external-defs-to-decls %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -external-defs-to-decls %s | %FileCheck %s
 
 // CHECK: sil @no_op : $@convention(thin) () -> ()
 sil public_external @no_op : $@convention(thin) () -> () {

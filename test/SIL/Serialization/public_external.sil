@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -module-name Swift | FileCheck %s
+// RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -module-name Swift | %FileCheck %s
 
 // CHECK-NOT: sil public_external @pe : $@convention(thin) () -> () {
 // CHECK-NOT: sil hidden_external @he : $@convention(thin) () -> () {

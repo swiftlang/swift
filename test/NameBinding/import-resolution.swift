@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 
 // RUN: %target-swift-frontend -parse %s -enable-source-import -I %S/Inputs -sdk "" -verify -show-diagnostics-after-fatal
-// RUN: not %target-swift-frontend -parse %s -I %S/Inputs -sdk "" -show-diagnostics-after-fatal 2>&1 | FileCheck %s -check-prefix=CHECK-NO-SOURCE-IMPORT
+// RUN: not %target-swift-frontend -parse %s -I %S/Inputs -sdk "" -show-diagnostics-after-fatal 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-SOURCE-IMPORT
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/abcde.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/aeiou.swift
@@ -10,7 +10,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/letters.swift
 // RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify -show-diagnostics-after-fatal
 
-// RUN: %target-swift-ide-test -source-filename %s -print-module-imports -module-to-print=letters -I %t | FileCheck %s -check-prefix=CHECK-IMPORTS
+// RUN: %target-swift-ide-test -source-filename %s -print-module-imports -module-to-print=letters -I %t | %FileCheck %s -check-prefix=CHECK-IMPORTS
 
 // CHECK-NO-SOURCE-IMPORT: no such module 'letters'
 // CHECK-NO-SOURCE-IMPORT: no such module 'abcde'

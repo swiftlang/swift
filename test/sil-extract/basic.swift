@@ -1,16 +1,16 @@
 // Passing demangled name
 
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.foo" | FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.X.test" | FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.Vehicle.init" | FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.Vehicle.now" | FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.foo" | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.X.test" | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.Vehicle.init" | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="basic.Vehicle.now" | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 // Passing mangled name
 
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TF5basic3fooFT_Si" | FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFV5basic1X4testfT_T_" | FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7VehiclecfT1nSi_S0_" | FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7Vehicle3nowfT_Si" | FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TF5basic3fooFT_Si" | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFV5basic1X4testfT_T_" | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7VehiclecfT1nSi_S0_" | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7Vehicle3nowfT_Si" | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 
 // EXTRACT-FOO-NOT: sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {

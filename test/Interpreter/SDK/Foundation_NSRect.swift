@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // iOS doesn't have NSRect. iOS and OS X CGRect is tested elsewhere.

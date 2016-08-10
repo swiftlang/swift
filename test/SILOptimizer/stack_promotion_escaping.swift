@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
 
 final class Item {}
 

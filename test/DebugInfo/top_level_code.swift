@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -S -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s
 
 // XFAIL: linux
 

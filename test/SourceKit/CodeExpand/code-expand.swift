@@ -1,4 +1,4 @@
-// RUN: %sourcekitd-test -req=expand-placeholder %s | FileCheck %s
+// RUN: %sourcekitd-test -req=expand-placeholder %s | %FileCheck %s
 
 foo(x: <#T##() -> Void#>)
 // CHECK:      foo {

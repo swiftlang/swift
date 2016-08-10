@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -inline -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -inline -sil-combine | %FileCheck %s
 
 // Check that type propagation is performed correctly for existentials.
 // The concrete type set in init_existential instructions should be propagated

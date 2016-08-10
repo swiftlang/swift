@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -enable-swift-newtype -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
-// RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
+// RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: %target-parse-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -enable-swift-newtype -I %t
 // REQUIRES: objc_interop
 

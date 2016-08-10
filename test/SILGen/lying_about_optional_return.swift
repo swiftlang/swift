@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/c_function_pointer_in_c_struct.h -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF27lying_about_optional_return45optionalChainingForeignFunctionTypeProperties
 func optionalChainingForeignFunctionTypeProperties(a: SomeCallbacks?) {

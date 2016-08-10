@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 // These two should not have the same type.
 // CHECK: !DIGlobalVariable(name: "a",{{.*}} line: [[@LINE+2]]

@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
-// RUN: %target-run %t/a.out.optimized | FileCheck %s
+// RUN: %target-run %t/a.out.optimized | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out

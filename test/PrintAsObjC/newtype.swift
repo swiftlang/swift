@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/newtype.h -enable-swift-newtype -emit-module -o %t %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/newtype.h -enable-swift-newtype -parse-as-library %t/newtype.swiftmodule -parse -emit-objc-header-path %t/newtype.h
 
-// RUN: FileCheck %s < %t/newtype.h
+// RUN: %FileCheck %s < %t/newtype.h
 
 // RUN: %check-in-clang %t/newtype.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/newtype.h

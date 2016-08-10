@@ -1,7 +1,7 @@
 import Foo
 
 // REQUIRES: objc_interop
-// RUN: %sourcekitd-test -req=complete -pos=2:1 %s -- %mcp_opt -F %S/../Inputs/libIDE-mock-sdk %s | FileCheck %s
+// RUN: %sourcekitd-test -req=complete -pos=2:1 %s -- %mcp_opt -F %S/../Inputs/libIDE-mock-sdk %s | %FileCheck %s
 
 // CHECK-LABEL:      key.name: "fooIntVar",
 // CHECK-NEXT:       key.sourcetext: "fooIntVar",

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 struct Foo {
   // Allocating constructor - should have no line table info.
   // CHECK: !DISubprogram(name: "init", linkageName: "_TFV12Constructors3FooCfT1xVs5Int64_S0_",
