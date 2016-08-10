@@ -17,12 +17,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/Config.h"
+
+#if !SWIFT_OBJC_INTEROP
+
 #include <stdio.h>
 #include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "Private.h"
-
-#if !SWIFT_OBJC_INTEROP
 
 using namespace swift;
 

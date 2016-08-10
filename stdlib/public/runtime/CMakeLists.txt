@@ -33,6 +33,7 @@ else()
 endif()
 
 set(swift_runtime_sources
+    AnyHashableSupport.cpp
     Casting.cpp
     CygwinPort.cpp
     Demangle.cpp

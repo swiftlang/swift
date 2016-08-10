@@ -26,6 +26,7 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
+#include "SwiftHashableSupport.h"
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
 
@@ -34,23 +35,96 @@
 #endif
 
 using namespace swift;
+using namespace swift::hashable_support;
 
 // TODO: Making this a SwiftObject subclass would let us use Swift refcounting,
 // but we would need to be able to emit SwiftValue's Objective-C class object
 // with the Swift destructor pointer prefixed before it.
+//
+// The layout of `SwiftValue` is:
+// - object header,
+// - `SwiftValueHeader` instance,
+// - the payload, tail-allocated (the Swift value contained in this box).
 @interface SwiftValue : NSObject <NSCopying>
 
 - (id)copyWithZone:(NSZone *)zone;
 
 @end
 
-static constexpr const size_t SwiftValueMetadataOffset
+/// The fixed-size ivars of `SwiftValue`.  The actual boxed value is
+/// tail-allocated.
+struct SwiftValueHeader {
+  /// The type of the value contained in the `SwiftValue` box.
+  const Metadata *type;
+
+  /// The base type that introduces the `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableBaseType()`.
+  mutable std::atomic<const Metadata *> hashableBaseType;
+
+  /// The witness table for `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableConformance()`.
+  mutable std::atomic<const hashable_support::HashableWitnessTable *>
+      hashableConformance;
+
+  /// Get the base type that conforms to `Hashable`.
+  /// Returns NULL if the type does not conform.
+  const Metadata *getHashableBaseType() const;
+
+  /// Get the `Hashable` protocol witness table for the contained type.
+  /// Returns NULL if the type does not conform.
+  const hashable_support::HashableWitnessTable *getHashableConformance() const;
+
+  SwiftValueHeader()
+      : hashableBaseType(nullptr), hashableConformance(nullptr) {}
+};
+
+const Metadata *SwiftValueHeader::getHashableBaseType() const {
+  if (auto type = hashableBaseType.load(std::memory_order_acquire)) {
+    if (reinterpret_cast<uintptr_t>(type) == 1) {
+      return nullptr;
+    }
+    return type;
+  }
+
+  const Metadata *expectedType = nullptr;
+  const Metadata *hashableBaseType = findHashableBaseType(type);
+  this->hashableBaseType.compare_exchange_strong(
+      expectedType, hashableBaseType ? hashableBaseType
+                                     : reinterpret_cast<const Metadata *>(1),
+      std::memory_order_acq_rel);
+  return type;
+}
+
+const hashable_support::HashableWitnessTable *
+SwiftValueHeader::getHashableConformance() const {
+  if (auto wt = hashableConformance.load(std::memory_order_acquire)) {
+    if (reinterpret_cast<uintptr_t>(wt) == 1) {
+      return nullptr;
+    }
+    return wt;
+  }
+
+  const HashableWitnessTable *expectedWT = nullptr;
+  const HashableWitnessTable *wt =
+      reinterpret_cast<const HashableWitnessTable *>(
+          swift_conformsToProtocol(type, &_TMps8Hashable));
+  hashableConformance.compare_exchange_strong(
+      expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
+      std::memory_order_acq_rel);
+  return wt;
+}
+
+static constexpr const size_t SwiftValueHeaderOffset
   = sizeof(Class); // isa pointer
 static constexpr const size_t SwiftValueMinAlignMask
   = alignof(Class) - 1;
 /* TODO: If we're able to become a SwiftObject subclass in the future,
  * change to this:
-static constexpr const size_t SwiftValueMetadataOffset
+static constexpr const size_t SwiftValueHeaderOffset
   = sizeof(SwiftObject_s);
 static constexpr const size_t SwiftValueMinAlignMask
   = alignof(SwiftObject_s) - 1;
@@ -59,7 +133,7 @@ static constexpr const size_t SwiftValueMinAlignMask
 static Class _getSwiftValueClass() {
   auto theClass = [SwiftValue class];
   // Fixed instance size of SwiftValue should be same as object header.
-  assert(class_getInstanceSize(theClass) == SwiftValueMetadataOffset
+  assert(class_getInstanceSize(theClass) == SwiftValueHeaderOffset
          && "unexpected size of SwiftValue?!");
   return theClass;
 }
@@ -68,63 +142,64 @@ static Class getSwiftValueClass() {
   return SWIFT_LAZY_CONSTANT(_getSwiftValueClass());
 }
 
-static constexpr size_t getSwiftValueOffset(size_t alignMask) {
-  return SwiftValueMetadataOffset + sizeof(const Metadata *)
-    + alignMask & ~alignMask;
+static constexpr size_t getSwiftValuePayloadOffset(size_t alignMask) {
+  return (SwiftValueHeaderOffset + sizeof(SwiftValueHeader) + alignMask) &
+         ~alignMask;
+}
+
+static SwiftValueHeader *getSwiftValueHeader(SwiftValue *v) {
+  auto instanceBytes = reinterpret_cast<char *>(v);
+  return reinterpret_cast<SwiftValueHeader *>(instanceBytes +
+                                              SwiftValueHeaderOffset);
+}
+
+static OpaqueValue *getSwiftValuePayload(SwiftValue *v, size_t alignMask) {
+  auto instanceBytes = reinterpret_cast<char *>(v);
+  return reinterpret_cast<OpaqueValue *>(instanceBytes +
+                                         getSwiftValuePayloadOffset(alignMask));
+}
+
+static size_t getSwiftValuePayloadAlignMask(const Metadata *type) {
+  return type->getValueWitnesses()->getAlignmentMask() | SwiftValueMinAlignMask;
 }
 
 const Metadata *swift::getSwiftValueTypeMetadata(SwiftValue *v) {
-  auto instanceBytes = reinterpret_cast<const char*>(v);
-  const Metadata *result;
-  memcpy(&result, instanceBytes + SwiftValueMetadataOffset,
-         sizeof(result));
-  return result;
+  return getSwiftValueHeader(v)->type;
 }
 
 std::pair<const Metadata *, const OpaqueValue *>
 swift::getValueFromSwiftValue(SwiftValue *v) {
-  auto instanceBytes = reinterpret_cast<const char*>(v);
   auto instanceType = getSwiftValueTypeMetadata(v);
-  size_t alignMask = instanceType->getValueWitnesses()->getAlignmentMask()
-    | SwiftValueMinAlignMask;
-  auto instanceOffset = getSwiftValueOffset(alignMask);
-  auto value = reinterpret_cast<const OpaqueValue *>(
-    instanceBytes + instanceOffset);
-  return {instanceType, value};
+  size_t alignMask = getSwiftValuePayloadAlignMask(instanceType);
+  return {instanceType, getSwiftValuePayload(v, alignMask)};
 }
 
 SwiftValue *swift::bridgeAnythingToSwiftValueObject(OpaqueValue *src,
                                                     const Metadata *srcType,
                                                     bool consume) {
-  Class SwiftValueClass = getSwiftValueClass();
-  
-  // We lay out the metadata after the object header, and the value after
-  // the metadata (rounded up to alignment).
-  size_t alignMask = srcType->getValueWitnesses()->getAlignmentMask()
-                   | SwiftValueMinAlignMask;
-  size_t valueOffset = SwiftValueMetadataOffset + sizeof(const Metadata *)
-    + alignMask & ~alignMask;
-  
-  size_t totalSize = valueOffset + srcType->getValueWitnesses()->size;
-  
+  size_t alignMask = getSwiftValuePayloadAlignMask(srcType);
+
+  size_t totalSize =
+      getSwiftValuePayloadOffset(alignMask) + srcType->getValueWitnesses()->size;
+
   void *instanceMemory = swift_slowAlloc(totalSize, alignMask);
   SwiftValue *instance
-    = objc_constructInstance(SwiftValueClass, instanceMemory);
+    = objc_constructInstance(getSwiftValueClass(), instanceMemory);
   /* TODO: If we're able to become a SwiftObject subclass in the future,
    * change to this:
-  auto instance = swift_allocObject(SwiftValueClass, totalSize, alignMask);
+  auto instance = swift_allocObject(getSwiftValueClass(), totalSize,
+                                    alignMask);
    */
-  
-  auto instanceBytes = reinterpret_cast<char*>(instance);
-  memcpy(instanceBytes + SwiftValueMetadataOffset, &srcType,
-         sizeof(const Metadata*));
-  auto instanceValue = reinterpret_cast<OpaqueValue *>(
-    instanceBytes + valueOffset);
-  
+
+  auto header = getSwiftValueHeader(instance);
+  new (header) SwiftValueHeader();
+  header->type = srcType;
+
+  auto payload = getSwiftValuePayload(instance, alignMask);
   if (consume)
-    srcType->vw_initializeWithTake(instanceValue, src);
+    srcType->vw_initializeWithTake(payload, src);
   else
-    srcType->vw_initializeWithCopy(instanceValue, src);
+    srcType->vw_initializeWithCopy(payload, src);
   
   return instance;
 }
@@ -162,23 +237,67 @@ SwiftValue *swift::getAsSwiftValue(id object) {
 - (void)dealloc {
   // TODO: If we're able to become a SwiftObject subclass in the future,
   // this should move to the heap metadata destructor function.
-  
+
   // Destroy the contained value.
-  auto instanceBytes = reinterpret_cast<char*>(self);
   auto instanceType = getSwiftValueTypeMetadata(self);
-  size_t alignMask = instanceType->getValueWitnesses()->getAlignmentMask()
-    | SwiftValueMinAlignMask;
-  auto instanceOffset = getSwiftValueOffset(alignMask);
-  auto value = reinterpret_cast<OpaqueValue *>(
-    instanceBytes + instanceOffset);
-  instanceType->vw_destroy(value);
-  
+  size_t alignMask = getSwiftValuePayloadAlignMask(instanceType);
+  getSwiftValueHeader(self)->~SwiftValueHeader();
+  instanceType->vw_destroy(getSwiftValuePayload(self, alignMask));
+
   // Deallocate ourselves.
   objc_destructInstance(self);
-  auto totalSize = instanceOffset = instanceType->getValueWitnesses()->size;
+  auto totalSize = getSwiftValuePayloadOffset(alignMask) +
+                   instanceType->getValueWitnesses()->size;
   swift_slowDealloc(self, totalSize, alignMask);
 }
 #pragma clang diagnostic pop
+
+- (BOOL)isEqual:(id)other {
+  if (self == other) {
+    return YES;
+  }
+
+  if (!other) {
+    return NO;
+  }
+
+  if (![other isKindOfClass:getSwiftValueClass()]) {
+    return self == other;
+  }
+
+  auto selfHeader = getSwiftValueHeader(self);
+  auto otherHeader = getSwiftValueHeader(other);
+
+  auto hashableBaseType = selfHeader->getHashableBaseType();
+  if (!hashableBaseType ||
+      otherHeader->getHashableBaseType() != hashableBaseType) {
+    return self == other;
+  }
+
+  auto hashableConformance = selfHeader->getHashableConformance();
+  if (!hashableConformance) {
+    return self == other;
+  }
+
+  return swift_stdlib_Hashable_isEqual_indirect(
+      getSwiftValuePayload(self,
+                           getSwiftValuePayloadAlignMask(selfHeader->type)),
+      getSwiftValuePayload(other,
+                           getSwiftValuePayloadAlignMask(otherHeader->type)),
+      hashableBaseType, hashableConformance);
+}
+
+- (NSUInteger)hash {
+  auto selfHeader = getSwiftValueHeader(self);
+  auto hashableConformance = selfHeader->getHashableConformance();
+  if (!hashableConformance) {
+    return (NSUInteger)self;
+  }
+  return swift_stdlib_Hashable_hashValue_indirect(
+      getSwiftValuePayload(self,
+                           getSwiftValuePayloadAlignMask(selfHeader->type)),
+      selfHeader->type, hashableConformance);
+}
 
 static NSString *getValueDescription(SwiftValue *self) {
   String tmp;
@@ -210,9 +329,6 @@ static NSString *getValueDescription(SwiftValue *self) {
 - (const OpaqueValue *)_swiftValue {
   return getValueFromSwiftValue(self).second;
 }
-
-// TODO: Forward isEqual: and hash to
-// corresponding operations on the boxed Swift type.
 
 @end
 

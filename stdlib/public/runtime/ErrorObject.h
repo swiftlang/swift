@@ -26,6 +26,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "SwiftHashableSupport.h"
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
@@ -70,12 +71,25 @@ struct SwiftError : SwiftErrorHeader {
   // Core Foundation's refcounting scheme.
 
   /// The type of Swift error value contained in the box.
-  /// This is only available for native Swift errors.
+  /// This member is only available for native Swift errors.
   const Metadata *type;
-  /// The Error witness table.
-  /// This is only available for native Swift errors.
+
+  /// The witness table for `Error` conformance.
+  /// This member is only available for native Swift errors.
   const WitnessTable *errorConformance;
-  
+
+  /// The base type that introduces the `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableBaseType()`.
+  mutable std::atomic<const Metadata *> hashableBaseType;
+
+  /// The witness table for `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableConformance()`.
+  mutable std::atomic<const hashable_support::HashableWitnessTable *> hashableConformance;
+
   /// Get a pointer to the value contained inside the indirectly-referenced
   /// box reference.
   static const OpaqueValue *getIndirectValue(const SwiftError * const *ptr) {
@@ -128,7 +142,15 @@ struct SwiftError : SwiftErrorHeader {
   /// Get the Error protocol witness table for the contained type.
   const WitnessTable *getErrorConformance() const { return errorConformance; }
 #endif
-  
+
+  /// Get the base type that conforms to `Hashable`.
+  /// Returns NULL if the type does not conform.
+  const Metadata *getHashableBaseType() const;
+
+  /// Get the `Hashable` protocol witness table for the contained type.
+  /// Returns NULL if the type does not conform.
+  const hashable_support::HashableWitnessTable *getHashableConformance() const;
+
   // Don't copy or move, please.
   SwiftError(const SwiftError &) = delete;
   SwiftError(SwiftError &&) = delete;
@@ -201,6 +223,9 @@ bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 
 /// Get the NSError Objective-C class.
 Class getNSErrorClass();
+
+/// Get the NSError metadata.
+const Metadata *getNSErrorMetadata();
 
 #endif
 
