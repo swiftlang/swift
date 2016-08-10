@@ -358,10 +358,16 @@ Other substitutions:
 * ``%{python}``: run the same Python interpreter that's being used to run the
   current ``lit`` test.
 
+* ``%FileCheck``: like the LLVM ``FileCheck`` utility, but occurrences of full
+  paths to the source and build directories in the input text are replaced with
+  path-independent constants.
+
+* ``%raw-FileCheck``: the LLVM ``FileCheck`` utility.
+
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 
-  // RUN: %target-swift-frontend ... | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
+  // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
 
   // CHECK: common line
   // CHECK-32: only for 32-bit
@@ -377,7 +383,7 @@ target CPU, use this pattern::
 When writing a test where output (or IR, SIL) depends on the target CPU itself,
 use this pattern::
 
-  // RUN: %target-swift-frontend ... | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+  // RUN: %target-swift-frontend ... | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
   // CHECK: common line
   // CHECK-i386:        only for i386
