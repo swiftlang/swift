@@ -224,3 +224,8 @@ protocol Prot2 {
 }
 class Cls1 : Prot1 {}
 func testwhere<T: Prot2>(_: T) where T.Ty == Cls1 {}
+
+enum E {
+  case abc
+}
+func testEnumRename() { _ = E.Abc }
