@@ -18,6 +18,7 @@ import Darwin
 //===----------------------------------------------------------------------===//
 
 extension CGColor {
+  @available(OSX 10.3, iOS 2.0, *)
   public var components: [CGFloat]? {
     guard let pointer = self.__unsafeComponents else { return nil }
     let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
@@ -25,14 +26,11 @@ extension CGColor {
   }
 
 #if os(macOS)
-  public class var white: CGColor
-   { return CGColor.__constantColor(for: CGColor.__whiteColorName)! }
+  public class var white: CGColor { return CGColor.__constantColor(for: CGColor.__whiteColorName)! }
 
-  public class var black: CGColor
-   { return CGColor.__constantColor(for: CGColor.__blackColorName)! }
+  public class var black: CGColor { return CGColor.__constantColor(for: CGColor.__blackColorName)! }
 
-  public class var clear: CGColor
-   { return CGColor.__constantColor(for: CGColor.__clearColorName)! }
+  public class var clear: CGColor { return CGColor.__constantColor(for: CGColor.__clearColorName)! }
 #endif
 }
 
@@ -220,3 +218,4 @@ extension CGAffineTransform {
    get { return CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
  }
 }
+
