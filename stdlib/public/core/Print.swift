@@ -173,8 +173,9 @@ public func debugPrint(
 ///     item.
 ///
 /// - SeeAlso: `print(_:separator:terminator:)`,
-///   `debugPrint(_:separator:terminator:to:)`, `TextOutputStream`,
-///   `TextOutputStreamable`, `CustomStringConvertible`, `CustomDebugStringConvertible`
+///   `debugPrint(_:separator:terminator:to:)`,
+///   `TextOutputStream`, `TextOutputStreamable`,
+///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
@@ -225,7 +226,8 @@ public func print<Target : TextOutputStream>(
 ///     item.
 ///
 /// - SeeAlso: `debugPrint(_:separator:terminator:)`,
-///   `print(_:separator:terminator:to:)`, `TextOutputStream`, `TextOutputStreamable`,
+///   `print(_:separator:terminator:to:)`,
+///   `TextOutputStream`, `TextOutputStreamable`,
 ///   `CustomStringConvertible`, `CustomDebugStringConvertible`
 @inline(__always)
 public func debugPrint<Target : TextOutputStream>(
