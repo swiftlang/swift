@@ -278,6 +278,29 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         status |= type;
         param.Type = type.getPtrOrNull();
 
+        if (param.SpecifierKind == ParsedParameter::InOut) {
+          if (auto *fnTR = dyn_cast_or_null<FunctionTypeRepr>(param.Type)) {
+            // If the input to the function isn't parenthesized, apply the inout
+            // to the first (only) parameter, as we would in Swift 2. (This
+            // syntax is deprecated in Swift 3.)
+            TypeRepr *argsTR = fnTR->getArgsTypeRepr();
+            if (!isa<TupleTypeRepr>(argsTR)) {
+              auto *newArgsTR =
+                  new (Context) InOutTypeRepr(argsTR, param.LetVarInOutLoc);
+              auto *newTR =
+                  new (Context) FunctionTypeRepr(fnTR->getGenericParams(),
+                                                 newArgsTR,
+                                                 fnTR->getThrowsLoc(),
+                                                 fnTR->getArrowLoc(),
+                                                 fnTR->getResultTypeRepr());
+              newTR->setGenericSignature(fnTR->getGenericSignature());
+              param.Type = newTR;
+              param.SpecifierKind = ParsedParameter::Let;
+              param.LetVarInOutLoc = SourceLoc();
+            }
+          }
+        }
+
         // If we didn't parse a type, then we already diagnosed that the type
         // was invalid.  Remember that.
         if (type.isParseError() && !type.hasCodeCompletion())
