@@ -139,8 +139,8 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
 #if SWIFT_OBJC_INTEROP
     id srcObject;
     memcpy(&srcObject, value, sizeof(id));
-    // Do we have a SwiftValue?
-    if (SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject)) {
+    // Do we have a _SwiftValue?
+    if (_SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject)) {
       // If so, extract the boxed value and try to cast it.
       const Metadata *unboxedType;
       const OpaqueValue *unboxedValue;
