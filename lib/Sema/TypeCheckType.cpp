@@ -1228,14 +1228,14 @@ static Type resolveNestedIdentTypeComponent(
 
     return ErrorType::get(TC.Context);
   }
-  if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
-    if (parentTy->isExistentialType() && memberType->hasTypeParameter()) {
-      if (diagnoseErrors)
-        TC.diagnose(comp->getIdLoc(), diag::typealias_to_assoc_type_outside_of_protocol,
-                    comp->getIdentifier(), alias->getUnderlyingTypeLoc());
 
-      return ErrorType::get(TC.Context);
-    }
+  if (parentTy->isExistentialType() && isa<TypeAliasDecl>(member) &&
+      memberType->hasTypeParameter()) {
+    if (diagnoseErrors)
+      TC.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
+                  comp->getIdentifier());
+
+    return ErrorType::get(TC.Context);
   }
 
   // If there are generic arguments, apply them now.

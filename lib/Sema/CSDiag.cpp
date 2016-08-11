@@ -2349,14 +2349,32 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
                                    SourceLoc loc) {
   SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
 
+  Optional<InFlightDiagnostic> Diag;
+
   // If the base of the lookup is a protocol metatype, suggest
   // to replace the metatype with 'Self'
   // error saying the lookup cannot be on a protocol metatype
   if (auto metatypeTy = baseObjTy->getAs<MetatypeType>()) {
-    auto Diag = diagnose(loc,
-                         diag::could_not_use_type_member_on_protocol_metatype,
-                         baseObjTy, memberName);
-    Diag.highlight(baseRange).highlight(nameLoc.getSourceRange());
+    assert(metatypeTy->getInstanceType()->isExistentialType());
+
+    // Give a customized message if we're accessing a member type
+    // of a protocol -- otherwise a diagnostic talking about
+    // static members doesn't make a whole lot of sense
+    if (isa<TypeAliasDecl>(member)) {
+      Diag.emplace(diagnose(loc,
+                            diag::typealias_outside_of_protocol,
+                            memberName.getBaseName()));
+    } else if (isa<AssociatedTypeDecl>(member)) {
+      Diag.emplace(diagnose(loc,
+                            diag::assoc_type_outside_of_protocol,
+                            memberName.getBaseName()));
+    } else {
+      Diag.emplace(diagnose(loc,
+                            diag::could_not_use_type_member_on_protocol_metatype,
+                            baseObjTy, memberName));
+    }
+
+    Diag->highlight(baseRange).highlight(nameLoc.getSourceRange());
 
     // See through function decl context
     if (auto parent = CS->DC->getInnermostTypeContext()) {
@@ -2365,17 +2383,13 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
       if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
         if (extensionContext->getDeclaredType()->getCanonicalType()
             == metatypeTy->getInstanceType()->getCanonicalType()) {
-          Diag.fixItReplace(baseRange, "Self");
+          Diag->fixItReplace(baseRange, "Self");
         }
       }
     }
 
     return;
   }
-
-  // Otherwise the static member lookup was invalid because it was
-  // called on an instance
-  Optional<InFlightDiagnostic> Diag;
 
   if (isa<EnumElementDecl>(member))
     Diag.emplace(diagnose(loc, diag::could_not_use_enum_element_on_instance,

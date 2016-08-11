@@ -135,13 +135,18 @@ protocol P5 {
   var a: T2 { get }
 }
 
+protocol P6 {
+  typealias A = Int
+  typealias B = Self
+}
+
 struct T5 : P5 {
   // This is OK -- the typealias is fully concrete
   var a: P5.T1 // OK
 
   // Invalid -- cannot represent associated type of existential
-  var v2: P5.T2 // expected-error {{cannot use typealias 'T2' of associated type 'A' outside of its protocol}}
-  var v3: P5.X // expected-error {{cannot use typealias 'X' of associated type 'Self' outside of its protocol}}
+  var v2: P5.T2 // expected-error {{typealias 'T2' can only be used with a concrete type or generic parameter base}}
+  var v3: P5.X // expected-error {{typealias 'X' can only be used with a concrete type or generic parameter base}}
 
   // FIXME: Unqualified reference to typealias from a protocol conformance
   var v4: T1 // expected-error {{use of undeclared type 'T1'}}
@@ -150,18 +155,21 @@ struct T5 : P5 {
   // Qualified reference
   var v6: T5.T1 // OK
   var v7: T5.T2 // OK
+
+  var v8 = P6.A.self
+  var v9 = P6.B.self // expected-error {{typealias 'B' can only be used with a concrete type or generic parameter base}}
 }
 
 // Unqualified lookup finds typealiases in protocol extensions, though
-protocol P6 {
+protocol P7 {
   associatedtype A
 }
 
-extension P6 {
+extension P7 {
   typealias Y = A
 }
 
-struct S6 : P6 {
+struct S7 : P7 {
   typealias A = Int
 
   // FIXME

@@ -2962,7 +2962,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         result.addUnviable(cand, MemberLookupResult::UR_InstanceMemberOnType);
         return;
       }
-      
+
+    // If the underlying type of a typealias is fully concrete, it is legal
+    // to access the type with a protocol metatype base.
+    } else if (isExistential &&
+               isa<TypeAliasDecl>(cand) &&
+               !cast<TypeAliasDecl>(cand)->getInterfaceType()->getCanonicalType()
+                  ->hasTypeParameter()) {
+
+      /* We're OK */
+
     } else {
       if (!hasStaticMembers) {
         result.addUnviable(cand, MemberLookupResult::UR_TypeMemberOnInstance);

@@ -1197,6 +1197,16 @@ ConstraintSystem::getTypeOfMemberReference(
                               functionRefKind, locator, base);
   }
 
+  // Don't open existentials when accessing typealias members of
+  // protocols.
+  if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
+    if (baseObjTy->isExistentialType()) {
+      auto memberTy = alias->getUnderlyingType();
+      auto openedType = FunctionType::get(baseObjTy, memberTy);
+      return { openedType, memberTy };
+    }
+  }
+
   // Handle associated type lookup as a special case, horribly.
   // FIXME: This is an awful hack.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
