@@ -1434,10 +1434,11 @@ NOTE(optional_req_near_match_accessibility,none,
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
-      "cannot use associated type %0 outside of its protocol", (Identifier))
-ERROR(typealias_to_assoc_type_outside_of_protocol,none,
-      "cannot use typealias %0 of associated type %1 outside of its protocol",
-      (Identifier, TypeLoc))
+      "associated type %0 can only be used with a concrete type or "
+      "generic parameter base", (Identifier))
+ERROR(typealias_outside_of_protocol,none,
+      "typealias %0 can only be used with a concrete type or "
+      "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
