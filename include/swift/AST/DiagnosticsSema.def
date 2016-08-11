@@ -196,6 +196,9 @@ ERROR(cannot_subscript_base,none,
       "cannot subscript a value of type %0",
       (Type))
 
+ERROR(cannot_subscript_nil_literal,none,
+      "cannot subscript a nil literal value", ())
+
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
