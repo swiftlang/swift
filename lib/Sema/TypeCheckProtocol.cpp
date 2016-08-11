@@ -68,7 +68,7 @@ namespace {
                          unsigned &bestIdx,
                          bool &doNotDiagnoseMatches);
 
-    bool checkWitnessAccessibility(Accessibility *requiredAccess,
+    bool checkWitnessAccessibility(const DeclContext *&requiredAccessScope,
                                    ValueDecl *requirement,
                                    ValueDecl *witness,
                                    bool *isSetter);
@@ -77,7 +77,7 @@ namespace {
                                   ValueDecl *witness,
                                   AvailabilityContext *requirementInfo);
 
-    RequirementCheck checkWitness(Accessibility requiredAccess,
+    RequirementCheck checkWitness(const DeclContext *requiredAccessScope,
                                   ValueDecl *requirement,
                                   RequirementMatch match);
   };
@@ -392,24 +392,24 @@ namespace {
   struct RequirementCheck {
     CheckKind Kind;
 
-    /// The required accessibility, if the check failed due to the
+    /// The required access scope, if the check failed due to the
     /// witness being less accessible than the requirement.
-    Accessibility RequiredAccess;
+    const DeclContext *RequiredAccessScope;
 
     /// The required availability, if the check failed due to the
     /// witness being less available than the requirement.
     AvailabilityContext RequiredAvailability;
 
     RequirementCheck(CheckKind kind)
-      : Kind(kind), RequiredAccess(Accessibility::Public),
+      : Kind(kind), RequiredAccessScope(nullptr),
         RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
 
-    RequirementCheck(CheckKind kind, Accessibility requiredAccess)
-      : Kind(kind), RequiredAccess(requiredAccess),
+    RequirementCheck(CheckKind kind, const DeclContext *requiredAccessScope)
+      : Kind(kind), RequiredAccessScope(requiredAccessScope),
         RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
 
     RequirementCheck(CheckKind kind, AvailabilityContext requiredAvailability)
-      : Kind(kind), RequiredAccess(Accessibility::Public),
+      : Kind(kind), RequiredAccessScope(nullptr),
         RequiredAvailability(requiredAvailability) { }
   };
 }
@@ -1214,48 +1214,35 @@ bool WitnessChecker::findBestWitness(ValueDecl *requirement,
 }
 
 bool WitnessChecker::
-checkWitnessAccessibility(Accessibility *requiredAccess,
+checkWitnessAccessibility(const DeclContext *&requiredAccessScope,
                           ValueDecl *requirement,
                           ValueDecl *witness,
                           bool *isSetter) {
   *isSetter = false;
 
-  *requiredAccess = std::min(Proto->getFormalAccess(), *requiredAccess);
-  if (TC.getLangOpts().EnableSwift3Private)
-    *requiredAccess = std::max(*requiredAccess, Accessibility::FilePrivate);
+  const DeclContext *protoAccessScope = Proto->getFormalAccessScope(DC);
 
-  Accessibility witnessAccess = witness->getFormalAccess(DC);
-
-  // Leave a hole for old-style top-level operators to be declared 'private' for
-  // a fileprivate conformance.
-  if (witnessAccess == Accessibility::Private &&
-      witness->getDeclContext()->isModuleScopeContext()) {
-    witnessAccess = Accessibility::FilePrivate;
+  // FIXME: This is the same operation as TypeCheckDecl.cpp's
+  // TypeAccessScopeChecker::intersectAccess.
+  if (!requiredAccessScope) {
+    requiredAccessScope = protoAccessScope;
+  } else if (protoAccessScope) {
+    if (protoAccessScope->isChildContextOf(requiredAccessScope)) {
+      requiredAccessScope = protoAccessScope;
+    } else {
+      assert(requiredAccessScope == protoAccessScope ||
+             requiredAccessScope->isChildContextOf(protoAccessScope));
+    }
   }
 
-  if (witnessAccess < *requiredAccess)
+  if (!witness->isAccessibleFrom(requiredAccessScope))
     return true;
 
   if (requirement->isSettable(DC)) {
     *isSetter = true;
 
     auto ASD = cast<AbstractStorageDecl>(witness);
-    const DeclContext *accessDC;
-    switch (*requiredAccess) {
-    case Accessibility::Open:
-    case Accessibility::Public:
-      accessDC = nullptr;
-      break;
-    case Accessibility::Internal:
-      accessDC = DC->getParentModule();
-      break;
-    case Accessibility::FilePrivate:
-    case Accessibility::Private:
-      accessDC = DC->getModuleScopeContext();
-      break;
-    }
-
-    if (!ASD->isSetterAccessibleFrom(accessDC))
+    if (!ASD->isSetterAccessibleFrom(requiredAccessScope))
       return true;
   }
 
@@ -1272,19 +1259,19 @@ checkWitnessAvailability(ValueDecl *requirement,
 }
 
 RequirementCheck WitnessChecker::
-checkWitness(Accessibility requiredAccess,
+checkWitness(const DeclContext *requiredAccessScope,
              ValueDecl *requirement,
              RequirementMatch match) {
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
 
   bool isSetter = false;
-  if (checkWitnessAccessibility(&requiredAccess, requirement,
+  if (checkWitnessAccessibility(requiredAccessScope, requirement,
                                 match.Witness, &isSetter)) {
     CheckKind kind = (isSetter
                       ? CheckKind::AccessibilityOfSetter
                       : CheckKind::Accessibility);
-    return RequirementCheck(kind, requiredAccess);
+    return RequirementCheck(kind, requiredAccessScope);
   }
 
   auto requiredAvailability = AvailabilityContext::alwaysAvailable();
@@ -1910,17 +1897,23 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   if (typeDecl) {
     // Check access.
-    Accessibility requiredAccess = Adoptee->getAnyNominal()->getFormalAccess();
+    const DeclContext *requiredAccessScope =
+        Adoptee->getAnyNominal()->getFormalAccessScope(DC);
     bool isSetter = false;
-    if (checkWitnessAccessibility(&requiredAccess, assocType, typeDecl,
+    if (checkWitnessAccessibility(requiredAccessScope, assocType, typeDecl,
                                   &isSetter)) {
       assert(!isSetter);
 
+      // Avoid relying on the lifetime of 'this'.
+      const DeclContext *DC = this->DC;
       diagnoseOrDefer(assocType, false,
-        [typeDecl, requiredAccess, assocType](
+        [DC, typeDecl, requiredAccessScope, assocType](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
+        Accessibility requiredAccess =
+            accessibilityFromScopeForDiagnostics(requiredAccessScope);
         auto proto = conformance->getProtocol();
-        bool protoForcesAccess = (requiredAccess == proto->getFormalAccess());
+        bool protoForcesAccess =
+            (requiredAccessScope == proto->getFormalAccessScope(DC));
         auto diagKind = protoForcesAccess
                           ? diag::type_witness_not_accessible_proto
                           : diag::type_witness_not_accessible_type;
@@ -2010,6 +2003,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                               NormalProtocolConformance *Conformance,
                               TypeChecker &TC) {
+  // FIXME: Try an ignore-access lookup?
+
   SourceLoc FixitLocation;
   SourceLoc TypeLoc;
   if (auto Extension = dyn_cast<ExtensionDecl>(Conformance->getDeclContext())) {
@@ -2158,8 +2153,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         });
     }
 
-    Accessibility requiredAccess = Adoptee->getAnyNominal()->getFormalAccess();
-    auto check = checkWitness(requiredAccess, requirement, best);
+    const DeclContext *nominalAccessScope =
+        Adoptee->getAnyNominal()->getFormalAccessScope(DC);
+    auto check = checkWitness(nominalAccessScope, requirement, best);
 
     switch (check.Kind) {
     case CheckKind::Success:
@@ -2167,12 +2163,17 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     case CheckKind::Accessibility:
     case CheckKind::AccessibilityOfSetter: {
+      // Avoid relying on the lifetime of 'this'.
+      const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
-        [witness, check, requirement](
+        [DC, witness, check, requirement](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
+        Accessibility requiredAccess =
+            accessibilityFromScopeForDiagnostics(check.RequiredAccessScope);
+
         auto proto = conformance->getProtocol();
         bool protoForcesAccess =
-            (check.RequiredAccess == proto->getFormalAccess());
+            (check.RequiredAccessScope == proto->getFormalAccessScope(DC));
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
@@ -2182,9 +2183,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                 getRequirementKind(requirement),
                                 witness->getFullName(),
                                 isSetter,
-                                check.RequiredAccess,
+                                requiredAccess,
                                 proto->getName());
-        fixItAccessibility(diag, witness, check.RequiredAccess, isSetter);
+        fixItAccessibility(diag, witness, requiredAccess, isSetter);
       });
       break;
     }
@@ -4978,7 +4979,7 @@ DefaultWitnessChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     // Perform the same checks as conformance witness matching, but silently
     // ignore the candidate instead of diagnosing anything.
-    auto check = checkWitness(Accessibility::Public, requirement, best);
+    auto check = checkWitness(/*access: public*/nullptr, requirement, best);
     if (check.Kind != CheckKind::Success)
       return ResolveWitnessResult::ExplicitFailed;
 
