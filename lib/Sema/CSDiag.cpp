@@ -4736,6 +4736,12 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   if (!baseExpr) return true;
   auto baseType = baseExpr->getType();
   
+  if (isa<NilLiteralExpr>(baseExpr)) {
+    diagnose(baseExpr->getLoc(), diag::cannot_subscript_nil_literal)
+      .highlight(baseExpr->getSourceRange());
+    return true;
+  }
+
   auto locator =
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
