@@ -21,3 +21,23 @@ let qualified = HasPrivateAccess.global
 // CHECK-INT: let result: Int?
 // CHECK-STRING: let result: String?
 let result = HasPrivateAccess.MyStruct.method()
+
+// CHECK-ERROR: let processedInt: Int
+// CHECK-INT: let processedInt: Int
+// CHECK-STRING: let processedInt: Int
+let processedInt = process(1)
+
+// CHECK-ERROR: let processedIntQualified: Int
+// CHECK-INT: let processedIntQualified: Int
+// CHECK-STRING: let processedIntQualified: Int
+let processedIntQualified = MyStruct.process(1)
+
+// CHECK-ERROR: let processedString: String
+// CHECK-INT: let processedString: String
+// CHECK-STRING: let processedString: String
+let processedString = process("abc")
+
+// CHECK-ERROR: let processedStringQualified: String
+// CHECK-INT: let processedStringQualified: String
+// CHECK-STRING: let processedStringQualified: String
+let processedStringQualified = MyStruct.process("abc")
