@@ -162,7 +162,7 @@ struct SequenceY : Sequence, IteratorProtocol {
 
 func useRangeOfPrintables(_ roi : RangeOfPrintables<[Int]>) {
   var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
-  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
+  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'SequenceY.Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
 }
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}
@@ -222,7 +222,7 @@ struct X4 : P, Q {
 
 struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
-var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int') and 'AssocQ' (aka 'String') be equivalent}}
+var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka 'Int') and 'X4.AssocQ' (aka 'String') be equivalent}}
 
 // Recursive generic signature validation.
 class Top {}
