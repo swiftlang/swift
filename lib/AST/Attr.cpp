@@ -249,16 +249,8 @@ void DeclAttributes::print(ASTPrinter &Printer,
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
-    if (std::find(Options.ExcludeAttrList.begin(),
-                  Options.ExcludeAttrList.end(),
-                  DA->getKind()) != Options.ExcludeAttrList.end())
+    if (Options.excludeAttrKind(DA->getKind()))
       continue;
-    if (!Options.ExclusiveAttrList.empty()) {
-      if (std::find(Options.ExclusiveAttrList.begin(),
-                    Options.ExclusiveAttrList.end(),
-                    DA->getKind()) == Options.ExclusiveAttrList.end())
-        continue;
-    }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isShortAvailable(DA) ? shortAvailableAttributes :

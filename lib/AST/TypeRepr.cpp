@@ -264,36 +264,43 @@ void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
 
 void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
-  printAttrs(Printer);
+  printAttrs(Printer, Opts);
   printTypeRepr(Ty, Printer, Opts);
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   StreamPrinter Printer(OS);
-  printAttrs(Printer);
+  printAttrs(Printer, PrintOptions());
 }
 
-void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
+void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
+                                    const PrintOptions &Options) const {
   const TypeAttributes &Attrs = getAttrs();
 
-  if (Attrs.has(TAK_autoclosure)) {
+  auto hasAttr = [&](TypeAttrKind K) -> bool {
+    if (Options.excludeAttrKind(K))
+      return false;
+    return Attrs.has(K);
+  };
+
+  if (hasAttr(TAK_autoclosure)) {
     Printer.printAttrName("@autoclosure");
     Printer << " ";
   }
-  if (Attrs.has(TAK_escaping)) {
+  if (hasAttr(TAK_escaping)) {
     Printer.printAttrName("@escaping");
     Printer << " ";
   }
 
-  if (Attrs.has(TAK_thin)) {
+  if (hasAttr(TAK_thin)) {
     Printer.printAttrName("@thin");
     Printer << " ";
   }
-  if (Attrs.has(TAK_thick)) {
+  if (hasAttr(TAK_thick)) {
     Printer.printAttrName("@thick");
     Printer << " ";
   }
-  if (Attrs.convention.hasValue()) {
+  if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
     Printer.printAttrName("@convention");
     Printer << "(" << Attrs.convention.getValue() << ") ";
   }

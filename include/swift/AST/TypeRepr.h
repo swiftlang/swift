@@ -166,7 +166,7 @@ public:
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;
-  void printAttrs(ASTPrinter &Printer) const;
+  void printAttrs(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Attributed;

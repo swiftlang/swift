@@ -105,6 +105,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ASSOC_TYPE1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=DEPRECATED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ESCAPING_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ESCAPING_1
 
 @objc
 class TagPA {}
@@ -463,8 +464,7 @@ class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
 // HAS_THROWING: Begin completions
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar() throws
-// FIXME: SR-2214 make the below require printing @escaping 
-// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: {{(@escaping )?}}() throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: @escaping () throws -> ()) rethrows {|}; name=baz(x: {{(@escaping )?}}() throws -> ()) rethrows
 // HAS_THROWING-DAG: Decl[Constructor]/Super:            init() throws {|}; name=init() throws
 // HAS_THROWING: End completions
 
@@ -490,3 +490,11 @@ class Deprecated2 : Deprecated1 {
   override func #^DEPRECATED_1^#
 }
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
+
+class EscapingBase {
+  func method(_ x: @escaping (@escaping ()->()) -> (@escaping ()->())) -> (@escaping (@escaping ()->() )->()) { }
+}
+class Escaping : EscapingBase {
+  override func #^ESCAPING_1^#
+}
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (@escaping () -> ())) -> ((@escaping () -> ()) -> ()) {|};
