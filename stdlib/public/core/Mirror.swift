@@ -944,3 +944,7 @@ extension Mirror : CustomReflectable {
 
 @available(*, unavailable, renamed: "MirrorPath")
 public typealias MirrorPathType = MirrorPath
+
+// Staging so we can move the official declarations into PlaygroundSupport
+public typealias _CustomPlaygroundQuickLookable = CustomPlaygroundQuickLookable
+public typealias _PlaygroundQuickLook = PlaygroundQuickLook
