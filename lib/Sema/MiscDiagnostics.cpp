@@ -2040,9 +2040,6 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), call);
   }
 
-  if (TC.getLangOpts().DisableAvailabilityChecking)
-    return false;
-
   // Diagnose for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
@@ -3574,7 +3571,8 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+  if (!TC.getLangOpts().DisableAvailabilityChecking)
+    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
