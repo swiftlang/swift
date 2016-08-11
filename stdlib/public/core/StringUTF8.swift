@@ -709,8 +709,8 @@ extension String.UTF8View : CustomReflectable {
   }
 }
 
-extension String.UTF8View : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension String.UTF8View : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }

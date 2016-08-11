@@ -1529,8 +1529,8 @@ extension NSKeyedUnarchiver {
 // Mirror/Quick Look Conformance
 //===----------------------------------------------------------------------===//
 
-extension NSURL : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension NSURL : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     guard let str = absoluteString else { return .text("Unknown URL") }
     return .url(str)
   }
@@ -1542,13 +1542,13 @@ extension NSRange : CustomReflectable {
   }
 }
 
-extension NSRange : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension NSRange : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .range(Int64(location), Int64(length))
   }
 }
 
-extension NSDate : CustomPlaygroundQuickLookable {
+extension NSDate : _CustomPlaygroundQuickLookable {
   var summary: String {
     let df = DateFormatter()
     df.dateStyle = .medium
@@ -1556,7 +1556,7 @@ extension NSDate : CustomPlaygroundQuickLookable {
     return df.string(from: self as Date)
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
 }
@@ -1567,8 +1567,8 @@ extension NSSet : CustomReflectable {
   }
 }
 
-extension NSString : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension NSString : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(self as String)
   }
 }

@@ -181,7 +181,7 @@ internal struct _UIViewQuickLookState {
 }
 
 extension UIView : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+  public var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
       return .view(UIImage())
     } else {

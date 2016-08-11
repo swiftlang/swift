@@ -24,7 +24,6 @@
 
 import StdlibUnittest
 
-
 var mirrors = TestSuite("Mirrors")
 
 extension Mirror {
@@ -701,18 +700,18 @@ mirrors.test("Invalid Path Type")
 
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.
-  struct CustomQuickie : CustomPlaygroundQuickLookable {
-    var customPlaygroundQuickLook: PlaygroundQuickLook {
+  struct CustomQuickie : _CustomPlaygroundQuickLookable {
+    var customPlaygroundQuickLook: _PlaygroundQuickLook {
       return .point(1.25, 42)
     }
   }
-  switch PlaygroundQuickLook(reflecting: CustomQuickie()) {
+  switch _PlaygroundQuickLook(reflecting: CustomQuickie()) {
   case .point(1.25, 42): break
   default: expectTrue(false)
   }
   
-  // PlaygroundQuickLook support from Legacy Mirrors works.
-  switch PlaygroundQuickLook(reflecting: true) {
+  // _PlaygroundQuickLook support from Legacy Mirrors works.
+  switch _PlaygroundQuickLook(reflecting: true) {
   case .bool(true): break
   default: expectTrue(false)
   }
@@ -720,7 +719,7 @@ mirrors.test("PlaygroundQuickLook") {
   // With no Legacy Mirror QuickLook support, we fall back to
   // String(reflecting: ).
   struct X {}
-  switch PlaygroundQuickLook(reflecting: X()) {
+  switch _PlaygroundQuickLook(reflecting: X()) {
   case .text(let text):
 #if _runtime(_ObjC)
 // FIXME: Enable if non-objc hasSuffix is implemented.
@@ -732,7 +731,7 @@ mirrors.test("PlaygroundQuickLook") {
   struct Y : CustomDebugStringConvertible {
     var debugDescription: String { return "Why?" }
   }
-  switch PlaygroundQuickLook(reflecting: Y()) {
+  switch _PlaygroundQuickLook(reflecting: Y()) {
   case .text("Why?"): break
   default: expectTrue(false)
   }
@@ -741,27 +740,27 @@ mirrors.test("PlaygroundQuickLook") {
 class Parent {}
 
 extension Parent : _DefaultCustomPlaygroundQuickLookable {
-  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+  var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text("base")
   }
 }
 
 class Child : Parent { }
 
-class FancyChild : Parent, CustomPlaygroundQuickLookable {
-  var customPlaygroundQuickLook: PlaygroundQuickLook {
+class FancyChild : Parent, _CustomPlaygroundQuickLookable {
+  var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text("child")
   }
 }
 
 mirrors.test("_DefaultCustomPlaygroundQuickLookable") {
   // testing the workaround for custom quicklookables in subclasses
-  switch PlaygroundQuickLook(reflecting: Child()) {
+  switch _PlaygroundQuickLook(reflecting: Child()) {
   case .text("base"): break
   default: expectUnreachable("Base custom quicklookable was expected")
   }
 
-  switch PlaygroundQuickLook(reflecting: FancyChild()) {
+  switch _PlaygroundQuickLook(reflecting: FancyChild()) {
   case .text("child"): break
   default: expectUnreachable("FancyChild custom quicklookable was expected")
   }

@@ -156,7 +156,7 @@ extension String.CharacterView : BidirectionalCollection {
   ///         print(Array(hearts.utf8.prefix(upTo: j)))
   ///     }
   ///     // Prints "[72, 101, 97, 114, 116, 115]"
-  public struct Index : Comparable, CustomPlaygroundQuickLookable {
+  public struct Index : Comparable, _CustomPlaygroundQuickLookable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index, in c: String.CharacterView) {
       self._base = _base
@@ -185,7 +185,7 @@ extension String.CharacterView : BidirectionalCollection {
       return UnicodeScalarView.Index(_position: _utf16Index + _countUTF16)
     }
 
-    public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    public var customPlaygroundQuickLook: _PlaygroundQuickLook {
       return .int(Int64(_utf16Index))
     }
   }

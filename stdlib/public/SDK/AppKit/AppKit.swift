@@ -14,7 +14,7 @@ import Foundation
 @_exported import AppKit
 
 extension NSCursor : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+  public var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook {
     return .image(image)
   }
 }
@@ -24,7 +24,7 @@ internal struct _NSViewQuickLookState {
 }
 
 extension NSView : _DefaultCustomPlaygroundQuickLookable {
-  public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
+  public var _defaultCustomPlaygroundQuickLook: _PlaygroundQuickLook {
     // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
     // could need to draw itself in order to get a QLObject for itself, which in turn if your code was
     // instrumented to log on-draw, would cause yourself to get back here and so on and so forth
@@ -36,7 +36,7 @@ extension NSView : _DefaultCustomPlaygroundQuickLookable {
       return .view(NSImage())
     } else {
       _NSViewQuickLookState.views.insert(self)
-      let result: PlaygroundQuickLook
+      let result: _PlaygroundQuickLook
       if let b = bitmapImageRepForCachingDisplay(in: bounds) {
         cacheDisplay(in: bounds, to: b)
         result = .view(b)

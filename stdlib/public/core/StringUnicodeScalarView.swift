@@ -610,8 +610,8 @@ extension String.UnicodeScalarView : CustomReflectable {
   }
 }
 
-extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }

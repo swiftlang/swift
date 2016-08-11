@@ -447,14 +447,14 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : CustomPlaygroundQuickLookable {
+extension ${Self} : _CustomPlaygroundQuickLookable {
   var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+  public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(summary)
   }
 }

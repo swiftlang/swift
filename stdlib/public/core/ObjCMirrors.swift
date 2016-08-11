@@ -41,7 +41,7 @@ struct _ObjCMirror : _Mirror {
   public var summary: String {
     return _getObjCSummary(data)
   }
-  public var quickLookObject: PlaygroundQuickLook? {
+  public var quickLookObject: _PlaygroundQuickLook? {
     let object = _swift_ClassMirror_quickLookObject(data)
     return _getClassPlaygroundQuickLook(object)
   }
@@ -68,7 +68,7 @@ struct _ObjCSuperMirror : _Mirror {
   public var summary: String {
     return _getObjCSummary(data)
   }
-  public var quickLookObject: PlaygroundQuickLook? {
+  public var quickLookObject: _PlaygroundQuickLook? {
     let object = _swift_ClassMirror_quickLookObject(data)
     return _getClassPlaygroundQuickLook(object)
   }
