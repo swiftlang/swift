@@ -240,3 +240,9 @@ func testEnumRename() { _ = E.Abc }
 func testAnyToAnyObject(x: Any) {
   x.instMeth(p: 1)
 }
+
+func testProtocolCompositionSyntax() {
+  var _: protocol<>
+  var _: protocol<Prot1>
+  var _: protocol<Prot1, Prot2>
+}
