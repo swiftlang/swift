@@ -1539,8 +1539,7 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
   ReferencedTypeFinder(decltype(Callback) callback) : Callback(callback) {}
 
   void visitType(TypeBase *base) {
-    assert(base->getDesugaredType() == base && "unhandled sugared type");
-    return;
+    llvm_unreachable("unhandled type");
   }
 
   void visitNameAliasType(NameAliasType *aliasTy) {
@@ -1556,12 +1555,29 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
       visit(elemTy);
   }
 
+  void visitReferenceStorageType(ReferenceStorageType *ty) {
+    visit(ty->getReferentType());
+  }
+
   void visitNominalType(NominalType *nominal) {
     Callback(*this, nominal->getDecl());
   }
 
-  void visitMetatypeType(MetatypeType *metatype) {
+  void visitAnyMetatypeType(AnyMetatypeType *metatype) {
     visit(metatype->getInstanceType());
+  }
+
+  void visitDynamicSelfType(DynamicSelfType *module) {
+    return;
+  }
+
+  void visitArchetypeType(ArchetypeType *archetype) {
+    // Appears in protocols and in generic ObjC classes.
+    return;
+  }
+
+  void visitGenericTypeParamType(GenericTypeParamType *archetype) {
+    llvm_unreachable("unexpected generic type param type in @objc decl");
   }
 
   void visitSubstitutedType(SubstitutedType *sub) {

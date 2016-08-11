@@ -328,6 +328,18 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @end
 @objc protocol MyProtocol : NSObjectProtocol {}
 
+// CHECK-LABEL: @protocol MyProtocolMetaOnly;
+// CHECK-LABEL: @interface MyProtocolMetaCheck
+// CHECK-NEXT: - (void)test:(Class <MyProtocolMetaOnly> _Nullable)x;
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class MyProtocolMetaCheck {
+  func test(_ x: MyProtocolMetaOnly.Type?) {}
+}
+// CHECK-LABEL: @protocol MyProtocolMetaOnly
+// CHECK-NEXT: @end
+@objc protocol MyProtocolMetaOnly {}
+
 // CHECK-LABEL: @interface Nested
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
