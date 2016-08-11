@@ -78,6 +78,7 @@ struct SwiftError : SwiftErrorHeader {
   /// This member is only available for native Swift errors.
   const WitnessTable *errorConformance;
 
+#if SWIFT_OBJC_INTEROP
   /// The base type that introduces the `Hashable` conformance.
   /// This member is only available for native Swift errors.
   /// This member is lazily-initialized.
@@ -89,6 +90,7 @@ struct SwiftError : SwiftErrorHeader {
   /// This member is lazily-initialized.
   /// Instead of using it directly, call `getHashableConformance()`.
   mutable std::atomic<const hashable_support::HashableWitnessTable *> hashableConformance;
+#endif
 
   /// Get a pointer to the value contained inside the indirectly-referenced
   /// box reference.
@@ -143,6 +145,7 @@ struct SwiftError : SwiftErrorHeader {
   const WitnessTable *getErrorConformance() const { return errorConformance; }
 #endif
 
+#if SWIFT_OBJC_INTEROP
   /// Get the base type that conforms to `Hashable`.
   /// Returns NULL if the type does not conform.
   const Metadata *getHashableBaseType() const;
@@ -150,6 +153,7 @@ struct SwiftError : SwiftErrorHeader {
   /// Get the `Hashable` protocol witness table for the contained type.
   /// Returns NULL if the type does not conform.
   const hashable_support::HashableWitnessTable *getHashableConformance() const;
+#endif
 
   // Don't copy or move, please.
   SwiftError(const SwiftError &) = delete;
@@ -228,6 +232,14 @@ Class getNSErrorClass();
 const Metadata *getNSErrorMetadata();
 
 #endif
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_sizeof_SwiftError;
 
 } // namespace swift
 
