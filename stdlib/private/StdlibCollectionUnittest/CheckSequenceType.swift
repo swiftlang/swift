@@ -1463,6 +1463,9 @@ extension TestSuite {
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
     SequenceWithEquatableElement.Iterator.Element : Equatable,
+    SequenceWithEquatableElement.SubSequence : Sequence,
+    SequenceWithEquatableElement.SubSequence.Iterator.Element
+      == SequenceWithEquatableElement.Iterator.Element,
     S.SubSequence : Sequence,
     S.SubSequence.Iterator.Element == S.Iterator.Element,
     S.SubSequence.SubSequence == S.SubSequence {
@@ -1616,6 +1619,25 @@ self.test("\(testNamePrefix).dropLast/semantics/negative") {
 }
 
 //===----------------------------------------------------------------------===//
+// drop(while:)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).drop(while:)/semantics").forEach(in: findTests) {
+  test in
+  let s = makeWrappedSequenceWithEquatableElement(test.sequence)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let remainingSequence = s.drop {
+    _blackHole(closureLifetimeTracker)
+    return $0 != wrapValueIntoEquatable(test.element)
+  }
+  let remaining = Array(remainingSequence)
+  let expectedSuffix = test.sequence.suffix(
+    from: test.expected ?? test.sequence.endIndex)
+  expectEqual(expectedSuffix.count, remaining.count)
+  expectEqualSequence(expectedSuffix.map(wrapValueIntoEquatable), remaining)
+}
+
+//===----------------------------------------------------------------------===//
 // prefix()
 //===----------------------------------------------------------------------===//
 
@@ -1652,6 +1674,25 @@ self.test("\(testNamePrefix).prefix/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
   _ = s.prefix(-1)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefix(while:)/semantics").forEach(in: findTests) {
+  test in
+  let s = makeWrappedSequenceWithEquatableElement(test.sequence)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let remainingSequence = s.prefix {
+    _blackHole(closureLifetimeTracker)
+    return $0 != wrapValueIntoEquatable(test.element)
+  }
+  let expectedPrefix = test.sequence.prefix(
+    upTo: test.expected ?? test.sequence.endIndex)
+  let remaining = Array(remainingSequence)
+  expectEqual(expectedPrefix.count, remaining.count)
+  expectEqualSequence(expectedPrefix.map(wrapValueIntoEquatable), remaining)
 }
 
 //===----------------------------------------------------------------------===//

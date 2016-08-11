@@ -44,6 +44,7 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  DropWhile.swift.gyb
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -88,6 +89,7 @@ set(SWIFTLIB_ESSENTIAL
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
