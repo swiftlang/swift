@@ -331,7 +331,7 @@ namespace {
         pointeeType = Impl.importType(pointeeQualType,
                                       ImportTypeKind::Pointee,
                                       AllowNSUIntegerAsInt,
-                                      /*can fully bridge*/false);
+                                      /*isFullyBridgeable*/false);
 
       // If the pointed-to type is unrepresentable in Swift, import as
       // OpaquePointer.
@@ -418,7 +418,7 @@ namespace {
       Type elementType = Impl.importType(type->getElementType(),
                                          ImportTypeKind::Pointee,
                                          AllowNSUIntegerAsInt,
-                                         /*can fully bridge*/false);
+                                         /*isFullyBridgeable*/false);
       if (!elementType)
         return Type();
       
@@ -2272,7 +2272,14 @@ Type ClangImporter::Implementation::importMethodType(
                                OptionalityOfReturn);
     // Adjust the result type for a throwing function.
     if (swiftResultTy && errorInfo) {
-      origSwiftResultTy = swiftResultTy->getCanonicalType();
+
+      // Get the original unbridged result type.
+      origSwiftResultTy = importType(resultType, resultKind,
+                                 allowNSUIntegerAsIntInResult,
+                                 /*isFullyBridgeable*/false,
+                                 OptionalityOfReturn)
+                              ->getCanonicalType();
+
       swiftResultTy = adjustResultTypeForThrowingFunction(*errorInfo,
                                                           swiftResultTy);
     }

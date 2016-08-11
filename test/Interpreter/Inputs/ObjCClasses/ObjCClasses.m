@@ -1,6 +1,7 @@
 #import "ObjCClasses.h"
 #import <Foundation/NSError.h>
 #include <stdio.h>
+#include <assert.h>
 
 @implementation HasHiddenIvars
 @synthesize x;
@@ -131,4 +132,16 @@ static int _value = 0;
 - (NSInteger) count {
   return _objects.count;
 }
+@end
+
+@implementation TestingBool
+
+- (void) shouldBeTrueObjCBool: (BOOL)value {
+  assert(value);
+}
+
+- (void) shouldBeTrueCBool: (_Bool)value {
+  assert(value);
+}
+
 @end
