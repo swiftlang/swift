@@ -1560,7 +1560,7 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
     Callback(*this, nominal->getDecl());
   }
 
-  void visitMetatypeType(MetatypeType *metatype) {
+  void visitAnyMetatypeType(AnyMetatypeType *metatype) {
     visit(metatype->getInstanceType());
   }
 
