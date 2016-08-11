@@ -199,6 +199,13 @@ public:
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
+    // Capture the generic parameters of the decl.
+    if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
+      for (auto sub : DRE->getDeclRef().getSubstitutions()) {
+        checkType(sub.getReplacement(), DRE->getLoc());
+      }
+    }
+
     // DC is the DeclContext where D was defined
     // CurDC is the DeclContext where D was referenced
     auto DC = D->getDeclContext();
@@ -430,17 +437,22 @@ public:
               && !E->getType()->is<AnyMetatypeType>());
 
     // Accessing @objc members doesn't require type metadata.
+    // rdar://problem/27796375 -- allocating init entry points for ObjC
+    // initializers are generated as true Swift generics, so reify type
+    // parameters.
     if (auto memberRef = dyn_cast<MemberRefExpr>(E))
       return !memberRef->getMember().getDecl()->hasClangNode();
 
     if (auto applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (auto methodApply = dyn_cast<ApplyExpr>(applyExpr->getFn())) {
         if (auto callee = dyn_cast<DeclRefExpr>(methodApply->getFn())) {
-          return !callee->getDecl()->isObjC();
+          return !callee->getDecl()->isObjC()
+            || isa<ConstructorDecl>(callee->getDecl());
         }
       }
       if (auto callee = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
-        return !callee->getDecl()->isObjC();
+        return !callee->getDecl()->isObjC()
+          || isa<ConstructorDecl>(callee->getDecl());
       }
     }
 
