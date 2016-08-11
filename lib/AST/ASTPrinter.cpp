@@ -3590,12 +3590,17 @@ public:
       return;
     }
 
-    if (shouldPrintFullyQualified(T)) {
-      if (auto ParentDC = T->getDecl()->getDeclContext()) {
-        printDeclContext(ParentDC);
-        Printer << ".";
-      }
+    auto ParentDC = T->getDecl()->getDeclContext();
+    auto ParentNominal = ParentDC ?
+      ParentDC->getAsNominalTypeOrNominalTypeExtensionContext() : nullptr;
+
+    if (ParentNominal) {
+      visit(ParentNominal->getDeclaredType());
+      Printer << ".";
+    } else if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
     }
+
     printTypeDeclName(T);
   }
 

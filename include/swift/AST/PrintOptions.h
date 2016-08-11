@@ -314,7 +314,7 @@ struct PrintOptions {
 
   /// \brief The module in which the printer is used. Determines if the module
   /// name should be printed when printing a type.
-  ModuleDecl *CurrentModule;
+  ModuleDecl *CurrentModule = nullptr;
 
   /// \brief The information for converting archetypes to specialized types.
   std::shared_ptr<TypeTransformContext> TransformContext;
