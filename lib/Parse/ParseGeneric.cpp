@@ -183,17 +183,7 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   // as written all the way to the right angle bracket (">")
   auto LastGenericParam = GenericParams->getParams().back();
   auto EndOfLastGenericParam =
-  Lexer::getLocForEndOfToken(SourceMgr,
-                             LastGenericParam->getLoc());
-
-  // If the generic parameter list has inherited requirements attached
-  // directly to the parameters themselves, leave them in place.
-  auto InheritedGenericConstraints = LastGenericParam->getInherited();
-  if (!InheritedGenericConstraints.empty()) {
-    EndOfLastGenericParam =
-    Lexer::getLocForEndOfToken(SourceMgr,
-                               InheritedGenericConstraints.back().getLoc());
-  }
+      Lexer::getLocForEndOfToken(SourceMgr, LastGenericParam->getEndLoc());
 
   CharSourceRange RemoveWhereRange { SourceMgr,
     EndOfLastGenericParam,
@@ -218,17 +208,14 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 
   auto Diag = diagnose(WhereRangeInsideBrackets.Start,
                        diag::where_inside_brackets);
+  Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
+                        RemoveWhereRange.getEnd());
 
   if (Tok.is(tok::kw_where)) {
-    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
-                          RemoveWhereRange.getEnd())
-      .fixItReplace(Tok.getLoc(),
-                    WhereClauseText.str());
+    Diag.fixItReplace(Tok.getLoc(), WhereClauseText.str());
   } else {
-    Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
-                          RemoveWhereRange.getEnd())
-      .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
-                   WhereClauseText.str());
+    Diag.fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
+                     WhereClauseText.str());
   }
 }
 
