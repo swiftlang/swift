@@ -265,6 +265,14 @@ extension AnimalContainer {
     T.apexPredator = x // expected-note{{used here}}
   }
 
+  // rdar://problem/27796375 -- allocating init entry points for ObjC
+  // initializers are generated as true Swift generics, so reify type
+  // parameters.
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamE(_ x: T) {
+    _ = GenericClass(thing: x) // expected-note{{used here}}
+  }
+
   func checkThatMethodsAreObjC() {
     _ = #selector(AnimalContainer.doesntUseGenericParam1)
     _ = #selector(AnimalContainer.doesntUseGenericParam2)
@@ -283,9 +291,11 @@ extension AnimalContainer {
 
 extension PettableContainer {
   func doesntUseGenericParam(_ x: T, _ y: T.Type) {
-    _ = type(of: x).init(fur: x).other()
+    // TODO: rdar://problem/27796375--allocating entry points are emitted as
+    // true generics.
+    // _ = type(of: x).init(fur: x).other()
     _ = type(of: x).adopt().other()
-    _ = y.init(fur: x).other()
+    // _ = y.init(fur: x).other()
     _ = y.adopt().other()
     x.pet()
     x.pet(with: x)

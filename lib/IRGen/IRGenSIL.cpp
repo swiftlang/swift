@@ -747,8 +747,10 @@ public:
     // Force all archetypes referenced by the type to be bound by this point.
     // TODO: just make sure that we have a path to them that the debug info
     //       can follow.
-    if (!IGM.IRGen.Opts.Optimize && Ty.getType()->hasArchetype())
-      Ty.getType()->getCanonicalType().visit([&](Type t) {
+    auto runtimeTy = getRuntimeReifiedType(IGM,
+                                           Ty.getType()->getCanonicalType());
+    if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
+      runtimeTy.visit([&](Type t) {
         if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
           emitTypeMetadataRef(archetype);
        });

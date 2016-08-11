@@ -267,8 +267,8 @@ static bool isTypeErasedGenericClassType(CanType type) {
 }
 
 // Get the type that exists at runtime to represent a compile-time type.
-static CanType
-getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+CanType
+irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
