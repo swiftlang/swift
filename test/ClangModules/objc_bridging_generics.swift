@@ -221,6 +221,33 @@ extension AnimalContainer {
     _ = x
   }
 
+  // Doesn't use 'T', since dynamic casting to an ObjC generic class doesn't
+  // check its generic parameters
+  func doesntUseGenericParam7() {
+    _ = (self as AnyObject) as! GenericClass<T>
+    _ = (self as AnyObject) as? GenericClass<T>
+    _ = (self as AnyObject) as! AnimalContainer<T>
+    _ = (self as AnyObject) as? AnimalContainer<T>
+    _ = (self as AnyObject) is AnimalContainer<T>
+    _ = (self as AnyObject) is AnimalContainer<T>
+  }
+
+  // Dynamic casting to the generic parameter would require its generic params,
+  // though
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamZ1() {
+    _ = (self as AnyObject) as! T //expected-note{{here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamZ2() {
+    _ = (self as AnyObject) as? T //expected-note{{here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamZ3() {
+    _ = (self as AnyObject) is T //expected-note{{here}}
+  }
+
+
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamA(_ x: T) {
     _ = T(noise: x) // expected-note{{used here}}
