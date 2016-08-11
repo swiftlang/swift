@@ -236,3 +236,9 @@ enum E {
   case abc
 }
 func testEnumRename() { _ = E.Abc }
+
+func testProtocolCompositionSyntax() {
+  var _: protocol<>
+  var _: protocol<Prot1>
+  var _: protocol<Prot1, Prot2>
+}

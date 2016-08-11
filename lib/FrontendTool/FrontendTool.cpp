@@ -635,7 +635,10 @@ private:
         Info.ID == diag::selector_construction_suggest.ID ||
         Info.ID == diag::selector_literal_deprecated_suggest.ID ||
         Info.ID == diag::attr_noescape_deprecated.ID ||
-        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID)
+        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID ||
+        Info.ID == diag::deprecated_protocol_composition.ID ||
+        Info.ID == diag::deprecated_protocol_composition_single.ID ||
+        Info.ID == diag::deprecated_any_composition.ID)
       return true;
 
     return false;
