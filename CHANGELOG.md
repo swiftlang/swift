@@ -3,6 +3,33 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0128](https://github.com/apple/swift-evolution/blob/master/proposals/0128-unicodescalar-failable-initializer.md)
+
+  Some UnicodeScalar initializers (ones that are non-failable) now return an Optional, 
+  i.e., in case a UnicodeScalar can not be constructed, nil is returned.
+
+  ```swift
+  // Old
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  let ucode = UnicodeScalar(codepoint) // Program crashes at this point.
+  string.append(ucode)
+  ``` 
+
+  After marking the initializer as failable, users can write code like this and the
+  program will execute fine even if the codepoint isn't valid.
+
+  ```swift
+  // New 
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  if let ucode = UnicodeScalar(codepoint) {
+    string.append(ucode)
+  } else {
+    // do something else
+  }
+  ``` 
+
 * [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
 
   Closure parameters are non-escaping by default, rather than explicitly being
