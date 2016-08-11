@@ -57,7 +57,6 @@ KNOWN_SETTINGS=(
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    llvm-enable-assertions      "1"              "enable assertions in LLVM and Clang"
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
@@ -237,7 +236,6 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
-    llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
 
@@ -1962,9 +1960,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
-                    -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
-                    -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
