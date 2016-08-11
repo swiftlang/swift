@@ -3664,17 +3664,13 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
   // Need to be referencing a parameter of function type
   auto declRef = dyn_cast<DeclRefExpr>(expr);
   if (!declRef || !isa<ParamDecl>(declRef->getDecl()) ||
-      !declRef->getType()->is<FunctionType>())
+      !declRef->getType()->is<AnyFunctionType>())
     return false;
 
   // Must be from non-escaping function to escaping function
-  auto srcFT = srcType->getAs<FunctionType>();
-  auto destFT = dstType->getAs<FunctionType>();
+  auto srcFT = srcType->getAs<AnyFunctionType>();
+  auto destFT = dstType->getAs<AnyFunctionType>();
   if (!srcFT || !destFT || !srcFT->isNoEscape() || destFT->isNoEscape())
-    return false;
-
-  // Function types must be equivalent modulo @escaping, @convention, etc.
-  if (!destFT->isEqual(srcFT->withExtInfo(destFT->getExtInfo())))
     return false;
 
   // Pick a specific diagnostic for the specific use
