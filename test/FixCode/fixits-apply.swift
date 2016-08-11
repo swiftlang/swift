@@ -78,6 +78,14 @@ func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
 
+struct Wrapper {
+  typealias InnerMask = MyEventMask2
+}
+func sendItInner(_: Wrapper.InnerMask) {}
+func testInnerMask(a: UInt64) {
+  sendItInner(a)
+}
+
 struct SomeName : RawRepresentable {
   init(_ rawValue: String) {}
   init(rawValue: String) {}

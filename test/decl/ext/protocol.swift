@@ -221,7 +221,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'AssocP4' (aka 'Bool')}}
+  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'S4d.AssocP4' (aka 'Bool')}}
   _ = b1
 }
 
@@ -498,7 +498,7 @@ struct SConforms8c : PConforms8 {
 }
 
 func testSConforms8c() {
-  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Assoc' (aka 'Int')}}
+  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'SConforms8c.Assoc' (aka 'Int')}}
   _ = s
   let i: SConforms8c.Assoc = 5
   _ = i

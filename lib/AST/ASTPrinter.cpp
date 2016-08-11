@@ -3590,12 +3590,24 @@ public:
       return;
     }
 
-    if (shouldPrintFullyQualified(T)) {
-      if (auto ParentDC = T->getDecl()->getDeclContext()) {
-        printDeclContext(ParentDC);
-        Printer << ".";
+    auto ParentDC = T->getDecl()->getDeclContext();
+    auto ParentNominal = ParentDC ?
+      ParentDC->getAsNominalTypeOrNominalTypeExtensionContext() : nullptr;
+
+    if (ParentNominal) {
+      Type ParentTy = ParentNominal->getType();
+      if (auto *MT = ParentTy->getAs<AnyMetatypeType>()) {
+        // Don't print as '<PARENT_TYPENAME>.Type'.
+        // FIXME: There should be a convenient API to get a TypeDecl as a type
+        // without the meta type.
+        ParentTy = Type(MT->getInstanceType());
       }
+      visit(ParentTy);
+      Printer << ".";
+    } else if (shouldPrintFullyQualified(T)) {
+      printModuleContext(T);
     }
+
     printTypeDeclName(T);
   }
 
