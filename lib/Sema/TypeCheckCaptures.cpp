@@ -75,7 +75,29 @@ public:
 
     // We want to look through type aliases here.
     type = type->getCanonicalType();
-
+    
+    class TypeCaptureWalker : public TypeWalker {
+      AnyFunctionRef AFR;
+      llvm::function_ref<void(Type)> Callback;
+    public:
+      explicit TypeCaptureWalker(AnyFunctionRef AFR,
+                                 llvm::function_ref<void(Type)> callback)
+        : AFR(AFR), Callback(callback) {}
+    
+      Action walkToTypePre(Type ty) override {
+        Callback(ty);
+        // Pseudogeneric classes don't use their generic parameters so we
+        // don't need to visit them.
+        if (AFR.isObjC()) {
+          if (auto clas = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
+            if (clas->usesObjCGenericsModel()) {
+              return Action::SkipChildren;
+            }
+          }
+        }
+        return Action::Continue;
+      }
+    };
     // If the type contains dynamic 'Self', conservatively assume we will
     // need 'Self' metadata at runtime. We could generalize the analysis
     // used below for usages of generic parameters in Objective-C
@@ -88,14 +110,14 @@ public:
     // retainable pointer. Similarly stored property access does not
     // need it, etc.
     if (type->hasDynamicSelfType()) {
-      type.visit([&](Type t) {
+      type.walk(TypeCaptureWalker(AFR, [&](Type t) {
         if (auto *dynamicSelf = t->getAs<DynamicSelfType>()) {
           if (DynamicSelfCaptureLoc.isInvalid()) {
             DynamicSelfCaptureLoc = loc;
             DynamicSelf = dynamicSelf;
           }
         }
-      });
+      }));
     }
 
     // Similar to dynamic 'Self', IRGen doesn't really need type metadata
@@ -106,13 +128,13 @@ public:
     // instead, but even there we don't really have enough information to
     // perform it accurately.
     if (type->hasArchetype()) {
-      type.visit([&](Type t) {
+      type.walk(TypeCaptureWalker(AFR, [&](Type t) {
         if (t->is<ArchetypeType>() &&
             !t->isOpenedExistential() &&
           GenericParamCaptureLoc.isInvalid()) {
           GenericParamCaptureLoc = loc;
         }
-      });
+      }));
     }
   }
 
@@ -498,6 +520,17 @@ public:
     if (isa<ClassMetatypeToObjectExpr>(E)
         || isa<ExistentialMetatypeToObjectExpr>(E))
       return false;
+    
+    // Casting to an ObjC class doesn't require the metadata of its type
+    // parameters, if any.
+    if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+      if (auto clas = dyn_cast_or_null<ClassDecl>(
+                         cast->getCastTypeLoc().getType()->getAnyNominal())) {
+        if (clas->usesObjCGenericsModel()) {
+          return false;
+        }
+      }
+    }
     
     // Assigning an object doesn't require type metadata.
     if (auto assignment = dyn_cast<AssignExpr>(E))
