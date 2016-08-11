@@ -3,7 +3,7 @@
 //
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/custom-modules/ -o %t/OS_objects -Xfrontend -disable-access-control
-// RUN: %target-run %t/OS_objects 2>&1 | FileCheck %s
+// RUN: %target-run %t/OS_objects 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test

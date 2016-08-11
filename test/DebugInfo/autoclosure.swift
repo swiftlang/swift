@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: define{{.*}}@_TF11autoclosure7call_meFVs5Int64T_
 // CHECK-NOT: ret void

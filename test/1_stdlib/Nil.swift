@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out

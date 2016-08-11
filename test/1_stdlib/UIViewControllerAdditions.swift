@@ -1,6 +1,6 @@
 // RxUN: %target-build-swift -g %s -o %t/ViewControllerAdditions.out
-// RxUN: %target-run %t/ViewControllerAdditions.out %S/Inputs/UIViewControllerAdditions | FileCheck %s
-// RUN: %target-run-simple-swift %S/Inputs/UIViewControllerAdditions | FileCheck %s
+// RxUN: %target-run %t/ViewControllerAdditions.out %S/Inputs/UIViewControllerAdditions | %FileCheck %s
+// RUN: %target-run-simple-swift %S/Inputs/UIViewControllerAdditions | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: OS=ios

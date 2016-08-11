@@ -93,8 +93,8 @@ func is_doc18() {}
 func is_doc19() {}
 
 // RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
-// RUN: FileCheck %s -check-prefix=WRONG < %t.txt
-// RUN: FileCheck %s < %t.txt
+// RUN: %FileCheck %s -check-prefix=WRONG < %t.txt
+// RUN: %FileCheck %s < %t.txt
 
 // Non-documentation comments should not be attached to anything.
 // WRONG-NOT: NOT_DOC

@@ -16,7 +16,7 @@
 //  outlive the array.  
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift %s | FileCheck %s
+// RUN: %target-run-stdlib-swift %s | %FileCheck %s
 // REQUIRES: executable_test
 //
 // REQUIRES: objc_interop

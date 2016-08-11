@@ -15,8 +15,8 @@
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/classes.h
-// RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
+// RUN: %FileCheck %s < %t/classes.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
 // RUN: not %check-in-clang -fno-modules -Qunused-arguments %t/classes.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-swift-frontend -emit-module -module-name def_enum -o %t %S/Inputs/def_enum.swift %S/Inputs/def_enum_derived.swift
-// RUN: llvm-bcanalyzer %t/def_enum.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %t/def_enum.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -parse -I %t %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -I %t %s -o /dev/null
 

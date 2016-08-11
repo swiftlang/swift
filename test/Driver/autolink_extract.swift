@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -### %s | FileCheck %s
+// RUN: %target-swiftc_driver -### %s | %FileCheck %s
 
 // REQUIRES: autolink-extract
 

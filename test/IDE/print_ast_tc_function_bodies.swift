@@ -2,10 +2,10 @@
 // RUN: %target-parse-verify-swift
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
 
 struct FooStruct {
 // CHECK-LABEL: {{^}}struct FooStruct {{{$}}

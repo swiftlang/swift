@@ -1,14 +1,14 @@
 // XFAIL: broken_std_regex
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_DOT | FileCheck %s -check-prefix=S1_DOT
-// RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX | FileCheck %s -check-prefix=S1_POSTFIX
-// RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX_INIT | FileCheck %s -check-prefix=S1_INIT
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_PAREN_INIT | FileCheck %s -check-prefix=S1_INIT
-// RUN: %complete-test %s -group=none -hide-none -fuzz -structure -tok=STMT_0 | FileCheck %s -check-prefix=STMT_0
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=ENUM_0 | FileCheck %s -check-prefix=ENUM_0
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=OVERRIDE_0 | FileCheck %s -check-prefix=OVERRIDE_0
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_INNER_0 | FileCheck %s -check-prefix=S1_INNER_0
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=INT_INNER_0 | FileCheck %s -check-prefix=INT_INNER_0
-// RUN: %complete-test %s -group=none -fuzz -structure -tok=ASSOCIATED_TYPE_1 | FileCheck %s -check-prefix=ASSOCIATED_TYPE_1
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_DOT | %FileCheck %s -check-prefix=S1_DOT
+// RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX | %FileCheck %s -check-prefix=S1_POSTFIX
+// RUN: %complete-test %s -group=none -add-inner-results -fuzz -structure -tok=S1_POSTFIX_INIT | %FileCheck %s -check-prefix=S1_INIT
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_PAREN_INIT | %FileCheck %s -check-prefix=S1_INIT
+// RUN: %complete-test %s -group=none -hide-none -fuzz -structure -tok=STMT_0 | %FileCheck %s -check-prefix=STMT_0
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=ENUM_0 | %FileCheck %s -check-prefix=ENUM_0
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=OVERRIDE_0 | %FileCheck %s -check-prefix=OVERRIDE_0
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=S1_INNER_0 | %FileCheck %s -check-prefix=S1_INNER_0
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=INT_INNER_0 | %FileCheck %s -check-prefix=INT_INNER_0
+// RUN: %complete-test %s -group=none -fuzz -structure -tok=ASSOCIATED_TYPE_1 | %FileCheck %s -check-prefix=ASSOCIATED_TYPE_1
 
 struct S1 {
   func method1() {}

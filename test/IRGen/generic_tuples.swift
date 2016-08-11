@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
 
 // Make sure that optimization passes don't choke on storage types for generic tuples
 // RUN: %target-swift-frontend -emit-ir -O %s

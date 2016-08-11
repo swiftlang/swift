@@ -3,12 +3,12 @@
 // RUN: %target-parse-verify-swift -show-diagnostics-after-fatal %s
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
-// RUN: FileCheck -check-prefix=NO-TYPEREPR %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck -check-prefix=NO-TYPEREPR %s -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
-// RUN: FileCheck -check-prefix=TYPEREPR %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck -check-prefix=TYPEREPR %s -strict-whitespace < %t.printed.txt
 
 //===---
 //===--- Helper types.

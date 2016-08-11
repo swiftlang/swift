@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

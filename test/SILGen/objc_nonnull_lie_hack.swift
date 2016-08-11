@@ -1,8 +1,8 @@
 // RUN: rm -rf %t/APINotes
 // RUN: mkdir -p %t/APINotes
 // RUN: %clang_apinotes -yaml-to-binary %S/Inputs/gizmo.apinotes -o %t/APINotes/gizmo.apinotesc
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | FileCheck -check-prefix=OPT %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-frontend -emit-sil -O -sdk %S/Inputs -I %S/Inputs -I %t/APINotes -enable-source-import -primary-file %s | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: objc_interop
 

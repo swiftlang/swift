@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
-// RUN: FileCheck %s < %t.ll
+// RUN: %FileCheck %s < %t.ll
 
 class UIWindow {}
 class AppDelegate {
@@ -25,7 +25,7 @@ class AppDelegate {
 
 // End-to-end test:
 // RUN: llc %t.ll -filetype=obj -o %t.o
-// RUN: llvm-dwarfdump %t.o | FileCheck %s --check-prefix DWARF-CHECK
+// RUN: llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
 // DWARF-CHECK: DW_AT_name {{.*}} "f"
 //
 // DWARF-CHECK: DW_TAG_formal_parameter

@@ -6,7 +6,7 @@
 // RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
 
 // RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
-// RUN: FileCheck %s < %t.astdump
+// RUN: %FileCheck %s < %t.astdump
 
 import overload_intFunctions
 import overload_boolFunctions

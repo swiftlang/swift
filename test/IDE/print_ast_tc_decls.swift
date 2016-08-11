@@ -11,51 +11,51 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse -verify %s -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE_TYPE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_ONE_LINE_TYPE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE_TYPEREPR -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_ONE_LINE_TYPEREPR -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module %s
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_RW_PROP_NO_GET_SET -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_2200_DESERIALIZED -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_NO_GET_SET -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_2200_DESERIALIZED -strict-whitespace < %t.printed.txt
 // FIXME: rdar://15167697
-// FIXME: FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
+// FIXME: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_ONE_LINE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -skip-deinit=false -print-module -source-filename %s -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -fully-qualified-types-if-ambiguous=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=PASS_QUAL_IF_AMBIGUOUS -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
-// FIXME: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=PASS_QUAL_IF_AMBIGUOUS -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
+// FIXME: %FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux

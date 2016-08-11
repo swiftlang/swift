@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -parse-sil -sil-inline-threshold 0 %S/Inputs/function_param_convention_input.sil -o %t/FunctionInput.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-name FunctionInput -sil-serialize-all -O
-// RUN: %target-sil-opt -I %t -linker %s -o - | FileCheck %s
+// RUN: %target-sil-opt -I %t -linker %s -o - | %FileCheck %s
 
 import Swift
 import FunctionInput

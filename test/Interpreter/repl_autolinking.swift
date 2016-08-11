@@ -4,7 +4,7 @@
 // RUN: sed -n -e '/REPL_START$/,/REPL_END$/ p' %s > %t/repl.swift
 // RUN: %target-swiftc_driver -emit-library %t/a.swift -I %t -L %t -emit-module-path %t/ModuleA.swiftmodule -autolink-force-load -module-link-name ModuleA -module-name ModuleA -o %t/libModuleA.dylib
 // RUN: %target-swiftc_driver -emit-library %t/b.swift -I %t -L %t -emit-module-path %t/ModuleB.swiftmodule -autolink-force-load -module-link-name ModuleB -module-name ModuleB -o %t/libModuleB.dylib
-// RUN: %swift -repl -I %t -L %t < %t/repl.swift 2>&1 | FileCheck %s
+// RUN: %swift -repl -I %t -L %t < %t/repl.swift 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_repl
 // UNSUPPORTED: OS=linux-gnu

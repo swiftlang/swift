@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -compute-dominance-info -compute-loop-info -loop-canonicalizer %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -compute-dominance-info -compute-loop-info -loop-canonicalizer %s | %FileCheck %s
 
 sil_stage canonical
 

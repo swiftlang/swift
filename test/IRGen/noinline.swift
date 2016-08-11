@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-ir | %FileCheck %s
 
 public var x = 0
 

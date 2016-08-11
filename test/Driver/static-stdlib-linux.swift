@@ -4,7 +4,7 @@
 print("hello world!")
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swiftc_driver -static-stdlib -o %t/static-stdlib %s
-// RUN: %t/static-stdlib | FileCheck %s
-// RUN: ldd %t/static-stdlib | FileCheck %s --check-prefix=LDD
+// RUN: %t/static-stdlib | %FileCheck %s
+// RUN: ldd %t/static-stdlib | %FileCheck %s --check-prefix=LDD
 // CHECK: hello world!
 // LDD-NOT: libswiftCore.so 

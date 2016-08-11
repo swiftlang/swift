@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-stdlib -module-name Swift -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -parse-stdlib -module-name Swift -emit-silgen | %FileCheck %s
 
 enum Optional<T> {
   case none

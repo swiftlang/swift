@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -module-name inout -o %t.ll
-// RUN: cat %t.ll | FileCheck %s
-// RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK
-// RUN: cat %t.ll | FileCheck %s --check-prefix=FOO-CHECK
+// RUN: cat %t.ll | %FileCheck %s
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=PROMO-CHECK
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=FOO-CHECK
 
 // LValues are direct values, too. They are reference types, though.
 

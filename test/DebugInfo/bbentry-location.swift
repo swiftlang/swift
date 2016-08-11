@@ -1,6 +1,6 @@
 // REQUIRES: OS=ios
 // REQUIRES: objc_interop
-// RUN: %target-swift-frontend -emit-ir -g %s -o - | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
 
 import UIKit
 @available(iOS, introduced: 8.0)

@@ -23,7 +23,7 @@
 // RUN: %utils/apply-fixit-edits.py %t.remapping
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -parse %t.sources/fixits.swift 2> %t.result
 
-// RUN: FileCheck %s < %t.result
+// RUN: %FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 3
 
 // CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'

@@ -2,7 +2,7 @@
 // Do not edit the line above.
 
 // RUN: rm -rf %t  &&  mkdir -p %t
-// RUN: %target-run-simple-swift %s %t | FileCheck %s
+// RUN: %target-run-simple-swift %s %t | %FileCheck %s
 // rdar://26960623
 // REQUIRES: disabled
 // REQUIRES: executable_test

@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -emit-library -c %S/Inputs/testability_helper.swift -enable-testing -force-single-frontend-invocation -o %t/testability_helper.o -emit-module
 
 // RUN: %target-build-swift %s -I %t -Xlinker %t/testability_helper.o -o %t/main
-// RUN: %target-run %t/main | FileCheck %s
+// RUN: %target-run %t/main | %FileCheck %s
 // REQUIRES: executable_test
 
 @testable import testability_helper

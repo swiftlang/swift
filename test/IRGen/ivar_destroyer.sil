@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop

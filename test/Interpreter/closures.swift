@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 func localFunc(_ x: Int) -> Int {

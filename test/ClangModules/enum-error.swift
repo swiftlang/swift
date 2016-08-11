@@ -1,18 +1,18 @@
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend -DVALUE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=VALUE
-// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=EMPTYCATCH
-// RUN: %target-swift-frontend -DASQEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=ASQEXPR
-// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=ASBANGEXPR
-// RUN: %target-swift-frontend -DCATCHIS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=CATCHIS
-// RUN: %target-swift-frontend -DCATCHAS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=CATCHAS
-// RUN: %target-swift-frontend -DGENERICONLY -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | FileCheck %s -check-prefix=GENERICONLY
+// RUN: %target-swift-frontend -DVALUE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=VALUE
+// RUN: %target-swift-frontend -DEMPTYCATCH -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=EMPTYCATCH
+// RUN: %target-swift-frontend -DASQEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASQEXPR
+// RUN: %target-swift-frontend -DASBANGEXPR -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=ASBANGEXPR
+// RUN: %target-swift-frontend -DCATCHIS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHIS
+// RUN: %target-swift-frontend -DCATCHAS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
+// RUN: %target-swift-frontend -DGENERICONLY -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
 
 // RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-error.h -verify
 
 // RUN: echo '#include "enum-error.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
-// RUN: FileCheck -check-prefix=HEADER %s < %t.txt
+// RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
 
 import Foundation
 
