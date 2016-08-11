@@ -1896,6 +1896,19 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 /// \endverbatim
 ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                llvm::function_ref<void(Decl*)> Handler) {
+  if (Tok.is(tok::pound_if)) {
+    auto IfConfigResult = parseDeclIfConfig(Flags);
+    if (auto ICD = IfConfigResult.getPtrOrNull()) {
+      // The IfConfigDecl is ahead of its members in source order.
+      Handler(ICD);
+      // Copy the active members into the entries list.
+      for (auto activeMember : ICD->getActiveMembers()) {
+        Handler(activeMember);
+      }
+    }
+    return IfConfigResult;
+  }
+
   Decl* LastDecl = nullptr;
   auto InternalHandler  = [&](Decl *D) {
     LastDecl = D;
@@ -2139,20 +2152,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       DeclResult = parseDeclProtocol(Flags, Attributes);
       Status = DeclResult;
       break;
-    case tok::pound_if: {
-      auto IfConfigResult = parseDeclIfConfig(Flags);
-      Status = IfConfigResult;
-
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        // The IfConfigDecl is ahead of its members in source order.
-        InternalHandler(ICD);
-        // Copy the active members into the entries list.
-        for (auto activeMember : ICD->getActiveMembers()) {
-          InternalHandler(activeMember);
-        }
-      }
-      break;
-    }
     case tok::pound_sourceLocation:
       Status = parseLineDirective(false);
       break;
