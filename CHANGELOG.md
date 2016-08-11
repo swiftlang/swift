@@ -221,9 +221,9 @@ Swift 3.0
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
   prefix and suffix of all strings.
 
-* [SE-128](https://github.com/apple/swift-evolution/blob/master/proposals/0128-unicodescalar-failable-initializer.md)
+* [SE-0128](https://github.com/apple/swift-evolution/blob/master/proposals/0128-unicodescalar-failable-initializer.md)
 
-  Some UnicodeScalar initializers (ones that are non-failable) now returns an Optional, 
+  Some UnicodeScalar initializers (ones that are non-failable) now return an Optional, 
   i.e., in case a UnicodeScalar can not be constructed, nil is returned.
 
   ```swift
