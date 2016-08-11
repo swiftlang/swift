@@ -635,7 +635,8 @@ private:
         Info.ID == diag::selector_construction_suggest.ID ||
         Info.ID == diag::selector_literal_deprecated_suggest.ID ||
         Info.ID == diag::attr_noescape_deprecated.ID ||
-        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID)
+        Info.ID == diag::attr_autoclosure_escaping_deprecated.ID ||
+        Info.ID == diag::any_as_anyobject_fixit.ID)
       return true;
 
     return false;

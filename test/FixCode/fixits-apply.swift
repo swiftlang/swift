@@ -236,3 +236,7 @@ enum E {
   case abc
 }
 func testEnumRename() { _ = E.Abc }
+
+func testAnyToAnyObject(x: Any) {
+  x.instMeth(p: 1)
+}
