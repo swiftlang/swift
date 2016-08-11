@@ -3595,14 +3595,7 @@ public:
       ParentDC->getAsNominalTypeOrNominalTypeExtensionContext() : nullptr;
 
     if (ParentNominal) {
-      Type ParentTy = ParentNominal->getType();
-      if (auto *MT = ParentTy->getAs<AnyMetatypeType>()) {
-        // Don't print as '<PARENT_TYPENAME>.Type'.
-        // FIXME: There should be a convenient API to get a TypeDecl as a type
-        // without the meta type.
-        ParentTy = Type(MT->getInstanceType());
-      }
-      visit(ParentTy);
+      visit(ParentNominal->getDeclaredType());
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
