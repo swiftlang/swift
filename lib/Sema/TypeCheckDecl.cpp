@@ -1538,23 +1538,6 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   }
 }
 
-/// Returns the access level associated with \p accessScope, for diagnostic
-/// purposes.
-///
-/// \sa ValueDecl::getFormalAccessScope
-static Accessibility
-accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
-  if (!accessScope)
-    return Accessibility::Public;
-  if (isa<ModuleDecl>(accessScope))
-    return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext() &&
-      accessScope->getASTContext().LangOpts.EnableSwift3Private) {
-    return Accessibility::FilePrivate;
-  }
-  return Accessibility::Private;
-}
-
 static void checkGenericParamAccessibility(TypeChecker &TC,
                                            const GenericParamList *params,
                                            const Decl *owner,
