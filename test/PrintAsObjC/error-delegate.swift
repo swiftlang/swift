@@ -18,20 +18,12 @@
 
 import Foundation
 
-@objc protocol MySwiftProtocol { }
-
 // CHECK-LABEL: @interface Test : NSObject <ABCErrorProtocol>
 // CHECK-NEXT: - (void)didFail:(NSError * _Nonnull)error;
 // CHECK-NEXT: - (void)didFailOptional:(NSError * _Nullable)error;
-// CHECK-NEXT-FIXME: - (void)composition:(NSError<MySwiftProtocol> * _Nonnull)error;
-// CHECK-NEXT-FIXME: - (void)compositionOptional:(NSError<MySwiftProtocol> * _Nullable)error;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 class Test : NSObject, ABCErrorProtocol {
   func didFail(_ error: Swift.Error) {}
   func didFailOptional(_ error: Swift.Error?) {}
-
-  // FIXME: SILGenc crashes on this.
-  //  func composition(_ error: MySwiftProtocol & Error) { }
-  //  func compositionOptional(_ error: (MySwiftProtocol & Error)?) { }
 }
