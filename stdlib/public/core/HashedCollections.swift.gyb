@@ -671,6 +671,8 @@ public struct Set<Element : Hashable> :
   }
 
   /// The number of elements in the set.
+  ///
+  /// - Complexity: O(1).
   public var count: Int {
     return _variantBuffer.count
   }
@@ -5201,10 +5203,8 @@ extension Set {
   ///     print(attendees.isSubset(of: employees))
   ///     // Prints "true"
   ///
-  /// - Parameter other: A sequence of elements. `possibleSuperset` must be
-  ///   finite.
-  /// - Returns: `true` if the set is a subset of `possibleSuperset`;
-  ///   otherwise, `false`.
+  /// - Parameter other: Another set.
+  /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
   public func isSubset(of other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
@@ -5221,9 +5221,9 @@ extension Set {
   ///     print(employees.isSuperset(of: attendees))
   ///     // Prints "true"
   ///
-  /// - Parameter possibleSubset: Another set.
-  /// - Returns: `true` if the set is a superset of `possibleSubset`;
-  ///   otherwise, `false`.
+  /// - Parameter other: Another set.
+  /// - Returns: `true` if the set is a superset of `other`; otherwise,
+  ///   `false`.
   public func isSuperset(of other: Set<Element>) -> Bool {
     return other.isSubset(of: self)
   }
@@ -5283,9 +5283,9 @@ extension Set {
   ///     print(employees.isStrictSuperset(of: employees))
   ///     // Prints "false"
   ///
-  /// - Parameter possibleStrictSubset: Another set.
+  /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict superset of
-  ///   `possibleStrictSubset`; otherwise, `false`.
+  ///   `other`; otherwise, `false`.
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
     return self.isSuperset(of: other) && self != other
   }
@@ -5306,9 +5306,9 @@ extension Set {
   ///     print(attendees.isStrictSubset(of: attendees))
   ///     // Prints "false"
   ///
-  /// - Parameter possibleStrictSuperset: Another set.
+  /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict subset of
-  ///   `possibleStrictSuperset`; otherwise, `false`.
+  ///   `other`; otherwise, `false`.
   public func isStrictSubset(of other: Set<Element>) -> Bool {
     return other.isStrictSuperset(of: self)
   }

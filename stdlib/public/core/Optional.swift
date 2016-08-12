@@ -304,6 +304,39 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
+/// Returns a Boolean value indicating whether two optional instances are
+/// equal.
+///
+/// Use this equal-to operator (`==`) to compare any two optional instances of
+/// a type that conforms to the `Equatable` protocol. The comparison returns
+/// `true` if both arguments are `nil` or if the two arguments wrap values
+/// that are equal. Conversely, the comparison returns `false` if only one of
+/// the arguments is `nil` or if the two arguments wrap values that are not
+/// equal.
+///
+///     let group1 = [1, 2, 3, 4, 5]
+///     let group2 = [1, 3, 5, 7, 9]
+///     if group1.first == group2.first {
+///         print("The two groups start the same.")
+///     }
+///     // Prints "The two groups start the same."
+///
+/// You can also use this operator to compare a non-optional value to an
+/// optional that wraps the same type. The non-optional value is wrapped as an
+/// optional before the comparison is made. In this example, the
+/// `numberToMatch` constant is wrapped as an optional before comparing to the
+/// optional `numberFromString`:
+///
+///     let numberToFind: Int = 23
+///     let numberFromString: Int? = Int("23")      // Optional(23)
+///     if numberToFind == numberFromString {
+///         print("It's a match!")
+///     }
+///     // Prints "It's a match!"
+///
+/// - Parameters:
+///   - lhs: An optional value to compare.
+///   - rhs: Another optional value to compare.
 public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -315,6 +348,39 @@ public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether two optional instances are not
+/// equal.
+///
+/// Use this not-equal-to operator (`==`) to compare any two optional instances
+/// of a type that conforms to the `Equatable` protocol. The comparison
+/// returns `true` if only one of the arguments is `nil` or if the two
+/// arguments wrap values that are not equal. The comparison returns `false`
+/// if both arguments are `nil` or if the two arguments wrap values that are
+/// equal.
+///
+///     let group1 = [2, 4, 6, 8, 10]
+///     let group2 = [1, 3, 5, 7, 9]
+///     if group1.first != group2.first {
+///         print("The two groups start differently.")
+///     }
+///     // Prints "The two groups start differently."
+///
+/// You can also use this operator to compare a non-optional value to an
+/// optional that wraps the same type. The non-optional value is wrapped as an
+/// optional before the comparison is made. In this example, the
+/// `numberToMatch` constant is wrapped as an optional before comparing to the
+/// optional `numberFromString`:
+///
+///     let numberToFind: Int = 23
+///     let numberFromString: Int? = Int("not-a-number")      // nil
+///     if numberToFind != numberFromString {
+///         print("No match.")
+///     }
+///     // Prints "No match."
+///
+/// - Parameters:
+///   - lhs: An optional value to compare.
+///   - rhs: Another optional value to compare.
 public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
@@ -328,6 +394,40 @@ public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   public init(nilLiteral: ()) {
   }
 }
+
+/// Returns a Boolean value indicating whether an argument matches `nil`.
+///
+/// You can use the pattern-matching operator (`~=`) to test whether an
+/// optional instance is `nil` even when the wrapped value's type does not
+/// conform to the `Equatable` protocol. The following example declares the
+/// `numbers` variable as an optional array of integers. Although `Array<Int>`
+/// is not an `Equatable` type, this operator allows matching against `nil`.
+///
+///     var numbers: [Int]?
+///     if nil ~= numbers {
+///         print("No numbers to be found.")
+///     }
+///     // Prints "No numbers to be found."
+///
+/// The pattern-matching operator is used internally in `case` statements for
+/// pattern matching. When you match against `nil` in a `case` statement, this
+/// operator is called behind the scenes.
+///
+///     switch numbers {
+///     case nil:
+///         print("No numbers to be found.")
+///     case let x?:
+///         print("Found \(x.count) numbers.")
+///     }
+///     // Prints "No numbers to be found."
+///
+/// - Note: In most cases, you should use the equal-to operator (`==`) to test
+///   whether an instance is `nil`. The pattern-matching operator is primarily
+///   intended to enable `case` statement pattern matching.
+///
+/// - Parameters:
+///   - lhs: A `nil` literal.
+///   - rhs: A value to match against `nil`.
 @_transparent
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -340,6 +440,26 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 
 // Enable equality comparisons against the nil literal, even if the
 // element type isn't equatable
+
+/// Returns a Boolean value indicating whether the left-hand-side argument is
+/// `nil`.
+///
+/// You can use this equal-to operator (`==`) to test whether an optional
+/// instance is `nil` even when the wrapped value's type does not conform to
+/// the `Equatable` protocol. The following example declares the `numbers`
+/// variable as an optional array of integers. Although `Array<Int>` is not an
+/// `Equatable` type, this operator allows checking whether `numbers` is
+/// `nil`.
+///
+///     var numbers: [Int]?
+///     if numbers == nil {
+///         print("No numbers to be found.")
+///     }
+///     // Prints "No numbers to be found."
+///
+/// - Parameters:
+///   - lhs: A value to compare to `nil`.
+///   - rhs: A `nil` literal.
 @_transparent
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
@@ -350,6 +470,25 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether the left-hand-side argument is
+/// not `nil`.
+///
+/// You can use this not-equal-to operator (`!=`) to test whether an optional
+/// instance is not `nil` even when the wrapped value's type does not conform
+/// to the `Equatable` protocol. The following example declares the `numbers`
+/// variable as an optional array of integers. Although `Array<Int>` is not an
+/// `Equatable` type, this operator allows checking whether `numbers` wraps a
+/// value and is therefore not `nil`.
+///
+///     var numbers: [Int]? = [10, 20, 30, 40]
+///     if nil != numbers {
+///         print("Found some numbers.")
+///     }
+///     // Prints "Found some numbers."
+///
+/// - Parameters:
+///   - lhs: A value to compare to `nil`.
+///   - rhs: A `nil` literal.
 @_transparent
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
@@ -360,6 +499,25 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether the right-hand-side argument is
+/// `nil`.
+///
+/// You can use this equal-to operator (`==`) to test whether an optional
+/// instance is `nil` even when the wrapped value's type does not conform to
+/// the `Equatable` protocol. The following example declares the `numbers`
+/// variable as an optional array of integers. Although `Array<Int>` is not an
+/// `Equatable` type, this operator allows checking whether `numbers` is
+/// `nil`.
+///
+///     var numbers: [Int]?
+///     if nil == numbers {
+///         print("No numbers to be found.")
+///     }
+///     // Prints "No numbers to be found."
+///
+/// - Parameters:
+///   - lhs: A `nil` literal.
+///   - rhs: A value to compare to `nil`.
 @_transparent
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
@@ -370,6 +528,25 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether the right-hand-side argument is
+/// not `nil`.
+///
+/// You can use this not-equal-to operator (`!=`) to test whether an optional
+/// instance is not `nil` even when the wrapped value's type does not conform
+/// to the `Equatable` protocol. The following example declares the `numbers`
+/// variable as an optional array of integers. Although `Array<Int>` is not an
+/// `Equatable` type, this operator allows checking whether `numbers` wraps a
+/// value and is therefore not `nil`.
+///
+///     var numbers: [Int]? = [10, 20, 30, 40]
+///     if nil != numbers {
+///         print("Found some numbers.")
+///     }
+///     // Prints "Found some numbers."
+///
+/// - Parameters:
+///   - lhs: A `nil` literal.
+///   - rhs: A value to compare to `nil`.
 @_transparent
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
