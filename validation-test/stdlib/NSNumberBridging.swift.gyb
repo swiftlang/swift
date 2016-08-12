@@ -151,7 +151,7 @@ extension ${Self} {
   func toNSNumberByteArray() -> [UInt8] {
     var v = self.bitPattern
     var result: [UInt8] = []
-    for _ in 0 ..< MemoryLayout._ofInstance(v).size {
+    for _ in 0 ..< MemoryLayout.size(ofValue: v) {
       result.append(UInt8(v & 0xff))
       v = v >> 8
     }

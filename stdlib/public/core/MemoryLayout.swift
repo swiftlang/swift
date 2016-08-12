@@ -12,30 +12,28 @@
 
 /// The memory layout of a type, describing its size, stride, and alignment.
 public enum MemoryLayout<T> {
-
-  /// The contiguous memory footprint of the type.
+  /// The contiguous memory footprint of `T`.
   ///
-  /// The `size` property for a type `T` does not include any
-  /// dynamically-allocated or "remote" storage. In particular,
-  /// `MemoryLayout<T>.size`, when `T` is a class type, is the same regardless
-  /// of how many stored properties `T` has.
+  /// Does not include any dynamically-allocated or "remote" storage. In
+  /// particular, `MemoryLayout<T>.size`, when `T` is a class type, is the same
+  /// regardless of how many stored properties `T` has.
   @_transparent
   public static var size: Int {
     return Int(Builtin.sizeof(T.self))
   }
 
-  /// The number of bytes from the start of one instance to the start of the
-  /// next, when stored in a contiguous array.
+  /// The number of bytes from the start of one instance of `T` to the start of
+  /// the next in an `Array<T>`.
   ///
   /// This is the same as the number of bytes moved when an `UnsafePointer<T>`
-  /// is incremented. The type may have a lower minimal alignment that trades
-  /// runtime performance for space efficiency. The result is always positive.
+  /// is incremented. `T` may have a lower minimal alignment that trades runtime
+  /// performance for space efficiency. The result is always positive.
   @_transparent
   public static var stride: Int {
     return Int(Builtin.strideof_nonzero(T.self))
   }
 
-  /// The default memory alignment of the type.
+  /// The default memory alignment of `T`.
   @_transparent
   public static var alignment: Int {
     return Int(Builtin.alignof(T.self))
@@ -43,9 +41,30 @@ public enum MemoryLayout<T> {
 }
 
 extension MemoryLayout {
+  /// Returns the contiguous memory footprint of `T`.
+  ///
+  /// Does not include any dynamically-allocated or "remote" storage. In
+  /// particular, `MemoryLayout.size(ofValue: x)`, when `x` is a class instance,
+  /// is the same regardless of how many stored properties `T` has.
   @_transparent
-  public // @testable
-  static func _ofInstance(_: @autoclosure () -> T) -> MemoryLayout<T>.Type {
-    return MemoryLayout<T>.self
+  public static func size(ofValue _: T) -> Int {
+    return MemoryLayout.size
+  }
+
+  /// Returns the number of bytes from the start of one instance of `T` to the
+  /// start of the next in an `Array<T>`.
+  ///
+  /// This is the same as the number of bytes moved when an `UnsafePointer<T>`
+  /// is incremented. `T` may have a lower minimal alignment that trades runtime
+  /// performance for space efficiency. The result is always positive.
+  @_transparent
+  public static func stride(ofValue _: T) -> Int {
+    return MemoryLayout.stride
+  }
+
+  /// Returns the default memory alignment of `T`.
+  @_transparent
+  public static func alignment(ofValue _: T) -> Int {
+    return MemoryLayout.alignment
   }
 }

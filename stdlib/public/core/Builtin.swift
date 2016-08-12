@@ -20,7 +20,7 @@ public func sizeof<T>(_:T.Type) -> Int {
   Builtin.unreachable()
 }
 
-@available(*, unavailable, message: "use MemoryLayout<T>.size instead.")
+@available(*, unavailable, renamed: "MemoryLayout.size(ofValue:)")
 public func sizeofValue<T>(_:T) -> Int {
   Builtin.unreachable()
 }
@@ -30,7 +30,7 @@ public func alignof<T>(_:T.Type) -> Int {
   Builtin.unreachable()
 }
 
-@available(*, unavailable, message: "use MemoryLayout<T>.alignment instead.")
+@available(*, unavailable, renamed: "MemoryLayout.alignment(ofValue:)")
 public func alignofValue<T>(_:T) -> Int {
   Builtin.unreachable()
 }
@@ -40,7 +40,7 @@ public func strideof<T>(_:T.Type) -> Int {
   Builtin.unreachable()
 }
 
-@available(*, unavailable, message: "use MemoryLayout<T>.stride instead.")
+@available(*, unavailable, renamed: "MemoryLayout.stride(ofValue:)")
 public func strideofValue<T>(_:T) -> Int {
   Builtin.unreachable()
 }

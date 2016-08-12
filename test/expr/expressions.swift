@@ -891,9 +891,5 @@ func se0101<P: Pse0101>(x: Cse0101<P>) {
   _ = sizeof(Cse0101<P>.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{24-30=>.size}} {{none}}
   _ = alignof(Cse0101<P>.T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{27-33=>.alignment}} {{none}}
   _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
-  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}/
-
-  _ = sizeofValue(x) // expected-error {{'sizeofValue' is unavailable: use MemoryLayout<T>.size instead.}} {{7-21=MemoryLayout<Cse0101<P>>.size}} {{none}}
-  _ = alignofValue(x.val) // expected-error {{'alignofValue' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-26=MemoryLayout<P>.alignment}} {{none}}
-  _ = strideofValue(x.val.getIt()) // expected-error {{'strideofValue' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-35=MemoryLayout<P.Value>.stride}} {{none}}
+  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}
 }

@@ -144,7 +144,7 @@ extension Int64 : CVarArg, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return MemoryLayout._ofInstance(self).alignment
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
@@ -192,7 +192,7 @@ extension UInt64 : CVarArg, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return MemoryLayout._ofInstance(self).alignment
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
@@ -265,7 +265,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return MemoryLayout._ofInstance(Double(self)).alignment
+    return MemoryLayout.alignment(ofValue: Double(self))
   }
 }
 
@@ -280,7 +280,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   /// the value returned by `_cVarArgEncoding`.
   public var _cVarArgAlignment: Int {
     // FIXME: alignof differs from the ABI alignment on some architectures
-    return MemoryLayout._ofInstance(self).alignment
+    return MemoryLayout.alignment(ofValue: self)
   }
 }
 
