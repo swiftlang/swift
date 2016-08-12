@@ -88,7 +88,7 @@ class Super {
 class Sub : Super {
   override func f1(_ x: @autoclosure(escaping)() -> ()) { }
     // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{37-47= @escaping }}
-  override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}}
+  override func f2(_ x: @autoclosure () -> ()) { } // expected-error{{does not override any method}} // expected-note{{type does not match superclass instance method with type '(@autoclosure @escaping () -> ()) -> ()'}}
   override func f3(_ x: @autoclosure(escaping) () -> ()) { }  // expected-error{{does not override any method}}
     // expected-warning@-1{{@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead}} {{37-47= @escaping}}
 }
