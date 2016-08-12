@@ -989,6 +989,7 @@ public:
 /// "[\(min)..\(max)]"
 /// \endcode
 class InterpolatedStringLiteralExpr : public LiteralExpr {
+  /// Points at the beginning quote.
   SourceLoc Loc;
   MutableArrayRef<Expr *> Segments;
   Expr *SemanticExpr;
@@ -1007,10 +1008,12 @@ public:
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
   
   SourceLoc getStartLoc() const {
-    return Segments.front()->getStartLoc();
+    return Loc;
   }
   SourceLoc getEndLoc() const {
-    return Segments.back()->getEndLoc();
+    // SourceLocs are token based, and the interpolated string is one string
+    // token, so the range should be (Start == End).
+    return Loc;
   }
   
   static bool classof(const Expr *E) {
