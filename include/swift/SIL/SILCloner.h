@@ -270,6 +270,7 @@ public:
     {
       setInsertionPoint(SC.getBuilder().getInsertionBB(),
                         SC.getBuilder().getInsertionPoint());
+      setOpenedArchetypesTracker(SC.getBuilder().getOpenedArchetypesTracker());
     }
 
   ~SILBuilderWithPostProcess() {
