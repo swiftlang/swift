@@ -1466,6 +1466,13 @@ function(add_swift_library name)
           "${UNIVERSAL_LIBRARY_NAME}"
           ${THIN_INPUT_TARGETS})
 
+      if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
+          # Ad-hoc sign stdlib dylibs
+          add_custom_command(TARGET "${lipo_target}"
+                             POST_BUILD
+                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
+      endif()
+
       # Determine the subdirectory where this library will be installed.
       set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
 
