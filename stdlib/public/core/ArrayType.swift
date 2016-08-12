@@ -61,7 +61,7 @@ protocol _ArrayProtocol
   ///
   /// - returns: The removed element.
   ///
-  /// - Complexity: Worst case O(N).
+  /// - Complexity: Worst case O(*n*).
   ///
   /// - Precondition: `count > index`.
   @discardableResult

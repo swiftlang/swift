@@ -467,7 +467,7 @@ struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Precondition: `U` is a class or `@objc` existential.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {

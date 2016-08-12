@@ -191,7 +191,7 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 /// same value. For value equality, see the equal-to operator (`==`) and the
 /// `Equatable` protocol.
 ///
-/// The following example defines an `IntegerRef` type; an integer type with
+/// The following example defines an `IntegerRef` type, an integer type with
 /// reference semantics.
 ///
 ///     class IntegerRef: Equatable {
@@ -218,7 +218,7 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 ///     // Prints "true"
 ///
 /// The identical-to operator (`===`) returns `false` when comparing two
-/// references to different objects instances, even if the two instances have
+/// references to different object instances, even if the two instances have
 /// the same value.
 ///
 ///     let c = IntegerRef(10)

@@ -70,7 +70,7 @@ extension Sequence {
   /// These counters can only be used as indices in instances of zero-based,
   /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
   /// other collections the counters may be out of range or of the wrong type
-  /// to use as an index. To iterate over the elements of collection with its
+  /// to use as an index. To iterate over the elements of a collection with its
   /// indices, use the `zip(_:_:)` function.
   ///
   /// This example iterates over the indices and elements of a set, building a
@@ -312,7 +312,7 @@ ${equivalenceExplanation}
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %   if preds:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain equivalent elements, using the given predicate as the
   /// equivalence test.
   ///
@@ -328,13 +328,13 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:)`
 %   else:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
   ///
   /// At least one of the sequences must be finite.
   ///
   /// This example tests whether one countable range shares the same elements
-  /// as another countable range and as an array with the same elements.
+  /// as another countable range and an array.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
@@ -393,7 +393,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the given
+  /// sequence in a lexicographical (dictionary) ordering, using the given
   /// predicate to compare elements.
   ///
 ${orderingExplanation}
@@ -412,7 +412,7 @@ ${orderingExplanation}
   /// - SeeAlso: `lexicographicallyPrecedes(_:)`
 %   else:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the
+  /// sequence in a lexicographical (dictionary) ordering, using the
   /// less-than operator (`<`) to compare elements.
   ///
   /// This example uses the `lexicographicallyPrecedes` method to test which
@@ -432,7 +432,7 @@ ${orderingExplanation}
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting
-  ///   strings to present to the end user, you should use `String` APIs that
+  ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
@@ -611,7 +611,7 @@ extension Sequence {
   ///
   /// The sequence must be finite.
   ///
-  /// - Complexity: O(N), where N is the length of the sequence.
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.

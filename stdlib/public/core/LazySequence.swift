@@ -44,7 +44,7 @@
 ///       ///
 ///       ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
 ///       ///
-///       /// - Complexity: O(N)
+///       /// - Complexity: O(n)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
 ///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
