@@ -108,7 +108,10 @@ class LLVMTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertNotIn('-DCLANG_VENDOR=Apple', llvm.cmake_options)
-        self.assertNotIn('-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang', llvm.cmake_options)
+        self.assertNotIn(
+            '-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang',
+            llvm.cmake_options
+        )
         self.assertNotIn('-DPACKAGE_VERSION=1.2.3', llvm.cmake_options)
 
         self.args.compiler_vendor = "apple"
@@ -151,4 +154,7 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertIn('-DCLANG_REPOSITORY_STRING=clang-2.2.3', llvm.cmake_options)
+        self.assertIn(
+            '-DCLANG_REPOSITORY_STRING=clang-2.2.3',
+            llvm.cmake_options
+        )

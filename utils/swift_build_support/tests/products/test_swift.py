@@ -91,10 +91,15 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VENDOR' in x])
-        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VENDOR_UTI' in x])
-        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VERSION' in x])
-        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x])
+        self.assertListEqual(
+            [], [x for x in swift.cmake_options if 'SWIFT_VENDOR' in x])
+        self.assertListEqual(
+            [], [x for x in swift.cmake_options if 'SWIFT_VENDOR_UTI' in x])
+        self.assertListEqual(
+            [], [x for x in swift.cmake_options if 'SWIFT_VERSION' in x])
+        self.assertListEqual(
+            [],
+            [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x])
 
         self.args.compiler_vendor = "apple"
         self.args.swift_user_visible_version = "1.3"
@@ -105,7 +110,9 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertIn('-DSWIFT_VENDOR=Apple', swift.cmake_options)
-        self.assertIn('-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift', swift.cmake_options)
+        self.assertIn(
+            '-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift',
+            swift.cmake_options)
         self.assertIn('-DSWIFT_VERSION=1.3', swift.cmake_options)
         self.assertIn('-DSWIFT_COMPILER_VERSION=', swift.cmake_options)
 
@@ -118,10 +125,11 @@ class SwiftTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         self.assertIn('-DSWIFT_VENDOR=Apple', swift.cmake_options)
-        self.assertIn('-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift', swift.cmake_options)
+        self.assertIn(
+            '-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift',
+            swift.cmake_options)
         self.assertIn('-DSWIFT_VERSION=1.3', swift.cmake_options)
         self.assertIn('-DSWIFT_COMPILER_VERSION=2.3', swift.cmake_options)
-
 
         self.args.compiler_vendor = "unknown"
         with self.assertRaises(RuntimeError):

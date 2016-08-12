@@ -47,8 +47,7 @@ class LLVM(product.Product):
             "-DCLANG_VENDOR=Apple",
             "-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang",
             # This is safe since we always provide a default of 3.8.0
-            "-DPACKAGE_VERSION={}".\
-              format(self.args.clang_user_visible_version)
+            "-DPACKAGE_VERSION={}".format(self.args.clang_user_visible_version)
         ]
 
     @property

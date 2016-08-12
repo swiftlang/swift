@@ -604,11 +604,11 @@ class BuildScriptInvocation(object):
             cmake_opts = product.cmake_options
 
             # FIXME: We should be using pipes.quote here but we run into issues
-            # with build-script-impl/cmake not being happy with all of the extra
-            # "'" in the strings. To fix this easily, we really need to just
-            # invoke cmake from build-script directly rather than futzing with
-            # build-script-impl. This makes even more sense since there really
-            # isn't a security issue here.
+            # with build-script-impl/cmake not being happy with all of the
+            # extra "'" in the strings. To fix this easily, we really need to
+            # just invoke cmake from build-script directly rather than futzing
+            # with build-script-impl. This makes even more sense since there
+            # really isn't a security issue here.
             impl_args += [
                 "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
             ]
