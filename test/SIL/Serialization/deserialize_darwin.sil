@@ -1,6 +1,6 @@
 // Make sure that we can deserialize darwin.
 // RUN: %target-sil-opt %platform-sdk-overlay-dir/Darwin.swiftmodule > /dev/null
-// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Darwin.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Darwin.swiftmodule | %FileCheck %s
 
 // REQUIRES: objc_interop
 

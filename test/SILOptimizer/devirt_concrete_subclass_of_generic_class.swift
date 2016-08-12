@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 // Check that devirtualizer can properly handle concrete non-generic subclasses 
 // of generic classes.

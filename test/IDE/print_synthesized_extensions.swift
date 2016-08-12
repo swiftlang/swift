@@ -1,19 +1,19 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -emit-module-path %t/print_synthesized_extensions.swiftmodule -emit-module-doc -emit-module-doc-path %t/print_synthesized_extensions.swiftdoc %s
 // RUN: %target-swift-ide-test -print-module -annotate-print -synthesize-extension -print-interface -no-empty-line-between-members -module-to-print=print_synthesized_extensions -I %t -source-filename=%s > %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK2 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK3 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK4 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK5 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK6 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK7 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK8 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK9 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK10 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
-// RUN: FileCheck %s -check-prefix=CHECK13 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK1 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK2 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK3 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK4 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK5 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK6 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK7 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK8 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK9 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK10 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK11 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK13 < %t.syn.txt
 
 public protocol P1 {
   associatedtype T1

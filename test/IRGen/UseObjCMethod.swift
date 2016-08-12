@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 import Foundation

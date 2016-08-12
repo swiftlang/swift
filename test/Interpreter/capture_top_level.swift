@@ -1,10 +1,10 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 
 // RUN: %target-build-swift -DVAR %s -o %t-var
-// RUN: %target-run %t-var | FileCheck %s
+// RUN: %target-run %t-var | %FileCheck %s
 
 // RUN: %target-build-swift -DVAR_UPDATE %s -o %t-var
-// RUN: %target-run %t-var | FileCheck %s
+// RUN: %target-run %t-var | %FileCheck %s
 
 // REQUIRES: executable_test
 

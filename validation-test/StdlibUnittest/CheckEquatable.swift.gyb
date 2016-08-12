@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swiftgyb > %t.stdout 2>&1
-// RUN: FileCheck %s < %t.stdout
+// RUN: %FileCheck %s < %t.stdout
 // REQUIRES: executable_test
 
 import StdlibUnittest

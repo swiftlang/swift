@@ -5,7 +5,7 @@
 
 // RUN: %target-build-swift %s %t/NSLogIsWorking.o -import-objc-header %t/NSLogIsWorking.h -o %t/main
 // RUN: %target-run %t/main 2>%t/output.txt
-// RUN: (FileCheck %s < %t/output.txt) || (not FileCheck -check-prefix=CHECK-WORKING %s < %t/output.txt)
+// RUN: %FileCheck %s < %t/output.txt
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -13,7 +13,6 @@
 import Foundation
 
 // CHECK: working
-// CHECK-WORKING: working
 testNSLog()
 
 // CHECK: 1 is the loneliest number that you'll ever do

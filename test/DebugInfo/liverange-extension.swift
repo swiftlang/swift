@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -g -emit-ir -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -g -emit-ir -o - | %FileCheck %s
 
 func use<T>(_ x: T) {}
 

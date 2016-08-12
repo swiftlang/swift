@@ -2,9 +2,9 @@
 //
 // REQUIRES: swift_interpreter
 //
-// RUN: %swift_driver_plain -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
-// RUN: %swift_driver_plain run -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
-// RUN: %swift_driver_plain repl -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
+// RUN: %swift_driver_plain -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
+// RUN: %swift_driver_plain run -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
+// RUN: %swift_driver_plain repl -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-INVOKES-REPL %s
 //
 // CHECK-SWIFT-INVOKES-REPL: {{.*}}/swift -frontend -repl
 
@@ -18,11 +18,11 @@
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/stdin
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/t.swift
 // RUN: echo "print(\"exec: \" + #file)" > %t.dir/subpath/build
-// RUN: cd %t.dir && %swift_driver_plain - < %t.dir/stdin -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-STDIN-INVOKES-INTERPRETER %s
+// RUN: cd %t.dir && %swift_driver_plain - < %t.dir/stdin -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-STDIN-INVOKES-INTERPRETER %s
 // CHECK-SWIFT-STDIN-INVOKES-INTERPRETER: exec: <stdin>
-// RUN: cd %t.dir && %swift_driver_plain t.swift -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-SUFFIX-INVOKES-INTERPRETER %s
+// RUN: cd %t.dir && %swift_driver_plain t.swift -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-SUFFIX-INVOKES-INTERPRETER %s
 // CHECK-SWIFT-SUFFIX-INVOKES-INTERPRETER: exec: t.swift
-// RUN: cd %t.dir && %swift_driver_plain subpath/build -### 2>&1 | FileCheck -check-prefix=CHECK-SWIFT-PATH-INVOKES-INTERPRETER %s
+// RUN: cd %t.dir && %swift_driver_plain subpath/build -### 2>&1 | %FileCheck -check-prefix=CHECK-SWIFT-PATH-INVOKES-INTERPRETER %s
 // CHECK-SWIFT-PATH-INVOKES-INTERPRETER: exec: subpath/build
 
 
@@ -33,5 +33,5 @@
 // RUN: echo "#!/bin/sh" > %t.dir/swift-foo
 // RUN: echo "echo \"exec: \$0\"" >> %t.dir/swift-foo
 // RUN: chmod +x %t.dir/swift-foo
-// RUN: env PATH=%t.dir %swift_driver_plain foo | FileCheck -check-prefix=CHECK-SWIFT-SUBCOMMAND %s
+// RUN: env PATH=%t.dir %swift_driver_plain foo | %FileCheck -check-prefix=CHECK-SWIFT-SUBCOMMAND %s
 // CHECK-SWIFT-SUBCOMMAND: exec: {{.*}}/swift-foo

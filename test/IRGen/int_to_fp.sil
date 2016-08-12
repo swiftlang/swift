@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
 // Test if llvm can generate code for it
 // RUN: %target-swift-frontend -c %s

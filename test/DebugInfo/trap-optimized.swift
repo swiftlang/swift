@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s -emit-ir -g -o - | %FileCheck %s
 import StdlibUnittest
 // CHECK-LABEL: define{{.*}}2fn
 public var i : UInt32 = 1

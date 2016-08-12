@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // Two select_enum instructions must not be considered as the same "condition",
 // even if they have the same enum operand.

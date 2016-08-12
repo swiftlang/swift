@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/block_property_in_objc_class.h -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/block_property_in_objc_class.h -emit-silgen %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 // CHECK-LABEL: sil hidden @_TF32lying_about_optional_return_objc45optionalChainingForeignFunctionTypeProperties

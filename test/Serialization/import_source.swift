@@ -1,6 +1,6 @@
 // RUN: not %target-swift-frontend -parse -I %S/Inputs %s 2>%t.txt
-// RUN: FileCheck %s < %t.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.txt
+// RUN: %FileCheck %s < %t.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE < %t.txt
 
 // FIXME: We need to type-check transparent functions if they are used.
 // XFAIL: *

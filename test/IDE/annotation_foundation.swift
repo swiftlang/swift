@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -annotate -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -annotate -source-filename %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

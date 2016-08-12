@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 import Swift
 // CHECK: define{{.*}}1f

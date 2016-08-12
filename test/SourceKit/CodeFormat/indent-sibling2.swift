@@ -57,7 +57,7 @@ public func someTestFunc(withArgumentLabel label: String,
 // RUN: %sourcekitd-test -req=format -line=41 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=42 -length=1 %s >>%t.response
 
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 //                        "foo(0,"
 // CHECK: key.sourcetext: "    bar: 1,"

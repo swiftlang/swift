@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -O %s | FileCheck --check-prefix=CHECK-%target-runtime %s
-// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Ounchecked %s | FileCheck --check-prefix=CHECK-%target-runtime %s
-// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Onone %s | FileCheck --check-prefix=ONONE %s
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -O %s | %FileCheck --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Ounchecked %s | %FileCheck --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Onone %s | %FileCheck --check-prefix=ONONE %s
 
 // REQUIRES: CPU=i386_or_x86_64
 

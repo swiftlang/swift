@@ -2,8 +2,8 @@
 // RUN: mkdir %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -playground -Xfrontend -disable-playground-transform -o %t/main %t/main.swift
-// RUN: %target-run %t/main | FileCheck %s
-// RUN: ! %target-run %t/main --crash 2>&1 | FileCheck -check-prefix=CRASH-CHECK %s
+// RUN: %target-run %t/main | %FileCheck %s
+// RUN: ! %target-run %t/main --crash 2>&1 | %FileCheck -check-prefix=CRASH-CHECK %s
 // REQUIRES: executable_test
 
 // NOTE: "!" is used above instead of "not --crash" because simctl's exit

@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // RUN: %target-parse-verify-swift -parse -debug-generic-signatures %s > %t.dump 2>&1 
-// RUN: FileCheck %s < %t.dump
+// RUN: %FileCheck %s < %t.dump
 
 class A {
   func foo() { }
