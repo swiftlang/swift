@@ -1262,7 +1262,7 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:isSeparator:)' and invert the 'allowEmptySlices' argument")
+  @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:whereSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(_ maxSplit: Int, allowEmptySlices: Bool,
     isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
