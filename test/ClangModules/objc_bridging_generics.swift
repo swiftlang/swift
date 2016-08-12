@@ -301,6 +301,17 @@ extension PettableContainer {
     x.pet(with: x)
   }
 
+  // TODO: rdar://problem/27796375--allocating entry points are emitted as
+  // true generics.
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamZ1(_ x: T, _ y: T.Type) {
+    _ = type(of: x).init(fur: x).other() // expected-note{{used here}}
+  }
+  // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
+  func usesGenericParamZ2(_ x: T, _ y: T.Type) {
+    _ = y.init(fur: x).other() // expected-note{{used here}}
+  }
+
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamA(_ x: T) {
     _ = T(fur: x) // expected-note{{used here}}
