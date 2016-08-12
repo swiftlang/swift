@@ -598,6 +598,13 @@ private:
     if (Info.ID == diag::objc_witness_selector_mismatch.ID ||
         Info.ID == diag::witness_non_objc.ID)
       return false;
+    // This interacts badly with the migrator. For such code:
+    //   func test(p: Int, _: String) {}
+    //   test(0, "")
+    // the compiler bizarrely suggests to change order of arguments in the call
+    // site.
+    if (Info.ID == diag::argument_out_of_order_unnamed_unnamed.ID)
+      return false;
     // The following interact badly with the swift migrator by removing @IB*
     // attributes when there is some unrelated type issue.
     if (Info.ID == diag::invalid_iboutlet.ID ||
