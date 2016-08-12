@@ -774,9 +774,9 @@ getConformanceAndConcreteType(FullApplySite AI,
   }
 
   if (ConcreteType->isOpenedExistential()) {
-    assert(!InitExistential->getOpenedArchetypeOperands().empty() &&
+    assert(!InitExistential->getTypeDependentOperands().empty() &&
            "init_existential is supposed to have a typedef operand");
-    ConcreteTypeDef = InitExistential->getOpenedArchetypeOperands()[0].get();
+    ConcreteTypeDef = InitExistential->getTypeDependentOperands()[0].get();
   }
 
   // Find the conformance for the protocol we're interested in.

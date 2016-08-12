@@ -356,16 +356,19 @@ bool swift::hasDynamicSelfTypes(ArrayRef<Substitution> Subs) {
   return false;
 }
 
-bool swift::computeMayBindDynamicSelf(SILFunction *F) {
-  for (auto &BB : *F)
-    for (auto &I : BB) {
-      if (auto AI = FullApplySite::isa(&I))
-        if (hasDynamicSelfTypes(AI.getSubstitutions()))
-          return true;
-      if (auto MI = dyn_cast<MetatypeInst>(&I))
-        if (MI->getType().getSwiftRValueType()->hasDynamicSelfType())
-          return true;
+bool swift::mayBindDynamicSelf(SILFunction *F) {
+  if (!F->hasSelfMetadataParam())
+    return false;
+
+  SILValue MDArg = F->getSelfMetadataArgument();
+
+  for (Operand *MDUse : F->getSelfMetadataArgument()->getUses()) {
+    SILInstruction *MDUser = MDUse->getUser();
+    for (Operand &TypeDepOp : MDUser->getTypeDependentOperands()) {
+      if (TypeDepOp.get() == MDArg)
+        return true;
     }
+  }
   return false;
 }
 
