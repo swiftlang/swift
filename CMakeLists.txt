@@ -589,10 +589,10 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
 
   # set(CMAKE_EXECUTABLE_FORMAT "ELF")
-  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [windows].")
+  set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [cygwin].")
 
-  configure_sdk_unix(CYGWIN "Cygwin" "windows" "cygwin" "windows" "x86_64-unknown-windows-cygnus" "/")
+  configure_sdk_unix(CYGWIN "Cygwin" "cygwin" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus" "/")
   set(SWIFT_PRIMARY_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 

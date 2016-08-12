@@ -937,7 +937,7 @@ void IRGenModule::emitVTableStubs() {
     // For each eliminated method symbol create an alias to the stub.
     auto *alias = llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage,
                                             F.getName(), stub);
-    if (Triple.isOSBinFormatCOFF())
+    if (useDllStorage())
       alias->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
@@ -1260,7 +1260,7 @@ getIRLinkage(IRGenModule &IGM, SILLinkage linkage, bool isFragile,
 
   const auto ObjFormat = IGM.TargetInfo.OutputObjectFormat;
   bool IsELFObject = ObjFormat == llvm::Triple::ELF;
-  bool IsCOFFObject = ObjFormat == llvm::Triple::COFF;
+  bool UseDLLStorage = IGM.useDllStorage();
 
   // Use protected visibility for public symbols we define on ELF.  ld.so
   // doesn't support relative relocations at load time, which interferes with
@@ -1270,11 +1270,11 @@ getIRLinkage(IRGenModule &IGM, SILLinkage linkage, bool isFragile,
       IsELFObject ? llvm::GlobalValue::ProtectedVisibility
                   : llvm::GlobalValue::DefaultVisibility;
   llvm::GlobalValue::DLLStorageClassTypes ExportedStorage =
-      IsCOFFObject ? llvm::GlobalValue::DLLExportStorageClass
-                   : llvm::GlobalValue::DefaultStorageClass;
+      UseDLLStorage ? llvm::GlobalValue::DLLExportStorageClass
+                    : llvm::GlobalValue::DefaultStorageClass;
   llvm::GlobalValue::DLLStorageClassTypes ImportedStorage =
-      IsCOFFObject ? llvm::GlobalValue::DLLImportStorageClass
-                   : llvm::GlobalValue::DefaultStorageClass;
+      UseDLLStorage ? llvm::GlobalValue::DLLImportStorageClass
+                    : llvm::GlobalValue::DefaultStorageClass;
 
   if (isFragile) {
     // Fragile functions/globals must be visible from outside, regardless of
