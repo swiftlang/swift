@@ -12,6 +12,7 @@
 
 import Foundation
 import AppKit
+import objc_generics
 
 // CHECK-NOT: AppKit
 
@@ -81,6 +82,13 @@ extension ClassWithCustomName {
 // NEGATIVE-NOT: CGColor
 extension CGColor {
   func anyOldMethod() {}
+}
+
+// CHECK-LABEL: @interface GenericClass (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (void)bar;
+// CHECK-NEXT: @end
+extension GenericClass {
+  func bar() {}
 }
 
 // NEGATIVE-NOT: NotObjC
