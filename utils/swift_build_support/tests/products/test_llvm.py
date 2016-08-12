@@ -48,6 +48,9 @@ class LLVMTestCase(unittest.TestCase):
         self.args = argparse.Namespace(
             llvm_targets_to_build='X86;ARM;AArch64;PowerPC;SystemZ',
             llvm_assertions='true',
+            compiler_vendor='none',
+            clang_compiler_version=None,
+            clang_user_visible_version=None,
             darwin_deployment_version_osx='10.9')
 
         # Setup shell
@@ -96,3 +99,62 @@ class LLVMTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertIn('-DLLVM_ENABLE_ASSERTIONS=FALSE', llvm.cmake_options)
 
+    def test_compiler_vendor_flags(self):
+        self.args.compiler_vendor = "none"
+        self.args.clang_user_visible_version = "1.2.3"
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertNotIn('-DCLANG_VENDOR=Apple', llvm.cmake_options)
+        self.assertNotIn(
+            '-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang',
+            llvm.cmake_options
+        )
+        self.assertNotIn('-DPACKAGE_VERSION=1.2.3', llvm.cmake_options)
+
+        self.args.compiler_vendor = "apple"
+        self.args.clang_user_visible_version = "2.2.3"
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn('-DCLANG_VENDOR=Apple', llvm.cmake_options)
+        self.assertIn(
+            '-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang',
+            llvm.cmake_options
+        )
+        self.assertIn('-DPACKAGE_VERSION=2.2.3', llvm.cmake_options)
+
+        self.args.compiler_vendor = "unknown"
+        with self.assertRaises(RuntimeError):
+            llvm = LLVM(
+                args=self.args,
+                toolchain=self.toolchain,
+                source_dir='/path/to/src',
+                build_dir='/path/to/build')
+
+    def test_version_flags(self):
+        self.args.clang_compiler_version = None
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            [],
+            [x for x in llvm.cmake_options if 'CLANG_REPOSITORY_STRING' in x]
+        )
+
+        self.args.clang_compiler_version = "2.2.3"
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DCLANG_REPOSITORY_STRING=clang-2.2.3',
+            llvm.cmake_options
+        )
