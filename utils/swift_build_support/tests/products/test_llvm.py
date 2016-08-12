@@ -77,7 +77,7 @@ class LLVMTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         expected_targets = 'X86;ARM;AArch64;PowerPC;SystemZ'
         expected_arg = '-DLLVM_TARGETS_TO_BUILD=%s' % expected_targets
-        self.assertTrue(expected_arg in llvm.cmake_options)
+        self.assertIn(expected_arg, llvm.cmake_options)
 
     def test_llvm_enable_assertions(self):
         self.args.llvm_assertions = True
@@ -86,8 +86,7 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=true' in
-                        llvm.cmake_options)
+        self.assertIn('-DLLVM_ENABLE_ASSERTIONS=TRUE', llvm.cmake_options)
 
         self.args.llvm_assertions = False
         llvm = LLVM(
@@ -95,6 +94,5 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=false' in
-                        llvm.cmake_options)
+        self.assertIn('-DLLVM_ENABLE_ASSERTIONS=FALSE', llvm.cmake_options)
 

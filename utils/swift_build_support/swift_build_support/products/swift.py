@@ -19,9 +19,10 @@ class Swift(product.Product):
         product.Product.__init__(self, args, toolchain, source_dir,
                                  build_dir)
         # Add any runtime sanitizer arguments.
-        self.cmake_options.extend(self._compute_runtime_use_sanitizer())
+        self.cmake_options.extend(self._runtime_sanitizer_flags)
 
-    def _compute_runtime_use_sanitizer(self):
+    @property
+    def _runtime_sanitizer_flags(self):
         sanitizer_list = []
         if self.args.enable_tsan_runtime:
             sanitizer_list += ['Thread']
