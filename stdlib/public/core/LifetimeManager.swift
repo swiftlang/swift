@@ -100,7 +100,7 @@ public func withUnsafePointer<T, Result>(
 public func withUnsafeMutablePointers<A0, A1, Result>(
   _ arg0: inout A0,
   _ arg1: inout A1,
-  _ body: @noescape (
+  _ body: (
     UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
 ) rethrows -> Result {
   Builtin.unreachable()
@@ -111,7 +111,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
   _ arg0: inout A0,
   _ arg1: inout A1,
   _ arg2: inout A2,
-  _ body: @noescape (
+  _ body: (
     UnsafeMutablePointer<A0>,
     UnsafeMutablePointer<A1>,
     UnsafeMutablePointer<A2>
