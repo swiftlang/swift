@@ -408,7 +408,6 @@ Functions:
 # These are hidden so we can improve them further in the SDK overlay
 - Name: CGGetLastMouseDelta
   # replaced by a version that returns CGVector instead of using out-pointers
-  SwiftName: __CGGetLastMouseDelta
   SwiftPrivate: true
   
 # CGEvent
