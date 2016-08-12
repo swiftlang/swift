@@ -201,7 +201,7 @@ public struct ${Self}<
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
-  /// - Complexity: O(N), where N is the ratio between unfiltered and
+  /// - Complexity: O(*n*), where *n* is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
     var index = _base.startIndex
