@@ -1172,7 +1172,12 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypeLoc(const TypeLoc &TL) {
     if (Options.TransformContext && TL.getType()) {
       if (auto RT = Options.TransformContext->transform(TL.getType())) {
+        // FIXME: it's not clear exactly what we want to keep from the existing
+        // options, and what we want to discard.
         PrintOptions FreshOptions;
+        FreshOptions.PrintAsInParamType = Options.PrintAsInParamType;
+        FreshOptions.ExcludeAttrList = Options.ExcludeAttrList;
+        FreshOptions.ExclusiveAttrList = Options.ExclusiveAttrList;
         RT.print(Printer, FreshOptions);
         return;
       }
@@ -2527,10 +2532,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
   // Set and restore in-parameter-position printing of types
-  auto prior = Options.PrintAsInParamType;
-  Options.PrintAsInParamType = true;
+  llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
   visitVarDecl(decl);
-  Options.PrintAsInParamType = prior;
 }
 
 void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
@@ -2585,10 +2588,10 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   }
 
   // Set and restore in-parameter-position printing of types
-  auto prior = Options.PrintAsInParamType;
-  Options.PrintAsInParamType = true;
-  printTypeLoc(TheTypeLoc);
-  Options.PrintAsInParamType = prior;
+  {
+    llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
+    printTypeLoc(TheTypeLoc);
+  }
 
   if (param->isVariadic())
     Printer << "...";
@@ -3762,16 +3765,18 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (info.isAutoClosure()) {
+    if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
       Printer.printAttrName("@autoclosure");
       Printer << " ";
     }
-    if (inParameterPrinting && !info.isNoEscape()) {
+    if (inParameterPrinting && !info.isNoEscape() &&
+        !Options.excludeAttrKind(TAK_escaping)) {
       Printer.printAttrName("@escaping");
       Printer << " ";
     }
 
-    if (Options.PrintFunctionRepresentationAttrs) {
+    if (Options.PrintFunctionRepresentationAttrs &&
+        !Options.excludeAttrKind(TAK_convention)) {
       // TODO: coalesce into a single convention attribute.
       switch (info.getSILRepresentation()) {
       case SILFunctionType::Representation::Thick:

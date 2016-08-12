@@ -4080,7 +4080,7 @@ public:
         Options.setArchetypeSelfTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
-      Options.SkipAttributes = true;
+      Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
       VD->print(Printer, Options);

@@ -110,6 +110,36 @@ public:
   }
 };
 
+/// A union of DeclAttrKind and TypeAttrKind.
+class AnyAttrKind {
+  unsigned kind : 31;
+  unsigned isType : 1;
+
+public:
+  AnyAttrKind(TypeAttrKind K) : kind(static_cast<unsigned>(K)), isType(1) {
+    static_assert(TAK_Count < UINT_MAX, "TypeAttrKind is > 31 bits");
+  }
+  AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
+    static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
+  }
+  AnyAttrKind() : kind(TAK_Count), isType(1) {}
+  AnyAttrKind(const AnyAttrKind &) = default;
+
+  /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
+  TypeAttrKind type() const {
+    return isType ? static_cast<TypeAttrKind>(kind) : TAK_Count;
+  }
+  /// Returns the DeclAttrKind, or DAK_Count if this is not a decl attribute.
+  DeclAttrKind decl() const {
+    return isType ? DAK_Count : static_cast<DeclAttrKind>(kind);
+  }
+
+  bool operator==(AnyAttrKind K) const {
+    return kind == K.kind && isType == K.isType;
+  }
+  bool operator!=(AnyAttrKind K) const { return !(*this == K); }
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -225,12 +255,12 @@ struct PrintOptions {
   bool PrintUserInaccessibleAttrs = true;
 
   /// List of attribute kinds that should not be printed.
-  std::vector<DeclAttrKind> ExcludeAttrList =
+  std::vector<AnyAttrKind> ExcludeAttrList =
       { DAK_Transparent, DAK_Effects, DAK_FixedLayout };
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
-  std::vector<DeclAttrKind> ExclusiveAttrList;
+  std::vector<AnyAttrKind> ExclusiveAttrList;
 
   /// Whether to print function @convention attribute on function types.
   bool PrintFunctionRepresentationAttrs = true;
@@ -325,6 +355,16 @@ struct PrintOptions {
   std::function<std::string(const ValueDecl *)> FunctionBody;
 
   BracketOptions BracketOptions;
+
+  bool excludeAttrKind(AnyAttrKind K) const {
+    if (std::any_of(ExcludeAttrList.begin(), ExcludeAttrList.end(),
+                    [K](AnyAttrKind other) { return other == K; }))
+      return true;
+    if (!ExclusiveAttrList.empty())
+      return std::none_of(ExclusiveAttrList.begin(), ExclusiveAttrList.end(),
+                          [K](AnyAttrKind other) { return other == K; });
+    return false;
+  }
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
