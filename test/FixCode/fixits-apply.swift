@@ -233,6 +233,8 @@ func testescape(rec: ()->()) {
   fnWithClosure { rec() }
 }
 
+@warn_unused_result func testDeprecatedAttr() -> Int { return 0 }
+
 protocol Prot1 {}
 protocol Prot2 {
   associatedtype Ty = Prot1
