@@ -67,7 +67,7 @@ public struct LazyFilterSequence<Base : SequenceType>
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> LazyFilterGenerator<Base.Generator> {
     return LazyFilterGenerator(
       base.generate(), whereElementsSatisfy: _include)
@@ -221,7 +221,7 @@ public struct LazyFilterCollection<
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> LazyFilterGenerator<Base.Generator> {
     return LazyFilterGenerator(
       _base.generate(), whereElementsSatisfy: _predicate)

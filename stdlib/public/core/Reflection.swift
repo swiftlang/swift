@@ -146,6 +146,7 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 public func _reflect<T>(x: T) -> _MirrorType
 
 /// Dump an object's contents using its mirror to the specified output stream.
+@swift3_migration(renamed="dump(_:to:name:indent:maxDepth:maxItems:)")
 public func dump<T, TargetStream : OutputStreamType>(
     x: T, inout _ targetStream: TargetStream,
     name: String? = nil, indent: Int = 0,

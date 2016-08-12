@@ -589,6 +589,7 @@ extension String {
     }
   }
   
+  @swift3_migration(renamed="append(contentsOf:)")
   public mutating func appendContentsOf<
       S : SequenceType
   where S.Generator.Element == Character
@@ -623,6 +624,7 @@ extension SequenceType where Generator.Element == String {
   ///
   ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
   @warn_unused_result
+  @swift3_migration(renamed="joined(separator:)")
   public func joinWithSeparator(separator: String) -> String {
     var result = ""
 
@@ -713,6 +715,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
+  @swift3_migration(renamed="insert(contentsOf:at:)")
   public mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, at i: Index) {
@@ -726,7 +729,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  @swift3_migration(renamed="removeAt(_:)")
+  @swift3_migration(renamed="remove(at:)")
   public mutating func removeAtIndex(i: Index) -> Character {
     return withMutableCharacters {
       (inout v: CharacterView) in v.removeAtIndex(i)
@@ -970,6 +973,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf8: String.UTF8View
@@ -981,6 +985,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
@@ -992,6 +997,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(unicodeScalars).indices`.
+  @swift3_migration(renamed="samePosition(in:)")
   @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView

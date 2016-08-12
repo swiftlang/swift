@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A generator over the elements of `Range<Element>`.
-@swift3_migration(renamed="RangeIterator")
+@swift3_migration(message="Ranges use IndexingIterator in Swift 3.")
 public struct RangeGenerator<
   Element : ForwardIndexType
 > : GeneratorType, SequenceType {
@@ -20,7 +20,7 @@ public struct RangeGenerator<
   public typealias T = Element
 
   /// Construct an instance that traverses the elements of `bounds`.
-  @swift3_migration(message="use the 'iterator()' method on the collection")
+  @swift3_migration(message="call the 'makeIterator()' method on the collection")
   @available(*, deprecated, message="it will be removed in Swift 3.  Use the 'generate()' method on the collection.")
   @_transparent
   public init(_ bounds: Range<Element>) {
@@ -38,13 +38,13 @@ public struct RangeGenerator<
   }
 
   /// The lower bound of the remaining range.
-  @swift3_migration(message="removed in Swift 3, no replacement")
+  @swift3_migration(message="Removed in Swift 3, no replacement.")
   @available(*, deprecated, message="it will be removed in Swift 3")
   public var startIndex: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
-  @swift3_migration(message="removed in Swift 3, no replacement")
+  @swift3_migration(message="Removed in Swift 3, no replacement.")
   @available(*, deprecated, message="it will be removed in Swift 3")
   public var endIndex: Element
 }
@@ -130,6 +130,7 @@ public struct Range<
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> RangeGenerator<Element> {
     return Generator(self)
   }

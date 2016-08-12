@@ -253,7 +253,7 @@ public struct ${Collection}<
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> FlattenGenerator<Base.Generator> {
     return FlattenGenerator(_base.generate())
   }

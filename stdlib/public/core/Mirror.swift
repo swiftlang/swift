@@ -62,6 +62,7 @@ public struct Mirror {
   /// customization, an override of `customMirror()` should pass
   /// `ancestorRepresentation: .Customized(super.customMirror)` when
   /// initializing its `Mirror`.
+  @swift3_migration(renamed="generated")
   case Generated
 
   /// Use the nearest ancestor's implementation of `customMirror()` to
@@ -77,10 +78,12 @@ public struct Mirror {
   ///         children: ["someProperty": self.someProperty],
   ///         ancestorRepresentation: .Customized(super.customMirror)) // <==
   ///     }
+  @swift3_migration(renamed="customized")
   case Customized(() -> Mirror)
 
   /// Suppress the representation of all ancestor classes.  The
   /// resulting `Mirror`'s `superclassMirror()` is `nil`.
+  @swift3_migration(renamed="suppressed")
   case Suppressed
   }
 
@@ -132,7 +135,29 @@ public struct Mirror {
   /// to the one used for instances of the kind indicated by the
   /// `DisplayStyle` case name when the `Mirror` is used for display.
   public enum DisplayStyle {
-  case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
+    @swift3_migration(renamed="struct")
+    case Struct
+
+    @swift3_migration(renamed="class")
+    case Class
+
+    @swift3_migration(renamed="enum")
+    case Enum
+
+    @swift3_migration(renamed="tuple")
+    case Tuple
+
+    @swift3_migration(renamed="optional")
+    case Optional
+
+    @swift3_migration(renamed="collection")
+    case Collection
+
+    @swift3_migration(renamed="dictionary")
+    case Dictionary
+
+    @swift3_migration(renamed="set")
+    case Set
   }
 
   @warn_unused_result
@@ -584,77 +609,96 @@ public enum PlaygroundQuickLook {
   // implementation.
 
   /// Plain text.
+  @swift3_migration(renamed="text")
   case Text(String)
 
   /// An integer numeric value.
+  @swift3_migration(renamed="int")
   case Int(Int64)
 
   /// An unsigned integer numeric value.
+  @swift3_migration(renamed="uInt")
   case UInt(UInt64)
 
   /// A single precision floating-point numeric value.
+  @swift3_migration(renamed="float")
   case Float(Float32)
 
   /// A double precision floating-point numeric value.
+  @swift3_migration(renamed="double")
   case Double(Float64)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An image.
+  @swift3_migration(renamed="image")
   case Image(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A sound.
+  @swift3_migration(renamed="sound")
   case Sound(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A color.
+  @swift3_migration(renamed="color")
   case Color(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// A bezier path.
+  @swift3_migration(renamed="bezierPath")
   case BezierPath(Any)
 
   // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
   /// An attributed string.
+  @swift3_migration(renamed="attributedString")
   case AttributedString(Any)
 
   /// A rectangle.
   ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="rectangle")
   case Rectangle(Float64,Float64,Float64,Float64)
 
   /// A point.
   ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="point")
   case Point(Float64,Float64)
 
   /// A size.
   ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="size")
   case Size(Float64,Float64)
 
   /// A logical value.
+  @swift3_migration(renamed="bool")
   case Logical(Bool)
 
   /// A range.
   ///
   /// Uses explicit values to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="range")
   case Range(Int64, Int64)
 
   /// A GUI view.
   ///
   /// Uses an Any to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="view")
   case View(Any)
 
   /// A graphical sprite.
   ///
   /// Uses an Any to avoid coupling a particular Cocoa type.
+  @swift3_migration(renamed="sprite")
   case Sprite(Any)
 
   /// A Uniform Resource Locator.
+  @swift3_migration(renamed="url")
   case URL(String)
 
   /// Raw data that has already been encoded in a format the IDE understands.
+  @swift3_migration(renamed="_raw")
   case _Raw([UInt8], String)
 }
 
@@ -755,6 +799,7 @@ extension DictionaryLiteral : CollectionType {
   public var endIndex: Int { return elements.endIndex }
 
   // FIXME: a typealias is needed to prevent <rdar://20248032>
+  @swift3_migration(message="labels were added to the tuple: '(key: Key, value: Value)'")
   public typealias Element = (Key, Value)
 
   /// Access the element indicated by `position`.

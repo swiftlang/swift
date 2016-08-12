@@ -19,7 +19,7 @@ internal enum _JoinGeneratorState {
 
 /// A generator that presents the elements of the sequences generated
 /// by `Base`, concatenated using a given separator.
-@swift3_migration(renamed="JoinIterator")
+@swift3_migration(renamed="JoinedIterator")
 public struct JoinGenerator<
   Base : GeneratorType where Base.Element : SequenceType
 > : GeneratorType {
@@ -96,6 +96,7 @@ public struct JoinGenerator<
 
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
+@swift3_migration(renamed="JoinedSequence")
 public struct JoinSequence<
   Base : SequenceType where Base.Generator.Element : SequenceType
 > : SequenceType {
@@ -117,7 +118,7 @@ public struct JoinSequence<
   /// Returns a generator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @swift3_migration(renamed="iterator")
+  @swift3_migration(renamed="makeIterator()")
   public func generate() -> JoinGenerator<Base.Generator> {
     return JoinGenerator(
       base: _base.generate(),
@@ -173,6 +174,7 @@ extension SequenceType where Generator.Element : SequenceType {
   /// `[[1, 2, 3], [4, 5, 6], [7, 8, 9]].joinWithSeparator([-1, -2])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
+  @swift3_migration(renamed="joined(separator:)")
   public func joinWithSeparator<
     Separator : SequenceType
     where

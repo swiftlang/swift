@@ -37,6 +37,7 @@ extension OutputStreamType {
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
   /// Write a textual representation of `self` into `target`.
+  @swift3_migration(renamed="write(to:)")
   func writeTo<Target : OutputStreamType>(inout target: Target)
 }
 
@@ -275,6 +276,7 @@ extension String : OutputStreamType {
 
 extension String : Streamable {
   /// Write a textual representation of `self` into `target`.
+  @swift3_migration(renamed="write(to:)")
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(self)
   }
@@ -282,6 +284,7 @@ extension String : Streamable {
 
 extension Character : Streamable {
   /// Write a textual representation of `self` into `target`.
+  @swift3_migration(renamed="write(to:)")
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(self))
   }
@@ -289,6 +292,7 @@ extension Character : Streamable {
 
 extension UnicodeScalar : Streamable {
   /// Write a textual representation of `self` into `target`.
+  @swift3_migration(renamed="write(to:)")
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(Character(self)))
   }

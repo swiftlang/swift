@@ -15,8 +15,11 @@
 public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `None` and `Some`.
-  
+
+  @swift3_migration(renamed="none")
   case None
+
+  @swift3_migration(renamed="some")
   case Some(Wrapped)
 
   @available(*, unavailable, renamed="Wrapped")
