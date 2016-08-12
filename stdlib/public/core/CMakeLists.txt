@@ -45,6 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   DropWhile.swift.gyb
+  Dump.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -84,6 +85,7 @@ set(SWIFTLIB_ESSENTIAL
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
+  ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift

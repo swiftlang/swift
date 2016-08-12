@@ -95,10 +95,12 @@
     "MemoryLayout.swift"
   ],
   "Reflection": [
-    "Mirrors.swift",
+    "Dump.swift",
     "Mirror.swift",
-    "Reflection.swift",
-    "ObjCMirrors.swift"
+    "Mirrors.swift",
+    "ObjCMirrors.swift",
+    "ObjectIdentifier.swift",
+    "Reflection.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
