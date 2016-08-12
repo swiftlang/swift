@@ -67,11 +67,13 @@ updated without updating swift.py?")
     def _version_flags(self):
         r = []
         if self.args.swift_compiler_version is not None:
+            swift_compiler_version = self.args.swift_compiler_version
             r.append(
-                "-DSWIFT_COMPILER_VERSION={}".format(self.args.swift_compiler_version)
+                "-DSWIFT_COMPILER_VERSION={}".format(swift_compiler_version)
             )
         if self.args.clang_compiler_version is not None:
+            clang_compiler_version = self.args.clang_compiler_version
             r.append(
-                "-DCLANG_COMPILER_VERSION={}".format(self.args.clang_compiler_version)
+                "-DCLANG_COMPILER_VERSION={}".format(clang_compiler_version)
             )
         return r

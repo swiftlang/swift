@@ -103,6 +103,7 @@ def type_clang_compiler_version(string):
 
 _register(type, 'clang_compiler_version', type_clang_compiler_version)
 
+
 def type_swift_compiler_version(string):
     """
     Parse version string and split into a tuple of strings
