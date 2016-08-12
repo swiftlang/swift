@@ -24,6 +24,9 @@ class Swift(product.Product):
         # Add any compiler vendor cmake flags.
         self.cmake_options.extend(self._compiler_vendor_flags)
 
+        # Add any swift version related cmake flags.
+        self.cmake_options.extend(self._version_flags)
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
@@ -60,3 +63,15 @@ updated without updating swift.py?")
             "-DSWIFT_COMPILER_VERSION={}".format(swift_compiler_version),
         ]
 
+    @property
+    def _version_flags(self):
+        r = []
+        if self.args.swift_compiler_version is not None:
+            r.append(
+                "-DSWIFT_COMPILER_VERSION={}".format(self.args.swift_compiler_version)
+            )
+        if self.args.clang_compiler_version is not None:
+            r.append(
+                "-DCLANG_COMPILER_VERSION={}".format(self.args.clang_compiler_version)
+            )
+        return r

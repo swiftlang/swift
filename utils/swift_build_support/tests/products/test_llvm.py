@@ -132,3 +132,23 @@ class LLVMTestCase(unittest.TestCase):
                 toolchain=self.toolchain,
                 source_dir='/path/to/src',
                 build_dir='/path/to/build')
+
+    def test_version_flags(self):
+        self.args.clang_compiler_version = None
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            [],
+            [x for x in llvm.cmake_options if 'CLANG_REPOSITORY_STRING' in x]
+        )
+
+        self.args.clang_compiler_version = "2.2.3"
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn('-DCLANG_REPOSITORY_STRING=clang-2.2.3', llvm.cmake_options)
