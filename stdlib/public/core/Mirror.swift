@@ -840,8 +840,9 @@ extension String {
   /// string representation of `instance` in one of the following ways,
   /// depending on its protocol conformance:
   ///
-  /// - If `instance` conforms to the `TextOutputStreamable` protocol, the result is
-  ///   obtained by calling `instance.write(to: s)` on an empty string `s`.
+  /// - If `instance` conforms to the `TextOutputStreamable` protocol, the
+  ///   result is obtained by calling `instance.write(to: s)` on an empty
+  ///   string `s`.
   /// - If `instance` conforms to the `CustomStringConvertible` protocol, the
   ///   result is `instance.description`.
   /// - If `instance` conforms to the `CustomDebugStringConvertible` protocol,
@@ -890,8 +891,9 @@ extension String {
   ///   the result is `subject.debugDescription`.
   /// - If `subject` conforms to the `CustomStringConvertible` protocol, the
   ///   result is `subject.description`.
-  /// - If `subject` conforms to the `TextOutputStreamable` protocol, the result is
-  ///   obtained by calling `subject.write(to: s)` on an empty string `s`.
+  /// - If `subject` conforms to the `TextOutputStreamable` protocol, the
+  ///   result is obtained by calling `subject.write(to: s)` on an empty
+  ///   string `s`.
   /// - An unspecified result is supplied automatically by the Swift standard
   ///   library.
   ///
