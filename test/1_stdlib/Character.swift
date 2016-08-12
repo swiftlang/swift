@@ -142,7 +142,7 @@ CharacterTests.test("sizeof") {
   expectTrue(size1 == 8 || size1 == 9)
 
   var a: Character = "a"
-  let size2 = MemoryLayout._ofInstance(a).size
+  let size2 = MemoryLayout.size(ofValue: a)
   expectTrue(size2 == 8 || size2 == 9)
 
   expectEqual(size1, size2)
