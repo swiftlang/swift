@@ -3,6 +3,17 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0136](https://github.com/apple/swift-evolution/blob/master/proposals/0136-memory-layout-of-values.md) and [SE-0101](https://github.com/apple/swift-evolution/blob/master/proposals/0101-standardizing-sizeof-naming.md)
+
+  The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
+  Instead, these memory layout properties for a type `T` are now spelled
+  `MemoryLayout<T>.size`, `MemoryLayout<T>.stride`, and
+  `MemoryLayout<T>.alignment`, respectively.
+
+  The functions `sizeofValue()`, `strideofValue()`, and `alignofValue()` have
+  been renamed `MemoryLayout.size(ofValue:)`, `MemoryLayout.stride(ofValue:)`,
+  and `MemoryLayout.alignment(ofValue:)`.
+
 * [SE-125](https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
