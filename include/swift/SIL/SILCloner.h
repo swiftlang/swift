@@ -221,9 +221,9 @@ public:
   void doPreProcess(SILInstruction *Orig) {
     // Extend the set of available opened archetypes by the opened archetypes
     // used by the instruction being cloned.
-    auto OpenedArchetypeOperands = Orig->getOpenedArchetypeOperands();
+    auto TypeDependentOperands = Orig->getTypeDependentOperands();
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        OpenedArchetypeOperands);
+        TypeDependentOperands);
   }
 
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {

@@ -358,7 +358,7 @@ public:
                               X->getMember().getHashCode(),
                               X->getConformance(),
                               X->getType(),
-                              !X->getOpenedArchetypeOperands().empty(),
+                              !X->getTypeDependentOperands().empty(),
                               llvm::hash_combine_range(
                               Operands.begin(),
                               Operands.end()));
@@ -645,7 +645,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
     auto User = Use->getUser();
-    if (User->mayHaveOpenedArchetypeOperands()) {
+    if (!User->getTypeDependentOperands().empty()) {
       if (canHandle(User)) {
         auto It = AvailableValues->begin(User);
         if (It != AvailableValues->end()) {
@@ -685,7 +685,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // by a dominating one.
   for (auto Candidate : Candidates) {
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        Candidate->getOpenedArchetypeOperands());
+        Candidate->getTypeDependentOperands());
     Builder.setInsertionPoint(Candidate);
     auto NewI = Cloner.clone(Candidate);
     Candidate->replaceAllUsesWith(NewI);
@@ -884,7 +884,7 @@ static ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
   for (auto *UI : getNonDebugUses(OE)) {
     auto *User = UI->getUser();
     if (!isa<WitnessMethodInst>(User) &&
-        User->isOpenedArchetypeOperand(UI->getOperandNumber()))
+        User->isTypeDependentOperand(UI->getOperandNumber()))
       continue;
     // Check that we have a single Apply user.
     if (auto *AA = dyn_cast<ApplyInst>(User)) {

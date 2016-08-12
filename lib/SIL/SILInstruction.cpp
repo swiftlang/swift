@@ -680,8 +680,8 @@ namespace {
   (!::std::is_same<BaseClass, GET_IMPLEMENTING_CLASS(DerivedClass, MemberName,\
                                                      ExpectedType)>::value)
 
-  class OpenedArchetypeOperandsAccessor
-      : public SILVisitor<OpenedArchetypeOperandsAccessor,
+  class TypeDependentOperandsAccessor
+      : public SILVisitor<TypeDependentOperandsAccessor,
                           ArrayRef<Operand>> {
   public:
 #define VALUE(CLASS, PARENT) \
@@ -690,16 +690,16 @@ namespace {
     }
 #define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                           \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getOpenedArchetypeOperands, \
+      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
                              ArrayRef<Operand>() const))                       \
         return {};                                                             \
-      return I->getOpenedArchetypeOperands();                                 \
+      return I->getTypeDependentOperands();                                 \
     }
 #include "swift/SIL/SILNodes.def"
   };
 
-  class OpenedArchetypeOperandsMutableAccessor
-    : public SILVisitor<OpenedArchetypeOperandsMutableAccessor,
+  class TypeDependentOperandsMutableAccessor
+    : public SILVisitor<TypeDependentOperandsMutableAccessor,
                         MutableArrayRef<Operand> > {
   public:
 #define VALUE(CLASS, PARENT) \
@@ -708,28 +708,11 @@ namespace {
     }
 #define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
     MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                          \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getOpenedArchetypeOperands, \
+      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
                              MutableArrayRef<Operand>()))                      \
         return {};                                                             \
-      return I->getOpenedArchetypeOperands();                                 \
+      return I->getTypeDependentOperands();                                 \
     }
-#include "swift/SIL/SILNodes.def"
-  };
-
-  class MayHaveOpenedArchetypeOperandsAccessor
-      : public SILVisitor<MayHaveOpenedArchetypeOperandsAccessor,
-                          bool> {
-  public:
-#define VALUE(CLASS, PARENT)                                                   \
-  bool visit##CLASS(const CLASS *I) {                                          \
-    llvm_unreachable("accessing non-instruction " #CLASS);                     \
-  }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
-  bool visit##CLASS(const CLASS *I) {                                          \
-    return IMPLEMENTS_METHOD(CLASS, SILInstruction,                            \
-                             getOpenedArchetypeOperands,                       \
-                             ArrayRef<Operand>() const);                       \
-  }
 #include "swift/SIL/SILNodes.def"
   };
 } // end anonymous namespace
@@ -742,18 +725,13 @@ MutableArrayRef<Operand> SILInstruction::getAllOperands() {
   return AllOperandsMutableAccessor().visit(this);
 }
 
-ArrayRef<Operand> SILInstruction::getOpenedArchetypeOperands() const {
-  return OpenedArchetypeOperandsAccessor().visit(
+ArrayRef<Operand> SILInstruction::getTypeDependentOperands() const {
+  return TypeDependentOperandsAccessor().visit(
       const_cast<SILInstruction *>(this));
 }
 
-MutableArrayRef<Operand> SILInstruction::getOpenedArchetypeOperands() {
-  return OpenedArchetypeOperandsMutableAccessor().visit(this);
-}
-
-bool SILInstruction::mayHaveOpenedArchetypeOperands() const {
-  return MayHaveOpenedArchetypeOperandsAccessor().visit(
-      const_cast<SILInstruction *>(this));
+MutableArrayRef<Operand> SILInstruction::getTypeDependentOperands() {
+  return TypeDependentOperandsMutableAccessor().visit(this);
 }
 
 /// getOperandNumber - Return which operand this is in the operand list of the

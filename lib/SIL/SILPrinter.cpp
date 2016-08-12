@@ -546,20 +546,41 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
+  bool printTypeDependentOperands(SILInstruction *I) {
+    ArrayRef<Operand> TypeDepOps = I->getTypeDependentOperands();
+    if (TypeDepOps.empty())
+      return false;
+
+    PrintState.OS.PadToColumn(50);
+    *this << "// type-defs: ";
+    interleave(TypeDepOps,
+               [&](const Operand &op) { *this << getID(op.get()); },
+               [&] { *this << ", "; });
+    return true;
+  }
+
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfSILValue(SILValue V) {
-    if (!V->hasValue()) {
+  bool printUsersOfSILValue(SILValue V, bool printedSlashes) {
+
+    if (V->hasValue() && V->use_empty())
+      return printedSlashes;
+
+    if (printedSlashes) {
+      *this << "; ";
+    } else {
       PrintState.OS.PadToColumn(50);
-      *this << "// id: " << getID(V);
+      *this << "// ";
+    }
+    if (!V->hasValue()) {
+      *this << "id: " << getID(V);
       return true;
     }
 
     if (V->use_empty())
-      return false;
+      return true;
 
-    PrintState.OS.PadToColumn(50);
-    *this << "// user";
+    *this << "user";
     if (std::next(V->use_begin()) != V->use_end())
       *this << 's';
     *this << ": ";
@@ -733,14 +754,16 @@ public:
     // Print the value.
     visit(V);
 
+    bool printedSlashes = false;
     if (auto *I = dyn_cast<SILInstruction>(V)) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
+      printedSlashes = printTypeDependentOperands(I);
     }
 
     // Print users, or id for valueless instructions.
-    bool printedSlashes = printUsersOfSILValue(V);
+    printedSlashes = printUsersOfSILValue(V, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
@@ -1320,9 +1343,9 @@ public:
     if (WMI->isVolatile())
       *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
-    if (!WMI->getOpenedArchetypeOperands().empty()) {
+    if (!WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
-      *this << getIDAndType(WMI->getOpenedArchetypeOperands()[0].get());
+      *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
   }

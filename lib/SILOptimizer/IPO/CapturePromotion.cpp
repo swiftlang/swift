@@ -663,7 +663,7 @@ isNonmutatingCapture(SILArgument *BoxArg) {
 static bool
 isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   auto *U = O->getUser();
-  if (U->isOpenedArchetypeOperand(*O))
+  if (U->isTypeDependentOperand(*O))
     return true;
   // Marking the boxed value as escaping is OK. It's just a DI annotation.
   if (isa<MarkFunctionEscapeInst>(U))
