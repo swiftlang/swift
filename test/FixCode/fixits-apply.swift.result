@@ -236,6 +236,8 @@ func testescape(rec: @escaping ()->()) {
   fnWithClosure { rec() }
 }
 
+func testDeprecatedAttr() -> Int { return 0 }
+
 protocol Prot1 {}
 protocol Prot2 {
   associatedtype Ty = Prot1
