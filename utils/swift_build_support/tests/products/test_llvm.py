@@ -86,7 +86,7 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=true' in
+        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=TRUE' in
                         llvm.cmake_options)
 
         self.args.llvm_assertions = False
@@ -95,6 +95,6 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=false' in
+        self.assertTrue('-DLLVM_ENABLE_ASSERTIONS=FALSE' in
                         llvm.cmake_options)
 

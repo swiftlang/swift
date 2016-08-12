@@ -21,7 +21,7 @@ class LLVM(product.Product):
 
         # Add the cmake option for enabling or disabling assertions.
         self.cmake_options.extend([
-            '-DLLVM_ENABLE_ASSERTIONS=%s' % str(args.llvm_assertions).lower()
+            '-DLLVM_ENABLE_ASSERTIONS=%s' % str(args.llvm_assertions).upper()
         ])
 
         # Add the cmake option for LLVM_TARGETS_TO_BUILD.
