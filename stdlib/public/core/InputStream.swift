@@ -71,3 +71,8 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   _swift_stdlib_free(linePtr)
   return result
 }
+
+@available(*, unavailable, renamed: "readLine(strippingNewline:)")
+public func readLine(stripNewline: Bool = true) -> String? {
+  Builtin.unreachable()
+}
