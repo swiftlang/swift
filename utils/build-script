@@ -632,16 +632,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--enable-asan"]
         if args.enable_ubsan:
             impl_args += ["--enable-ubsan"]
-        if args.clang_compiler_version:
-            impl_args += [
-                "--clang-compiler-version=%s" % (
-                    args.clang_compiler_version)
-            ]
-        if args.swift_compiler_version:
-            impl_args += [
-                "--swift-compiler-version=%s" % (
-                    args.swift_compiler_version)
-            ]
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:

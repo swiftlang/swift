@@ -32,6 +32,9 @@ class LLVM(product.Product):
         # Add the cmake options for vendors
         self.cmake_options.extend(self._compiler_vendor_flags)
 
+        # Add the cmake options for compiler version information.
+        self.cmake_options.extend(self._version_flags)
+
     @property
     def _compiler_vendor_flags(self):
         if self.args.compiler_vendor == "none":
@@ -48,3 +51,11 @@ class LLVM(product.Product):
               format(self.args.clang_user_visible_version)
         ]
 
+    @property
+    def _version_flags(self):
+        result = []
+        if self.args.clang_compiler_version is not None:
+            result.append("-DCLANG_REPOSITORY_STRING=clang-{}".format(
+                self.args.clang_compiler_version
+            ))
+        return result

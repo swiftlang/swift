@@ -1801,23 +1801,6 @@ for host in "${ALL_HOSTS[@]}"; do
         -DINTERNAL_INSTALL_PREFIX="local"
     )
 
-    if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
-        llvm_cmake_options=(
-            "${llvm_cmake_options[@]}"
-            -DCLANG_REPOSITORY_STRING="clang-${CLANG_COMPILER_VERSION}"
-        )
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DCLANG_COMPILER_VERSION="${CLANG_COMPILER_VERSION}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-        )
-    fi
-    if [[ "${SWIFT_COMPILER_VERSION}" ]] ; then
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-        )
-    fi
     if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"

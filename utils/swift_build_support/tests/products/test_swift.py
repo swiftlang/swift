@@ -131,3 +131,68 @@ class SwiftTestCase(unittest.TestCase):
                 source_dir='/path/to/src',
                 build_dir='/path/to/build')
 
+    def test_version_flags(self):
+        # First make sure that by default, we do not get any version flags.
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            [],
+            [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x]
+        )
+        self.assertListEqual(
+            [],
+            [x for x in swift.cmake_options if 'CLANG_COMPILER_VERSION' in x]
+        )
+
+        self.args.swift_compiler_version = "3.0"
+        self.args.clang_compiler_version = None
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            ['-DSWIFT_COMPILER_VERSION=3.0'],
+            [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x]
+        )
+        self.assertListEqual(
+            [],
+            [x for x in swift.cmake_options if 'CLANG_COMPILER_VERSION' in x]
+        )
+
+        self.args.swift_compiler_version = None
+        self.args.clang_compiler_version = "3.8.0"
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            [],
+            [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x]
+        )
+        self.assertListEqual(
+            ['-DCLANG_COMPILER_VERSION=3.8.0'],
+            [x for x in swift.cmake_options if 'CLANG_COMPILER_VERSION' in x]
+        )
+
+        self.args.swift_compiler_version = "1.0"
+        self.args.clang_compiler_version = "1.9.3"
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual(
+            ['-DSWIFT_COMPILER_VERSION=1.0'],
+            [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x]
+        )
+        self.assertListEqual(
+            ['-DCLANG_COMPILER_VERSION=1.9.3'],
+            [x for x in swift.cmake_options if 'CLANG_COMPILER_VERSION' in x]
+        )
+        self.args.swift_compiler_version = None
+        self.args.clang_compiler_version = None
