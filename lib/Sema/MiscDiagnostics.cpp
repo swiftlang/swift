@@ -1130,8 +1130,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
   // override uses a reference type, and the value type is bridged to the
   // reference type. This is a way to migrate code that makes use of types
   // that previously were not bridged to value types.
-  auto checkType = [&](Type overrideTy, Type baseTy,
-                       SourceRange typeRange) -> bool {
+  auto checkValueReferenceType = [&](Type overrideTy, Type baseTy,
+                                     SourceRange typeRange) -> bool {
     if (typeRange.isInvalid())
       return false;
 
@@ -1182,6 +1182,39 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     newOverrideTy->print(baseTypeStr, options);
     diag.fixItReplace(typeRange, baseTypeStr.str());
     return true;
+  };
+
+  // Check if overriding fails because we lack @escaping attribute on the function
+  // type repr.
+  auto checkTypeMissingEscaping = [&](Type overrideTy, Type baseTy,
+                                      SourceRange typeRange) -> bool {
+    // Fix-it needs position to apply.
+    if (typeRange.isInvalid())
+      return false;
+    auto overrideFnTy = overrideTy->getCanonicalType()->getAs<FunctionType>();
+    auto baseFnTy = baseTy->getCanonicalType()->getAs<FunctionType>();
+
+    // Both types should be function.
+    if (overrideFnTy && baseFnTy &&
+        // Both function types should have same input/result types.
+        overrideFnTy->getInput()->isEqual(baseFnTy->getInput()) &&
+        overrideFnTy->getResult()->isEqual(baseFnTy->getResult()) &&
+        // The overriding function type should be no escaping.
+        overrideFnTy->getExtInfo().isNoEscape() &&
+        // The overriden function type should be escaping.
+        !baseFnTy->getExtInfo().isNoEscape() &&
+        // Being escaping or not should be the only difference.
+        baseFnTy->getExtInfo().withNoEscape() == overrideFnTy->getExtInfo()) {
+      diag.fixItInsert(typeRange.Start, "@escaping ");
+      return true;
+    }
+    return false;
+  };
+
+  auto checkType = [&](Type overrideTy, Type baseTy,
+                       SourceRange typeRange) -> bool {
+    return checkValueReferenceType(overrideTy, baseTy, typeRange) ||
+      checkTypeMissingEscaping(overrideTy, baseTy, typeRange);
   };
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
