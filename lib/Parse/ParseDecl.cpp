@@ -1896,6 +1896,9 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 /// \endverbatim
 ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                llvm::function_ref<void(Decl*)> Handler) {
+  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line))
+    return parseLineDirective(Tok.is(tok::pound_line));
+
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseDeclIfConfig(Flags);
     if (auto ICD = IfConfigResult.getPtrOrNull()) {
@@ -2151,12 +2154,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_protocol:
       DeclResult = parseDeclProtocol(Flags, Attributes);
       Status = DeclResult;
-      break;
-    case tok::pound_sourceLocation:
-      Status = parseLineDirective(false);
-      break;
-    case tok::pound_line:
-      Status = parseLineDirective(true);
       break;
 
     case tok::kw_func:
