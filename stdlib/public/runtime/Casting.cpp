@@ -892,9 +892,6 @@ extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
 /// Nominal type descriptor for Swift.AnyHashable.
 extern "C" const NominalTypeDescriptor _TMnVs11AnyHashable;
 
-/// Protocol descriptor for Swift.Hashable.
-extern "C" const ProtocolDescriptor _TMps8Hashable;
-
 static bool isAnyHashableType(const StructMetadata *type) {
   return type->getDescription() == &_TMnVs11AnyHashable;
 }
@@ -914,7 +911,7 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
                                       DynamicCastFlags flags) {
   // Look for a conformance to Hashable.
   auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(sourceType, &_TMps8Hashable));
+      swift_conformsToProtocol(sourceType, &HashableProtocolDescriptor));
 
   // If we don't find one, the cast fails.
   if (!hashableConformance) {
