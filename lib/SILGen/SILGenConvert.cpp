@@ -654,6 +654,40 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return emitManagedRValueWithCleanup(existential);
   }
   case ExistentialRepresentation::Opaque: {
+  
+    // If the concrete value is a pseudogeneric archetype, first erase it to
+    // its upper bound.
+    auto anyObjectProto = getASTContext()
+      .getProtocol(KnownProtocolKind::AnyObject);
+    auto anyObjectTy = anyObjectProto
+      ? anyObjectProto->getDeclaredType()->getCanonicalType()
+      : CanType();
+    auto eraseToAnyObject =
+    [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
+      auto concreteValue = F(SGFContext());
+      auto anyObjectConformance = SGM.SwiftModule
+        ->lookupConformance(concreteFormalType, anyObjectProto, nullptr);
+      ProtocolConformanceRef buf[] = {
+        *anyObjectConformance,
+      };
+      
+      auto asAnyObject = B.createInitExistentialRef(loc,
+                                  SILType::getPrimitiveObjectType(anyObjectTy),
+                                  concreteFormalType,
+                                  concreteValue.getValue(),
+                                  getASTContext().AllocateCopy(buf));
+      return ManagedValue(asAnyObject, concreteValue.getCleanup());
+    };
+    
+    auto concreteTLPtr = &concreteTL;
+    if (this->F.getLoweredFunctionType()->isPseudogeneric()) {
+      if (anyObjectTy && concreteFormalType->is<ArchetypeType>()) {
+        concreteFormalType = anyObjectTy;
+        concreteTLPtr = &getTypeLowering(anyObjectTy);
+        F = eraseToAnyObject;
+      }
+    }
+
     // Allocate the existential.
     SILValue existential =
       getBufferForExprResult(loc, existentialTL.getLoweredType(), C);
@@ -662,7 +696,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     SILValue valueAddr = B.createInitExistentialAddr(
                             loc, existential,
                             concreteFormalType,
-                            concreteTL.getLoweredType(),
+                            concreteTLPtr->getLoweredType(),
                             conformances);
     // Initialize the concrete value in-place.
     InitializationPtr init(
