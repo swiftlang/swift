@@ -2588,8 +2588,10 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   }
 
   // Set and restore in-parameter-position printing of types
-  llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
-  printTypeLoc(TheTypeLoc);
+  {
+    llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
+    printTypeLoc(TheTypeLoc);
+  }
 
   if (param->isVariadic())
     Printer << "...";
