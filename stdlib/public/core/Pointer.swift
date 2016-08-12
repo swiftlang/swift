@@ -17,7 +17,7 @@ public protocol _Pointer {
   /// The underlying raw pointer value.
   var _rawValue: Builtin.RawPointer { get }
 
-  /// Construct a pointer from a raw value.
+  /// Creates a pointer from a raw value.
   init(_ _rawValue: Builtin.RawPointer)
 }
 

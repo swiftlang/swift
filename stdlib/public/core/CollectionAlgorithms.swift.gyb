@@ -127,9 +127,9 @@ orderingExplanation = """\
   /// hold:
   ///
   /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are both `true`,
-  ///   then `areInIncreasingOrder(a, c)` is also `true`. (Transitive
-  ///   comparability)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///   (Transitive comparability)
   /// - Two elements are *incomparable* if neither is ordered before the other
   ///   according to the predicate. If `a` and `b` are incomparable, and `b`
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.

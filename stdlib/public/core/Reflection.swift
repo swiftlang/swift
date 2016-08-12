@@ -18,30 +18,59 @@ public struct ObjectIdentifier : Hashable {
   internal let _value: Builtin.RawPointer
 
   // FIXME: Better hashing algorithm
-  /// The hash value.
+  /// The identifier's hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
   ///
-  /// - Note: The hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
+  /// - SeeAlso: `Hashable`
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_value))
   }
 
-  /// Construct an instance that uniquely identifies the class instance `x`.
+  /// Creates an instance that uniquely identifies the given class instance.
+  ///
+  /// The following example creates an example class `A` and compares instances
+  /// of the class using their object identifiers and the identical-to
+  /// operator (`===`):
+  ///
+  ///     class IntegerRef {
+  ///         let value: Int
+  ///         init(_ value: Int) {
+  ///             self.value = value
+  ///         }
+  ///     }
+  ///
+  ///     let x = IntegerRef(10)
+  ///     let y = x
+  ///
+  ///     print(ObjectIdentifier(x) == ObjectIdentifier(y))
+  ///     // Prints "true"
+  ///     print(x === y)
+  ///     // Prints "true"
+  ///
+  ///     let z = IntegerRef(10)
+  ///     print(ObjectIdentifier(x) == ObjectIdentifier(z))
+  ///     // Prints "false"
+  ///     print(x === z)
+  ///     // Prints "false"
+  ///
+  /// - Parameter x: An instance of a class.
   public init(_ x: AnyObject) {
     self._value = Builtin.bridgeToRawPointer(x)
   }
 
-  /// Construct an instance that uniquely identifies the metatype `x`.
+  /// Creates an instance that uniquely identifies the given metatype.
+  ///
+  /// - Parameter: A metatype.
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
 
 extension ObjectIdentifier : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
+  /// A textual representation of the identifier, suitable for debugging.
   public var debugDescription: String {
     return "ObjectIdentifier(\(_rawPointerToString(_value)))"
   }
@@ -58,14 +87,16 @@ extension ObjectIdentifier : Comparable {
 }
 
 extension UInt {
-  /// Create a `UInt` that captures the full value of `objectID`.
+  /// Creates an integer that captures the full value of the given object
+  /// identifier.
   public init(bitPattern objectID: ObjectIdentifier) {
     self.init(Builtin.ptrtoint_Word(objectID._value))
   }
 }
 
 extension Int {
-  /// Create an `Int` that captures the full value of `objectID`.
+  /// Creates an integer that captures the full value of the given object
+  /// identifier.
   public init(bitPattern objectID: ObjectIdentifier) {
     self.init(bitPattern: UInt(bitPattern: objectID))
   }
@@ -140,7 +171,7 @@ func _getSummary<T>(_ out: UnsafeMutablePointer<String>, x: T) {
 @_silgen_name("swift_reflectAny")
 internal func _reflect<T>(_ x: T) -> _Mirror
 
-/// Dump an object's contents using its mirror to the specified output stream.
+/// Dumps an object's contents using its mirror to the specified output stream.
 @discardableResult
 public func dump<T, TargetStream : TextOutputStream>(
   _ value: T,
@@ -165,7 +196,7 @@ public func dump<T, TargetStream : TextOutputStream>(
   return value
 }
 
-/// Dump an object's contents using its mirror to standard output.
+/// Dumps an object's contents using its mirror to standard output.
 @discardableResult
 public func dump<T>(
   _ value: T,
