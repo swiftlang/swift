@@ -47,6 +47,10 @@ class SwiftTestCase(unittest.TestCase):
         # Setup args
         self.args = argparse.Namespace(
             enable_tsan_runtime=False,
+            compiler_vendor='none',
+            swift_compiler_version=None,
+            clang_compiler_version=None,
+            swift_user_visible_version=None,
             darwin_deployment_version_osx="10.9")
 
         # Setup shell
@@ -77,3 +81,53 @@ class SwiftTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         self.assertEqual(swift.cmake_options,
                          ['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread'])
+
+    def test_swift_compiler_vendor_flags(self):
+        self.args.compiler_vendor = "none"
+        self.args.swift_user_visible_version = None
+        self.args.swift_compiler_version = None
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VENDOR' in x])
+        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VENDOR_UTI' in x])
+        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_VERSION' in x])
+        self.assertListEqual([], [x for x in swift.cmake_options if 'SWIFT_COMPILER_VERSION' in x])
+
+        self.args.compiler_vendor = "apple"
+        self.args.swift_user_visible_version = "1.3"
+        self.args.swift_compiler_version = None
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn('-DSWIFT_VENDOR=Apple', swift.cmake_options)
+        self.assertIn('-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift', swift.cmake_options)
+        self.assertIn('-DSWIFT_VERSION=1.3', swift.cmake_options)
+        self.assertIn('-DSWIFT_COMPILER_VERSION=', swift.cmake_options)
+
+        self.args.compiler_vendor = "apple"
+        self.args.swift_user_visible_version = "1.3"
+        self.args.swift_compiler_version = "2.3"
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn('-DSWIFT_VENDOR=Apple', swift.cmake_options)
+        self.assertIn('-DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift', swift.cmake_options)
+        self.assertIn('-DSWIFT_VERSION=1.3', swift.cmake_options)
+        self.assertIn('-DSWIFT_COMPILER_VERSION=2.3', swift.cmake_options)
+
+
+        self.args.compiler_vendor = "unknown"
+        with self.assertRaises(RuntimeError):
+            swift = Swift(
+                args=self.args,
+                toolchain=self.toolchain,
+                source_dir='/path/to/src',
+                build_dir='/path/to/build')
+

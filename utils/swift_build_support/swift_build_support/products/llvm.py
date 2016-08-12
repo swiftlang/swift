@@ -28,3 +28,23 @@ class LLVM(product.Product):
         self.cmake_options.extend([
             '-DLLVM_TARGETS_TO_BUILD=%s' % args.llvm_targets_to_build
         ])
+
+        # Add the cmake options for vendors
+        self.cmake_options.extend(self._compiler_vendor_flags)
+
+    @property
+    def _compiler_vendor_flags(self):
+        if self.args.compiler_vendor == "none":
+            return []
+
+        if self.args.compiler_vendor != "apple":
+            raise RuntimeError("Unknown compiler vendor?!")
+
+        return [
+            "-DCLANG_VENDOR=Apple",
+            "-DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang",
+            # This is safe since we always provide a default of 3.8.0
+            "-DPACKAGE_VERSION={}".\
+              format(self.args.clang_user_visible_version)
+        ]
+
