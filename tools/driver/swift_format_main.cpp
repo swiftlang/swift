@@ -185,7 +185,7 @@ public:
     }
     FormatterDocument Doc(std::move(Code));
     if (LineRanges.empty()) {
-      LineRanges.push_back("1:9999999");
+      LineRanges.push_back("1:" + std::to_string(UINT_MAX));
     }
     std::string Output = Doc.memBuffer().getBuffer();
     clang::tooling::Replacements Replacements;
