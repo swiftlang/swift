@@ -3667,10 +3667,14 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
       !declRef->getType()->is<AnyFunctionType>())
     return false;
 
-  // Must be from non-escaping function to escaping function
+  // Must be from non-escaping function to escaping function. For the
+  // destination type, we read through optionality to give better diagnostics in
+  // the event of an implicit promotion.
   auto srcFT = srcType->getAs<AnyFunctionType>();
-  auto destFT = dstType->getAs<AnyFunctionType>();
-  if (!srcFT || !destFT || !srcFT->isNoEscape() || destFT->isNoEscape())
+  auto dstFT =
+      dstType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
+
+  if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
 
   // Pick a specific diagnostic for the specific use
