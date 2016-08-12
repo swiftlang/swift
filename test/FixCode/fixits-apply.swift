@@ -256,3 +256,6 @@ func testProtocolCompositionSyntax() {
   var _: protocol<Prot1>
   var _: protocol<Prot1, Prot2>
 }
+
+func disable_unnamed_param_reorder(p: Int, _: String) {}
+disable_unnamed_param_reorder(0, "") // no change.
