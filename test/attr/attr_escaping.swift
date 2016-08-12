@@ -71,3 +71,24 @@ func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
 }
 
 
+func takesEscapingGeneric<T>(_ fn: @escaping () -> T) {}
+func callEscapingGeneric<T>(_ fn: () -> T) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{35-35=@escaping }}
+  takesEscapingGeneric(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
+
+
+class Super {}
+class Sub: Super {}
+
+func takesEscapingSuper(_ fn: @escaping () -> Super) {}
+func callEscapingSuper(_ fn: () -> Sub) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{30-30=@escaping }}
+  takesEscapingSuper(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
+
+func takesEscapingSuperGeneric<T: Super>(_ fn: @escaping () -> T) {}
+func callEscapingSuperGeneric(_ fn: () -> Sub) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
+  takesEscapingSuperGeneric(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
+func callEscapingSuperGeneric<T: Sub>(_ fn: () -> T) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{45-45=@escaping }}
+  takesEscapingSuperGeneric(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}
