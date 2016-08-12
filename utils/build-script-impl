@@ -1795,30 +1795,6 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
     fi
 
-    case "${COMPILER_VENDOR}" in
-        none)
-            ;;
-        apple)
-            llvm_cmake_options=(
-                "${llvm_cmake_options[@]}"
-                -DCLANG_VENDOR=Apple
-                -DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang
-                -DPACKAGE_VERSION="${CLANG_USER_VISIBLE_VERSION}"
-            )
-            swift_cmake_options=(
-                "${swift_cmake_options[@]}"
-                -DSWIFT_VENDOR=Apple
-                -DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift
-                -DSWIFT_VERSION="${SWIFT_USER_VISIBLE_VERSION}"
-                -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-            )
-            ;;
-        *)
-            echo "unknown compiler vendor"
-            exit 1
-            ;;
-    esac
-
     llvm_cmake_options=(
         "${llvm_cmake_options[@]}"
         -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
