@@ -841,6 +841,12 @@ FUNCTION(GetObjectClass, object_getClass, C_CC,
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// id object_dispose(id object);
+FUNCTION(ObjectDispose, object_dispose, C_CC,
+         RETURNS(ObjCPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind))
+
 // Class objc_lookUpClass(const char *name);
 FUNCTION(LookUpClass, objc_lookUpClass, C_CC,
          RETURNS(ObjCClassPtrTy),

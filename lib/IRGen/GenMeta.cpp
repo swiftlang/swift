@@ -1340,7 +1340,7 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // Non-native types are just wrapped in various ways.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
     // We emit a completely different pattern for foreign classes.
-    if (classDecl->isForeign()) {
+    if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       return emitForeignTypeMetadataRef(IGF, type);
     }
 
