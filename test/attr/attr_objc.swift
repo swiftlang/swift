@@ -314,6 +314,7 @@ class ConcreteContext2 {
 }
 
 class ConcreteContext3 {
+
   func dynamicSelf1() -> Self { return self }
 
   @objc func dynamicSelf1_() -> Self { return self }
@@ -321,6 +322,38 @@ class ConcreteContext3 {
 
   @objc func genericParams<T: NSObject>() -> [T] { return [] }
   // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
+
+  @objc func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias AnotherNSCoding = NSCoding
+  typealias MetaNSCoding1 = NSCoding.Protocol
+  typealias MetaNSCoding2 = AnotherNSCoding.Protocol
+
+  @objc func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias Composition = NSCopying & NSCoding
+
+  @objc func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias NSCodingExistential = NSCoding.Type
+
+  @objc func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+
+  @objc func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 func genericContext1<T>(_: T) {
