@@ -334,6 +334,15 @@ func _Policy() {
   func fn<O : BitwiseOperationsType>(_: O) {} // expected-error {{'BitwiseOperationsType' has been renamed to 'BitwiseOperations'}} {{15-36=BitwiseOperations}} {{none}}
 }
 
+func _Print<T, O : TextOutputStream>(x: T, out: O) {
+  var out = out
+  print(x, toStream: &out) // expected-error {{'print(_:separator:terminator:toStream:)' has been renamed to 'print(_:separator:terminator:to:)'}} {{3-8=print}} {{12-20=to}} {{none}}
+  print(x, x, separator: "/", toStream: &out) // expected-error {{'print(_:separator:terminator:toStream:)' has been renamed to 'print(_:separator:terminator:to:)'}} {{3-8=print}} {{31-39=to}} {{none}}
+  print(terminator: "|", toStream: &out) // expected-error {{'print(_:separator:terminator:toStream:)' has been renamed to 'print(_:separator:terminator:to:)'}} {{3-8=print}} {{26-34=to}} {{none}}
+  print(x, separator: "*", terminator: "$", toStream: &out) // expected-error {{'print(_:separator:terminator:toStream:)' has been renamed to 'print(_:separator:terminator:to:)'}} {{3-8=print}} {{45-53=to}} {{none}}
+  debugPrint(x, toStream: &out) // expected-error {{'debugPrint(_:separator:terminator:toStream:)' has been renamed to 'debugPrint(_:separator:terminator:to:)'}} {{3-13=debugPrint}} {{17-25=to}} {{none}}
+}
+
 func _Print<T>(x: T) {
   print(x, appendNewline: true) // expected-error {{'print(_:appendNewline:)' is unavailable: Please use 'terminator: ""' instead of 'appendNewline: false': 'print((...), terminator: "")'}} {{none}}
   debugPrint(x, appendNewline: true) // expected-error {{'debugPrint(_:appendNewline:)' is unavailable: Please use 'terminator: ""' instead of 'appendNewline: false': 'debugPrint((...), terminator: "")'}} {{none}}
