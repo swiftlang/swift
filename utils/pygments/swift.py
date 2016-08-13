@@ -5,8 +5,8 @@ import re
 from pygments.lexer import (
     RegexLexer,
     bygroups,
-    include,
     default,
+    include,
 )
 from pygments.token import (
     Comment,
@@ -23,6 +23,7 @@ from pygments.token import (
 
 __all__ = ['SwiftLexer', 'SILLexer', 'SwiftConsoleLexer']
 
+
 class SwiftLexer(RegexLexer):
     name = 'Swift'
     aliases = ['swift']
@@ -33,7 +34,8 @@ class SwiftLexer(RegexLexer):
     _isa = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s*)(:)(\s*)([A-Z0-9_][a-zA-Z0-9_]*)'
     _isa_comma = r'([a-zA-Z_][a-zA-Z0-9_]*)(\s*)(:)(\s*)' + \
                  '([A-Z0-9_][a-zA-Z0-9_]*)(,\s?)'
-    _name = u'([@a-zA-Z_\U00000100-\U00100000][a-zA-Z0-9_\U00000100-\U00100000]*)'
+    _name = u'([@a-zA-Z_\U00000100-\U00100000]' + \
+            u'[a-zA-Z0-9_\U00000100-\U00100000]*)'
 
     tokens = {
 
@@ -51,7 +53,8 @@ class SwiftLexer(RegexLexer):
         ],
 
         'func-class-list': [
-            (r'\b(func|init|deinit|class func|public func)\s', Keyword.Declaration, 'func-decl'),
+            (r'\b(func|init|deinit|class func|public func)\s',
+             Keyword.Declaration, 'func-decl'),
         ],
 
         'comment': [
@@ -66,7 +69,7 @@ class SwiftLexer(RegexLexer):
         'body': [
             include('comment'),
             include('name'),
-            (r'\.{3}', Generic.Emph), # emphasize ellipses
+            (r'\.{3}', Generic.Emph),  # emphasize ellipses
             (r'[\~\^\*!%&<>+=/?-]|\.{2}', Operator),
             include('token-list'),
             (r'[\[\]\(\)\{\}\|:;,.#]', Punctuation),
@@ -254,7 +257,8 @@ class SwiftLexer(RegexLexer):
             (_name, Name.Namespace),
             (r',\s*', Punctuation),
             (r' ', Text.Whitespace),
-            (r'(\()(\d+\.\d+)(\))', bygroups(Punctuation, Number.Float, Punctuation)),
+            (r'(\()(\d+\.\d+)(\))', bygroups(
+             Punctuation, Number.Float, Punctuation)),
             default('#pop'),
         ],
 
@@ -266,12 +270,14 @@ class SwiftLexer(RegexLexer):
                 Punctuation,
                 Whitespace)),
             include('class-isa'),
-            (r'(\*?)([a-zA-Z_][a-zA-Z0-9_?]*)', bygroups(Punctuation, Name.Class)),
+            (r'(\*?)([a-zA-Z_][a-zA-Z0-9_?]*)', bygroups(
+             Punctuation, Name.Class)),
             (r'\.', Punctuation),
             (r'<', Punctuation, 'generic-type'),
             (r':', Punctuation, 'name-list'),
             (r'\s', Whitespace),
-            (r'\s?(,)(\s*)([A-Z0-9_][a-zA-Z0-9_]*)', bygroups(Punctuation, Whitespace, Name.Constant)),
+            (r'\s?(,)(\s*)([A-Z0-9_][a-zA-Z0-9_]*)', bygroups(
+             Punctuation, Whitespace, Name.Constant)),
             (r'<', Punctuation, 'generic-type'),
             (r'where', Keyword.Reserved),
             default("#pop"),
