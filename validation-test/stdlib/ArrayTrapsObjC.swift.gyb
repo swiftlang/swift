@@ -25,10 +25,8 @@ ArrayTraps.test("downcast1")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [Base] = [ Derived(), Base() ]
-  let da = ba as! [Derived]
-  let d0 = da[0]
   expectCrashLater()
-  _ = da[1]
+  let da = ba as! [Derived]
 }
 
 ArrayTraps.test("downcast2")
@@ -37,10 +35,8 @@ ArrayTraps.test("downcast2")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let a: [AnyObject] = ["String" as NSString, 1 as NSNumber]
-  let sa = a as! [NSString]
-  let s0 = sa[0]
   expectCrashLater()
-  _ = sa[1]
+  let sa = a as! [NSString]
 }
 
 ArrayTraps.test("downcast3")
@@ -49,13 +45,8 @@ ArrayTraps.test("downcast3")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [Base] = [ Derived2(), Derived(), Base() ]
-  let d2a = ba as! [Derived2]
-  let d2a0 = d2a[0]
-  let d1a = d2a as [Derived]
-  let d1a0 = d1a[0]
-  let d1a1 = d1a[1]
   expectCrashLater()
-  _ = d1a[2]
+  let d2a = ba as! [Derived2]
 }
 
 @objc protocol ObjCProto { }
@@ -68,23 +59,18 @@ ArrayTraps.test("downcast4")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [ObjCProto] = [ ObjCDerived(), ObjCBase() ]
-  let da = ba as! [ObjCDerived]
-  let d0 = da[0]
   expectCrashLater()
-  _ = da[1]
+  let da = ba as! [ObjCDerived]
 }
 
 ArrayTraps.test("bounds_with_downcast")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "Fatal error: Index out of range" : "")
   .code {
   let ba: [Base] = [ Derived(), Base() ]
-  let da = ba as! [Derived]
   expectCrashLater()
-  let x = da[2]
+  let da = ba as! [Derived]
 }
 
 var ArraySemanticOptzns = TestSuite("ArraySemanticOptzns" + testSuiteSuffix)

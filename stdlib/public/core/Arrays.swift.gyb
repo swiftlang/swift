@@ -889,16 +889,7 @@ extension ${Self} {
   func _checkSubscript(
     _ index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
-#if _runtime(_ObjC)
-% if Self == 'Array':
-    _buffer._checkInoutAndNativeTypeCheckedBounds(
-      index, wasNativeTypeChecked: wasNativeTypeChecked)
-% else:
     _buffer._checkValidSubscript(index)
-% end
-#else
-    _buffer._checkValidSubscript(index)
-#endif
     return _DependenceToken()
   }
 
@@ -923,11 +914,7 @@ extension ${Self} {
     wasNativeTypeChecked : Bool,
     matchingSubscriptCheck: _DependenceToken
   ) -> Element {
-#if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
-    return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
-#else
     return _buffer.getElement(index)
-#endif
   }
 
   @_inlineable
@@ -936,6 +923,14 @@ extension ${Self} {
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
   }
+
+%if Self == 'ArraySlice':
+  internal typealias _Buffer = _SliceBuffer<Element>
+%else:
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+%end
+
+
 }
 
 extension ${Self} : ExpressibleByArrayLiteral {
@@ -2319,11 +2314,68 @@ extension ${Self} {
 %end
 
 #if _runtime(_ObjC)
+import SwiftShims
+
+internal enum _ArrayBridgeFailure : Error {
+case count(Int)
+}
+
+extension _ContiguousArrayBuffer {
+  internal init?(_bridgingFromObjectiveC source: AnyObject) {
+    typealias Storage = _ContiguousArrayStorage<Element>
+    
+    // First see if there's already a native buffer we can grab
+    if let storage = (source as? Storage)
+      ?? (source as? _SwiftDeferredNSArray)?._nativeStorage as? Storage {
+      self.init(storage)
+    }
+    else {
+      self.init(_slowBridgingFromObjectiveC: source)
+    }
+  }
+
+  internal init?(_slowBridgingFromObjectiveC source: AnyObject) {
+    let nsArray = unsafeBitCast(source, to: _NSArrayCore.self)
+    let count = nsArray.count
+    self.init(_uninitializedCount: count)
+    if count == 0 { return }
+
+    if (_isBridgedVerbatimToObjectiveC(Element.self)) {
+      withUnsafeMutableBufferPointer {
+        $0.baseAddress!.withMemoryRebound(to: AnyObject.self, capacity: count) {
+          nsArray.getObjects($0, range: _SwiftNSRange(location: 0, length: count))
+        }
+      }
+    }
+    else {
+      self.count = withUnsafeMutableBufferPointer {
+        let p = $0.baseAddress!
+        for i in 0..<count {
+          guard let e = nsArray.objectAt(i) as? Element else {
+            return i
+          }
+          (p + i).initialize(to: e)
+        }
+        return count
+      }
+      if self.count < count { return nil }
+    }
+  }
+}
+
 extension Array {
   @_inlineable
   public // @SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
     return _buffer._asCocoaArray()
+  }
+
+  // Note: this function exists here so that Foundation doesn't have
+  // to know Array's implementation details.
+  public init?(_bridgingFromObjectiveC source: AnyObject) {
+    guard let buffer = _ContiguousArrayBuffer<Element>(
+      _bridgingFromObjectiveC: source) else { return nil }
+    self.init(buffer)
   }
 
   /// Tries to downcast the source `NSArray` as our native buffer type.
@@ -2335,24 +2387,12 @@ extension Array {
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ source: AnyObject
   ) -> Array? {
-    // If source is deferred, we indirect to get its native storage
-    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+    typealias Storage = _ContiguousArrayStorage<Element>
 
-    return (maybeNative as? _ContiguousArrayStorage<Element>).map {
-      Array(_ContiguousArrayBuffer($0))
-    }
-  }
+    let storage = (source as? Storage)
+      ?? (source as? _SwiftDeferredNSArray)?._nativeStorage as? Storage
 
-  /// Private initializer used for bridging.
-  ///
-  /// Only use this initializer when both conditions are true:
-  ///
-  /// * it is statically known that the given `NSArray` is immutable;
-  /// * `Element` is bridged verbatim to Objective-C (i.e.,
-  ///   is a reference type).
-  @_inlineable
-  public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
+	  return storage.map { Array(_ContiguousArrayBuffer($0)) }
   }
 }
 #endif

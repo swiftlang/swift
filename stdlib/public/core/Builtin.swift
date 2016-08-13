@@ -255,7 +255,11 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent
 public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
-  _debugPrecondition(x is T, "invalid unsafeDowncast")
+  if _isDebugAssertConfiguration() && _slowPath(!(x is T)) {
+    _assertionFailed(
+      "unsafeDowncast",
+      "\(type(of: x)) to \(T.self)", #file, #line, flags: _fatalErrorFlags())
+  }
   return Builtin.castReference(x)
 }
 

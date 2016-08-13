@@ -203,7 +203,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @_versioned
   internal init(
     _uninitializedCount uninitializedCount: Int,
-    minimumCapacity: Int
+    minimumCapacity: Int = 0
   ) {
     let realMinimumCapacity = Swift.max(uninitializedCount, minimumCapacity)
     if realMinimumCapacity == 0 {

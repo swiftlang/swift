@@ -117,7 +117,7 @@ reflect(object: obj)
 // CHECK-64: Type info:
 // CHECK-64-NEXT: (class_instance size=185 alignment=8 stride=192 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=t00 offset=16
-// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1
+// CHECK-64-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
 // (unstable implementation details omitted)
 // CHECK-64:   (field name=t01 offset=24
 // CHECK-64-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
@@ -207,7 +207,7 @@ reflect(object: obj)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=121 alignment=8 stride=128 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=t00 offset=8
-// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=2147483647
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t01 offset=12
 // CHECK-32-NEXT:     (struct size=1 alignment=1 stride=1 num_extra_inhabitants=254
