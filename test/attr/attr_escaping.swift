@@ -92,3 +92,18 @@ func callEscapingSuperGeneric(_ fn: () -> Sub) { // expected-note {{parameter 'f
 func callEscapingSuperGeneric<T: Sub>(_ fn: () -> T) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{45-45=@escaping }}
   takesEscapingSuperGeneric(fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
+
+func testModuloOptionalness() {
+  var iuoClosure: (() -> Void)! = nil
+  func setIUOClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{28-28=@escaping }}
+    iuoClosure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
+  }
+  var iuoClosureExplicit: ImplicitlyUnwrappedOptional<() -> Void>
+  func setExplicitIUOClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{36-36=@escaping }}
+    iuoClosureExplicit = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
+  }
+  var deepOptionalClosure: (() -> Void)???
+  func setDeepOptionalClosure(_ fn: () -> Void) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
+    deepOptionalClosure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
+  }
+}
