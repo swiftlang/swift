@@ -474,19 +474,12 @@ extension Array : _ObjectiveCBridgeable {
   internal init(_cocoaArray: NSArray) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Array can be backed by NSArray only when the element type can be bridged verbatim to Objective-C")
-    // FIXME: We would like to call CFArrayCreateCopy() to avoid doing an
-    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
-    // today because CFArrayCreateCopy() copies array contents unconditionally,
-    // resulting in O(n) copies even for immutable arrays.
-    //
-    // <rdar://problem/19773555> CFArrayCreateCopy() is >10x slower than
-    // -[NSArray copyWithZone:]
-    //
-    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
-    // and watchOS.
-    self = Array(
-      _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy() as AnyObject, to: _NSArrayCore.self))
+    self.init()
+    let n = _cocoaArray.count
+    self.reserveCapacity(n)
+    for i in 0..<n {
+      append(_cocoaArray.object(at: i) as! Element)
+    }
   }
 
   @_semantics("convertToObjectiveC")
