@@ -329,7 +329,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
     let source = [ 10, 20, 30 ]
     let nsa = getAsNSArray(source)
     var result = nsa as Array
-    expectTrue(isCocoaArray(result))
+    expectFalse(isCocoaArray(result))
     expectType(Array<AnyObject>.self, &result)
     checkSequence(source.map { TestObjCValueTy($0) as AnyObject }, result) {
       ($0 as! TestObjCValueTy).value == ($1 as! TestObjCValueTy).value
@@ -339,7 +339,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
     let source = [ 10, 20, 30 ]
     let nsa = getAsNSArray(source)
     var result = nsa as! Array<TestObjCValueTy>
-    expectTrue(isCocoaArray(result))
+    expectFalse(isCocoaArray(result))
     expectType(Array<TestObjCValueTy>.self, &result)
     checkSequence(source.map { TestObjCValueTy($0) }, result) {
       $0.value == $1.value
@@ -363,7 +363,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
   let result = nsa as Array<AnyObject>
-  expectTrue(isCocoaArray(result))
+  expectFalse(isCocoaArray(result))
 
   // Delete the value from NSMutableArray.
   expectEqual(20, (nsa[1] as! TestObjCValueTy).value)
@@ -395,7 +395,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   var a: Array<AnyObject> = convertNSArrayToArray(nsa)
   var bridgedBack: NSArray = convertArrayToNSArray(a)
 
-  expectEqual(
+  expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -426,13 +426,13 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
   CustomImmutableNSArray.timesCountWasCalled = 0
   let a: Array<AnyObject> = convertNSArrayToArray(nsa)
-  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
-  expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
-  expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(a.count, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectEqual(1, CustomImmutableNSArray.timesCountWasCalled)
 
   let bridgedBack: NSArray = convertArrayToNSArray(a)
 
-  expectEqual(
+  expectNotEqual(
     unsafeBitCast(nsa, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -453,7 +453,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
   // FIXME: bridging shouldn't dump array contents into the autorelease pool.
   autoreleasepoolIfUnoptimizedReturnAutoreleased {
     a = convertNSArrayToArray(nsa)
-    expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+    expectEqual(0, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
     expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
     expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
     expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -1005,7 +1005,12 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   // Bridge back to native array with a cast.
-  var native: [TestObjCValueTy] = convertNSArrayToArray(a)
+  
+  // FIXME(eager-bridging): This autoreleasepool was needed to prevent the
+  // epilogue from detecting a leak.  Figure out why!
+  var native: [TestObjCValueTy] = autoreleasepool {
+    convertNSArrayToArray(a) 
+  }
   native[0] = TestObjCValueTy(110)
   native[1] = TestObjCValueTy(120)
   native[2] = TestObjCValueTy(130)
@@ -1086,7 +1091,7 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
     let a: ${MiddleType} = convertNSArrayToArray(nsa)
     let bridgedBack = convertArrayToNSArray(a)
 
-    expectEqual(
+    expectNotEqual(
       unsafeBitCast(nsa, to: Int.self),
       unsafeBitCast(bridgedBack, to: Int.self))
 
@@ -1099,7 +1104,7 @@ ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
     let a = nsa ${AsCast} ${MiddleType}
     let bridgedBack: NSArray = a as NSArray
 
-    expectEqual(
+    expectNotEqual(
       unsafeBitCast(nsa, to: Int.self),
       unsafeBitCast(bridgedBack, to: Int.self))
 
