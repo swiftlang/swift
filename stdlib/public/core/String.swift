@@ -896,7 +896,7 @@ extension String {
   ///
   /// - Returns: A lowercase copy of the string.
   ///
-  /// - Complexity: O(n)
+  /// - Complexity: O(*n*)
   public func lowercased() -> String {
     if self._core.isASCII {
       let count = self._core.count
@@ -946,7 +946,7 @@ extension String {
   ///
   /// - Returns: An uppercase copy of the string.
   ///
-  /// - Complexity: O(n)
+  /// - Complexity: O(*n*)
   public func uppercased() -> String {
     if self._core.isASCII {
       let count = self._core.count

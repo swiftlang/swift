@@ -137,7 +137,8 @@ public protocol UnicodeCodec {
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
   ///
   /// Is an equivalent of `strlen` for C-strings.
-  /// - Complexity: O(n)
+  ///
+  /// - Complexity: O(*n*)
   static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 

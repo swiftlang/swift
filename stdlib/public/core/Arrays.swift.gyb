@@ -169,8 +169,8 @@ if True:
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
 /// arrays to organize your app's data. Specifically, you use the `Array` type
-/// to hold elements of a single type, the array's `Element` type. An array's
-/// elements can be anything from an integer to a string to a class.
+/// to hold elements of a single type, the array's `Element` type. An array
+/// can store any kind of elements---from integers to strings to classes.
 ///
 /// Swift makes it easy to create arrays in your code using an array literal:
 /// simply surround a comma separated list of values with square brackets.
@@ -261,8 +261,8 @@ if True:
 ///     var students = ["Ben", "Ivy", "Jordell"]
 ///
 /// To add single elements to the end of an array, use the `append(_:)` method.
-/// Add multiple elements at once by passing another array or a sequence of
-/// any kind to the `append(contentsOf:)` method.
+/// Add multiple elements at the same time by passing another array or a
+/// sequence of any kind to the `append(contentsOf:)` method.
 ///
 ///     students.append("Maxime")
 ///     students.append(contentsOf: ["Shakia", "William"])
@@ -271,8 +271,8 @@ if True:
 /// You can add new elements in the middle of an array by using the
 /// `insert(_:at:)` method for single elements and by using
 /// `insert(contentsOf:at:)` to insert multiple elements from another
-/// collection or array literal. The elements at that index and later are
-/// shifted back to make room.
+/// collection or array literal. The elements at that index and later indices
+/// are shifted back to make room.
 ///
 ///     students.insert("Liam", at: 3)
 ///     // ["Ben", "Ivy", "Jordell", "Liam", "Maxime", "Shakia", "William"]
@@ -288,8 +288,8 @@ if True:
 ///     students.removeLast()
 ///     // ["Ivy", "Jordell", "Liam", "Maxime", "Shakia"]
 ///
-/// You can replace an existing element with a new value by assigning to the
-/// subscript.
+/// You can replace an existing element with a new value by assigning the new
+/// value to the subscript.
 ///
 ///     if let i = students.index(of: "Maxime") {
 ///         students[i] = "Max"
@@ -423,7 +423,7 @@ if True:
 ///
 /// Bridging from `Array` to `NSArray` takes O(1) time and O(1) space if the
 /// array's elements are already instances of a class or an `@objc` protocol;
-/// otherwise, it takes O(n) time and space.
+/// otherwise, it takes O(*n*) time and space.
 ///
 /// Bridging from `NSArray` to `Array` first calls the `copy(with:)`
 /// (`- copyWithZone:` in Objective-C) method on the array to get an immutable

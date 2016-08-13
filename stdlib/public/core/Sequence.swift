@@ -210,9 +210,9 @@ public protocol IteratorProtocol {
 
 /// A type that provides sequential, iterated access to its elements.
 ///
-/// Sequences are lists of values that let you step over their values
-/// one at a time. The most common way to iterate over the elements of a
-/// sequence is to use a `for`-`in` loop:
+/// A sequence is a list of values that you can step through one at a time. The
+/// most common way to iterate over the elements of a sequence is to use a
+/// `for`-`in` loop:
 ///
 ///     let oneTwoThree = 1...3
 ///     for number in oneTwoThree {
@@ -253,38 +253,38 @@ public protocol IteratorProtocol {
 ///     }
 ///     // Prints "Whew, no mosquitos!"
 ///
-/// Repeated Access 
+/// Repeated Access
 /// ===============
 ///
 /// The `Sequence` protocol makes no requirement on conforming types regarding
-/// whether they will be destructively "consumed" by iteration. As a
+/// whether they will be destructively consumed by iteration. As a
 /// consequence, don't assume that multiple `for`-`in` loops on a sequence
-/// will either "resume" iteration or restart from the beginning:
+/// will either resume iteration or restart from the beginning:
 ///
 ///     for element in sequence {
 ///         if ... some condition { break }
 ///     }
-/// 
+///
 ///     for element in sequence {
 ///         // No defined behavior
 ///     }
 ///
-/// In this case, you cannot assume that a sequence will either be
-/// "consumable" and will resume iteration, or that a sequence is a
-/// collection and will restart iteration from the first element. A
-/// conforming sequence that is not a collection is allowed to produce an
-/// arbitrary sequence of elements in the second `for`-`in` loop.
+/// In this case, you cannot assume either that a sequence will be consumable
+/// and will resume iteration, or that a sequence is a collection and will
+/// restart iteration from the first element. A conforming sequence that is
+/// not a collection is allowed to produce an arbitrary sequence of elements
+/// in the second `for`-`in` loop.
 ///
-/// To establish that a type you've created supports nondestructive
-/// iteration, add conformance to the `Collection` protocol.
+/// To establish that a type you've created supports nondestructive iteration,
+/// add conformance to the `Collection` protocol.
 ///
-/// Conforming to the Sequence Protocol 
+/// Conforming to the Sequence Protocol
 /// ===================================
 ///
 /// Making your own custom types conform to `Sequence` enables many useful
 /// operations, like `for`-`in` looping and the `contains` method, without
-/// much effort. To add `Sequence` conformance to your own custom type, add
-/// a `makeIterator()` method that returns an iterator.
+/// much effort. To add `Sequence` conformance to your own custom type, add a
+/// `makeIterator()` method that returns an iterator.
 ///
 /// Alternatively, if your type can act as its own iterator, implementing the
 /// requirements of the `IteratorProtocol` protocol and declaring conformance
@@ -296,7 +296,7 @@ public protocol IteratorProtocol {
 ///
 ///     struct Countdown: Sequence, IteratorProtocol {
 ///         var count: Int
-/// 
+///
 ///         mutating func next() -> Int? {
 ///             if count == 0 {
 ///                 return nil
@@ -306,7 +306,7 @@ public protocol IteratorProtocol {
 ///             }
 ///         }
 ///     }
-/// 
+///
 ///     let threeToGo = Countdown(count: 3)
 ///     for i in threeToGo {
 ///         print(i)
@@ -315,7 +315,7 @@ public protocol IteratorProtocol {
 ///     // Prints "2"
 ///     // Prints "1"
 ///
-/// Expected Performance 
+/// Expected Performance
 /// ====================
 ///
 /// A sequence should provide its iterator in O(1). The `Sequence` protocol
@@ -915,7 +915,7 @@ extension Sequence {
   /// Returns a value less than or equal to the number of elements in
   /// the sequence, nondestructively.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   public var underestimatedCount: Int {
     return 0
   }
