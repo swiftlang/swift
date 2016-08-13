@@ -3,6 +3,8 @@
 .. @raise litre.TestsAreMissing
 .. _ABI:
 
+.. highlight:: none
+
 The Swift ABI
 =============
 

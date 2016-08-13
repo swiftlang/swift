@@ -1,5 +1,7 @@
 :orphan:
 
+.. highlight:: sil
+
 ==========================
 ARC Optimization for Swift
 ==========================

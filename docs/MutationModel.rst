@@ -44,7 +44,7 @@ What do we do with this?  Since ``+=`` has an ``inout`` first
 argument, we detect this situation statically (hopefully one day we'll
 have a better error message): 
 
-::
+.. code-block:: swift-console
    
  <REPL Input>:1:9: error: expression does not type-check
  w.title += " (parenthesized remark)"

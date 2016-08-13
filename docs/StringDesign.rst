@@ -389,7 +389,9 @@ end, strings support properties for more-specific segmentations:
    `Search Grapheme Cluster: o`
 
 Also, each such segmentation provides a unique ``IndexType``, allowing
-a string to be indexed directly with different indexing schemes::
+a string to be indexed directly with different indexing schemes
+
+.. code-block:: swift-console
 
    |swift| var i = s.searchCharacters.startIndex
    `// r2 : UInt8 = UInt8(83)`

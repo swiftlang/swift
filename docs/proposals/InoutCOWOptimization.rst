@@ -1,4 +1,6 @@
 :orphan:
+
+.. highlight:: sil
    
 ================================================
  Copy-On-Write Optimization of ``inout`` Values

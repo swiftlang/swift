@@ -62,7 +62,9 @@ test suite, via ``utils/build-script --validation-test``.
 Although it is not recommended for day-to-day contributions, it is also
 technically possible to execute the tests directly via CMake. For example, if you have
 built Swift products at the directory ``build/Ninja-ReleaseAssert/swift-macosx-x86_64``,
-you may run the entire test suite directly using the following command::
+you may run the entire test suite directly using the following command:
+
+.. code-block:: bash
 
   cmake --build build/Ninja-ReleaseAssert/swift-macosx-x86_64 -- check-swift-macosx-x86_64
 
@@ -112,7 +114,9 @@ For every target above, there are variants for different optimizations:
   ``executable_test`` in ``-Onone`` mode.
 
 If you need to manually run certain tests, you can invoke LLVM's lit.py script
-directly. For example::
+directly. For example:
+
+.. code-block:: bash
 
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv ${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/Parse/
 
@@ -128,7 +132,7 @@ source 'test/' directory.) There is a more verbose form that specifies the
 testing configuration explicitly, which then allows you to test files
 regardless of location.
 
-::
+.. code-block:: bash
 
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_ROOT}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 
