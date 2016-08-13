@@ -1397,18 +1397,18 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
     if (parsed.isMember()) {
       diag.fixItReplace(call->getFn()->getSourceRange(), parsed.ContextName);
 
-    } else {
-      auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn());
-      if (!dotCall)
-        return;
-
+    } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(call->getFn())) {
       SourceLoc removeLoc = dotCall->getDotLoc();
       if (removeLoc.isInvalid())
         return;
 
       diag.fixItRemove(SourceRange(removeLoc, dotCall->getFn()->getEndLoc()));
+    } else if (!isa<ConstructorRefCallExpr>(call->getFn())) {
+      return;
     }
 
+    // Continue on to diagnose any constructor argument label renames.
+    
   } else {
     // Just replace the base name.
     SmallString<64> baseReplace;
