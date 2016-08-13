@@ -467,6 +467,28 @@ func r25178926(_ a : Type) {
   }
 }
 
+do {
+  guard 1 == 2 else {
+    break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+  }
+}
+
+func fn(a: Int) {
+  guard a < 1 else {
+    break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
+  }
+}
+
+func fn(x: Int) {
+  if x >= 0 {
+    guard x < 1 else {
+      guard x < 2 else {
+        break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+      }
+      return
+    }
+  }
+}
 
 
 // Errors in case syntax
