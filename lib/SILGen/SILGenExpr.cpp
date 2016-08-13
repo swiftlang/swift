@@ -2274,12 +2274,28 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-static bool isNullableTypeInC(SILModule &M, Type ty) {
+static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
   ty = ty->getLValueOrInOutObjectType()->getReferenceStorageReferent();
 
-  // Functions, class instances, and @objc existentials are all nullable.
-  if (ty->hasReferenceSemantics())
+  // Class instances, and @objc existentials are all nullable.
+  if (ty->hasReferenceSemantics()) {
+    // So are blocks, but we usually bridge them to Swift closures before we get
+    // a chance to check for optional promotion, so we're already screwed if
+    // an API lies about nullability.
+    if (auto fnTy = ty->getAs<AnyFunctionType>()) {
+      switch (fnTy->getRepresentation()) {
+      // Carried verbatim from C.
+      case FunctionTypeRepresentation::Block:
+      case FunctionTypeRepresentation::CFunctionPointer:
+        return true;
+      // Was already bridged.
+      case FunctionTypeRepresentation::Swift:
+      case FunctionTypeRepresentation::Thin:
+        return false;
+      }
+    }
     return true;
+  }
 
   // Other types like UnsafePointer can also be nullable.
   const DeclContext *DC = M.getAssociatedContext();
@@ -2310,7 +2326,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Functions that return non-optional reference type and were imported from
   // Objective-C.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    assert((isNullableTypeInC(M, func->getResultType())
+    assert((isVerbatimNullableTypeInC(M, func->getResultType())
             || func->getResultType()->hasArchetype())
            && "func's result type is not nullable?!");
     return func->hasClangNode();
@@ -2319,7 +2335,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Computed properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    assert((isNullableTypeInC(M, var->getType()->getReferenceStorageReferent())
+    assert((isVerbatimNullableTypeInC(M, var->getType()->getReferenceStorageReferent())
             || var->getType()->getReferenceStorageReferent()->hasArchetype())
            && "property's result type is not nullable?!");
     return var->hasClangNode();
@@ -2328,7 +2344,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((isNullableTypeInC(M, subscript->getElementType())
+    assert((isVerbatimNullableTypeInC(M, subscript->getElementType())
             || subscript->getElementType()->hasArchetype())
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
@@ -2352,7 +2368,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
   // get the function we're calling.
   if (auto apply = dyn_cast<ApplyExpr>(expr)) {
     // The result has to be a nullable type.
-    if (!isNullableTypeInC(M, apply->getType()))
+    if (!isVerbatimNullableTypeInC(M, apply->getType()))
       return false;
     
     auto getFuncDeclFromDynamicMemberLookup = [&](Expr *expr) -> FuncDecl * {
@@ -2405,25 +2421,25 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
 
   // A reference to a member property.
   if (auto member = dyn_cast<MemberRefExpr>(expr)) {
-    return isNullableTypeInC(M, member->getType()) &&
+    return isVerbatimNullableTypeInC(M, member->getType()) &&
       mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
   }
 
   // A reference to a subscript.
   if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-    return isNullableTypeInC(M, subscript->getType()) &&
+    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
       mayLieAboutNonOptionalReturn(M, subscript->getDecl().getDecl());
   }
 
   // A reference to a member property found via dynamic lookup.
   if (auto member = dyn_cast<DynamicMemberRefExpr>(expr)) {
-    return isNullableTypeInC(M, member->getType()) &&
+    return isVerbatimNullableTypeInC(M, member->getType()) &&
       mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
   }
 
   // A reference to a subscript found via dynamic lookup.
   if (auto subscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-    return isNullableTypeInC(M, subscript->getType()) &&
+    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
       mayLieAboutNonOptionalReturn(M, subscript->getMember().getDecl());
   }
 
