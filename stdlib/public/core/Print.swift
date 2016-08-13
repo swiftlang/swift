@@ -283,6 +283,22 @@ internal func _debugPrint<Target : TextOutputStream>(
 //===----------------------------------------------------------------------===//
 //===--- Migration Aids ---------------------------------------------------===//
 
+@available(*, unavailable, renamed: "print(_:separator:terminator:to:)")
+public func print<Target : TextOutputStream>(
+  _ items: Any...,
+  separator: String = "",
+  terminator: String = "",
+  toStream output: inout Target
+) {}
+
+@available(*, unavailable, renamed: "debugPrint(_:separator:terminator:to:)")
+public func debugPrint<Target : TextOutputStream>(
+  _ items: Any...,
+  separator: String = "",
+  terminator: String = "",
+  toStream output: inout Target
+) {}
+
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
 public func print<T>(_: T, appendNewline: Bool = true) {}
 @available(*, unavailable, message: "Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
