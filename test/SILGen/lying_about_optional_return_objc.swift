@@ -6,13 +6,13 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   b?.readWriteBlock()
 
-  // CHECK: unchecked_bitwise_cast
+  // CHECK: enum $Optional
   _ = b?.readWriteBlock
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
   b?.readOnlyBlock()
 
-  // CHECK: unchecked_bitwise_cast
+  // CHECK: enum $Optional
   _ = b?.readOnlyBlock
 
   // CHECK: unchecked_trivial_bit_cast
