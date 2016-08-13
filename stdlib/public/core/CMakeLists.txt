@@ -20,7 +20,6 @@ set(SWIFTLIB_ESSENTIAL
   # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
   ArrayBody.swift
-  ArrayBuffer.swift
   ArrayBufferProtocol.swift
   ArrayCast.swift
   Arrays.swift.gyb
