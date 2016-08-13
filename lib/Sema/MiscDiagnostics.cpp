@@ -1191,8 +1191,8 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     // Fix-it needs position to apply.
     if (typeRange.isInvalid())
       return false;
-    auto overrideFnTy = overrideTy->getAs<FunctionType>();
-    auto baseFnTy = baseTy->getAs<FunctionType>();
+    auto overrideFnTy = overrideTy->getAs<AnyFunctionType>();
+    auto baseFnTy = baseTy->getAs<AnyFunctionType>();
 
     // Both types should be function.
     if (overrideFnTy && baseFnTy &&
