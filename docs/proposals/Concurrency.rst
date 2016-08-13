@@ -65,7 +65,9 @@ deallocated class instance.  To understand the bug try to imagine two threads
 executing the SIL code below in lockstep.  After they both load the same value
 they both try to release the object.  One thread succeeds and deallocates the
 object while another thread attempts to read the memory of a deallocated
-object::
+object:
+
+.. code-block:: sil
 
   %10 = global_addr @singleton : $*Bird
 
@@ -78,7 +80,9 @@ object::
 
 Next, we'll look into the problem of sliced values. Intuitively, it is easy to
 see why sharing memory between two threads could lead to catastrophic bugs.
-Consider the program below::
+Consider the program below:
+
+.. code-block:: none
 
   Thread #1:              Thread #2:
    A.first = "John"        A.first = "Paul"
