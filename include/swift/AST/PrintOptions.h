@@ -16,6 +16,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include <limits.h>
 #include <vector>
 
 namespace swift {
