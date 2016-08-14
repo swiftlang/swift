@@ -367,7 +367,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
         & (UInt(MemoryLayout<T>.alignment) - 1)),
       "load from misaligned raw pointer")
 
-    return Builtin.load((self + offset)._rawValue)
+    return Builtin.loadRaw((self + offset)._rawValue)
   }
 
 %  if mutable:
