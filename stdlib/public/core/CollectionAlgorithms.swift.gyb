@@ -597,6 +597,22 @@ extension MutableCollection
   }
 }
 
+extension Sequence {
+  @available(*, unavailable, renamed: "sorted(by:)")
+  public func sort(
+    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
+  ) -> [${IElement}] {
+    Builtin.unreachable()
+  }
+}
+
+extension Sequence where ${IElement} : Comparable {
+  @available(*, unavailable, renamed: "sorted()")
+  public func sort() -> [${IElement}] {
+    Builtin.unreachable()
+  }
+}
+
 extension MutableCollection
   where
   Self : RandomAccessCollection,
@@ -611,7 +627,7 @@ extension MutableCollection
 extension MutableCollection where Self : RandomAccessCollection {
   @available(*, unavailable, renamed: "sort(by:)")
   public mutating func sortInPlace(
-    _ isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+    _ isOrderedBefore: (${IElement}, ${IElement}) -> Bool
   ) {
     Builtin.unreachable()
   }
