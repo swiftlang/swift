@@ -29,6 +29,7 @@ namespace llvm {
 template <> struct GraphTraits<swift::SILBasicBlock*> {
   typedef swift::SILBasicBlock NodeType;
   typedef NodeType::SuccessorListTy::iterator ChildIteratorType;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(NodeType *BB) { return BB; }
 
@@ -43,6 +44,7 @@ template <> struct GraphTraits<swift::SILBasicBlock*> {
 template <> struct GraphTraits<const swift::SILBasicBlock*> {
   typedef const swift::SILBasicBlock NodeType;
   typedef NodeType::ConstSuccessorListTy::iterator ChildIteratorType;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(NodeType *BB) { return BB; }
 
@@ -57,6 +59,7 @@ template <> struct GraphTraits<const swift::SILBasicBlock*> {
 template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
   typedef swift::SILBasicBlock NodeType;
   typedef NodeType::pred_iterator ChildIteratorType;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(Inverse<swift::SILBasicBlock *> G) {
     return G.Graph;
@@ -72,6 +75,8 @@ template <> struct GraphTraits<Inverse<swift::SILBasicBlock*> > {
 template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
   typedef const swift::SILBasicBlock NodeType;
   typedef NodeType::pred_iterator ChildIteratorType;
+  typedef NodeType *NodeRef;
+
   static NodeType *getEntryNode(Inverse<const swift::SILBasicBlock *> G) {
     return G.Graph;
   }
@@ -86,6 +91,7 @@ template <> struct GraphTraits<Inverse<const swift::SILBasicBlock*> > {
 template <> struct GraphTraits<swift::SILFunction*>
     : public GraphTraits<swift::SILBasicBlock*> {
   typedef swift::SILFunction *GraphType;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(GraphType F) { return &F->front(); }
 
@@ -94,9 +100,11 @@ template <> struct GraphTraits<swift::SILFunction*>
   static nodes_iterator nodes_end(GraphType F) { return F->end(); }
   static unsigned size(GraphType F) { return F->size(); }
 };
+
 template <> struct GraphTraits<Inverse<swift::SILFunction*> >
     : public GraphTraits<Inverse<swift::SILBasicBlock*> > {
   typedef Inverse<swift::SILFunction *> GraphType;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(GraphType F) { return &F.Graph->front(); }
 

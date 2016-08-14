@@ -170,6 +170,7 @@ namespace llvm {
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
   using NodeType = swift::DominanceInfoNode;
   using ChildIteratorType = NodeType::iterator;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(NodeType *N) { return N; }
   static inline ChildIteratorType child_begin(NodeType *N) {
@@ -181,6 +182,7 @@ template <> struct GraphTraits<swift::DominanceInfoNode *> {
 template <> struct GraphTraits<const swift::DominanceInfoNode *> {
   using NodeType = const swift::DominanceInfoNode;
   using ChildIteratorType = NodeType::const_iterator;
+  typedef NodeType *NodeRef;
 
   static NodeType *getEntryNode(NodeType *N) { return N; }
   static inline ChildIteratorType child_begin(NodeType *N) {
