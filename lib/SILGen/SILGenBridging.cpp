@@ -738,20 +738,29 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
   llvm_unreachable("bad CC");
 }
 
-/// Bridge an optional foreign error type to Error.
+/// Bridge a possibly-optional foreign error type to Error.
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
-  // If the incoming error is non-optional, inject it into an optional.
-  Type bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
-  if (!bridgedErrorTy->getAnyOptionalObjectType()) {
-    SILType loweredOptErrorTy =
-        SGM.getLoweredType(OptionalType::get(bridgedErrorTy));
-    auto *someDecl = getASTContext().getOptionalSomeDecl();
-    auto *enumInst = B.createEnum(loc, bridgedError.getValue(), someDecl,
-                                  loweredOptErrorTy);
-    bridgedError = ManagedValue(enumInst, bridgedError.getCleanup());
+  // If the incoming error is non-optional, just do an existential erasure.
+  CanType bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
+  if (!bridgedErrorTy.getAnyOptionalObjectType()) {
+    auto nativeErrorTy = SILType::getExceptionType(getASTContext());
+
+    auto conformance = SGM.getNSErrorConformanceToError();
+    if (!conformance) return emitUndef(loc, nativeErrorTy);
+    ProtocolConformanceRef conformanceArray[] = {
+      ProtocolConformanceRef(conformance)
+    };
+    auto conformances = getASTContext().AllocateCopy(conformanceArray);
+
+    SILValue nativeError =
+      B.createInitExistentialRef(loc, nativeErrorTy, bridgedErrorTy,
+                                 bridgedError.forward(*this), conformances);
+    return emitManagedRValueWithCleanup(nativeError);
   }
 
+  // Otherwise, we need to call a runtime function to potential substitute
+  // a standard error for a nil NSError.
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
   assert(bridgeFnType->getNumAllResults() == 1);
