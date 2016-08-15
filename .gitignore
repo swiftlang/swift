@@ -40,3 +40,6 @@ docs/_build
 CMakeCache.txt
 CMakeFiles
 .atom-build.json
+
+xcuserdata
+*.xccheckout
