@@ -31,7 +31,7 @@ echo ========== Running script ========== >> $LOG_FILE 2>&1
 
 echo ========== Finishing ========== >> $LOG_FILE 2>&1
 cd $SWIFT_PATH/swift >> $LOG_FILE 2>&1
-test -e swift-nightly-install || echo swift-nightly-install does not exist; exit >> $LOG_FILE 2>&1
+test -e swift-nightly-install || exit 
 rm -rf swift-toolchain-$(date "+%u") >> $LOG_FILE 2>&1
 mv swift-toolchain swift-toolchain-$(date "+%u") >> $LOG_FILE 2>&1
 mv swift-nightly-install swift-toolchain >> $LOG_FILE 2>&1
