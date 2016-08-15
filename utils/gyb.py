@@ -711,7 +711,11 @@ class Code(ASTNode):
         # its value
         if result is not None and result != '':
             from numbers import Number, Integral
-            result_string = repr(result) if isinstance(result, Number) and not isinstance(result, Integral) else str(result)
+            result_string = None
+            if isinstance(result, Number) and not isinstance(result, Integral):
+                result_string = repr(result)
+            else:
+                result_string = str(result)
             context.append_text(
                 result_string, self.filename, self.start_line_number)
 
