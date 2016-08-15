@@ -132,7 +132,11 @@ public struct StaticString
       var buffer: UInt64 = 0
       var i = 0
       let sink: (UInt8) -> Void = {
+#if _endian(little)
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
+#else
+        buffer = buffer | (UInt64($0) << (UInt64(7-i) * 8))
+#endif
         i += 1
       }
       UTF8.encode(unicodeScalar, into: sink)
