@@ -326,6 +326,12 @@ static NSString *getValueDescription(_SwiftValue *self) {
 - (const Metadata *)_swiftTypeMetadata {
   return getSwiftValueTypeMetadata(self);
 }
+- (NSString *)_swiftTypeName {
+  TwoWordPair<const char *, uintptr_t> typeName
+    = swift_getTypeName(getSwiftValueTypeMetadata(self), true);
+  
+  return [NSString stringWithUTF8String: typeName.first];
+}
 - (const OpaqueValue *)_swiftValue {
   return getValueFromSwiftValue(self).second;
 }

@@ -1155,6 +1155,11 @@ static inline void swift_unknownUnownedTakeAssign(UnownedReference *dest,
 
 #endif /* SWIFT_OBJC_INTEROP */
 
+/// Return the name of a Swift type represented by a metadata object.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+extern "C"
+TwoWordPair<const char *, uintptr_t>::Return
+swift_getTypeName(const Metadata *type, bool qualified);  
 
 } // end namespace swift
 
