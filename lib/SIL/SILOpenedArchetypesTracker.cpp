@@ -90,9 +90,7 @@ void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
   for (auto &Op : I->getTypeDependentOperands()) {
     auto OpenedArchetypeDef = Op.get();
     if (auto *DefInst = dyn_cast<SILInstruction>(OpenedArchetypeDef)) {
-      addOpenedArchetypeDef(
-          getOpenedArchetypeOf(cast<SILInstruction>(OpenedArchetypeDef)),
-          OpenedArchetypeDef);
+      addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), OpenedArchetypeDef);
     }
   }
 }
