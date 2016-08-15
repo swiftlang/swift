@@ -1,0 +1,37 @@
+#!/bin/bash
+
+LOG_FILE=/var/log/build-toolchain-daily.$(date "+%u")
+echo ========== Setup =========== > $LOG_FILE 2>&1
+SWIFT_PATH=/home/amr/swift
+PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+cd $SWIFT_PATH >> $LOG_FILE 2>&1
+rm -rf build >> $LOG_FILE 2>&1
+mkdir -p build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64 >> $LOG_FILE 2>&1
+cp $SWIFT_PATH/swift-3.0-PREVIEW-3/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64 >> $LOG_FILE 2>&1
+cd swift >> $LOG_FILE 2>&1
+rm -f *.tar.gz >> $LOG_FILE 2>&1
+
+echo ========== Syncing ========== >> $LOG_FILE 2>&1
+cd $SWIFT_PATH >> $LOG_FILE 2>&1
+git multi commit -am "auto commit from build-toolchain-daily" >> $LOG_FILE 2>&1
+git multi push >> $LOG_FILE 2>&1
+git multi checkout stable >> $LOG_FILE 2>&1
+git multi checkout master >> $LOG_FILE 2>&1
+git multi pull >> $LOG_FILE 2>&1
+git multi fetch upstream >> $LOG_FILE 2>&1
+git multi merge upstream/master >> $LOG_FILE 2>&1
+git multi push >> $LOG_FILE 2>&1
+git multi checkout develop >> $LOG_FILE 2>&1
+git multi pull >> $LOG_FILE 2>&1
+git multi merge master >> $LOG_FILE 2>&1
+git multi push >> $LOG_FILE 2>&1
+
+echo ========== Running script ========== >> $LOG_FILE 2>&1
+./swift/utils/build-toolchain local.swift >> $LOG_FILE 2>&1
+
+echo ========== Finishing ========== >> $LOG_FILE 2>&1
+cd $SWIFT_PATH/swift >> $LOG_FILE 2>&1
+rm -rf swift-toolchain-$(date "+%u") >> $LOG_FILE 2>&1
+mv swift-toolchain swift-toolchain-$(date "+%u") >> $LOG_FILE 2>&1
+mv swift-nightly-install swift-toolchain >> $LOG_FILE 2>&1
+
