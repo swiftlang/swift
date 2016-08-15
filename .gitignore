@@ -43,3 +43,7 @@ CMakeFiles
 
 xcuserdata
 *.xccheckout
+
+swift-nightly-install
+*.tar.gz
+swift-toolchain*
