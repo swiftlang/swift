@@ -71,7 +71,7 @@ add_swift_library(swiftAST STATIC
   COMPONENT_DEPENDS
     bitreader bitwriter irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
+    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )
 
 if(NOT SWIFT_BUILT_STANDALONE)
