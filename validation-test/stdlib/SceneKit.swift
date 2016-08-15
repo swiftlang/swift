@@ -346,7 +346,7 @@ if #available(iOS 8.0, *) {
     let sceneData = sceneDescription.data(
       using: .utf8,
       allowLossyConversion: true)!
-    let sceneSource = SCNSceneSource(data: sceneData as Data, options: [:])!
+    let sceneSource = SCNSceneSource(data: sceneData as Data, options: nil)!
 
     do {
       var unarchivedPlaneGeometry =
