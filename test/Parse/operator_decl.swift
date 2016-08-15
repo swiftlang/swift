@@ -1,8 +1,12 @@
 // RUN: %target-parse-verify-swift
 
-prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
-postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
-infix operator +++ {} // expected-warning {{operator should no longer be declared with body}}
+prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{20-23=}}
+postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{21-24=}}
+infix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{19-22=}}
+infix operator +++* { // expected-warning {{operator should no longer be declared with body; use a precedence group instead}} {{none}}
+  associativity right
+}
+infix operator +++** : A { } // expected-warning {{operator should no longer be declared with body}} {{25-29=}}
 
 prefix operator // expected-error {{expected operator name in operator declaration}}
 
