@@ -1460,6 +1460,25 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
   if (requirements.empty())
     return;
 
+  // FIXME: Type objects do not preserve info to print requirements accurately.
+  // SIL printing cares about semantics so \c PrevPreferTypeRepr is false but
+  // we need to set it to true for printing requirements.
+  struct PrefTypeReprForSILRAII {
+    PrintOptions &Opts;
+    bool PrevPreferTypeRepr;
+    PrefTypeReprForSILRAII(PrintOptions &opts) : Opts(opts) {
+      if (Opts.PrintForSIL) {
+        PrevPreferTypeRepr = Opts.PreferTypeRepr;
+        Opts.PreferTypeRepr = true;
+      }
+    }
+    ~PrefTypeReprForSILRAII() {
+      if (Opts.PrintForSIL) {
+        Opts.PreferTypeRepr = PrevPreferTypeRepr;
+      }
+    }
+  } PrefTypeReprForSILRAII(Options);
+
   std::vector<std::tuple<StringRef, StringRef, RequirementReprKind>> Elements;
   llvm::SmallString<64> Output;
   bool Handled = true;
