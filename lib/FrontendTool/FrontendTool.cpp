@@ -647,7 +647,8 @@ private:
         Info.ID == diag::any_as_anyobject_fixit.ID ||
         Info.ID == diag::deprecated_protocol_composition.ID ||
         Info.ID == diag::deprecated_protocol_composition_single.ID ||
-        Info.ID == diag::deprecated_any_composition.ID)
+        Info.ID == diag::deprecated_any_composition.ID ||
+        Info.ID == diag::deprecated_operator_body.ID)
       return true;
 
     return false;
