@@ -514,7 +514,31 @@ public func isKnownUniquelyReferenced<T : AnyObject>(
   return _isUnique(&object)
 }
 
+
+@available(*, unavailable, renamed: "ManagedBuffer")
+public typealias ManagedProtoBuffer<Header, Element> =
+  ManagedBuffer<Header, Element>
+
+extension ManagedBuffer {
+  @available(*, unavailable, renamed: "create(minimumCapacity:makingHeaderWith:)")
+  public final class func create(
+    _ minimumCapacity: Int,
+    initialValue: (ManagedBuffer<Header, Element>) -> Header
+  ) -> ManagedBuffer<Header, Element> {
+    Builtin.unreachable()
+  }
+}
+
 extension ManagedBufferPointer {
+  @available(*, unavailable, renamed: "init(bufferClass:minimumCapacity:makingHeaderWith:)")
+  public init(
+    bufferClass: AnyClass,
+    minimumCapacity: Int,
+    initialValue: (_ buffer: AnyObject, _ allocatedCount: (AnyObject) -> Int) -> Header
+  ) {
+    Builtin.unreachable()
+  }
+
   @available(*, unavailable, renamed: "capacity")
   public var allocatedElementCount: Int {
     Builtin.unreachable()
