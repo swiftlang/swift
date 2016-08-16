@@ -1841,7 +1841,8 @@ public:
         if (TD == container)
           return;
 
-        if (finder.isWithinConstrainedObjCGeneric()) {
+        if (finder.isWithinConstrainedObjCGeneric() &&
+            isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
@@ -1876,18 +1877,21 @@ public:
           if (!forwardDeclare(CD)) {
             (void)addImport(CD);
           }
-        } else if (auto PD = dyn_cast<ProtocolDecl>(TD))
+        } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
-        else if (addImport(TD))
-          return;
-        else if (auto ED = dyn_cast<EnumDecl>(TD))
-          forwardDeclare(ED);
-        else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))
+        } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+          (void)addImport(TD);
+          // Just in case, make sure the underlying type is visible too.
           finder.visit(TAD->getUnderlyingType());
-        else if (isa<AbstractTypeParamDecl>(TD))
+        } else if (addImport(TD)) {
+          return;
+        } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
+          forwardDeclare(ED);
+        } else if (isa<AbstractTypeParamDecl>(TD)) {
           llvm_unreachable("should not see type params here");
-        else
+        } else {
           assert(false && "unknown local type decl");
+        }
       });
 
       if (needsToBeIndividuallyDelayed) {
