@@ -748,7 +748,7 @@ extension Sequence {
   @available(*, unavailable, renamed: "elementsEqual(_:by:)")
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence,
-    isEquivalent isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+    isEquivalent: (${GElement}, ${GElement}) throws -> Bool
   ) rethrows -> Bool
     where
     OtherSequence: Sequence,
@@ -779,7 +779,7 @@ extension Sequence {
   @available(*, unavailable, renamed: "reduce(_:_:)")
   public func reduce<Result>(
     _ initial: Result,
-    combine combine: (_ partialResult: Result, ${GElement}) throws -> Result
+    combine: (_ partialResult: Result, ${GElement}) throws -> Result
   ) rethrows -> Result {
     Builtin.unreachable()
   }
