@@ -2414,8 +2414,10 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      types.push_back(FieldTypeInfo(prop->getType()->getCanonicalType(),
-                                    /*indirect*/ false));
+      auto propertyType = prop->getType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(propertyType,
+                                    /*indirect*/ false,
+                                    propertyType->is<WeakStorageType>()));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2431,7 +2433,7 @@ namespace {
       auto caseType = elt.decl->getArgumentType()->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
-      types.push_back(FieldTypeInfo(caseType, isIndirect));
+      types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2784,9 +2786,13 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     
     auto metadata = IGF.emitTypeMetadataRef(fieldTy);
 
+    auto fieldTypeInfo = fieldTypes[i];
+
     // Mix in flag bits.
-    if (fieldTypes[i].isIndirect()) {
-      auto flags = FieldType().withIndirect(true);
+    if (fieldTypeInfo.hasFlags()) {
+      auto flags = FieldType()
+        .withIndirect(fieldTypeInfo.isIndirect())
+        .withWeak(fieldTypeInfo.isWeak());
       auto metadataBits = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
       metadataBits = IGF.Builder.CreateOr(metadataBits,
                    llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()));
