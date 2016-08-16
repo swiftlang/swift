@@ -2000,7 +2000,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 
   auto nom = conformingType->getAnyNominal();
   auto clas = dyn_cast<ClassDecl>(nom);
-  if (nom->isGenericContext() ||
+  if ((nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel())) ||
       (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))) {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
@@ -2152,7 +2152,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
-                                        conformance->getType()->getCanonicalType());
+                                    conformance->getType()->getCanonicalType());
     auto flags = typeEntity.flags
         .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
 

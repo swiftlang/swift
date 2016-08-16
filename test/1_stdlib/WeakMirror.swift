@@ -31,17 +31,14 @@ class NativeSwiftClass : NativeClassBoundExistential {}
 protocol NativeClassBoundExistential : class {}
 class NativeSwiftClassHasWeak {
   weak var weakProperty: AnyObject?
-  let x = 0xAABBCCDDEE
 }
 
 class NativeSwiftClassHasNativeClassBoundExistential {
   weak var weakProperty: NativeClassBoundExistential?
-  let x = 0xAABBCCDDEE
 }
 
 struct StructHasNativeWeakReference {
   weak var weakProperty: AnyObject?
-  let x = 0xAABBCCDDEE
 }
 
 mirrors.test("class/NativeSwiftClassHasNativeWeakReference") {
@@ -80,32 +77,26 @@ import Foundation
 
 class NativeSwiftClassHasObjCClassBoundExistential {
   weak var weakProperty: NSObjectProtocol?
-  let x = 0xAABBCCDDEE
 }
 
 class ObjCClassHasWeak : NSObject {
   weak var weakProperty: AnyObject?
-  let x = 0xAABBCCDDEE
 }
 
 class ObjCClassHasNativeClassBoundExistential : NSObject {
   weak var weakProperty: NativeClassBoundExistential?
-  let x = 0xAABBCCDDEE
 }
 
 class ObjCClassHasObjCClassBoundExistential : NSObject {
   weak var weakProperty: NSObjectProtocol?
-  let x = 0xAABBCCDDEE
 }
 
 struct StructHasObjCWeakReference {
   weak var weakProperty: NSObject?
-  let x = 0xAABBCCDDEE
 }
 
 struct StructHasObjCClassBoundExistential {
   weak var weakProperty: NSObjectProtocol?
-  let x = 0xAABBCCDDEE
 }
 
 mirrors.test("class/NativeSwiftClassHasObjCWeakReference") {
