@@ -30,9 +30,9 @@ echo ========== Running script ==========
 ./swift/utils/build-toolchain local.swift
 
 echo ========== Finishing ==========
-cd $SWIFT_PATH/swift
-test -e swift-nightly-install || exit 
-rm -rf swift-toolchain-$(date "+%u")
-mv swift-toolchain swift-toolchain-$(date "+%u")
-mv swift-nightly-install swift-toolchain
+cd $SWIFT_PATH
+test -e swift/swift-nightly-install || exit 
+rm -rf toolchains/swift-toolchain-$(date "+%u")
+mv toolchains/swift-toolchain toolchains/swift-toolchain-$(date "+%u")
+mv swift/swift-nightly-install toolchains/swift-toolchain
 
