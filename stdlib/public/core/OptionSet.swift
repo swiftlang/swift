@@ -55,10 +55,10 @@
 /// ========================
 ///
 /// When you need to create an instance of an option set, assign one of the
-/// type's static members to your variable or constant. Alternately, to create
-/// an option set instance with multiple members, assign an array literal with
-/// multiple static members of the option set. To create an empty instance,
-/// assign an empty array literal to your variable.
+/// type's static members to your variable or constant. Alternatively, to
+/// create an option set instance with multiple members, assign an array
+/// literal with multiple static members of the option set. To create an empty
+/// instance, assign an empty array literal to your variable.
 ///
 ///     let singleOption: ShippingOptions = .priority
 ///     let multipleOptions: ShippingOptions = [.nextDay, .secondDay, .priority]
@@ -214,10 +214,12 @@ extension OptionSet where Element == Self {
     return self.isSuperset(of: member)
   }
   
-  /// Inserts the given element into the option set if it is not already a
-  /// member.
+  /// Adds the given element to the option set if it is not already a member.
   ///
-  /// For example:
+  /// In the following example, the `.secondDay` shipping option is added to
+  /// the `freeOptions` option set if `purchasePrice` is greater than 50.0. For
+  /// the `ShippingOptions` declaration, see the `OptionSet` protocol
+  /// discussion.
   ///
   ///     let purchasePrice = 87.55
   ///
@@ -247,9 +249,12 @@ extension OptionSet where Element == Self {
     return result
   }
   
-  /// Removes the given element and all elements subsumed by the given element.
+  /// Removes the given element and all elements subsumed by it.
   ///
-  /// For example:
+  /// In the following example, the `.priority` shipping option is removed from
+  /// the `options` option set. Attempting to remove the same shipping option
+  /// a second time results in `nil`, because `options` no longer contains
+  /// `.priority` as a member.
   ///
   ///     var options: ShippingOptions = [.secondDay, .priority]
   ///     let priorityOption = options.remove(.priority)
@@ -259,11 +264,11 @@ extension OptionSet where Element == Self {
   ///     print(options.remove(.priority))
   ///     // Prints "nil"
   ///
-  /// In the following example, the `.express` element is passed to
-  /// `remove(_:)`. Although `.express` is not a member of `options`,
-  /// `.express` subsumes the remaining `.secondDay` element of the option
-  /// set. Therefore, `options` is emptied and the intersection between
-  /// `.express` and `options` is returned.
+  /// In the next example, the `.express` element is passed to `remove(_:)`.
+  /// Although `.express` is not a member of `options`, `.express` subsumes
+  /// the remaining `.secondDay` element of the option set. Therefore,
+  /// `options` is emptied and the intersection between `.express` and
+  /// `options` is returned.
   ///
   ///     let expressOption = options.remove(.express)
   ///     print(expressOption == .express)
@@ -272,8 +277,8 @@ extension OptionSet where Element == Self {
   ///     // Prints "true"
   ///
   /// - Parameter member: The element of the set to remove.
-  /// - Returns: The intersection of `[member]` and the set if the intersection
-  ///   was nonempty; otherwise, `nil`.
+  /// - Returns: The intersection of `[member]` and the set, if the
+  ///   intersection was nonempty; otherwise, `nil`.
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
     let r = isSuperset(of: member) ? Optional(member) : nil

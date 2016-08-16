@@ -16,14 +16,14 @@ import Foundation
 #if os(iOS)
 @available(iOS 10.0, *)
 extension INSearchForPhotosIntentResponse {
-    @nonobjc
-    public final var searchResultsCount: Int? {
-        get {
-            return __searchResultsCount?.intValue
-        }
-        set {
-            __searchResultsCount = newValue.map { NSNumber(value: $0) }
-        }
+  @nonobjc
+  public final var searchResultsCount: Int? {
+    get {
+      return __searchResultsCount?.intValue
     }
+    set {
+      __searchResultsCount = newValue.map { NSNumber(value: $0) }
+    }
+  }
 }
 #endif

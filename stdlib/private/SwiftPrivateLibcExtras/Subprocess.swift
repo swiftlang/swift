@@ -13,12 +13,13 @@
 import SwiftPrivate
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
 
-// posix_spawn is not available on Android.
+#if !os(Windows) || CYGWIN
+// posix_spawn is not available on Android or Windows.
 #if !os(Android)
 // swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
 // unavailable attribute declaration here of the APIs that we need.
@@ -109,15 +110,15 @@ public func spawnChild(_ args: [String])
     // Start the executable. If execve() does not encounter an error, the
     // code after this block will never be executed, and the parent write pipe
     // will be closed.
-    withArrayOfCStrings([Process.arguments[0]] + args) {
-      execve(Process.arguments[0], $0, _getEnviron())
+    withArrayOfCStrings([CommandLine.arguments[0]] + args) {
+      execve(CommandLine.arguments[0], $0, _getEnviron())
     }
 
     // If execve() encountered an error, we write the errno encountered to the
     // parent write pipe.
-    let errnoSize = sizeof(errno.dynamicType)
+    let errnoSize = MemoryLayout.size(ofValue: errno)
     var execveErrno = errno
-    let writtenBytes = withUnsafePointer(&execveErrno) {
+    let writtenBytes = withUnsafePointer(to: &execveErrno) {
       write(childToParentPipe.writeFD, UnsafePointer($0), errnoSize)
     }
 
@@ -181,7 +182,7 @@ public func spawnChild(_ args: [String])
 
   var pid: pid_t = -1
   var childArgs = args
-  childArgs.insert(Process.arguments[0], at: 0)
+  childArgs.insert(CommandLine.arguments[0], at: 0)
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let invocation = String(validatingUTF8: interpreter!) {
@@ -284,10 +285,14 @@ internal func _getEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<CChar>?
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   return _NSGetEnviron().pointee
 #elseif os(FreeBSD)
-  return environ;
+  return environ
+#elseif os(PS4)
+  return environ
 #elseif os(Android)
   return environ
 #else
   return __environ
 #endif
 }
+#endif
+

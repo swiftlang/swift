@@ -51,10 +51,10 @@ extension LazyCollectionProtocol where Elements == Self {
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
 public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
-  /// The type of the underlying collection
+  /// The type of the underlying collection.
   public typealias Elements = Base
 
-  /// The underlying collection
+  /// The underlying collection.
   public var elements: Elements { return _base }
 
   /// A type that represents a valid position in the collection.
@@ -63,7 +63,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
   
-  /// Construct an instance with `base` as its underlying Collection
+  /// Creates an instance with `base` as its underlying Collection
   /// instance.
   internal init(_base: Base) {
     self._base = _base
@@ -86,12 +86,12 @@ extension ${Self} : Sequence {
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   public var underestimatedCount: Int { return _base.underestimatedCount }
 
-  public func _copyToNativeArrayBuffer() 
-     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    return _base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+     -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
   
   @discardableResult
@@ -134,7 +134,7 @@ extension ${Self} : ${TraversalCollection} {
     return _base.index(after: i)
   }
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
@@ -150,7 +150,7 @@ extension ${Self} : ${TraversalCollection} {
     return ${Slice}(base: _base, bounds: bounds).lazy
   }
   
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
   public var isEmpty: Bool {
     return _base.isEmpty
   }
@@ -158,7 +158,7 @@ extension ${Self} : ${TraversalCollection} {
   /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
-  ///   O(N) otherwise.
+  ///   O(*n*) otherwise.
   public var count: Base.IndexDistance {
     return _base.count
   }
@@ -169,7 +169,7 @@ extension ${Self} : ${TraversalCollection} {
   /// Returns `Optional(Optional(index))` if an element was found;
   /// `nil` otherwise.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   public func _customIndexOfEquatableElement(
     _ element: Base.Iterator.Element
   ) -> Index?? {

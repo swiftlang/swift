@@ -52,7 +52,7 @@
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
 /// 
 /// - SeeAlso: `OptionSet`, `Set`
-public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
+public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
   
   /// A type for which the conforming type provides a containment test.
@@ -75,10 +75,11 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
-  /// 
-  /// For example:
   ///
-  ///     let primes: Set = [2, 3, 5, 7]
+  /// This example uses the `contains(_:)` method to test whether an integer is
+  /// a member of a set of prime numbers.
+  ///
+  ///     let primes: Set = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]
   ///     let x = 5
   ///     if primes.contains(x) {
   ///         print("\(x) is prime!")
@@ -93,7 +94,8 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
 
   /// Returns a new set with the elements of both this and the given set.
   ///
-  /// For example:
+  /// In the following example, the `attendeesAndVisitors` set is made up
+  /// of the elements of the `attendees` and `visitors` sets:
   ///
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
   ///     let visitors = ["Marcia", "Nathaniel"]
@@ -102,7 +104,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
   ///
   /// If the set already contains one or more elements that are also in
-  /// `other`, the existing members are kept. For example:
+  /// `other`, the existing members are kept.
   ///
   ///     let initialIndices = Set(0..<5)
   ///     let expandedIndices = initialIndices.union([2, 3, 6, 7])
@@ -120,7 +122,10 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Returns a new set with the elements that are common to both this set and
   /// the given set.
   ///
-  /// For example:
+  /// In the following example, the `bothNeighborsAndEmployees` set is made up
+  /// of the elements that are in *both* the `employees` and `neighbors` sets.
+  /// Elements that are in only one or the other are left out of the result of
+  /// the intersection.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -139,7 +144,10 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Returns a new set with the elements that are either in this set or in the
   /// given set, but not in both.
   ///
-  /// For example:
+  /// In the following example, the `eitherNeighborsOrEmployees` set is made up
+  /// of the elements of the `employees` and `neighbors` sets that are not in
+  /// both `employees` *and* `neighbors`. In particular, the names `"Bethany"`
+  /// and `"Eric"` do not appear in `eitherNeighborsOrEmployees`.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
@@ -229,7 +237,8 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   
   /// Adds the elements of the given set to the set.
   ///
-  /// For example:
+  /// In the following example, the elements of the `visitors` set are added to
+  /// the `attendees` set:
   ///
   ///     var attendees: Set = ["Alicia", "Bethany", "Diana"]
   ///     let visitors: Set = ["Marcia", "Nathaniel"]
@@ -238,7 +247,7 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
   ///
   /// If the set already contains one or more elements that are also in
-  /// `other`, the existing members are kept. For example:
+  /// `other`, the existing members are kept.
   ///
   ///     var initialIndices = Set(0..<5)
   ///     initialIndices.formUnion([2, 3, 6, 7])
@@ -250,7 +259,9 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
 
   /// Removes the elements of this set that aren't also in the given set.
   ///
-  /// For example:
+  /// In the following example, the elements of the `employees` set that are
+  /// not also members of the `neighbors` set are removed. In particular, the
+  /// names `"Alicia"`, `"Chris"`, and `"Diana"` are removed.
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -261,16 +272,21 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// - Parameter other: A set of the same type as the current set.
   mutating func formIntersection(_ other: Self)
 
-  /// Removes the elements of the set that are also in the given set and
-  /// adds the members of the given set that are not already in the set.
+  /// Removes the elements of the set that are also in the given set and adds
+  /// the members of the given set that are not already in the set.
   ///
-  /// For example:
+  /// In the following example, the elements of the `employees` set that are
+  /// also members of `neighbors` are removed from `employees`, while the
+  /// elements of `neighbors` that are not members of `employees` are added to
+  /// `employees`. In particular, the names `"Alicia"`, `"Chris"`, and
+  /// `"Diana"` are removed from `employees` while the names `"Forlani"` and
+  /// `"Greta"` are added.
   ///
-  ///     var employees: Set = ["Alicia", "Bethany", "Diana", "Eric"]
-  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani"]
+  ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
+  ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
   ///     employees.formSymmetricDifference(neighbors)
   ///     print(employees)
-  ///     // Prints "["Diana", "Forlani", "Alicia"]"
+  ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
   ///
   /// - Parameter other: A set of the same type.
   mutating func formSymmetricDifference(_ other: Self)
@@ -279,7 +295,8 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Returns a new set containing the elements of this set that do not occur
   /// in the given set.
   ///
-  /// For example:
+  /// In the following example, the `nonNeighbors` set is made up of the
+  /// elements of the `employees` set that are not elements of `neighbors`:
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -309,7 +326,8 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
   /// Returns a Boolean value that indicates whether the set has no members in
   /// common with the given set.
   ///
-  /// For example:
+  /// In the following example, the `employees` set is disjoint with the
+  /// `visitors` set because no name appears in both sets.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let visitors: Set = ["Marcia", "Nathaniel", "Olivia"]
@@ -354,7 +372,9 @@ public protocol SetAlgebra : Equatable, ArrayLiteralConvertible {
 
   /// Removes the elements of the given set from this set.
   ///
-  /// For example:
+  /// In the following example, the elements of the `employees` set that are
+  /// also members of the `neighbors` set are removed. In particular, the
+  /// names `"Bethany"` and `"Eric"` are removed from `employees`.
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -413,7 +433,9 @@ extension SetAlgebra {
 
   /// Removes the elements of the given set from this set.
   ///
-  /// For example:
+  /// In the following example, the elements of the `employees` set that are
+  /// also members of the `neighbors` set are removed. In particular, the
+  /// names `"Bethany"` and `"Eric"` are removed from `employees`.
   ///
   ///     var employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -464,7 +486,8 @@ extension SetAlgebra {
   /// Returns a Boolean value that indicates whether the set has no members in
   /// common with the given set.
   ///
-  /// For example:
+  /// In the following example, the `employees` set is disjoint with the
+  /// `visitors` set because no name appears in both sets.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let visitors: Set = ["Marcia", "Nathaniel", "Olivia"]
@@ -481,7 +504,8 @@ extension SetAlgebra {
   /// Returns a new set containing the elements of this set that do not occur
   /// in the given set.
   ///
-  /// For example:
+  /// In the following example, the `nonNeighbors` set is made up of the
+  /// elements of the `employees` set that are not elements of `neighbors`:
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -511,6 +535,8 @@ extension SetAlgebra {
   ///     let attendees: Set = ["Alicia", "Bethany", "Diana"]
   ///     print(employees.isStrictSuperset(of: attendees))
   ///     // Prints "true"
+  ///
+  ///     // A set is never a strict superset of itself:
   ///     print(employees.isStrictSuperset(of: employees))
   ///     // Prints "false"
   ///
@@ -549,27 +575,27 @@ extension SetAlgebra {
 public typealias SetAlgebraType = SetAlgebra
 
 extension SetAlgebra {
-  @available(*, unavailable, renamed: "intersection")
+  @available(*, unavailable, renamed: "intersection(_:)")
   public func intersect(_ other: Self) -> Self {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "symmetricDifference")
+  @available(*, unavailable, renamed: "symmetricDifference(_:)")
   public func exclusiveOr(_ other: Self) -> Self {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formUnion")
+  @available(*, unavailable, renamed: "formUnion(_:)")
   public mutating func unionInPlace(_ other: Self) {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formIntersection")
+  @available(*, unavailable, renamed: "formIntersection(_:)")
   public mutating func intersectInPlace(_ other: Self) {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "formSymmetricDifference")
+  @available(*, unavailable, renamed: "formSymmetricDifference(_:)")
   public mutating func exclusiveOrInPlace(_ other: Self) {
     Builtin.unreachable()
   }
@@ -589,7 +615,7 @@ extension SetAlgebra {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "subtract")
+  @available(*, unavailable, renamed: "subtract(_:)")
   public mutating func subtractInPlace(_ other: Self) {
     Builtin.unreachable()
   }

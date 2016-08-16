@@ -30,7 +30,7 @@ var bad_d_is_b:Bool = D() is B // expected-warning{{always true}}
 func base_class_archetype_casts<T : B>(_ t: T) {
   var _ : B = t
   _ = B() as! T
-  var _ : T = B() // expected-error{{cannot convert value of type 'B' to specified type 'T'}}
+  var _ : T = B() // expected-error{{'B' is not convertible to 'T'; did you mean to use 'as!' to force downcast?}}
 
   let b = B()
 
@@ -65,7 +65,7 @@ struct S12 : P1, P2 {
   func p2() {}
 }
 
-func protocol_archetype_casts<T : P1>(_ t: T, p1: P1, p2: P2, p12: protocol<P1, P2>) {
+func protocol_archetype_casts<T : P1>(_ t: T, p1: P1, p2: P2, p12: P1 & P2) {
   // Coercions.
   var _ : P1 = t
   var _ : P2 = t // expected-error{{value of type 'T' does not conform to specified type 'P2'}}
@@ -102,14 +102,14 @@ func protocol_archetype_casts<T : P1>(_ t: T, p1: P1, p2: P2, p12: protocol<P1, 
   var _:Bool = t is S2
 }
 
-func protocol_concrete_casts(_ p1: P1, p2: P2, p12: protocol<P1, P2>) {
+func protocol_concrete_casts(_ p1: P1, p2: P2, p12: P1 & P2) {
   // Checked unconditional casts.
   _ = p1 as! S1
   _ = p1 as! C1
   _ = p1 as! D1
   _ = p1 as! S12
 
-  _ = p1 as! protocol<P1, P2>
+  _ = p1 as! P1 & P2
 
   _ = p2 as! S1
 
@@ -124,7 +124,7 @@ func protocol_concrete_casts(_ p1: P1, p2: P2, p12: protocol<P1, P2>) {
   var _:Bool = p1 is D1
   var _:Bool = p1 is S12
 
-  var _:Bool = p1 is protocol<P1, P2>
+  var _:Bool = p1 is P1 & P2
 
   var _:Bool = p2 is S1
 
@@ -148,13 +148,13 @@ class NonObjCClass {}
 func objc_protocol_casts(_ op1: ObjCProto1, opn: NonObjCProto) {
   _ = ObjCClass() as! ObjCProto1
   _ = ObjCClass() as! ObjCProto2
-  _ = ObjCClass() as! protocol<ObjCProto1, ObjCProto2>
+  _ = ObjCClass() as! ObjCProto1 & ObjCProto2
   _ = ObjCClass() as! NonObjCProto
-  _ = ObjCClass() as! protocol<ObjCProto1, NonObjCProto>
+  _ = ObjCClass() as! ObjCProto1 & NonObjCProto
 
-  _ = op1 as! protocol<ObjCProto1, ObjCProto2>
-  _ = op1 as! protocol<ObjCProto2>
-  _ = op1 as! protocol<ObjCProto1, NonObjCProto>
+  _ = op1 as! ObjCProto1 & ObjCProto2
+  _ = op1 as! ObjCProto2
+  _ = op1 as! ObjCProto1 & NonObjCProto
   _ = opn as! ObjCProto1
 
   _ = NonObjCClass() as! ObjCProto1
@@ -163,7 +163,7 @@ func objc_protocol_casts(_ op1: ObjCProto1, opn: NonObjCProto) {
 func dynamic_lookup_cast(_ dl: AnyObject) {
   _ = dl as! ObjCProto1
   _ = dl as! ObjCProto2
-  _ = dl as! protocol<ObjCProto1, ObjCProto2>
+  _ = dl as! ObjCProto1 & ObjCProto2
 }
 
 // Cast to subclass with generic parameter inference
@@ -186,8 +186,8 @@ var f2: (B) -> Bool = { $0 is D }
 func metatype_casts<T, U>(_ b: B.Type, t:T.Type, u: U.Type) {
   _ = b is D.Type
   _ = T.self is U.Type
-  _ = T.self.dynamicType is U.Type.Type
-  _ = b.dynamicType is D.Type // expected-warning{{always fails}}
+  _ = type(of: T.self) is U.Type.Type
+  _ = type(of: b) is D.Type // expected-warning{{always fails}}
   _ = b is D.Type.Type // expected-warning{{always fails}}
 
 }

@@ -1,6 +1,22 @@
 ---
 Name: AppKit
 Classes:
+- Name: NSButton
+  Methods:
+  - Selector: 'mouseEntered:'
+    SwiftName: mouseEntered(with:)
+    MethodKind: Instance
+  - Selector: 'mouseExited:'
+    SwiftName: mouseExited(with:)
+    MethodKind: Instance
+- Name: NSButtonCell
+  Methods:
+  - Selector: 'mouseEntered:'
+    SwiftName: mouseEntered(with:)
+    MethodKind: Instance
+  - Selector: 'mouseExited:'
+    SwiftName: mouseExited(with:)
+    MethodKind: Instance
 - Name: NSCell
   Methods:
   - Selector: 'initImageCell:'
@@ -15,6 +31,14 @@ Classes:
   - Selector: 'stopTracking:at:inView:mouseIsUp:'
     SwiftName: stopTracking(last:current:in:mouseIsUp:)
     MethodKind: Instance
+  - Selector: 'trackMouse:inRect:ofView:untilMouseUp:'
+    SwiftName: trackMouse(with:in:of:untilMouseUp:)
+    MethodKind: Instance
+- Name: NSClipView
+  Methods:
+  - Selector: 'autoscroll:'
+    SwiftName: autoscroll(with:)
+    MethodKind: Instance
 - Name: NSControl
   Methods:
   - Selector: 'initWithFrame:'
@@ -26,11 +50,20 @@ Classes:
   - Selector: 'drawCellInside:'
     SwiftName: drawCellInside(_:)
     MethodKind: Instance
+  - Selector: 'mouseDown:'
+    SwiftName: mouseDown(with:)
+    MethodKind: Instance
 - Name: NSCursor
   Methods:
   - Selector: 'initWithImage:hotSpot:'
     MethodKind: Instance
     DesignatedInit: true
+  - Selector: 'mouseEntered:'
+    SwiftName: mouseEntered(with:)
+    MethodKind: Instance
+  - Selector: 'mouseExited:'
+    SwiftName: mouseExited(with:)
+    MethodKind: Instance
 - Name: NSDocument
   Methods:
   - Selector: init
@@ -77,6 +110,47 @@ Classes:
   - Selector: 'initTextCell:'
     MethodKind: Instance
     DesignatedInit: true
+- Name: NSGestureRecognizer
+  Methods:
+  - Selector: 'mouseDown:'
+    SwiftName: mouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseDown:'
+    SwiftName: rightMouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseDown:'
+    SwiftName: otherMouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'mouseUp:'
+    SwiftName: mouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseUp:'
+    SwiftName: rightMouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseUp:'
+    SwiftName: otherMouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'mouseDragged:'
+    SwiftName: mouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseDragged:'
+    SwiftName: rightMouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseDragged:'
+    SwiftName: otherMouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'keyDown:'
+    SwiftName: keyDown(with:)
+    MethodKind: Instance
+  - Selector: 'keyUp:'
+    SwiftName: keyUp(with:)
+    MethodKind: Instance
+  - Selector: 'flagsChanged:'
+    SwiftName: flagsChanged(with:)
+    MethodKind: Instance
+  - Selector: 'tabletPoint:'
+    SwiftName: tabletPoint(with:)
+    MethodKind: Instance
 - Name: NSGradient
   Methods:
   - Selector: 'initWithColors:atLocations:colorSpace:'
@@ -146,6 +220,15 @@ Classes:
   - Selector: 'sortUsingFunction:context:'
     SwiftName: sort(using:context:)
     MethodKind: Instance
+  - Selector: 'mouseDown:'
+    SwiftName: mouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'performKeyEquivalent:'
+    SwiftName: performKeyEquivalent(with:)
+    MethodKind: Instance
+  - Selector: 'acceptsFirstMouse:'
+    SwiftName: acceptsFirstMouse(for:)
+    MethodKind: Instance
 - Name: NSMenu
   Methods:
   - Selector: 'initWithTitle:'
@@ -163,6 +246,12 @@ Classes:
   - Selector: 'removeItem:'
     SwiftName: removeItem(_:)
     MethodKind: Instance
+  - Selector: 'performKeyEquivalent:'
+    SwiftName: performKeyEquivalent(with:)
+    MethodKind: Instance
+  - Selector: 'helpRequested:'
+    SwiftName: helpRequested(with:)
+    MethodKind: Instance
   Properties:
   - Name: itemArray
     SwiftName: items
@@ -171,6 +260,14 @@ Classes:
   - Selector: 'initWithFrame:'
     MethodKind: Instance
     DesignatedInit: true
+- Name: NSPathCell
+  Methods:
+  - Selector: 'mouseEntered:withFrame:inView:'
+    SwiftName: mouseEntered(with:frame:in:)
+    MethodKind: Instance
+  - Selector: 'mouseExited:withFrame:inView:'
+    SwiftName: mouseExited(with:frame:in:)
+    MethodKind: Instance
 - Name: NSPopUpButtonCell
   Methods:
   - Selector: 'initTextCell:pullsDown:'
@@ -189,6 +286,9 @@ Classes:
   - Selector: 'initWithRulerView:markerLocation:image:imageOrigin:'
     MethodKind: Instance
     DesignatedInit: true
+  - Selector: 'trackMouse:adding:'
+    SwiftName: trackMouse(with:adding:)
+    MethodKind: Instance
 - Name: NSRulerView
   Methods:
   - Selector: 'initWithScrollView:orientation:'
@@ -247,6 +347,9 @@ Classes:
     MethodKind: Instance
   - Selector: 'handleTextCheckingResults:forRange:types:options:orthography:wordCount:'
     SwiftName: handleTextCheckingResults(_:forRange:types:options:orthography:wordCount:)
+    MethodKind: Instance
+  - Selector: 'rulerView:handleMouseDown:'
+    SwiftName: rulerView(_:handleMouseDownWith:)
     MethodKind: Instance
 - Name: NSUserDefaultsController
   Methods:
@@ -315,6 +418,9 @@ Classes:
   - Selector: 'handleCloseScriptCommand:'
     SwiftName: handleClose(_:)
     MethodKind: Instance
+  - Selector: 'keyDown:'
+    SwiftName: keyDown(with:)
+    MethodKind: Instance
   Properties:
   - Name: isFlushWindowDisabled
     SwiftName: isFlushingDisabled
@@ -353,6 +459,9 @@ Classes:
     MethodKind: Class
 - Name: NSApplication
   Methods:
+  - Selector: 'activateIgnoringOtherApps:'
+    SwiftName: activate(ignoringOtherApps:)
+    MethodKind: Instance
   - Selector: 'runModalSession:'
     SwiftName: runModalSession(_:)
     MethodKind: Instance
@@ -392,6 +501,11 @@ Classes:
     SwiftName: remove(contentsOf:)
     MethodKind: Instance
 - Name: NSBezierPath
+  Properties:
+  - Name: bezierPathByFlatteningPath
+    SwiftName: flattened
+  - Name: bezierPathByReversingPath
+    SwiftName: reversed
   Methods:
   - Selector: 'clipRect:'
     SwiftName: clip(_:)
@@ -435,118 +549,83 @@ Classes:
     SwiftName: noteHeightOfRowsWithIndexesChanged(_:inColumn:)
     MethodKind: Instance
 - Name: NSColor
+  Properties:
+  - Name: controlShadowColor
+    SwiftName: controlShadowColor
+  - Name: controlDarkShadowColor
+    SwiftName: controlDarkShadowColor
+  - Name: controlColor
+    SwiftName: controlColor
+  - Name: controlHighlightColor
+    SwiftName: controlHighlightColor
+  - Name: controlLightHighlightColor
+    SwiftName: controlLightHighlightColor
+  - Name: controlTextColor
+    SwiftName: controlTextColor
+  - Name: controlBackgroundColor
+    SwiftName: controlBackgroundColor
+  - Name: selectedControlColor
+    SwiftName: selectedControlColor
+  - Name: secondarySelectedControlColor
+    SwiftName: secondarySelectedControlColor
+  - Name: selectedControlTextColor
+    SwiftName: selectedControlTextColor
+  - Name: disabledControlTextColor
+    SwiftName: disabledControlTextColor
+  - Name: textColor
+    SwiftName: textColor
+  - Name: textBackgroundColor
+    SwiftName: textBackgroundColor
+  - Name: selectedTextColor
+    SwiftName: selectedTextColor
+  - Name: selectedTextBackgroundColor
+    SwiftName: selectedTextBackgroundColor
+  - Name: gridColor
+    SwiftName: gridColor
+  - Name: keyboardFocusIndicatorColor
+    SwiftName: keyboardFocusIndicatorColor
+  - Name: windowBackgroundColor
+    SwiftName: windowBackgroundColor
+  - Name: underPageBackgroundColor
+    SwiftName: underPageBackgroundColor
+  - Name: labelColor
+    SwiftName: labelColor
+  - Name: secondaryLabelColor
+    SwiftName: secondaryLabelColor
+  - Name: tertiaryLabelColor
+    SwiftName: tertiaryLabelColor
+  - Name: quaternaryLabelColor
+    SwiftName: quaternaryLabelColor
+  - Name: scrollBarColor
+    SwiftName: scrollBarColor
+  - Name: knobColor
+    SwiftName: knobColor
+  - Name: selectedKnobColor
+    SwiftName: selectedKnobColor
+  - Name: windowFrameColor
+    SwiftName: windowFrameColor
+  - Name: windowFrameTextColor
+    SwiftName: windowFrameTextColor
+  - Name: selectedMenuItemColor
+    SwiftName: selectedMenuItemColor
+  - Name: selectedMenuItemTextColor
+    SwiftName: selectedMenuItemTextColor
+  - Name: highlightColor
+    SwiftName: highlightColor
+  - Name: shadowColor
+    SwiftName: shadowColor
+  - Name: headerColor
+    SwiftName: headerColor
+  - Name: headerTextColor
+    SwiftName: headerTextColor
+  - Name: alternateSelectedControlColor
+    SwiftName: alternateSelectedControlColor
+  - Name: alternateSelectedControlTextColor
+    SwiftName: alternateSelectedControlTextColor
   Methods:
   - Selector: 'colorWithSRGBRed:green:blue:alpha:'
     SwiftName: init(sRGBRed:green:blue:alpha:)
     MethodKind: Instance
-  - Selector: controlShadowColor
-    SwiftName: controlShadowColor()
-    MethodKind: Class
-  - Selector: controlDarkShadowColor
-    SwiftName: controlDarkShadowColor()
-    MethodKind: Class
-  - Selector: controlColor
-    SwiftName: controlColor()
-    MethodKind: Class
-  - Selector: controlHighlightColor
-    SwiftName: controlHighlightColor()
-    MethodKind: Class
-  - Selector: controlLightHighlightColor
-    SwiftName: controlLightHighlightColor()
-    MethodKind: Class
-  - Selector: controlTextColor
-    SwiftName: controlTextColor()
-    MethodKind: Class
-  - Selector: controlBackgroundColor
-    SwiftName: controlBackgroundColor()
-    MethodKind: Class
-  - Selector: selectedControlColor
-    SwiftName: selectedControlColor()
-    MethodKind: Class
-  - Selector: secondarySelectedControlColor
-    SwiftName: secondarySelectedControlColor()
-    MethodKind: Class
-  - Selector: selectedControlTextColor
-    SwiftName: selectedControlTextColor()
-    MethodKind: Class
-  - Selector: disabledControlTextColor
-    SwiftName: disabledControlTextColor()
-    MethodKind: Class
-  - Selector: textColor
-    SwiftName: textColor()
-    MethodKind: Class
-  - Selector: textBackgroundColor
-    SwiftName: textBackgroundColor()
-    MethodKind: Class
-  - Selector: selectedTextColor
-    SwiftName: selectedTextColor()
-    MethodKind: Class
-  - Selector: selectedTextBackgroundColor
-    SwiftName: selectedTextBackgroundColor()
-    MethodKind: Class
-  - Selector: gridColor
-    SwiftName: gridColor()
-    MethodKind: Class
-  - Selector: keyboardFocusIndicatorColor
-    SwiftName: keyboardFocusIndicatorColor()
-    MethodKind: Class
-  - Selector: windowBackgroundColor
-    SwiftName: windowBackgroundColor()
-    MethodKind: Class
-  - Selector: underPageBackgroundColor
-    SwiftName: underPageBackgroundColor()
-    MethodKind: Class
-  - Selector: labelColor
-    SwiftName: labelColor()
-    MethodKind: Class
-  - Selector: secondaryLabelColor
-    SwiftName: secondaryLabelColor()
-    MethodKind: Class
-  - Selector: tertiaryLabelColor
-    SwiftName: tertiaryLabelColor()
-    MethodKind: Class
-  - Selector: quaternaryLabelColor
-    SwiftName: quaternaryLabelColor()
-    MethodKind: Class
-  - Selector: scrollBarColor
-    SwiftName: scrollBarColor()
-    MethodKind: Class
-  - Selector: knobColor
-    SwiftName: knobColor()
-    MethodKind: Class
-  - Selector: selectedKnobColor
-    SwiftName: selectedKnobColor()
-    MethodKind: Class
-  - Selector: windowFrameColor
-    SwiftName: windowFrameColor()
-    MethodKind: Class
-  - Selector: windowFrameTextColor
-    SwiftName: windowFrameTextColor()
-    MethodKind: Class
-  - Selector: selectedMenuItemColor
-    SwiftName: selectedMenuItemColor()
-    MethodKind: Class
-  - Selector: selectedMenuItemTextColor
-    SwiftName: selectedMenuItemTextColor()
-    MethodKind: Class
-  - Selector: highlightColor
-    SwiftName: highlightColor()
-    MethodKind: Class
-  - Selector: shadowColor
-    SwiftName: shadowColor()
-    MethodKind: Class
-  - Selector: headerColor
-    SwiftName: headerColor()
-    MethodKind: Class
-  - Selector: headerTextColor
-    SwiftName: headerTextColor()
-    MethodKind: Class
-  - Selector: alternateSelectedControlColor
-    SwiftName: alternateSelectedControlColor()
-    MethodKind: Class
-  - Selector: alternateSelectedControlTextColor
-    SwiftName: alternateSelectedControlTextColor()
-    MethodKind: Class
   - Selector: 'blendedColorWithFraction:ofColor:'
     SwiftName: blended(withFraction:of:)
     MethodKind: Instance
@@ -828,15 +907,89 @@ Classes:
   - Selector: 'shouldBeTreatedAsInkEvent:'
     SwiftName: shouldBeTreatedAsInkEvent(_:)
     MethodKind: Instance
+  - Selector: 'performKeyEquivalent:'
+    SwiftName: performKeyEquivalent(with:)
+    MethodKind: Instance
+  - Selector: 'mouseDown:'
+    SwiftName: mouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseDown:'
+    SwiftName: rightMouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseDown:'
+    SwiftName: otherMouseDown(with:)
+    MethodKind: Instance
+  - Selector: 'mouseUp:'
+    SwiftName: mouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseUp:'
+    SwiftName: rightMouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseUp:'
+    SwiftName: otherMouseUp(with:)
+    MethodKind: Instance
+  - Selector: 'mouseMoved:'
+    SwiftName: mouseMoved(with:)
+    MethodKind: Instance
+  - Selector: 'mouseDragged:'
+    SwiftName: mouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'scrollWheel:'
+    SwiftName: scrollWheel(with:)
+    MethodKind: Instance
+  - Selector: 'rightMouseDragged:'
+    SwiftName: rightMouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'otherMouseDragged:'
+    SwiftName: otherMouseDragged(with:)
+    MethodKind: Instance
+  - Selector: 'mouseEntered:'
+    SwiftName: mouseEntered(with:)
+    MethodKind: Instance
+  - Selector: 'mouseExited:'
+    SwiftName: mouseExited(with:)
+    MethodKind: Instance
+  - Selector: 'keyDown:'
+    SwiftName: keyDown(with:)
+    MethodKind: Instance
+  - Selector: 'keyUp:'
+    SwiftName: keyUp(with:)
+    MethodKind: Instance
+  - Selector: 'flagsChanged:'
+    SwiftName: flagsChanged(with:)
+    MethodKind: Instance
+  - Selector: 'tabletPoint:'
+    SwiftName: tabletPoint(with:)
+    MethodKind: Instance
+  - Selector: 'tabletProximity:'
+    SwiftName: tabletProximity(with:)
+    MethodKind: Instance
+  - Selector: 'cursorUpdate:'
+    SwiftName: cursorUpdate(with:)
+    MethodKind: Instance
 - Name: NSScroller
   Methods:
   - Selector: 'drawArrow:highlight:'
     SwiftName: drawArrow(_:highlight:)
     MethodKind: Instance
+  - Selector: 'trackKnob:'
+    SwiftName: trackKnob(with:)
+    MethodKind: Instance
+  - Selector: 'trackScrollButtons:'
+    SwiftName: trackScrollButtons(with:)
+    MethodKind: Instance
+  - Selector: 'scrollWheel:'
+    SwiftName: scrollWheel(with:)
+    MethodKind: Instance
 - Name: NSSharingServicePicker
   Methods:
   - Selector: 'showRelativeToRect:ofView:preferredEdge:'
     SwiftName: show(relativeTo:of:preferredEdge:)
+    MethodKind: Instance
+- Name: NSSlider
+  Methods:
+  - Selector: 'acceptsFirstMouse:'
+    SwiftName: acceptsFirstMouse(for:)
     MethodKind: Instance
 - Name: NSSliderCell
   Methods:
@@ -1015,6 +1168,18 @@ Classes:
   - Selector: 'locationOfPrintRect:'
     SwiftName: locationOfPrintRect(_:)
     MethodKind: Instance
+  - Selector: 'autoscroll:'
+    SwiftName: autoscroll(with:)
+    MethodKind: Instance
+  - Selector: 'performKeyEquivalent:'
+    SwiftName: performKeyEquivalent(with:)
+    MethodKind: Instance
+  - Selector: 'acceptsFirstMouse:'
+    SwiftName: acceptsFirstMouse(for:)
+    MethodKind: Instance
+  - Selector: 'rulerView:handleMouseDown:'
+    SwiftName: rulerView(_:handleMouseDownWith:)
+    MethodKind: Instance
   Properties:
   - Name: nextKeyView
     SwiftName: nextKeyView
@@ -1089,6 +1254,14 @@ Protocols:
   - Selector: 'tabViewDidChangeNumberOfTabViewItems:'
     SwiftName: tabViewDidChangeNumberOfTabViewItems(_:)
     MethodKind: Instance
+- Name: NSTextAttachmentCell
+  Methods:
+  - Selector: 'trackMouse:inRect:ofView:untilMouseUp:'
+    SwiftName: trackMouse(with:in:of:untilMouseUp:)
+    MethodKind: Instance
+  - Selector: 'trackMouse:inRect:ofView:atCharacterIndex:untilMouseUp:'
+    SwiftName: trackMouse(with:in:of:atCharacterIndex:untilMouseUp:)
+    MethodKind: Instance
 - Name: NSUserInterfaceValidations
   Methods:
   - Selector: 'validateUserInterfaceItem:'
@@ -1102,6 +1275,73 @@ Protocols:
   - Selector: 'windowDidFailToExitFullScreen:'
     SwiftName: windowDidFailToExitFullScreen(_:)
     MethodKind: Instance
+Globals:
+- Name: NSAccessibilityMainWindowChangedNotification
+  SwiftName: NSAccessibilityMainWindowChangedNotification
+- Name: NSAccessibilityFocusedWindowChangedNotification
+  SwiftName: NSAccessibilityFocusedWindowChangedNotification
+- Name: NSAccessibilityFocusedUIElementChangedNotification
+  SwiftName: NSAccessibilityFocusedUIElementChangedNotification
+- Name: NSAccessibilityApplicationActivatedNotification
+  SwiftName: NSAccessibilityApplicationActivatedNotification
+- Name: NSAccessibilityApplicationDeactivatedNotification
+  SwiftName: NSAccessibilityApplicationDeactivatedNotification
+- Name: NSAccessibilityApplicationHiddenNotification
+  SwiftName: NSAccessibilityApplicationHiddenNotification
+- Name: NSAccessibilityApplicationShownNotification
+  SwiftName: NSAccessibilityApplicationShownNotification
+- Name: NSAccessibilityWindowCreatedNotification
+  SwiftName: NSAccessibilityWindowCreatedNotification
+- Name: NSAccessibilityWindowMovedNotification
+  SwiftName: NSAccessibilityWindowMovedNotification
+- Name: NSAccessibilityWindowResizedNotification
+  SwiftName: NSAccessibilityWindowResizedNotification
+- Name: NSAccessibilityWindowMiniaturizedNotification
+  SwiftName: NSAccessibilityWindowMiniaturizedNotification
+- Name: NSAccessibilityWindowDeminiaturizedNotification
+  SwiftName: NSAccessibilityWindowDeminiaturizedNotification
+- Name: NSAccessibilityDrawerCreatedNotification
+  SwiftName: NSAccessibilityDrawerCreatedNotification
+- Name: NSAccessibilitySheetCreatedNotification
+  SwiftName: NSAccessibilitySheetCreatedNotification
+- Name: NSAccessibilityUIElementDestroyedNotification
+  SwiftName: NSAccessibilityUIElementDestroyedNotification
+- Name: NSAccessibilityValueChangedNotification
+  SwiftName: NSAccessibilityValueChangedNotification
+- Name: NSAccessibilityTitleChangedNotification
+  SwiftName: NSAccessibilityTitleChangedNotification
+- Name: NSAccessibilityResizedNotification
+  SwiftName: NSAccessibilityResizedNotification
+- Name: NSAccessibilityMovedNotification
+  SwiftName: NSAccessibilityMovedNotification
+- Name: NSAccessibilityCreatedNotification
+  SwiftName: NSAccessibilityCreatedNotification
+- Name: NSAccessibilityLayoutChangedNotification
+  SwiftName: NSAccessibilityLayoutChangedNotification
+- Name: NSAccessibilityHelpTagCreatedNotification
+  SwiftName: NSAccessibilityHelpTagCreatedNotification
+- Name: NSAccessibilitySelectedTextChangedNotification
+  SwiftName: NSAccessibilitySelectedTextChangedNotification
+- Name: NSAccessibilityRowCountChangedNotification
+  SwiftName: NSAccessibilityRowCountChangedNotification
+- Name: NSAccessibilitySelectedChildrenChangedNotification
+  SwiftName: NSAccessibilitySelectedChildrenChangedNotification
+- Name: NSAccessibilitySelectedRowsChangedNotification
+  SwiftName: NSAccessibilitySelectedRowsChangedNotification
+- Name: NSAccessibilitySelectedColumnsChangedNotification
+  SwiftName: NSAccessibilitySelectedColumnsChangedNotification
+- Name: NSAccessibilityRowExpandedNotification
+  SwiftName: NSAccessibilityRowExpandedNotification
+- Name: NSAccessibilityRowCollapsedNotification
+  SwiftName: NSAccessibilityRowCollapsedNotification
+- Name: NSAccessibilitySelectedCellsChangedNotification
+  SwiftName: NSAccessibilitySelectedCellsChangedNotification
+- Name: NSAccessibilityUnitsChangedNotification
+  SwiftName: NSAccessibilityUnitsChangedNotification
+- Name: NSAccessibilitySelectedChildrenMovedNotification
+  SwiftName: NSAccessibilitySelectedChildrenMovedNotification
+- Name: NSAccessibilityAnnouncementRequestedNotification
+  SwiftName: NSAccessibilityAnnouncementRequestedNotification
 Enumerators:
 - Name: NSFPPreviewButton
   Availability: nonswift

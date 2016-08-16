@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
@@ -13,14 +13,14 @@
 // CHECK: return [[RESULT]] : $Int
 
 // Default argument for third parameter.
-// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1{{.*}} : $@convention(thin) () -> @owned String
-// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSC
-// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK-LABEL: sil hidden @_TIF17default_arguments7defarg1FT1iSi1dSd1sSS_T_A1_{{.*}} : $@convention(thin) () -> @owned String
 // CHECK: [[LIT:%[0-9]+]] = string_literal utf8 "Hello"
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
+// CHECK: [[STRING:%[0-9]+]] = metatype $@thin String.Type
+// CHECK: [[CVT:%[0-9]+]] = function_ref @_TFSSC
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], {{[^,]+}}, [[STRING]]) : $@convention(method)
 // CHECK: return [[RESULT]] : $String
-func defarg1(i i: Int = 17, d: Double, s: String = "Hello") { }
+func defarg1(i: Int = 17, d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments15testDefaultArg1FT_T_
 func testDefaultArg1() {
@@ -66,7 +66,7 @@ func testAutocloseFile() {
   autocloseFile()
 }
 
-func testMagicLiterals(file file: String = #file,
+func testMagicLiterals(file: String = #file,
                        function: String = #function,
                        line: Int = #line,
                        column: Int = #column) {}
@@ -184,16 +184,16 @@ func takeDefaultArgUnnamed(_ x: Int = 5) { }
 // CHECK-LABEL: sil hidden @_TF17default_arguments25testTakeDefaultArgUnnamed
 func testTakeDefaultArgUnnamed(_ i: Int) {
   // CHECK: bb0([[I:%[0-9]+]] : $Int):
-  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFTSi_T_ : $@convention(thin) (Int) -> ()
+  // CHECK:   [[FN:%[0-9]+]] = function_ref @_TF17default_arguments21takeDefaultArgUnnamedFSiT_ : $@convention(thin) (Int) -> ()
   // CHECK:   apply [[FN]]([[I]]) : $@convention(thin) (Int) -> ()
   takeDefaultArgUnnamed(i)
 }
 
-func takeDSOHandle(_ handle: UnsafeMutablePointer<Void> = #dsohandle) { }
+func takeDSOHandle(_ handle: UnsafeRawPointer = #dsohandle) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @_Tv17default_arguments12__dso_handleGSpT__ : $*UnsafeMutablePointer<()>
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @__dso_handle : $*Builtin.RawPointer
   takeDSOHandle()
 }
 
@@ -225,12 +225,12 @@ class ReabstractDefaultArgument<T> {
 // CHECK-NEXT: apply [[INITFN]]<Int>(%7, 
 
 func testDefaultArgumentReabstraction() {
-  ReabstractDefaultArgument<Int>()
+  _ = ReabstractDefaultArgument<Int>()
 }
 
 // <rdar://problem/20494437> SILGen crash handling default arguments
 // CHECK-LABEL: sil hidden @_TF17default_arguments18r20494437onSuccessFPS_25r20494437ExecutionContext_T_
-// CHECK: function_ref @_TF17default_arguments19r20494437onCompleteFTPS_25r20494437ExecutionContext__T_
+// CHECK: function_ref @_TF17default_arguments19r20494437onCompleteFPS_25r20494437ExecutionContext_T_
 // <rdar://problem/20494437> SILGen crash handling default arguments
 protocol r20494437ExecutionContext {}
 let r20494437Default: r20494437ExecutionContext
@@ -262,5 +262,5 @@ func localFunctionWithDefaultArg() {
   }
   bar()
 }
-// CHECK-LABEL: sil shared @_TIFF17default_arguments27localFunctionWithDefaultArgFT_T_L_3barFTGSqSi__T_A_
+// CHECK-LABEL: sil shared @_TIFF17default_arguments27localFunctionWithDefaultArgFT_T_L_3barFGSqSi_T_A_
 // CHECK-SAME: $@convention(thin) () -> Optional<Int>

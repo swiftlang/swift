@@ -3,6 +3,7 @@ add_swift_executable(swift
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
+  swift_format_main.cpp
   LINK_LIBRARIES
     swiftDriver
     swiftFrontendTool
@@ -16,6 +17,10 @@ add_custom_command(TARGET swift POST_BUILD
 
 add_custom_command(TARGET swift POST_BUILD
     COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-autolink-extract"
+    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+
+add_custom_command(TARGET swift POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "swift" "swift-format"
     WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 # If building as part of clang, make sure the headers are installed.
@@ -46,4 +51,7 @@ swift_install_in_component(compiler
     DESTINATION "bin")
 swift_install_in_component(autolink-driver
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
+    DESTINATION "bin")
+swift_install_in_component(editor-integration
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format"
     DESTINATION "bin")

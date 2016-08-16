@@ -10,12 +10,12 @@ var f : Float
 
 func f1(y: Float, rest: Int...) {}
 
-func f2(_: (x: Int, y: Int) -> Int) {}
+func f2(_: (_ x: Int, _ y: Int) -> Int) {}
 func f2xy(x: Int, y: Int) -> Int {}
 func f2ab(a: Int, b: Int) -> Int {}
 func f2yx(y: Int, x: Int) -> Int {}
 
-func f3(_ x: (x: Int, y: Int) -> ()) {}
+func f3(_ x: (_ x: Int, _ y: Int) -> ()) {}
 func f3a(_ x: Int, y: Int) {}
 func f3b(_: Int) {}
 
@@ -35,10 +35,10 @@ f4(1, 2, 3)
 
 f2(f2xy)
 f2(f2ab)
-f2(f2yx) // expected-error{{cannot convert value of type '(y: Int, x: Int) -> Int' to expected argument type '(x: Int, y: Int) -> Int'}} 
+f2(f2yx)
 
 f3(f3a)
-f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(x: Int, y: Int) -> ()'}} 
+f3(f3b) // expected-error{{cannot convert value of type '(Int) -> ()' to expected argument type '(Int, Int) -> ()'}} 
 
 func getIntFloat() -> (int: Int, float: Float) {}
 var values = getIntFloat()
@@ -60,7 +60,10 @@ any = (label: 4)
 
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
-any.1 // expected-error{{value of type 'Any' (aka 'protocol<>') has no member '1'}}
+any.1 // expected-error{{value of type 'Any' has no member '1'}}
+// expected-note@-1{{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+any = (5.0, 6.0) as (Float, Float)
+_ = (any as! (Float, Float)).1
 
 // Fun with tuples
 protocol PosixErrorReturn {
@@ -71,8 +74,8 @@ extension Int : PosixErrorReturn {
   static func errorReturnValue() -> Int { return -1 }
 }
 
-func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
-  (_ f:(A) -> T) -> (args:A) -> T
+func posixCantFail<A, T : Comparable & PosixErrorReturn>
+  (_ f: @escaping (A) -> T) -> (_ args:A) -> T
 {
   return { args in
     let result = f(args)
@@ -85,7 +88,7 @@ func open(_ name: String, oflag: Int) -> Int { }
 
 var foo: Int = 0
 
-var fd = posixCantFail(open)(args: ("foo", 0))
+var fd = posixCantFail(open)(("foo", 0))
 
 // Tuples and lvalues
 class C {
@@ -115,7 +118,7 @@ class Paws {
   init() throws {}
 }
 
-func scruff() -> (AnyObject?, ErrorProtocol?) {
+func scruff() -> (AnyObject?, Error?) {
   do {
     return try (Paws(), nil)
   } catch {
@@ -159,7 +162,7 @@ protocol Kingdom {
   associatedtype King
 }
 struct Victory<General> {
-  init<K: Kingdom where K.King == General>(_ king: K) {}
+  init<K: Kingdom>(_ king: K) where K.King == General {}
 }
 struct MagicKingdom<K> : Kingdom {
   typealias King = K
@@ -179,4 +182,23 @@ func makeRequest() {
   }
 }
 
+// <rdar://problem/25271859> QoI: Misleading error message when expression result can't be inferred from closure
+struct r25271859<T> {
+}
+
+extension r25271859 {
+  func map<U>(f: (T) -> U) -> r25271859<U> {
+  }
+
+  func andThen<U>(f: (T)->r25271859<U>) {
+  }
+}
+
+func f(a : r25271859<(Float, Int)>) {
+  a.map { $0.0 }
+    .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
+      print("hello") // comment this out and it runs, leave any form of print in and it doesn't
+      return r25271859<String>()
+  }
+}
 

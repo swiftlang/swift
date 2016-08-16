@@ -1,82 +1,82 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 > %t.top1
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.top1
-// RUN: FileCheck %s -check-prefix=KW_NO_RETURN < %t.top1
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.top1
+// RUN: %FileCheck %s -check-prefix=KW_NO_RETURN < %t.top1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_2 > %t.top2
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.top2
-// RUN: FileCheck %s -check-prefix=KW_NO_RETURN < %t.top2
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.top2
+// RUN: %FileCheck %s -check-prefix=KW_NO_RETURN < %t.top2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_1 > %t.func1
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func1
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func1
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func1
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_2 > %t.func2
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func2
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func2
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func2
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_3 > %t.func3
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func3
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func3
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func3
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_4 > %t.func4
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func4
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func4
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func4
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_5 > %t.func5
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.func5
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.func5
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.func5
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.func5
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_1 > %t.clos1
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos1
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos1
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos1
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_2 > %t.clos2
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos2
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos2
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos2
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_3 > %t.clos3
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos3
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos3
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos3
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_4 > %t.clos4
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos4
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.clos4
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.clos4
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.clos4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_SUBSCRIPT_1 > %t.subs
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.subs
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.subs
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.subs
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.subs
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INIT_1 > %t.init
-// RUN: FileCheck %s -check-prefix=KW_DECL_STMT < %t.init
-// RUN: FileCheck %s -check-prefix=KW_RETURN < %t.init
+// RUN: %FileCheck %s -check-prefix=KW_DECL_STMT < %t.init
+// RUN: %FileCheck %s -check-prefix=KW_RETURN < %t.init
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_1 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_2 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_3 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_4 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_5 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_6 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_7 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_8 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_1 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_2 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_3 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_4 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_5 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_6 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_7 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_8 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | %FileCheck %s -check-prefix=KW_DECL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | %FileCheck %s -check-prefix=KW_DECL
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | FileCheck %s -check-prefix=SUPER_KEYWORD0
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | FileCheck %s -check-prefix=SUPER_KEYWORD1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | FileCheck %s -check-prefix=SUPER_KEYWORD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | FileCheck %s -check-prefix=SUPER_KEYWORD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | %FileCheck %s -check-prefix=SUPER_KEYWORD0
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | %FileCheck %s -check-prefix=SUPER_KEYWORD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | %FileCheck %s -check-prefix=SUPER_KEYWORD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | %FileCheck %s -check-prefix=SUPER_KEYWORD3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_1 > %t.expr1
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr1
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr1
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr1
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_2 > %t.expr2
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr2
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr2
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr2
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_3 > %t.expr3
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr3
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr3
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr3
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_4 > %t.expr4
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr4
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr4
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr4
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_5 > %t.expr5
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr5
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr5
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_6 > %t.expr6
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr6
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
+// RUN: %FileCheck %s -check-prefix=KW_EXPR < %t.expr6
+// RUN: %FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
 
 // KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
 // KW_NO_RETURN-NOT: Keyword[return]

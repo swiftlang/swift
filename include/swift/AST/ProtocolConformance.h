@@ -181,6 +181,10 @@ public:
       if (!assocTypeReq || req->isInvalid())
         continue;
 
+      // If we don't have and cannot resolve witnesses, skip it.
+      if (!resolver && !hasTypeWitness(assocTypeReq))
+        continue;
+
       const auto &TWInfo = getTypeWitnessSubstAndDecl(assocTypeReq, resolver);
       if (f(assocTypeReq, TWInfo.first, TWInfo.second))
         return true;

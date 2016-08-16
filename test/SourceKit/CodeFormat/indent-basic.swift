@@ -13,7 +13,7 @@ foo(a: [
   3: 3
 ])
 
-operator <> {
+precedencegroup Whatever {
 x
 }
 
@@ -28,7 +28,7 @@ x
 // RUN: %sourcekitd-test -req=format -line=9 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=13 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=17 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "class Foo {"
 // CHECK: key.sourcetext: "    "

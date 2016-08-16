@@ -108,10 +108,13 @@ static ResolutionKind recordImportDecls(LazyResolver *typeResolver,
     std::copy_if(newDecls.begin(), newDecls.end(), std::back_inserter(results),
                  [&](ValueDecl *result) -> bool {
       if (!result->hasType()) {
-        if (typeResolver)
+        if (typeResolver) {
           typeResolver->resolveDeclSignature(result);
-        else
+          if (result->isInvalid())
+            return true;
+        } else {
           return true;
+        }
       }
       return isValidOverload(overloads, result);
     });

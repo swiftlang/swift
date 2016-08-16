@@ -24,7 +24,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
 from swift_build_support import diagnostics  # noqa (E402)
-from swift_build_support import shell  # noqa (E402)
 
 
 HOME = os.environ.get("HOME", "/")
@@ -143,30 +142,37 @@ def get_preset_options(substitutions, preset_file_names, preset_name):
                           "': " + ", ".join(missing_opts))
 
     # Migrate 'swift-sdks' parameter to 'stdlib-deployment-targets'
-    for opt in build_script_impl_opts:
-        if opt.startswith("--swift-sdks"):
-            sdks_to_configure = opt.split("=")[1].split(";")
-            tgts = []
-            # Expand SDKs in to their deployment targets
-            from swift_build_support.targets import StdlibDeploymentTarget
-            for sdk in sdks_to_configure:
-                if sdk == "OSX":
-                    tgts += StdlibDeploymentTarget.OSX.targets
-                elif sdk == "IOS":
-                    tgts += StdlibDeploymentTarget.iOS.targets
-                elif sdk == "IOS_SIMULATOR":
-                    tgts += StdlibDeploymentTarget.iOSSimulator.targets
-                elif sdk == "TVOS":
-                    tgts += StdlibDeploymentTarget.AppleTV.targets
-                elif sdk == "TVOS_SIMULATOR":
-                    tgts += StdlibDeploymentTarget.AppleTVSimulator.targets
-                elif sdk == "WATCHOS":
-                    tgts += StdlibDeploymentTarget.AppleWatch.targets
-                elif sdk == "WATCHOS_SIMULATOR":
-                    tgts += StdlibDeploymentTarget.AppleWatchSimulator.targets
+    swift_sdks_opts = [opt for opt in build_script_impl_opts
+                       if opt.startswith("--swift-sdks")]
+    try:
+        swift_sdks_opt = swift_sdks_opts[-1]
+    except IndexError:
+        swift_sdks_opt = None
 
-            build_script_opts.append("--stdlib-deployment-targets=" +
-                                     " ".join([tgt.name for tgt in tgts]))
+    if swift_sdks_opt is not None:
+        sdks_to_configure = swift_sdks_opt.split("=")[1].split(";")
+        tgts = []
+        # Expand SDKs in to their deployment targets
+        from swift_build_support.targets import StdlibDeploymentTarget
+        for sdk in sdks_to_configure:
+            if sdk == "OSX":
+                tgts += StdlibDeploymentTarget.OSX.targets
+            elif sdk == "IOS":
+                tgts += StdlibDeploymentTarget.iOS.targets
+            elif sdk == "IOS_SIMULATOR":
+                tgts += StdlibDeploymentTarget.iOSSimulator.targets
+            elif sdk == "TVOS":
+                tgts += StdlibDeploymentTarget.AppleTV.targets
+            elif sdk == "TVOS_SIMULATOR":
+                tgts += StdlibDeploymentTarget.AppleTVSimulator.targets
+            elif sdk == "WATCHOS":
+                tgts += StdlibDeploymentTarget.AppleWatch.targets
+            elif sdk == "WATCHOS_SIMULATOR":
+                tgts += StdlibDeploymentTarget.AppleWatchSimulator.targets
+
+        build_script_opts.append("--stdlib-deployment-targets=" +
+                                 " ".join([tgt.name for tgt in tgts]))
+
     # Filter the swift-sdks parameter
     build_script_impl_opts = [opt for opt in build_script_impl_opts
                               if not opt.startswith("--swift-sdks")]

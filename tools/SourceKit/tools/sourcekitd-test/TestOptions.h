@@ -74,10 +74,12 @@ struct TestOptions {
   std::string USR;
   bool CheckInterfaceIsASCII = false;
   bool UsedSema = false;
+  bool PrintRequest = true;
   bool PrintResponseAsJSON = false;
   bool PrintRawResponse = false;
   bool SimplifiedDemangling = false;
   bool SynthesizedExtensions = false;
+  bool isAsyncRequest = false;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
 };
 

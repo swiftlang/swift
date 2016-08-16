@@ -1037,6 +1037,10 @@ private:
       return createSwiftType(Node::Kind::Structure, "Float");
     if (Mangled.nextIf('i'))
       return createSwiftType(Node::Kind::Structure, "Int");
+    if (Mangled.nextIf('V'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeRawPointer");
+    if (Mangled.nextIf('v'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeMutableRawPointer");
     if (Mangled.nextIf('P'))
       return createSwiftType(Node::Kind::Structure, "UnsafePointer");
     if (Mangled.nextIf('p'))
@@ -1154,6 +1158,76 @@ private:
     return nullptr;
   }
 
+  NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
+    // Generic arguments for the outermost type come first.
+    NodePointer parentOrModule = nominalType->getChild(0);
+
+    if (parentOrModule->getKind() != Node::Kind::Module &&
+        parentOrModule->getKind() != Node::Kind::Function &&
+        parentOrModule->getKind() != Node::Kind::Extension) {
+      parentOrModule = demangleBoundGenericArgs(parentOrModule);
+
+      // Rebuild this type with the new parent type, which may have
+      // had its generic arguments applied.
+      NodePointer result = NodeFactory::create(nominalType->getKind());
+      result->addChild(parentOrModule);
+      result->addChild(nominalType->getChild(1));
+
+      nominalType = result;
+    }
+
+    NodePointer args = NodeFactory::create(Node::Kind::TypeList);
+    while (!Mangled.nextIf('_')) {
+      NodePointer type = demangleType();
+      if (!type)
+        return nullptr;
+      args->addChild(type);
+      if (Mangled.isEmpty())
+        return nullptr;
+    }
+
+    // If there were no arguments at this level there is nothing left
+    // to do.
+    if (args->getNumChildren() == 0)
+      return nominalType;
+
+    // Otherwise, build a bound generic type node from the unbound
+    // type and arguments.
+    NodePointer unboundType = NodeFactory::create(Node::Kind::Type);
+    unboundType->addChild(nominalType);
+
+    Node::Kind kind;
+    switch (nominalType->getKind()) { // look through Type node
+      case Node::Kind::Class:
+        kind = Node::Kind::BoundGenericClass;
+        break;
+      case Node::Kind::Structure:
+        kind = Node::Kind::BoundGenericStructure;
+        break;
+      case Node::Kind::Enum:
+        kind = Node::Kind::BoundGenericEnum;
+        break;
+      default:
+        return nullptr;
+    }
+    NodePointer result = NodeFactory::create(kind);
+    result->addChild(unboundType);
+    result->addChild(args);
+    return result;
+  }
+
+  NodePointer demangleBoundGenericType() {
+    // bound-generic-type ::= 'G' nominal-type (args+ '_')+
+    //
+    // Each level of nominal type nesting has its own list of arguments.
+
+    NodePointer nominalType = demangleNominalType();
+    if (!nominalType)
+      return nullptr;
+
+    return demangleBoundGenericArgs(nominalType);
+  }
+
   NodePointer demangleContext() {
     // context ::= module
     // context ::= entity
@@ -1191,6 +1265,8 @@ private:
       return demangleSubstitutionIndex();
     if (Mangled.nextIf('s'))
       return NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
+    if (Mangled.nextIf('G'))
+      return demangleBoundGenericType();
     if (isStartOfEntity(Mangled.peek()))
       return demangleEntity();
     return demangleModule();
@@ -1872,37 +1948,7 @@ private:
       return demangleFunctionType(Node::Kind::UncurriedFunctionType);
     }
     if (c == 'G') {
-      NodePointer unboundType = demangleType();
-      if (!unboundType)
-        return nullptr;
-      NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
-      while (!Mangled.nextIf('_')) {
-        NodePointer type = demangleType();
-        if (!type)
-          return nullptr;
-        type_list->addChild(type);
-        if (Mangled.isEmpty())
-          return nullptr;
-      }
-      Node::Kind bound_type_kind;
-      switch (unboundType->getChild(0)->getKind()) { // look through Type node
-        case Node::Kind::Class:
-          bound_type_kind = Node::Kind::BoundGenericClass;
-          break;
-        case Node::Kind::Structure:
-          bound_type_kind = Node::Kind::BoundGenericStructure;
-          break;
-        case Node::Kind::Enum:
-          bound_type_kind = Node::Kind::BoundGenericEnum;
-          break;
-        default:
-          return nullptr;
-      }
-      NodePointer type_application =
-          NodeFactory::create(bound_type_kind);
-      type_application->addChild(unboundType);
-      type_application->addChild(type_list);
-      return type_application;
+      return demangleBoundGenericType();
     }
     if (c == 'X') {
       if (Mangled.nextIf('b')) {
@@ -2049,10 +2095,8 @@ private:
 
       return nullptr;
     }
-    if (isStartOfNominalType(c)) {
-      NodePointer nominal_type = demangleDeclarationName(nominalTypeMarkerToNodeKind(c));
-      return nominal_type;
-    }
+    if (isStartOfNominalType(c))
+      return demangleDeclarationName(nominalTypeMarkerToNodeKind(c));
     return nullptr;
   }
 
@@ -2081,7 +2125,6 @@ private:
   // impl-function-attribute ::= 'Cm'            // compatible with Swift method
   // impl-function-attribute ::= 'CO'            // compatible with ObjC method
   // impl-function-attribute ::= 'Cw'            // compatible with protocol witness
-  // impl-function-attribute ::= 'N'             // noreturn
   // impl-function-attribute ::= 'G'             // generic
   NodePointer demangleImplFunctionType() {
     NodePointer type = NodeFactory::create(Node::Kind::ImplFunctionType);
@@ -2103,9 +2146,6 @@ private:
       else
         return nullptr;
     }
-
-    if (Mangled.nextIf('N'))
-      addImplFunctionAttribute(type, "@noreturn");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
@@ -3428,12 +3468,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer type_list = pointer->getChild(0);
     if (!type_list)
       return;
-    bool needs_proto_marker = (type_list->getNumChildren() != 1);
-    if (needs_proto_marker)
-      Printer << "protocol<";
-    printChildren(type_list, ", ");
-    if (needs_proto_marker)
-      Printer << ">";
+    if (type_list->getNumChildren() == 0)
+      Printer << "Any";
+    else
+      printChildren(type_list, " & ");
     return;
   }
   case Node::Kind::Archetype: {

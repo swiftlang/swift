@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
@@ -82,7 +82,68 @@ bb0:
   strong_release %11 : $@box Int
   strong_release %6 : $@box Baz
   strong_release %1 : $@box Foo
+
   return %21 : $@callee_owned () -> Int
+}
+
+// CHECK-LABEL: sil @test_capture_promotion_indirect
+sil @test_capture_promotion_indirect : $@convention(thin) () -> @owned @callee_owned () -> @out Int {
+bb0:
+  %0 = tuple ()
+  %1 = alloc_box $Foo
+  %1a = project_box %1 : $@box Foo
+  %2 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  %3 = metatype $@thick Foo.Type
+  %4 = apply %2(%3) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  store %4 to %1a : $*Foo
+  %6 = alloc_box $Baz
+  %6a = project_box %6 : $@box Baz
+  %7 = function_ref @baz_init : $@convention(thin) (@thin Baz.Type) -> @owned Baz
+  %8 = metatype $@thin Baz.Type
+  %9 = apply %7(%8) : $@convention(thin) (@thin Baz.Type) -> @owned Baz
+  store %9 to %6a : $*Baz
+  %11 = alloc_box $Int
+  %11a = project_box %11 : $@box Int
+  %12 = function_ref @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  %13 = metatype $@thin Int.Type
+  %14 = integer_literal $Builtin.Word, 3
+  %15 = apply %12(%14, %13) : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
+  store %15 to %11a : $*Int
+
+// CHECK-NOT: function_ref @closure_indirect_result :
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2i_i_i_n__closure_indirect_result
+// CHECK-NOT: function_ref @closure_indirect_result :
+
+// The three strong retains are removed
+
+// The Foo variable is loaded from and retained, because it is a reference type
+// CHECK-NEXT: [[LOADFOO:%.*]] = load {{.*}} : $*Foo
+// CHECK-NEXT: strong_retain [[LOADFOO]] : $Foo
+
+// The Baz variable is loaded and retain_value'd, because it is a non-trivial
+// aggregate type
+// CHECK-NEXT: [[LOADBAZ:%.*]] = load {{.*}} : $*Baz
+// CHECK-NEXT: retain_value [[LOADBAZ:%.*]] : $Baz
+
+// The Int variable is loaded only, because it is trivial
+// CHECK-NEXT: [[LOADINT:%.*]] = load {{.*}} : $*Int
+
+// The partial apply has one value argument for each pair of arguments that was
+// previously used to capture and pass the variable by reference
+// CHECK-NEXT: {{.*}} = partial_apply [[CLOSURE_PROMOTE]]([[LOADFOO]], [[LOADBAZ]], [[LOADINT]])
+
+
+  %17 = function_ref @closure_indirect_result : $@convention(thin) (@owned @box Foo, @owned @box Baz, @owned @box Int) -> @out Int
+  strong_retain %1 : $@box Foo
+  strong_retain %6 : $@box Baz
+  strong_retain %11 : $@box Int
+  %21 = partial_apply %17(%1, %6, %11) : $@convention(thin) (@owned @box Foo, @owned @box Baz, @owned @box Int) -> @out Int
+
+  strong_release %11 : $@box Int
+  strong_release %6 : $@box Baz
+  strong_release %1 : $@box Foo
+
+  return %21 : $@callee_owned () -> @out Int
 }
 
 // CHECK-LABEL: sil private @_TTSf2i_i_i__closure0 : $@convention(thin) (@owned Foo, @owned Baz, Int) -> Int
@@ -215,3 +276,30 @@ bb0(%0 : $@box Int, %2 : $@box Int):
 }
 
 sil [transparent] [fragile] @_TFsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
+
+
+sil private @closure_indirect_result : $@convention(thin) (@owned @box Foo, @owned @box Baz, @owned @box Int) -> @out Int {
+bb0(%0: $*Int, %1 : $@box Foo, %2 : $@box Baz, %4 : $@box Int):
+  %17 = project_box %1 : $@box Foo
+  %3 = project_box %2 : $@box Baz
+  %5 = project_box %4 : $@box Int
+  %6 = tuple ()
+  // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
+  %7 = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
+  %8 = load %17 : $*Foo
+  strong_retain %8 : $Foo
+  %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
+  %11 = apply %10(%8) : $@convention(method) (@guaranteed Foo) -> Int
+  %12 = struct_element_addr %3 : $*Baz, #Baz.x
+  %13 = load %12 : $*Int
+  %14 = load %5 : $*Int
+  %15 = apply %7(%11, %13, %14) : $@convention(thin) (Int, Int, Int) -> Int
+  strong_release %4 : $@box Int
+  strong_release %2 : $@box Baz
+  strong_release %1 : $@box Foo
+  store %15 to %0 : $*Int
+  %16 = tuple()
+  return %16 : $()
+}
+
+

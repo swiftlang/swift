@@ -1,5 +1,5 @@
 // RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s -verify
-// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 //
 // This test requires a target of OS X 10.51 or later to test deprecation
 // diagnostics because (1) we only emit deprecation warnings if a symbol is
@@ -21,16 +21,16 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
   // when importing deprecated enums do not themselves trigger deprecation
   // warnings in the synthesized code.
 
-  _ = ClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
-  _ = ClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  _ = DeprecatedOptions.first // expected-warning {{'DeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
-  _ = DeprecatedEnum.first    // expected-warning {{'DeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedOptions.first // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
 }
 
-func useInSignature(options: DeprecatedOptions) { // expected-warning {{'DeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
 }
 
 
@@ -156,7 +156,7 @@ func functionWithDeprecatedMethodInDeadElseBranch() {
     let _ = ClassDeprecatedIn10_9()  // no-warning
   }
 
-  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  if #available(OSX 10.9, *) { // no-warning
   } else {
     // This branch is dead because our minimum deployment target is 10.51.
     let _ = ClassDeprecatedIn10_9()  // no-warning

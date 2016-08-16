@@ -1,7 +1,7 @@
 
 include(AddSwiftUnittests)
 
-if(SWIFT_BUILD_TOOLS)
+if(SWIFT_INCLUDE_TOOLS)
   # We can't link C++ unit tests unless we build the tools.
 
   add_subdirectory(AST)

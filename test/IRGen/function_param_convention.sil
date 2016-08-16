@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -module-name Test | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -module-name Test | %FileCheck %s
 
 import Builtin
 

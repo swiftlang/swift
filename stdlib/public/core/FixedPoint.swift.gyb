@@ -13,6 +13,7 @@
 %{
 
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
 
 #
 # Utility code for later in this template
@@ -50,8 +51,8 @@ public typealias UIntMax = ${UIntMax}
 /// not use it directly.
 @_show_in_interface
 public protocol _Integer
-  : _BuiltinIntegerLiteralConvertible,
-    IntegerLiteralConvertible,
+  : _ExpressibleByBuiltinIntegerLiteral,
+    ExpressibleByIntegerLiteral,
     CustomStringConvertible,
     Hashable,
     IntegerArithmetic,
@@ -203,8 +204,15 @@ T : UnsignedInteger, U : _SignedInteger
 %   OtherSelf = self_ty.get_opposite_signedness().stdlib_name
 %   Article = 'An' if bits == 8 else 'A'
 
+% if self_ty.is_word:
+/// ${'An un' if sign == 'u' else 'A '}signed integer value type.
+///
+/// On 32-bit platforms, `${Self}` is the same size as `${Self}32`, and
+/// on 64-bit platforms, `${Self}` is the same size as `${Self}64`.
+% else:
 /// ${Article} ${bits}-bit ${'un' if sign == 'u' else ''}signed integer value
 /// type.
+% end
 @_fixed_layout
 public struct ${Self}
    : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'},
@@ -256,9 +264,6 @@ public struct ${Self}
   }
 % end
 
-  /// Create an instance initialized to `value`.
-  @_transparent public
-  init(_ value: ${Self}) { self = value }
 
 %  if bits > 8:
   /// Creates an integer from its big-endian representation, changing the
@@ -429,44 +434,72 @@ extension ${Self} {
 extension ${Self} : SignedNumber {}
 % end
 
-// Construction from other integer types
-@_transparent
-extension ${Self} {
+
+%{
+import gyb
+
+fixed_fixed_conversion_function = gyb.parse_template("fixed_fixed_conversion_function",
+"""
+%
+  let src = value._value
+  let result: (value: Builtin.${BuiltinName}, error: Builtin.Int1)
+%
+%       if srcBits == bits and srcSign == sign: # Exact same size/signedness.
+  result = (src, false._value)
+%
+%       elif srcBits == bits:  # Same size, switching signs.
+  result = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(src)
+%
+%       elif srcBits > bits:  # Larger input, check for truncation.
+  result = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(src)
+%
+%       elif srcSigned and not signed: # Smaller size input, signed going to unsigned.
+  let (tmp, signError) = Builtin.s_to_u_checked_conversion_Int${srcBits}(src)
+  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp), signError)
+%
+%       else: # Smaller size input, unsigned to signed or unsigned to unsigned.
+  result = (Builtin.${srcExt}_Int${srcBits}_Int${bits}(src), false._value)
+%       end
+% 
+% if not safelyConvertible:
+  ${error_check}
+% end
+  self._value = result.value
+""")
+}%
+
 % for src_ty in all_integer_types(word_bits):
 %    srcBits = src_ty.bits
 %    srcSigned = src_ty.is_signed
 %    Src = src_ty.stdlib_name
 %    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
-%    if Self != Src:
-  public init(_ v: ${Src}) {
-%
-    let srcNotWord = v._value
-%
-%       if srcBits == bits and srcSign == sign:
-    let dstNotWord = srcNotWord
-%
-%       elif srcBits == bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
-%
-%       elif srcBits > bits:
-    let tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = tmp.0
-%
-%       elif srcSigned and not signed:
-    let tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
-    Builtin.condfail(tmp.1)
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
-%
-%       else:
-    let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
-%       end
-%
-    self._value = dstNotWord
+%    safelyConvertible = (srcBits < bits and (srcSign == sign or signed)) or (srcBits == bits and srcSign == sign)
+
+@_transparent
+extension ${Self} {
+
+  @_transparent
+  public init(_ value: ${Src}) {
+    ${gyb.execute_template(
+        fixed_fixed_conversion_function,
+        error_check="Builtin.condfail(result.error)",
+        **locals()
+        )
+    }
   }
-%    end
+    
+% if safelyConvertible:
+  @available(*, message: "Converting ${Src} to ${Self} will always succeed.")
+% end
+  @_transparent 
+  public init?(exactly value: ${Src}) {
+    ${gyb.execute_template(
+        fixed_fixed_conversion_function,
+        error_check="if Bool(result.error) == true { return nil }",
+        **locals()
+        )
+    }
+  }
 
 %    if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=self_ty):
   /// Construct a `${Self}` having the same bitwise representation as
@@ -476,19 +509,61 @@ extension ${Self} {
   @_transparent
   public init(truncatingBitPattern: ${Src}) {
 %
-    let srcNotWord = truncatingBitPattern._value
+    let src = truncatingBitPattern._value
 %
 %       if self_ty.bits == src_ty.bits:
-    let dstNotWord = srcNotWord
+    let dstNotWord = src
 %       else:
-    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
+    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
 %       end
 %
     self._value = dstNotWord
   }
 
 %    end
+}
 % end
+
+extension ${Self} {
+// Construction of integers from floating point numbers.
+%   for src_type in all_floating_point_types():
+%     Src = src_type.stdlib_name
+%     srcBits = src_type.bits
+%     (lower, upper) = getFtoIBounds(floatBits=srcBits, intBits=int(bits), signed=signed)
+
+%     if srcBits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  /// Creates a new instance by rounding the given floating-point value toward
+  /// zero.
+  ///
+  /// - Parameter other: A floating-point value. When `other` is rounded toward
+  ///   zero, the result must be within the range `${Self}.min...${Self}.max`.
+  @_transparent
+  public init(_ value: ${Src}) {
+    _precondition(value.isFinite,
+      "${Src} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(value > ${str(lower)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(value < ${str(upper)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+
+  /// Creates a ${Self} whose value is `value`
+  /// if no rounding is necessary, nil otherwise.
+  @inline(__always)
+  public init?(exactly value: ${Src}) {
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+    if ${Src}(self) != value {
+      return nil
+    }
+  }
+%     if srcBits == 80:
+#endif
+%     end
+%   end
 
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
@@ -536,7 +611,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 ///
 /// - SeeAlso: `BitwiseOperations`
 @_transparent
-public prefix func ~(rhs: ${Self}) -> ${Self} {
+public prefix func ~ (rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }

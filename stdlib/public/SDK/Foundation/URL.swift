@@ -36,15 +36,15 @@ public struct URLThumbnailSizeKey : RawRepresentable, Hashable {
  As a convenience, volume resource values can be requested from any file system URL. The value returned will reflect the property value for the volume on which the resource is located.
 */
 public struct URLResourceValues {
-    private var _values: [URLResourceKey: AnyObject]
-    private var _keys: Set<URLResourceKey>
+    fileprivate var _values: [URLResourceKey: Any]
+    fileprivate var _keys: Set<URLResourceKey>
     
     public init() {
         _values = [:]
         _keys = []
     }
     
-    private init(keys: Set<URLResourceKey>, values: [URLResourceKey: AnyObject]) {
+    fileprivate init(keys: Set<URLResourceKey>, values: [URLResourceKey: Any]) {
         _values = values
         _keys = keys
     }
@@ -63,7 +63,7 @@ public struct URLResourceValues {
         return (_values[key] as? NSNumber)?.intValue
     }
     
-    private mutating func _set(_ key : URLResourceKey, newValue : AnyObject?) {
+    private mutating func _set(_ key : URLResourceKey, newValue : Any?) {
         _keys.insert(key)
         _values[key] = newValue
     }
@@ -103,7 +103,7 @@ public struct URLResourceValues {
     /// A loosely-typed dictionary containing all keys and values.
     ///
     /// If you have set temporary keys or non-standard keys, you can find them in here.
-    public var allValues : [URLResourceKey : AnyObject] {
+    public var allValues : [URLResourceKey : Any] {
         return _values
     }
     
@@ -220,12 +220,12 @@ public struct URLResourceValues {
     /// An identifier which can be used to compare two file system objects for equality using `isEqual`.
     ///
     /// Two object identifiers are equal if they have the same file system path or if the paths are linked to same inode on the same file system. This identifier is not persistent across system restarts.
-    public var fileResourceIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.fileResourceIdentifierKey) }
+    public var fileResourceIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.fileResourceIdentifierKey) }
     
     /// An identifier that can be used to identify the volume the file system object is on. 
     ///
     /// Other objects on the same volume will have the same volume identifier and can be compared using for equality using `isEqual`. This identifier is not persistent across system restarts.
-    public var volumeIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.volumeIdentifierKey) }
+    public var volumeIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.volumeIdentifierKey) }
     
     /// The optimal block size when reading or writing this file's data, or nil if not available.
     public var preferredIOBlockSize: Int? { return _get(.preferredIOBlockSizeKey) }
@@ -271,7 +271,7 @@ public struct URLResourceValues {
     ///
     /// For URLs which refer to the same file inode, the generation identifier will change when the data in the file's data fork is changed (changes to extended attributes or other file system metadata do not change the generation identifier). For URLs which refer to the same directory inode, the generation identifier will change when direct children of that directory are added, removed or renamed (changes to the data of the direct children of that directory will not change the generation identifier). The generation identifier is persistent across system restarts. The generation identifier is tied to a specific document on a specific volume and is not transferred when the document is copied to another volume. This property is not supported by all volumes.
     @available(OSX 10.10, iOS 8.0, *)
-    public var generationIdentifier: protocol<NSCopying, NSCoding, NSSecureCoding, NSObjectProtocol>? { return _get(.generationIdentifierKey) }
+    public var generationIdentifier: (NSCopying & NSCoding & NSSecureCoding & NSObjectProtocol)? { return _get(.generationIdentifierKey) }
     
     /// The document identifier -- a value assigned by the kernel to a document (which can be either a file or directory) and is used to identify the document regardless of where it gets moved on a volume.
     ///
@@ -286,7 +286,7 @@ public struct URLResourceValues {
 #if os(OSX)
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
-    public var quarantineProperties: [String : AnyObject]? {
+    public var quarantineProperties: [String : Any]? {
         get { return _get(.quarantinePropertiesKey) }
         set { _set(.quarantinePropertiesKey, newValue: newValue as NSObject?) }
     }
@@ -475,19 +475,21 @@ public struct URLResourceValues {
  
  URLs are the preferred way to refer to local files. Most objects that read data from or write data to a file have methods that accept a URL instead of a pathname as the file reference. For example, you can get the contents of a local file URL as `String` by calling `func init(contentsOf:encoding) throws`, or as a `Data` by calling `func init(contentsOf:options) throws`.
 */
-public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
+public struct URL : ReferenceConvertible, Equatable {
     public typealias ReferenceType = NSURL
-    private var _url : NSURL
+    fileprivate var _url : NSURL
     
     public typealias BookmarkResolutionOptions = NSURL.BookmarkResolutionOptions
     public typealias BookmarkCreationOptions = NSURL.BookmarkCreationOptions
 
     /// Initialize with string.
     ///
-    /// Returns `nil` if a `URL` cannot be formed with the string.
+    /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
     public init?(string: String) {
+        guard !string.isEmpty else { return nil }
+        
         if let inner = NSURL(string: string) {
-            _url = inner
+            _url = URL._converted(from: inner)
         } else {
             return nil
         }
@@ -495,10 +497,12 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     
     /// Initialize with string, relative to another URL.
     ///
-    /// Returns `nil` if a `URL` cannot be formed with the string.
-    public init?(string: String, relativeTo url: URL) {
+    /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
+    public init?(string: String, relativeTo url: URL?) {
+        guard !string.isEmpty else { return nil }
+        
         if let inner = NSURL(string: string, relativeTo: url) {
-            _url = inner
+            _url = URL._converted(from: inner)
         } else {
             return nil
         }
@@ -510,7 +514,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     /// - note: This function avoids an extra file system access to check if the file URL is a directory. You should use it if you know the answer already.
     @available(OSX 10.11, iOS 9.0, *)
     public init(fileURLWithPath path: String, isDirectory: Bool, relativeTo base: URL?) {
-        _url = NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory, relativeTo: base)
+        _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory, relativeTo: base))
     }
     
     /// Initializes a newly created file URL referencing the local file or directory at path, relative to a base URL.
@@ -518,7 +522,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     /// If an empty string is used for the path, then the path is assumed to be ".".
     @available(OSX 10.11, iOS 9.0, *)
     public init(fileURLWithPath path: String, relativeTo base: URL?) {
-        _url = NSURL(fileURLWithPath: path.isEmpty ? "." : path, relativeTo: base)
+        _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, relativeTo: base))
     }
     
     /// Initializes a newly created file URL referencing the local file or directory at path.
@@ -526,314 +530,433 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     /// If an empty string is used for the path, then the path is assumed to be ".".
     /// - note: This function avoids an extra file system access to check if the file URL is a directory. You should use it if you know the answer already.
     public init(fileURLWithPath path: String, isDirectory: Bool) {
-        _url = NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory)
+        _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory))
     }
     
     /// Initializes a newly created file URL referencing the local file or directory at path.
     ///
     /// If an empty string is used for the path, then the path is assumed to be ".".
     public init(fileURLWithPath path: String) {
-        _url = NSURL(fileURLWithPath: path.isEmpty ? "." : path)
+        _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path))
     }
     
-    /// Initializes a newly created URL using the contents of the given data, relative to a base URL. If the data representation is not a legal URL string as ASCII bytes, the URL object may not behave as expected.
+    /// Initializes a newly created URL using the contents of the given data, relative to a base URL.
+    ///
+    /// If the data representation is not a legal URL string as ASCII bytes, the URL object may not behave as expected. If the URL cannot be formed then this will return nil.
     @available(OSX 10.11, iOS 9.0, *)
-    public init(dataRepresentation: Data, relativeTo url: URL?, isAbsolute: Bool = false) {
+    public init?(dataRepresentation: Data, relativeTo url: URL?, isAbsolute: Bool = false) {
+        guard dataRepresentation.count > 0 else { return nil }
+        
         if isAbsolute {
-            _url = NSURL(absoluteURLWithDataRepresentation: dataRepresentation, relativeTo: url)
+            _url = URL._converted(from: NSURL(absoluteURLWithDataRepresentation: dataRepresentation, relativeTo: url))
         } else {
-            _url = NSURL(dataRepresentation: dataRepresentation, relativeTo: url)
+            _url = URL._converted(from: NSURL(dataRepresentation: dataRepresentation, relativeTo: url))
         }
     }
 
     /// Initializes a URL that refers to a location specified by resolving bookmark data.
     public init?(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws {
         var stale : ObjCBool = false
-        _url = try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale)
+        _url = URL._converted(from: try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale))
         bookmarkDataIsStale = stale.boolValue
     }
     
-    /// Creates and initializes a NSURL that refers to the location specified by resolving the alias file at url. If the url argument does not refer to an alias file as defined by the NSURLIsAliasFileKey property, the NSURL returned is the same as url argument. This method fails and returns nil if the url argument is unreachable, or if the original file or directory could not be located or is not reachable, or if the original file or directory is on a volume that could not be located or mounted. The URLBookmarkResolutionWithSecurityScope option is not supported by this method.
+    /// Creates and initializes an NSURL that refers to the location specified by resolving the alias file at url. If the url argument does not refer to an alias file as defined by the NSURLIsAliasFileKey property, the NSURL returned is the same as url argument. This method fails and returns nil if the url argument is unreachable, or if the original file or directory could not be located or is not reachable, or if the original file or directory is on a volume that could not be located or mounted. The URLBookmarkResolutionWithSecurityScope option is not supported by this method.
     @available(OSX 10.10, iOS 8.0, *)
     public init(resolvingAliasFileAt url: URL, options: BookmarkResolutionOptions = []) throws {
-        _url = try NSURL(resolvingAliasFileAt: url, options: options)
+        self.init(reference: try NSURL(resolvingAliasFileAt: url, options: options))
     }
 
     /// Initializes a newly created URL referencing the local file or directory at the file system representation of the path. File system representation is a null-terminated C string with canonical UTF-8 encoding.
-    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeToURL baseURL: URL?) {
-        _url = NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL)
+    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: URL?) {
+        _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
     
-    // MARK: -
-    
-    public var description: String {
-        return _url.description
-    }
-
-    public var debugDescription: String {
-        return _url.debugDescription
-    }
-
-    public var hashValue : Int {
+    public var hashValue: Int {
         return _url.hash
     }
     
     // MARK: -
     
-    /// Returns the data representation of the URL's relativeString. If the URL was initialized with -initWithData:relativeToURL:, the data representation returned are the same bytes as those used at initialization; otherwise, the data representation returned are the bytes of the relativeString encoded with NSUTF8StringEncoding.
+    /// Returns the data representation of the URL's relativeString. 
+    ///
+    /// If the URL was initialized with `init?(dataRepresentation:relativeTo:isAbsolute:)`, the data representation returned are the same bytes as those used at initialization; otherwise, the data representation returned are the bytes of the `relativeString` encoded with UTF8 string encoding.
     @available(OSX 10.11, iOS 9.0, *)
-    public var dataRepresentation: Data { return _url.dataRepresentation as Data }
+    public var dataRepresentation: Data {
+        return _url.dataRepresentation
+    }
     
-    public var absoluteString: String? { return _url.absoluteString }
+    // MARK: -
     
-    /// The relative portion of a URL.  If baseURL is nil, or if the receiver is itself absolute, this is the same as absoluteString
-    public var relativeString: String { return _url.relativeString }
-    public var baseURL: URL? { return _url.baseURL }
+    // Future implementation note:
+    // NSURL (really CFURL, which provides its implementation) has quite a few quirks in its processing of some more esoteric (and some not so esoteric) strings. We would like to move much of this over to the more modern NSURLComponents, but binary compat concerns have made this difficult.
+    // Hopefully soon, we can replace some of the below delegation to NSURL with delegation to NSURLComponents instead. It cannot be done piecemeal, because otherwise we will get inconsistent results from the API.
     
-    /// If the receiver is itself absolute, this will return self.
-    public var absoluteURL: URL? {  return _url.absoluteURL }
+    /// Returns the absolute string for the URL.
+    public var absoluteString: String {
+        if let string = _url.absoluteString {
+            return string
+        } else {
+            // This should never fail for non-file reference URLs
+            return ""
+        }
+    }
     
-    /// Any URL is composed of these two basic pieces.  The full URL would be the concatenation of `myURL.scheme, ':', myURL.resourceSpecifier`.
-    public var scheme: String? { return _url.scheme }
-    
-    /// Any URL is composed of these two basic pieces.  The full URL would be the concatenation of `myURL.scheme, ':', myURL.resourceSpecifier`.
-    public var resourceSpecifier: String? { return _url.resourceSpecifier }
-    
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// The relative portion of a URL.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var host: String? { return _url.host }
+    /// If `baseURL` is nil, or if the receiver is itself absolute, this is the same as `absoluteString`.
+    public var relativeString: String {
+        return _url.relativeString
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// Returns the base URL.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var port: Int? { return _url.port?.intValue }
+    /// If the URL is itself absolute, then this value is nil.
+    public var baseURL: URL? {
+        return _url.baseURL
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// Returns the absolute URL.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var user: String? { return _url.user }
+    /// If the URL is itself absolute, this will return self.
+    public var absoluteURL: URL {
+        if let url = _url.absoluteURL {
+            return url
+        } else {
+            // This should never fail for non-file reference URLs
+            return self
+        }
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    // MARK: -
+    
+    /// Returns the scheme of the URL.
+    public var scheme: String? {
+        return _url.scheme
+    }
+    
+    /// Returns true if the scheme is `file:`.
+    public var isFileURL: Bool {
+        return _url.isFileURL
+    }
+
+    // This thing was never really part of the URL specs
+    @available(*, unavailable, message: "Use `path`, `query`, and `fragment` instead")
+    public var resourceSpecifier: String {
+        fatalError()
+    }
+    
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the host component of the URL; otherwise it returns nil.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var password: String? { return _url.password }
+    /// - note: This function will resolve against the base `URL`.
+    public var host: String? {
+        return _url.host
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the port component of the URL; otherwise it returns nil.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var path: String? { return _url.path }
+    /// - note: This function will resolve against the base `URL`.
+    public var port: Int? {
+        return _url.port?.intValue
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the user component of the URL; otherwise it returns nil.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var fragment: String? { return _url.fragment }
+    /// - note: This function will resolve against the base `URL`.
+    public var user: String? {
+        return _url.user
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the password component of the URL; otherwise it returns nil.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var parameterString: String? { return _url.parameterString }
+    /// - note: This function will resolve against the base `URL`.
+    public var password: String? {
+        return _url.password
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the path component of the URL; otherwise it returns an empty string.
     ///
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var query: String? { return _url.query }
+    /// If the URL contains a parameter string, it is appended to the path with a `;`.
+    /// - note: This function will resolve against the base `URL`.
+    /// - returns: The path, or an empty string if the URL has an empty path.
+    public var path: String {
+        if let parameterString = _url.parameterString {
+            if let path = _url.path {
+                return path + ";" + parameterString
+            } else {
+                return ";" + parameterString
+            }
+        } else if let path = _url.path {
+            return path
+        } else {
+            return ""
+        }
+    }
     
-    /// If the URL conforms to rfc 1808 (the most common form of URL), returns a component of the URL; otherwise it returns nil.
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the relative path of the URL; otherwise it returns nil.
     ///
     /// This is the same as path if baseURL is nil.
-    /// The litmus test for conformance is as recommended in RFC 1808 - whether the first two characters of resourceSpecifier is "//".  In all cases, they return the component's value after resolving the receiver against its base URL.
-    public var relativePath: String? { return _url.relativePath }
+    /// If the URL contains a parameter string, it is appended to the path with a `;`.
+    ///
+    /// - note: This function will resolve against the base `URL`.
+    /// - returns: The relative path, or an empty string if the URL has an empty path.
+    public var relativePath: String {
+        if let parameterString = _url.parameterString {
+            if let path = _url.relativePath {
+                return path + ";" + parameterString
+            } else {
+                return ";" + parameterString
+            }
+        } else if let path = _url.relativePath {
+            return path
+        } else {
+            return ""
+        }
+    }
+
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the fragment component of the URL; otherwise it returns nil.
+    ///
+    /// - note: This function will resolve against the base `URL`.
+    public var fragment: String? {
+        return _url.fragment
+    }
     
+    @available(*, unavailable, message: "use the 'path' property")
+    public var parameterString: String? {
+        fatalError()
+    }
+    
+    /// If the URL conforms to RFC 1808 (the most common form of URL), returns the query of the URL; otherwise it returns nil.
+    ///
+    /// - note: This function will resolve against the base `URL`.
+    public var query: String? {
+        return _url.query
+    }
+    
+    /// Returns true if the URL path represents a directory.
     @available(OSX 10.11, iOS 9.0, *)
-    public var hasDirectoryPath: Bool { return _url.hasDirectoryPath }
+    public var hasDirectoryPath: Bool {
+        return _url.hasDirectoryPath
+    }
     
     /// Passes the URL's path in file system representation to `block`. 
     /// 
     /// File system representation is a null-terminated C string with canonical UTF-8 encoding.
     /// - note: The pointer is not valid outside the context of the block.
     @available(OSX 10.9, iOS 7.0, *)
-    public func withUnsafeFileSystemRepresentation(_ block: @noescape (UnsafePointer<Int8>) throws -> Void) rethrows {
-        try block(_url.fileSystemRepresentation)
+    public func withUnsafeFileSystemRepresentation<ResultType>(_ block: (UnsafePointer<Int8>?) throws -> ResultType) rethrows -> ResultType {
+        return try block(_url.fileSystemRepresentation)
     }
     
-    /// Whether the scheme is file:; if `myURL.isFileURL` is `true`, then `myURL.path` is suitable for input into `FileManager` or `PathUtilities`.
-    public var isFileURL: Bool {
-        return _url.isFileURL
+    // MARK: -
+    // MARK: Path manipulation
+    
+    /// Returns the path components of the URL, or an empty array if the path is an empty string.
+    public var pathComponents: [String] {
+        // In accordance with our above change to never return a nil path, here we return an empty array.
+        return _url.pathComponents ?? []
     }
     
-    public func standardized() throws -> URL {
-        if let result = _url.standardized.map({ URL(reference: $0 as NSURL) }) {
-            return result;
-        } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
-        }
+    /// Returns the last path component of the URL, or an empty string if the path is an empty string.
+    public var lastPathComponent: String {
+        return _url.lastPathComponent ?? ""
     }
     
-    /// Returns a file reference URL that refers to the same resource as a specified file URL.
+    /// Returns the path extension of the URL, or an empty string if the path is an empty string.
+    public var pathExtension: String {
+        return _url.pathExtension ?? ""
+    }
+    
+    /// Returns a URL constructed by appending the given path component to self.
     ///
-    /// File reference URLs use a URL path syntax that identifies a file system object by reference, not by path. This form of file URL remains valid when the file system path of the URL's underlying resource changes. An error will occur if the url parameter is not a file URL. File reference URLs cannot be created to file system objects which do not exist or are not reachable. In some areas of the file system hierarchy, file reference URLs cannot be generated to the leaf node of the URL path. A file reference URL's path should never be persistently stored because is not valid across system restarts, and across remounts of volumes -- if you want to create a persistent reference to a file system object, use a bookmark.
-    /// - seealso: func bookmarkData(options: BookmarkCreationOptions = [], includingResourceValuesForKeys keys: Set<URLResourceKey>? = nil, relativeTo url: URL? = nil) throws -> Data
-    public func fileReferenceURL() throws -> URL {
-        if let result = _url.fileReferenceURL().map({ URL(reference: $0 as NSURL) }) {
-            return result as URL
-        } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
-        }
-    }
-    
-    /// Returns `true` if the URL is a file reference URL.
-    public var isFileReferenceURL : Bool {
-        return _url.isFileReferenceURL()
-    }
-    
-    /// Returns a file path URL that refers to the same resource as a specified URL. 
-    ///
-    /// File path URLs use a file system style path. A file reference URL's resource must exist and be reachable to be converted to a file path URL.
-    public func filePathURL() throws -> URL {
-        if let result = _url.filePathURL.map({ URL(reference: $0 as NSURL) }) {
+    /// - parameter pathComponent: The path component to add.
+    /// - parameter isDirectory: If `true`, then a trailing `/` is added to the resulting path.
+    public func appendingPathComponent(_ pathComponent: String, isDirectory: Bool) -> URL {
+        if let result = _url.appendingPathComponent(pathComponent, isDirectory: isDirectory) {
             return result
         } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+            // Now we need to do something more expensive
+            if var c = URLComponents(url: self, resolvingAgainstBaseURL: true) {
+                c.path = (c.path as NSString).appendingPathComponent(pathComponent)
+                
+                if let result = c.url {
+                    return result
+                } else {
+                    // Couldn't get url from components
+                    // Ultimate fallback:
+                    return self
+                }
+            } else {
+                return self
+            }
         }
     }
     
-    public var pathComponents: [String]? { return _url.pathComponents }
-    
-    public var lastPathComponent: String? { return _url.lastPathComponent }
-    
-    public var pathExtension: String? { return _url.pathExtension }
-    
-    public func appendingPathComponent(_ pathComponent: String, isDirectory: Bool) throws -> URL {
-        // TODO: Use URLComponents to handle an empty-path case
-        /*
-         URLByAppendingPathComponent can return nil if:
-         * the URL does not have a path component. (see note 1)
-         * a mutable copy of the URLs string could not be created.
-         * a percent-encoded string of the new path component could not created using the same encoding as the URL's string. (see note 2)
-         * a new URL object could not be created with the modified URL string.
-         
-         Note 1: If NS/CFURL parsed URLs correctly, this would not occur because URL strings always have a path component. For example, the URL <mailto:user@example.com> should be parsed as Scheme="mailto", and Path= "user@example.com". Instead, CFURL returns false for CFURLCanBeDecomposed(), says Scheme="mailto", Path=nil, and ResourceSpecifier="user@example.com". rdar://problem/15060399
-         
-         Note 2: CFURLCreateWithBytes() and CFURLCreateAbsoluteURLWithBytes() allow URLs to be created with an array of bytes and a CFStringEncoding. All other CFURL functions and URL methods which create URLs use kCFStringEncodingUTF8/NSUTF8StringEncoding. So, the encoding passed to CFURLCreateWithBytes/CFURLCreateAbsoluteURLWithBytes might prevent the percent-encoding of the new path component or path extension.
-         */
-        guard let result = _url.appendingPathComponent(pathComponent, isDirectory: isDirectory) else {
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+    /// Returns a URL constructed by appending the given path component to self.
+    ///
+    /// - note: This function performs a file system operation to determine if the path component is a directory. If so, it will append a trailing `/`. If you know in advance that the path component is a directory or not, then use `func appendingPathComponent(_:isDirectory:)`.
+    /// - parameter pathComponent: The path component to add.
+    public func appendingPathComponent(_ pathComponent: String) -> URL {
+        if let result = _url.appendingPathComponent(pathComponent) {
+            return result
+        } else {
+            // Now we need to do something more expensive
+            if var c = URLComponents(url: self, resolvingAgainstBaseURL: true) {
+                c.path = (c.path as NSString).appendingPathComponent(pathComponent)
+                
+                if let result = c.url {
+                    return result
+                } else {
+                    // Couldn't get url from components
+                    // Ultimate fallback:
+                    return self
+                }
+            } else {
+                // Ultimate fallback:
+                return self
+            }
         }
-        return result
-    }
-    public mutating func appendPathComponent(_ pathComponent: String, isDirectory: Bool) throws {
-        self = try appendingPathComponent(pathComponent, isDirectory: isDirectory)
     }
     
-    public func appendingPathComponent(_ pathComponent: String) throws -> URL {
-        guard let result = _url.appendingPathComponent(pathComponent) else {
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+    /// Returns a URL constructed by removing the last path component of self.
+    ///
+    /// This function may either remove a path component or append `/..`.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will return the URL unchanged.
+    public func deletingLastPathComponent() -> URL {
+        // This is a slight behavior change from NSURL, but better than returning "http://www.example.com../".
+        if path.isEmpty {
+            return self
         }
-        return result
-    }
-    public mutating func appendPathComponent(_ pathComponent: String) throws {
-        self = try appendingPathComponent(pathComponent)        
-    }
-
-    public func deletingLastPathComponent() throws -> URL {
-        /*
-         URLByDeletingLastPathComponent can return nil if:
-         * the URL is a file reference URL which cannot be resolved back to a path.
-         * the URL does not have a path component. (see note 1)
-         * a mutable copy of the URLs string could not be created.
-         * a new URL object could not be created with the modified URL string.
-         */
+        
         if let result = _url.deletingLastPathComponent.map({ URL(reference: $0 as NSURL) }) {
             return result
         } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+            return self
         }
     }
-    public mutating func deleteLastPathComponent() throws {
-        let result = try deletingLastPathComponent()
-        self = result
-    }
     
-    public func appendingPathExtension(_ pathExtension: String) throws -> URL {
-        /*
-         URLByAppendingPathExtension can return nil if:
-         * the new path extension is not a valid extension (see _CFExtensionIsValidToAppend)
-         * the URL is a file reference URL which cannot be resolved back to a path.
-         * the URL does not have a path component. (see note 1)
-         * a mutable copy of the URLs string could not be created.
-         * a percent-encoded string of the new path extension could not created using the same encoding as the URL's string. (see note 1))
-         * a new URL object could not be created with the modified URL string.
-         */
-        guard let result = _url.appendingPathExtension(pathExtension) else {
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+    /// Returns a URL constructed by appending the given path extension to self.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will return the URL unchanged.
+    ///
+    /// Certain special characters (for example, Unicode Right-To-Left marks) cannot be used as path extensions. If any of those are contained in `pathExtension`, the function will return the URL unchanged.
+    /// - parameter pathExtension: The extension to append.
+    public func appendingPathExtension(_ pathExtension: String) -> URL {
+        if path.isEmpty {
+            return self
         }
-        return result
-    }
-    public mutating func appendPathExtension(_ pathExtension: String) throws {
-        self = try appendingPathExtension(pathExtension)
+        
+        if let result = _url.appendingPathExtension(pathExtension) {
+            return result
+        } else {
+            return self
+        }
     }
     
-    public func deletingPathExtension() throws -> URL {
-        /*
-         URLByDeletingPathExtension can return nil if:
-         * the URL is a file reference URL which cannot be resolved back to a path.
-         * the URL does not have a path component. (see note 1)
-         * a mutable copy of the URLs string could not be created.
-         * a new URL object could not be created with the modified URL string.
-         */
+    /// Returns a URL constructed by removing any path extension.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will return the URL unchanged.
+    public func deletingPathExtension() -> URL {
+        if path.isEmpty {
+            return self
+        }
+
         if let result = _url.deletingPathExtension.map({ URL(reference: $0 as NSURL) }) {
             return result
         } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
-        }
-    }
-    public mutating func deletePathExtension() throws {
-        let result = try deletingPathExtension()
-        self = result
-    }
-    
-    public func standardizingPath() throws -> URL {
-        /*
-         URLByStandardizingPath can return nil if:
-         * the URL is a file reference URL which cannot be resolved back to a path.
-         * a new URL object could not be created with the standardized path).
-         */
-        if let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
-        }
-    }
-    public mutating func standardizePath() throws {
-        let result = try standardizingPath()
-        self = result
-    }
-    
-    public func resolvingSymlinksInPath() throws -> URL {
-        /*
-         URLByResolvingSymlinksInPath can return nil if:
-         * the URL is a file reference URL which cannot be resolved back to a path.
-         * NSPathUtilities' stringByResolvingSymlinksInPath property returns nil.
-         * a new URL object could not be created with the resolved path).
-         */
-        if let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) {
-            return result
-        } else {
-            // TODO: We need to call into CFURL to figure out the error
-            throw NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError, userInfo: [:])
+            return self
         }
     }
 
-    public mutating func resolveSymlinksInPath() throws {
-        let result = try resolvingSymlinksInPath()
-        self = result
+    /// Appends a path component to the URL.
+    ///
+    /// - parameter pathComponent: The path component to add.
+    /// - parameter isDirectory: Use `true` if the resulting path is a directory.
+    public mutating func appendPathComponent(_ pathComponent: String, isDirectory: Bool) {
+        self = appendingPathComponent(pathComponent, isDirectory: isDirectory)
+    }
+    
+    /// Appends a path component to the URL.
+    ///
+    /// - note: This function performs a file system operation to determine if the path component is a directory. If so, it will append a trailing `/`. If you know in advance that the path component is a directory or not, then use `func appendingPathComponent(_:isDirectory:)`.
+    /// - parameter pathComponent: The path component to add.
+    public mutating func appendPathComponent(_ pathComponent: String) {
+        self = appendingPathComponent(pathComponent)
+    }
+    
+    /// Appends the given path extension to self.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will do nothing.
+    /// Certain special characters (for example, Unicode Right-To-Left marks) cannot be used as path extensions. If any of those are contained in `pathExtension`, the function will return the URL unchanged.
+    /// - parameter pathExtension: The extension to append.
+    public mutating func appendPathExtension(_ pathExtension: String) {
+        self = appendingPathExtension(pathExtension)
+    }
+
+    /// Returns a URL constructed by removing the last path component of self.
+    ///
+    /// This function may either remove a path component or append `/..`.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will do nothing.
+    public mutating func deleteLastPathComponent() {
+        self = deletingLastPathComponent()
+    }
+    
+
+    /// Returns a URL constructed by removing any path extension.
+    ///
+    /// If the URL has an empty path (e.g., `http://www.example.com`), then this function will do nothing.
+    public mutating func deletePathExtension() {
+        self = deletingPathExtension()
+    }
+    
+    /// Returns a `URL` with any instances of ".." or "." removed from its path.
+    public var standardized : URL {
+        // The NSURL API can only return nil in case of file reference URL, which we should not be
+        if let result = _url.standardized.map({ URL(reference: $0 as NSURL) }) {
+            return result
+        } else {
+            return self
+        }
+    }
+    
+    /// Standardizes the path of a file URL.
+    ///
+    /// If the `isFileURL` is false, this method does nothing.
+    public mutating func standardize() {
+        self = self.standardized
+    }
+    
+    /// Standardizes the path of a file URL.
+    ///
+    /// If the `isFileURL` is false, this method returns `self`.
+    public var standardizedFileURL : URL {
+        // NSURL should not return nil here unless this is a file reference URL, which should be impossible
+        if let result = _url.standardizingPath.map({ URL(reference: $0 as NSURL) }) {
+            return result
+        } else {
+            return self
+        }
+    }
+    
+    /// Resolves any symlinks in the path of a file URL.
+    ///
+    /// If the `isFileURL` is false, this method returns `self`.
+    public func resolvingSymlinksInPath() -> URL {
+        // NSURL should not return nil here unless this is a file reference URL, which should be impossible
+        if let result = _url.resolvingSymlinksInPath.map({ URL(reference: $0 as NSURL) }) {
+            return result
+        } else {
+            return self
+        }
+    }
+
+    /// Resolves any symlinks in the path of a file URL.
+    ///
+    /// If the `isFileURL` is false, this method does nothing.
+    public mutating func resolveSymlinksInPath() {
+        self = self.resolvingSymlinksInPath()
     }
 
     // MARK: - Reachability
@@ -892,7 +1015,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     /// Temporary resource values are for client use. Temporary resource values exist only in memory and are never written to the resource's backing store. Once set, a temporary resource value can be copied from the URL object with `func resourceValues(forKeys:)`. The values are stored in the loosely-typed `allValues` dictionary property.
     ///
     /// To remove a temporary resource value from the URL object, use `func removeCachedResourceValue(forKey:)`. Care should be taken to ensure the key that identifies a temporary resource value is unique and does not conflict with system defined keys (using reverse domain name notation in your temporary resource value keys is recommended). This method is currently applicable only to URLs for file system resources.
-    public mutating func setTemporaryResourceValue(_ value : AnyObject, forKey key: URLResourceKey) {
+    public mutating func setTemporaryResourceValue(_ value : Any, forKey key: URLResourceKey) {
         _url.setTemporaryResourceValue(value, forKey: key)
     }
     
@@ -927,6 +1050,26 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         return URLResourceValues(keys: keys, values: try _url.promisedItemResourceValues(forKeys: Array(keys)))
     }
     
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func setResourceValue(_ value: AnyObject?, forKey key: URLResourceKey) throws {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func setResourceValues(_ keyedValues: [URLResourceKey : AnyObject]) throws {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.resourceValues(forKeys:) instead")
+    public func resourceValues(forKeys keys: [URLResourceKey]) throws -> [URLResourceKey : AnyObject] {
+        fatalError()
+    }
+    
+    @available(*, unavailable, message: "Use struct URLResourceValues and URL.setResourceValues(_:) instead")
+    public func getResourceValue(_ value: AutoreleasingUnsafeMutablePointer<AnyObject?>, forKey key: URLResourceKey) throws {
+        fatalError()
+    }
+    
     // MARK: - Bookmarks and Alias Files
     
     /// Returns bookmark data for the URL, created with specified options and resource values.
@@ -952,7 +1095,7 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
         return result as Data
     }
     
-    /// Given a NSURL created by resolving a bookmark data created with security scope, make the resource referenced by the url accessible to the process. When access to this resource is no longer needed the client must call stopAccessingSecurityScopedResource. Each call to startAccessingSecurityScopedResource must be balanced with a call to stopAccessingSecurityScopedResource (Note: this is not reference counted).
+    /// Given an NSURL created by resolving a bookmark data created with security scope, make the resource referenced by the url accessible to the process. When access to this resource is no longer needed the client must call stopAccessingSecurityScopedResource. Each call to startAccessingSecurityScopedResource must be balanced with a call to stopAccessingSecurityScopedResource (Note: this is not reference counted).
     @available(OSX 10.7, iOS 8.0, *)
     public func startAccessingSecurityScopedResource() -> Bool {
         return _url.startAccessingSecurityScopedResource()
@@ -966,37 +1109,44 @@ public struct URL : ReferenceConvertible, CustomStringConvertible, Equatable {
     
     // MARK: - Bridging Support
     
-    private init(reference: NSURL) {
-        _url = reference.copy() as! NSURL
+    /// We must not store an NSURL without running it through this function. This makes sure that we do not hold a file reference URL, which changes the nullability of many NSURL functions.
+    private static func _converted(from url: NSURL) -> NSURL {
+        // Future readers: file reference URL here is not the same as playgrounds "file reference"
+        if url.isFileReferenceURL() {
+            // Convert to a file path URL, or use an invalid scheme
+            return (url.filePathURL ?? URL(string: "com-apple-unresolvable-file-reference-url:")!) as NSURL
+        } else {
+            return url
+        }
+    }
+    
+    fileprivate init(reference: NSURL) {
+        _url = URL._converted(from: reference).copy() as! NSURL
     }
     
     private var reference : NSURL {
         return _url
     }
-}
 
-public func ==(lhs: URL, rhs: URL) -> Bool {
-    return lhs.reference.isEqual(rhs.reference)
+    public static func ==(lhs: URL, rhs: URL) -> Bool {
+        return lhs.reference.isEqual(rhs.reference)
+    }
 }
 
 extension URL : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSURL {
         return _url
     }
     
-    public static func _forceBridgeFromObjectiveC(_ x: NSURL, result: inout URL?) {
-        if !_conditionallyBridgeFromObjectiveC(x, result: &result) {
+    public static func _forceBridgeFromObjectiveC(_ source: NSURL, result: inout URL?) {
+        if !_conditionallyBridgeFromObjectiveC(source, result: &result) {
             fatalError("Unable to bridge \(_ObjectiveCType.self) to \(self)")
         }
     }
     
-    public static func _conditionallyBridgeFromObjectiveC(_ x: NSURL, result: inout URL?) -> Bool {
-        result = URL(reference: x)
+    public static func _conditionallyBridgeFromObjectiveC(_ source: NSURL, result: inout URL?) -> Bool {
+        result = URL(reference: source)
         return true
     }
 
@@ -1007,13 +1157,27 @@ extension URL : _ObjectiveCBridgeable {
     }
 }
 
+extension URL : CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        return _url.description
+    }
+    
+    public var debugDescription: String {
+        return _url.debugDescription
+    }
+}
+
+extension NSURL : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URL)
+    }
+}
+
 extension URL : CustomPlaygroundQuickLookable {
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
-        if let str = absoluteString {
-            return .url(str)
-        } else {
-            return .text(self.description)
-        }
+        return .url(absoluteString)
     }
 }
 
@@ -1021,9 +1185,9 @@ extension URL : CustomPlaygroundQuickLookable {
 // File references, for playgrounds.
 //===----------------------------------------------------------------------===//
 
-extension URL : _FileReferenceLiteralConvertible {
+extension URL : _ExpressibleByFileReferenceLiteral {
   public init(fileReferenceLiteralResourceName name: String) {
-    self = Bundle.main().urlForResource(name, withExtension: nil)!
+    self = Bundle.main.url(forResource: name, withExtension: nil)!
   }
 }
 

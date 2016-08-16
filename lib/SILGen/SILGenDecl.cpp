@@ -918,10 +918,6 @@ struct InitializationForPattern
   InitializationPtr visitExprPattern(ExprPattern *P) {
     return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
   }
-  InitializationPtr visitNominalTypePattern(NominalTypePattern *P) {
-    P->dump();
-    llvm_unreachable("pattern not supported in let/else yet");
-  }
 };
 
 } // end anonymous namespace
@@ -1248,6 +1244,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
     llvm_unreachable("Not a valid external definition for SILGen");
   }
@@ -1454,8 +1451,8 @@ public:
       isFragile = IsFragile;
     if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
       if (nominal->hasFixedLayout() &&
-          proto->getEffectiveAccess() == Accessibility::Public &&
-          nominal->getEffectiveAccess() == Accessibility::Public)
+          proto->getEffectiveAccess() >= Accessibility::Public &&
+          nominal->getEffectiveAccess() >= Accessibility::Public)
         isFragile = IsFragile;
 
     // Check if we already have a declaration or definition for this witness
@@ -1839,7 +1836,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     // For default implementations, Self is the protocol archetype.
     } else {
       auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-      selfType = proto->getProtocolSelf()->getArchetype();
+      selfType = proto->getSelfTypeInContext();
     }
   }
 

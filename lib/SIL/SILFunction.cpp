@@ -89,7 +89,6 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     LoweredType(LoweredType),
     // FIXME: Context params should be independent of the function type.
     ContextGenericParams(contextGenericParams),
-    Location(Loc),
     DeclCtx(DC),
     DebugScope(DebugScope),
     Bare(isBareSILFunction),
@@ -293,6 +292,11 @@ Type SILFunction::mapTypeOutOfContext(Type type) const {
   return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
                                                getContextGenericParams(),
                                                type);
+}
+
+bool SILFunction::isNoReturnFunction() const {
+  return SILType::getPrimitiveObjectType(getLoweredFunctionType())
+      .isNoReturnFunction();
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

@@ -14,7 +14,7 @@ public class C {
   public let aMetatype: C.Type
   public let aFunction: (C, S, E, Int) -> (Int)
   public let aFunctionWithVarArgs: (C, S...) -> ()
-  public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aTupleWithLabels: (a: C, s: S, e: E), aMetatype: C.Type, aFunction: (C, S, E, Int) -> Int, aFunctionWithVarArgs: (C, S...) -> ()) {
+  public init(aClass: C, aStruct: S, anEnum: E, aTuple: (C, S, E, Int), aTupleWithLabels: (a: C, s: S, e: E), aMetatype: C.Type, aFunction: @escaping (C, S, E, Int) -> Int, aFunctionWithVarArgs: @escaping (C, S...) -> ()) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum

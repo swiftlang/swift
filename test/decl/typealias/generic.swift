@@ -1,8 +1,30 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift -enable-experimental-nested-generic-types
 
-struct MyType<TyA, TyB> {
+struct MyType<TyA, TyB> { // expected-note {{declared here}}
   var a : TyA, b : TyB
 }
+
+//
+// Type aliases that reference unbound generic types -- not really generic,
+// but they behave as such, in the sense that you can apply generic
+// arguments to them.
+//
+
+// FIXME: This should work?
+typealias OurType = MyType  // expected-error {{reference to generic type 'MyType' requires arguments in <...>}}
+
+typealias YourType = Swift.Optional
+
+struct Container {
+  typealias YourType = Swift.Optional
+}
+
+let _ : YourType<Int>
+let _ : Container.YourType<Int>
+
+//
+// Bona-fide generic type aliases
+//
 
 typealias DS<T> = MyType<String, T>
 
@@ -94,20 +116,110 @@ func f(a : MyTypeWithHashable<Int, Int>) {
 }
 
 
-
-
-// FIXME: Nested generic typealiases aren't working yet.
-struct GenericStruct<T> {
+// Unqualified lookup of generic typealiases nested inside generic contexts
+class GenericClass<T> {
   typealias TA<U> = MyType<T, U>
+  typealias TAI<U> = MyType<Int, U>
   
-  func testCapture<S>(s : S, t : T) -> TA<S> {  // expected-error {{cannot specialize non-generic type 'MyType<T, U>'}}
-    return TA<S>(a: t, b : s)
+  func testCapture<S>(s: S, t: T) -> TA<S> {
+    return TA<S>(a: t, b: s)
+  }
+
+  func testCaptureUnbound<S>(s: S, t: T) -> TA<S> {
+    return TA(a: t, b: s)
+  }
+
+  func testConcrete1(s: Int, t: T) -> TA<Int> {
+    return TA<Int>(a: t, b: s)
+  }
+
+  func testConcreteUnbound1(s: Int, t: T) -> TA<Int> {
+    return TA(a: t, b: s)
+  }
+
+  func testConcrete2(s: Float, t: Int) -> TAI<Float> {
+    return TAI<Float>(a: t, b: s)
+  }
+
+  func testConcreteUnbound2(s: Float, t: Int) -> TAI<Float> {
+    return TAI(a: t, b: s)
+  }
+
+  // FIXME: Would be nice to preserve sugar here
+
+  func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'MyType<T, Int>'}}
+  }
+
+  func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
+    return TA(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, Int>' to return type 'MyType<T, S>'}}
+  }
+
+  struct NestedStruct<U> {
+    typealias TA<V> = MyType<(T, V), (U, V)>
+
+    func testCapture<S>(x: (T, S), y: (U, S)) -> TA<S> {
+      return TA(a: x, b: y)
+    }
   }
 }
 
-let _ = GenericStruct<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
+let gc = GenericClass<Double>()
+let fn: MyType<Double, Int> = gc.testCapture(s: 1, t: 1.0)
 
-let _ : GenericStruct<Int>.TA<Float>  // expected-error {{cannot specialize non-generic type 'MyType<Int, U>'}}
+func use<T>(_ t: T) {}
+use(fn)
+
+// Make sure we apply base substitutions to the interface type of the typealias
+class ConcreteClass : GenericClass<String> {
+  func testSubstitutedCapture1<S>(s: S, t: String) -> TA<S> {
+    return TA<S>(a: t, b: s)
+  }
+
+  func testSubstitutedCapture2<S>(s: S, t: String) -> TA<S> {
+    return TA(a: t, b: s)
+  }
+
+  func testSubstitutedCapture3(s: Int, t: String) -> TA<Int> {
+    return TA<Int>(a: t, b: s)
+  }
+
+  func testSubstitutedCapture4(s: Int, t: String) -> TA<Int> {
+    return TA(a: t, b: s)
+  }
+
+  func testSubstitutedCapture5(s: Float, t: Int) -> TAI<Float> {
+    return TAI<Float>(a: t, b: s)
+  }
+
+  func testSubstitutedCapture6(s: Float, t: Int) -> TAI<Float> {
+    return TAI(a: t, b: s)
+  }
+}
+
+// Qualified lookup of generic typealiases nested inside concrete contexts
+struct ConcreteStruct {
+  typealias O<T> = Optional<T>
+}
+
+func takesUnsugaredType1(m: MyType<String, Float>) {}
+func takesSugaredType1(m: ConcreteClass.TA<Float>) {
+  takesUnsugaredType1(m: m)
+}
+
+// FIXME: Something is wrong with SpecializeExpr here
+let _ = ConcreteStruct.O<Int>(123) // expected-error {{cannot invoke value of type 'Optional<Int>.Type' with argument list '(Int)'}}
+
+// Qualified lookup of generic typealiases nested inside generic contexts
+
+// FIXME: Something is wrong with SpecializeExpr here
+let _ = GenericClass<Int>.TA<Float>(a: 4.0, b: 1)  // expected-error {{'Int' is not convertible to 'Float'}}
+let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)  // expected-error {{'Int' is not convertible to 'Float'}}
+
+func takesUnsugaredType2(m: MyType<Int, Float>) {}
+func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
+  takesUnsugaredType2(m: m)
+}
 
 
 

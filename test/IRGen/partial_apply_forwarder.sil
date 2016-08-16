@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 sil_stage canonical
 
 public protocol P {}
@@ -19,6 +19,28 @@ bb0(%0 : $E):
 }
 
 sil hidden_external @unspecialized_uncurried : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+
+
+// CHECK-LABEL: define internal void @_TPA_takingP(%swift.refcounted*
+// CHECK: [[CONTEXT:%.*]] = alloca %swift.refcounted*
+// CHECK: [[TYPE:%.*]]    = call %swift.type* @_TMaC23partial_apply_forwarder1C
+// CHECK: store %swift.refcounted* %0, %swift.refcounted** [[CONTEXT]]
+// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted** [[CONTEXT]] to %swift.opaque*
+// CHECK:  call void @takingP(%swift.type* [[TYPE]], i8**{{.*}}_TWPC23partial_apply_forwarder1CS_1PS_{{.*}}, %swift.opaque* {{.*}} [[CAST]]
+// CHECK:  ret
+sil hidden_external @takingP : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+
+sil hidden @reabstract_context : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %6 = alloc_stack $C
+  store %0 to %6 : $*C
+  %8 = function_ref @takingP : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %9 = partial_apply %8<C>(%6) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %6 : $*C
+  strong_release %9 : $@callee_owned() -> ()
+  %10 = tuple ()
+  return %10 : $()
+}
 
 sil_vtable C {}
 sil_vtable D {}

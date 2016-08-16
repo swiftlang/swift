@@ -22,41 +22,50 @@ public struct Unmanaged<Instance : AnyObject> {
   @_transparent
   internal init(_private: Instance) { _value = _private }
 
-  /// Unsafely turn an opaque C pointer into an unmanaged
-  /// class reference.
+  /// Unsafely turns an opaque C pointer into an unmanaged class reference.
   ///
   /// This operation does not change reference counts.
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  ///
+  /// - Parameter value: An opaque C pointer.
+  /// - Returns: An unmanaged class reference to `value`.
   @_transparent
-  public static func fromOpaque(_ value: UnsafePointer<Void>) -> Unmanaged {
+  public static func fromOpaque(_ value: UnsafeRawPointer) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
-  /// Unsafely convert an unmanaged class reference to a pointer
+  /// Unsafely converts an unmanaged class reference to a pointer.
   ///
   /// This operation does not change reference counts.
   ///
   ///     let str0: CFString = "boxcar"
   ///     let bits = Unmanaged.passUnretained(str0)
-  ///     let str1 = Unmanaged<CFString>(bits).object
+  ///     let ptr = bits.toOpaque()
+  ///
+  /// - Returns: An opaque pointer to the value of this unmanaged reference.
   @_transparent
-  public func toOpaque() -> UnsafeMutablePointer<Void> {
-    return unsafeBitCast(_value, to: UnsafeMutablePointer<Void>.self)
+  public func toOpaque() -> UnsafeMutableRawPointer {
+    return unsafeBitCast(_value, to: UnsafeMutableRawPointer.self)
   }
 
-  /// Create an unmanaged reference with an unbalanced retain.
-  /// The object will leak if nothing eventually balances the retain.
+  /// Creates an unmanaged reference with an unbalanced retain.
   ///
-  /// This is useful when passing an object to an API which Swift
-  /// does not know the ownership rules for, but you know that the
-  /// API expects you to pass the object at +1.
+  /// The instance passed as `value` will leak if nothing eventually balances
+  /// the retain.
+  ///
+  /// This is useful when passing an object to an API which Swift does not know
+  /// the ownership rules for, but you know that the API expects you to pass
+  /// the object at +1.
+  ///
+  /// - Parameter value: A class instance.
+  /// - Returns: An unmanaged reference to the object passed as `value`.
   @_transparent
   public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
 
-  /// Create an unmanaged reference without performing an unbalanced
+  /// Creates an unmanaged reference without performing an unbalanced
   /// retain.
   ///
   /// This is useful when passing a reference to an API which Swift
@@ -65,33 +74,40 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
+  ///
+  /// - Parameter value: A class instance.
+  /// - Returns: An unmanaged reference to the object passed as `value`.
   @_transparent
   public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
 
-  /// Get the value of this unmanaged reference as a managed
+  /// Gets the value of this unmanaged reference as a managed
   /// reference without consuming an unbalanced retain of it.
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
+  ///
+  /// - Returns: The object referenced by this `Unmanaged` instance.
   public func takeUnretainedValue() -> Instance {
     return _value
   }
 
-  /// Get the value of this unmanaged reference as a managed
-  /// reference and consume an unbalanced retain of it.
+  /// Gets the value of this unmanaged reference as a managed
+  /// reference and consumes an unbalanced retain of it.
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
+  ///
+  /// - Returns: The object referenced by this `Unmanaged` instance.
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()
     return result
   }
 
-  /// Get the value of the unmanaged referenced as a managed reference without
-  /// consuming an unbalanced retain of it and pass it to the closure. Asserts
+  /// Gets the value of the unmanaged referenced as a managed reference without
+  /// consuming an unbalanced retain of it and passes it to the closure. Asserts
   /// that there is some other reference ('the owning reference') to the
   /// instance referenced by the unmanaged reference that guarantees the
   /// lifetime of the instance for the duration of the
@@ -136,7 +152,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///  }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {
@@ -168,7 +184,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///   }
   ///
   ///  class Owner {
-  ///    final var owned : Owned
+  ///    final var owned: Owned
   ///
   ///    func foo() {
   ///        withExtendedLifetime(self) {
@@ -183,29 +199,29 @@ public struct Unmanaged<Instance : AnyObject> {
   ///    }
   ///  }
   public func _withUnsafeGuaranteedRef<Result>(
-    _ closure: @noescape (Instance) throws -> Result
+    _ body: (Instance) throws -> Result
   ) rethrows -> Result {
     let (guaranteedInstance, token) = Builtin.unsafeGuaranteed(_value)
-    let result = try closure(guaranteedInstance)
+    let result = try body(guaranteedInstance)
     Builtin.unsafeGuaranteedEnd(token)
     return result
   }
 
-  /// Perform an unbalanced retain of the object.
+  /// Performs an unbalanced retain of the object.
   @_transparent
   public func retain() -> Unmanaged {
     Builtin.retain(_value)
     return self
   }
 
-  /// Perform an unbalanced release of the object.
+  /// Performs an unbalanced release of the object.
   @_transparent
   public func release() {
     Builtin.release(_value)
   }
 
 #if _runtime(_ObjC)
-  /// Perform an unbalanced autorelease of the object.
+  /// Performs an unbalanced autorelease of the object.
   @_transparent
   public func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)
@@ -216,13 +232,13 @@ public struct Unmanaged<Instance : AnyObject> {
 
 extension Unmanaged {
   @available(*, unavailable, 
-    message:"use 'fromOpaque(_: UnsafePointer<Void>)' instead")
+    message:"use 'fromOpaque(_: UnsafeRawPointer)' instead")
   public static func fromOpaque(_ value: OpaquePointer) -> Unmanaged {
     Builtin.unreachable()
   }
   
   @available(*, unavailable, 
-    message:"use 'toOpaque() -> UnsafePointer<Void>' instead")
+    message:"use 'toOpaque() -> UnsafeRawPointer' instead")
   public func toOpaque() -> OpaquePointer {
     Builtin.unreachable()
   }

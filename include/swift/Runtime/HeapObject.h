@@ -107,12 +107,12 @@ struct TwoWordPair {
   // Use an enum class with implicit conversions so we don't dirty C callers
   // too much.
 #if __arm__ || __i386__ || defined(__CYGWIN__) || defined(_MSC_VER)
-#if defined(__CYGWIN__) || defined(_MSC_VER)
+#if defined(__CYGWIN__)
   enum class Return : unsigned __int128 {};
 #else
   enum class Return : unsigned long long {};
 #endif
-  
+
   operator Return() const {
     union {
       TwoWordPair value;
@@ -1155,6 +1155,11 @@ static inline void swift_unknownUnownedTakeAssign(UnownedReference *dest,
 
 #endif /* SWIFT_OBJC_INTEROP */
 
+/// Return the name of a Swift type represented by a metadata object.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+extern "C"
+TwoWordPair<const char *, uintptr_t>::Return
+swift_getTypeName(const Metadata *type, bool qualified);  
 
 } // end namespace swift
 

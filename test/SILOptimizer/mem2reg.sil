@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
@@ -313,3 +313,17 @@ bb0:
   // CHECK: return [[VAL]]
   return %1 : $()
 }
+
+// CHECK-LABEL: sil @keep_release
+// CHECK: strong_release %0
+// CHECK: return
+sil @keep_release : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = alloc_stack $AnyObject
+  store %0 to %1 : $*AnyObject
+  destroy_addr %1 : $*AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %7 = tuple ()
+  return %7 : $()
+}
+

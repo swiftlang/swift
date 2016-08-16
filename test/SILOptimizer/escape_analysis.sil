@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -escapes-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -escapes-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -50,10 +50,10 @@ class LinkedNode {
   init(_ n: LinkedNode)
 }
 
-struct MyError : ErrorProtocol {
+struct MyError : Error {
 }
 
-final class ErrorClass : ErrorProtocol {
+final class ErrorClass : Error {
 }
 
 struct SomeData {
@@ -674,16 +674,16 @@ bb2(%5 : $LinkedNode):
 // CHECK-NEXT:    Val %3 Esc: R, Succ: %0
 // CHECK-NEXT:    Ret Esc: R, Succ: %3
 // CHECK-NEXT:  End
-sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
+sil @call_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
 bb0(%0 : $X):
-  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol), normal bb1, error bb2
+  %1 = function_ref @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
 
-bb2(%5 : $ErrorProtocol):
-  throw %5 : $ErrorProtocol
+bb2(%5 : $Error):
+  throw %5 : $Error
 }
 
 // CHECK-LABEL: CG of throwing_func
@@ -692,16 +692,16 @@ bb2(%5 : $ErrorProtocol):
 // CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
 // CHECK-NEXT:    Ret  Esc: R, Succ: %0
 // CHECK-NEXT:  End
-sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
+sil @throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
 bb0(%0 : $X):
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = alloc_existential_box $ErrorProtocol, $MyError
-  %3 = project_existential_box $MyError in %2 : $ErrorProtocol
+  %2 = alloc_existential_box $Error, $MyError
+  %3 = project_existential_box $MyError in %2 : $Error
   %4 = struct $MyError ()
   store %4 to %3 : $*MyError
-  throw %2 : $ErrorProtocol
+  throw %2 : $Error
 
 bb2:
   return %0 : $X
@@ -716,19 +716,19 @@ bb2:
 // CHECK-NEXT:    Con %3.1 Esc: G, Succ: 
 // CHECK-NEXT:    Ret Esc: R, Succ: %3
 // CHECK-NEXT:  End
-sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol) {
+sil @call_unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error) {
 bb0(%0 : $X):
-  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
-  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol), normal bb1, error bb2
+  %1 = function_ref @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
+  try_apply %1(%0) : $@convention(thin) (@owned X) -> (@owned X, @error Error), normal bb1, error bb2
 
 bb1(%3 : $X):
   return %3 : $X
 
-bb2(%5 : $ErrorProtocol):
-  throw %5 : $ErrorProtocol
+bb2(%5 : $Error):
+  throw %5 : $Error
 }
 
-sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error ErrorProtocol)
+sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error Error)
 
 // Test that the deinit of a box itself does not capture anything.
 
@@ -980,8 +980,8 @@ bb0(%0 : $X):
 // CHECK-NEXT:  End
 sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
 bb0(%0 : $ErrorClass):
-  %2 = alloc_existential_box $ErrorProtocol, $ErrorClass
-  %3 = project_existential_box $ErrorClass in %2 : $ErrorProtocol
+  %2 = alloc_existential_box $Error, $ErrorClass
+  %3 = project_existential_box $ErrorClass in %2 : $Error
   store %0 to %3 : $*ErrorClass
   %5 = tuple ()
   return %5 : $()
@@ -1017,7 +1017,7 @@ bb0(%0 : $X, %1 : $Builtin.Word):
 sil @test_address_to_pointer : $@convention(thin) (@owned X) -> @out X {
 bb0(%0 : $*X, %1 : $X):
   %2 = address_to_pointer %0 : $*X to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*X
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*X
   store %1 to %3 : $*X
   %7 = tuple ()
   return %7 : $()
@@ -1239,6 +1239,28 @@ bb(%0 : $*Array<X>, %1 : $@callee_owned (@inout X) -> (@out (), @error ErrorType
   return %r : $()
 }
 
+// CHECK-LABEL: CG of arraysemantics_createUninitialized
+// CHECK-NEXT:    Arg %0 Esc: A, Succ: 
+// CHECK-NEXT:    Val %2 Esc: R, Succ: (%4.2)
+// CHECK-NEXT:    Val %4 Esc: R, Succ: (%4.1)
+// CHECK-NEXT:    Con %4.1 Esc: R, Succ: %2
+// CHECK-NEXT:    Con %4.2 Esc: R, Succ: %0
+// CHECK-NEXT:    Ret  Esc: R, Succ: %4
+// CHECK-NEXT:  End
+sil @arraysemantics_createUninitialized : $@convention(thin) (@owned X) -> @owned Array<X> {
+bb0(%0 : $X):
+  %1 = function_ref @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
+  %2 = apply %1() : $@convention(thin) () -> @owned AnyObject
+  %3 = function_ref @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %4 = apply %3(%2) : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+  %5 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 0
+  %6 = tuple_extract %4 : $(Array<X>, UnsafeMutablePointer<X>), 1
+  %7 = struct_extract %6 : $UnsafeMutablePointer<X>, #UnsafeMutablePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*X
+  store %0 to %8 : $*X
+  return %5 : $Array<X>
+}
+
 sil [_semantics "array.withUnsafeMutableBufferPointer"] @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout X) -> (@out (), @error ErrorType), @inout Array<X>) -> (@out (), @error ErrorType)
 sil [_semantics "array.props.isNativeTypeChecked"] @is_native_type_checked : $@convention(method) (@guaranteed Array<X>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript : $@convention(method) (Int32, Bool, @guaranteed Array<X>) -> ()
@@ -1251,6 +1273,10 @@ sil [_semantics "array.get_capacity"] @get_capacity : $@convention(method) (@gua
 
 sil [_semantics "pair_no_escaping_closure"] @unsafeWithNotEscapedSelfPointerPair : $@convention(method) (@owned X, @owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
 sil [_semantics "self_no_escaping_closure"] @unsafeWithNotEscapedSelfPointer: $@convention(method) (@owned @callee_owned (X, X) -> (@out X, @error ErrorType), @guaranteed X) -> (@out X, @error ErrorType)
+sil [_semantics "array.uninitialized"] @createUninitialized : $@convention(method) (@owned AnyObject) -> (@owned Array<X>, UnsafeMutablePointer<X>)
+
+// A simplified version of swift_bufferAllocate
+sil @swift_bufferAllocate : $@convention(thin) () -> @owned AnyObject
 
 // CHECK-LABEL: CG of semantics_pair_no_escaping_closure
 // CHECK-NEXT:   Arg %0 Esc: A, Succ:

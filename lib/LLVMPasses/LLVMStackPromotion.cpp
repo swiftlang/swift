@@ -216,6 +216,9 @@ bool SwiftStackPromotion::runOnFunction(Function &F) {
                                          {MetaDataTy, HeapObjTy},
                                          false);
         initFunc = M->getOrInsertFunction("swift_initStackObject", NewFTy);
+        if (llvm::Triple(M->getTargetTriple()).isOSBinFormatCOFF())
+          if (auto *F = dyn_cast<llvm::Function>(initFunc))
+            F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
       }
       // Replace the allocation call with an alloca.
       Value *AllocA = new AllocaInst(AllocType, ConstantInt::get(IntType, size),
@@ -235,6 +238,9 @@ bool SwiftStackPromotion::runOnFunction(Function &F) {
       if (!allocFunc) {
         allocFunc = M->getOrInsertFunction("swift_bufferAllocate",
                                            Callee->getFunctionType());
+        if (llvm::Triple(M->getTargetTriple()).isOSBinFormatCOFF())
+          if (auto *F = dyn_cast<llvm::Function>(allocFunc))
+            F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
       }
       CI->setCalledFunction(allocFunc);
     }

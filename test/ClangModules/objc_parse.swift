@@ -51,7 +51,7 @@ func instanceMethods(_ b: B) {
   // Both class and instance methods exist.
   _ = b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert value of type 'Double' to expected argument type 'AnyObject!'}}
+  b.instanceTakesObjectClassTakesFloat(2.0)
 
   // Instance methods with keyword components
   var obj = NSObject()
@@ -86,21 +86,21 @@ func instanceMethodsInExtensions(_ b: B) {
   b.method(1, separateExtMethod:3.5)
 
   let m1 = b.method(_:onCat1:)
-  _ = m1(1, onCat1: 2.5)
+  _ = m1(1, 2.5)
 
   let m2 = b.method(_:onExtA:)
-  _ = m2(1, onExtA: 2.5)
+  _ = m2(1, 2.5)
 
   let m3 = b.method(_:onExtB:)
-  _ = m3(1, onExtB: 2.5)
+  _ = m3(1, 2.5)
 
   let m4 = b.method(_:separateExtMethod:)
-  _ = m4(1, separateExtMethod: 2.5)
+  _ = m4(1, 2.5)
 }
 
 func dynamicLookupMethod(_ b: AnyObject) {
   if let m5 = b.method(_:separateExtMethod:) {
-    _ = m5(1, separateExtMethod: 2.5)
+    _ = m5(1, 2.5)
   }
 }
 
@@ -119,7 +119,7 @@ func properties(_ b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'b' is a 'let' constant}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'informalMadeFormal' is a method}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -170,8 +170,8 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
-  let q = dict[nil]  // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
+  dict[nil] = a // expected-error {{ambiguous reference}}
+  let q = dict[nil]  // expected-error {{ambiguous subscript}}
   _ = q
 }
 
@@ -192,7 +192,7 @@ func testProtocols(_ b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()!
   c1 = bcat1
-  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'protocol<BProto, Cat1Proto>' in assignment}}
+  bcat1 = c1 // expected-error{{value of type 'Cat1Proto' does not conform to 'BProto & Cat1Proto' in assignment}}
 }
 
 // Methods only defined in a protocol
@@ -241,18 +241,18 @@ func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var _ : AnyObject = bc[key]
+  var _ : Any = bc[key]
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
-  var value : AnyObject = bc[key] // no-warning, inherited from parent
+  var value : Any = bc[key] // no-warning, inherited from parent
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
-  var value : AnyObject = roc[key] // no-warning, inherited from parent
+  var value : Any = roc[key] // no-warning, inherited from parent
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -262,28 +262,29 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : Wobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'Wobbling'}}{{none}}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{none}}
   // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
-extension Wobbler : MaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, Wobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
 
-extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-func optionalMemberAccess(_ w: Wobbling) {
+func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
-  var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}} {{26-26=!}}
+  let x = w[5]!!
+  _ = x
 }
 
 func protocolInheritance(_ s: NSString) {
@@ -305,16 +306,16 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.isMakingHoney)
-  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}
+  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}{{28-30=}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
-  _ = hive.`guard`.description // okay
-  _ = hive.`guard`.description! // no-warning
+  _ = (hive.`guard` as AnyObject).description // okay
+  _ = (hive.`guard` as AnyObject).description! // no-warning
   hive.`guard` = bee // no-warning
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
+func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
@@ -329,7 +330,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
 
   // Instance method on a protocol with instancetype result.
   var wobbler2 = wobbler.returnMyself()!
-  var wobbler: Wobbling = wobbler2
+  var wobbler: NSWobbling = wobbler2
   wobbler2 = wobbler
 
   // Instance method on a base class with instancetype result, called on the
@@ -381,20 +382,20 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   obj.object = nil
   obj.object(obj, doSomething:#selector(getter: NSMenuItem.action))
 
-  obj.dynamicType.classRef = nil
-  obj.dynamicType.classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: obj).classRef = nil
+  type(of: obj).classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.object = nil
   rev.object(rev, doSomething:#selector(getter: NSMenuItem.action))
 
-  rev.dynamicType.classRef = nil
-  rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: rev).classRef = nil
+  type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
-  var value: AnyObject
+  var value: Any
   value = obj.protoProp()
   value = obj.protoPropRO()
-  value = obj.dynamicType.protoClassProp()
-  value = obj.dynamicType.protoClassPropRO()
+  value = type(of: obj).protoClassProp()
+  value = type(of: obj).protoClassPropRO()
   _ = value
 }
 
@@ -469,7 +470,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'AnyObject?!'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'Any?!'}}
 }
 
 func testFactoryMethodAvailability() {
@@ -490,8 +491,8 @@ class FooDelegateImpl : NSObject, FooDelegate {
 }
 
 class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
-  var foo: AnyObject? // no errors about conformance
-  var bar: AnyObject? // no errors about conformance
+  var foo: Any? // no errors about conformance
+  var bar: Any? // no errors about conformance
 }
 
 func testUnusedResults(_ ur: UnusedResults) {
@@ -505,17 +506,17 @@ func testCStyle() {
 
 func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
   _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
 
@@ -549,7 +550,7 @@ extension Printing {
 func testSetInitializers() {
   let a: [AnyObject] = [NSObject()]
 
-  let _ = CountedSet(array: a)
+  let _ = NSCountedSet(array: a)
   let _ = NSMutableSet(array: a)
 }
 

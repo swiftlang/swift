@@ -239,6 +239,7 @@ takes precedence for files in the Swift project"
         ad-do-it)
     ad-do-it))
 
+(require 'compile) ;; for compilation-error-regexp-alist et al.
 (push 'swift-stdlibunittest-possibly-expected-assertion compilation-error-regexp-alist)
 (push `(swift-stdlibunittest-possibly-expected-assertion "^\\(\\(?:stdout\\|stderr\\)>>> *\\)?.*\\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\([^,]*\\), line \\([0-9]+\\)$"
               2 3 ,(not :column) 0)
@@ -250,7 +251,7 @@ takes precedence for files in the Swift project"
       compilation-error-regexp-alist-alist)
     
 (push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
-(push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\([^,]*\\), line \\([0-9]+\\)$"
+(push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\(.*?\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
 

@@ -2,4 +2,4 @@
 
 // REQUIRES: objc_interop
 
-extension AXError: ErrorProtocol { }
+extension AXError: Error { }

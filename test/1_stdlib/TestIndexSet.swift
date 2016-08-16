@@ -23,7 +23,7 @@ class TestIndexSetSuper { }
 class TestIndexSet : TestIndexSetSuper {
     
     func testEnumeration() {
-        let someIndexes = IndexSet(integersIn: 3..<5)
+        let someIndexes = IndexSet(integersIn: 3...4)
         let first = someIndexes.startIndex
         let last = someIndexes.endIndex
         
@@ -79,6 +79,7 @@ class TestIndexSet : TestIndexSetSuper {
         
         r = someIndexes.indexRange(in: 100..<201)
         expectEqual(r.lowerBound, r.upperBound)
+        expectTrue(r.isEmpty)
         
         r = someIndexes.indexRange(in: 0..<100)
         expectEqual(r.lowerBound, someIndexes.startIndex)
@@ -87,6 +88,9 @@ class TestIndexSet : TestIndexSetSuper {
         r = someIndexes.indexRange(in: 1..<11)
         expectEqual(1, someIndexes[r.lowerBound])
         expectEqual(11, someIndexes[r.upperBound])
+        
+        let empty = IndexSet()
+        expectTrue(empty.indexRange(in: 1..<3).isEmpty)
     }
     
     func testMutation() {
@@ -99,6 +103,62 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(11)
         
         expectEqual(someIndexes.count, 7)
+        
+        someIndexes.remove(11)
+        
+        expectEqual(someIndexes.count, 6)
+        
+        someIndexes.insert(integersIn: 100...101)
+        expectEqual(8, someIndexes.count)
+        expectEqual(2, someIndexes.count(in: 100...101))
+        
+        someIndexes.remove(integersIn: 100...101)
+        expectEqual(6, someIndexes.count)
+        expectEqual(0, someIndexes.count(in: 100...101))
+
+        someIndexes.insert(integersIn: 200..<202)
+        expectEqual(8, someIndexes.count)
+        expectEqual(2, someIndexes.count(in: 200..<202))
+        
+        someIndexes.remove(integersIn: 200..<202)
+        expectEqual(6, someIndexes.count)
+        expectEqual(0, someIndexes.count(in: 200..<202))
+    }
+    
+    func testContainsAndIntersects() {
+        let someIndexes = IndexSet(integersIn: 1..<10)
+
+        expectTrue(someIndexes.contains(integersIn: 1..<10))
+        expectTrue(someIndexes.contains(integersIn: 1...9))
+        expectTrue(someIndexes.contains(integersIn: 2..<10))
+        expectTrue(someIndexes.contains(integersIn: 2...9))
+        expectTrue(someIndexes.contains(integersIn: 1..<9))
+        expectTrue(someIndexes.contains(integersIn: 1...8))
+
+        expectFalse(someIndexes.contains(integersIn: 0..<10))
+        expectFalse(someIndexes.contains(integersIn: 0...9))
+        expectFalse(someIndexes.contains(integersIn: 2..<11))
+        expectFalse(someIndexes.contains(integersIn: 2...10))
+        expectFalse(someIndexes.contains(integersIn: 0..<9))
+        expectFalse(someIndexes.contains(integersIn: 0...8))
+        
+        expectTrue(someIndexes.intersects(integersIn: 1..<10))
+        expectTrue(someIndexes.intersects(integersIn: 1...9))
+        expectTrue(someIndexes.intersects(integersIn: 2..<10))
+        expectTrue(someIndexes.intersects(integersIn: 2...9))
+        expectTrue(someIndexes.intersects(integersIn: 1..<9))
+        expectTrue(someIndexes.intersects(integersIn: 1...8))
+        
+        expectTrue(someIndexes.intersects(integersIn: 0..<10))
+        expectTrue(someIndexes.intersects(integersIn: 0...9))
+        expectTrue(someIndexes.intersects(integersIn: 2..<11))
+        expectTrue(someIndexes.intersects(integersIn: 2...10))
+        expectTrue(someIndexes.intersects(integersIn: 0..<9))
+        expectTrue(someIndexes.intersects(integersIn: 0...8))
+
+        expectFalse(someIndexes.intersects(integersIn: 0..<0))
+        expectFalse(someIndexes.intersects(integersIn: 10...12))
+        expectFalse(someIndexes.intersects(integersIn: 10..<12))
     }
     
     func testIteration() {
@@ -148,7 +208,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(15)
         
         var count = 0
-        for r in someIndexes.rangeView() {
+        for r in someIndexes.rangeView {
             // print("\(r)")
             count += 1
             if count == 3 {
@@ -159,7 +219,7 @@ class TestIndexSet : TestIndexSetSuper {
         
         // Backwards
         count = 0
-        for r in someIndexes.rangeView().reversed() {
+        for r in someIndexes.rangeView.reversed() {
             // print("\(r)")
             count += 1
             if count == 3 {
@@ -177,7 +237,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(integersIn: 60..<80)
         
         var count = 0
-        for _ in someIndexes.rangeView() {
+        for _ in someIndexes.rangeView {
             count += 1
         }
         expectEqual(5, count)
@@ -196,7 +256,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(3, count)
         
         count = 0
-        for r in someIndexes.rangeView(of: 0..<35) {
+        for r in someIndexes.rangeView(of: 0...34) {
             if count == 0 {
                 expectEqual(r, 2..<5)
             }
@@ -249,7 +309,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(8, someIndexes.count(in: 5..<25))
         expectEqual(8, count)
         
-        r = someIndexes.indexRange(in: 100..<200)
+        r = someIndexes.indexRange(in: 100...199)
         expectTrue(r.isEmpty)
         
         let emptySlice = someIndexes[r]
@@ -280,7 +340,7 @@ class TestIndexSet : TestIndexSetSuper {
         expectEqual(count, 0)
         
         count = 0
-        for _ in empty.rangeView() {
+        for _ in empty.rangeView {
             count += 1
         }
         
@@ -337,7 +397,7 @@ class TestIndexSet : TestIndexSetSuper {
         someIndexes.insert(integersIn: 8..<11)
         someIndexes.insert(15)
 
-        let resultArray = someIndexes.rangeView().filter { $0.count > 1 }
+        let resultArray = someIndexes.rangeView.filter { $0.count > 1 }
         expectEqual(resultArray.count, 2)
     }
     
@@ -460,6 +520,12 @@ class TestIndexSet : TestIndexSetSuper {
             expectEqual(expected, is1.symmetricDifference(is2))
             expectEqual(expected, is2.symmetricDifference(is1))
         }
+        
+        do {
+            is1 = IndexSet([0, 2])
+            is2 = IndexSet([0, 1, 2])
+            expectEqual(IndexSet(integer: 1), is1.symmetricDifference(is2))
+        }
     }
     
     func testIntersection() {
@@ -531,7 +597,12 @@ class TestIndexSet : TestIndexSetSuper {
             expectEqual(expected, is1.intersection(is2))
             expectEqual(expected, is2.intersection(is1))
         }
-
+        
+        do {
+            is1 = IndexSet([0, 2])
+            is2 = IndexSet([0, 1, 2])
+            expectEqual(is1, is1.intersection(is2))
+        }
     }
     
     func testUnion() {
@@ -661,6 +732,36 @@ class TestIndexSet : TestIndexSetSuper {
         }
     }
     
+    func test_findIndex() {
+        var i = IndexSet()
+        
+        // Verify nil result for empty sets
+        expectEqual(nil, i.first)
+        expectEqual(nil, i.last)
+        expectEqual(nil, i.integerGreaterThan(5))
+        expectEqual(nil, i.integerLessThan(5))
+        expectEqual(nil, i.integerGreaterThanOrEqualTo(5))
+        expectEqual(nil, i.integerLessThanOrEqualTo(5))
+        
+        i.insert(integersIn: 5..<10)
+        i.insert(integersIn: 15..<20)
+
+        // Verify non-nil result
+        expectEqual(5, i.first)
+        expectEqual(19, i.last)
+        
+        expectEqual(nil, i.integerGreaterThan(19))
+        expectEqual(5, i.integerGreaterThan(3))
+        
+        expectEqual(nil, i.integerLessThan(5))
+        expectEqual(5, i.integerLessThan(6))
+        
+        expectEqual(nil, i.integerGreaterThanOrEqualTo(20))
+        expectEqual(19, i.integerGreaterThanOrEqualTo(19))
+        
+        expectEqual(nil, i.integerLessThanOrEqualTo(4))
+        expectEqual(5, i.integerLessThanOrEqualTo(5))
+    }
 
     // MARK: -
     // MARK: Performance Testing
@@ -690,6 +791,34 @@ class TestIndexSet : TestIndexSetSuper {
         }
         */
     }
+
+    func test_AnyHashableContainingIndexSet() {
+        let values: [IndexSet] = [
+            IndexSet([0, 1]),
+            IndexSet([0, 1, 2]),
+            IndexSet([0, 1, 2]),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(IndexSet.self, type(of: anyHashables[0].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[1].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSIndexSet() {
+        let values: [NSIndexSet] = [
+            NSIndexSet(index: 0),
+            NSIndexSet(index: 1),
+            NSIndexSet(index: 1),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(IndexSet.self, type(of: anyHashables[0].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[1].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -701,6 +830,7 @@ IndexSetTests.test("testEnumeration") { TestIndexSet().testEnumeration() }
 IndexSetTests.test("testSubsequence") { TestIndexSet().testSubsequence() }
 IndexSetTests.test("testIndexRange") { TestIndexSet().testIndexRange() }
 IndexSetTests.test("testMutation") { TestIndexSet().testMutation() }
+IndexSetTests.test("testContainsAndIntersects") { TestIndexSet().testContainsAndIntersects() }
 IndexSetTests.test("testIteration") { TestIndexSet().testIteration() }
 IndexSetTests.test("testRangeIteration") { TestIndexSet().testRangeIteration() }
 IndexSetTests.test("testSubrangeIteration") { TestIndexSet().testSubrangeIteration() }
@@ -710,7 +840,10 @@ IndexSetTests.test("testSubsequences") { TestIndexSet().testSubsequences() }
 IndexSetTests.test("testFiltering") { TestIndexSet().testFiltering() }
 IndexSetTests.test("testFilteringRanges") { TestIndexSet().testFilteringRanges() }
 IndexSetTests.test("testShift") { TestIndexSet().testShift() }
+IndexSetTests.test("test_findIndex") { TestIndexSet().test_findIndex() }
 // IndexSetTests.test("testIndexingPerformance") { TestIndexSet().testIndexingPerformance() }
+IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
+IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
 runAllTests()
 #endif
 

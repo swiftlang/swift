@@ -67,7 +67,7 @@ extension Sequence
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
   public func map<T>(
-    _ transform: @noescape (Base.Iterator.Element) throws -> T
+    _ transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
@@ -88,9 +88,9 @@ extension Sequence
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.
   public func filter(
-    _ includeElement: @noescape (Base.Iterator.Element) throws -> Bool
+    _ isIncluded: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> [Base.Iterator.Element] {
-    return try _base.filter(includeElement)
+    return try _base.filter(isIncluded)
   }
   
   public func _customContainsEquatableElement(
@@ -103,16 +103,16 @@ extension Sequence
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    return _base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array, returning one past the last

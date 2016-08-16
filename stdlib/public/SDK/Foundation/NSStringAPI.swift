@@ -20,7 +20,7 @@
 // Property Lists need to be properly bridged
 //
 
-func _toNSArray<T, U : AnyObject>(_ a: [T], f: @noescape (T) -> U) -> NSArray {
+func _toNSArray<T, U : AnyObject>(_ a: [T], f: (T) -> U) -> NSArray {
   let result = NSMutableArray(capacity: a.count)
   for s in a {
     result.add(f(s))
@@ -32,33 +32,6 @@ func _toNSRange(_ r: Range<String.Index>) -> NSRange {
   return NSRange(
     location: r.lowerBound._utf16Index,
     length: r.upperBound._utf16Index - r.lowerBound._utf16Index)
-}
-
-func _countFormatSpecifiers(_ a: String) -> Int {
-  // The implementation takes advantage of the fact that internal
-  // representation of String is UTF-16.  Because we only care about the ASCII
-  // percent character, we don't need to decode UTF-16.
-
-  let percentUTF16  = UTF16.CodeUnit(("%" as UnicodeScalar).value)
-  let notPercentUTF16: UTF16.CodeUnit = 0
-  var lastChar = notPercentUTF16 // anything other than % would work here
-  var count = 0
-
-  for c in a.utf16 {
-    if lastChar == percentUTF16 {
-      if c == percentUTF16 {
-        // a "%" following this one should not be taken as literal
-        lastChar = notPercentUTF16
-      }
-      else {
-        count += 1
-        lastChar = c
-      }
-    } else {
-      lastChar = c
-    }
-  }
-  return count
 }
 
 // We only need this for UnsafeMutablePointer, but there's not currently a way
@@ -76,7 +49,8 @@ extension Optional {
   /// `body` is complicated than that results in unnecessarily repeated code.
   internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
     of object: inout NSType?,
-    body: @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
+    _ body:
+      (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
   ) -> ResultType {
     return self == nil ? body(nil) : body(&object)
   }
@@ -96,7 +70,10 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return Index(_base: String.UnicodeScalarView.Index(utf16Index, _core))
+    return Index(
+      _base: String.UnicodeScalarView.Index(_position: utf16Index),
+      in: characters
+    )
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
@@ -119,7 +96,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     _ index: UnsafeMutablePointer<Index>?,
-    _ body: @noescape (UnsafeMutablePointer<Int>?) -> Result
+    _ body: (UnsafeMutablePointer<Int>?) -> Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = (index != nil ? body(&utf16Index) : body(nil))
@@ -132,7 +109,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     _ range: UnsafeMutablePointer<Range<Index>>?,
-    _ body: @noescape (UnsafeMutablePointer<NSRange>?) -> Result
+    _ body: (UnsafeMutablePointer<NSRange>?) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = (range != nil ? body(&nsRange) : body(nil))
@@ -143,13 +120,13 @@ extension String {
   //===--- Class Methods --------------------------------------------------===//
   //===--------------------------------------------------------------------===//
 
-  // + (const NSStringEncoding *)availableStringEncodings
+  // @property (class) const NSStringEncoding *availableStringEncodings;
 
   /// Returns an Array of the encodings string objects support
   /// in the application's environment.
-  public static func availableStringEncodings() -> [Encoding] {
+  public static var availableStringEncodings: [Encoding] {
     var result = [Encoding]()
-    var p = NSString.availableStringEncodings()
+    var p = NSString.availableStringEncodings
     while p.pointee != 0 {
       result.append(Encoding(rawValue: p.pointee))
       p += 1
@@ -157,12 +134,12 @@ extension String {
     return result
   }
 
-  // + (NSStringEncoding)defaultCStringEncoding
+  // @property (class) NSStringEncoding defaultCStringEncoding;
 
   /// Returns the C-string encoding assumed for any method accepting
   /// a C string as an argument.
-  public static func defaultCStringEncoding() -> Encoding {
-    return Encoding(rawValue: NSString.defaultCStringEncoding())
+  public static var defaultCStringEncoding: Encoding {
+    return Encoding(rawValue: NSString.defaultCStringEncoding)
   }
 
   // + (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding
@@ -182,7 +159,7 @@ extension String {
   public static func localizedStringWithFormat(
     _ format: String, _ arguments: CVarArg...
   ) -> String {
-    return String(format: format, locale: Locale.current(),
+    return String(format: format, locale: Locale.current,
       arguments: arguments)
   }
 
@@ -383,12 +360,10 @@ extension String {
         outputArray in
         // FIXME: completePath(...) is incorrectly annotated as requiring
         // non-optional output parameters. rdar://problem/25494184
-        let outputNonOptionalName = AutoreleasingUnsafeMutablePointer<NSString?>(
-          UnsafeMutablePointer<NSString>(outputName)
-        )
-        let outputNonOptionalArray = AutoreleasingUnsafeMutablePointer<NSArray?>(
-          UnsafeMutablePointer<NSArray>(outputArray)
-        )
+        let outputNonOptionalName = unsafeBitCast(
+          outputName, to: AutoreleasingUnsafeMutablePointer<NSString?>.self)
+        let outputNonOptionalArray = unsafeBitCast(
+          outputArray, to: AutoreleasingUnsafeMutablePointer<NSArray?>.self)
         return self._ns.completePath(
           into: outputNonOptionalName,
           caseSensitive: caseSensitive,
@@ -492,14 +467,16 @@ extension String {
   //     enumerateLinesUsing:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  public func enumerateLines(_ body: (line: String, stop: inout Bool) -> ()) {
+  public func enumerateLines(
+    invoking body: @escaping (_ line: String, _ stop: inout Bool) -> ()
+  ) {
     _ns.enumerateLines {
       (line: String, stop: UnsafeMutablePointer<ObjCBool>)
     in
       var stop_ = false
-      body(line: line, stop: &stop_)
+      body(line, &stop_)
       if stop_ {
-        UnsafeMutablePointer<ObjCBool>(stop).pointee = true
+        stop.pointee = true
       }
     }
   }
@@ -523,7 +500,7 @@ extension String {
     scheme tagScheme: String,
     options opts: NSLinguisticTagger.Options = [],
     orthography: NSOrthography? = nil,
-    _ body:
+    invoking body:
       (String, Range<Index>, Range<Index>, inout Bool) -> ()
   ) {
     _ns.enumerateLinguisticTags(
@@ -535,7 +512,7 @@ extension String {
       var stop_ = false
       body($0, self._range($1), self._range($2), &stop_)
       if stop_ {
-        UnsafeMutablePointer($3).pointee = true
+        $3.pointee = true
       }
     }
   }
@@ -556,17 +533,17 @@ extension String {
   public func enumerateSubstrings(
     in range: Range<Index>,
     options opts: EnumerationOptions = [],
-    _ body: (
-      substring: String?, substringRange: Range<Index>,
-      enclosingRange: Range<Index>, inout Bool
+    _ body: @escaping (
+      _ substring: String?, _ substringRange: Range<Index>,
+      _ enclosingRange: Range<Index>, inout Bool
     ) -> ()
   ) {
     _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
       var stop_ = false
 
-      body(substring: $0,
-        substringRange: self._range($1),
-        enclosingRange: self._range($2),
+      body($0,
+        self._range($1),
+        self._range($2),
         &stop_)
 
       if stop_ {
@@ -776,7 +753,7 @@ extension String {
   /// in a given encoding, and optionally frees the buffer.  WARNING:
   /// this initializer is not memory-safe!
   public init?(
-    bytesNoCopy bytes: UnsafeMutablePointer<Void>, length: Int,
+    bytesNoCopy bytes: UnsafeMutableRawPointer, length: Int,
     encoding: Encoding, freeWhenDone flag: Bool
   ) {
     if let ns = NSString(
@@ -817,7 +794,7 @@ extension String {
     freeWhenDone flag: Bool
   ) {
     self = NSString(
-      charactersNoCopy: UnsafeMutablePointer(utf16CodeUnitsNoCopy),
+      charactersNoCopy: UnsafeMutablePointer(mutating: utf16CodeUnitsNoCopy),
       length: count,
       freeWhenDone: flag) as String
   }
@@ -974,10 +951,6 @@ extension String {
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
   public init(format: String, locale: Locale?, arguments: [CVarArg]) {
-    _precondition(
-      _countFormatSpecifiers(format) <= arguments.count,
-      "Too many format specifiers (%<letter>) provided for the argument list"
-    )
     self = withVaList(arguments) {
       NSString(format: format, locale: locale, arguments: $0) as String
     }
@@ -1164,7 +1137,7 @@ extension String {
   /// Parses the `String` as a text representation of a
   /// property list, returning an NSString, NSData, NSArray, or
   /// NSDictionary object, according to the topmost element.
-  public func propertyList() -> AnyObject {
+  public func propertyList() -> Any {
     return _ns.propertyList()
   }
 
@@ -1174,7 +1147,8 @@ extension String {
   /// values found in the `String`.
   public
   func propertyListFromStringsFileFormat() -> [String : String] {
-    return _ns.propertyListFromStringsFileFormat() as! [String : String]
+    return _ns.propertyListFromStringsFileFormat()! as [NSObject : AnyObject]
+      as! [String : String]
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet
@@ -1678,10 +1652,10 @@ extension String {
   ///
   ///     self.rangeOf(
   ///       other, options: .CaseInsensitiveSearch,
-  ///       locale: Locale.current()) != nil
+  ///       locale: Locale.current) != nil
   public func localizedCaseInsensitiveContains(_ other: String) -> Bool {
     let r = self.range(
-      of: other, options: .caseInsensitive, locale: Locale.current()
+      of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
     if #available(OSX 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.localizedCaseInsensitiveContains(other))
@@ -1773,8 +1747,8 @@ extension String {
     _ range: Range<Index>,
     options opts: EnumerationOptions = [],
     _ body: (
-      substring: String?, substringRange: Range<Index>,
-      enclosingRange: Range<Index>, inout Bool
+      _ substring: String?, _ substringRange: Range<Index>,
+      _ enclosingRange: Range<Index>, inout Bool
     ) -> ()
   ) {
     fatalError("unavailable function can't be called")

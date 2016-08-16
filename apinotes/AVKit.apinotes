@@ -1,0 +1,44 @@
+---
+Name: AVKit
+Tags:
+- Name: AVKitError
+  NSErrorDomain: AVKitErrorDomain
+Protocols:
+- Name: AVPlayerViewControllerDelegate
+  Methods:
+  - Selector: 'playerViewControllerWillStartPictureInPicture:'
+    SwiftName: 'playerViewControllerWillStartPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'playerViewControllerDidStartPictureInPicture:'
+    SwiftName: 'playerViewControllerDidStartPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'playerViewControllerWillStopPictureInPicture:'
+    SwiftName: 'playerViewControllerWillStopPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'playerViewControllerDidStopPictureInPicture:'
+    SwiftName: 'playerViewControllerDidStopPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'playerViewControllerShouldAutomaticallyDismissAtPictureInPictureStart:'
+    SwiftName: 'playerViewControllerShouldAutomaticallyDismissAtPictureInPictureStart(_:)'
+    MethodKind: Instance
+- Name: AVPictureInPictureControllerDelegate
+  Methods:
+  - Selector: 'pictureInPictureControllerWillStartPictureInPicture:'
+    SwiftName: 'pictureInPictureControllerWillStartPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'pictureInPictureControllerDidStartPictureInPicture:'
+    SwiftName: 'pictureInPictureControllerDidStartPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'pictureInPictureController:failedToStartPictureInPictureWithError:'
+    SwiftName: 'pictureInPictureController(_:, failedToStartPictureInPictureWithError:)'
+    MethodKind: Instance
+  - Selector: 'pictureInPictureControllerWillStopPictureInPicture:'
+    SwiftName: 'pictureInPictureControllerWillStopPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'pictureInPictureControllerDidStopPictureInPicture:'
+    SwiftName: 'pictureInPictureControllerDidStopPictureInPicture(_:)'
+    MethodKind: Instance
+  - Selector: 'pictureInPictureController:restoreUserInterfaceForPictureInPictureStopWithCompletionHandler:'
+    SwiftName: 'pictureInPictureController(_:, restoreUserInterfaceForPictureInPictureStopWithCompletionHandler:'
+    MethodKind: Instance
+

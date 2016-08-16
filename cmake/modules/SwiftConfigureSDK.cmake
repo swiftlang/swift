@@ -8,7 +8,12 @@ set(SWIFT_CONFIGURED_SDKS)
 # Report the given SDK to the user.
 function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
-  message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
+  if("${prefix}" STREQUAL "WINDOWS")
+    message(STATUS "  INCLUDE: $ENV{INCLUDE}")
+    message(STATUS "  LIB: $ENV{LIB}")
+  else()
+    message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
+  endif()
   message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
   message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
   message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
@@ -16,6 +21,7 @@ function(_report_sdk prefix)
   message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
   message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
 
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS
@@ -96,6 +102,7 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
+  set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
   foreach(arch ${architectures})
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
@@ -122,8 +129,42 @@ macro(configure_sdk_unix
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${arch}")
+  if("${prefix}" STREQUAL "CYGWIN")
+    set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+  else()
+    set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
+  endif()
 
   set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+
+  # Add this to the list of known SDKs.
+  list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
+
+  _report_sdk("${prefix}")
+endmacro()
+
+macro(configure_sdk_windows prefix sdk_name environment architectures)
+  # Note: this has to be implemented as a macro because it sets global
+  # variables.
+
+  set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
+  # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
+  # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
+  # instead.
+  set(SWIFT_SDK_${prefix}_PATH "/")
+  set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
+  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "NOTFOUND")
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
+  set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+
+  foreach(arch ${architectures})
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
+        "${arch}-unknown-windows-${environment}")
+  endforeach()
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")

@@ -10,7 +10,7 @@ class C {
 	init() {}
 }
 
-typealias t = t // expected-error {{circular reference}}
+typealias t = t // expected-error {{redundant type alias declaration}}{{1-17=}}
 
 
 

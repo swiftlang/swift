@@ -119,7 +119,7 @@
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
 @_fixed_layout
-public enum Optional<Wrapped> : NilLiteralConvertible {
+public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
 
@@ -153,13 +153,16 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   ///     print(noSquare)
   ///     // Prints "nil"
   ///
-  /// - Parameter f: A closure that takes the unwrapped value of the instance.
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  public func map<U>(_ f: @noescape (Wrapped) throws -> U) rethrows -> U? {
+  public func map<U>(
+    _ transform: (Wrapped) throws -> U
+  ) rethrows -> U? {
     switch self {
     case .some(let y):
-      return .some(try f(y))
+      return .some(try transform(y))
     case .none:
       return .none
     }
@@ -180,13 +183,16 @@ public enum Optional<Wrapped> : NilLiteralConvertible {
   ///     print(nonOverflowingSquare)
   ///     // Prints "Optional(1746)"
   ///
-  /// - Parameter f: A closure that takes the unwrapped value of the instance.
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.  
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  public func flatMap<U>(_ f: @noescape (Wrapped) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(
+    _ transform: (Wrapped) throws -> U?
+  ) rethrows -> U? {
     switch self {
     case .some(let y):
-      return try f(y)
+      return try transform(y)
     case .none:
       return .none
     }
@@ -298,7 +304,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
-public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return l == r
@@ -309,14 +315,14 @@ public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
 @_fixed_layout
-public struct _OptionalNilComparisonType : NilLiteralConvertible {
+public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent
   public init(nilLiteral: ()) {
@@ -374,44 +380,6 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l < r
-  case (nil, _?):
-    return true
-  default:
-    return false
-  }
-}
-
-public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l > r
-  default:
-    return rhs < lhs
-  }
-}
-
-public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l <= r
-  default:
-    return !(rhs < lhs)
-  }
-}
-
-public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l >= r
-  default:
-    return !(lhs < rhs)
-  }
-}
-
 /// Performs a nil-coalescing operation, returning the wrapped value of an
 /// `Optional` instance or a default value.
 ///
@@ -445,7 +413,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
   case .some(let value):
@@ -498,7 +466,7 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):

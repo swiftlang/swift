@@ -1,4 +1,5 @@
 .. @raise litre.TestsAreMissing
+.. highlight:: none
 
 Swift Intermediate Language (SIL)
 =================================
@@ -1216,8 +1217,8 @@ flow, such as a non-``Void`` function failing to ``return`` a value, or a
 ``switch`` statement failing to cover all possible values of its subject.
 The guaranteed dead code elimination pass can eliminate truly unreachable
 basic blocks, or ``unreachable`` instructions may be dominated by applications
-of ``@noreturn`` functions. An ``unreachable`` instruction that survives
-guaranteed DCE and is not immediately preceded by a ``@noreturn``
+of functions returning uninhabited types. An ``unreachable`` instruction that
+survives guaranteed DCE and is not immediately preceded by a no-return
 application is a dataflow error.
 
 Runtime Failure
@@ -1538,15 +1539,16 @@ Class TBAA
 
 Class instances and other *heap object references* are pointers at the
 implementation level, but unlike SIL addresses, they are first class values and
-can be ``capture``-d and alias. Swift, however, is memory-safe and statically
+can be ``capture``-d and aliased. Swift, however, is memory-safe and statically
 typed, so aliasing of classes is constrained by the type system as follows:
 
 * A ``Builtin.NativeObject`` may alias any native Swift heap object,
   including a Swift class instance, a box allocated by ``alloc_box``,
   or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A ``Builtin.UnknownObject`` may alias any class instance, whether Swift or
-  Objective-C, but may not alias non-class-instance heap objects.
+* A ``Builtin.UnknownObject`` or ``Builtin.BridgeObject`` may alias
+  any class instance, whether Swift or Objective-C, but may not alias
+  non-class-instance heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
@@ -1560,6 +1562,15 @@ typed, so aliasing of classes is constrained by the type system as follows:
   potentially alias concrete instances of the generic type, such as
   ``$C<Int>``, because ``Int`` is a potential substitution for ``T``.
 
+A violation of the above aliasing rules only results in undefined
+behavior if the aliasing references are dereferenced within Swift code.
+For example,
+``_SwiftNativeNS[Array|Dictionary|String]`` classes alias with
+``NS[Array|Dictionary|String]`` classes even though they are not
+statically related. Since Swift never directly accesses stored
+properties on the Foundation classes, this aliasing does not pose a
+danger.
+
 Typed Access TBAA
 ~~~~~~~~~~~~~~~~~
 
@@ -1571,15 +1582,86 @@ Define a *typed access* of an address or reference as one of the following:
   typed projection operation (e.x. ``ref_element_addr``,
   ``tuple_element_addr``).
 
-It is undefined behavior to perform a typed access to an address or reference if
-the stored object or referent is not an allocated object of the relevant type.
+With limited exceptions, it is undefined behavior to perform a typed access to
+an address or reference addressed memory is not bound to the relevant type.
 
-This allows the optimizer to assume that two addresses cannot alias if there
-does not exist a substitution of archetypes that could cause one of the types to
-be the type of a subobject of the other. Additionally, this applies to the types
-of the values from which the addresses were derived, ignoring "blessed"
-alias-introducing operations such as ``pointer_to_address``, the ``bitcast``
-intrinsic, and the ``inttoptr`` intrinsic.
+This allows the optimizer to assume that two addresses cannot alias if
+there does not exist a substitution of archetypes that could cause one
+of the types to be the type of a subobject of the other. Additionally,
+this applies to the types of the values from which the addresses were
+derived via a typed projection.
+
+Consider the following SIL::
+
+  struct Element {
+    var i: Int
+  }
+  struct S1 {
+    var elt: Element
+  }   
+  struct S2 {
+    var elt: Element
+  }   
+  %adr1 = struct_element_addr %ptr1 : $*S1, #S.elt
+  %adr2 = struct_element_addr %ptr2 : $*S2, #S.elt
+
+The optimizer may assume that ``%adr1`` does not alias with ``%adr2``
+because the values that the addresses are derived from (``%ptr1`` and
+``%ptr2``) have unrelated types. However, in the following example,
+the optimizer cannot assume that ``%adr1`` does not alias with
+``%adr2`` because ``%adr2`` is derived from a cast, and any subsequent
+typed operations on the address will refer to the common ``Element`` type::
+
+  %adr1 = struct_element_addr %ptr1 : $*S1, #S.elt
+  %adr2 = pointer_to_address %ptr2 : $Builtin.RawPointer to $*Element
+
+Exceptions to typed access TBAA rules are only allowed for blessed
+alias-introducing operations. This permits limited type-punning. The only
+current exception is the non-struct ``pointer_to_address`` variant. The
+optimizer must be able to defensively determine that none of the *roots* of an
+address are alias-introducing operations. An address root is the operation that
+produces the address prior to applying any typed projections, indexing, or
+casts. The following are valid address roots:
+
+* Object allocation that generates an address, such as ``alloc_stack``
+  and ``alloc_box``.
+
+* Address-type function arguments. These are crucially *not* considered
+  alias-introducing operations. It is illegal for the SIL optimizer to
+  form a new function argument from an arbitrary address-type
+  value. Doing so would require the optimizer to guarantee that the
+  new argument is both has a non-alias-introducing address root and
+  can be properly represented by the calling convention (address types
+  do not have a fixed representation).
+
+* A strict cast from an untyped pointer, ``pointer_to_address [strict]``. It is
+  illegal for ``pointer_to_address [strict]`` to derive its address from an
+  alias-introducing operation's value. A type punned address may only be
+  produced from an opaque pointer via a non-strict ``pointer_to_address`` at the
+  point of conversion.
+
+Address-to-address casts, via ``unchecked_addr_cast``, transparently
+forward their source's address root, just like typed projections.
+
+Address-type basic block arguments can be conservatively considered
+aliasing-introducing operations; they are uncommon enough not to
+matter and may eventually be prohibited altogether.
+
+Although some pointer producing intrinsics exist, they do not need to be
+considered alias-introducing exceptions to TBAA rules. ``Builtin.inttoptr``
+produces a ``Builtin.RawPointer`` which is not interesting because by definition
+it may alias with everything. Similarly, the LLVM builtins ``Builtin.bitcast``
+and ``Builtin.trunc|sext|zextBitCast`` cannot produce typed pointers. These
+pointer values must be converted to an address via ``pointer_to_address`` before
+typed access can occur. Whether the ``pointer_to_address`` is strict determines
+whether aliasing may occur.
+
+Memory may be rebound to an unrelated type. Addresses to unrelated types may
+alias as long as typed access only occurs while memory is bound to the relevant
+type. Consequently, the optimizer cannot outright assume that addresses accessed
+as unrelated types are nonaliasing. For example, pointer comparison cannot be
+eliminated simply because the two addresses derived from those pointers are
+accessed as unrelated types at different program points.
 
 Value Dependence
 ----------------
@@ -2240,6 +2322,20 @@ index_raw_pointer
 Given a ``Builtin.RawPointer`` value ``%0``, returns a pointer value at the
 byte offset ``%1`` relative to ``%0``.
 
+bind_memory
+```````````
+
+::
+
+  sil-instruction ::= 'bind_memory' sil-operand ',' sil-operand 'to' sil-type
+
+  bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T
+  // %0 must be of $Builtin.RawPointer type
+  // %1 must be of $Builtin.Word type
+
+Binds memory at ``Builtin.RawPointer`` value ``%0`` to type ``$T`` with enough
+capacity to hold ``%1`` values. See SE-0107: UnsafeRawPointer.
+   
 Reference Counting
 ~~~~~~~~~~~~~~~~~~
 
@@ -3415,7 +3511,7 @@ container may use one of several representations:
   * `init_existential_metatype`_
   * `open_existential_metatype`_
 
-- **Boxed existential containers**: The standard library ``ErrorProtocol`` protocol
+- **Boxed existential containers**: The standard library ``Error`` protocol
   uses a size-optimized reference-counted container, which indirectly stores
   the conforming value. Boxed existential containers can be ``retain``-ed
   and ``release``-d. The following instructions manipulate boxed existential
@@ -3428,22 +3524,22 @@ container may use one of several representations:
 
 Some existential types may additionally support specialized representations
 when they contain certain known concrete types. For example, when Objective-C
-interop is available, the ``ErrorProtocol`` protocol existential supports
+interop is available, the ``Error`` protocol existential supports
 a class existential container representation for ``NSError`` objects, so it
 can be initialized from one using ``init_existential_ref`` instead of the
 more expensive ``alloc_existential_box``::
 
   bb(%nserror: $NSError):
-    // The slow general way to form an ErrorProtocol, allocating a box and
+    // The slow general way to form an Error, allocating a box and
     // storing to its value buffer:
-    %error1 = alloc_existential_box $ErrorProtocol, $NSError
-    %addr = project_existential_box $NSError in %error1 : $ErrorProtocol
+    %error1 = alloc_existential_box $Error, $NSError
+    %addr = project_existential_box $NSError in %error1 : $Error
     strong_retain %nserror: $NSError
     store %nserror to %addr : $NSError
 
     // The fast path supported for NSError:
     strong_retain %nserror: $NSError
-    %error2 = init_existential_ref %nserror: $NSError, $ErrorProtocol
+    %error2 = init_existential_ref %nserror: $NSError, $Error
 
 init_existential_addr
 `````````````````````
@@ -3700,9 +3796,9 @@ pointer_to_address
 ``````````````````
 ::
 
-  sil-instruction ::= 'pointer_to_address' sil-operand 'to' sil-type
+  sil-instruction ::= 'pointer_to_address' sil-operand 'to' ('[' 'strict' ']')? sil-type
 
-  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*T
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
   // %1 will be of type $*T
 
 Creates an address value corresponding to the ``Builtin.RawPointer`` value
@@ -3712,6 +3808,14 @@ address. It is undefined behavior to cast the ``RawPointer`` back to any type
 other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
 address type.
+
+The ``strict`` flag indicates whether the returned address adheres to
+strict aliasing.  If true, then the type of each memory access
+dependent on this address must be consistent with the memory's bound
+type. A memory access from an address that is not strict cannot have
+its address substituted with a strict address, even if other nearby
+memory accesses at the same location are strict.
+
 
 unchecked_ref_cast
 ``````````````````
@@ -3890,12 +3994,8 @@ in the following ways:
 - A class tuple element of the destination type may be a superclass or
   subclass of the source type's corresponding tuple element.
 
-The function types may also differ in attributes, with the following
-caveats:
-
-- The ``convention`` attribute cannot be changed.
-- A ``@noreturn`` function may be converted to a non-``@noreturn``
-  type and vice-versa.
+The function types may also differ in attributes, except that the
+``convention`` attribute cannot be changed.
 
 thin_function_to_pointer
 ````````````````````````
@@ -4111,7 +4211,7 @@ unreachable
 Indicates that control flow must not reach the end of the current basic block.
 It is a dataflow error if an unreachable terminator is reachable from the entry
 point of a function and is not immediately preceded by an ``apply`` of a
-``@noreturn`` function.
+no-return function.
 
 return
 ``````

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 indirect enum TreeA<T> {
   case Nil
@@ -43,16 +43,16 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 }
 
 // CHECK-LABEL: sil hidden @_TF13indirect_enum16TreeA_reabstractFFSiSiT_
-func TreeA_reabstract(_ f: (Int) -> Int) {
+func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 
-// CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<Int -> Int>.Type
+// CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $@callee_owned (@in Int) -> @out Int
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    strong_retain %0
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [[THUNK]](%0)
 // CHECK-NEXT:    store [[FN]] to [[PB]]
-// CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<Int -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
+// CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
 // CHECK-NEXT:    release_value [[LEAF]]
 // CHECK-NEXT:    strong_release %0
 // CHECK: return

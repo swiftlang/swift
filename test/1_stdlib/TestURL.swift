@@ -25,7 +25,7 @@ class TestURL : TestURLSuper {
     func testBasics() {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
         
-        expectTrue(url.pathComponents!.count > 0)
+        expectTrue(url.pathComponents.count > 0)
     }
     
     func testProperties() {
@@ -45,7 +45,7 @@ class TestURL : TestURLSuper {
         // Create a temporary file
         var file = URL(fileURLWithPath: NSTemporaryDirectory())
         let name = "my_great_file" + UUID().uuidString
-        try! file.appendPathComponent(name)
+        file.appendPathComponent(name)
         let data = Data(bytes: [1, 2, 3, 4, 5])
         do {
             try data.write(to: file)
@@ -71,7 +71,7 @@ class TestURL : TestURLSuper {
         // Create a temporary file
         var file = URL(fileURLWithPath: NSTemporaryDirectory())
         let name = "my_great_file" + UUID().uuidString
-        try! file.appendPathComponent(name)
+        file.appendPathComponent(name)
         let data = Data(bytes: [1, 2, 3, 4, 5])
         do {
             try data.write(to: file)
@@ -88,7 +88,7 @@ class TestURL : TestURLSuper {
             try file.setResourceValues(resourceValues)
             
             // get label number
-            try file.resourceValues(forKeys: [.labelNumberKey])
+            let _ = try file.resourceValues(forKeys: [.labelNumberKey])
             expectNotEmpty(resourceValues.labelNumber)
             expectEqual(resourceValues.labelNumber!, 1)
         } catch (let e as NSError) {
@@ -113,7 +113,7 @@ class TestURL : TestURLSuper {
         }
         
         do {
-            try FileManager.`default`().removeItem(at: file)
+            try FileManager.default.removeItem(at: file)
         } catch {
             expectTrue(false, "Unable to remove file")
         }
@@ -148,6 +148,178 @@ class TestURL : TestURLSuper {
             expectEqual("globalnav", first.value)
         }
     }
+    
+    func testURLResourceValues() {
+        
+        let fileName = "temp_file"
+        var dir = URL(fileURLWithPath: NSTemporaryDirectory())
+        dir.appendPathComponent(UUID().uuidString)
+        
+        try! FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        
+        dir.appendPathComponent(fileName)
+        try! Data(bytes: [1,2,3,4]).write(to: dir)
+        
+        defer {
+            do {
+                try FileManager.default.removeItem(at: dir)
+            } catch {
+                // Oh well
+            }
+        }
+        
+        do {
+            let values = try dir.resourceValues(forKeys: [.nameKey, .isDirectoryKey])
+            expectEqual(values.name, fileName)
+            expectFalse(values.isDirectory!)
+            expectEqual(nil, values.creationDate) // Didn't ask for this
+        } catch {
+            expectTrue(false, "Unable to get resource value")
+        }
+        
+        let originalDate : Date
+        do {
+            var values = try dir.resourceValues(forKeys: [.creationDateKey])
+            expectNotEqual(nil, values.creationDate)
+            originalDate = values.creationDate!
+        } catch {
+            originalDate = Date()
+            expectTrue(false, "Unable to get creation date")
+        }
+        
+        let newDate = originalDate + 100
+        
+        do {
+            var values = URLResourceValues()
+            values.creationDate = newDate
+            try dir.setResourceValues(values)
+        } catch {
+            expectTrue(false, "Unable to set resource value")
+        }
+        
+        do {
+            let values = try dir.resourceValues(forKeys: [.creationDateKey])
+            expectEqual(newDate, values.creationDate)
+        } catch {
+            expectTrue(false, "Unable to get values")
+        }
+    }
+
+    func test_AnyHashableContainingURL() {
+        let values: [URL] = [
+            URL(string: "https://example.com/")!,
+            URL(string: "https://example.org/")!,
+            URL(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URL.self, type(of: anyHashables[0].base))
+        expectEqual(URL.self, type(of: anyHashables[1].base))
+        expectEqual(URL.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSURL() {
+        let values: [NSURL] = [
+            NSURL(string: "https://example.com/")!,
+            NSURL(string: "https://example.org/")!,
+            NSURL(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URL.self, type(of: anyHashables[0].base))
+        expectEqual(URL.self, type(of: anyHashables[1].base))
+        expectEqual(URL.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableContainingURLComponents() {
+        let values: [URLComponents] = [
+            URLComponents(string: "https://example.com/")!,
+            URLComponents(string: "https://example.org/")!,
+            URLComponents(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URLComponents.self, type(of: anyHashables[0].base))
+        expectEqual(URLComponents.self, type(of: anyHashables[1].base))
+        expectEqual(URLComponents.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSURLComponents() {
+        let values: [NSURLComponents] = [
+            NSURLComponents(string: "https://example.com/")!,
+            NSURLComponents(string: "https://example.org/")!,
+            NSURLComponents(string: "https://example.org/")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URLComponents.self, type(of: anyHashables[0].base))
+        expectEqual(URLComponents.self, type(of: anyHashables[1].base))
+        expectEqual(URLComponents.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableContainingURLQueryItem() {
+        if #available(OSX 10.10, iOS 8.0, *) {
+            let values: [URLQueryItem] = [
+                URLQueryItem(name: "foo", value: nil),
+                URLQueryItem(name: "bar", value: nil),
+                URLQueryItem(name: "bar", value: nil),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual(URLQueryItem.self, type(of: anyHashables[0].base))
+            expectEqual(URLQueryItem.self, type(of: anyHashables[1].base))
+            expectEqual(URLQueryItem.self, type(of: anyHashables[2].base))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
+
+    func test_AnyHashableCreatedFromNSURLQueryItem() {
+        if #available(OSX 10.10, iOS 8.0, *) {
+            let values: [NSURLQueryItem] = [
+                NSURLQueryItem(name: "foo", value: nil),
+                NSURLQueryItem(name: "bar", value: nil),
+                NSURLQueryItem(name: "bar", value: nil),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual(URLQueryItem.self, type(of: anyHashables[0].base))
+            expectEqual(URLQueryItem.self, type(of: anyHashables[1].base))
+            expectEqual(URLQueryItem.self, type(of: anyHashables[2].base))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
+
+    func test_AnyHashableContainingURLRequest() {
+        let values: [URLRequest] = [
+            URLRequest(url: URL(string: "https://example.com/")!),
+            URLRequest(url: URL(string: "https://example.org/")!),
+            URLRequest(url: URL(string: "https://example.org/")!),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URLRequest.self, type(of: anyHashables[0].base))
+        expectEqual(URLRequest.self, type(of: anyHashables[1].base))
+        expectEqual(URLRequest.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSURLRequest() {
+        let values: [NSURLRequest] = [
+            NSURLRequest(url: URL(string: "https://example.com/")!),
+            NSURLRequest(url: URL(string: "https://example.org/")!),
+            NSURLRequest(url: URL(string: "https://example.org/")!),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(URLRequest.self, type(of: anyHashables[0].base))
+        expectEqual(URLRequest.self, type(of: anyHashables[1].base))
+        expectEqual(URLRequest.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -157,5 +329,14 @@ URLTests.test("testProperties") { TestURL().testProperties() }
 URLTests.test("testSetProperties") { TestURL().testSetProperties() }
 URLTests.test("testMoreSetProperties") { TestURL().testMoreSetProperties() }
 URLTests.test("testURLComponents") { TestURL().testURLComponents() }
+URLTests.test("testURLResourceValues") { TestURL().testURLResourceValues() }
+URLTests.test("test_AnyHashableContainingURL") { TestURL().test_AnyHashableContainingURL() }
+URLTests.test("test_AnyHashableCreatedFromNSURL") { TestURL().test_AnyHashableCreatedFromNSURL() }
+URLTests.test("test_AnyHashableContainingURLComponents") { TestURL().test_AnyHashableContainingURLComponents() }
+URLTests.test("test_AnyHashableCreatedFromNSURLComponents") { TestURL().test_AnyHashableCreatedFromNSURLComponents() }
+URLTests.test("test_AnyHashableContainingURLQueryItem") { TestURL().test_AnyHashableContainingURLQueryItem() }
+URLTests.test("test_AnyHashableCreatedFromNSURLQueryItem") { TestURL().test_AnyHashableCreatedFromNSURLQueryItem() }
+URLTests.test("test_AnyHashableContainingURLRequest") { TestURL().test_AnyHashableContainingURLRequest() }
+URLTests.test("test_AnyHashableCreatedFromNSURLRequest") { TestURL().test_AnyHashableCreatedFromNSURLRequest() }
 runAllTests()
 #endif

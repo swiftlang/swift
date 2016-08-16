@@ -144,10 +144,10 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialData {
            Observation(2, 10, 20,  0, 40),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -215,10 +215,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -302,10 +302,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -429,10 +429,10 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
            Observation(2, 10, 20,  0,  0, 100, 200, 999, 999),
            Observation(2, 10, 20, 30,  0, 100, 200, 300, 999),
            Observation(2, 10, 20, 30, 40, 100, 200, 300, 400):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -510,10 +510,10 @@ struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialData {
            Observation(2,  8, 16, -4, 64),
            Observation(2,  8, 16, 32, -4),
            Observation(2,  8, 16, 32, 64):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -591,10 +591,10 @@ struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialData {
            Observation(2, 11, 19,  3, 67),
            Observation(2, 11, 19, 35,  3),
            Observation(2, 11, 19, 35, 67):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -672,10 +672,10 @@ struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialData {
            Observation(2, 10, 18,  3, 66),
            Observation(2, 10, 18, 34,  3),
            Observation(2, 10, 18, 34, 66):
-        sink(.passInteresting(String(observation)))
+        sink(.passInteresting(String(describing: observation)))
 
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
   }
@@ -704,7 +704,8 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     var _atomicReference: AnyObject? = nil
 
     var atomicReferencePtr: UnsafeMutablePointer<AnyObject?> {
-      return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+        to: Optional<AnyObject>.self)
     }
 
     init() {}
@@ -725,7 +726,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     _ raceData: RaceData, _ threadLocalData: inout ThreadLocalData
   ) -> Observation {
     var observation = Observation4UInt(0, 0, 0, 0)
-    var initializerDestroyed = HeapBool(false)
+    let initializerDestroyed = HeapBool(false)
     do {
       let initializer = DummyObject(
         destroyedFlag: initializerDestroyed,
@@ -749,13 +750,13 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
     _ sink: (RaceTestObservationEvaluation) -> Void
   ) {
     let ref = observations[0].data2
-    if observations.contains({ $0.data2 != ref }) {
+    if observations.contains(where: { $0.data2 != ref }) {
       for observation in observations {
         sink(.failureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
-    if observations.contains({ $0.data3 != 0x12345678 }) {
+    if observations.contains(where: { $0.data3 != 0x12345678 }) {
       for observation in observations {
         sink(.failureInteresting("wrong data: \(observation)"))
       }
@@ -773,7 +774,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialData {
         // Lost race, value destroyed.
         lostRace += 1
       default:
-        sink(.failureInteresting(String(observation)))
+        sink(.failureInteresting(String(describing: observation)))
       }
     }
     if wonRace != 1 {

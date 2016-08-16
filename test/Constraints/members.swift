@@ -120,9 +120,9 @@ var wcurried1 = w.curried
 var wcurried2 = w.curried(0)
 var wcurriedFull : () = w.curried(0)(1)
 
-// Member of enum Type
+// Member of enum type
 func enumMetatypeMember(_ opt: Int?) {
-  opt.none // expected-error{{static member 'none' cannot be used on instance of type 'Int?'}}
+  opt.none // expected-error{{enum element 'none' cannot be referenced as an instance member}}
 }
 
 ////
@@ -145,10 +145,6 @@ func goo() {
 ////
 
 func id<T>(_ t: T) -> T { return t }
-
-func doGetLogicValue<T : Boolean>(_ t: T) {
-  t.boolValue  // expected-warning {{expression of type 'Bool' is unused}}
-}
 
 protocol P {
   init()
@@ -185,6 +181,16 @@ extension P {
 
 protocol ClassP : class {
   func bas(_ x: Int)
+  func quux(_ x: Int)
+}
+
+class ClassC : ClassP {
+  func bas(_ x: Int) {}
+}
+
+extension ClassP {
+  func quux(_ x: Int) {}
+  func bing(_ x: Int) {}
 }
 
 func generic<T: P>(_ t: T) {
@@ -247,6 +253,14 @@ func genericClassP<T: ClassP>(_ t: T) {
   let _: () = id(T.bas(t)(1))
 }
 
+func genericClassC<C : ClassC>(_ c: C) {
+  // Make sure that we can find members of protocol extensions
+  // on a class-bound archetype
+  let _ = c.bas(123)
+  let _ = c.quux(123)
+  let _ = c.bing(123)
+}
+
 ////
 // Members of existentials
 ////
@@ -262,7 +276,7 @@ func existential(_ p: P) {
   let _: () = id(p.bar(0))
 
   // Static member of existential metatype)
-  let _: () -> () = id(p.dynamicType.tum)
+  let _: () -> () = id(type(of: p).tum)
 
   // Instance member of extension returning Self
   let _: () -> P = id(p.returnSelfInstance)
@@ -308,6 +322,19 @@ func staticExistential(_ p: P.Type, pp: P.Protocol) {
   let _: P! = id(p.returnSelfIUOStatic(true))
 }
 
+protocol StaticP {
+  static func foo(a: Int)
+}
+extension StaticP {
+  func bar() {
+    _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{9-16=Self}}
+
+    func nested() {
+      _ = StaticP.foo(a:) // expected-error{{static member 'foo(a:)' cannot be used on protocol metatype 'StaticP.Protocol'}} {{11-18=Self}}
+    }
+  }
+}
+
 func existentialClassP(_ p: ClassP) {
   // Instance member of existential)
   let _: (Int) -> () = id(p.bas)
@@ -328,7 +355,7 @@ protocol Functional {
   func apply(_ v: Vector) -> Scalar
 }
 protocol Coalgebra {
-  func coproduct(_ f: Functional) -> (v1: Vector, v2: Vector) -> Scalar
+  func coproduct(_ f: Functional) -> (_ v1: Vector, _ v2: Vector) -> Scalar
 }
 
 // Make sure existential is closed early when we partially apply
@@ -376,7 +403,7 @@ func testPreferClassMethodToCurriedInstanceMethod(_ obj: InstanceOrClassMethod) 
 }
 
 protocol Numeric {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
 
 func acceptBinaryFunc<T>(_ x: T, _ fn: (T, T) -> T) { }

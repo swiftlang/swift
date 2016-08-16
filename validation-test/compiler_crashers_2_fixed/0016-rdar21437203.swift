@@ -5,7 +5,7 @@ struct Curds {
 }
 
 private class Butter {
-    private func churn<T>(block: () throws -> T) throws -> T {
+    fileprivate func churn<T>(block: () throws -> T) throws -> T {
       return try block()
     }
 }

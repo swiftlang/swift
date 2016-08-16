@@ -1,0 +1,43 @@
+// RUN: %swift -module-name bridge_object -emit-ir -target armv7-apple-ios8.0 %s | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=ARM
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+sil_vtable C {}
+
+@objc protocol ObjC {}
+
+sil @retain_release_bridge_object : $(Builtin.BridgeObject) -> () {
+entry(%b : $Builtin.BridgeObject):
+  strong_retain %b : $Builtin.BridgeObject
+  strong_release %b : $Builtin.BridgeObject
+  return undef : $()
+}
+
+sil @convert_to_bridge_object : $(C, Builtin.Word) -> Builtin.BridgeObject {
+entry(%c : $C, %w : $Builtin.Word):
+  %b = ref_to_bridge_object %c : $C, %w : $Builtin.Word
+  return %b : $Builtin.BridgeObject
+}
+
+// CHECK-LABEL: define{{( protected)?}} { %objc_object*, i32 } @convert_from_bridge_object
+// CHECK:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i32
+// CHECK:         [[MASKED_BITS:%.*]] = and i32 [[BOBITS]], -4
+// CHECK:         inttoptr i32 [[MASKED_BITS]] to [[C:%objc_object\*]]
+sil @convert_from_bridge_object : $Builtin.BridgeObject -> (ObjC, Builtin.Word) {
+entry(%b : $Builtin.BridgeObject):
+  %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $ObjC
+  %w = bridge_object_to_word %b : $Builtin.BridgeObject to $Builtin.Word
+  %t = tuple (%c : $ObjC, %w : $Builtin.Word)
+  return %t : $(ObjC, Builtin.Word)
+}
+
+sil @convert_from_native_bridge_object : $Builtin.BridgeObject -> C {
+entry(%b : $Builtin.BridgeObject):
+  %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
+  return %c : $C
+}

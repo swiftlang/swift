@@ -212,9 +212,6 @@ bool FulfillmentMap::searchParentTypeMetadata(IRGenModule &IGM,
   // We might not have a parent type.
   if (!parent) return false;
 
-  // Only class types properly initialize their parent type.
-  if (!isa<ClassDecl>(decl)) return false;
-
   // If we do, it has to be nominal one way or another.
   path.addNominalParentComponent();
   return searchTypeMetadata(IGM, parent, IsExact, source, std::move(path),keys);

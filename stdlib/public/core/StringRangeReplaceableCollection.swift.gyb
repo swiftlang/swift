@@ -35,7 +35,11 @@ extension String {
   /// In an empty string, `endIndex` is equal to `startIndex`.
   public var endIndex: Index { return characters.endIndex }
 
-    // TODO: swift-3-indexing-model - add docs
+  /// Returns the position immediately after the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
     return characters.index(after: i)
   }
@@ -45,19 +49,86 @@ extension String {
     return characters.index(before: i)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  ///
+  ///     let s = "Swift"
+  ///     let i = s.index(s.startIndex, offsetBy: 4)
+  ///     print(s[i])
+  ///     // Prints "t"
+  ///
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - n: The distance to offset `i`.
+  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
+  ///   this is the same value as the result of `n` calls to `index(after:)`.
+  ///   If `n` is negative, this is the same value as the result of `-n` calls
+  ///   to `index(before:)`.
+  ///
+  /// - SeeAlso: `index(_:offsetBy:limitedBy:)`
+  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return characters.index(i, offsetBy: n)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The following example obtains an index advanced four positions from a
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
+  ///
+  ///     let s = "Swift"
+  ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
+  ///         print(s[i])
+  ///     }
+  ///     // Prints "t"
+  ///
+  /// The next example attempts to retrieve an index six positions from
+  /// `s.startIndex` but fails, because that distance is beyond the index
+  /// passed as `limit`.
+  ///
+  ///     let j = s.index(s.startIndex, offsetBy: 6, limitedBy: s.endIndex)
+  ///     print(j)
+  ///     // Prints "nil"
+  ///
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - n: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
+  /// - Returns: An index offset by `n` from the index `i`, unless that index
+  ///   would be beyond `limit` in the direction of movement. In that case,
+  ///   the method returns `nil`.
+  ///
+  /// - SeeAlso: `index(_:offsetBy:)`
+  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     return characters.index(i, offsetBy: n, limitedBy: limit)
   }
 
-  // TODO: swift-3-indexing-model - add docs
+  /// Returns the distance between two indices.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the resulting distance.
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return characters.distance(from: start, to: end)
   }
@@ -94,12 +165,14 @@ extension String {
   }
 }
 
-public func == (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base == rhs._base
-}
+extension String.Index {
+  public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
+    return lhs._base == rhs._base
+  }
 
-public func < (lhs: String.Index, rhs: String.Index) -> Bool {
-  return lhs._base < rhs._base
+  public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
+    return lhs._base < rhs._base
+  }
 }
 
 extension String {

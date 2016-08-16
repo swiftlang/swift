@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -44,10 +44,10 @@ print("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
 
 // FIXME: Array type annotation should not be required
 let data = NSData(bytes: [1.5, 2.25, 3.125] as [Double], 
-                  length: sizeof(Double.self) * 3)
+                  length: MemoryLayout<Double>.size * 3)
 var fromData = [0.25, 0.25, 0.25]
 let notFromData = fromData
-data.getBytes(&fromData, length: sizeof(Double.self) * 3)
+data.getBytes(&fromData, length: MemoryLayout<Double>.size * 3)
 
 // CHECK-LABEL: Data is:
 print("Data is:")
@@ -127,8 +127,8 @@ puts(s)
 //
 
 var unsorted = [3, 14, 15, 9, 2, 6, 5]
-qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
-  return Int32(UnsafePointer<Int>(a!).pointee - UnsafePointer<Int>(b!).pointee)
+qsort(&unsorted, unsorted.count, MemoryLayout.size(ofValue: unsorted[0])) { a, b in
+  return Int32(a!.load(as: Int.self) - b!.load(as: Int.self))
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
 print(unsorted)

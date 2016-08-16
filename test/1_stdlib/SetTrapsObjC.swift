@@ -11,6 +11,7 @@
 import StdlibUnittest
 import Foundation
 
+let testSuiteSuffix = _isDebugAssertConfiguration() ? "_debug" : "_release"
 
 struct NotBridgedKeyTy : Equatable, Hashable {
   init(_ value: Int) {
@@ -49,7 +50,7 @@ func == (lhs: BridgedVerbatimRefTy, rhs: BridgedVerbatimRefTy) -> Bool {
 assert(_isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
-var SetTraps = TestSuite("SetTraps")
+var SetTraps = TestSuite("SetTraps" + testSuiteSuffix)
 
 SetTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
@@ -62,7 +63,7 @@ class TestObjCKeyTy : NSObject {
     self.value = value
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any?) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -79,10 +80,6 @@ class TestObjCKeyTy : NSObject {
 }
 
 struct TestBridgedKeyTy : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   init(_ value: Int) { self.value = value }
 
   var hashValue: Int { return value }

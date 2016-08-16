@@ -353,6 +353,8 @@ public:
   /// into.
   SILGenBuilder B;
 
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;
@@ -570,9 +572,11 @@ public:
   /// Generates code to initialize instance variables from their
   /// initializers.
   ///
+  /// \param dc The DeclContext containing the current function.
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param nominal The type whose members are being initialized.
-  void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
+  void emitMemberInitializers(DeclContext *dc, VarDecl *selfDecl,
+                              NominalTypeDecl *nominal);
 
   /// Emit a method that initializes the ivars of a class.
   void emitIVarInitializer(SILDeclRef ivarInitializer);
@@ -595,7 +599,7 @@ public:
   /// Generates a thunk from a native function to the conventions.
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
-  // Generate a nullary function that returns the given value.
+  /// Generate a nullary function that returns the given value.
   void emitGeneratorFunction(SILDeclRef function, Expr *value);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
@@ -860,16 +864,16 @@ public:
                                                  const TypeLowering &optTL,
                                                  SGFContext C = SGFContext());
 
-  typedef std::function<ManagedValue(SILGenFunction &gen,
-                                     SILLocation loc,
-                                     ManagedValue input,
-                                     SILType loweredResultTy)> ValueTransform;
+  typedef llvm::function_ref<ManagedValue(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue input,
+                                    SILType loweredResultTy)> ValueTransformRef;
 
   /// Emit a transformation on the value of an optional type.
   ManagedValue emitOptionalToOptional(SILLocation loc,
                                       ManagedValue input,
                                       SILType loweredResultTy,
-                                      const ValueTransform &transform);
+                                      ValueTransformRef transform);
 
   /// Emit a reinterpret-cast from one pointer type to another, using a library
   /// intrinsic.
@@ -942,7 +946,8 @@ public:
                             const TypeLowering &existentialTL,
                             ArrayRef<ProtocolConformanceRef> conformances,
                             SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F);
+                            llvm::function_ref<ManagedValue (SGFContext)> F,
+                            bool allowEmbeddedNSError = true);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -1003,6 +1008,10 @@ public:
   ManagedValue emitRValueAsOrig(Expr *E, AbstractionPattern origPattern,
                                 const TypeLowering &origTL,
                                 SGFContext C = SGFContext());
+
+  /// Emit an r-value into temporary memory and return the managed address.
+  ManagedValue
+  emitMaterializedRValueAsOrig(Expr *E, AbstractionPattern origPattern);
   
   /// Emit the given expression, ignoring its result.
   void emitIgnoredExpr(Expr *E);
@@ -1014,6 +1023,7 @@ public:
   /// Emit 'undef' in a particular formal type.
   ManagedValue emitUndef(SILLocation loc, Type type);
   ManagedValue emitUndef(SILLocation loc, SILType type);
+  RValue emitUndefRValue(SILLocation loc, Type type);
   
   std::pair<ManagedValue, SILValue>
   emitUninitializedArrayAllocation(Type ArrayTy,
@@ -1228,6 +1238,14 @@ public:
                                         AbstractionPattern origResultType,
                                         SGFContext C = SGFContext());
 
+  RValue emitApplyOfStoredPropertyInitializer(
+      SILLocation loc,
+      const PatternBindingEntry &entry,
+      ArrayRef<Substitution> subs,
+      CanType resultType,
+      AbstractionPattern origResultType,
+      SGFContext C);
+
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
   RValue emitMonomorphicApply(SILLocation loc,
@@ -1249,6 +1267,9 @@ public:
                                 SILType substFnType,
                                 ArrayRef<Substitution> subs,
                                 ArrayRef<SILValue> args);
+
+  /// Emit a literal that applies the various initializers.
+  RValue emitLiteral(LiteralExpr *literal, SGFContext C);
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult,
@@ -1390,11 +1411,11 @@ public:
                                         SILFunctionTypeRepresentation srcRep,
                                         CanType nativeTy);
 
-  /// Convert a bridged error type to the native Swift ErrorProtocol
+  /// Convert a bridged error type to the native Swift Error
   /// representation.  The value may be optional.
   ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
-  /// Convert a value in the native Swift ErrorProtocol representation to
+  /// Convert a value in the native Swift Error representation to
   /// a bridged error type representation.
   ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
                                         CanType bridgedType);

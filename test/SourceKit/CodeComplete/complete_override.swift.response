@@ -76,6 +76,15 @@
     },
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "fileprivate",
+      key.sourcetext: "fileprivate",
+      key.description: "fileprivate",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "final",
       key.sourcetext: "final",
       key.description: "final",
@@ -216,6 +225,15 @@
       key.name: "postfix",
       key.sourcetext: "postfix",
       key.description: "postfix",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "precedencegroup",
+      key.sourcetext: "precedencegroup",
+      key.description: "precedencegroup",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.num_bytes_to_erase: 0

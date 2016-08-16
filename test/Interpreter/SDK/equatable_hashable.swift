@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -18,7 +18,7 @@ test_CBool()
 
 func test_ObjCBool() {
   let x = ObjCBool(true)
-  let hash = testHash(Bool(x))
+  let hash = testHash(x.boolValue)
   print("ObjCBool: hash = \(hash)")
 }
 // CHECK-NEXT: ObjCBool: hash = 1

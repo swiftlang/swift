@@ -12,6 +12,7 @@
 
 #include <random>
 #include <type_traits>
+#include <cmath>
 #if defined(_MSC_VER)
 #include <io.h>
 #else
@@ -20,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "swift/Basic/Lazy.h"
 #include "../SwiftShims/LibcShims.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -93,7 +95,7 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 }
 #elif defined(_MSC_VER)
 #include <malloc.h>
-size_t _swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
@@ -105,9 +107,10 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 #error No malloc_size analog known for this platform/libc.
 #endif
 
+static Lazy<std::mt19937> theGlobalMT19937;
+
 static std::mt19937 &getGlobalMT19937() {
-  static std::mt19937 MersenneRandom;
-  return MersenneRandom;
+  return theGlobalMT19937.get();
 }
 
 __swift_uint32_t swift::_swift_stdlib_cxx11_mt19937() {
@@ -121,3 +124,26 @@ swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);
   return RandomUniform(getGlobalMT19937());
 }
+
+float swift::_swift_stdlib_remainderf(float dividend, float divisor) {
+  return std::remainder(dividend, divisor);
+}
+
+float swift::_swift_stdlib_squareRootf(float x) { return std::sqrt(x); }
+
+double swift::_swift_stdlib_remainder(double dividend, double divisor) {
+  return std::remainder(dividend, divisor);
+}
+
+double swift::_swift_stdlib_squareRoot(double x) { return std::sqrt(x); }
+
+#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
+void swift::_swift_stdlib_remainderl(void *_self, const void *_other) {
+  *(long double *)_self = std::remainder(*(long double *)_self,
+                                         *(const long double *)_other);
+}
+
+void swift::_swift_stdlib_squareRootl(void *_self) {
+  *(long double *)_self = std::sqrt(*(long double *)_self);
+}
+#endif // Have Float80

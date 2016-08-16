@@ -10,10 +10,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN-DISABLED: %target-run-simple-swift | FileCheck %s
+// RUN-DISABLED: %target-run-simple-swift | %FileCheck %s
 // RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/NewArray.swift
 // RUN: %line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
-// RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- %FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -32,16 +32,39 @@ func printSequence<T : Sequence>(_ x: T) {
   print("]")
 }
 
-typealias BufferID = UnsafePointer<Void>?
+typealias _BufferID = UnsafeRawPointer?
 
-func bufferID<T : _ArrayProtocol>(_ x: T) -> BufferID {
-  return x._buffer.identity
+protocol MyArrayProtocol
+  : RandomAccessCollection,
+    RangeReplaceableCollection,
+    MutableCollection,
+    ArrayLiteralConvertible {
+
+  associatedtype Iterator : IteratorProtocol
+
+  var _owner: AnyObject? { get }
+
+  var capacity: Int { get }
+
+  func += <
+    S : Sequence
+    where
+    S.Iterator.Element == Iterator.Element
+  >(lhs: inout Self, rhs: S)
 }
+extension MyArrayProtocol {
+  var _bufferID: _BufferID {
+    return unsafeBitCast(_owner, to: _BufferID.self)
+  }
+}
+extension Array : MyArrayProtocol {}
+extension ArraySlice : MyArrayProtocol {}
+extension ContiguousArray : MyArrayProtocol {}
 
-func checkReallocation<T : _ArrayProtocol>(
-  _ x: T, _ lastBuffer: BufferID, _ reallocationExpected: Bool
-) -> BufferID {
-  let currentBuffer = bufferID(x)
+func checkReallocation<T : MyArrayProtocol>(
+  _ x: T, _ lastBuffer: _BufferID, _ reallocationExpected: Bool
+) -> _BufferID {
+  let currentBuffer = x._bufferID
   if (currentBuffer != lastBuffer) != reallocationExpected {
     let message = reallocationExpected ? "lack of" : ""
     print("unexpected \(message) reallocation")
@@ -62,13 +85,12 @@ func checkEqual<
 }
 
 func test<
-  T : _ArrayProtocol
+  T : MyArrayProtocol
   where
-  T.Iterator.Element == T._Buffer.Element,
-  T._Buffer.Element == T.Element,
-  T.Element == LifetimeTracked,
+  T.Iterator.Element == LifetimeTracked,
+  T.Iterator.Element == T.Element,
   T.Index == Int,
-  T : RandomAccessCollection
+  T.IndexDistance == Int
 >(_: T.Type, _ label: String) {
   print("test: \(label)...", terminator: "")
 
@@ -85,7 +107,7 @@ func test<
   x.reserveCapacity(x.count + 2)
   checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
   
-  let bufferId0 = bufferID(x)
+  let bufferId0 = x._bufferID
 
   // Append a range of integers
   x += LifetimeTracked(0)..<LifetimeTracked(2)
@@ -113,9 +135,9 @@ func test<
     // has shown that using 1.5, the other popular growth factor,
     // slows things down.
     for _ in a.count..<(a.capacity * 4) {
-      let oldId = bufferID(a)
+      let oldId = a._bufferID
       growBy1(&a)
-      if oldId != bufferID(a) {
+      if oldId != a._bufferID {
         reallocations += 1
       }
     }
@@ -156,29 +178,29 @@ func testAsArray() {
   // CHECK: == AsArray == 
   
   let x = ContiguousArray(w)
-  print(bufferID(w) == bufferID(x))
+  print(w._bufferID == x._bufferID)
   // CHECK-NEXT: true
   
   let y = Array(x)
-  print(bufferID(x) == bufferID(y))
+  print(x._bufferID == y._bufferID)
   // CHECK-NEXT: true
 
   // Because of their indirection, arrays of classes can share
   // buffers.  
   let y1 = Array(y)
-  print(bufferID(y1) == bufferID(y))
+  print(y1._bufferID == y._bufferID)
   // CHECK-NEXT: true
   
   let z = ArraySlice(y)
-  print(bufferID(y) == bufferID(z))
+  print(y._bufferID == z._bufferID)
   // CHECK-NEXT: true
 
   w = ContiguousArray(z)
-  print(bufferID(w) == bufferID(z))
+  print(w._bufferID == z._bufferID)
   // CHECK-NEXT: true
 
   let zz = y[0..<2]
-  print(bufferID(zz))
+  print(zz._bufferID)
   // CHECK-NEXT: 0x
 }
 testAsArray()
@@ -190,7 +212,10 @@ func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   return src.withUnsafeBufferPointer {
-    let ns =  NSArray(objects: UnsafePointer($0.baseAddress!), count: $0.count)
+    let ns =  NSArray(
+      objects: unsafeBitCast($0.baseAddress!,
+        to: UnsafeMutablePointer<AnyObject>.self),
+      count: $0.count)
     return ns as! [NSString]
   }
 }
@@ -245,8 +270,8 @@ testCocoa()
 #endif // _runtime(_ObjC)
 
 extension ArraySlice {
-  mutating func qsort(_ compare: (Element, Element) -> Bool) {
-    _introSort(&self, subRange: Range(self.indices), isOrderedBefore: compare)
+  mutating func qsort(_ compare: @escaping (Element, Element) -> Bool) {
+    _introSort(&self, subRange: Range(self.indices), by: compare)
   }
 }
 
@@ -317,14 +342,14 @@ let testWidth = 11
 %arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
 %for A in arrayTypes:
 
-func testReplace(_ make: () -> ${A}<LifetimeTracked>) {
+func testReplace(_ make: @escaping () -> ${A}<LifetimeTracked>) {
 
   checkRangeReplaceable(
     make, { LifetimeTracked(100)..<LifetimeTracked(100 + $0) })
 }
 
 func testReplace${A}(
-  makeOne: () -> ${A}<LifetimeTracked> = {
+  makeOne: @escaping () -> ${A}<LifetimeTracked> = {
     var x = ${A}<LifetimeTracked>()
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)
@@ -428,8 +453,8 @@ func testIsEmptyFirstLast${A}() {
   print(${A}<Int>().isEmpty)          // CHECK-NEXT: true
   print(${A}(42...42).isEmpty)   // CHECK-NEXT: false
 
-  print("<\(${A}(3...42).first!)>")  // CHECK-NEXT: <3>
-  print("<\(${A}(3...42).last!)>")   // CHECK-NEXT: <42>
+  print("<\(${A}(3..<43).first!)>")  // CHECK-NEXT: <3>
+  print("<\(${A}(3..<43).last!)>")   // CHECK-NEXT: <42>
 
   print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
   print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
@@ -469,7 +494,7 @@ class Rdar16914909 : NSObject {
   var basicColorSet = [OSColor]()
   
   func doColorStuff() {
-    basicColorSet.append(OSColor.lightGray())
+    basicColorSet.append(OSColor.lightGray)
     print("appended")
   }
 }

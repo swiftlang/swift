@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 infix operator ~> { precedence 255 associativity left }
 
@@ -9,9 +9,9 @@ func baz<T:P>(_: inout T) -> (Int) -> () { return {_ in ()} }
 
 func ~> <T: P, Args, Result>(
   x: inout T,
-  m: (x: inout T) -> ((Args) -> Result)
+  m: (_ x: inout T) -> ((Args) -> Result)
 ) -> ((Args) -> Result) {
-  return m(x: &x)
+  return m(&x)
 }
 
 struct X : P {}

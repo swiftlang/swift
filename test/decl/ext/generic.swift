@@ -5,18 +5,10 @@ protocol P2 : P1 { }
 protocol P3 { }
 
 struct X<T : P1, U : P2, V> { 
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
+  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' cannot be nested in type 'X'}}
 
   struct NonGenericInner { } // expected-error{{nested in generic type}}
 }
-
-struct Y {
-  struct Inner<A, B : P3> { } // expected-error{{generic type 'Inner' nested in type}}
-
-  struct NonGenericInner { } 
-}
-
-struct Z<T : P1 where T.AssocType : P3> { }
 
 extension Int : P1 {
   typealias AssocType = Int
@@ -160,4 +152,4 @@ struct S4<Q>: P4 {
   init(_: Q) { }
 }
 
-extension S4 where T : P5 {} // expected-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
+extension S4 where T : P5 {} // expected-FIXME-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}

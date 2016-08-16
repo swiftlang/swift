@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !defined(_WIN32)
 #include "swift/Runtime/Mutex.h"
 
 #include "swift/Runtime/Debug.h"
@@ -142,3 +143,4 @@ void ReadWriteLockPlatformHelper::readUnlock(pthread_rwlock_t &rwlock) {
 void ReadWriteLockPlatformHelper::writeUnlock(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_unlock(&rwlock));
 }
+#endif

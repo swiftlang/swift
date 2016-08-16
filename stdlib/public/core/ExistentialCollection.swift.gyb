@@ -24,8 +24,11 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@noreturn @inline(never)
-internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
+@inline(never)
+internal func _abstract(
+  file: StaticString = #file,
+  line: UInt = #line
+) -> Never {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
@@ -40,33 +43,48 @@ internal func _abstract(_ file: StaticString = #file, line: UInt = #line) {
 ///
 /// - SeeAlso: `AnySequence`
 public struct AnyIterator<Element> : IteratorProtocol {
-  /// Creates an iterator that wraps `base` but whose type depends only on the
-  /// type of `I.Element`.
+  /// Creates an iterator that wraps a base iterator but whose type depends
+  /// only on the base iterator's element type.
   ///
-  /// Example:
+  /// You can use `AnyIterator` to hide the type signature of a more complex
+  /// iterator. For example, the `digits()` function in the following example
+  /// creates an iterator over a collection that lazily maps the elements of a
+  /// `CountableRange<Int>` instance to strings. Instead of returning an
+  /// iterator with a type that encapsulates the implementation of the
+  /// collection, the `digits()` function first wraps the iterator in an
+  /// `AnyIterator` instance.
   ///
   ///     func digits() -> AnyIterator<String> {
-  ///       let lazyStrings = (0..<10).lazy.map { String($0) }
+  ///         let lazyStrings = (0..<10).lazy.map { String($0) }
+  ///         let iterator:
+  ///             LazyMapIterator<IndexingIterator<CountableRange<Int>>, String>
+  ///             = lazyStrings.makeIterator()
   ///
-  ///       // This is a really complicated type of no interest to our
-  ///       // clients.
-  ///       let iterator: MapSequenceIterator<RangeIterator<Int>, String>
-  ///         = lazyStrings.makeIterator()
-  ///       return AnyIterator(iterator)
+  ///         return AnyIterator(iterator)
   ///     }
+  ///
+  /// - Parameter base: An iterator to type-erase.
   public init<I : IteratorProtocol>(_ base: I) where I.Element == Element {
     self._box = _IteratorBox(base)
   }
 
-  /// Creates an iterator whose `next` method invokes `body` and returns the
-  /// result.
+  /// Creates an iterator that wraps the given closure in its `next()` method.
   ///
-  /// Example:
+  /// The following example creates an iterator that counts up from the initial
+  /// value of an integer `x` to 15:
   ///
   ///     var x = 7
-  ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
-  ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-  public init(_ body: () -> Element?) {
+  ///     let iterator: AnyIterator<Int> = AnyIterator {
+  ///         defer { x += 1 }
+  ///         return x < 15 ? x : nil
+  ///     }
+  ///     let a = Array(iterator)
+  ///     // a == [7, 8, 9, 10, 11, 12, 13, 14]
+  ///
+  /// - Parameter body: A closure that returns an optional element. `body` is
+  ///   executed each time the `next()` method is called on the resulting
+  ///   iterator.
+  public init(_ body: @escaping () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
@@ -90,7 +108,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
 extension AnyIterator : Sequence {}
 
 internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
-  internal init(_ body: () -> Element?) {
+  internal init(_ body: @escaping () -> Element?) {
     self._body = body
   }
   internal func next() -> Element? { return _body() }
@@ -113,10 +131,6 @@ internal final class _IteratorBox<
   internal init(_ base: Base) { self._base = base }
   internal override func next() -> Base.Element? { return _base.next() }
   internal var _base: Base
-}
-
-internal func _typeID(_ instance: AnyObject) -> ObjectIdentifier {
-  return ObjectIdentifier(instance.dynamicType)
 }
 
 //===--- Sequence ---------------------------------------------------------===//
@@ -145,19 +159,19 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal var _underestimatedCount: Int { _abstract() }
 
   internal func _map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     _abstract()
   }
 
   internal func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
 
   internal func _forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     _abstract()
   }
@@ -169,12 +183,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal func __preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     _abstract()
   }
 
-  internal func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+  internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
 
@@ -204,7 +218,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -334,17 +348,17 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return _base.underestimatedCount
   }
   internal override func _map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
   internal override func _filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _base.filter(includeElement)
+    return try _base.filter(isIncluded)
   }
   internal override func _forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     return try _base.forEach(body)
   }
@@ -354,12 +368,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return _base._customContainsEquatableElement(element)
   }
   internal override func __preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
-  internal override func __copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return _base._copyToNativeArrayBuffer()._storage
+  internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
   internal override func __copyContents(initializing ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
@@ -380,12 +394,12 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
       .map {
         Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
       }
@@ -515,7 +529,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
   : Sequence {
 
-  internal init(_ makeUnderlyingIterator: () -> Iterator) {
+  internal init(_ makeUnderlyingIterator: @escaping () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 
@@ -523,14 +537,14 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: () -> Iterator
+  internal var _makeUnderlyingIterator: @escaping () -> Iterator
 }
 
 /// A type-erased sequence.
 ///
-/// Forwards operations to an arbitrary underlying sequence having the
-/// same `Element` type, hiding the specifics of the underlying
-/// `Sequence`.
+/// An instance of `AnySequence` forwards its operations to an underlying base
+/// sequence having the same `Element` type, hiding the specifics of the
+/// underlying sequence.
 ///
 /// - SeeAlso: `AnyIterator`
 public struct AnySequence<Element> : Sequence {
@@ -547,7 +561,7 @@ public struct AnySequence<Element> : Sequence {
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol>(
-    _ makeUnderlyingIterator: () -> I
+    _ makeUnderlyingIterator: @escaping () -> I
   ) where I.Element == Element {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
@@ -566,8 +580,6 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
-  ///
-  /// - Complexity: O(1).
   public func makeIterator() -> AnyIterator<Element> {
     return _box._makeIterator()
   }
@@ -577,19 +589,19 @@ extension Any${Kind} {
   }
 
   public func map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _box._map(transform)
   }
 
   public func filter(
-    _ includeElement: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    return try _box._filter(includeElement)
+    return try _box._filter(isIncluded)
   }
 
   public func forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     return try _box._forEach(body)
   }
@@ -613,22 +625,22 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
-      isSeparator: isSeparator)
+      whereSeparator: isSeparator)
   }
 
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _box.__preprocessingPass(preprocess)
   }
 
-  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _ContiguousArrayBuffer(self._box.__copyToNativeArrayBuffer())
+  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return self._box.__copyToContiguousArray()
   }
 
   public func _copyContents(initializing ptr: UnsafeMutablePointer<Element>)
@@ -646,17 +658,9 @@ internal protocol _AnyIndexBox : class {
 
   func _unbox<T : Comparable>() -> T?
 
-  func _equal(to rhs: _AnyIndexBox) -> Bool
+  func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
-  func _notEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _less(than rhs: _AnyIndexBox) -> Bool
-
-  func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool
-
-  func _greater(than rhs: _AnyIndexBox) -> Bool
-
-  func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool
+  func _isLess(than rhs: _AnyIndexBox) -> Bool
 }
 
 internal final class _IndexBox<
@@ -673,43 +677,26 @@ internal final class _IndexBox<
   }
 
   internal var _typeID: ObjectIdentifier {
-    return Swift._typeID(self)
+    return ObjectIdentifier(type(of: self))
   }
 
   internal func _unbox<T : Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  internal func _equal(to rhs: _AnyIndexBox) -> Bool {
+  internal func _isEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
 
-  internal func _notEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base != _unsafeUnbox(rhs)
-  }
-
-  internal func _less(than rhs: _AnyIndexBox) -> Bool {
+  internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
-  }
-
-  internal func _lessOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base <= _unsafeUnbox(rhs)
-  }
-
-  internal func _greater(than rhs: _AnyIndexBox) -> Bool {
-    return _base > _unsafeUnbox(rhs)
-  }
-
-  internal func _greaterOrEqual(to rhs: _AnyIndexBox) -> Bool {
-    return _base >= _unsafeUnbox(rhs)
   }
 }
 
-/// A wrapper over an underlying index that hides
-/// the specific underlying type.
+/// A wrapper over an underlying index that hides the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
-public struct AnyIndex : Comparable {
+public struct AnyIndex {
   /// Creates a new index wrapping `base`.
   public init<BaseIndex : Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
@@ -726,67 +713,42 @@ public struct AnyIndex : Comparable {
   internal var _box: _AnyIndexBox
 }
 
-/// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
-///
-/// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
-///   identical.
-public func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._equal(to: rhs._box)
-}
+extension AnyIndex : Comparable {
+  /// Returns a Boolean value indicating whether two indices wrap equal
+  /// underlying indices.
+  ///
+  /// The types of the two underlying indices must be identical.
+  ///
+  /// - Parameters:
+  ///   - lhs: An index to compare.
+  ///   - rhs: Another index to compare.
+  public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isEqual(to: rhs._box)
+  }
 
-public func != (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._notEqual(to: rhs._box)
-}
-
-public func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._less(than: rhs._box)
-}
-
-public func <= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._lessOrEqual(to: rhs._box)
-}
-
-public func > (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greater(than: rhs._box)
-}
-
-public func >= (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
-  _precondition(lhs._typeID == rhs._typeID, "base index types differ")
-  return lhs._box._greaterOrEqual(to: rhs._box)
+  /// Returns a Boolean value indicating whether the first argument represents a
+  /// position before the second argument.
+  ///
+  /// The types of the two underlying indices must be identical.
+  ///
+  /// - Parameters:
+  ///   - lhs: An index to compare.
+  ///   - rhs: Another index to compare.
+  public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
+    _precondition(lhs._typeID == rhs._typeID, "base index types differ")
+    return lhs._box._isLess(than: rhs._box)
+  }
 }
 
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A protocol for `AnyCollection<Element>`,
-/// `AnyBidirectionalCollection<Element>`, and
-/// `AnyRandomAccessCollection<Element>`.
-///
-/// This protocol can be considered an implementation detail of the
-/// `===` and `!==` implementations for these types.
-public protocol AnyCollectionProtocol : Collection {
+public // @testable
+protocol _AnyCollectionProtocol : Collection {
   /// Identifies the underlying collection stored by `self`. Instances
-  /// copied from one another have the same `_underlyingCollectionID`.
-  var _underlyingCollectionID: ObjectIdentifier { get }
-}
-
-/// Returns `true` iff `lhs` and `rhs` store the same underlying collection.
-public func === <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID == rhs._underlyingCollectionID
-}
-
-/// Returns `false` iff `lhs` and `rhs` store the same underlying collection.
-public func !== <
-  L : AnyCollectionProtocol, R : AnyCollectionProtocol
->(lhs: L, rhs: R) -> Bool {
-  return lhs._underlyingCollectionID != rhs._underlyingCollectionID
+  /// copied or upgraded/downgraded from one another have the same `_boxID`.
+  var _boxID: ObjectIdentifier { get }
 }
 
 % for (ti, Traversal) in enumerate(TRAVERSALS):
@@ -795,13 +757,13 @@ public func !== <
 /// A type-erased wrapper over any collection with indices that
 /// support ${Traversal.lower().replace('omacc', 'om acc')} traversal.
 ///
-/// Forwards operations to an arbitrary underlying collection having the
+/// An `${Self}` instance forwards its operations to a base collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `Collection`.
+/// collection.
 ///
 /// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
-  : AnyCollectionProtocol, ${SelfProtocol} {
+  : _AnyCollectionProtocol, ${SelfProtocol} {
 
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
@@ -809,8 +771,9 @@ public struct ${Self}<Element>
 
 %   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
-  /// Creates an `${Self}` that
-  /// stores `base` as its underlying collection.
+  /// Creates a type-erased collection that wraps the given collection.
+  ///
+  /// - Parameter base: The collection to wrap.
   ///
   /// - Complexity: O(1).
   public init<C : ${SubProtocol}>(_ base: C)
@@ -837,12 +800,9 @@ public struct ${Self}<Element>
       _base: base)
   }
 
-  /// Creates an `Any${Traversal}Collection` having the same underlying
-  /// collection as `other`.
+  /// Creates an `${Self}` having the same underlying collection as `other`.
   ///
-  /// - Postcondition: The result is `===` to `other`.
-  ///
-  /// - Complexity: O(1).
+  /// - Complexity: O(1)
   public init(
     _ other: Any${SubProtocol}<Element>
   ) {
@@ -851,12 +811,12 @@ public struct ${Self}<Element>
 %   end
 
 %   for SuperTraversal in TRAVERSALS[:ti]:
-  /// If the underlying collection stored by `other` satisfies
-  /// `${SelfProtocol}`, creates an `${Self}` having the same
-  /// underlying collection as `other`.  Otherwise, the result is
-  /// `nil`.
+  /// Creates an `${Self}` having the same underlying collection as `other`.
   ///
-  /// - Complexity: O(1).
+  /// If the underlying collection stored by `other` does not satisfy
+  /// `${SelfProtocol}`, the result is `nil`.
+  ///
+  /// - Complexity: O(1)
   public init?(
     _ other: Any${collectionForTraversal(SuperTraversal)}<Element>
   ) {
@@ -968,7 +928,7 @@ public struct ${Self}<Element>
 
   /// The number of elements.
   ///
-  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
+  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   public var count: IntMax {
     return _box._count
   }
@@ -998,7 +958,7 @@ public struct ${Self}<Element>
 
   /// Uniquely identifies the stored underlying collection.
   public // Due to language limitations only
-  var _underlyingCollectionID: ObjectIdentifier {
+  var _boxID: ObjectIdentifier {
     return ObjectIdentifier(_box)
   }
 
@@ -1010,7 +970,7 @@ public struct ${Self}<Element>
 public struct AnyGenerator<Element> {}
 
 extension AnyIterator {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Element> {
     Builtin.unreachable()
   }
@@ -1019,18 +979,21 @@ extension AnyIterator {
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
 
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
-  public var underestimateCount: Int {
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
+  public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
 }
 %end
 
-@available(*, unavailable, renamed: "AnyCollectionProtocol")
-public typealias AnyCollectionType = AnyCollectionProtocol
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionType = _AnyCollectionProtocol
 
-extension AnyCollectionProtocol {
-  @available(*, unavailable, renamed: "makeIterator")
+@available(*, unavailable, renamed: "_AnyCollectionProtocol")
+public typealias AnyCollectionProtocol = _AnyCollectionProtocol
+
+extension _AnyCollectionProtocol {
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> AnyIterator<Iterator.Element> {
     Builtin.unreachable()
   }
@@ -1040,3 +1003,28 @@ extension AnyCollectionProtocol {
 @available(*, unavailable, renamed: "AnyIndex")
 public typealias Any${Traversal}Index = AnyIndex
 % end
+
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<G : IteratorProtocol>(_ base: G) -> AnyIterator<G.Element> {
+    Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "AnyIterator.init(_:)")
+public func anyGenerator<Element>(_ body: () -> Element?) -> AnyIterator<Element> {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func === <
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable)
+public func !== <
+  L : _AnyCollectionProtocol, R : _AnyCollectionProtocol
+>(lhs: L, rhs: R) -> Bool {
+  Builtin.unreachable()
+}

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -9,9 +9,9 @@ import Foundation
 
 // CHECK-LABEL: define{{( protected)?}} %swift.error* @errortype_from_nserror(%CSo7NSError*)
 // CHECK:         %1 = bitcast %CSo7NSError* %0 to %swift.error*
-sil @errortype_from_nserror : $@convention(thin) (@owned NSError) -> @owned ErrorProtocol {
+sil @errortype_from_nserror : $@convention(thin) (@owned NSError) -> @owned Error {
 entry(%0 : $NSError):
-  %1 = init_existential_ref %0 : $NSError : $NSError, $ErrorProtocol
-  return %1 : $ErrorProtocol
+  %1 = init_existential_ref %0 : $NSError : $NSError, $Error
+  return %1 : $Error
 }
 

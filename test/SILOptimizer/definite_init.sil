@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -verify | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
 
 import Builtin
 import Swift
@@ -65,7 +65,7 @@ bb0(%0 : $Int):
 
 
 struct AddressOnlyStruct {
-  var a : protocol<>
+  var a : Any
   var b : Int
 }
 

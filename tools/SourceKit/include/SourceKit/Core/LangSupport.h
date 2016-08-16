@@ -27,7 +27,6 @@ namespace llvm {
   class MemoryBuffer;
 }
 namespace SourceKit {
-  class Context;
 
 struct EntityInfo {
   UIdent Kind;
@@ -254,6 +253,8 @@ struct CursorInfo {
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
+  StringRef TypeUSR;
+  StringRef ContainerTypeUSR;
   StringRef DocComment;
   StringRef TypeInterface;
   StringRef GroupName;
@@ -412,6 +413,10 @@ public:
                                    bool SynthesizedExtensions,
                                    Optional<StringRef> InterestedUSR) = 0;
 
+  virtual void editorOpenTypeInterface(EditorConsumer &Consumer,
+                                       ArrayRef<const char *> Args,
+                                       StringRef TypeUSR) = 0;
+
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,
                                          StringRef HeaderName,
@@ -472,9 +477,6 @@ public:
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
-
-  static std::unique_ptr<LangSupport> createSwiftLangSupport(
-                                                     SourceKit::Context &SKCtx);
 };
 
 } // namespace SourceKit

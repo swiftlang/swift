@@ -10,23 +10,65 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_exported import GameplayKit
+@_exported import GameplayKit // Clang module
+import CoreGraphics
+import simd
 
-@_silgen_name("GK_Swift_GKEntity_componentForClass")
-internal func GK_Swift_GKEntity_componentForClass(
-  _ self_: AnyObject,
-  _ componentClass: AnyObject) -> AnyObject?
+
+@available(iOS, introduced: 9.0)
+@available(OSX, introduced: 10.11)
+@available(tvOS, introduced: 9.0)
+extension GKPath {
+  /// Creates a path from an array of points
+  /// - Parameter points: an array of simd.float2 points to make a path from
+  /// - Parameter radius: radius of the path to create
+  /// - Parameter cyclical: if the path is of a cycle that loops back on itself
+  public convenience init(points: [simd.float2], radius: Float, cyclical: Bool) {
+    var variablePoints = points
+    self.init(__points: &variablePoints, count: points.count, radius: radius, cyclical: cyclical)
+  }
+}
+
+
+@available(iOS, introduced: 10.0)
+@available(OSX, introduced: 10.12)
+@available(tvOS, introduced: 10.0)
+extension GKPath {
+  /// Creates a path from an array of points
+  /// - Parameter points: an array of simd.float3 points to make a path from
+  /// - Parameter radius: the radius of the path to create
+  /// - Parameter cyclical: if the path is of a cycle that loops back on itself
+  public convenience init(points: [simd.float3], radius: Float, cyclical: Bool) {
+    var variablePoints = points
+    self.init(__float3Points: &variablePoints, count: points.count, radius: radius, cyclical: cyclical)
+  }
+}
+
+@available(iOS, introduced: 9.0)
+@available(OSX, introduced: 10.11)
+@available(tvOS, introduced: 9.0)
+extension GKPolygonObstacle {
+  /// Creates a polygon obstacle with an array of points.
+  /// - Parameter points: array of points in counter-clockwise order that are the vertices of a convex polygon
+  public convenience init(points: [simd.float2]) {
+    var variablePoints = points
+    self.init(__points: &variablePoints, count: points.count)
+  }
+}
 
 @available(iOS, introduced: 9.0)
 @available(OSX, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKEntity {
-  /// Returns the component instance of the indicated class contained by the
-  /// entity. Returns nil if entity does not have this component.
-  public func componentForClass<ComponentType : GKComponent>(
-    _ componentClass: ComponentType.Type) -> ComponentType? {
-    return GK_Swift_GKEntity_componentForClass(
-      self, componentClass) as! ComponentType?
+  /// Gets the component of the indicated class.  Returns nil if entity does not have this component
+  /// - Parameter ofType: the type of the component you want to get
+  public func component<ComponentType : GKComponent>(ofType componentClass: ComponentType.Type) -> ComponentType? {
+     return self.__component(for: componentClass) as? ComponentType
+  }
+  /// Removes the component of the indicates class from this entity
+  /// - Parameter ofType: the type of component you want to remove
+  public func removeComponent<ComponentType : GKComponent>(ofType componentClass: ComponentType.Type) {
+     self.__removeComponent(for: componentClass)
   }
 }
 
@@ -39,11 +81,12 @@ internal func GK_Swift_GKStateMachine_stateForClass(
 @available(OSX, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKStateMachine {
-  /// Returns the state instance of the indicated class contained by the state
-  /// machine. Returns nil if state machine does not have this state.
-  public func stateForClass<StateType : GKState>(
-    _ stateClass: StateType.Type) -> StateType? {
+  /// Gets the state of the indicated class.  Returns nil if the state machine does not have this state.
+  /// - Parameter forClass: the type of the state you want to get
+  public func state<StateType : GKState>(
+    forClass stateClass: StateType.Type) -> StateType? {
     return GK_Swift_GKStateMachine_stateForClass(
       self, stateClass) as! StateType?
   }
 }
+

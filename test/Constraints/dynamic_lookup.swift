@@ -39,7 +39,7 @@ class Y : P {
   init() {} 
 
   @objc func foo(_ s: String) { }
-  @objc func wibble() { }
+  @objc func wibble() { } // expected-note 2 {{did you mean 'wibble'?}}
 
   @objc func ovl1() -> A { }
 
@@ -130,12 +130,12 @@ obj.ext1()  // expected-warning {{result of call is unused}}
 obj.wonka()
 
 // Find class methods via dynamic method lookup.
-obj.dynamicType.staticFoo!(5)
-obj.dynamicType.staticWibble!()
+type(of: obj).staticFoo!(5)
+type(of: obj).staticWibble!()
 
 // Same as above but without the '!'
-obj.dynamicType.staticFoo(5)
-obj.dynamicType.staticWibble()
+type(of: obj).staticFoo(5)
+type(of: obj).staticWibble()
 
 // Overloading and ambiguity resolution
 
@@ -197,15 +197,15 @@ var prop3ResultB : (() -> Int)? = obj.prop3
 var prop3ResultC = obj.prop3
 let prop3ResultCChecked: Int? = prop3ResultC
 
-var obj2 : protocol<AnyObject, P> = Y()
+var obj2 : AnyObject & P = Y()
 
 class Z2 : AnyObject { }
 class Z3<T : AnyObject> { }
-class Z4<T where T : AnyObject> { }
+class Z4<T> where T : AnyObject { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-obj.dynamicType.foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+type(of: obj).foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
 
 // Checked casts to AnyObject
 var p: P = Y()
@@ -219,3 +219,14 @@ uopt.wibble!()
 // Should not be able to see private or internal @objc methods.
 uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
 uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
+
+let anyValue: Any = X()
+_ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{13-13= as AnyObject)}}
+_ = (anyValue as AnyObject).bar()
+_ = (anyValue as! X).bar()
+
+var anyDict: [String : Any] = Dictionary<String, Any>()
+anyDict["test"] = anyValue
+_ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
+// expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{21-21= as AnyObject)}}

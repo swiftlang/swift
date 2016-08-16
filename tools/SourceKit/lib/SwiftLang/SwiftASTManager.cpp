@@ -209,6 +209,10 @@ namespace SourceKit {
   EditorDiagConsumer &ASTUnit::getEditorDiagConsumer() const {
     return Impl.CollectDiagConsumer;
   }
+
+  void ASTUnit::performAsync(std::function<void()> Fn) {
+    Impl.Queue.dispatch(std::move(Fn));
+  }
 }
 
 namespace {

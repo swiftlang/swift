@@ -18,10 +18,10 @@ import CoreFoundation
  
  A `Date` is independent of a particular calendar or time zone. To represent a `Date` to a user, you must interpret it in the context of a `Calendar`.
 */
-public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringConvertible {
+public struct Date : ReferenceConvertible, Comparable, Equatable {
     public typealias ReferenceType = NSDate
     
-    private var _time : TimeInterval
+    fileprivate var _time : TimeInterval
 
     /// The number of seconds from 1 January 1970 to the reference date, 1 January 2001.
     public static let timeIntervalBetween1970AndReferenceDate : TimeInterval = 978307200.0
@@ -56,7 +56,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
         self.init(timeIntervalSinceReferenceDate: date.timeIntervalSinceReferenceDate + timeInterval)
     }
 
-    /// Returns an `Date` initialized relative to 00:00:00 UTC on 1 January 2001 by a given number of seconds.
+    /// Returns a `Date` initialized relative to 00:00:00 UTC on 1 January 2001 by a given number of seconds.
     public init(timeIntervalSinceReferenceDate ti: TimeInterval) {
         _time = ti
     }
@@ -88,7 +88,7 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /**
     The time interval between the date and the current date and time.
 
-    If the date is earlier than the current date and time, the this property's value is negative.
+    If the date is earlier than the current date and time, this property's value is negative.
 
     - SeeAlso: `timeIntervalSince(_:)`
     - SeeAlso: `timeIntervalSince1970`
@@ -114,15 +114,15 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
     /// Return a new `Date` by adding a `TimeInterval` to this `Date`.
     ///
     /// - parameter timeInterval: The value to add, in seconds.
-    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
-    public func addingTimeInterval(_ timeInterval : TimeInterval) -> Date {
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+    public func addingTimeInterval(_ timeInterval: TimeInterval) -> Date {
         return self + timeInterval
     }
     
     /// Add a `TimeInterval` to this `Date`.
     ///
     /// - parameter timeInterval: The value to add, in seconds.
-    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
     public mutating func addTimeInterval(_ timeInterval: TimeInterval) {
         self += timeInterval
     }
@@ -160,78 +160,85 @@ public struct Date : ReferenceConvertible, Comparable, Equatable, CustomStringCo
         }
     }
     
+    /// Returns true if the two `Date` values represent the same point in time.
+    public static func ==(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate == rhs.timeIntervalSinceReferenceDate
+    }
+
+    /// Returns true if the left hand `Date` is earlier in time than the right hand `Date`.
+    public static func <(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate < rhs.timeIntervalSinceReferenceDate
+    }
+
+    /// Returns true if the left hand `Date` is later in time than the right hand `Date`.
+    public static func >(lhs: Date, rhs: Date) -> Bool {
+        return lhs.timeIntervalSinceReferenceDate > rhs.timeIntervalSinceReferenceDate
+    }
+
+    /// Returns a `Date` with a specified amount of time added to it.
+    public static func +(lhs: Date, rhs: TimeInterval) -> Date {
+        return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate + rhs)
+    }
+
+    /// Returns a `Date` with a specified amount of time subtracted from it.
+    public static func -(lhs: Date, rhs: TimeInterval) -> Date {
+        return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate - rhs)
+    }
+
+    /// Add a `TimeInterval` to a `Date`.
+    ///
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+    public static func +=(lhs: inout Date, rhs: TimeInterval) {
+        lhs = lhs + rhs
+    }
+
+    /// Subtract a `TimeInterval` from a `Date`.
+    ///
+    /// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexities like daylight saving time, months with different numbers of days, and more.
+    public static func -=(lhs: inout Date, rhs: TimeInterval) {
+        lhs = lhs - rhs
+    }
+
+}
+
+extension Date : CustomDebugStringConvertible, CustomStringConvertible, CustomReflectable {
     /**
-    A string representation of the date object (read-only).
+     A string representation of the date object (read-only).
      
-    The representation is useful for debugging only.
+     The representation is useful for debugging only.
      
-    There are a number of options to acquire a formatted string for a date including: date formatters (see
-     [NSDateFormatter](//apple_ref/occ/cl/NSDateFormatter) and [Data Formatting Guide](//apple_ref/doc/uid/10000029i)), and the `Date` functions `description(locale:)`.
-    */
+     There are a number of options to acquire a formatted string for a date including: date formatters (see
+     [NSDateFormatter](//apple_ref/occ/cl/NSDateFormatter) and [Data Formatting Guide](//apple_ref/doc/uid/10000029i)), and the `Date` function `description(locale:)`.
+     */
     public var description: String {
         // Defer to NSDate for description
         return NSDate(timeIntervalSinceReferenceDate: _time).description
     }
     
     /**
-    Returns a string representation of the receiver using the given
+     Returns a string representation of the receiver using the given
      locale.
      
-    - Parameter locale: A `Locale` object. If you pass `nil`, `NSDate` formats the date in the same way as the `description` property.
+     - Parameter locale: A `Locale`. If you pass `nil`, `Date` formats the date in the same way as the `description` property.
      
-    - Returns: A string representation of the receiver, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`")
-    */
-    public func description(with locale : Locale?) -> String {
+     - Returns: A string representation of the `Date`, using the given locale, or if the locale argument is `nil`, in the international format `YYYY-MM-DD HH:MM:SS ±HHMM`, where `±HHMM` represents the time zone offset in hours and minutes from UTC (for example, "`2001-03-24 10:45:32 +0600`").
+     */
+    public func description(with locale: Locale?) -> String {
         return NSDate(timeIntervalSinceReferenceDate: _time).description(with: locale)
     }
     
-    public var debugDescription: String { return description }
-}
+    public var debugDescription: String {
+        return description
+    }
 
-/// Returns true if the two `Date` values represent the same point in time.
-public func ==(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate == rhs.timeIntervalSinceReferenceDate
-}
-
-/// Returns true if the left hand `Date` is earlier in time than the right hand `Date`.
-public func <(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate < rhs.timeIntervalSinceReferenceDate
-}
-
-/// Returns true if the left hand `Date` is later in time than the right hand `Date`.
-public func >(lhs: Date, rhs: Date) -> Bool {
-    return lhs.timeIntervalSinceReferenceDate > rhs.timeIntervalSinceReferenceDate
-}
-
-/// Returns a `Date` with a specified amount of time added to it.
-public func +(lhs: Date, rhs: TimeInterval) -> Date {
-    return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate + rhs)
-}
-
-/// Returns a `Date` with a specified amount of time subtracted from it.
-public func -(lhs: Date, rhs: TimeInterval) -> Date {
-    return Date(timeIntervalSinceReferenceDate: lhs.timeIntervalSinceReferenceDate - rhs)
-}
-
-/// Add a `TimeInterval` to a `Date`.
-///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
-public func +=(lhs: inout Date, rhs: TimeInterval) {
-    lhs = lhs + rhs
-}
-
-/// Subtract a `TimeInterval` from a `Date`.
-///
-/// - warning: This only adjusts an absolute value. If you wish to add calendrical concepts like hours, days, months then you must use a `Calendar`. That will take into account complexites like daylight saving time, months with different numbers of days, and more.
-public func -=(lhs: inout Date, rhs: TimeInterval) {
-    lhs = lhs - rhs
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "timeIntervalSinceReferenceDate", value: timeIntervalSinceReferenceDate))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 extension Date : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSDate {
         return NSDate(timeIntervalSinceReferenceDate: _time)
@@ -252,6 +259,14 @@ extension Date : _ObjectiveCBridgeable {
         var result: Date? = nil
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
+    }
+}
+
+extension NSDate : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Date)
     }
 }
 

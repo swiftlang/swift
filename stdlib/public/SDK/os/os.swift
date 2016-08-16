@@ -1,0 +1,92 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+@_exported import os
+@_exported import os.log
+
+@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+public func os_log(
+	_ message: StaticString, 
+	dso: UnsafeRawPointer? = #dsohandle,
+	log: OSLog = .default, 
+	type: OSLogType = .default, 
+	_ args: CVarArg...) 
+{
+	guard log.isEnabled(type: type) else { return }
+
+	message.withUTF8Buffer { (buf: UnsafeBufferPointer<UInt8>) in
+		// Since dladdr is in libc, it is safe to unsafeBitCast
+                // the cstring argument type.
+		let str = unsafeBitCast(buf.baseAddress!, to: UnsafePointer<Int8>.self)
+		withVaList(args) { valist in
+		  _swift_os_log(dso, log, type, str, valist)
+    }
+	}
+}
+
+extension OSLogType {
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let `default` = __OS_LOG_TYPE_DEFAULT
+
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let info = __OS_LOG_TYPE_INFO
+
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let debug = __OS_LOG_TYPE_DEBUG
+
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let error = __OS_LOG_TYPE_ERROR
+
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let fault = __OS_LOG_TYPE_FAULT
+}
+
+extension OSLog {
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public static let `default` = _swift_os_log_default()
+
+	@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+	public convenience init(subsystem: String, category: String) {
+		self.init(__subsystem: subsystem, category: category)
+	}
+}
+
+@_silgen_name("_swift_os_log")
+internal func _swift_os_log(_ dso: UnsafeRawPointer!, _ log: OSLog, _ type: OSLogType, _ format: UnsafePointer<Int8>!, _ args: CVaListPointer)
+
+@_silgen_name("_swift_os_log_default")
+internal func _swift_os_log_default() -> OSLog
+
+@available(*, unavailable, renamed: "OSLogType.default")
+public var OS_LOG_TYPE_DEFAULT: OSLogType {
+	fatalError()
+}
+
+@available(*, unavailable, renamed: "OSLogType.info")
+public var OS_LOG_TYPE_INFO: OSLogType {
+	fatalError()
+}
+
+@available(*, unavailable, renamed: "OSLogType.debug")
+public var OS_LOG_TYPE_DEBUG: OSLogType {
+	fatalError()
+}
+
+@available(*, unavailable, renamed: "OSLogType.error")
+public var OS_LOG_TYPE_ERROR: OSLogType {
+	fatalError()
+}
+
+@available(*, unavailable, renamed: "OSLogType.fault")
+public var OS_LOG_TYPE_FAULT: OSLogType {
+	fatalError()
+}

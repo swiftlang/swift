@@ -15,9 +15,11 @@ NSSetAPI.test("Sequence") {
   expectSequenceType(result)
 }
 
-private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
+private func compareAnythingAtAll(_ x: Any, y: Any)
   -> ExpectedComparisonResult {
-  switch (x.description < y.description, x.description == y.description) {
+  let xDescription = "\(x)"
+  let yDescription = "\(y)"
+  switch (xDescription < yDescription, xDescription == yDescription) {
   case (true, _): return .lt
   case (_, true): return .eq
   default: return .gt
@@ -27,16 +29,16 @@ private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
 NSSetAPI.test("initWithObjects") {
   let result = NSSet(objects: 1, "two")
   // using the descriptions of 1 and "two" are fine for these tests.
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
-NSSetAPI.test("ArrayLiteralConvertible") {
+NSSetAPI.test("ExpressibleByArrayLiteral") {
   let result: NSSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSSetAPI.test("CustomStringConvertible") {
-  let result = String(NSSet(objects:"a", "b", "c", "42"))
+  let result = String(describing: NSSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    b,\n    42,\n    c,\n    a\n)}"
   expectEqual(expect, result)
 }
@@ -44,22 +46,22 @@ NSSetAPI.test("CustomStringConvertible") {
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("Sequence") {
-  let result = OrderedSet()
+  let result = NSOrderedSet()
   expectSequenceType(result)
 }
 
 NSOrderedSetAPI.test("initWithObjects") {
-  let result = OrderedSet(objects: 1, "two")
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  let result = NSOrderedSet(objects: 1, "two")
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
-NSOrderedSetAPI.test("ArrayLiteralConvertible") {
-  let result: OrderedSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+NSOrderedSetAPI.test("ExpressibleByArrayLiteral") {
+  let result: NSOrderedSet = [1, "two"]
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("CustomStringConvertible") {
-  let result = String(OrderedSet(objects:"a", "b", "c", "42"))
+  let result = String(describing: NSOrderedSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
   expectEqual(expect, result)
 }
@@ -76,7 +78,7 @@ var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
 
 NSIndexSetAPI.test("Sequence") {
   let result = NSIndexSet()
-  expectSequenceType(result)
+  let _ = expectSequenceType(result)
   let s = NSIndexSet(indexesIn: NSMakeRange(1, 1))
   var iter = s.makeIterator()
   // FIXME: Compiler doesn't accept these terms.

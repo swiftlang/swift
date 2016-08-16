@@ -9,3 +9,6 @@ Protocols:
   - Selector: 'paymentAuthorizationController:didSelectPaymentMethod:completion:'
     SwiftName: paymentAuthorizationController(_:didSelectPaymentMethod:completion:)
     MethodKind: Instance
+Tags:
+- Name: PKPassKitErrorCode
+  NSErrorDomain: PKPassKitErrorDomain

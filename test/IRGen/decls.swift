@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
 
 // Check that we emit all local decls, not just the first one.
 func test1() {

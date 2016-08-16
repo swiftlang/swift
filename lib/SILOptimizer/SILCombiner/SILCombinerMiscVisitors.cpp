@@ -37,11 +37,11 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   // Optimize away the pattern below that happens when exceptions are created
   // and in some cases, due to inlining, are not needed.
   //
-  //   %6 = alloc_existential_box $ErrorProtocol, $ColorError
+  //   %6 = alloc_existential_box $Error, $ColorError
   //   %7 = enum $VendingMachineError, #ColorError.Red
   //   store %7 to %6#1 : $*ColorError
-  //   debug_value %6#0 : $ErrorProtocol
-  //   strong_release %6#0 : $ErrorProtocol
+  //   debug_value %6#0 : $Error
+  //   strong_release %6#0 : $Error
 
   StoreInst *SingleStore = nullptr;
   StrongReleaseInst *SingleRelease = nullptr;
@@ -997,35 +997,80 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!CBI->getFalseBB()->getSinglePredecessor())
       return nullptr;
 
-    SILBasicBlock *Default = nullptr;
-
+    SILBasicBlock *DefaultBB = nullptr;
     match_integer<0> Zero;
 
     if (SEI->hasDefault()) {
+      // Default result should be an integer constant.
+      if (!isa<IntegerLiteralInst>(SEI->getDefaultResult()))
+        return nullptr;
       bool isFalse = match(SEI->getDefaultResult(), Zero);
-      Default = isFalse ? CBI->getFalseBB() : Default = CBI->getTrueBB();
+      // Pick the default BB.
+      DefaultBB = isFalse ? CBI->getFalseBB() : CBI->getTrueBB();
     }
 
-    // We can now convert cond_br(select_enum) into switch_enum
+    if (!DefaultBB) {
+      // Find the targets for the majority of cases and pick it
+      // as a default BB.
+      unsigned TrueBBCases = 0;
+      unsigned FalseBBCases = 0;
+      for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
+        auto Pair = SEI->getCase(i);
+        if (isa<IntegerLiteralInst>(Pair.second)) {
+          bool isFalse = match(Pair.second, Zero);
+          if (!isFalse) {
+            TrueBBCases++;
+          } else {
+            FalseBBCases++;
+          }
+          continue;
+        }
+        return nullptr;
+      }
+
+      if (FalseBBCases > TrueBBCases)
+        DefaultBB = CBI->getFalseBB();
+      else
+        DefaultBB = CBI->getTrueBB();
+    }
+
+    assert(DefaultBB && "Default should be defined at this point");
+
+    unsigned NumTrueBBCases = 0;
+    unsigned NumFalseBBCases = 0;
+
+    if (DefaultBB == CBI->getFalseBB())
+      NumFalseBBCases++;
+    else
+      NumTrueBBCases++;
+
+    // We can now convert cond_br(select_enum) into switch_enum.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
     for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
       auto Pair = SEI->getCase(i);
-      if (isa<IntegerLiteralInst>(Pair.second)) {
-        bool isFalse = match(Pair.second, Zero);
-        if (!isFalse && Default != CBI->getTrueBB()) {
-          Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
-        }
-        if (isFalse && Default != CBI->getFalseBB()) {
-          Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
-        }
-        continue;
-      }
 
-      return nullptr;
+      // Bail if one of the results is not an integer constant.
+      if (!isa<IntegerLiteralInst>(Pair.second))
+        return nullptr;
+
+      // Add a switch case.
+      bool isFalse = match(Pair.second, Zero);
+      if (!isFalse && DefaultBB != CBI->getTrueBB()) {
+        Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
+        NumTrueBBCases++;
+      }
+      if (isFalse && DefaultBB != CBI->getFalseBB()) {
+        Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
+        NumFalseBBCases++;
+      }
     }
 
+    // Bail if a switch_enum would introduce a critical edge.
+    if (NumTrueBBCases > 1 || NumFalseBBCases > 1)
+      return nullptr;
+
     return Builder.createSwitchEnum(SEI->getLoc(), SEI->getEnumOperand(),
-                                    Default, Cases);
+                                    DefaultBB, Cases);
   }
 
   return nullptr;

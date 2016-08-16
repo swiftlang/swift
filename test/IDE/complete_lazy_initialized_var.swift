@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LAZY_IN_CLASS_1 | FileCheck %s -check-prefix=LAZYVAR1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LAZY_IN_CLASS_1 | %FileCheck %s -check-prefix=LAZYVAR1
 class FooClass1 {
  lazy var lazyVar1 = 0
 }

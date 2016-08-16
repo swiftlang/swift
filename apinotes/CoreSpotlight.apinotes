@@ -1,0 +1,7 @@
+---
+Name: CoreSpotlight
+Tags:
+- Name: CSIndexErrorCode
+  NSErrorDomain: CSIndexErrorDomain
+- Name: CSSearchQueryErrorCode
+  NSErrorDomain: CSSearchQueryErrorDomain

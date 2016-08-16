@@ -9,7 +9,7 @@
 // --------------------------------------------------
 
 struct Foo<T> { // expected-note{{generic type 'Foo' declared here}} expected-note{{generic type 'Foo' declared here}}
-  struct Wibble { } // expected-error{{nested in generic type}}
+  struct Wibble { } // expected-error{{cannot be nested in generic type}}
 }
 
 class Dict<K, V> { } // expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}} expected-note{{generic type 'Dict' declared here}}
@@ -31,45 +31,6 @@ var x : Dict // expected-error{{reference to generic type 'Dict' requires argume
 // Cannot create parameters of generic type without arguments.
 func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
 
-
-// ---------------------------------------------
-// Unbound name references within a generic type
-// ---------------------------------------------
-struct GS<T> {
-  func f() -> GS {
-    let gs = GS()
-    return gs
-  }
-
-  struct Nested { // expected-error{{nested in generic type}}
-    func ff() -> GS {
-      let gs = GS()
-      return gs
-    }
-  }
-
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' nested in type}}
-    func fff() -> (GS, NestedGeneric) {
-      let gs = GS()
-      let ns = NestedGeneric()
-      return (gs, ns)
-    }
-  }
-
-  // FIXME: We're losing some sugar here by performing the substitution.
-  func ng() -> NestedGeneric { } // expected-error{{reference to generic type 'GS<T>.NestedGeneric' requires arguments in <...>}}
-}
-
-extension GS {
-  func g() -> GS {
-    let gs = GS()
-    return gs
-  }
-
-  func h() {
-    _ = GS() as GS<Int> // expected-error{{cannot convert value of type 'GS<T>' to type 'GS<Int>' in coercion}}
-  }
-}
 
 class GC<T, U> {
   init() {} 

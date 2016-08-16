@@ -1,3 +1,6 @@
+// TODO: Properties with unowned or weak ownership should not be bridged.
+// XFAIL: *
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
@@ -5,7 +8,7 @@
 // RUN: diff -u %S/Inputs/mock-sdk/Foo.printed.txt %t/Foo.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-interface -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -print-regular-comments > %t/Foo.interface.printed.txt
-// RUN: FileCheck %s -check-prefix=INTERFACE1 < %t/Foo.interface.printed.txt
+// RUN: %FileCheck %s -check-prefix=INTERFACE1 < %t/Foo.interface.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt
 // RUN: diff -u %S/Inputs/mock-sdk/Foo.printed.recursive.txt %t/Foo.printed.recursive.txt
@@ -27,7 +30,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // This test is in general platform-independent, but it happens to check
 // printing of @available attributes for OS X, and those are not printed on

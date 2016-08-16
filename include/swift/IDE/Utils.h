@@ -151,11 +151,13 @@ struct SemaToken {
   bool IsKeywordArgument = false;
   Type Ty;
   DeclContext *DC = nullptr;
+  Type ContainerType;
 
   SemaToken() = default;
   SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, SourceLoc Loc, bool IsRef,
-            Type Ty) : ValueD(ValueD), CtorTyRef(CtorTyRef), Loc(Loc),
-            IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()) {}
+            Type Ty, Type ContainerType) : ValueD(ValueD), CtorTyRef(CtorTyRef), Loc(Loc),
+            IsRef(IsRef), Ty(Ty), DC(ValueD->getDeclContext()),
+            ContainerType(ContainerType) {}
   SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
 
   bool isValid() const { return ValueD != nullptr || Mod; }
@@ -166,12 +168,14 @@ class SemaLocResolver : public SourceEntityWalker {
   SourceFile &SrcFile;
   SourceLoc LocToResolve;
   SemaToken SemaTok;
+  Type ContainerType;
 
 public:
   explicit SemaLocResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
   SemaToken resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
+  bool walkToExprPre(Expr *E) override;
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToStmtPre(Stmt *S) override;
@@ -194,14 +198,12 @@ private:
 } // namespace ide
 
 class ArchetypeTransformer {
-  std::function<Type(Type)> TheFunc = nullptr;
-  DeclContext *DC;
-  Type BaseTy;
-  llvm::DenseMap<TypeBase *, Type> Cache;
-  TypeSubstitutionMap Map;
+  struct Implementation;
+  Implementation &Impl;
 public:
   ArchetypeTransformer(DeclContext *DC, Type Ty);
   llvm::function_ref<Type(Type)> getTransformerFunc();
+  ~ArchetypeTransformer();
 };
 } // namespace swift
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/const_and_pure.h | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/const_and_pure.h | %FileCheck %s
 
 func testit() {
 	const_function()
@@ -8,8 +8,8 @@ func testit() {
 	normal_function()
 }
 
-// CHECK: sil [readnone] @const_function : $@convention(c) () -> ()
-// CHECK: sil [readonly] @pure_function : $@convention(c) () -> ()
-// CHECK: sil @normal_function : $@convention(c) () -> ()
+// CHECK: sil [readnone] [clang const_function] @const_function : $@convention(c) () -> ()
+// CHECK: sil [readonly] [clang pure_function] @pure_function : $@convention(c) () -> ()
+// CHECK: sil [clang normal_function] @normal_function : $@convention(c) () -> ()
 
 

@@ -25,8 +25,7 @@
     "UnavailableStringAPIs.swift"
   ],
   "Bool": [
-    "Bool.swift",
-    "Boolean.swift"
+    "Bool.swift"
   ],
   "Collection": [
     "Collection.swift",
@@ -79,7 +78,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift"]
+        "HashedCollections.swift",
+        "HashedCollectionsAnyHashableExtensions.swift"
+      ]
     }
   ],
   "C": [
@@ -87,7 +88,8 @@
     "BridgeStorage.swift",
     "Builtin.swift",
     "VarArgs.swift",
-    "CTypes.swift"
+    "CTypes.swift",
+    "MemoryLayout.swift"
   ],
   "Reflection": [
     "Mirrors.swift",
@@ -100,6 +102,7 @@
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Integers.swift",
       "IntegerArithmetic.swift",
       "FixedPoint.swift",
       "IntegerParsing.swift"],
@@ -115,6 +118,7 @@
   "Pointer": [
     "Pointer.swift",
     "UnsafePointer.swift",
+    "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift"
   ],
   "Protocols": [
@@ -122,6 +126,7 @@
     "ShadowProtocols.swift"
   ],
   "Misc": [
+    "AnyHashable.swift",
     "Interval.swift",
     "Hashing.swift",
     "ErrorType.swift",
@@ -138,9 +143,13 @@
     "Shims.swift",
     "Unmanaged.swift",
     "Availability.swift",
-    "Process.swift",
+    "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift"
+    "UnsafeBitMap.swift",
+    "DebuggerSupport.swift",
+    "Equatable.swift",
+    "Comparable.swift",
+    "Hashable.swift"
   ]
 }

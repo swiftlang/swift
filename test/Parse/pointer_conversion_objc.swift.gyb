@@ -24,23 +24,23 @@ class C {}
 class D {}
 
 func takesMutablePointer(_ x: UnsafeMutablePointer<Int>${suffix}) {}
-func takesMutableVoidPointer(_ x: UnsafeMutablePointer<Void>${suffix}) {}
+func takesMutableVoidPointer(_ x: UnsafeMutableRawPointer${suffix}) {}
 @discardableResult
 func takesConstPointer(_ x: UnsafePointer<Int>${suffix}) -> Character { return "x" }
-func takesConstVoidPointer(_ x: UnsafePointer<Void>${suffix}) {}
+func takesConstVoidPointer(_ x: UnsafeRawPointer${suffix}) {}
 
 func takesAutoreleasingPointer(_ x: AutoreleasingUnsafeMutablePointer<C>${suffix}) {}
 
 func pointerArgumentsObjC(ap: AutoreleasingUnsafeMutablePointer<Int>,
                           afp: AutoreleasingUnsafeMutablePointer<Float>) {
   takesMutablePointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Int>${suffix}'}}
-  takesMutableVoidPointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Void>${suffix}'}}
+  takesMutableVoidPointer(ap) // expected-error{{cannot convert value of type 'AutoreleasingUnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutableRawPointer${suffix}'}}
   takesConstPointer(ap)
   takesConstVoidPointer(ap)
   takesConstVoidPointer(afp)
 
-  var x: UnsafePointer<Void>
-  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  var x: UnsafeRawPointer
+  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafeRawPointer'}}
   _ = x
 }
 

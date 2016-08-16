@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // High-level tests that DI handles early returns from failable and throwing
 // initializers properly. The main complication is conditional release of self
@@ -326,7 +326,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeDelegation: Int) throws {
@@ -346,11 +346,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeOrDuringDelegation: Int) throws {
@@ -370,11 +370,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failBeforeOrDuringDelegation2: Int) throws {
@@ -390,7 +390,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK:         dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failDuringDelegation: Int) throws {
@@ -408,7 +408,7 @@ struct ThrowStruct {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK:         release_value [[NEW_SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -435,11 +435,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -476,11 +476,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -521,10 +521,10 @@ struct ThrowStruct {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<ThrowStruct>
 // CHECK:       bb6:
-// CHECK-NEXT:    strong_release [[ERROR:%.*]] : $ErrorProtocol
+// CHECK-NEXT:    strong_release [[ERROR:%.*]] : $Error
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
 // CHECK-NEXT:    br bb2([[NEW_SELF]] : $Optional<ThrowStruct>)
-// CHECK:       bb7([[ERROR]] : $ErrorProtocol):
+// CHECK:       bb7([[ERROR]] : $Error):
 // CHECK-NEXT:    br bb6
   init?(throwsToOptional: Int) {
     try? self.init(failDuringDelegation: throwsToOptional)
@@ -561,7 +561,7 @@ struct ThrowStruct {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   init(failDuringSelfReplacement: Int) throws {
@@ -580,7 +580,7 @@ struct ThrowStruct {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    release_value [[NEW_SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -900,7 +900,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
   required init() throws {
@@ -925,7 +925,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[DERIVED_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]] : $ThrowDerivedClass
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -954,13 +954,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
@@ -995,7 +995,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    strong_release [[DERIVED_SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -1023,13 +1023,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
@@ -1070,11 +1070,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND:%.*]], bb6, bb7
 // CHECK:       bb6:
@@ -1088,7 +1088,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
-// CHECK-NEXT:    throw [[ERROR]] : $ErrorProtocol
+// CHECK-NEXT:    throw [[ERROR]] : $Error
   init(failBeforeFullInitialization: Int, failAfterFullInitialization: Int) throws {
     try unwrap(failBeforeFullInitialization)
     super.init(noFail: ())
@@ -1117,15 +1117,15 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[DERIVED_SELF]]
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb7([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb7([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb6([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb7([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb7([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
+// CHECK:       bb6([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb7([[ERROR]] : $Error)
+// CHECK:       bb7([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
@@ -1172,7 +1172,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[METATYPE:%.*]] = value_metatype $@thick ThrowDerivedClass.Type, %1 : $ThrowDerivedClass
 // CHECK-NEXT:    dealloc_partial_ref %1 : $ThrowDerivedClass, [[METATYPE]] : $@thick ThrowDerivedClass.Type
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1192,9 +1192,9 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    store [[NEW_SELF]] to [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT:    throw [[ERROR]] : $ErrorProtocol
+// CHECK-NEXT:    throw [[ERROR]] : $Error
   convenience init(failDuringDelegation: Int) throws {
     try self.init()
   }
@@ -1218,13 +1218,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR1:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR2:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR1:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
+// CHECK:       bb4([[ERROR2:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR2]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR3:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP_VALUE]] : $Builtin.Int2, [[BIT_NUM]] : $Builtin.Int2)
@@ -1264,13 +1264,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR1:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR2:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
+// CHECK:       bb5([[ERROR2:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP_VALUE:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[BIT_NUM:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP_VALUE]] : $Builtin.Int2, [[BIT_NUM]] : $Builtin.Int2)
@@ -1302,7 +1302,7 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK:       bb1([[RESULT:%.*]] : $Int):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb2([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    strong_release [[NEW_SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    throw [[ERROR]]
@@ -1330,13 +1330,13 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR1:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR1:%.*]] : $Error):
 // CHECK-NEXT:    [[BIT:%.*]] = integer_literal $Builtin.Int2, -1
 // CHECK-NEXT:    store [[BIT]] to [[BITMAP_BOX]]
-// CHECK-NEXT:    br bb5([[ERROR1]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR2:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR2]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR3:%.*]] : $ErrorProtocol):
+// CHECK-NEXT:    br bb5([[ERROR1]] : $Error)
+// CHECK:       bb4([[ERROR2:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
+// CHECK:       bb5([[ERROR3:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    [[ONE:%.*]] = integer_literal $Builtin.Int2, 1
 // CHECK-NEXT:    [[BITMAP_MSB:%.*]] = builtin "lshr_Int2"([[BITMAP]] : $Builtin.Int2, [[ONE]] : $Builtin.Int2)
@@ -1377,11 +1377,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    dealloc_stack [[BITMAP_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
-// CHECK:       bb3([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb4([[ERROR:%.*]] : $ErrorProtocol):
-// CHECK-NEXT:    br bb5([[ERROR]] : $ErrorProtocol)
-// CHECK:       bb5([[ERROR:%.*]] : $ErrorProtocol):
+// CHECK:       bb3([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb4([[ERROR:%.*]] : $Error):
+// CHECK-NEXT:    br bb5([[ERROR]] : $Error)
+// CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
 // CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
@@ -1504,7 +1504,7 @@ extension P2 {
 }
 
 ////
-// self.dynamicType with uninitialized self
+// type(of: self) with uninitialized self
 ////
 
 func use(_ a : Any) {}
@@ -1513,24 +1513,24 @@ class DynamicTypeBase {
   var x: Int
 
   init() {
-    use(self.dynamicType)
+    use(type(of: self))
     x = 0
   }
 
   convenience init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }
 
 class DynamicTypeDerived : DynamicTypeBase {
   override init() {
-    use(self.dynamicType)
+    use(type(of: self))
     super.init()
   }
 
   convenience init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }
@@ -1539,12 +1539,12 @@ struct DynamicTypeStruct {
   var x: Int
 
   init() {
-    use(self.dynamicType)
+    use(type(of: self))
     x = 0
   }
 
   init(a : Int) {
-    use(self.dynamicType)
+    use(type(of: self))
     self.init()
   }
 }

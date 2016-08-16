@@ -1,16 +1,16 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | FileCheck -check-prefix=CHECK-WMO %s
-// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s
 
 // Test propagation of non-static let properties with compile-time constant values.
 
-// TODO: Once this optimization can remove the propagated private/internal let properties or
+// TODO: Once this optimization can remove the propagated fileprivate/internal let properties or
 // mark them as ones without a storage, new tests should be added here to check for this
 // functionality.
 
 // FIXME: This test is written in Swift instead of SIL, because there are some problems
 // with SIL deserialization (rdar://22636911)
 
-// Check that initializers do not contain a code to initialize private or
+// Check that initializers do not contain a code to initialize fileprivate or
 // internal (if used with WMO) properties, because their values are propagated into
 // their uses and they cannot be accessed from other modules. Therefore the
 // initialization code could be removed.
@@ -36,7 +36,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// Check that initializers do not contain a code to initialize private properties, 
+// Check that initializers do not contain a code to initialize fileprivate properties, 
 // because their values are propagated into their uses and they cannot be accessed
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
@@ -58,7 +58,7 @@
 public class Foo {
   public let Prop0: Int32 = 1
   let Prop1: Int32 = 1 + 4/2 + 8
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32  = 4*8
   public init(i:Int32) {}  
   public init(i:Int64) {}
@@ -66,7 +66,7 @@ public class Foo {
 
 public class Foo1 {
   let Prop1: Int32
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {
     Prop1  = 11
@@ -80,7 +80,7 @@ public class Foo1 {
 public struct Boo {
   public let Prop0: Int32 = 1
   let Prop1: Int32 = 1 + 4/2 + 8  
-  private let Prop2: Int32 = 3*7
+  fileprivate let Prop2: Int32 = 3*7
   internal let Prop3: Int32 = 4*8
   public init(i:Int32) {}
   public init(i:Int64) {}
@@ -104,7 +104,7 @@ struct Boo3 {
   //public 
   let Prop0: Int32
   let Prop1: Int32
-  private let Prop2: Int32
+  fileprivate let Prop2: Int32
   internal let Prop3: Int32
 
   @inline(__always)
@@ -149,12 +149,12 @@ public struct StructWithPublicAndInternalLetProperties {
 }
 
 // The initializer of this struct cannot be defined elsewhere,
-// because it contains a private stored property, which is
+// because it contains a fileprivate stored property, which is
 // impossible to initialize outside of this file.
 public struct StructWithPublicAndInternalAndPrivateLetProperties {
   public let Prop0: Int32
   internal let Prop1: Int32
-  private let Prop2: Int32
+  fileprivate let Prop2: Int32
 
   init(_ v: Int32, _ u: Int32) {
     Prop0 = 10
@@ -326,7 +326,7 @@ public func testStructPropertyAccessibility(_ b: StructWithPublicAndInternalLetP
 }
 
 // Properties can be initialized only in this file, because one of the
-// properties is private.
+// properties is fileprivate.
 // Therefore their values are known and can be propagated.
 
 // CHECK: sil @_TF19let_properties_opts31testStructPropertyAccessibilityFVS_50StructWithPublicAndInternalAndPrivateLetPropertiesVs5Int32

@@ -165,18 +165,18 @@ public:
   virtual ~EnumImplStrategy() { }
   
   /// Construct a layout strategy appropriate to the enum type.
-  static EnumImplStrategy *get(TypeConverter &TC,
-                               SILType Type,
-                               EnumDecl *theEnum);
+  static std::unique_ptr<EnumImplStrategy> get(TypeConverter &TC,
+                                               SILType Type,
+                                               EnumDecl *theEnum);
   
   /// Given an incomplete StructType for the enum, completes layout of the
   /// storage type, calculates its size and alignment, and produces the
   /// TypeInfo for the enum.
   virtual TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
-                                            SILType Type,
-                                            EnumDecl *theEnum,
-                                            llvm::StructType *enumTy) = 0;
-  
+                                           SILType Type,
+                                           EnumDecl *theEnum,
+                                           llvm::StructType *enumTy) = 0;
+
   const TypeInfo &getTypeInfo() const {
     assert(TI);
     return *TI;

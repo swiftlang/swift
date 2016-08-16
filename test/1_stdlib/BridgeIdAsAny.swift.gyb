@@ -1,0 +1,244 @@
+// RUN: rm -rf %t  &&  mkdir %t
+//
+// RUN: %gyb %s -o %t/BridgeIdAsAny.swift
+// RUN: %target-build-swift -g -module-name a %t/BridgeIdAsAny.swift -o %t.out
+// RUN: %target-run %t.out
+// REQUIRES: executable_test
+//
+// REQUIRES: objc_interop
+
+import StdlibUnittest
+import Foundation
+
+var BridgeAnything = TestSuite("BridgeAnything")
+
+func wantonlyWrapInAny<T>(_ x: T) -> Any {
+  return x
+}
+
+// Professional runtime testers on a closed course. Do not attempt at home.
+extension LifetimeTracked: Error {}
+extension String: Error {}
+
+struct KnownUnbridged: Equatable, Error {
+  var x, y: LifetimeTracked
+
+  init() {
+    x = LifetimeTracked(17)
+    y = LifetimeTracked(38)
+  }
+}
+func ==(a: KnownUnbridged, b: KnownUnbridged) -> Bool {
+  return a.x === b.x && a.y === b.y
+}
+
+struct KnownUnbridgedWithDescription: CustomStringConvertible,
+                                      CustomDebugStringConvertible {
+  var x, y: LifetimeTracked
+
+  init() {
+    x = LifetimeTracked(17)
+    y = LifetimeTracked(38)
+  }
+
+  var description: String {
+    return "\(x)\(y), baby, hey"
+  }
+
+  var debugDescription: String {
+    return "KnownUnbridgedWithDescription(\"\(x)\(y)\" /* baby, hey */)"
+  }
+}
+
+func bridgedObjectPreservesIdentity(original: LifetimeTracked,
+                                    bridged: AnyObject) {
+  expectTrue(original === bridged)
+}
+
+func stringBridgesToEqualNSString(original: String,
+                                  bridged: AnyObject) {
+  expectTrue(bridged.isEqual(to: original))
+}
+
+func boxedTypeRoundTripsThroughDynamicCasting(original: KnownUnbridged,
+                                              bridged: AnyObject) {
+  direct: do {
+    guard let bridgedAndCast = bridged as? KnownUnbridged else {
+      expectUnreachable()
+      break direct
+    }
+    expectEqual(original, bridgedAndCast)
+  }
+
+  let bridgedAny: Any = bridged
+  any: do {
+    guard let bridgedAndCastAny = bridgedAny as? KnownUnbridged else {
+      expectUnreachable()
+      break any
+    }
+    expectEqual(original, bridgedAndCastAny)
+  }
+
+  anyInAny: do {
+    let bridgedAnyInAny = wantonlyWrapInAny(bridgedAny)
+    guard let bridgedAndCastAnyInAny = bridgedAnyInAny as? KnownUnbridged else {
+      expectUnreachable()
+      break anyInAny
+    }
+    expectEqual(original, bridgedAndCastAnyInAny)
+  }
+
+  // Failed casts should fail, and hopefully shouldn't leak or corrupt memory
+  // either.
+  expectEqual(bridged as? Int, nil)
+  expectEqual(bridged as? String, nil)
+}
+
+func tupleCanBeDynamicallyCast(original: (Int, String),
+                               bridged: AnyObject) {
+  expectTrue(original == bridged as! (Int, String))
+}
+func metatypeCanBeDynamicallyCast(original: Int.Type,
+                               bridged: AnyObject) {
+  expectTrue(original == bridged as! Int.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+func metatypeCanBeDynamicallyCast(original: CFString.Type,
+                                  bridged: AnyObject) {
+  expectTrue(original == bridged as! CFString.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+func metatypeCanBeDynamicallyCastGenerically<T>(original: T.Type,
+                                                bridged: AnyObject) {
+  expectTrue(original == bridged as! T.Type)
+  expectTrue(original == bridged as! Any.Type)
+}
+
+
+func guineaPigFunction() -> Int {
+  return 1738
+}
+
+func functionCanBeDynamicallyCast(original: () -> Int,
+                                  bridged: AnyObject) {
+  expectEqual(original(), (bridged as! () -> Int)())
+  expectEqual(original(), try! (bridged as! () throws -> Int)())
+}
+
+func classMetatypePreservesIdentity<T: AnyObject>(original: T.Type,
+                                                  bridged: AnyObject) {
+  expectTrue(original as AnyObject === bridged)
+  expectTrue(original as AnyObject.Type as AnyObject === bridged)
+  expectTrue(original as Any.Type as AnyObject === bridged)
+}
+
+func classMetatypePreservesIdentityGenerically<T>(original: T.Type,
+                                                  bridged: AnyObject) {
+  expectTrue(original as AnyObject === bridged)
+  expectTrue(original as Any.Type as AnyObject === bridged)
+}
+
+func protocolObjectPreservesIdentity(original: NSCopying.Protocol,
+                                     bridged: AnyObject) {
+  let proto: Protocol = original
+  expectTrue(proto === bridged)
+}
+
+protocol P {}
+
+// We want to exhaustively check all paths through the bridging and dynamic
+// casting infrastructure, so expand out test cases that wrap the different
+// interesting bridging cases in different kinds of existential container.
+%{
+testCases = [
+  ("classes",                    "LifetimeTracked(0)",          "bridgedObjectPreservesIdentity",            True),
+  ("strings",                    '"vitameatavegamin"',          "stringBridgesToEqualNSString",              True),
+  ("unbridged type",             "KnownUnbridged()",            "boxedTypeRoundTripsThroughDynamicCasting",  True),
+  ("tuple",                      '(1, "2")',                    "tupleCanBeDynamicallyCast",                 False),
+  ("metatype",                   'Int.self',                    "metatypeCanBeDynamicallyCast",              False),
+  ("generic metatype",           'Int.self',                    "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("CF metatype",                'CFString.self',               "metatypeCanBeDynamicallyCast",              False),
+  ("generic CF metatype",        'CFString.self',               "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("class metatype",             'LifetimeTracked.self',        "classMetatypePreservesIdentity",            False),
+  ("objc metatype",              'NSObject.self',               "classMetatypePreservesIdentity",            False),
+  ("protocol",                   'P.self',                      "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("objc protocol",              'NSCopying.self',              "protocolObjectPreservesIdentity",           False),
+  ("objc protocol composition",  '(NSCopying & NSCoding).self', "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("mixed protocol composition", '(NSCopying & P).self',        "metatypeCanBeDynamicallyCastGenerically",   False),
+  ("generic class metatype",     'LifetimeTracked.self',        "classMetatypePreservesIdentityGenerically", False),
+  ("generic objc metatype",      'NSObject.self',               "classMetatypePreservesIdentityGenerically", False),
+  ("function",                   'guineaPigFunction',           "functionCanBeDynamicallyCast",              False),
+]
+}%
+
+% for testName, valueExpr, testFunc, conformsToError in testCases:
+BridgeAnything.test("${testName}") {
+  do {
+    let x = ${valueExpr}
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(x))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(x))
+
+    let xInAny: Any = x
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInAny))
+
+    let xInAnyInAny = wantonlyWrapInAny(xInAny)
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAnyInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInAnyInAny))
+
+%  if conformsToError:
+    let xInError: Error = x
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInError))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInError))
+
+    let xInErrorInAny = wantonlyWrapInAny(xInError)
+    ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInErrorInAny))
+    ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(xInErrorInAny))
+%  end
+  }
+}
+% end
+
+BridgeAnything.test("description of boxed values") {
+  for x in [KnownUnbridged(), KnownUnbridgedWithDescription()] as [Any] {
+    let summary = String(reflecting: x)
+    expectEqual(summary, _bridgeAnythingToObjectiveC(x).description)
+    expectEqual(summary, _bridgeAnythingToObjectiveC(x).debugDescription)
+  }
+}
+
+BridgeAnything.test("SwiftValue(mixed values)/Hashable") {
+  var boxedXs: [NSObject] = []
+% for wrapped in ['OpaqueValue', 'MinimalHashableValue']:
+  do {
+    let xs = (0..<5).flatMap {
+      [ ${wrapped}($0, identity: 0),
+        ${wrapped}($0, identity: 1) ]
+    }
+    boxedXs.append(
+      contentsOf: xs.map {
+        _bridgeAnythingToObjectiveC($0) as! NSObject
+      })
+  }
+% end
+
+  boxedXs.append(
+    contentsOf: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4].map {
+      _bridgeAnythingToObjectiveC($0) as! NSObject
+    })
+
+  boxedXs.append(
+    contentsOf: ["a", "a", "b", "b", "c", "c", "d", "d", "e", "e"].map {
+      _bridgeAnythingToObjectiveC($0) as! NSObject
+    })
+
+  func equalityOracle(_ lhs: Int, rhs: Int) -> Bool {
+    if (0..<10).contains(lhs) || (0..<10).contains(rhs) {
+      return lhs == rhs
+    }
+    return lhs / 2 == rhs / 2
+  }
+  checkHashable(boxedXs, equalityOracle: equalityOracle)
+}
+
+runAllTests()

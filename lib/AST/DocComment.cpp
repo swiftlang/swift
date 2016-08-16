@@ -325,16 +325,129 @@ extractCommentParts(swift::markup::MarkupContext &MC,
   return Parts;
 }
 
-Optional<DocComment *> swift::getDocComment(swift::markup::MarkupContext &MC,
-                                            const Decl *D) {
+Optional<DocComment *>
+swift::getSingleDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
+  PrettyStackTraceDecl StackTrace("parsing comment for", D);
+
   auto RC = D->getRawComment();
   if (RC.isEmpty())
     return None;
-
-  PrettyStackTraceDecl StackTrace("parsing comment for", D);
 
   swift::markup::LineList LL = MC.getLineList(RC);
   auto *Doc = swift::markup::parseDocument(MC, LL);
   auto Parts = extractCommentParts(MC, Doc);
   return new (MC) DocComment(D, Doc, Parts);
+}
+
+static Optional<DocComment *>
+getAnyBaseClassDocComment(swift::markup::MarkupContext &MC,
+                          const ClassDecl *CD,
+                          const Decl *D) {
+  RawComment RC;
+
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    const auto *BaseDecl = VD->getOverriddenDecl();
+    while (BaseDecl) {
+      RC = BaseDecl->getRawComment();
+      if (!RC.isEmpty()) {
+        swift::markup::LineList LL = MC.getLineList(RC);
+        auto *Doc = swift::markup::parseDocument(MC, LL);
+        auto Parts = extractCommentParts(MC, Doc);
+
+        SmallString<48> RawCascadeText;
+        llvm::raw_svector_ostream OS(RawCascadeText);
+        OS << "This documentation comment was inherited from ";
+
+
+        auto *Text = swift::markup::Text::create(MC, MC.allocateCopy(OS.str()));
+
+        auto BaseClass =
+          BaseDecl->getDeclContext()->getAsClassOrClassExtensionContext();
+
+        auto *BaseClassMonospace =
+          swift::markup::Code::create(MC,
+                                      MC.allocateCopy(BaseClass->getNameStr()));
+
+        auto *Period = swift::markup::Text::create(MC, ".");
+
+        auto *Para = swift::markup::Paragraph::create(MC, {
+          Text, BaseClassMonospace, Period
+        });
+        auto CascadeNote = swift::markup::NoteField::create(MC, {Para});
+
+        SmallVector<const swift::markup::MarkupASTNode *, 8> BodyNodes {
+          Parts.BodyNodes.begin(),
+          Parts.BodyNodes.end()
+        };
+        BodyNodes.push_back(CascadeNote);
+        Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
+
+        return new (MC) DocComment(D, Doc, Parts);
+      }
+
+      BaseDecl = BaseDecl->getOverriddenDecl();
+    }
+  }
+  
+  return None;
+}
+
+static Optional<DocComment *>
+getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
+                                 const ProtocolDecl *ProtoExt,
+                                 const Decl *D) {
+
+  auto getSingleRequirementWithNonemptyDoc = [](const ProtocolDecl *P,
+                                                const ValueDecl *VD)
+    -> const ValueDecl * {
+      SmallVector<ValueDecl *, 2> Members;
+      P->lookupQualified(P->getType(), VD->getFullName(),
+                         NLOptions::NL_ProtocolMembers,
+                         /*resolver=*/nullptr, Members);
+    SmallVector<const ValueDecl *, 1> ProtocolRequirements;
+    for (auto Member : Members)
+      if (!Member->isDefinition())
+        ProtocolRequirements.push_back(Member);
+
+    if (ProtocolRequirements.size() == 1) {
+      auto Requirement = ProtocolRequirements.front();
+      if (!Requirement->getRawComment().isEmpty())
+        return Requirement;
+    }
+
+    return nullptr;
+  };
+
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    SmallVector<const ValueDecl *, 4> RequirementsWithDocs;
+    if (auto Requirement = getSingleRequirementWithNonemptyDoc(ProtoExt, VD))
+      RequirementsWithDocs.push_back(Requirement);
+
+    for (auto Proto : ProtoExt->getInheritedProtocols(/*resolver=*/nullptr))
+      if (auto Requirement = getSingleRequirementWithNonemptyDoc(Proto, VD))
+        RequirementsWithDocs.push_back(Requirement);
+
+    if (RequirementsWithDocs.size() == 1)
+      return getSingleDocComment(MC, RequirementsWithDocs.front());
+  }
+  return None;
+}
+
+Optional<DocComment *>
+swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
+  auto Doc = getSingleDocComment(MC, D);
+  if (Doc.hasValue())
+    return Doc;
+
+  // If this refers to a class member, check to see if any
+  // base classes have a doc comment and cascade it to here.
+  if (const auto *CD = D->getDeclContext()->getAsClassOrClassExtensionContext())
+    if (auto BaseClassDoc = getAnyBaseClassDocComment(MC, CD, D))
+      return BaseClassDoc;
+
+  if (const auto *PE = D->getDeclContext()->getAsProtocolExtensionContext())
+    if (auto ReqDoc = getProtocolRequirementDocComment(MC, PE, D))
+      return ReqDoc;
+
+  return None;
 }

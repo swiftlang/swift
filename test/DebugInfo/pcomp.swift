@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -11,7 +11,7 @@ protocol B {
 }
 
 // CHECK-DAG: _TtP5pcomp1AS_1B_
-func f(_ arg :protocol<A,B>) {
+func f(_ arg : A & B) {
 }
 
 

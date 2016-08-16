@@ -1,5 +1,5 @@
-public class Base {
-  private func privateMethod() {}
+open class Base {
+  fileprivate func privateMethod() {}
 }
 
 // Demonstrate the need for a vtable entry for privateMethod().

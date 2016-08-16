@@ -118,7 +118,6 @@ static Type stripInitializers(Type origType) {
                for (const auto &field : tupleTy->getElements()) {
                  fields.push_back(TupleTypeElt(field.getType(),
                                                field.getName(),
-                                               DefaultArgumentKind::None,
                                                field.isVararg()));
                                                
                }
@@ -576,7 +575,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       Type openedType2;
       if (auto *funcType = type2->getAs<AnyFunctionType>()) {
         openedType2 = cs.openFunctionType(
-            funcType, locator,
+            funcType, /*numArgumentLabelsToRemove=*/0, locator,
             /*replacements=*/unused,
             decl2->getInnermostDeclContext(),
             decl2->getDeclContext(),
@@ -592,7 +591,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
         openedType1 = cs.openFunctionType(
-            funcType, locator,
+            funcType, /*numArgumentLabelsToRemove=*/0, locator,
             replacements,
             dc1,
             decl1->getDeclContext(),
@@ -646,11 +645,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         break;
 
       case SelfTypeRelationship::ConformsTo:
-        cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2, locator);
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy1,
+                         cast<ProtocolDecl>(decl2->getDeclContext())
+                           ->getDeclaredType(),
+                         locator);
         break;
 
       case SelfTypeRelationship::ConformedToBy:
-        cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1, locator);
+        cs.addConstraint(ConstraintKind::ConformsTo, selfTy2,
+                         cast<ProtocolDecl>(decl1->getDeclContext())
+                           ->getDeclaredType(),
+                         locator);
         break;
       }
 

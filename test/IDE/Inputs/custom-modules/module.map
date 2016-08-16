@@ -58,3 +58,9 @@ module InferImportAsMember {
   export *
   header "InferImportAsMember.h"
 }
+
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
+  export *
+}
+

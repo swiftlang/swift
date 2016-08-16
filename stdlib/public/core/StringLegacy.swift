@@ -22,15 +22,9 @@ extension String {
   ///     let zeroes = String("0" as Character, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
+  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
   public init(repeating repeatedValue: Character, count: Int) {
-    let s = String(repeatedValue)
-    self = String(_storage: _StringBuffer(
-        capacity: s._core.count * count,
-        initialSize: 0,
-        elementWidth: s._core.elementWidth))
-    for _ in 0..<count {
-      self += s
-    }
+    Builtin.unreachable()
   }
 
   /// Creates a string representing the given Unicode scalar repeated the
@@ -42,12 +36,41 @@ extension String {
   ///     let zeroes = String("0" as UnicodeScalar, count: 10)
   ///     print(zeroes)
   ///     // Prints "0000000000"
+  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
   public init(repeating repeatedValue: UnicodeScalar, count: Int) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(repeatedValue.value, count: count))
+    Builtin.unreachable()
   }
-  
+
+  /// Creates a new string representing the given string repeated the specified
+  /// number of times.
+  ///
+  /// For example, use this initializer to create a string with ten `"00"`
+  /// strings in a row.
+  ///
+  ///     let zeroes = String(repeating: "00", count: 10)
+  ///     print(zeroes)
+  ///     // Prints "00000000000000000000"
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The string to repeat.
+  ///   - count: The number of times to repeat `repeatedValue` in the resulting
+  ///     string.
+  public init(repeating repeatedValue: String, count: Int) {
+    if count == 0 {
+      self = ""
+      return
+    }
+    precondition(count > 0, "Negative count not allowed")
+    let s = repeatedValue
+    self = String(_storage: _StringBuffer(
+        capacity: s._core.count * count,
+        initialSize: 0,
+        elementWidth: s._core.elementWidth))
+    for _ in 0..<count {
+      self += s
+    }
+  }
+
   public var _lines : [String] {
     return _split(separator: "\n")
   }
@@ -58,14 +81,16 @@ extension String {
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  public var isEmpty : Bool {
+  public var isEmpty: Bool {
     return _core.count == 0
   }
 }
 
 extension String {
   public init(_ _c: UnicodeScalar) {
-    self = String(repeating: _c, count: 1)
+    self = String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: repeatElement(_c.value, count: 1))
   }
 }
 
@@ -114,16 +139,18 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
-  ///   Passing an empty string (`""`) as `prefix` always results in `false`.
   /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
     let selfCore = self._core
     let prefixCore = prefix._core
+    let prefixCount = prefixCore.count
+    if prefixCount == 0 {
+      return true
+    }
     if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       if selfCore.isASCII && prefixCore.isASCII {
         // Prefix longer than self.
-        let prefixCount = prefixCore.count
-        if prefixCount > selfCore.count || prefixCount == 0 {
+        if prefixCount > selfCore.count {
           return false
         }
         return Int(_swift_stdlib_memcmp(
@@ -167,17 +194,19 @@ extension String {
   ///     // Prints "true"
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
-  ///   Passing an empty string (`""`) as `suffix` always results in `false`.
   /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
     let selfCore = self._core
     let suffixCore = suffix._core
+    let suffixCount = suffixCore.count
+    if suffixCount == 0 {
+      return true
+    }
     if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       if selfCore.isASCII && suffixCore.isASCII {
-        // Prefix longer than self.
-        let suffixCount = suffixCore.count
+        // Suffix longer than self.
         let selfCount = selfCore.count
-        if suffixCount > selfCount || suffixCount == 0 {
+        if suffixCount > selfCount {
           return false
         }
         return Int(_swift_stdlib_memcmp(
@@ -310,7 +339,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character,
   /// and a boolean value indicating whether any character was found.
-  public func _splitFirstIf(_ predicate: @noescape (UnicodeScalar) -> Bool)
+  public func _splitFirstIf(_ predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     let rng = unicodeScalars

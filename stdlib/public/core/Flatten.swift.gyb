@@ -68,13 +68,13 @@ public struct FlattenIterator<Base : IteratorProtocol> : IteratorProtocol, Seque
 /// The elements of this view are a concatenation of the elements of
 /// each sequence in the base.
 ///
-/// The `flatten` property is always lazy, but does not implicitly
+/// The `joined` method is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary sequences `s`:
 ///
-/// * `s.flatten()` does not create new storage
-/// * `s.flatten().map(f)` maps eagerly and returns a new array
-/// * `s.lazy.flatten().map(f)` maps lazily and returns a `LazyMapSequence`
+/// * `s.joined()` does not create new storage
+/// * `s.joined().map(f)` maps eagerly and returns a new array
+/// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
 ///
 /// - See also: `FlattenCollection`
 public struct FlattenSequence<Base : Sequence> : Sequence
@@ -113,8 +113,8 @@ extension Sequence where Iterator.Element : Sequence {
   ///     // Prints "8..<10"
   ///     // Prints "15..<17"
   ///
-  ///     // Use 'flatten()' to access each element of each range:
-  ///     for index in ranges.flatten() {
+  ///     // Use 'joined()' to access each element of each range:
+  ///     for index in ranges.joined() {
   ///         print(index, terminator: " ")
   ///     }
   ///     // Prints: "0 1 2 8 9 15 16"
@@ -123,8 +123,13 @@ extension Sequence where Iterator.Element : Sequence {
   ///   sequence of sequences.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  public func flatten() -> FlattenSequence<Self> {
+  public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> FlattenSequence<Self> {
+    Builtin.unreachable()
   }
 }
 
@@ -133,11 +138,17 @@ extension LazySequenceProtocol
   Elements.Iterator.Element == Iterator.Element,
   Iterator.Element : Sequence {
 
-  /// A concatenation of the elements of `self`.
-  public func flatten() -> LazySequence<
+  /// Returns a lazy sequence that concatenates the elements of this sequence of
+  /// sequences.
+  public func joined() -> LazySequence<
     FlattenSequence<Elements>
   > {
     return FlattenSequence(_base: elements).lazy
+  }
+
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> LazySequence<FlattenSequence<Elements>> {
+    Builtin.unreachable()
   }
 }
 
@@ -150,7 +161,7 @@ extension LazySequenceProtocol
 %   Index = Collection + 'Index'
 %   Slice = sliceTypeName(traversal=traversal, mutable=False, rangeReplaceable=False)
 /// A position in a `${Collection}`.
-public struct ${Index}<BaseElements> : Comparable
+public struct ${Index}<BaseElements>
   where
   BaseElements : ${collectionForTraversal(traversal)},
   ${constraints % {'Base': 'BaseElements.'}} {
@@ -174,32 +185,34 @@ public struct ${Index}<BaseElements> : Comparable
   internal let _inner: BaseElements.Iterator.Element.Index?
 }
 
-public func == <BaseElements> (
-  lhs: ${Index}<BaseElements>, 
-  rhs: ${Index}<BaseElements>
-) -> Bool {
-  return lhs._outer == rhs._outer && lhs._inner == rhs._inner
-}
-
-public func < <BaseElements> (
-  lhs: ${Index}<BaseElements>, 
-  rhs: ${Index}<BaseElements>
-) -> Bool {
-  // FIXME: swift-3-indexing-model: tests.
-  if lhs._outer != rhs._outer {
-    return lhs._outer < rhs._outer
+extension ${Index} : Comparable {
+  public static func == (
+    lhs: ${Index}<BaseElements>, 
+    rhs: ${Index}<BaseElements>
+  ) -> Bool {
+    return lhs._outer == rhs._outer && lhs._inner == rhs._inner
   }
 
-  if let lhsInner = lhs._inner, rhsInner = rhs._inner {
-    return lhsInner < rhsInner
+  public static func < (
+    lhs: ${Index}<BaseElements>, 
+    rhs: ${Index}<BaseElements>
+  ) -> Bool {
+    // FIXME: swift-3-indexing-model: tests.
+    if lhs._outer != rhs._outer {
+      return lhs._outer < rhs._outer
+    }
+
+    if let lhsInner = lhs._inner, let rhsInner = rhs._inner {
+      return lhsInner < rhsInner
+    }
+
+    // When combined, the two conditions above guarantee that both
+    // `_outer` indices are `_base.endIndex` and both `_inner` indices
+    // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
+    _precondition(lhs._inner == nil && rhs._inner == nil)
+
+    return false
   }
-
-  // When combined, the two conditions above guarantee that both
-  // `_outer` indices are `_base.endIndex` and both `_inner` indices
-  // are `nil`, since `_inner` is `nil` iff `_outer == base.endIndex`.
-  _precondition(lhs._inner == nil && rhs._inner == nil)
-
-  return false
 }
 
 /// A flattened view of a base collection of collections.
@@ -207,13 +220,13 @@ public func < <BaseElements> (
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
 ///
-/// The `flatten` property is always lazy, but does not implicitly
+/// The `joined` method is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary collections `c`:
 ///
-/// * `c.flatten()` does not create new storage
-/// * `c.flatten().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
+/// * `c.joined()` does not create new storage
+/// * `c.joined().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.joined().map(f)` maps lazily and returns a `LazyMapCollection`
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
 ///   that depend on `startIndex`, or of advancing a `${Collection}Index`
@@ -316,7 +329,7 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   }
 % end
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
@@ -336,19 +349,19 @@ public struct ${Collection}<Base> : ${collectionForTraversal(traversal)}
   // just return zero.
   public var underestimatedCount: Int { return 0 }
 
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element.Iterator.Element> {
 
-    // The default implementation of `_copyToNativeArrayBuffer` queries the
+    // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only
     // rely on underestimated count.
-    return _copySequenceToNativeArrayBuffer(self)
+    return _copySequenceToContiguousArray(self)
   }
 
   // TODO: swift-3-indexing-model - add docs
   public func forEach(
-    _ body: @noescape (Base.Iterator.Element.Iterator.Element) throws -> Void
+    _ body: (Base.Iterator.Element.Iterator.Element) throws -> Void
   ) rethrows {
     // FIXME: swift-3-indexing-model: tests.
     for innerCollection in _base {
@@ -379,8 +392,8 @@ extension ${collectionForTraversal(traversal)}
   ///     // Prints "8..<10"
   ///     // Prints "15..<17"
   ///
-  ///     // Use 'flatten()' to access each element of each range:
-  ///     for index in ranges.flatten() {
+  ///     // Use 'joined()' to access each element of each range:
+  ///     for index in ranges.joined() {
   ///         print(index, terminator: " ")
   ///     }
   ///     // Prints: "0 1 2 8 9 15 16"
@@ -389,8 +402,13 @@ extension ${collectionForTraversal(traversal)}
   ///   collection of collections.
   ///
   /// - SeeAlso: `flatMap(_:)`, `joined(separator:)`
-  public func flatten() -> ${Collection}<Self> {
+  public func joined() -> ${Collection}<Self> {
     return ${Collection}(self)
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> ${Collection}<Self> {
+    Builtin.unreachable()
   }
 }
 
@@ -402,20 +420,24 @@ extension LazyCollectionProtocol
   ${constraints % {'Base': 'Elements.'}},
   Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
-  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+  public func joined() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
+  }
+  
+  @available(*, unavailable, renamed: "joined()")
+  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+    Builtin.unreachable()
   }
 }
 
 % end
 
 @available(*, unavailable, renamed: "FlattenIterator")
-public struct FlattenGenerator<
-  Base : IteratorProtocol where Base.Element : Sequence
-> {}
+public struct FlattenGenerator<Base : IteratorProtocol>
+  where Base.Element : Sequence {}
 
 extension FlattenSequence {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> FlattenIterator<Base.Iterator> {
     Builtin.unreachable()
   }
@@ -423,7 +445,7 @@ extension FlattenSequence {
 
 % for traversal in ('Forward', 'Bidirectional'):
 extension Flatten${collectionForTraversal(traversal)} {
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }

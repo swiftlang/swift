@@ -507,6 +507,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       case index_block::OPERATORS:
         OperatorDecls = readDeclTable(scratch, blobData);
         break;
+      case index_block::PRECEDENCE_GROUPS:
+        PrecedenceGroupDecls = readDeclTable(scratch, blobData);
+        break;
       case index_block::EXTENSIONS:
         ExtensionDecls = readDeclTable(scratch, blobData);
         break;
@@ -755,7 +758,8 @@ ModuleFile::ModuleFile(
       ModuleInputReader(getStartBytePtr(this->ModuleInputBuffer.get()),
                         getEndBytePtr(this->ModuleInputBuffer.get())),
       ModuleDocInputReader(getStartBytePtr(this->ModuleDocInputBuffer.get()),
-                           getEndBytePtr(this->ModuleDocInputBuffer.get())) {
+                           getEndBytePtr(this->ModuleDocInputBuffer.get())),
+      DeserializedTypeCallback([](Type ty) {}) {
   assert(getStatus() == Status::Valid);
   Bits.IsFramework = isFramework;
 
@@ -1089,7 +1093,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
              "invalid module name (submodules not yet supported)");
     }
     auto module = getModule(modulePath);
-    if (!module) {
+    if (!module || module->failedToLoad()) {
       // If we're missing the module we're shadowing, treat that specially.
       if (modulePath.size() == 1 &&
           modulePath.front() == file->getParentModule()->getName()) {
@@ -1202,6 +1206,21 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
   // FIXME: operators re-exported from other modules?
 
   return nullptr;
+}
+
+PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
+  PrettyModuleFileDeserialization stackEntry(*this);
+
+  if (!PrecedenceGroupDecls)
+    return nullptr;
+
+  auto iter = PrecedenceGroupDecls->find(name);
+  if (iter == PrecedenceGroupDecls->end())
+    return nullptr;
+
+  auto data = *iter;
+  assert(data.size() == 1);
+  return cast<PrecedenceGroupDecl>(getDecl(data[0].second));
 }
 
 void ModuleFile::getImportedModules(
@@ -1471,6 +1490,13 @@ ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
+  if (PrecedenceGroupDecls) {
+    for (auto entry : PrecedenceGroupDecls->data()) {
+      for (auto item : entry)
+        results.push_back(getDecl(item.second));
+    }
+  }
+
   if (OperatorDecls) {
     for (auto entry : OperatorDecls->data()) {
       for (auto item : entry)

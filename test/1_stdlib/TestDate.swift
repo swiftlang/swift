@@ -83,8 +83,8 @@ class TestDate : TestDateSuper {
     func dateWithString(_ str: String) -> Date {
         let formatter = DateFormatter()
         // Note: Calendar(identifier:) is OSX 10.9+ and iOS 8.0+ whereas the CF version has always been available
-        formatter.calendar = CFCalendarCreateWithIdentifier(kCFAllocatorSystemDefault, .gregorianCalendar)! as Calendar
-        formatter.locale = Locale(localeIdentifier: "en_US")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
         return formatter.date(from: str)! as Date
     }
@@ -135,6 +135,67 @@ class TestDate : TestDateSuper {
         expectEmpty(dc2.day)
         expectEqual(1999, dc2.year)
     }
+
+    func test_AnyHashableContainingDate() {
+        let values: [Date] = [
+            dateWithString("2016-05-17 14:49:47 -0700"),
+            dateWithString("2010-05-17 14:49:47 -0700"),
+            dateWithString("2010-05-17 14:49:47 -0700"),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(Date.self, type(of: anyHashables[0].base))
+        expectEqual(Date.self, type(of: anyHashables[1].base))
+        expectEqual(Date.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSDate() {
+        let values: [NSDate] = [
+            NSDate(timeIntervalSince1970: 1000000000),
+            NSDate(timeIntervalSince1970: 1000000001),
+            NSDate(timeIntervalSince1970: 1000000001),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(Date.self, type(of: anyHashables[0].base))
+        expectEqual(Date.self, type(of: anyHashables[1].base))
+        expectEqual(Date.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableContainingDateComponents() {
+        let values: [DateComponents] = [
+            DateComponents(year: 2016),
+            DateComponents(year: 1995),
+            DateComponents(year: 1995),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(DateComponents.self, type(of: anyHashables[0].base))
+        expectEqual(DateComponents.self, type(of: anyHashables[1].base))
+        expectEqual(DateComponents.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSDateComponents() {
+        func makeNSDateComponents(year: Int) -> NSDateComponents {
+            let result = NSDateComponents()
+            result.year = year
+            return result
+        }
+        let values: [NSDateComponents] = [
+            makeNSDateComponents(year: 2016),
+            makeNSDateComponents(year: 1995),
+            makeNSDateComponents(year: 1995),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(DateComponents.self, type(of: anyHashables[0].base))
+        expectEqual(DateComponents.self, type(of: anyHashables[1].base))
+        expectEqual(DateComponents.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -148,5 +209,9 @@ DateTests.test("testDistantFuture") { TestDate().testDistantFuture() }
 DateTests.test("testEquality") { TestDate().testEquality() }
 DateTests.test("testTimeIntervalSinceDate") { TestDate().testTimeIntervalSinceDate() }
 DateTests.test("testDateComponents") { TestDate().testDateComponents() }
+DateTests.test("test_AnyHashableContainingDate") { TestDate().test_AnyHashableContainingDate() }
+DateTests.test("test_AnyHashableCreatedFromNSDate") { TestDate().test_AnyHashableCreatedFromNSDate() }
+DateTests.test("test_AnyHashableContainingDateComponents") { TestDate().test_AnyHashableContainingDateComponents() }
+DateTests.test("test_AnyHashableCreatedFromNSDateComponents") { TestDate().test_AnyHashableCreatedFromNSDateComponents() }
 runAllTests()
 #endif

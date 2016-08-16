@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-run-simple-swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
@@ -116,13 +116,13 @@ extension C: Runcible {
 
 let c1: AnyObject = C()
 let c2: Any = C()
-if let fruncible = c1 as? protocol<Fooable, Runcible> {
+if let fruncible = c1 as? Fooable & Runcible {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
   print("not fooable and runcible")
 }
-if let fruncible = c2 as? protocol<Fooable, Runcible> {
+if let fruncible = c2 as? Fooable & Runcible {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {

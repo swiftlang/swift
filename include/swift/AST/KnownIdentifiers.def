@@ -25,6 +25,7 @@
 IDENTIFIER(alloc)
 IDENTIFIER(allocWithZone)
 IDENTIFIER(allZeros)
+IDENTIFIER(Any)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER_WITH_NAME(code_, "_code")
@@ -77,10 +78,16 @@ IDENTIFIER(with)
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 
+// Precedence groups
+IDENTIFIER(AssignmentPrecedence)
+IDENTIFIER(CastingPrecedence)
+IDENTIFIER(DefaultPrecedence)
+IDENTIFIER(FunctionArrowPrecedence)
+IDENTIFIER(TernaryPrecedence)
+
 // Builtins and literals
 IDENTIFIER_(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)
-IDENTIFIER(boolValue)
 IDENTIFIER(nilLiteral)
 IDENTIFIER(integerLiteral)
 IDENTIFIER_(builtinIntegerLiteral)
@@ -110,6 +117,10 @@ IDENTIFIER(arrayLiteral)
 IDENTIFIER(dictionaryLiteral)
 IDENTIFIER_(getBuiltinLogicValue)
 IDENTIFIER(className)
+
+IDENTIFIER_(ErrorType)
+IDENTIFIER(Code)
+IDENTIFIER_(nsError)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

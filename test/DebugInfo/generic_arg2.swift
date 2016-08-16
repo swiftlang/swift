@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 // CHECK: define hidden void @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
 // CHECK: [[Y:%.*]] = getelementptr inbounds %C12generic_arg25Class, %C12generic_arg25Class* %2, i32 0, i32 0, i32 0

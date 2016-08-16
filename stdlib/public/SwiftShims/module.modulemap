@@ -1,0 +1,16 @@
+module SwiftShims {
+  header "CoreFoundationShims.h"
+  header "DispatchShims.h"
+  header "FoundationShims.h"
+  header "GlobalObjects.h"
+  header "HeapObject.h"
+  header "LibcShims.h"
+  header "RefCount.h"
+  header "RuntimeShims.h"
+  header "RuntimeStubs.h"
+  header "SwiftStddef.h"
+  header "SwiftStdint.h"
+  header "UnicodeShims.h"
+  header "Visibility.h"
+  export *
+}

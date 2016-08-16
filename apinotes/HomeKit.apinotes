@@ -62,3 +62,6 @@ Classes:
   - Selector: 'initWithName:fireDate:timeZone:recurrences:'
     SwiftName: 'init(name:fireDate:timeZone:recurrences:)'
     MethodKind: Instance
+Tags:
+- Name: HMErrorCode
+  NSErrorDomain: HMErrorDomain

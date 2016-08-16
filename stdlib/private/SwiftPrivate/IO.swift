@@ -81,7 +81,7 @@ public struct _FDInputStream {
   }
 }
 
-public struct _Stderr : OutputStream {
+public struct _Stderr : TextOutputStream {
   public init() {}
 
   public mutating func write(_ string: String) {
@@ -91,7 +91,7 @@ public struct _Stderr : OutputStream {
   }
 }
 
-public struct _FDOutputStream : OutputStream {
+public struct _FDOutputStream : TextOutputStream {
   public let fd: CInt
   public var isClosed: Bool = false
 
@@ -100,14 +100,14 @@ public struct _FDOutputStream : OutputStream {
   }
 
   public mutating func write(_ string: String) {
-    let utf8 = string.nulTerminatedUTF8
-    utf8.withUnsafeBufferPointer {
-      (utf8) -> Void in
+    let utf8CStr = string.utf8CString
+    utf8CStr.withUnsafeBufferPointer {
+      (utf8CStr) -> Void in
       var writtenBytes = 0
-      let bufferSize = utf8.count - 1
+      let bufferSize = utf8CStr.count - 1
       while writtenBytes != bufferSize {
         let result = _swift_stdlib_write(
-          self.fd, UnsafePointer(utf8.baseAddress! + Int(writtenBytes)),
+          self.fd, UnsafeRawPointer(utf8CStr.baseAddress! + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
           fatalError("write() returned an error")

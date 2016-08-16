@@ -15,11 +15,11 @@ import TestsUtils
 
 class X<T : Comparable> {
   let deinitIters = 10000
-  var elem : T
+  var elem: T
   init(_ x : T) {elem = x}
   deinit {
     for _ in 1...deinitIters {
-      if (elem > elem) { };
+      if (elem > elem) { }
     }
   }
 }

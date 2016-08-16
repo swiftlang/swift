@@ -21,14 +21,14 @@ extension dispatch_queue_t {} // expected-error {{'dispatch_queue_t' is unavaila
 
 // Make sure you can extend a dispatch type via its common name.
 extension DispatchQueue {
-  func myAsync(_ block: () -> Void) {
+  func myAsync(_ block: @escaping () -> Void) {
     async(execute: block)
   }
 }
 
 func test_dispatch1(_ object: dispatch_object_t) {} // expected-error {{'dispatch_object_t' is unavailable}}
 func test_dispatch2(_ object: DispatchObject) {
-  dispatch_retain(object) // expected-error {{use of unresolved identifier 'dispatch_retain'}}
-  dispatch_release(object) // expected-error {{use of unresolved identifier 'dispatch_release'}}
+  dispatch_retain(object) // expected-error {{'dispatch_retain' is unavailable in Swift}}
+  dispatch_release(object) // expected-error {{'dispatch_release' is unavailable in Swift}}
 }
 

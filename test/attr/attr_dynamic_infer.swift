@@ -1,6 +1,8 @@
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
-@objc class Super {}
+@objc class Super {
+  func baseFoo() {}
+}
 
 // CHECK: extension Super {
 extension Super {
@@ -46,5 +48,9 @@ extension Sub {
     get { return sup }
     // CHECK: @objc override dynamic set
     set { }
+  }
+
+  // CHECK: @objc override dynamic func baseFoo
+  override func baseFoo() {
   }
 }

@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 
@@ -63,8 +64,7 @@ static const UCollator *MakeRootCollator() {
 // const here to make sure we don't misuse it.
 // http://sourceforge.net/p/icu/mailman/message/27427062/
 static const UCollator *GetRootCollator() {
-  static const UCollator *RootCollator = MakeRootCollator();
-  return RootCollator;
+  return SWIFT_LAZY_CONSTANT(MakeRootCollator());
 }
 
 /// This class caches the collation element results for the ASCII subset of
@@ -72,12 +72,11 @@ static const UCollator *GetRootCollator() {
 class ASCIICollation {
   int32_t CollationTable[128];
 public:
+  friend class swift::Lazy<ASCIICollation>;
 
+  static swift::Lazy<ASCIICollation> theTable;
   static const ASCIICollation *getTable() {
-    // We are reallying on C++11's guaranteed of thread safe static variable
-    // initialization.
-    static ASCIICollation collation;
-    return &collation;
+    return &theTable.get();
   }
 
   /// Maps an ASCII character to a collation element priority as would be
@@ -154,7 +153,7 @@ swift::_swift_stdlib_unicode_compare_utf16_utf16(const uint16_t *LeftString,
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
 int32_t
-swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
+swift::_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *LeftString,
                                                 int32_t LeftLength,
                                                 const uint16_t *RightString,
                                                 int32_t RightLength) {
@@ -162,7 +161,7 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
 #if defined(__CYGWIN__) || defined(_MSC_VER)
   uiter_setString(&RightIterator, reinterpret_cast<const UChar *>(RightString),
                   RightLength);
@@ -184,16 +183,16 @@ swift::_swift_stdlib_unicode_compare_utf8_utf16(const char *LeftString,
 /// ==0 the strings are equal according to their collation.
 ///  >0 the left string is greater than the right string.
 int32_t
-swift::_swift_stdlib_unicode_compare_utf8_utf8(const char *LeftString,
+swift::_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *LeftString,
                                                int32_t LeftLength,
-                                               const char *RightString,
+                                               const unsigned char *RightString,
                                                int32_t RightLength) {
   UCharIterator LeftIterator;
   UCharIterator RightIterator;
   UErrorCode ErrorCode = U_ZERO_ERROR;
 
-  uiter_setUTF8(&LeftIterator, LeftString, LeftLength);
-  uiter_setUTF8(&RightIterator, RightString, RightLength);
+  uiter_setUTF8(&LeftIterator, reinterpret_cast<const char *>(LeftString), LeftLength);
+  uiter_setUTF8(&RightIterator, reinterpret_cast<const char *>(RightString), RightLength);
 
   uint32_t Diff = ucol_strcollIter(GetRootCollator(),
     &LeftIterator, &RightIterator, &ErrorCode);
@@ -267,13 +266,13 @@ swift::_swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
-intptr_t swift::_swift_stdlib_unicode_hash_ascii(const char *Str,
+intptr_t swift::_swift_stdlib_unicode_hash_ascii(const unsigned char *Str,
                                                  int32_t Length) {
   const ASCIICollation *Table = ASCIICollation::getTable();
   intptr_t HashState = HASH_SEED;
   int32_t Pos = 0;
   while (Pos < Length) {
-    const char c = Str[Pos++];
+    const unsigned char c = Str[Pos++];
     assert((c & 0x80) == 0 && "This table only exists for the ASCII subset");
     intptr_t Elem = Table->map(c);
     // Ignore zero valued collation elements. They don't participate in the
@@ -343,3 +342,5 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
   }
   return OutputLength;
 }
+
+swift::Lazy<ASCIICollation> ASCIICollation::theTable;

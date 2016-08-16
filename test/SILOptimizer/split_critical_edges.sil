@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -split-critical-edges | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -split-critical-edges | %FileCheck %s
 
 import Builtin
 import Swift
@@ -142,8 +142,8 @@ lookup2:
   %23 = alloc_box $Optional<() -> ()>
   %24 = load %21a : $*AnyObject
   strong_retain %24 : $AnyObject
-  %26 = open_existential_ref %24 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  %27 = unchecked_ref_cast %26 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
+  %26 = open_existential_ref %24 : $AnyObject to $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject
+  %27 = unchecked_ref_cast %26 : $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
   dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
 bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):

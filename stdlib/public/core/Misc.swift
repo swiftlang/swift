@@ -60,10 +60,10 @@ public func _autorelease(_ x: AnyObject) {
 func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
-  let stringPtr = UnsafeMutablePointer<String>(allocatingCapacity: 1)
+  let stringPtr = UnsafeMutablePointer<String>.allocate(capacity: 1)
   let bodyResult = body(stringPtr)
   let stringResult = stringPtr.move()
-  stringPtr.deallocateCapacity(1)
+  stringPtr.deallocate(capacity: 1)
   return (bodyResult, stringResult)
 }
 

@@ -28,6 +28,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -964,7 +965,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
-  if (context.OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+  if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
     size_t argCount = Arguments.size();
     if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
       addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
@@ -996,11 +997,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   // we wouldn't have to replicate Clang's logic here.
   bool wantsObjCRuntime = false;
   if (Triple.isiOS())
-    wantsObjCRuntime = Triple.isOSVersionLT(8);
-  else if (Triple.isWatchOS())
-    wantsObjCRuntime = Triple.isOSVersionLT(2);
+    wantsObjCRuntime = Triple.isOSVersionLT(9);
   else if (Triple.isMacOSX())
-    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 10);
+    wantsObjCRuntime = Triple.isMacOSXVersionLT(10, 11);
 
   if (context.Args.hasFlag(options::OPT_link_objc_runtime,
                            options::OPT_no_link_objc_runtime,
@@ -1368,6 +1367,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
                               getTriple().getArchName() +
                               ".a");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
   }
 
   // Always add the stdlib

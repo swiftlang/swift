@@ -2,17 +2,19 @@
 // Do not edit the line above.
 
 // RUN: rm -rf %t  &&  mkdir -p %t
-// RUN: %target-run-simple-swift %s %t | FileCheck %s
+// RUN: %target-run-simple-swift %s %t | %FileCheck %s
+// rdar://26960623
+// REQUIRES: disabled
 // REQUIRES: executable_test
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
 #endif
 
-let sourcePath = Process.arguments[1]
-let tempPath = Process.arguments[2] + "/libc.txt"
+let sourcePath = CommandLine.arguments[1]
+let tempPath = CommandLine.arguments[2] + "/libc.txt"
 
 // CHECK: Hello world
 fputs("Hello world", stdout)
@@ -23,7 +25,7 @@ print("\(UINT32_MAX)")
 // CHECK: the magic word is ///* magic *///
 let sourceFile = open(sourcePath, O_RDONLY)
 assert(sourceFile >= 0)
-var bytes = UnsafeMutablePointer<CChar>(allocatingCapacity: 12)
+var bytes = UnsafeMutablePointer<CChar>.allocate(capacity: 12)
 var readed = read(sourceFile, bytes, 11)
 close(sourceFile)
 assert(readed == 11)

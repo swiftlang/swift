@@ -41,15 +41,31 @@
    ;; Integer literals
    '("\\b[-]?[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Decl and type keywords
-   `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
+   `(,(regexp-opt '("class" "init" "deinit" "extension" "fileprivate" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "lazy" "where"
-                    "private" "public" "internal" "override" "throws")
+                    "private" "public" "internal" "override" "throws" "rethrows"
+                    "open" "associatedtype" "inout" "indirect" "final")
+                  'words) . font-lock-keyword-face)
+   ;; Variable decl keywords
+   `("\\b\\(?:[^a-zA-Z_0-9]*\\)\\(get\\|set\\)\\(?:[^a-zA-Z_0-9]*\\)\\b" 1 font-lock-keyword-face)
+   `(,(regexp-opt '("willSet" "didSet") 'words) . font-lock-keyword-face)
+   ;; Operators
+   `("\\b\\(?:\\(?:pre\\|post\\|in\\)fix\\s-+\\)operator\\b" . font-lock-keyword-face)
+   ;; Keywords that begin with a number sign
+   `("#\\(if\\|endif\\|elseif\\|else\\|available\\)\\b" . font-lock-string-face)
+   `("#\\(file\\|line\\|column\\|function\\|selector\\)\\b" . font-lock-keyword-face)
+   ;; Infix operator attributes
+   `(,(regexp-opt '("precedence" "associativity" "left" "right" "none")
                   'words) . font-lock-keyword-face)
    ;; Statements
-   `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case" "default"
-                    "throw" "try" "catch")
+   `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while"
+                    "return" "break" "continue" "fallthrough"  "switch" "case"
+                    "default" "throw" "defer" "try" "catch")
+                  'words) . font-lock-keyword-face)
+   ;; Decl modifier keywords
+   `(,(regexp-opt '("convenience" "dynamic" "mutating" "nonmutating" "optional"
+                    "required" "weak" "unowned" "safe" "unsafe")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)

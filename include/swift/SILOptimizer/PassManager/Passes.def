@@ -73,6 +73,8 @@ PASS(ConditionForwarding, "condition-forwarding",
      "Forward conditional branch instructions")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
+PASS(EpilogueARCMatcherDumper, "sil-epilogue-arc-dumper",
+     "Dump epilogue retains for return value and releases for arguments")
 PASS(EpilogueRetainReleaseMatcherDumper, "sil-epilogue-retain-release-dumper",
      "Dump epilogue retains for return value and releases for arguments")
 PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
@@ -167,6 +169,9 @@ PASS(LSLocationPrinter, "lslocation-dump",
      "Dump LSLocation results from analyzing all accessed locations")
 PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
+PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
+     "Test pass that hoists conditional fails to predecessors blocks when "
+     "profitable")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
 PASS(RCIdentityDumper, "rc-id-dumper",

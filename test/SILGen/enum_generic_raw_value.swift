@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TFO22enum_generic_raw_value1EC
 enum E<T>: Int {
@@ -6,6 +6,6 @@ enum E<T>: Int {
 }
 
 // CHECK-LABEL: sil hidden @_TFO22enum_generic_raw_value1FC
-enum F<T: IntegerLiteralConvertible where T: Equatable>: T {
+enum F<T: ExpressibleByIntegerLiteral where T: Equatable>: T {
   case A = 1
 }

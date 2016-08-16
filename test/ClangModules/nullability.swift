@@ -5,17 +5,22 @@
 import CoreCooling
 
 func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
-  var ao1: AnyObject = sc.methodA(osc)
-  if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
+  let ao1: Any = sc.methodA(osc)
+  _ = ao1
+  if sc.methodA(osc) == nil { } // expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
-  var ao2: AnyObject = sc.methodB(nil)
-  if sc.methodA(osc) == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
+  let ao2: Any = sc.methodB(nil)
+  _ = ao2
+  if sc.methodA(osc) == nil { }// expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
-  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
-  var ao3_ok: AnyObject? = sc.property // okay
+  let ao3: Any? = sc.property.flatMap { .some($0) }
+  _ = ao3
+  let ao3_ok: Any? = sc.property // okay
+  _ = ao3_ok
 
-  var ao4: AnyObject = sc.methodD()
-  if sc.methodD() == nil { } // expected-error{{type 'AnyObject' is not optional, value can never be nil}}
+  let ao4: Any = sc.methodD()
+  _ = ao4
+  if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'Any' to nil always returns false}}
 
   sc.methodE(sc)
   sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
@@ -29,17 +34,20 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   sc.methodG(sc, second: osc) 
 
   let ci: CInt = 1
-  var sc2 = SomeClass(int: ci)
-  var sc2a: SomeClass = sc2
-  if sc2 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
+  let sc2 = SomeClass(int: ci)
+  let sc2a: SomeClass = sc2
+  _ = sc2a
+  if sc2 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to nil always returns false}}
 
-  var sc3 = SomeClass(double: 1.5)
+  let sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
-  var sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
+  let sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
+  _ = sc3a
 
-  var sc4 = sc.returnMe()
-  var sc4a: SomeClass = sc4
-  if sc4 == nil { } // expected-error{{type 'SomeClass' is not optional, value can never be nil}}
+  let sc4 = sc.returnMe()
+  let sc4a: SomeClass = sc4
+  _ = sc4a
+  if sc4 == nil { } // expected-warning {{comparing non-optional value of type 'SomeClass' to nil always returns false}}
 }
 
 // Nullability with CF types.

@@ -6,25 +6,41 @@
 
     <style> 
     
-    .repl, .emph, .look {color:rgb(47,175,187)}
-    .emph {font-weight:bold}
+    .repl,
+    .emph,
+    .look {
+      color:rgb(47,175,187)
+    }
+    .emph {
+      font-weight:bold
+    }
 
-    pre, .pre { font-family: Monaco, monospace; font-size:90% }
+    pre,
+    .pre {
+      font-family: Monaco, monospace; font-size:90%
+    }
 
     pre.literal-block {
       overflow: hidden;
     }
 
-    span.look, span.look1 {
+    span.look,
+    span.look1 {
       position: relative;
       border-bottom: .2em dotted rgb(255,165,165);
     }
 
-    span.aside { font-family: sans-serif; white-space: normal; }
+    span.aside {
+      font-family: sans-serif; white-space: normal;
+    }
 
-    span.look + span.aside, span.look1 + span.aside { display: none; }
+    span.look + span.aside,
+    span.look1 + span.aside {
+      display: none;
+    }
 
-    span.look:hover, span.look1:hover {
+    span.look:hover,
+    span.look1:hover {
       background-color:greenyellow;
     }
 
@@ -33,7 +49,8 @@
     }
 
     /* Main speech bubble*/
-    span.look:hover + span.aside, span.look1:hover + span.aside{
+    span.look:hover + span.aside,
+    span.look1:hover + span.aside {
       display: inline-block;
       position: relative;
       margin-top: -1000em;
@@ -53,7 +70,8 @@
     }
 
     /* Little triangle on the left */
-    span.look:hover + span.aside:after, span.look1:hover + span.aside:after {
+    span.look:hover + span.aside:after,
+    span.look1:hover + span.aside:after {
       content: "";
       position: absolute;
       bottom: 0.3em;
@@ -371,7 +389,9 @@ end, strings support properties for more-specific segmentations:
    `Search Grapheme Cluster: o`
 
 Also, each such segmentation provides a unique ``IndexType``, allowing
-a string to be indexed directly with different indexing schemes::
+a string to be indexed directly with different indexing schemes
+
+.. code-block:: swift-console
 
    |swift| var i = s.searchCharacters.startIndex
    `// r2 : UInt8 = UInt8(83)`
@@ -975,7 +995,7 @@ Building
 .. sidebar:: ``append``
 
    the ``append`` method is a consequence of ``String``\ 's
-   conformance to ``OutputStream``.  See the *Swift
+   conformance to ``TextOutputStream``.  See the *Swift
    formatting proposal* for details.
 
 :Swift:

@@ -10,14 +10,14 @@ struct TestHideName {
   func hideThis4(namedParam1 x: Int, namedParam2: Int) {}
   func dontHideThisByName() {}
 
-// XFAIL: broken_std_regex
+// REQUIRES: objc_interop
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideNames.json -tok=HIDE_NAMES_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_NAMES
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideNames.json -tok=HIDE_NAMES_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_NAMES
   func testHideName01() {
     #^HIDE_NAMES_1,hidethis^#
   }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideNames.json -tok=HIDE_NAMES_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_NAMES
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideNames.json -tok=HIDE_NAMES_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_NAMES
   func testHideName02() {
     self.#^HIDE_NAMES_2,hidethis^#
   }
@@ -26,7 +26,7 @@ struct TestHideName {
 // HIDE_NAMES-NEXT: ]
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideKeywords.json -tok=HIDE_KEYWORDS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_LET
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideKeywords.json -tok=HIDE_KEYWORDS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_LET
 func testHideKeyword01() {
   #^HIDE_KEYWORDS_1^#
 // HIDE_LET-NOT: let
@@ -34,7 +34,7 @@ func testHideKeyword01() {
 // HIDE_LET-NOT: let
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showKeywords.json -tok=HIDE_KEYWORDS_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_FUNC
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showKeywords.json -tok=HIDE_KEYWORDS_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_FUNC
 func testHideKeyword02() {
   #^HIDE_KEYWORDS_2^#
 // SHOW_FUNC-NOT: let
@@ -44,7 +44,7 @@ func testHideKeyword02() {
 // SHOW_FUNC-NOT: let
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideLiterals.json -tok=HIDE_LITERALS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_NIL
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideLiterals.json -tok=HIDE_LITERALS_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_NIL
 func testHideLiteral01() {
   let x = #^HIDE_LITERALS_1^#
 // HIDE_NIL-NOT: nil
@@ -52,7 +52,7 @@ func testHideLiteral01() {
 // HIDE_NIL-NOT: nil
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showLiterals.json -tok=HIDE_LITERALS_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_STRING
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showLiterals.json -tok=HIDE_LITERALS_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_STRING
 func testHideLiteral02() {
   let x = #^HIDE_LITERALS_2^#
 // SHOW_STRING-NOT: [
@@ -64,7 +64,7 @@ func testHideLiteral02() {
 
 // FIXME: custom completions
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideModules.json -tok=HIDE_MODULES_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_FOO
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideModules.json -tok=HIDE_MODULES_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_FOO
 func testHideModule01() {
   let x: #^HIDE_MODULES_1^#
 // FIXME: submodules
@@ -79,7 +79,7 @@ func testHideModule01() {
 func myFunFunction1() {}
 func myFunFunction2() {}
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=SHOW_SPECIFIC_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_SPECIFIC_1
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=SHOW_SPECIFIC_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_SPECIFIC_1
 func testShowSpecific01() {
   #^SHOW_SPECIFIC_1,fun^#
 // SHOW_SPECIFIC_1-LABEL: Results for filterText: fun [
@@ -88,7 +88,7 @@ func testShowSpecific01() {
 // SHOW_SPECIFIC_1-NEXT: ]
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=HIDE_OP_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=HIDE_OP_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP
 func testHideOp1() {
   var local = 1
   #^HIDE_OP_1,local^#
@@ -96,13 +96,13 @@ func testHideOp1() {
 // HIDE_OP-NOT: .
 // HIDE_OP-NOT: =
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=HIDE_OP_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=HIDE_OP_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP -allow-empty
 func testHideOp2() {
   var local = 1
   local#^HIDE_OP_2^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_OP_1
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_1 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_OP_1
 func testShowOp1() {
   var local = 1
   #^SHOW_OP_1,local^#
@@ -110,7 +110,7 @@ func testShowOp1() {
 // SHOW_OP_1: local.{{$}}
 // SHOW_OP_1: local={{$}}
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_OP_2
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_OP_2
 func testShowOp2() {
   var local = 1
   local#^SHOW_OP_2^#
@@ -118,31 +118,31 @@ func testShowOp2() {
 // SHOW_OP_2: {{^}}.{{$}}
 // SHOW_OP_2: {{^}}={{$}}
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=HIDE_OP_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=HIDE_OP_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP
 func testHideOp3() {
   let local = TestHideName()
   // Implicitly hidden because we hide all the members.
   #^HIDE_OP_3,local^#
 }
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=HIDE_OP_4 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=HIDE_OP_4 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP -allow-empty
 func testHideOp4() {
   let local = TestHideName()
   // Implicitly hidden because we hide all the members.
   local#^HIDE_OP_4^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_OP_1
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_3 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_OP_1
 func testShowOp3() {
   var local = 1
   #^SHOW_OP_3,local^#
 }
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_4 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=SHOW_OP_2
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showOp.json -tok=SHOW_OP_4 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=SHOW_OP_2
 func testShowOp4() {
   var local = 1
   local#^SHOW_OP_4^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_5 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_5 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
 func testHideOp5() {
   var local = 1
   #^HIDE_OP_5,local^#
@@ -151,19 +151,19 @@ func testHideOp5() {
 // HIDE_OP_5-NOT: local?.
 // HIDE_OP_5-NOT: local(
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_6 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_6 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
 func testHideOp6() {
   var local: Int? = 1
   #^HIDE_OP_6,local^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_7 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_7 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_5 -allow-empty
 func testHideOp7() {
   struct local {}
   #^HIDE_OP_7,local^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_8 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_8 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
 func testHideOp8() {
   var local = 1
   local#^HIDE_OP_8^#
@@ -172,13 +172,13 @@ func testHideOp8() {
 // HIDE_OP_8-NOT: {{^}}?.
 // HIDE_OP_8-NOT: {{^}}(
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_9 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_9 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
 func testHideOp9() {
   var local: Int? = 1
   local#^HIDE_OP_9^#
 }
 
-// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_10 %s -- -F %S/../Inputs/libIDE-mock-sdk | FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
+// RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/hideInnerOp.json -tok=HIDE_OP_10 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP_8 -allow-empty
 func testHideOp10() {
   struct local {}
   local#^HIDE_OP_10^#

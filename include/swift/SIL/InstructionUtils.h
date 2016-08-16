@@ -20,12 +20,17 @@ namespace swift {
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
 SILValue getUnderlyingObject(SILValue V);
+SILValue getUnderlyingObjectStopAtMarkDependence(SILValue V);
 
 SILValue stripSinglePredecessorArgs(SILValue V);
 
 /// Return the underlying SILValue after stripping off all casts from the
 /// current SILValue.
 SILValue stripCasts(SILValue V);
+
+/// Return the underlying SILValue after stripping off all casts (but
+/// mark_dependence) from the current SILValue.
+SILValue stripCastsWithoutMarkDependence(SILValue V);
 
 /// Return the underlying SILValue after stripping off all upcasts from the
 /// current SILValue.

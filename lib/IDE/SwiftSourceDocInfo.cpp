@@ -19,19 +19,20 @@
 using namespace swift;
 using namespace swift::ide;
 
-Optional<std::pair<unsigned, unsigned>> swift::ide::parseLineCol(StringRef LineCol) {
+Optional<std::pair<unsigned, unsigned>>
+swift::ide::parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
   size_t ColonIdx = LineCol.find(':');
   if (ColonIdx == StringRef::npos) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
   if (LineCol.substr(0, ColonIdx).getAsInteger(10, Line)) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
   if (LineCol.substr(ColonIdx+1).getAsInteger(10, Col)) {
-    llvm::errs() << "wrong pos format, it should be '<line>:<column'\n";
+    llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
     return None;
   }
 
@@ -57,12 +58,12 @@ SourceManager &SemaLocResolver::getSourceMgr() const
 }
 
 bool SemaLocResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
-                SourceLoc Loc, bool IsRef, Type Ty) {
+                                 SourceLoc Loc, bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
   if (Loc == LocToResolve) {
-    SemaTok = { D, CtorTyRef, Loc, IsRef, Ty };
+    SemaTok = { D, CtorTyRef, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
@@ -136,6 +137,22 @@ bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
+}
+
+bool SemaLocResolver::walkToExprPre(Expr *E) {
+  if (!isDone()) {
+    if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
+      if (SAE->getFn()->getStartLoc() == LocToResolve) {
+        ContainerType = SAE->getBase()->getType();
+      }
+    } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
+      SourceLoc DotLoc = ME->getDotLoc();
+      if (DotLoc.isValid() && DotLoc.getAdvancedLoc(1) == LocToResolve) {
+        ContainerType = ME->getBase()->getType();
+      }
+    }
+  }
+  return true;
 }
 
 bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,

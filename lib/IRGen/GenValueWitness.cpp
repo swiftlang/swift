@@ -1334,10 +1334,7 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
 /// Currently, this is true if the size and/or alignment of the type is
 /// dependent on its generic parameters.
 bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
-  if (auto ugt = dyn_cast<UnboundGenericType>(ty))
-    ty = ugt->getDecl()->getDeclaredTypeInContext()->getCanonicalType();
-
-  return !IGM.getTypeInfoForUnlowered(ty).isFixedSize();
+  return !IGM.getTypeInfoForUnlowered(getFormalTypeInContext(ty)).isFixedSize();
 }
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,

@@ -208,14 +208,11 @@ namespace {
   };
 
   class Remangler {
-    struct ArchetypeInfo {
-      Node::IndexType Index;
-      Node::IndexType AbsoluteDepth;
-    };
-
     DemanglerPrinter &Out;
-    std::unordered_map<std::string, ArchetypeInfo> Archetypes;
-    unsigned AbsoluteArchetypeDepth = 0;
+
+    // We have to cons up temporary nodes sometimes when remangling
+    // nested generics. This vector owns them.
+    std::vector<NodePointer> TemporaryNodes;
 
     std::unordered_map<SubstitutionEntry, unsigned,
                        SubstitutionEntry::Hasher> Substitutions;
@@ -223,19 +220,8 @@ namespace {
     Remangler(DemanglerPrinter &out) : Out(out) {}
 
     class EntityContext {
-      Remangler &R;
-      unsigned SavedAbsoluteDepth;
       bool AsContext = false;
     public:
-      EntityContext(Remangler &R)
-        : R(R), SavedAbsoluteDepth(R.AbsoluteArchetypeDepth) {
-      }
-
-      ~EntityContext() {
-        assert(R.AbsoluteArchetypeDepth >= SavedAbsoluteDepth);
-        R.AbsoluteArchetypeDepth = SavedAbsoluteDepth;
-      }
-
       bool isAsContext() const {
         return AsContext;
       }
@@ -262,6 +248,10 @@ namespace {
       }
       unreachable("bad demangling tree node");
     }
+
+    NodePointer getUnspecialized(Node *node);
+    void mangleGenericArgs(Node *node, EntityContext &ctx);
+    void mangleAnyNominalType(Node *node, EntityContext &ctx);
 
 #define NODE(ID)                                                        \
     void mangle##ID(Node *node);
@@ -318,7 +308,7 @@ namespace {
 #define NODE(ID)
 #define CONTEXT_NODE(ID)                        \
 void Remangler::mangle##ID(Node *node) {        \
-  EntityContext ctx(*this);                     \
+  EntityContext ctx;                            \
   mangle##ID(node, ctx);                        \
 }
 #include "swift/Basic/DemangleNodes.def"
@@ -364,6 +354,8 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
       SUCCESS_IF_DECLNAME_IS("Double", "Sd");
       SUCCESS_IF_DECLNAME_IS("Float", "Sf");
       SUCCESS_IF_DECLNAME_IS("Int", "Si");
+      SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
+      SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
       SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
       SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
       SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
@@ -1133,8 +1125,6 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Out << "CO";
   } else if (text == "@convention(witness_method)") {
     Out << "Cw";
-  } else if (text == "@noreturn") {
-    Out << "CN";
   } else {
     unreachable("bad impl-function-attribute");
   }
@@ -1531,20 +1521,132 @@ void Remangler::mangleProtocolWithoutPrefix(Node *node) {
   }
 
   assert(node->getKind() == Node::Kind::Protocol);
-  EntityContext ctx(*this);
+  EntityContext ctx;
   mangleNominalType(node, '\0', ctx);
 }
 
+static bool isSpecialized(Node *node) {
+  switch (node->getKind()) {
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericClass:
+    return true;
+
+  case Node::Kind::Structure:
+  case Node::Kind::Enum:
+  case Node::Kind::Class: {
+    Node *parentOrModule = node->getChild(0).get();
+    if (isSpecialized(parentOrModule))
+      return true;
+
+    return false;
+  }
+
+  default:
+    return false;
+  }
+}
+
+NodePointer Remangler::getUnspecialized(Node *node) {
+  switch (node->getKind()) {
+  case Node::Kind::Structure:
+  case Node::Kind::Enum:
+  case Node::Kind::Class: {
+    NodePointer result = NodeFactory::create(node->getKind());
+    NodePointer parentOrModule = node->getChild(0);
+    if (isSpecialized(parentOrModule.get()))
+      result->addChild(getUnspecialized(parentOrModule.get()));
+    else
+      result->addChild(parentOrModule);
+    result->addChild(node->getChild(1));
+    return result;
+  }
+
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericClass: {
+    NodePointer unboundType = node->getChild(0);
+    assert(unboundType->getKind() == Node::Kind::Type);
+    NodePointer nominalType = unboundType->getChild(0);
+    if (isSpecialized(nominalType.get()))
+      return getUnspecialized(nominalType.get());
+    else
+      return nominalType;
+  }
+
+  default:
+    unreachable("bad nominal type kind");
+  }
+}
+
+void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
+  switch (node->getKind()) {
+  case Node::Kind::Structure:
+  case Node::Kind::Enum:
+  case Node::Kind::Class: {
+    NodePointer parentOrModule = node->getChild(0);
+    mangleGenericArgs(parentOrModule.get(), ctx);
+
+    // No generic arguments at this level
+    Out << '_';
+    break;
+  }
+
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericClass: {
+    NodePointer unboundType = node->getChild(0);
+    assert(unboundType->getKind() == Node::Kind::Type);
+    NodePointer nominalType = unboundType->getChild(0);
+    NodePointer parentOrModule = nominalType->getChild(0);
+    mangleGenericArgs(parentOrModule.get(), ctx);
+
+    mangleTypeList(node->getChild(1).get());
+    break;
+  }
+
+  default:
+    break;
+  }
+}
+
+void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx) {
+  if (isSpecialized(node)) {
+    Out << 'G';
+
+    NodePointer unboundType = getUnspecialized(node);
+    TemporaryNodes.push_back(unboundType);
+
+    mangleAnyNominalType(unboundType.get(), ctx);
+    mangleGenericArgs(node, ctx);
+    return;
+  }
+
+  switch (node->getKind()) {
+  case Node::Kind::Structure:
+    mangleNominalType(node, 'V', ctx);
+    break;
+  case Node::Kind::Enum:
+    mangleNominalType(node, 'O', ctx);
+    break;
+  case Node::Kind::Class:
+    mangleNominalType(node, 'C', ctx);
+    break;
+  default:
+    unreachable("bad nominal type kind");
+  }
+}
+
 void Remangler::mangleStructure(Node *node, EntityContext &ctx) {
-  mangleNominalType(node, 'V', ctx);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleEnum(Node *node, EntityContext &ctx) {
-  mangleNominalType(node, 'O', ctx);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleClass(Node *node, EntityContext &ctx) {
-  mangleNominalType(node, 'C', ctx);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleNominalType(Node *node, char kind, EntityContext &ctx) {
@@ -1555,18 +1657,18 @@ void Remangler::mangleNominalType(Node *node, char kind, EntityContext &ctx) {
 }
 
 void Remangler::mangleBoundGenericClass(Node *node) {
-  Out << 'G';
-  mangleChildNodes(node); // type, type list
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleBoundGenericStructure(Node *node) {
-  Out << 'G';
-  mangleChildNodes(node); // type, type list
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleBoundGenericEnum(Node *node) {
-  Out << 'G';
-  mangleChildNodes(node); // type, type list
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleTypeList(Node *node) {

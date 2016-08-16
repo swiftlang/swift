@@ -9,9 +9,11 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the logic to pretty-print SIL, Instructions, etc.
-//
+///
+/// \file
+///
+/// This file defines the logic to pretty-print SIL, Instructions, etc.
+///
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"
@@ -227,6 +229,16 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
   llvm_unreachable("bad decl context");
 }
 
+static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
+  printFullContext(Decl->getDeclContext(), OS);
+  assert(Decl->hasName());
+
+  if (Decl->isOperator())
+    OS << '"' << Decl->getName() << '"';
+  else
+    OS << Decl->getName();
+}
+
 /// SILDeclRef uses sigil "#" and prints the fully qualified dotted path.
 void SILDeclRef::print(raw_ostream &OS) const {
   OS << "#";
@@ -240,53 +252,42 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<anonymous function>";
   } else if (kind == SILDeclRef::Kind::Func) {
     auto *FD = cast<FuncDecl>(getDecl());
-    ValueDecl *decl = FD;
-    const char *Suffix;
     switch (FD->getAccessorKind()) {
     case AccessorKind::IsWillSet:
-      Suffix = "!willSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!willSet";
       break;
     case AccessorKind::IsDidSet:
-      Suffix = "!didSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!didSet";
       break;
     case AccessorKind::NotAccessor:
-      Suffix = "";
+      printValueDecl(FD, OS);
       isDot = false;
       break;
     case AccessorKind::IsGetter:
-      Suffix = "!getter";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!getter";
       break;
     case AccessorKind::IsSetter:
-      Suffix = "!setter";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!setter";
       break;
     case AccessorKind::IsMaterializeForSet:
-      Suffix = "!materializeForSet";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!materializeForSet";
       break;
     case AccessorKind::IsAddressor:
-      Suffix = "!addressor";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!addressor";
       break;
     case AccessorKind::IsMutableAddressor:
-      Suffix = "!mutableAddressor";
-      decl = FD->getAccessorStorageDecl();
+      printValueDecl(FD->getAccessorStorageDecl(), OS);
+      OS << "!mutableAddressor";
       break;
     }
-
-    printFullContext(decl->getDeclContext(), OS);
-    assert(decl->hasName());
-
-    if (decl->isOperator())
-      OS << '"' << decl->getName() << '"' << Suffix;
-    else
-      OS << decl->getName() << Suffix;
   } else {
-    printFullContext(getDecl()->getDeclContext(), OS);
-    OS << getDecl()->getName();
+    printValueDecl(getDecl(), OS);
   }
   switch (kind) {
   case SILDeclRef::Kind::Func:
@@ -320,6 +321,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "!defaultarg" << "." << defaultArgIndex;
+    break;
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    OS << "!propertyinit";
     break;
   }
   if (uncurryLevel != 0)
@@ -432,6 +436,7 @@ public:
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
+    PrintState.ASTOptions.PrintForSIL = true;
   }
 
   ID getID(const SILBasicBlock *B);
@@ -478,12 +483,17 @@ public:
           *this << 's';
         *this << ": ";
 
-        // Display the user ids sorted to give a stable use order in the printer's
-        // output. This makes diffing large sections of SIL significantly easier.
         llvm::SmallVector<ID, 32> UserIDs;
         for (auto *Op : V->getUses())
           UserIDs.push_back(getID(Op->getUser()));
-        std::sort(UserIDs.begin(), UserIDs.end());
+
+        // Display the user ids sorted to give a stable use order in the
+        // printer's output if we are asked to do so. This makes diffing large
+        // sections of SIL significantly easier at the expense of not showing
+        // the _TRUE_ order of the users in the use list.
+        if (Ctx.sortSIL()) {
+          std::sort(UserIDs.begin(), UserIDs.end());
+        }
 
         interleave(UserIDs.begin(), UserIDs.end(),
             [&] (ID id) { *this << id; },
@@ -510,13 +520,18 @@ public:
       
       *this << "// Preds:";
 
-      // Display the predecessors ids sorted to give a stable use order in the
-      // printer's output. This makes diffing large sections of SIL
-      // significantly easier.
       llvm::SmallVector<ID, 32> PredIDs;
       for (auto *BBI : BB->getPreds())
         PredIDs.push_back(getID(BBI));
-      std::sort(PredIDs.begin(), PredIDs.end());
+
+      // Display the pred ids sorted to give a stable use order in the printer's
+      // output if we are asked to do so. This makes diffing large sections of
+      // SIL significantly easier at the expense of not showing the _TRUE_ order
+      // of the users in the use list.
+      if (Ctx.sortSIL()) {
+        std::sort(PredIDs.begin(), PredIDs.end());
+      }
+
       for (auto Id : PredIDs)
         *this << ' ' << Id;
     }
@@ -531,30 +546,55 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
+  bool printTypeDependentOperands(SILInstruction *I) {
+    ArrayRef<Operand> TypeDepOps = I->getTypeDependentOperands();
+    if (TypeDepOps.empty())
+      return false;
+
+    PrintState.OS.PadToColumn(50);
+    *this << "// type-defs: ";
+    interleave(TypeDepOps,
+               [&](const Operand &op) { *this << getID(op.get()); },
+               [&] { *this << ", "; });
+    return true;
+  }
+
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfSILValue(SILValue V) {
-    if (!V->hasValue()) {
+  bool printUsersOfSILValue(SILValue V, bool printedSlashes) {
+
+    if (V->hasValue() && V->use_empty())
+      return printedSlashes;
+
+    if (printedSlashes) {
+      *this << "; ";
+    } else {
       PrintState.OS.PadToColumn(50);
-      *this << "// id: " << getID(V);
+      *this << "// ";
+    }
+    if (!V->hasValue()) {
+      *this << "id: " << getID(V);
       return true;
     }
 
     if (V->use_empty())
-      return false;
+      return true;
 
-    PrintState.OS.PadToColumn(50);
-    *this << "// user";
+    *this << "user";
     if (std::next(V->use_begin()) != V->use_end())
       *this << 's';
     *this << ": ";
 
-    // Display the user ids sorted to give a stable use order in the printer's
-    // output. This makes diffing large sections of SIL significantly easier.
     llvm::SmallVector<ID, 32> UserIDs;
     for (auto *Op : V->getUses())
       UserIDs.push_back(getID(Op->getUser()));
-    std::sort(UserIDs.begin(), UserIDs.end());
+
+    // If we are asked to, display the user ids sorted to give a stable use
+    // order in the printer's output. This makes diffing large sections of SIL
+    // significantly easier.
+    if (Ctx.sortSIL()) {
+      std::sort(UserIDs.begin(), UserIDs.end());
+    }
 
     interleave(UserIDs.begin(), UserIDs.end(), [&](ID id) { *this << id; },
                [&] { *this << ", "; });
@@ -714,14 +754,16 @@ public:
     // Print the value.
     visit(V);
 
+    bool printedSlashes = false;
     if (auto *I = dyn_cast<SILInstruction>(V)) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
+      printedSlashes = printTypeDependentOperands(I);
     }
 
     // Print users, or id for valueless instructions.
-    bool printedSlashes = printUsersOfSILValue(V);
+    printedSlashes = printUsersOfSILValue(V, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
@@ -1026,6 +1068,13 @@ public:
       *this << "[initialization] ";
     *this << getIDAndType(CI->getDest());
   }
+
+  void visitBindMemoryInst(BindMemoryInst *BI) {
+    *this << "bind_memory ";
+    *this << getIDAndType(BI->getBase()) << ", ";
+    *this << getIDAndType(BI->getIndex()) << " to ";
+    *this << BI->getBoundType();
+  }
   
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand,
                                     StringRef name) {
@@ -1079,7 +1128,10 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand(), "address_to_pointer");
   }
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "pointer_to_address");
+    *this << "pointer_to_address " << getIDAndType(CI->getOperand()) << " to ";
+    if (CI->isStrict())
+      *this << "[strict] ";
+    *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");
@@ -1187,7 +1239,7 @@ public:
     // elements.
     bool SimpleType = true;
     for (auto &Elt : TI->getType().castTo<TupleType>()->getElements()) {
-      if (Elt.hasName() || Elt.isVararg() || Elt.hasDefaultArg()) {
+      if (Elt.hasName() || Elt.isVararg()) {
         SimpleType = false;
         break;
       }
@@ -1291,9 +1343,9 @@ public:
     if (WMI->isVolatile())
       *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
-    if (WMI->hasOperand()) {
+    if (!WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
-      *this << getIDAndType(WMI->getOperand());
+      *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
   }
@@ -1722,6 +1774,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   for (auto *Attr : getSpecializeAttrs()) {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
+
+  // TODO: Handle clang node owners which don't have a name.
+  if (hasClangNode() && getClangNodeOwner()->hasName()) {
+    OS << "[clang ";
+    printValueDecl(getClangNodeOwner(), OS);
+    OS << "] ";
+  }
+
   printName(OS);
   OS << " : $";
   

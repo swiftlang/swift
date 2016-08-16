@@ -1,9 +1,10 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
+import StdlibUnittest
 
 #if os(OSX)
 import AppKit
@@ -30,13 +31,47 @@ extension CGColor {
   var b: CGFloat { return components![2] }
 }
 
-let pink = CGColor.create(colorSpace: .deviceRGB(),
-                          components: [1.0, 0.5, 0.25, 1.0])
+var CFTestSuite = TestSuite("CFExtensions")
 
-// CHECK: 1.0
-print(pink.r)
-// CHECK-NEXT: 0.5
-print(pink.g)
-// CHECK-NEXT: 0.25
-print(pink.b)
+CFTestSuite.test("methods") {
+  let pink = CGColor.create(colorSpace: .deviceRGB(),
+                            components: [1.0, 0.5, 0.25, 1.0])
+  expectEqual(1.0, pink.r)
+  expectEqual(0.5, pink.g)
+  expectEqual(0.25, pink.b)
+}
 
+protocol SwiftProto {
+  func doTheThing() -> AnyObject
+}
+extension CGColor: SwiftProto {
+  func doTheThing() -> AnyObject { return self }
+}
+
+func callTheThing<T: SwiftProto>(_ instance: T) -> AnyObject {
+  return instance.doTheThing()
+}
+
+CFTestSuite.test("protocols") {
+  let pink = CGColor.create(colorSpace: .deviceRGB(),
+                            components: [1.0, 0.5, 0.25, 1.0])
+  expectTrue(pink === pink.doTheThing())
+
+  let protoObj: SwiftProto = pink
+  expectTrue(pink === protoObj.doTheThing())
+
+  expectTrue(pink === callTheThing(pink))
+}
+
+CFTestSuite.test("protocols/downcast")
+    .xfail(.always("unimplemented"))
+    .code {
+  let pink = CGColor.create(colorSpace: .deviceRGB(),
+                            components: [1.0, 0.5, 0.25, 1.0])
+  let opaquePink: AnyObject = pink
+  let downcasted = opaquePink as? SwiftProto
+  expectNotEmpty(downcasted)
+  expectTrue(pink === downcasted!.doTheThing())
+}
+
+runAllTests()

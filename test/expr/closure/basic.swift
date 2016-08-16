@@ -36,8 +36,8 @@ func attrs() {
 
 // Closures with argument and parameter names.
 func argAndParamNames() -> Int {
-  let _: (x: Int, y: Int) -> Int = { (a x, b y) in x + y }  // expected-error 2 {{closure cannot have keyword arguments}}
-  let f1: (x: Int, y: Int) -> Int = { (x, y) in x + y }
-  _ = f1(x: 1, y: 2)
-  return f1(x: 1, y: 2)
+  let _: (_ x: Int, _ y: Int) -> Int = { (a x, b y) in x + y }  // expected-error 2 {{closure cannot have keyword arguments}}
+  let f1: (_ x: Int, _ y: Int) -> Int = { (x, y) in x + y }
+  _ = f1(1, 2)
+  return f1(1, 2)
 }

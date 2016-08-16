@@ -10,11 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// dispatch/time.h
-// DISPATCH_TIME_NOW: ok
-// DISPATCH_TIME_FOREVER: ok
+import SwiftShims
 
-public struct DispatchTime {
+public struct DispatchTime : Comparable {
 	public let rawValue: dispatch_time_t
 
 	public static func now() -> DispatchTime {
@@ -24,12 +22,38 @@ public struct DispatchTime {
 
 	public static let distantFuture = DispatchTime(rawValue: ~0)
 
-	private init(rawValue: dispatch_time_t) { 
+	fileprivate init(rawValue: dispatch_time_t) { 
 		self.rawValue = rawValue
+	}
+
+	/// Creates a `DispatchTime` relative to the system clock that
+	/// ticks since boot.
+	///
+	/// - Parameters:
+	///   - uptimeNanoseconds: The number of nanoseconds since boot, excluding
+	///                        time the system spent asleep
+	/// - Returns: A new `DispatchTime`
+	/// - Discussion: This clock is the same as the value returned by 
+	///               `mach_absolute_time` when converted into nanoseconds.
+	public init(uptimeNanoseconds: UInt64) {
+		self.rawValue = dispatch_time_t(uptimeNanoseconds)
+	}
+
+	public var uptimeNanoseconds: UInt64 {
+		return UInt64(self.rawValue)
 	}
 }
 
-public struct DispatchWallTime {
+public func <(a: DispatchTime, b: DispatchTime) -> Bool {
+	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
+	return a.rawValue < b.rawValue
+}
+
+public func ==(a: DispatchTime, b: DispatchTime) -> Bool {
+	return a.rawValue == b.rawValue
+}
+
+public struct DispatchWallTime : Comparable {
 	public let rawValue: dispatch_time_t
 
 	public static func now() -> DispatchWallTime {
@@ -38,18 +62,24 @@ public struct DispatchWallTime {
 
 	public static let distantFuture = DispatchWallTime(rawValue: ~0)
 
-	private init(rawValue: dispatch_time_t) {
+	fileprivate init(rawValue: dispatch_time_t) {
 		self.rawValue = rawValue
 	}
 
-	public init(time: timespec) {
-		var t = time
+	public init(timespec: timespec) {
+		var t = timespec
 		self.rawValue = __dispatch_walltime(&t, 0)
 	}
 }
 
-@available(*, deprecated, renamed: "DispatchWallTime")
-public typealias DispatchWalltime = DispatchWallTime
+public func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
+	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
+	return -Int64(a.rawValue) < -Int64(b.rawValue)
+}
+
+public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
+	return a.rawValue == b.rawValue
+}
 
 public enum DispatchTimeInterval {
 	case seconds(Int)
@@ -57,23 +87,23 @@ public enum DispatchTimeInterval {
 	case microseconds(Int)
 	case nanoseconds(Int)
 
-	internal var rawValue: UInt64 {
+	internal var rawValue: Int64 {
 		switch self {
-		case .seconds(let s): return UInt64(s) * NSEC_PER_SEC
-		case .milliseconds(let ms): return UInt64(ms) * NSEC_PER_MSEC
-		case .microseconds(let us): return UInt64(us) * NSEC_PER_USEC
-		case .nanoseconds(let ns): return UInt64(ns)
+		case .seconds(let s): return Int64(s) * Int64(NSEC_PER_SEC)
+		case .milliseconds(let ms): return Int64(ms) * Int64(NSEC_PER_MSEC)
+		case .microseconds(let us): return Int64(us) * Int64(NSEC_PER_USEC)
+		case .nanoseconds(let ns): return Int64(ns)
 		}
 	}
 }
 
 public func +(time: DispatchTime, interval: DispatchTimeInterval) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, interval.rawValue)
 	return DispatchTime(rawValue: t)
 }
 
 public func -(time: DispatchTime, interval: DispatchTimeInterval) -> DispatchTime {
-	let t = __dispatch_time(time.rawValue, -Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, -interval.rawValue)
 	return DispatchTime(rawValue: t)
 }
 
@@ -88,12 +118,12 @@ public func -(time: DispatchTime, seconds: Double) -> DispatchTime {
 }
 
 public func +(time: DispatchWallTime, interval: DispatchTimeInterval) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, interval.rawValue)
 	return DispatchWallTime(rawValue: t)
 }
 
 public func -(time: DispatchWallTime, interval: DispatchTimeInterval) -> DispatchWallTime {
-	let t = __dispatch_time(time.rawValue, -Int64(interval.rawValue))
+	let t = __dispatch_time(time.rawValue, -interval.rawValue)
 	return DispatchWallTime(rawValue: t)
 }
 

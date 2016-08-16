@@ -96,13 +96,15 @@ public:
   Expr *buildPrintRefExpr(SourceLoc loc) {
     assert(!C.PrintDecls.empty());
     return TC.buildRefExpr(C.PrintDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true);
+                           /*Implicit=*/true, /*isSpecialized=*/false,
+                           FunctionRefKind::Compound);
   }
 
   Expr *buildDebugPrintlnRefExpr(SourceLoc loc) {
     assert(!C.DebugPrintlnDecls.empty());
     return TC.buildRefExpr(C.DebugPrintlnDecls, DC, DeclNameLoc(loc),
-                           /*Implicit=*/true);
+                           /*Implicit=*/true, /*isSpecialized=*/false,
+                           FunctionRefKind::Compound);
   }
 };
 } // unnamed namespace
@@ -110,13 +112,15 @@ public:
 void StmtBuilder::printLiteralString(StringRef Str, SourceLoc Loc) {
   Expr *PrintFn = buildPrintRefExpr(Loc);
   Expr *PrintStr = new (Context) StringLiteralExpr(Str, Loc);
-  addToBody(new (Context) CallExpr(PrintFn, PrintStr, /*Implicit=*/true));
+  addToBody(CallExpr::createImplicit(Context, PrintFn, { PrintStr }, { }));
 }
 
 void StmtBuilder::printReplExpr(VarDecl *Arg, SourceLoc Loc) {
   Expr *DebugPrintlnFn = buildDebugPrintlnRefExpr(Loc);
-  Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true);
-  addToBody(new (Context) CallExpr(DebugPrintlnFn, ArgRef, /*Implicit=*/true));
+  Expr *ArgRef = TC.buildRefExpr(Arg, DC, DeclNameLoc(Loc), /*Implicit=*/true,
+                                 /*isSpecialized=*/false,
+                                 FunctionRefKind::Compound);
+  addToBody(CallExpr::createImplicit(Context, DebugPrintlnFn, { ArgRef }, { }));
 }
 
 Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
@@ -239,7 +243,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
       new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
                                 TypeLoc(), discriminator, newTopLevel);
 
-  CE->setType(ParameterList::getFullType(TupleType::getEmpty(Context), params));
+  CE->setType(ParameterList::getFullInterfaceType(
+      TupleType::getEmpty(Context), params, newTopLevel));
   
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;
@@ -265,14 +270,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
 
-  // If the caller didn't wrap the argument in parentheses or make it a tuple,
-  // add the extra parentheses now.
-  Expr *TheArg = E;
-  Type Ty = ParenType::get(TC.Context, TheArg->getType());
-  TheArg = new (TC.Context) ParenExpr(SourceLoc(), TheArg, SourceLoc(), false,
-                                      Ty);
-
-  Expr *TheCall = new (Context) CallExpr(CE, TheArg, /*Implicit=*/true);
+  Expr *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
   if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
 

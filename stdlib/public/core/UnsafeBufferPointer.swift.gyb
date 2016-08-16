@@ -31,11 +31,11 @@ public struct UnsafeBufferPointerIterator<Element>
 }
 
 %for Mutable in ('Mutable', ''):
-/// A non-owning pointer to buffer of ${Mutable.lower()} `Element`s stored
-/// contiguously in memory, presenting a `Collection` interface to the
+/// A non-owning pointer to a buffer of ${Mutable.lower()} elements stored
+/// contiguously in memory, presenting a collection interface to the
 /// underlying elements.
 ///
-/// The pointer should be aligned to `alignof(Element.self)`.
+/// The pointer should be aligned to `MemoryLayout<Element>.alignment`.
 public struct Unsafe${Mutable}BufferPointer<Element>
   : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
 
@@ -142,7 +142,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     return startIndex..<endIndex
   }
 
-  /// Access the `i`th element in the buffer.
+  /// Accesses the `i`th element in the buffer.
   public subscript(i: Int) -> Element {
     get {
       _debugPrecondition(i >= 0)
@@ -162,21 +162,22 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}BufferPointer<Element>>
   {
     get {
-      // FIXME: swift-3-indexing-model: range check.
-      // FIXME: swift-3-indexing-model: tests.
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
       return ${Mutable}RandomAccessSlice(
         base: self, bounds: bounds)
     }
 %  if Mutable:
     set {
-      // FIXME: swift-3-indexing-model: range check.
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
       // FIXME: swift-3-indexing-model: tests.
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
 %  end
   }
 
-  /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
+  /// Creates an Unsafe${Mutable}Pointer over the `count` contiguous
   /// `Element` instances beginning at `start`.
   ///
   /// If `start` is nil, `count` must be 0. However, `count` may be 0 even for
@@ -218,7 +219,7 @@ extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-      + "(start: \(_position.map(String.init(_:)) ?? "nil"), count: \(count))"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 %end

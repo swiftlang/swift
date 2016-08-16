@@ -42,14 +42,31 @@ function(add_swift_unittest test_dirname)
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
+  endif()
 
-    if(SWIFT_ANALYZE_CODE_COVERAGE)
-      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
-        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-    endif()
-  elseif(${SWIFT_ENABLE_GOLD_LINKER})
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -fuse-ld=gold")
+  endif()
+  if(SWIFT_ENABLE_LLD_LINKER)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fuse-ld=lld")
+  endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+    set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+      LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
+  endif()
+
+  if(SWIFT_RUNTIME_USE_SANITIZERS)
+    list(FIND SWIFT_RUNTIME_USE_SANITIZERS "Thread" THREAD_INDEX)
+    if(NOT THREAD_INDEX EQUAL -1)
+      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS
+        " -fsanitize=thread")
+      set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
+        LINK_FLAGS " -fsanitize=thread")
+    endif()
   endif()
 endfunction()
 

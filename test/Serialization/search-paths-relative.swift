@@ -8,8 +8,8 @@
 
 // Check the actual serialized search paths.
 // RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule > %t/has_xref.swiftmodule.txt
-// RUN: FileCheck %s < %t/has_xref.swiftmodule.txt
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t/has_xref.swiftmodule.txt
+// RUN: %FileCheck %s < %t/has_xref.swiftmodule.txt
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/has_xref.swiftmodule.txt
 
 // XFAIL: linux
 

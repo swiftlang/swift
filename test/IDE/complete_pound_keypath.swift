@@ -1,10 +1,10 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=AFTER_POUND | FileCheck -check-prefix=CHECK-AFTER_POUND %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=AFTER_POUND | %FileCheck -check-prefix=CHECK-AFTER_POUND %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=KEYPATH_ARG | FileCheck -check-prefix=CHECK-KEYPATH_ARG %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=KEYPATH_ARG | %FileCheck -check-prefix=CHECK-KEYPATH_ARG %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_KEYPATH_1 | FileCheck -check-prefix=CHECK-IN_KEYPATH %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_KEYPATH_1 | %FileCheck -check-prefix=CHECK-IN_KEYPATH %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_KEYPATH_2 | FileCheck -check-prefix=CHECK-IN_KEYPATH %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_KEYPATH_2 | %FileCheck -check-prefix=CHECK-IN_KEYPATH %s
 
 
 // REQUIRES: objc_interop

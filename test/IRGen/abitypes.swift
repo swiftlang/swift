@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | FileCheck -check-prefix=%target-cpu-%target-os %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | %FileCheck -check-prefix=%target-cpu-%target-os %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
@@ -230,7 +230,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call [[TYPE:%.*]] @_TFC8abitypes3Foo13copyProtoComp
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProtoComp(_ a: protocol<P1, P2>) -> protocol<P1, P2> {
+  dynamic func copyProtoComp(_ a: P1 & P2) -> P1 & P2 {
     return a
   }
 
@@ -412,6 +412,48 @@ class Foo {
   dynamic func negate2(_ b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
+  }
+
+  // x86_64-macosx: define hidden i1 @_TFC8abitypes3Foo7negate3fSbSb(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
+  // x86_64-macosx: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
+  // x86_64-macosx: ret i1 [[NEG]]
+  // x86_64-macosx: }
+
+  // x86_64-ios: define hidden i1 @_TFC8abitypes3Foo7negate3fSbSb(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 8
+  // x86_64-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
+  // x86_64-ios: ret i1 [[NEG]]
+  // x86_64-ios: }
+
+  // i386-ios: define hidden i1 @_TFC8abitypes3Foo7negate3fSbSb(i1, %C8abitypes3Foo*) {{.*}} {
+  // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(invert:)", align 4
+  // i386-ios: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1)*)(%1* [[RECEIVER:%[0-9]+]], i8* [[SEL]], i1 zeroext %0)
+  // i386-ios: ret i1 [[NEG]]
+  // i386-ios: }
+
+  dynamic func negate3(_ b: Bool) -> Bool {
+    var g = Gadget()
+    return g.invert(b)
+  }
+
+  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo10throwsTestfzSbT_(i1, %C8abitypes3Foo*, %swift.error**) {{.*}} {
+  // x86_64-macosx: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
+  // x86_64-macosx: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
+  // x86_64-macosx: }
+
+  // x86_64-ios: define hidden void @_TFC8abitypes3Foo10throwsTestfzSbT_(i1, %C8abitypes3Foo*, %swift.error**) {{.*}} {
+  // x86_64-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 8
+  // x86_64-ios: call zeroext i1 bitcast (void ()* @objc_msgSend to i1 (%1*, i8*, i1, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext {{%[0-9]+}}, %2** {{%[0-9]+}})
+  // x86_64-ios: }
+
+  // i386-ios: define hidden void @_TFC8abitypes3Foo10throwsTestfzSbT_(i1, %C8abitypes3Foo*, %swift.error**) {{.*}} {
+  // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 4
+  // i386-ios: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
+  // i386-ios: }
+  dynamic func throwsTest(_ b: Bool) throws {
+    var g = Gadget()
+    try g.negateThrowing(b)
   }
 
   // x86_64-macosx: define hidden i32* @_TToFC8abitypes3Foo24copyUnsafeMutablePointer{{.*}}(i8*, i8*, i32*) unnamed_addr {{.*}} {

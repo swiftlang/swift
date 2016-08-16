@@ -154,7 +154,7 @@ bool hasDynamicSelfTypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
-bool computeMayBindDynamicSelf(SILFunction *F);
+bool mayBindDynamicSelf(SILFunction *F);
 
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
@@ -470,6 +470,7 @@ class CastOptimizer {
   /// into a bridged ObjC type.
   SILInstruction *
   optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,
@@ -485,13 +486,22 @@ class CastOptimizer {
 
 public:
   CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
-                std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){},
-                std::function<void ()> WillSucceedAction = [](){},
+                std::function<void (SILInstruction *)> EraseAction,
+                std::function<void ()> WillSucceedAction,
                 std::function<void ()> WillFailAction = [](){})
     : ReplaceInstUsesAction(ReplaceInstUsesAction),
       EraseInstAction(EraseAction),
       WillSucceedAction(WillSucceedAction),
       WillFailAction(WillFailAction) {}
+
+  // This constructor is used in
+  // 'SILOptimizer/Mandatory/ConstantPropagation.cpp'. MSVC2015 compiler
+  // couldn't use the single constructor version which has three default
+  // arguments. It seems the number of the default argument with lambda is
+  // limited.
+  CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
+                std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){})
+    : CastOptimizer(ReplaceInstUsesAction, EraseAction, [](){}, [](){}) {}
 
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *
@@ -522,6 +532,7 @@ public:
   /// May change the control flow.
   SILInstruction *
   optimizeBridgedCasts(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,

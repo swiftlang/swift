@@ -17,7 +17,7 @@ import TestsUtils
 
 struct Move {
    var from: String
-   var to  : String
+   var to: String
    init(from:String, to:String) {
       self.from = from
       self.to = to

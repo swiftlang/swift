@@ -22,7 +22,7 @@ import StdlibUnittest
 class TestAffineTransformSuper { }
 #endif
 
-func expectEqualWithAccuracy(_ lhs: Double, _ rhs: Double, accuracy: Double, file: String = #file, line: UInt = #line, _ message: String = "") {
+func expectEqualWithAccuracy(_ lhs: Double, _ rhs: Double, accuracy: Double, _ message: String = "", file: String = #file, line: UInt = #line) {
     expectTrue(fabs(lhs - rhs) < accuracy, message, file: file, line: line)
 }
 
@@ -37,27 +37,27 @@ class TestAffineTransform : TestAffineTransformSuper {
     
     func checkPointTransformation(_ transform: AffineTransform, point: NSPoint, expectedPoint: NSPoint, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newPoint = transform.transform(point)
-        expectEqualWithAccuracy(Double(newPoint.x), Double(expectedPoint.x), accuracy: accuracyThreshold, file: file, line: line,
-                                   "x (expected: \(expectedPoint.x), was: \(newPoint.x)): \(message)")
-        expectEqualWithAccuracy(Double(newPoint.y), Double(expectedPoint.y), accuracy: accuracyThreshold, file: file, line: line,
-                                   "y (expected: \(expectedPoint.y), was: \(newPoint.y)): \(message)")
+        expectEqualWithAccuracy(Double(newPoint.x), Double(expectedPoint.x), accuracy: accuracyThreshold,
+                                   "x (expected: \(expectedPoint.x), was: \(newPoint.x)): \(message)", file: file, line: line)
+        expectEqualWithAccuracy(Double(newPoint.y), Double(expectedPoint.y), accuracy: accuracyThreshold,
+                                   "y (expected: \(expectedPoint.y), was: \(newPoint.y)): \(message)", file: file, line: line)
     }
     
     func checkSizeTransformation(_ transform: AffineTransform, size: NSSize, expectedSize: NSSize, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newSize = transform.transform(size)
-        expectEqualWithAccuracy(Double(newSize.width), Double(expectedSize.width), accuracy: accuracyThreshold, file: file, line: line,
-                                   "width (expected: \(expectedSize.width), was: \(newSize.width)): \(message)")
-        expectEqualWithAccuracy(Double(newSize.height), Double(expectedSize.height), accuracy: accuracyThreshold, file: file, line: line,
-                                   "height (expected: \(expectedSize.height), was: \(newSize.height)): \(message)")
+        expectEqualWithAccuracy(Double(newSize.width), Double(expectedSize.width), accuracy: accuracyThreshold,
+                                   "width (expected: \(expectedSize.width), was: \(newSize.width)): \(message)", file: file, line: line)
+        expectEqualWithAccuracy(Double(newSize.height), Double(expectedSize.height), accuracy: accuracyThreshold,
+                                   "height (expected: \(expectedSize.height), was: \(newSize.height)): \(message)", file: file, line: line)
     }
     
     func checkRectTransformation(_ transform: AffineTransform, rect: NSRect, expectedRect: NSRect, _ message: String = "", file: String = #file, line: UInt = #line) {
         let newRect = transform.transform(rect)
         
-        checkPointTransformation(transform, point: newRect.origin, expectedPoint: expectedRect.origin, file: file, line: line,
-                                 "origin (expected: \(expectedRect.origin), was: \(newRect.origin)): \(message)")
-        checkSizeTransformation(transform, size: newRect.size, expectedSize: expectedRect.size, file: file, line: line,
-                                "size (expected: \(expectedRect.size), was: \(newRect.size)): \(message)")
+        checkPointTransformation(transform, point: newRect.origin, expectedPoint: expectedRect.origin,
+                                 "origin (expected: \(expectedRect.origin), was: \(newRect.origin)): \(message)", file: file, line: line)
+        checkSizeTransformation(transform, size: newRect.size, expectedSize: expectedRect.size,
+                                "size (expected: \(expectedRect.size), was: \(newRect.size)): \(message)", file: file, line: line)
     }
     
     func test_BasicConstruction() {
@@ -315,7 +315,7 @@ class TestAffineTransform : TestAffineTransformSuper {
     }
     
     func test_hashing_values() {
-        // the transforms are made up and the values dont matter
+        // the transforms are made up and the values don't matter
         let values = [
             AffineTransform(m11: 1.0, m12: 2.5, m21: 66.2, m22: 40.2, tX: -5.5, tY: 3.7),
             AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
@@ -328,6 +328,39 @@ class TestAffineTransform : TestAffineTransformSuper {
             ref.transformStruct = val
             expectEqual(ref.hashValue, val.hashValue)
         }
+    }
+
+    func test_AnyHashableContainingAffineTransform() {
+        let values: [AffineTransform] = [
+            AffineTransform.identity,
+            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33),
+            AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33)
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(AffineTransform.self, type(of: anyHashables[0].base))
+        expectEqual(AffineTransform.self, type(of: anyHashables[1].base))
+        expectEqual(AffineTransform.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSAffineTransform() {
+        func makeNSAffineTransform(rotatedByDegrees angle: CGFloat) -> NSAffineTransform {
+            let result = NSAffineTransform()
+            result.rotate(byDegrees: angle)
+            return result
+        }
+        let values: [NSAffineTransform] = [
+            makeNSAffineTransform(rotatedByDegrees: 0),
+            makeNSAffineTransform(rotatedByDegrees: 10),
+            makeNSAffineTransform(rotatedByDegrees: 10),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(AffineTransform.self, type(of: anyHashables[0].base))
+        expectEqual(AffineTransform.self, type(of: anyHashables[1].base))
+        expectEqual(AffineTransform.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
     }
 }
 
@@ -349,6 +382,8 @@ AffineTransformTests.test("test_PrependTransform") { TestAffineTransform().test_
 AffineTransformTests.test("test_TransformComposition") { TestAffineTransform().test_TransformComposition() }
 AffineTransformTests.test("test_hashing_identity") { TestAffineTransform().test_hashing_identity() }
 AffineTransformTests.test("test_hashing_values") { TestAffineTransform().test_hashing_values() }
+AffineTransformTests.test("test_AnyHashableContainingAffineTransform") { TestAffineTransform().test_AnyHashableContainingAffineTransform() }
+AffineTransformTests.test("test_AnyHashableCreatedFromNSAffineTransform") { TestAffineTransform().test_AnyHashableCreatedFromNSAffineTransform() }
 runAllTests()
 #endif
     

@@ -22,10 +22,6 @@ class BridgedClass : NSObject {
 class SubclassOfBridgedClass : BridgedClass { }
 
 struct BridgedStruct : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
   }

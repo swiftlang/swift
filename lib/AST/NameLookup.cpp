@@ -174,6 +174,13 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
     signature = decl->getType()->getCanonicalType();
 
+    // FIXME: The type of a variable or subscript doesn't include
+    // enough context to distinguish entities from different
+    // constrained extensions, so use the overload signature's
+    // type. This is layering a partial fix upon a total hack.
+    if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+      signature = asd->getOverloadSignature().InterfaceType;
+
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
         CollidingDeclGroups[std::make_pair(signature, decl->getName())];
@@ -320,23 +327,34 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   return anyRemoved;
 }
 
-static bool matchesDiscriminator(Identifier discriminator,
-                                 const ValueDecl *value) {
-  if (value->getFormalAccess() != Accessibility::Private)
-    return false;
+namespace {
+enum class DiscriminatorMatch {
+  NoDiscriminator,
+  Matches,
+  Different
+};
+}
+
+static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
+                                             const ValueDecl *value) {
+  if (value->getFormalAccess() > Accessibility::FilePrivate)
+    return DiscriminatorMatch::NoDiscriminator;
 
   auto containingFile =
     dyn_cast<FileUnit>(value->getDeclContext()->getModuleScopeContext());
   if (!containingFile)
-    return false;
+    return DiscriminatorMatch::Different;
 
-  return
-    discriminator == containingFile->getDiscriminatorForPrivateValue(value);
+  if (discriminator == containingFile->getDiscriminatorForPrivateValue(value))
+    return DiscriminatorMatch::Matches;
+
+  return DiscriminatorMatch::Different;
 }
 
-static bool matchesDiscriminator(Identifier discriminator,
-                                 UnqualifiedLookupResult lookupResult) {
-  return matchesDiscriminator(discriminator, lookupResult.getValueDecl());
+static DiscriminatorMatch
+matchDiscriminator(Identifier discriminator,
+                   UnqualifiedLookupResult lookupResult) {
+  return matchDiscriminator(discriminator, lookupResult.getValueDecl());
 }
 
 template <typename Result>
@@ -346,19 +364,21 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   if (discriminator.empty())
     return;
 
-  auto doesNotMatch = [discriminator](Result next) -> bool {
-    return !matchesDiscriminator(discriminator, next);
-  };
-
-  auto lastMatchIter = std::find_if_not(results.rbegin(), results.rend(),
-                                        doesNotMatch);
+  auto lastMatchIter = std::find_if(results.rbegin(), results.rend(),
+                                    [discriminator](Result next) -> bool {
+    return
+      matchDiscriminator(discriminator, next) == DiscriminatorMatch::Matches;
+  });
   if (lastMatchIter == results.rend())
     return;
 
   Result lastMatch = *lastMatchIter;
 
   auto newEnd = std::remove_if(results.begin(), lastMatchIter.base()-1,
-                               doesNotMatch);
+                               [discriminator](Result next) -> bool {
+    return
+      matchDiscriminator(discriminator, next) == DiscriminatorMatch::Different;
+  });
   results.erase(newEnd, results.end());
   results.push_back(lastMatch);
 }
@@ -410,7 +430,18 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       ValueDecl *MetaBaseDecl = 0;
       GenericParamList *GenericParams = nullptr;
       Type ExtendedType;
-
+      bool isTypeLookup = false;
+      
+      // If this declcontext is an initializer for a static property, then we're
+      // implicitly doing a static lookup into the parent declcontext.
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+        if (!DC->getParent()->isModuleScopeContext()) {
+          if (auto PBD = PBI->getBinding()) {
+            isTypeLookup = PBD->isStatic();
+            DC = DC->getParent();
+          }
+        }
+      
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
         // Look for local variables; normally, the parser resolves these
         // for us, but it can't do the right thing inside local types.
@@ -436,8 +467,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (AFD->getExtensionType()) {
           if (AFD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
-            ExtendedType = AFD->getDeclContext()->getProtocolSelf()
-                             ->getArchetype();
+            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
 
             // Fallback path.
             if (!ExtendedType)
@@ -481,11 +511,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!isCascadingUse.hasValue())
           isCascadingUse = ACE->isCascadingContextForLookup(false);
       } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(DC)) {
-        if (ED->getAsProtocolOrProtocolExtensionContext()) {
-          ExtendedType = ED->getProtocolSelf()->getArchetype();
-        } else {
-          ExtendedType = ED->getExtendedType();
-        }
+        ExtendedType = ED->getSelfTypeInContext();
 
         BaseDecl = ED->getAsNominalTypeOrNominalTypeExtensionContext();
         MetaBaseDecl = BaseDecl;
@@ -509,6 +535,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           isCascadingUse = DC->isCascadingContextForLookup(false);
       }
 
+      // If this is implicitly a lookup into the static members, add a metatype
+      // wrapper.
+      if (isTypeLookup && ExtendedType)
+        ExtendedType = MetatypeType::get(ExtendedType, Ctx);
+      
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
@@ -538,15 +569,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
-        bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
         bool FoundAny = false;
         for (auto Result : Lookup) {
-          // If we're looking into an instance, skip static functions.
-          if (!isMetatypeType &&
-              isa<FuncDecl>(Result) &&
-              cast<FuncDecl>(Result)->isStatic())
-            continue;
-
           // Classify this declaration.
           FoundAny = true;
 
@@ -556,12 +580,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               Results.push_back(UnqualifiedLookupResult(Result));
             else
               Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
-            continue;
-          } else if (auto FD = dyn_cast<FuncDecl>(Result)) {
-            if (FD->isStatic() && !isMetatypeType)
-              continue;
-          } else if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
             continue;
           }
 
@@ -880,6 +898,9 @@ void NominalTypeDecl::addedMember(Decl *member) {
 
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
+    if (getExtendedType()->is<ErrorType>())
+      return;
+
     auto nominal = getExtendedType()->getAnyNominal();
     if (nominal->LookupTable.getPointer()) {
       // Make sure we have the complete list of extensions.
@@ -1013,10 +1034,15 @@ static bool checkAccessibility(const DeclContext *useDC,
                                const DeclContext *sourceDC,
                                Accessibility access) {
   if (!useDC)
-    return access == Accessibility::Public;
+    return access >= Accessibility::Public;
 
+  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
   case Accessibility::Private:
+    if (sourceDC->getASTContext().LangOpts.EnableSwift3Private)
+      return useDC == sourceDC || useDC->isChildContextOf(sourceDC);
+    SWIFT_FALLTHROUGH;
+  case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {
     const Module *sourceModule = sourceDC->getParentModule();
@@ -1029,6 +1055,7 @@ static bool checkAccessibility(const DeclContext *useDC,
     return false;
   }
   case Accessibility::Public:
+  case Accessibility::Open:
     return true;
   }
   llvm_unreachable("bad Accessibility");
@@ -1125,9 +1152,13 @@ bool DeclContext::lookupQualified(Type type,
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     decls.erase(std::remove_if(decls.begin(), decls.end(),
                                [&](ValueDecl *vd) -> bool {
-                                 return !knownDecls.insert(vd).second;
-                               }),
-                decls.end());
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
+        return true;
+
+      return !knownDecls.insert(vd).second;
+    }), decls.end());
 
     if (auto *debugClient = topLevelScope->getParentModule()->getDebugClient())
       filterForDiscriminator(decls, debugClient);
@@ -1341,6 +1372,17 @@ bool DeclContext::lookupQualified(Type type,
     // already visited above, add it to the list of declarations.
     llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
     for (auto decl : allDecls) {
+      // If we're performing a type lookup, don't even attempt to validate
+      // the decl if its not a type.
+      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
+        continue;
+
+      if (typeResolver && !decl->isBeingTypeChecked()) {
+        typeResolver->resolveDeclSignature(decl);
+        if (!decl->hasType())
+          continue;
+      }
+
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.

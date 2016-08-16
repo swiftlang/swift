@@ -1,9 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -O -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop
+
+// TODO: Update optimizer for id-as-Any changes.
 
 // Note: no 'import Foundation'
 
-struct DoesNotBridgeToObjC {}
+struct PlainStruct {}
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation23testAnyObjectToArrayIntFPs9AnyObject_Sb
 // CHECK: bb0(%0 : $AnyObject):
@@ -25,14 +27,14 @@ func testAnyObjectToArrayString(_ a: AnyObject) -> Bool {
   return a is [String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4d___TF31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedFPs9AnyObject_Sb
-// CHECK-NEXT: bb0:
-// CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK: [[RESULT:%.*]] = struct $Bool ([[VALUE]] : $Builtin.Int1)
-// CHECK: return [[RESULT]]
+// CHECK-LABEL: sil hidden [noinline] @{{.*}}testAnyObjectToArrayNotBridgedFPs9AnyObject{{.*}}
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
+// CHECK: [[TARGET:%.*]] = alloc_stack $Array<PlainStruct>
+// CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Array<PlainStruct> in [[TARGET]] : $*Array<PlainStruct>, bb1, bb2
 @inline(never)
 func testAnyObjectToArrayNotBridged(_ a: AnyObject) -> Bool {
-  return a is [DoesNotBridgeToObjC]
+  return a is [PlainStruct]
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation25testAnyObjectToDictionaryFPs9AnyObject_Sb

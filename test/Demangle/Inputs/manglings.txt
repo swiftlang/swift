@@ -16,6 +16,10 @@ _TtSi ---> Swift.Int
 _TtSq ---> Swift.Optional
 _TtSS ---> Swift.String
 _TtSu ---> Swift.UInt
+_TtGSPSi_ ---> Swift.UnsafePointer<Swift.Int>
+_TtGSpSi_ ---> Swift.UnsafeMutablePointer<Swift.Int>
+_TtSV ---> Swift.UnsafeRawPointer
+_TtSv ---> Swift.UnsafeMutableRawPointer
 _TtGSaSS_ ---> [Swift.String]
 _TtGSqSS_ ---> Swift.String?
 _TtGSQSS_ ---> Swift.String!
@@ -31,10 +35,10 @@ _TtFSiSu ---> (Swift.Int) -> Swift.UInt
 _TtKSiSu ---> @autoclosure (Swift.Int) -> Swift.UInt
 _TtFSiFScSu ---> (Swift.Int) -> (Swift.UnicodeScalar) -> Swift.UInt
 _TtMSi ---> Swift.Int.Type
-_TtP_ ---> protocol<>
+_TtP_ ---> Any
 _TtP3foo3bar_ ---> foo.bar
-_TtP3foo3barS_3bas_ ---> protocol<foo.bar, foo.bas>
-_TtTP3foo3barS_3bas_PS1__PS1_S_3zimS0___ ---> (protocol<foo.bar, foo.bas>, foo.bas, protocol<foo.bas, foo.zim, foo.bar>)
+_TtP3foo3barS_3bas_ ---> foo.bar & foo.bas
+_TtTP3foo3barS_3bas_PS1__PS1_S_3zimS0___ ---> (foo.bar & foo.bas, foo.bas, foo.bas & foo.zim & foo.bar)
 _TtRSi ---> inout Swift.Int
 _TtTSiSu_ ---> (Swift.Int, Swift.UInt)
 _TttSiSu_ ---> (Swift.Int, Swift.UInt...)
@@ -108,7 +112,7 @@ _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)
 _TFSqcfT_GSqx_ ---> Swift.Optional.init () -> A?
-_TF21class_bound_protocols32class_bound_protocol_compositionFT1xPS_10ClassBoundS_13NotClassBound__PS0_S1__ ---> class_bound_protocols.class_bound_protocol_composition (x : protocol<class_bound_protocols.ClassBound, class_bound_protocols.NotClassBound>) -> protocol<class_bound_protocols.ClassBound, class_bound_protocols.NotClassBound>
+_TF21class_bound_protocols32class_bound_protocol_compositionFT1xPS_10ClassBoundS_13NotClassBound__PS0_S1__ ---> class_bound_protocols.class_bound_protocol_composition (x : class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound) -> class_bound_protocols.ClassBound & class_bound_protocols.NotClassBound
 _TtZZ ---> _TtZZ
 _TtB ---> _TtB
 _TtBSi ---> _TtBSi
@@ -184,10 +188,10 @@ _TFE11ext_structAV11def_structA1A4testfT_T_ ---> (extension in ext_structA):def_
 _TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> devirt_access.(getPrivateClass in _DISC) () -> devirt_access.(PrivateClass in _DISC)
 _TF4mainP5_mainX3wxaFT_T_ ---> main.(λ in _main) () -> ()
 _TF4mainP5_main3abcFT_aS_P5_DISC3xyz ---> main.(abc in _main) () -> main.(xyz in _DISC)
-_TtPMP_ ---> protocol<>.Type
-_TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType (protocol<>.Type) -> Swift.Bool
-_TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : protocol<>.Type
-_TFCs17_DictionaryMirrorg9valueTypePMP_ ---> Swift._DictionaryMirror.valueType.getter : protocol<>.Type
+_TtPMP_ ---> Any.Type
+_TFCs13_NSSwiftArray29canStoreElementsOfDynamicTypefPMP_Sb ---> Swift._NSSwiftArray.canStoreElementsOfDynamicType (Any.Type) -> Swift.Bool
+_TFCs13_NSSwiftArrayg17staticElementTypePMP_ ---> Swift._NSSwiftArray.staticElementType.getter : Any.Type
+_TFCs17_DictionaryMirrorg9valueTypePMP_ ---> Swift._DictionaryMirror.valueType.getter : Any.Type
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Swift.Int]> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSfq1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <preserving fragile attribute, Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Swift.Int]> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
 _TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Swift.Int]> of generic specialization <Swift.Int> of specgen.take_closure ((Swift.Int, Swift.Int) -> ()) -> ()
@@ -210,8 +214,12 @@ _TTWurGV23interface_type_mangling18GenericTypeContextx_S_18GenericWitnessTestS_F
 _TFC3red11BaseClassEHcfzT1aSi_S0_ ---> red.BaseClassEH.init (a : Swift.Int) throws -> red.BaseClassEH
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
 _TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx ---> (extension in mangling_generic_extensions):mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
-_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorProtocol) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorProtocol)
+_TTRXFo_iT__iT_zoPs5Error__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.Error) to @callee_owned () -> (@unowned (), @error @owned Swift.Error)
 _TFE1a ---> _TFE1a
-_TF21$__lldb_module_for_E0au3$E0Ps13ErrorProtocol_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorProtocol
+_TF21$__lldb_module_for_E0au3$E0Ps5Error_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.Error
 _TMps10Comparable ---> protocol descriptor for Swift.Comparable
 _TFC4testP33_83378C430F65473055F1BD53F3ADCDB71C5doFoofT_T_ ---> test.(C in _83378C430F65473055F1BD53F3ADCDB7).doFoo () -> ()
+_TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9leftoversx14transformationFxqd___GS1_x_qd___ ---> nested_generics.Lunch.Dinner.init (firstCourse : A, secondCourse : A1?, leftovers : A, transformation : (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
+_TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1).init (material : A) -> nested_generics.HotDogs.(applyRelish () -> ()).(Relish #1)<A>
+_TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1).init (material : A) -> (extension in nested_generics):Swift.String.(foo () -> ()).(Cheese #1)<A>
+

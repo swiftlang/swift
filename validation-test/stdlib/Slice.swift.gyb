@@ -12,34 +12,32 @@ from gyb_stdlib_support import (
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-import SwiftPrivate
 
 
 /// Reference-type collection for testing the `base` property.
 class ReferenceCollection : RandomAccessCollection {
-    typealias Index = Int
-    
-    var startIndex: Int {
-        return 0
-    }
-    
-    var endIndex: Int {
-        return 1
-    }
+  typealias Index = Int
 
-    subscript(index: Int) -> String {
-        return ""
-    }
-    
-    func index(after i: Int) -> Int {
-        return 1
-    }
-    
-    func index(before i: Int) -> Int {
-        return 0
-    }
+  var startIndex: Int {
+    return 0
+  }
+
+  var endIndex: Int {
+    return 1
+  }
+
+  subscript(index: Int) -> String {
+    return ""
+  }
+
+  func index(after i: Int) -> Int {
+    return 1
+  }
+
+  func index(before i: Int) -> Int {
+    return 0
+  }
 }
-
 
 var SliceTests = TestSuite("Collection")
 

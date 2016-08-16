@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
+// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 // REQUIRES: objc_interop
 
 // CHECK: FIELDS:
@@ -41,6 +41,9 @@
 
 // CHECK: rect: __C.CGRect
 // CHECK: (struct __C.CGRect)
+
+// CHECK: TypesToReflect.OP
+// CHECK: -----------------
 
 // CHECK: __ObjC.Bundle
 // CHECK: ---------------

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
 
 // Linux doesn't have the same symbol name for _ArrayBuffer.
 // XFAIL: linux
@@ -34,7 +34,7 @@ bb0(%0 : $TrivialDestructor):
   %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*TrivialDestructor
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
 // CHECK-NEXT: strong_release %0 : $TrivialDestructor, loc "{{.*}}":[[@LINE+1]]:3
   store %0 to %7 : $*TrivialDestructor
   %9 = integer_literal $Builtin.Word, 1
@@ -67,7 +67,7 @@ bb0(%0 : $TrivialDestructor):
   %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*TrivialDestructor
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
   %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
@@ -107,7 +107,7 @@ bb1:
   unreachable
 
 bb2:
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*TrivialDestructor
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   strong_retain %0 : $TrivialDestructor
   store %0 to %7 : $*TrivialDestructor
   strong_release %15 : $Builtin.BridgeObject
@@ -129,7 +129,7 @@ bb0(%0 : $TrivialDestructor):
   %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*TrivialDestructor
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   strong_retain %0 : $TrivialDestructor
   store %0 to %7 : $*TrivialDestructor
   br bb1
@@ -158,12 +158,12 @@ bb0(%0 : $TrivialDestructor):
   %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %10 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %11 = pointer_to_address %10 : $Builtin.RawPointer to $*TrivialDestructor
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   strong_retain %0 : $TrivialDestructor
   store %0 to %11 : $*TrivialDestructor
 
   %20 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %21 = pointer_to_address %20 : $Builtin.RawPointer to $*TrivialDestructor
+  %21 = pointer_to_address %20 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   %22 = load %21 : $*TrivialDestructor
 
   %12 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
@@ -193,7 +193,7 @@ bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
   %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
   %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
-  %7 = pointer_to_address %6 : $Builtin.RawPointer to $*TrivialDestructor
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
   %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue

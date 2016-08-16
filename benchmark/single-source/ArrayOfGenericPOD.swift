@@ -19,7 +19,7 @@
 // An integer enum takes two words.
 
 class RefArray<T> {
-  var array : [T]
+  var array: [T]
 
   init(_ i:T) {
     array = [T](repeating: i, count: 100000)
@@ -48,8 +48,8 @@ func genIOUArray() {
 // struct has multiple fields of trivial type. Destroying the
 // elements should be a nop.
 struct S<T> {
-  var x : T
-  var y : T
+  var x: T
+  var y: T
 }
 @inline(never)
 func genStructArray() {

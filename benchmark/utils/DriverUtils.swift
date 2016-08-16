@@ -50,7 +50,7 @@ struct Test {
   let index: Int
   let f: (Int) -> ()
   var run: Bool
-  init(name: String, n: Int, f: (Int) -> ()) {
+  init(name: String, n: Int, f: @escaping (Int) -> ()) {
     self.name = name
     self.index = n
     self.f = f
@@ -102,8 +102,10 @@ struct TestConfig {
   var tests = [Test]()
 
   mutating func processArguments() -> TestAction {
-    let validOptions=["--iter-scale", "--num-samples", "--num-iters",
-      "--verbose", "--delim", "--run-all", "--list", "--sleep"]
+    let validOptions = [
+      "--iter-scale", "--num-samples", "--num-iters",
+      "--verbose", "--delim", "--run-all", "--list", "--sleep"
+    ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
       return .Fail("Failed to parse arguments")
@@ -218,9 +220,9 @@ func internalMedian(_ inputs: [UInt64]) -> UInt64 {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 @_silgen_name("swift_leaks_startTrackingObjects")
-func startTrackingObjects(_: UnsafeMutablePointer<Void>) -> ()
+func startTrackingObjects(_: UnsafeMutableRawPointer) -> ()
 @_silgen_name("swift_leaks_stopTrackingObjects")
-func stopTrackingObjects(_: UnsafeMutablePointer<Void>) -> Int
+func stopTrackingObjects(_: UnsafeMutableRawPointer) -> Int
 
 #endif
 
@@ -233,14 +235,14 @@ class SampleRunner {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     var str = name
-    startTrackingObjects(UnsafeMutablePointer<Void>(str._core.startASCII))
+    startTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
     let start_ticks = mach_absolute_time()
     fn(Int(num_iters))
     // Stop the timer.
     let end_ticks = mach_absolute_time()
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    stopTrackingObjects(UnsafeMutablePointer<Void>(str._core.startASCII))
+    stopTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
 #endif
 
     // Compute the spent time and the scaling factor.

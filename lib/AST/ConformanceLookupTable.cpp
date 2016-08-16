@@ -445,7 +445,7 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
 
   // If this entry is synthesized or implied, scan to determine
   // whether there are any explicit better conformances that make this
-  // conformance trivially superseded (and, therefore, no worth
+  // conformance trivially superseded (and, therefore, not worth
   // recording).
   auto &conformanceEntries = Conformances[protocol];
   if (kind == ConformanceEntryKind::Implied ||
@@ -458,7 +458,9 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
 
       case ConformanceEntryKind::Implied:
         // An implied conformance is better than a synthesized one.
-        if (kind == ConformanceEntryKind::Synthesized)
+        // Ignore implied circular protocol inheritance
+        if (kind == ConformanceEntryKind::Synthesized ||
+            existingEntry->getProtocol() == protocol)
           return false;
         break;
 
@@ -516,10 +518,11 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
     }
 
-    // An @objc enum that explicitly conforms to the ErrorProtocol protocol
-    // also implicitly conforms to _ObjectiveCBridgeableErrorProtocol, via the
+    // An @objc enum that explicitly conforms to the Error protocol
+    // also implicitly conforms to _ObjectiveCBridgeableError, via the
     // known protocol _BridgedNSError.
-    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorProtocol) &&
+    if (conformingProtocol->isSpecificProtocol(
+          KnownProtocolKind::Error) &&
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();

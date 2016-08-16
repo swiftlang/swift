@@ -475,12 +475,11 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
   }
 
   // Make sure that it is a simple partial apply (i.e. its callee is a
-  // function_ref). We also do not handle indirect results currently in the
-  // closure so make sure that does not happen at this point.
+  // function_ref).
   //
   // TODO: We can probably handle other partial applies here.
   auto *FRI = dyn_cast<FunctionRefInst>(Callee);
-  if (!FRI || FRI->getFunctionType()->hasIndirectResults())
+  if (!FRI)
     return false;
 
   // Otherwise, we do support specializing this closure.
@@ -674,7 +673,7 @@ void ClosureSpecCloner::populateCloned() {
       auto NoReturnApply = FullApplySite::isa(&*PrevIter);
 
       // We insert the release value right before the no return apply so that if
-      // the partial apply is passed into the @noreturn function as an @owned
+      // the partial apply is passed into the no-return function as an @owned
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply.getInstruction());

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -62,7 +62,7 @@ protocol Protein {
   static func paleoDiet() throws -> Protein
 }
 
-enum CarbOverdose : ErrorProtocol {
+enum CarbOverdose : Error {
   case Mild
   case Severe
 }

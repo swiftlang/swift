@@ -51,6 +51,8 @@ Optional<PlatformKind> swift::platformFromString(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformKind>>(Name)
 #define AVAILABILITY_PLATFORM(X, PrettyName) .Case(#X, PlatformKind::X)
 #include "swift/AST/PlatformKinds.def"
+      .Case("macOS", PlatformKind::OSX)
+      .Case("macOSApplicationExtension", PlatformKind::OSXApplicationExtension)
       .Default(Optional<PlatformKind>());
 }
 

@@ -48,10 +48,10 @@ extension String.Index {
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within other: String
   ) {
-    if !unicodeScalarIndex._isOnGraphemeClusterBoundary {
+    if !other.unicodeScalars._isOnGraphemeClusterBoundary(unicodeScalarIndex) {
       return nil
     }
-    self.init(_base: unicodeScalarIndex)
+    self.init(_base: unicodeScalarIndex, in: other.characters)
   }
 
   /// Creates an index in the given string that corresponds exactly to the

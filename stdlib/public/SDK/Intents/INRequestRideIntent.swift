@@ -16,29 +16,24 @@ import Foundation
 #if os(iOS)
 @available(iOS 10.0, *)
 extension INRequestRideIntent {
-    public convenience init(pickupLocation: CLPlacemark?, dropOffLocation: CLPlacemark?, rideOptionName: String?, partySize: Int?, paymentMethodName: String?, usesApplePayForPayment: Bool?) {
-        self.init(__pickupLocation: pickupLocation,
-                  dropOffLocation: dropOffLocation,
-                  rideOptionName: rideOptionName,
-                  partySize: partySize.map { NSNumber(value: $0) },
-                  paymentMethodName: paymentMethodName,
-                  usesApplePayForPayment: usesApplePayForPayment.map {
-                    NSNumber(value : $0)
-                  })
-    }
+  @nonobjc
+  public convenience init(
+    pickupLocation: CLPlacemark? = nil,
+    dropOffLocation: CLPlacemark? = nil,
+    rideOptionName: INSpeakableString? = nil,
+    partySize: Int? = nil,
+    paymentMethod: INPaymentMethod? = nil
+  ) {
+    self.init(__pickupLocation: pickupLocation,
+      dropOffLocation: dropOffLocation,
+      rideOptionName: rideOptionName,
+      partySize: partySize.map { NSNumber(value: $0) },
+      paymentMethod: paymentMethod)
+  }
 
-    @nonobjc  
-    public final var partySize: Int? {
-        get {
-            return __partySize?.intValue
-        }
-    }
-
-    @nonobjc
-    public final var usesApplePayForPayment: Bool? {
-        get {
-            return __usesApplePayForPayment?.boolValue
-        }
-    }
+  @nonobjc
+  public final var partySize: Int? {
+    return __partySize?.intValue
+  }
 }
 #endif

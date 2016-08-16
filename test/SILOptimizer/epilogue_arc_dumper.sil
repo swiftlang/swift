@@ -1,0 +1,197 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-arc-dumper %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+
+/////////////////////
+// Data Structures //
+/////////////////////
+
+class foo {
+  var a: Int
+   deinit 
+  init()
+}
+
+// CHECK-LABEL: START: single_release_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: FINISH: single_release_foo
+sil @single_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_release %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: multiblock_release_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: FINISH: multiblock_release_foo
+sil @multiblock_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $foo
+ br bb3
+
+bb2:
+  strong_release %0 : $foo
+  br bb3
+
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: partial_multiblock_release_foo
+// CHECK: FINISH: partial_multiblock_release_foo
+sil @partial_multiblock_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_release %0 : $foo
+  br bb3
+
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+
+// CHECK-LABEL: START: loop_multiblock_release_foo
+// CHECK: FINISH: loop_multiblock_release_foo
+sil @loop_multiblock_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  br bb1
+
+bb1:
+  strong_release %0 : $foo
+  cond_br undef, bb1, bb2
+
+bb2:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+
+// CHECK-LABEL: START: empty_loop_multiblock_release_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: FINISH: empty_loop_multiblock_release_foo
+sil @empty_loop_multiblock_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_release %0 : $foo
+  br bb1
+
+bb1:
+  cond_br undef, bb1, bb2
+
+bb2:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: uniqueness_check_release_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: FINISH: uniqueness_check_release_foo
+sil @uniqueness_check_release_foo : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  is_unique %1  : $*foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: single_retain_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_retain [[IN1]] : $foo
+// CHECK: FINISH: single_retain_foo
+sil @single_retain_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: blocked_retain_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: FINISH: blocked_retain_foo
+sil @blocked_retain_foo : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_retain %0 : $foo
+  %2 = load %1 : $*foo
+  strong_release %2 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: multibb_retain_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_retain [[IN1]] : $foo
+// CHECK: strong_retain [[IN1]] : $foo
+// CHECK: FINISH: multibb_retain_foo
+sil @multibb_retain_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $foo
+  br bb3
+
+bb2:
+  strong_retain %0 : $foo
+  br bb3
+
+bb3:
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Make sure only 1 retain is found in this case.
+//
+// CHECK-LABEL: START: multibb_dominating_retain_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_retain [[IN1]] : $foo
+// CHECK: FINISH: multibb_dominating_retain_foo
+sil @multibb_dominating_retain_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $foo
+  br bb3
+
+bb2:
+  strong_retain %0 : $foo
+  br bb3
+
+bb3:
+  strong_retain %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: epilogue_retains_in_diamond_top_and_left_split_block
+// CHECK: apply
+// CHECK: FINISH: epilogue_retains_in_diamond_top_and_left_split_block
+sil @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  cond_br undef, bb1, bb2
+bb1:
+  strong_retain %0 : $foo
+  br bb3(%0 : $foo)
+bb2:
+  %5 = function_ref @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo 
+  %6 = apply %5(%0)  : $@convention(thin) (@owned foo) -> @owned foo
+  br bb3( %6 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}

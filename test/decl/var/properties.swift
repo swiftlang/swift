@@ -97,13 +97,13 @@ var implicitGet1: X {
 var implicitGet2: Int {
   var zzz = 0
   // For the purpose of this test, any other function attribute work as well.
-  @noreturn
+  @inline(__always)
   func foo() {}
   return 0
 }
 
 var implicitGet3: Int {
-  @noreturn
+  @inline(__always)
   func foo() {}
   return 0
 }
@@ -148,7 +148,7 @@ func disambiguateGetSet2() {
 func disambiguateGetSet2Attr() {
   func get(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     get {}
   }
@@ -168,7 +168,7 @@ func disambiguateGetSet3() {
 func disambiguateGetSet3Attr() {
   func set(_ fn: () -> ()) {}
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     set {}
   }
@@ -190,7 +190,7 @@ func disambiguateGetSet4Attr() {
   func set(_ x: Int, fn: () -> ()) {}
   var newValue: Int = 0
   var a: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func foo() {}
     set(newValue) {}
   }
@@ -771,7 +771,7 @@ struct WillSetDidSetProperties {
   }
 
   var disambiguate6: Int = takeTrailingClosure {
-    @noreturn
+    @inline(__always)
     func f() {}
     return ()
   }
@@ -1133,6 +1133,13 @@ extension rdar17391625derived {
   }
 }
 
+// <rdar://problem/27671033> Crash when defining property inside an invalid extension
+public protocol rdar27671033P {}
+struct rdar27671033S<Key, Value> {}
+extension rdar27671033S : rdar27671033P where Key == String { // expected-error {{extension of type 'rdar27671033S' with constraints cannot have an inheritance clause}}
+  // expected-error@-1 {{same-type requirement makes generic parameter 'Key' non-generic}}
+  let d = rdar27671033S<Int, Int>() // expected-error {{extensions may not contain stored properties}}
+}
 
 // <rdar://problem/19874152> struct memberwise initializer violates new sanctity of previously set `let` property
 struct r19874152S1 {
@@ -1147,7 +1154,7 @@ struct r19874152S2 {
 _ = r19874152S2(number:64)  // Ok, property is a var.
 _ = r19874152S2()  // Ok
 
-struct r19874152S3 {
+struct r19874152S3 { // expected-note {{'init(flavour:)' declared here}}
   let number : Int = 42
   let flavour : Int
 }

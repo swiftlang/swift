@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | %FileCheck %s
 //
 // ginit.cold has a hammock with an initializer call on the slow path.
 // ginit.loop has a loop containing an initializer call.
@@ -55,7 +55,7 @@ bb1:                                              // Preds: bb0
   // function_ref ginit.MyConst.mutableAddressor : Swift.Int32
   %6 = function_ref @_TF5ginita7MyConstSi : $@convention(thin) () -> Builtin.RawPointer // user: %7
   %7 = apply %6() : $@convention(thin) () -> Builtin.RawPointer // user: %8
-  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*Int32 // user: %9
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int32 // user: %9
   %9 = struct_element_addr %8 : $*Int32, #Int32._value // user: %10
   %10 = load %9 : $*Builtin.Int32                  // user: %13
   %12 = integer_literal $Builtin.Int1, -1         // user: %13
@@ -115,7 +115,7 @@ bb5:                                              // Preds: bb3
   // function_ref ginit.MyConst.mutableAddressor : Swift.Int32
   %32 = function_ref @_TF5ginita7MyConstSi : $@convention(thin) () -> Builtin.RawPointer // user: %33
   %33 = apply %32() : $@convention(thin) () -> Builtin.RawPointer // user: %34
-  %34 = pointer_to_address %33 : $Builtin.RawPointer to $*Int32 // user: %35
+  %34 = pointer_to_address %33 : $Builtin.RawPointer to [strict] $*Int32 // user: %35
   %35 = struct_element_addr %34 : $*Int32, #Int32._value // user: %36
   %36 = load %35 : $*Builtin.Int32                 // user: %37
   %37 = builtin "sadd_with_overflow_Int32"(%9 : $Builtin.Int32, %36 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %38
@@ -193,7 +193,7 @@ bb8:                                              // Preds: bb6
   // function_ref libg.MyGlobal.mutableAddressor : Swift.Int32
   %37 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer // user: %38
   %38 = apply %37() : $@convention(thin) () -> Builtin.RawPointer // user: %39
-  %39 = pointer_to_address %38 : $Builtin.RawPointer to $*Int32 // user: %40
+  %39 = pointer_to_address %38 : $Builtin.RawPointer to [strict] $*Int32 // user: %40
   %40 = struct_element_addr %39 : $*Int32, #Int32._value // user: %41
   %41 = load %40 : $*Builtin.Int32                 // user: %44
   %43 = integer_literal $Builtin.Int1, -1         // user: %44
@@ -247,7 +247,7 @@ bb4:                                              // Preds: bb3
   // function_ref libg.MyGlobal.mutableAddressor : Swift.Int32
   %24 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer // user: %25
   %25 = apply %24() : $@convention(thin) () -> Builtin.RawPointer // user: %26
-  %26 = pointer_to_address %25 : $Builtin.RawPointer to $*Int32 // user: %27
+  %26 = pointer_to_address %25 : $Builtin.RawPointer to [strict] $*Int32 // user: %27
   %27 = struct_element_addr %26 : $*Int32, #Int32._value // user: %28
   %28 = load %27 : $*Builtin.Int32                 // user: %29
   %29 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %28 : $Builtin.Int32, %13 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %30
@@ -269,14 +269,14 @@ sil @test_common_dominator : $@convention(thin) (Builtin.Int1) -> Int64 {
 bb0(%0 : $Builtin.Int1):
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
   %4 = struct_element_addr %3 : $*Int64, #Int64._value
   %5 = load %4 : $*Builtin.Int64
   cond_br %0, bb1, bb2(%5 : $Builtin.Int64)
 
 bb1:
   %8 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %9 = pointer_to_address %8 : $Builtin.RawPointer to $*Int64
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Int64
   %10 = struct_element_addr %9 : $*Int64, #Int64._value
   %11 = load %10 : $*Builtin.Int64
   br bb2(%11 : $Builtin.Int64)
@@ -300,7 +300,7 @@ bb0(%0 : $Builtin.Int1):
 bb1:
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
   %4 = struct_element_addr %3 : $*Int64, #Int64._value
   %5 = load %4 : $*Builtin.Int64
   br bb3(%5 : $Builtin.Int64)
@@ -308,7 +308,7 @@ bb1:
 bb2:
   %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int64
+  %13 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*Int64
   %14 = struct_element_addr %13 : $*Int64, #Int64._value
   %15 = load %14 : $*Builtin.Int64
   br bb3(%15 : $Builtin.Int64)
@@ -333,7 +333,7 @@ bb0(%0 : $Builtin.Int1):
 bb1:
   %1 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int64
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
   %4 = struct_element_addr %3 : $*Int64, #Int64._value
   %5 = load %4 : $*Builtin.Int64
   %r1 = struct $Int64 (%5 : $Builtin.Int64)
@@ -342,7 +342,7 @@ bb1:
 bb2:
   %11 = function_ref @_TF4libga8MyGlobalSi : $@convention(thin) () -> Builtin.RawPointer
   %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
-  %13 = pointer_to_address %12 : $Builtin.RawPointer to $*Int64
+  %13 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*Int64
   %14 = struct_element_addr %13 : $*Int64, #Int64._value
   %15 = load %14 : $*Builtin.Int64
   cond_br %0, bb2, bb1

@@ -46,7 +46,7 @@ func foo4() {
 // RUN: %sourcekitd-test -req=format -line=30 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=31 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=32 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 // CHECK: key.sourcetext: "        var abc = 1"
 // CHECK: key.sourcetext: "        let a: String = {"

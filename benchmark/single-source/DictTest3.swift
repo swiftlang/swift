@@ -44,14 +44,14 @@ public func run_Dictionary3(_ N: Int) {
   CheckResults(res == ref_result, "Incorrect results in Dictionary3: \(res) != \(ref_result)")
 }
 
-class Box<T : Hashable where T : Equatable> : Hashable {
+class Box<T : Hashable> : Hashable {
   var value: T
 
   init(_ v: T) {
     value = v
   }
 
-  var hashValue : Int {
+  var hashValue: Int {
     return value.hashValue
   }
 }

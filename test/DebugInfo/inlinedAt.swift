@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -O -I %t -emit-sil -emit-verbose-sil -o - \
-// RUN:    | FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | FileCheck %s
+// RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | %FileCheck %s
 
 public var glob : Int = 0
 @inline(never) public func hold(_ n : Int) { glob = n }
@@ -31,7 +31,7 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SIL-SAME: perf_inlined_at line:203:10
 // CHECK-SIL-SAME: perf_inlined_at line:302:10
 
-// CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi
+// CHECK: define {{.*}}@_TF9inlinedAt1fFSiSi({{.*}})
 // CHECK-NOT: ret
 // CHECK: @llvm.dbg.value
 // CHECK: @llvm.dbg.value

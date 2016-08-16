@@ -117,18 +117,48 @@ class TestMeasurement : TestMeasurementSuper {
         expectEqual(MyDimensionalUnit.unitA, MyDimensionalUnit.unitA)
         expectTrue(MyDimensionalUnit.unitA == MyDimensionalUnit.unitA)
     }
+    
+    func testMeasurementFormatter() {
+        let formatter = MeasurementFormatter()
+        let measurement = Measurement(value: 100, unit: UnitLength.kilometers)
+        let result = formatter.string(from: measurement)
+        
+        // Just make sure we get a result at all here
+        expectFalse(result.isEmpty)
+    }
+
+    func testEquality() {
+        let fiveKM = Measurement(value: 5, unit: UnitLength.kilometers)
+        let fiveSeconds = Measurement(value: 5, unit: UnitDuration.seconds)
+        let fiveThousandM = Measurement(value: 5000, unit: UnitLength.meters)
+
+        expectTrue(fiveKM == fiveThousandM)
+        expectEqual(fiveKM, fiveThousandM)
+        expectFalse(fiveKM == fiveSeconds)
+    }
+
+    func testComparison() {
+        let fiveKM = Measurement(value: 5, unit: UnitLength.kilometers)
+        let fiveThousandM = Measurement(value: 5000, unit: UnitLength.meters)
+        let sixKM = Measurement(value: 6, unit: UnitLength.kilometers)
+        let sevenThousandM = Measurement(value: 7000, unit: UnitLength.meters)
+
+        expectTrue(fiveKM < sixKM)
+        expectTrue(fiveKM < sevenThousandM)
+        expectTrue(fiveKM <= fiveThousandM)
+    }
 }
 
 #if !FOUNDATION_XCTEST
 if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
-    // Temporarily disabled (26345468)
-    /*
     var MeasurementTests = TestSuite("TestMeasurement")
     MeasurementTests.test("testBasicConstruction") { TestMeasurement().testBasicConstruction() }
     MeasurementTests.test("testConversion") { TestMeasurement().testConversion() }
     MeasurementTests.test("testOperators") { TestMeasurement().testOperators() }
     MeasurementTests.test("testUnits") { TestMeasurement().testUnits() }
+    MeasurementTests.test("testMeasurementFormatter") { TestMeasurement().testMeasurementFormatter() }
+    MeasurementTests.test("testEquality") { TestMeasurement().testEquality() }
+    MeasurementTests.test("testComparison") { TestMeasurement().testComparison() }
     runAllTests()
-    */
 }
 #endif

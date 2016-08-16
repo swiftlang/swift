@@ -1,0 +1,120 @@
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %gyb %s -o %t/FloatingPointConversion.swift
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O
+//
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Debug
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Release
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+%{
+from SwiftFloatingPointTypes import all_floating_point_types
+}%
+
+var FloatingPointConversionTruncations = TestSuite("FloatingPointToFloatingPointConversionTruncations")
+var FloatingPointConversionFailures = TestSuite("FloatingPointToFloatingPointConversionFailures")
+
+%  for self_type in all_floating_point_types():
+%   SelfSignificandBits = self_type.bits
+%   Self = self_type.stdlib_name
+
+%  if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%  end
+
+%  for other_type in all_floating_point_types():
+%   OtherSignificandBits = other_type.bits
+%   OtherFloat = other_type.stdlib_name
+
+%   if OtherFloat == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%   end
+
+%   if OtherSignificandBits <= SelfSignificandBits:
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
+  .forEach(in: [
+     ${OtherFloat}.greatestFiniteMagnitude,
+    -${OtherFloat}.greatestFiniteMagnitude,
+     (1.0 as ${OtherFloat}).nextUp,
+     (1.0 as ${OtherFloat}).nextDown,
+    (-1.0 as ${OtherFloat}).nextUp,
+    (-1.0 as ${OtherFloat}).nextDown,
+  ]) {
+  input in
+  // FIXME: we should have a stronger postcondition here.
+  let result = ${Self}(input)
+  let resultConvertedBack = ${OtherFloat}(result)
+  expectEqual(input, resultConvertedBack)
+}
+
+%   else:
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion")
+  .forEach(in: [
+    ( ${OtherFloat}.greatestFiniteMagnitude,  ${Self}.infinity),
+    (-${OtherFloat}.greatestFiniteMagnitude, -${Self}.infinity),
+    ( (1.0 as ${OtherFloat}).nextUp,    1.0 as ${Self}),
+    ( (1.0 as ${OtherFloat}).nextDown,  1.0 as ${Self}),
+    ((-1.0 as ${OtherFloat}).nextUp,   -1.0 as ${Self}),
+    ((-1.0 as ${OtherFloat}).nextDown, -1.0 as ${Self}),
+  ]) {
+  (input, expectedResult) in
+  expectEqual(expectedResult, ${Self}(input))
+}
+
+%   end
+
+FloatingPointConversionTruncations.test("${OtherFloat}To${Self}Conversion/special") {
+  expectEqual( 1.0 as ${Self},   ${Self}(exactly:  1.0 as ${OtherFloat}))
+  expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
+  expectEqual( ${Self}.infinity, ${Self}( ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(-${OtherFloat}.infinity))
+  expectTrue(${Self}(${OtherFloat}.nan).isNaN)
+}
+
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion")
+  .forEach(in: [
+    ${OtherFloat}.greatestFiniteMagnitude,
+    -${OtherFloat}.greatestFiniteMagnitude,
+    (1.0 as ${OtherFloat}).nextUp,
+    (1.0 as ${OtherFloat}).nextDown,
+    (-1.0 as ${OtherFloat}).nextUp,
+    (-1.0 as ${OtherFloat}).nextDown,
+  ]) {
+  input in
+  let result = ${Self}(exactly: input)
+%   if OtherSignificandBits <= SelfSignificandBits:
+  if let result = expectNotEmpty(result) {
+    // FIXME: we should have a stronger postcondition here.
+    expectEqual(input, ${OtherFloat}(result))
+  }
+%   else:
+  expectEmpty(result)
+%   end
+}
+
+FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuccess") {
+  expectEqual( 1.0 as ${Self},   ${Self}(exactly:  1.0 as ${OtherFloat}))
+  expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
+  expectEqual( ${Self}.infinity, ${Self}(exactly:  ${OtherFloat}.infinity))
+  expectEqual(-${Self}.infinity, ${Self}(exactly: -${OtherFloat}.infinity))
+  expectEmpty(${Self}(exactly: ${OtherFloat}.nan))
+}
+
+%   if OtherFloat == 'Float80':
+#endif
+%   end
+
+%  end # for in all_floating_point_types (Other)
+
+%  if Self == 'Float80':
+#endif
+%  end
+
+% end # for in all_floating_point_types (Self)
+
+runAllTests()

@@ -166,7 +166,7 @@ public:
   TypeRepr *getTypeRepr() const { return Ty; }
 
   void printAttrs(llvm::raw_ostream &OS) const;
-  void printAttrs(ASTPrinter &Printer) const;
+  void printAttrs(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Attributed;
@@ -580,24 +580,37 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief A named element of a tuple type.
+/// \brief A named element of a tuple type or a named parameter of a function
+/// type.
 /// \code
-///   (x: Foo = 0)
+///   (x: Foo)
+///   (_ x: Foo) -> ()
 /// \endcode
 class NamedTypeRepr : public TypeRepr {
   Identifier Id;
   TypeRepr *Ty;
   SourceLoc IdLoc;
+  SourceLoc UnderscoreLoc;
 
 public:
+  /// Used for a named element of a tuple type.
   NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc)
     : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc) {
+  }
+  /// Used for a named parameter of a function type.
+  NamedTypeRepr(Identifier Id, TypeRepr *Ty, SourceLoc IdLoc,
+                SourceLoc underscoreLoc)
+    : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc),
+      UnderscoreLoc(underscoreLoc) {
   }
 
   bool hasName() const { return !Id.empty(); }
   Identifier getName() const { return Id; }
   TypeRepr *getTypeRepr() const { return Ty; }
   SourceLoc getNameLoc() const { return IdLoc; }
+  SourceLoc getUnderscoreLoc() const { return UnderscoreLoc; }
+
+  bool isNamedParameter() const { return UnderscoreLoc.isValid(); }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Named;
@@ -605,7 +618,9 @@ public:
   static bool classof(const NamedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return IdLoc; }
+  SourceLoc getStartLocImpl() const {
+    return UnderscoreLoc.isValid() ? UnderscoreLoc : IdLoc;
+  }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
@@ -613,38 +628,44 @@ private:
 
 /// \brief A protocol composite type.
 /// \code
-///   protocol<Foo, Bar>
+///   Foo & Bar
 /// \endcode
 class ProtocolCompositionTypeRepr : public TypeRepr {
   ArrayRef<IdentTypeRepr *> Protocols;
-  SourceLoc ProtocolLoc;
-  SourceRange AngleBrackets;
+  SourceLoc FirstTypeLoc;
+  SourceRange CompositionRange;
 
 public:
   ProtocolCompositionTypeRepr(ArrayRef<IdentTypeRepr *> Protocols,
-                              SourceLoc ProtocolLoc,
-                              SourceRange AngleBrackets)
+                              SourceLoc FirstTypeLoc,
+                              SourceRange CompositionRange)
     : TypeRepr(TypeReprKind::ProtocolComposition), Protocols(Protocols),
-      ProtocolLoc(ProtocolLoc), AngleBrackets(AngleBrackets) {
+    FirstTypeLoc(FirstTypeLoc), CompositionRange(CompositionRange) {
   }
 
   ArrayRef<IdentTypeRepr *> getProtocols() const { return Protocols; }
-  SourceLoc getProtocolLoc() const { return ProtocolLoc; }
-  SourceRange getAngleBrackets() const { return AngleBrackets; }
+  SourceLoc getSourceLoc() const { return FirstTypeLoc; }
+  SourceRange getCompositionRange() const { return CompositionRange; }
 
   static ProtocolCompositionTypeRepr *create(ASTContext &C,
                                              ArrayRef<IdentTypeRepr*> Protocols,
-                                             SourceLoc ProtocolLoc,
-                                             SourceRange AngleBrackets);
-
+                                             SourceLoc FirstTypeLoc,
+                                             SourceRange CompositionRange);
+  
+  static ProtocolCompositionTypeRepr *createEmptyComposition(ASTContext &C,
+                                                             SourceLoc AnyLoc) {
+    return ProtocolCompositionTypeRepr::create(C, {}, AnyLoc, {AnyLoc, AnyLoc});
+  }
+  
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::ProtocolComposition;
   }
   static bool classof(const ProtocolCompositionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return ProtocolLoc; }
-  SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
+  SourceLoc getStartLocImpl() const { return FirstTypeLoc; }
+  SourceLoc getLocImpl() const { return CompositionRange.Start; }
+  SourceLoc getEndLocImpl() const { return CompositionRange.End; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };

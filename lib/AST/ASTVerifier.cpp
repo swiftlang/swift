@@ -641,6 +641,24 @@ struct ASTNodeBase {};
       OptionalEvaluations.pop_back();
     }
 
+    // Register the OVEs in a collection upcast.
+    bool shouldVerify(CollectionUpcastConversionExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues[keyConversion.OrigValue] = 0;
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues[valueConversion.OrigValue] = 0;
+      return true;
+    }
+    void cleanup(CollectionUpcastConversionExpr *expr) {
+      if (auto keyConversion = expr->getKeyConversion())
+        OpaqueValues.erase(keyConversion.OrigValue);
+      if (auto valueConversion = expr->getValueConversion())
+        OpaqueValues.erase(valueConversion.OrigValue);
+    }
+
     /// Canonicalize the given DeclContext pointer, in terms of
     /// producing something that can be looked up in
     /// ClosureDiscriminators.
@@ -670,6 +688,21 @@ struct ASTNodeBase {};
 
       if (D->hasType())
         verifyChecked(D->getType());
+
+      if (D->hasAccessibility()) {
+        PrettyStackTraceDecl debugStack("verifying access", D);
+        if (D->getFormalAccessScope() == nullptr &&
+            D->getFormalAccess() < Accessibility::Public) {
+          Out << "non-public decl has no formal access scope\n";
+          D->dump(Out);
+          abort();
+        }
+        if (D->getEffectiveAccess() == Accessibility::Private) {
+          Out << "effective access should use 'fileprivate' for 'private'\n";
+          D->dump(Out);
+          abort();
+        }
+      }
 
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
@@ -1144,7 +1177,7 @@ struct ASTNodeBase {};
         Out << "\n";
         abort();
       }
-      if (PTK != PTK_UnsafePointer) {
+      if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeRawPointer) {
         Out << "StringToPointer converts to non-const pointer:\n";
         E->print(Out);
         Out << "\n";
@@ -1179,6 +1212,33 @@ struct ASTNodeBase {};
       }
 
       checkTrivialSubtype(srcTy, destTy, "DerivedToBaseExpr");
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(AnyHashableErasureExpr *E) {
+      auto anyHashableDecl = Ctx.getAnyHashableDecl();
+      if (!anyHashableDecl) {
+        Out << "AnyHashable declaration could not be found\n";
+        abort();
+      }
+
+      auto hashableDecl = Ctx.getProtocol(KnownProtocolKind::Hashable);
+      if (!hashableDecl) {
+        Out << "Hashable declaration could not be found\n";
+        abort();
+      }
+
+      checkSameType(E->getType(), anyHashableDecl->getDeclaredType(),
+                    "AnyHashableErasureExpr and the standard AnyHashable type");
+
+      if (E->getConformance().getRequirement() != hashableDecl) {
+        Out << "conformance on AnyHashableErasureExpr was not for Hashable\n";
+        E->getConformance().dump();
+        abort();
+      }
+
+      verifyConformance(E->getSubExpr()->getType(), E->getConformance());
+
       verifyCheckedBase(E);
     }
 
@@ -1467,10 +1527,6 @@ struct ASTNodeBase {};
 
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
-      if (!TT || (!SubTT && !E->isSourceScalar())) {
-        Out << "Unexpected types in TupleShuffleExpr\n";
-        abort();
-      }
       auto getSubElementType = [&](unsigned i) {
         if (E->isSourceScalar()) {
           assert(i == 0);
@@ -1478,6 +1534,17 @@ struct ASTNodeBase {};
         } else {
           return SubTT->getElementType(i);
         }
+      };
+
+      /// Retrieve the ith element type from the resulting tuple type.
+      auto getOuterElementType = [&](unsigned i) -> Type {
+        if (!TT) {
+          if (auto parenTy = dyn_cast<ParenType>(E->getType().getPointer()))
+            return parenTy->getUnderlyingType();
+          return E->getType();
+        }
+
+        return TT->getElementType(i);
       };
 
       unsigned varargsIndex = 0;
@@ -1494,13 +1561,13 @@ struct ASTNodeBase {};
         }
         if (subElem == TupleShuffleExpr::CallerDefaultInitialize) {
           auto init = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
-          if (!TT->getElementType(i)->isEqual(init->getType())) {
+          if (!getOuterElementType(i)->isEqual(init->getType())) {
             Out << "Type mismatch in TupleShuffleExpr\n";
             abort();
           }
           continue;
         }
-        if (!TT->getElementType(i)->isEqual(getSubElementType(subElem))) {
+        if (!getOuterElementType(i)->isEqual(getSubElementType(subElem))) {
           Out << "Type mismatch in TupleShuffleExpr\n";
           abort();
         }
@@ -1753,6 +1820,32 @@ struct ASTNodeBase {};
         Out << " doesn't have a complete set of protocols\n";
         abort();
       }      
+    }
+
+    /// Verify that the given conformance makes sense for the given
+    /// type.
+    void verifyConformance(Type type, ProtocolConformanceRef conformance) {
+      if (conformance.isAbstract()) {
+        if (!type->is<ArchetypeType>() && !type->isAnyExistentialType()) {
+          Out << "type " << type
+              << " should not have an abstract conformance to "
+              << conformance.getRequirement()->getName();
+          abort();
+        }
+
+        return;
+      }
+
+      if (type->getCanonicalType() !=
+            conformance.getConcrete()->getType()->getCanonicalType()) {
+        Out << "conforming type does not match conformance\n";
+        Out << "conforming type:\n";
+        type.dump(Out, 2);
+        Out << "\nconformance:\n";
+        conformance.getConcrete()->dump(Out, 2);
+        Out << "\n";
+        abort();
+      }
     }
 
     /// Check the given explicit protocol conformance.
@@ -2279,7 +2372,7 @@ struct ASTNodeBase {};
       // If a decl has the Throws bit set, the function type should throw,
       // and vice versa.
       auto fnTy = AFD->getType()->castTo<AnyFunctionType>();
-      for (unsigned i = 1, e = AFD->getNaturalArgumentCount(); i != e; ++i)
+      for (unsigned i = 1, e = AFD->getNumParameterLists(); i != e; ++i)
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
 
       if (AFD->hasThrows() != fnTy->getExtInfo().throws()) {
@@ -2603,7 +2696,7 @@ struct ASTNodeBase {};
     }
 
     Type checkExceptionTypeExists(const char *where) {
-      auto exn = Ctx.getErrorProtocolDecl();
+      auto exn = Ctx.getErrorDecl();
       if (exn) return exn->getDeclaredType();
 
       Out << "exception type does not exist in " << where << "\n";

@@ -1,0 +1,49 @@
+---
+Name: CloudKit
+Classes:
+- Name: CKDatabase
+  Methods:
+  - Selector: 'fetchRecordWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'fetch(withRecordID:completionHandler:)'
+  - Selector: 'deleteRecordWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'delete(withRecordID:completionHandler:)'
+  - Selector: 'fetchRecordZoneWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'fetch(withRecordZoneID:completionHandler:)'
+  - Selector: 'deleteRecordZoneWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'delete(withRecordZoneID:completionHandler:)'
+  - Selector: 'fetchSubscriptionWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'fetch(withSubscriptionID:completionHandler:)'
+  - Selector: 'deleteSubscriptionWithID:completionHandler:'
+    MethodKind: Instance
+    SwiftName: 'delete(withSubscriptionID:completionHandler:)'
+- Name: CKFetchRecordsOperation
+  Methods:
+  - Selector: 'fetchCurrentUserRecordOperation'
+    MethodKind: Class
+    SwiftName: 'fetchCurrentUserRecordOperation()'
+- Name: CKFetchRecordZonesOperation
+  Methods:
+  - Selector: 'fetchAllRecordZonesOperation'
+    MethodKind: Class
+    SwiftName: 'fetchAllRecordZonesOperation()'
+- Name: CKFetchSubscriptionsOperation
+  Methods:
+  - Selector: 'fetchAllSubscriptionsOperation'
+    MethodKind: Class
+    SwiftName: 'fetchAllSubscriptionsOperation()'
+- Name: CKRecord
+  Methods:
+  - Selector: 'setParentReferenceFromRecord:'
+    MethodKind: Instance
+    SwiftName: 'setParent(_:)'
+  - Selector: 'setParentReferenceFromRecordID:'
+    MethodKind: Instance
+    SwiftName: 'setParent(_:)'
+Tags:
+- Name: CKErrorCode
+  NSErrorDomain: CKErrorDomain

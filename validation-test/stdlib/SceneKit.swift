@@ -14,15 +14,13 @@ import SceneKit
 var SceneKitTests = TestSuite("SceneKit")
 
 func bytesFromNSData(_ data: NSData) -> [UInt8] {
-  return Array(UnsafeBufferPointer(
-    start: UnsafePointer<UInt8>(data.bytes),
-    count: data.length))
+  let bytePtr = data.bytes.bindMemory(to: UInt8.self, capacity: data.length)
+  return Array(UnsafeBufferPointer(start: bytePtr, count: data.length))
 }
 
 func floatsFromNSData(_ data: NSData) -> [Float] {
-  return Array(UnsafeBufferPointer(
-    start: UnsafePointer<Float>(data.bytes),
-    count: data.length / sizeof(Float)))
+  let floatPtr = data.bytes.bindMemory(to: Float.self, capacity: data.length)
+  return Array(UnsafeBufferPointer(start: floatPtr, count: data.length / MemoryLayout<Float>.size))
 }
 
 if #available(iOS 8.0, *) {
@@ -138,11 +136,11 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(vertices: [SCNVector3(1, 2, 3),
                                               SCNVector3(4, 5, 6)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticVertex)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.vertex)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
-    expectEqual(source.bytesPerComponent, sizeof(Float))
+    expectEqual(source.bytesPerComponent, MemoryLayout<Float>.size)
     let positions = floatsFromNSData(source.data as NSData)
     expectEqual(positions[2], 3)
     expectEqual(positions[4], 5)
@@ -152,11 +150,11 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(normals: [SCNVector3(1, 2, 3),
                                              SCNVector3(4, 5, 6)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticNormal)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.normal)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
-    expectEqual(source.bytesPerComponent, sizeof(Float))
+    expectEqual(source.bytesPerComponent, MemoryLayout<Float>.size)
     let normals = floatsFromNSData(source.data as NSData)
     expectEqual(normals[2], 3)
     expectEqual(normals[4], 5)
@@ -166,7 +164,7 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(textureCoordinates: [CGPoint(x: 1, y: 2),
                                                         CGPoint(x: 4, y: 5)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticTexcoord)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.texcoord)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 2)
 
@@ -348,7 +346,7 @@ if #available(iOS 8.0, *) {
     let sceneData = sceneDescription.data(
       using: .utf8,
       allowLossyConversion: true)!
-    let sceneSource = SCNSceneSource(data: sceneData as Data, options: nil)!
+    let sceneSource = SCNSceneSource(data: sceneData as Data, options: [:])!
 
     do {
       var unarchivedPlaneGeometry =

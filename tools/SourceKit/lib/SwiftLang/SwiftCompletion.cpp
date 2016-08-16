@@ -61,12 +61,12 @@ struct SwiftToSourceKitCompletionAdapter {
 
     Completion extended(*result, name, description);
     return handleResult(consumer, &extended, /*leadingPunctuation=*/false,
-                        /*includeLiterals=*/false);
+                        /*legacyLiteralToKeyword=*/true);
   }
 
   static bool handleResult(SourceKit::CodeCompletionConsumer &consumer,
                            Completion *result, bool leadingPunctuation,
-                           bool includeLiterals);
+                           bool legacyLiteralToKeyword);
 
   static void getResultSourceText(const CodeCompletionString *CCStr,
                                   raw_ostream &OS);
@@ -219,9 +219,29 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
                                     SourceKit::CodeCompletionConsumer &SKConsumer,
                                     ArrayRef<const char *> Args) {
   SwiftCodeCompletionConsumer SwiftConsumer([&](
-      MutableArrayRef<CodeCompletionResult *> Results, SwiftCompletionInfo &) {
+      MutableArrayRef<CodeCompletionResult *> Results,
+      SwiftCompletionInfo &info) {
+    bool hasExpectedType = info.completionContext->HasExpectedTypeRelation;
     CodeCompletionContext::sortCompletionResults(Results);
+    // FIXME: this adhoc filtering should be configurable like it is in the
+    // codeCompleteOpen path.
     for (auto *Result : Results) {
+      if (Result->getKind() == CodeCompletionResult::Literal) {
+        switch (Result->getLiteralKind()) {
+        case CodeCompletionLiteralKind::NilLiteral:
+        case CodeCompletionLiteralKind::BooleanLiteral:
+          break;
+        case CodeCompletionLiteralKind::ImageLiteral:
+        case CodeCompletionLiteralKind::ColorLiteral:
+          if (hasExpectedType &&
+              Result->getExpectedTypeRelation() <
+                  CodeCompletionResult::Convertible)
+            continue;
+          break;
+        default:
+          continue;
+        }
+      }
       if (!SwiftToSourceKitCompletionAdapter::handleResult(SKConsumer, Result))
         break;
     }
@@ -352,7 +372,7 @@ static void getResultStructure(
       if (!param.range().empty())
         parameters.push_back(std::move(param));
 
-      if (chunks[i].hasText())
+      if (i < chunks.size() && chunks[i].hasText())
         textSize += chunks[i].getText().size();
     }
 
@@ -410,7 +430,7 @@ static UIdent KeywordFuncUID("source.lang.swift.keyword.func");
 
 bool SwiftToSourceKitCompletionAdapter::handleResult(
     SourceKit::CodeCompletionConsumer &Consumer, Completion *Result,
-    bool leadingPunctuation, bool includeLiterals) {
+    bool leadingPunctuation, bool legacyLiteralToKeyword) {
 
   static UIdent KeywordUID("source.lang.swift.keyword");
   static UIdent PatternUID("source.lang.swift.pattern");
@@ -428,14 +448,14 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
     Info.Kind = SwiftLangSupport::getUIDForCodeCompletionDeclKind(
         Result->getAssociatedDeclKind());
   } else if (Result->getKind() == CodeCompletionResult::Literal) {
-    if (includeLiterals) {
-      Info.Kind = getUIDForCodeCompletionLiteralKind(Result->getLiteralKind());
-    } else if (Result->getLiteralKind() ==
-                   CodeCompletionLiteralKind::BooleanLiteral ||
-               Result->getLiteralKind() ==
-                   CodeCompletionLiteralKind::NilLiteral) {
-      // If we're not including literals, fallback to keywords as appropriate.
+    auto literalKind = Result->getLiteralKind();
+    if (legacyLiteralToKeyword &&
+        (literalKind == CodeCompletionLiteralKind::BooleanLiteral ||
+         literalKind == CodeCompletionLiteralKind::NilLiteral)) {
+      // Fallback to keywords as appropriate.
       Info.Kind = KeywordUID;
+    } else {
+      Info.Kind = getUIDForCodeCompletionLiteralKind(literalKind);
     }
   }
 
@@ -761,7 +781,7 @@ public:
   bool handleResult(Completion *result) override {
     return SwiftToSourceKitCompletionAdapter::handleResult(
         consumer, result, /*leadingPunctuation=*/true,
-        /*includeLiterals=*/true);
+        /*legacyLiteralToKeyword=*/false);
   }
   void startGroup(StringRef name) override {
     static UIdent GroupUID("source.lang.swift.codecomplete.group");

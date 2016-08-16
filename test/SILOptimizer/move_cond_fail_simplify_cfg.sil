@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -move-cond-fail-to-preds | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage canonical
+
+// Make sure that we actually check all predecessors when we try to hoist
+// cond_fails.
+//
+// CHECK-LABEL: sil @check_all_preds_when_hoisting_cond_fails : $@convention(thin) (Builtin.Int1) -> () {
+sil @check_all_preds_when_hoisting_cond_fails : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  cond_br %0, bb3, bb2
+
+// Make sure that the predecessor order here is not changed. This is necessary
+// for the test to actually test that we are checking /all/ predecessors.
+//
+// CHECK: bb1({{.*}}): // Preds: bb2 bb1
+bb1(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1):
+  %10 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  cond_fail %9 : $Builtin.Int1
+  %13 = builtin "sadd_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int64, Builtin.Int1), 0
+  %15 = tuple_extract %13 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %15 : $Builtin.Int1
+  %17 = builtin "cmp_eq_Int64"(%14 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %18 = builtin "cmp_eq_Int64"(%11 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %18, bb3, bb1(%14 : $Builtin.Int64, %11 : $Builtin.Int64, %17 : $Builtin.Int1)
+
+// Make sure there can not be any cond_fail here.
+// CHECK: bb2:
+// CHECK-NEXT: br bb1
+bb2:
+  br bb1(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1)
+
+// CHECK: bb3:
+bb3:
+  %5 = tuple()
+  return %5 : $()
+}

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -11,7 +11,7 @@ struct State {
   let abbrev: String
 }
 
-func stateFromPlistLame(_ plist: Dictionary<String, AnyObject>) -> State? {
+func stateFromPlistLame(_ plist: Dictionary<String, Any>) -> State? {
   if let name = plist["name"] as? NSString {
     if let population = plist["population"] as? NSNumber {
       if let abbrev = plist["abbrev"] as? NSString {
@@ -26,7 +26,7 @@ func stateFromPlistLame(_ plist: Dictionary<String, AnyObject>) -> State? {
   return nil
 }
 
-func stateFromPlistCool(_ plist: Dictionary<String, AnyObject>) -> State? {
+func stateFromPlistCool(_ plist: Dictionary<String, Any>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
   case let (name as String, pop as Int, abbr as String)
   where abbr.characters.count == 2:
@@ -38,22 +38,22 @@ func stateFromPlistCool(_ plist: Dictionary<String, AnyObject>) -> State? {
   }
 }
 
-let goodStatePlist: Dictionary<String, AnyObject> = [
-  "name": "California",
-  "population": 38_040_000,
-  "abbrev": "CA",
+let goodStatePlist: Dictionary<String, Any> = [
+  "name" as String: "California",
+  "population" as String: 38_040_000,
+  "abbrev" as String: "CA",
 ]
-let invalidStatePlist1: Dictionary<String, AnyObject> = [
+let invalidStatePlist1: Dictionary<String, Any> = [
   "name": "California",
   "population": "hella",
   "abbrev": "CA",
 ]
-let invalidStatePlist2: Dictionary<String, AnyObject> = [
+let invalidStatePlist2: Dictionary<String, Any> = [
   "name": "California",
   "population": 38_040_000,
   "abbrev": "Cali",
 ]
-let invalidStatePlist3: Dictionary<String, AnyObject> = [
+let invalidStatePlist3: Dictionary<String, Any> = [
   "name": "California",
   "population": 38_040_000,
 ]
@@ -102,7 +102,7 @@ enum Statistic : CustomReflectable {
   }
 }
 
-func statisticFromPlist(_ plist: Dictionary<String, AnyObject>) -> Statistic? {
+func statisticFromPlist(_ plist: Dictionary<String, Any>) -> Statistic? {
   switch (plist["kind"], plist["name"], plist["population"], plist["abbrev"]) {
   case let ("state" as String, name as String, population as Int, abbrev as String)
   where abbrev.characters.count == 2:
@@ -117,29 +117,29 @@ func statisticFromPlist(_ plist: Dictionary<String, AnyObject>) -> Statistic? {
   }
 }
 
-let goodStatePlist2: Dictionary<String, AnyObject> = [
+let goodStatePlist2: Dictionary<String, Any> = [
   "kind": "state",
   "name": "California",
   "population": 38_040_000,
   "abbrev": "CA"
 ]
-let goodCountryPlist: Dictionary<String, AnyObject> = [
+let goodCountryPlist: Dictionary<String, Any> = [
   "kind": "country",
   "name": "India",
   "population": 1_23_70_00_000,
 ]
-let invalidCountryPlist1: Dictionary<String, AnyObject> = [
+let invalidCountryPlist1: Dictionary<String, Any> = [
   "kind": "country",
   "name": "India",
   "population": 1_23_70_00_000,
   "abbrev": "IN"
 ]
-let invalidCountryPlist2: Dictionary<String, AnyObject> = [
+let invalidCountryPlist2: Dictionary<String, Any> = [
   "kind": "country",
   "name": "India",
   "population": "123 crore",
 ]
-let invalidKindPlist: Dictionary<String, AnyObject> = [
+let invalidKindPlist: Dictionary<String, Any> = [
   "kind": "planet",
   "name": "Mercury",
   "population": 0

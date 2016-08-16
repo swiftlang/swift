@@ -164,10 +164,12 @@ enum class ImportTypeKind {
   /// considered CF-audited.
   Property,
 
-  /// \brief Import the type of an ObjC property accessor.
+  /// \brief Import the type of an ObjC property accessor marked 'weak',
+  /// 'assign', or 'unsafe_unretained'.
   ///
-  /// This behaves exactly like Property except that it accepts Void.
-  PropertyAccessor,
+  /// Like Property, but doesn't allow bridging to a value type, since that
+  /// would discard the ownership.
+  PropertyWithReferenceSemantics,
 
   /// \brief Import the underlying type of an enum.
   ///
@@ -386,6 +388,10 @@ public:
                  SmallVector<std::pair<clang::MacroInfo *, ValueDecl *>, 2>>
     ImportedMacros;
 
+  // Mapping from macro to value for macros that expand to constant values.
+  llvm::DenseMap<const clang::MacroInfo *, std::pair<clang::APValue, Type>>
+    ImportedMacroConstants;
+
   /// Keeps track of active selector-based lookups, so that we don't infinitely
   /// recurse when checking whether a method with a given selector has already
   /// been imported.
@@ -430,39 +436,6 @@ private:
   ///
   /// This value is incremented every time a new module is imported.
   unsigned Generation = 1;
-
-  /// \brief A cached set of extensions for a particular Objective-C class.
-  struct CachedExtensions {
-    CachedExtensions()
-      : Extensions(nullptr), Generation(0) { }
-
-    CachedExtensions(const CachedExtensions &) = delete;
-    CachedExtensions &operator=(const CachedExtensions &) = delete;
-
-    CachedExtensions(CachedExtensions &&other)
-      : Extensions(other.Extensions), Generation(other.Generation)
-    {
-      other.Extensions = nullptr;
-      other.Generation = 0;
-    }
-
-    CachedExtensions &operator=(CachedExtensions &&other) {
-      delete Extensions;
-      Extensions = other.Extensions;
-      Generation = other.Generation;
-      other.Extensions = nullptr;
-      other.Generation = 0;
-      return *this;
-    }
-
-    ~CachedExtensions() { delete Extensions; }
-
-    /// \brief The cached extensions.
-    SmallVector<ExtensionDecl *, 4> *Extensions;
-
-    /// \brief Generation number used to tell when this cache has gone stale.
-    unsigned Generation;
-  };
 
   void bumpGeneration() {
     ++Generation;
@@ -1185,11 +1158,8 @@ public:
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
-  /// \brief Retrieve the CFStringRef typealias.
-  Type getCFStringRefType();
-
   /// \brief Determines whether the given type matches an implicit type
-  /// bound of "NSObject", which is used to validate NSDictionary/NSSet.
+  /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesNSObjectBound(Type type);
 
   /// \brief Look up and attempt to import a Clang declaration with
@@ -1234,7 +1204,8 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importFunctionType(const clang::FunctionDecl *clangDecl,
+  Type importFunctionType(DeclContext *dc,
+                          const clang::FunctionDecl *clangDecl,
                           clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
@@ -1253,7 +1224,8 @@ public:
   ///
   /// \returns the imported function return type, or null if the type cannot be
   /// imported.
-  Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+  Type importFunctionReturnType(DeclContext *dc,
+                                const clang::FunctionDecl *clangDecl,
                                 clang::QualType resultType,
                                 bool allowNSUIntegerAsInt);
 
@@ -1269,7 +1241,8 @@ public:
   ///
   /// \returns The imported parameter list on success, or null on failure
   ParameterList *
-  importFunctionParameterList(const clang::FunctionDecl *clangDecl,
+  importFunctionParameterList(DeclContext *dc,
+                              const clang::FunctionDecl *clangDecl,
                               ArrayRef<const clang::ParmVarDecl *> params,
                               bool isVariadic, bool allowNSUIntegerAsInt,
                               ArrayRef<Identifier> argNames);
@@ -1410,17 +1383,17 @@ public:
     SmallVectorImpl<ProtocolConformance *> &Conformances) override;
 
   template <typename DeclTy, typename ...Targs>
-  DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
+  DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
+                                  Targs &&... Args) {
     assert(ClangN);
     void *DeclPtr = allocateMemoryForDecl<DeclTy>(SwiftContext, sizeof(DeclTy),
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
-    if (auto VD = dyn_cast<ValueDecl>(D))
-      VD->setAccessibility(Accessibility::Public);
+    D->setAccessibility(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-      ASD->setSetterAccessibility(Accessibility::Public);
+      ASD->setSetterAccessibility(access);
     return D;
   }
 

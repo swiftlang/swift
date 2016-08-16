@@ -19,7 +19,7 @@ func _getObjCCount(_: _MagicMirrorData) -> Int
 func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 func _getObjCSummary(_ data: _MagicMirrorData) -> String {
-  let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue())
+  let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue(ofType: AnyObject.self)) as AnyObject
   return _cocoaStringToSwiftString_NonASCII(theDescription)
 }
 
@@ -30,7 +30,7 @@ struct _ObjCMirror : _Mirror {
   public var value: Any { return data.objcValue }
   public var valueType: Any.Type { return data.objcValueType }
   public var objectIdentifier: ObjectIdentifier? {
-    return data._loadValue() as ObjectIdentifier
+    return data._loadValue(ofType: ObjectIdentifier.self)
   }
   public var count: Int {
     return _getObjCCount(data)

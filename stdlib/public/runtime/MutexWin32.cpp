@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(_WIN32) || defined(__CYGWIN__)
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Debug.h"
 
@@ -30,3 +31,4 @@ void ConditionPlatformHelper::wait(CONDITION_VARIABLE &condition,
                errorcode);
   }
 }
+#endif

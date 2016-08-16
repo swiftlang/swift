@@ -170,10 +170,10 @@ extension SCNGeometryElement {
       fatalError("Expected constant number of indices per primitive")
     }
     self.init(
-      data: Data(bytes: UnsafePointer<UInt8>(indices), count: indexCount * sizeof(IndexType.self)),
+      data: Data(bytes: indices, count: indexCount * MemoryLayout<IndexType>.stride),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
-      bytesPerIndex: sizeof(IndexType.self))
+      bytesPerIndex: MemoryLayout<IndexType>.stride)
     _fixLifetime(indices)
   }
 }
@@ -199,19 +199,19 @@ extension SCNBoundingVolume {
     get {
       var min = SCNVector3Zero
       var max = SCNVector3Zero
-      getBoundingBoxMin(&min, max: &max)
+      __getBoundingBoxMin(&min, max: &max)
       return (min: min, max: max)
     }
     set {
       var min = newValue.min
       var max = newValue.max
-      setBoundingBoxMin(&min, max: &max)
+      __setBoundingBoxMin(&min, max: &max)
     }
   }
   public var boundingSphere: (center: SCNVector3, radius: Float) {
     var center = SCNVector3Zero
     var radius = CGFloat(0.0)
-    getBoundingSphereCenter(&center, radius: &radius)
+    __getBoundingSphereCenter(&center, radius: &radius)
     return (center: center, radius: Float(radius))
   }
 }
@@ -229,7 +229,7 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
 extension SCNSceneSource {
   public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
-      self, uid as NSString, entryClass as! AnyObject) as! T?
+      self, uid as NSString, entryClass as! AnyClass) as! T?
   }
 }
 

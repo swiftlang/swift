@@ -258,8 +258,6 @@ public:
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
   static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
-  static bool printTypeInterface(Type Ty, DeclContext *DC, std::string &Result);
-  static bool printTypeInterface(Type Ty, DeclContext *DC, llvm::raw_ostream &Out);
 
 private:
   virtual void anchor();
@@ -274,6 +272,20 @@ public:
   explicit StreamPrinter(raw_ostream &OS) : OS(OS) {}
 
   void printText(StringRef Text) override;
+};
+
+/// AST stream printer that adds extra indentation to each line.
+class ExtraIndentStreamPrinter : public StreamPrinter {
+  StringRef ExtraIndent;
+
+public:
+  ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
+  : StreamPrinter(out), ExtraIndent(extraIndent) { }
+
+  virtual void printIndent() {
+    printText(ExtraIndent);
+    StreamPrinter::printIndent();
+  }
 };
 
 bool shouldPrint(const Decl *D, PrintOptions &Options);

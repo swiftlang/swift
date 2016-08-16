@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -emit-silgen -enable-source-import -parse-as-library -enable-resilience %s | FileCheck %s
-// RUN: %target-swift-frontend -I %S/../Inputs -emit-sil -enable-source-import -parse-as-library -enable-resilience %s -O | FileCheck --check-prefix=CHECK-OPT %s
+// RUN: %target-swift-frontend -I %S/../Inputs -emit-silgen -enable-source-import -parse-as-library -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %S/../Inputs -emit-sil -enable-source-import -parse-as-library -enable-resilience %s -O | %FileCheck --check-prefix=CHECK-OPT %s
 
 import resilient_global
 

@@ -19,23 +19,14 @@ import StdlibCollectionUnittest
 all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
 }%
 
-extension Array {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
+%for Self in all_array_types:
+extension ${Self} {
+  typealias _BufferID = UnsafeRawPointer?
+  var _bufferID: _BufferID {
+    return unsafeBitCast(_owner, to: _BufferID.self)
   }
 }
-
-extension ArraySlice {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
-  }
-}
-
-extension ContiguousArray {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
-  }
-}
+%end
 
 var ArrayTestSuite = TestSuite("Array")
 
@@ -44,12 +35,12 @@ var ArrayTestSuite = TestSuite("Array")
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(_ x: inout Int, body: (x: inout Int) -> Void) {
-  body(x: &x)
+func withInoutInt(_ x: inout Int, body: (_ x: inout Int) -> Void) {
+  body(&x)
 }
 
-func withInoutT<T>(_ x: inout T, body: (x: inout T) -> Void) {
-  body(x: &x)
+func withInoutT<T>(_ x: inout T, body: (_ x: inout T) -> Void) {
+  body(&x)
 }
 
 % for element_type in ['TestValueTy', 'TestBridgedValueTy']:
@@ -64,21 +55,21 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW") {
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70)
   ]]
-  let identityOuter = a.identity
-  var identityInner = a[0].identity
+  let identityOuter = a._bufferID
+  var identityInner = a[0]._bufferID
 
   func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.  Writeback of the inner array
     // does not happen.
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     else:
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
 
     // Should not reallocate storage.
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     end
   }
 
@@ -134,23 +125,23 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
     ${element_type}(40), ${element_type}(50), ${element_type}(60),
     ${element_type}(70), ${element_type}(80), ${element_type}(90),
   ]]
-  let identityOuter = a.identity
-  var identityInner = a[0].identity
+  let identityOuter = a._bufferID
+  var identityInner = a[0]._bufferID
 
   func checkIdentity(_ stackTrace: SourceLocStack) {
 %     if element_type == 'TestValueTy':
     // Does not reallocate storage because we changed a property based on a
     // reference; array storage was not changed.
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
-    expectEqual(identityInner, a[0].identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
+    expectEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
 %     else:
-    expectEqual(identityOuter, a.identity, stackTrace: stackTrace)
+    expectEqual(identityOuter, a._bufferID, stackTrace: stackTrace)
     // Writeback happens in subscript(Range<Int>), but array notices that the new
     // value did not change.
     // Another writeback happens in Array.subscript(Int), but this is not what we
     // want.
-    expectNotEqual(identityInner, a[0].identity, stackTrace: stackTrace)
-    identityInner = a[0].identity
+    expectNotEqual(identityInner, a[0]._bufferID, stackTrace: stackTrace)
+    identityInner = a[0]._bufferID
 %     end
   }
 
@@ -158,9 +149,9 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   a[0..<1][0][0] = ${element_type}(1010)
 
   // Reallocates storage because of the writeback in Array.subscript(Int).
-  expectEqual(identityOuter, a.identity)
-  expectNotEqual(identityInner, a[0].identity)
-  identityInner = a[0].identity
+  expectEqual(identityOuter, a._bufferID)
+  expectNotEqual(identityInner, a[0]._bufferID)
+  identityInner = a[0]._bufferID
 
   a[0..<1][0][1].value = 1020
 
@@ -195,9 +186,9 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
   // Reallocates storage because of the writeback in Array.subscript(Int)
   // (writeback is being requested for the array element even though it is not
   // needed).
-  expectEqual(identityOuter, a.identity)
-  expectNotEqual(identityInner, a[0].identity)
-  identityInner = a[0].identity
+  expectEqual(identityOuter, a._bufferID)
+  expectNotEqual(identityInner, a[0]._bufferID)
+  identityInner = a[0]._bufferID
 
   withInoutT(&a[0..<1][0][6].value) {
     (x: inout Int) in
@@ -291,13 +282,13 @@ class CustomImmutableNSArray : NSArray {
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> AnyObject {
+  override func copy(with zone: NSZone?) -> Any {
     CustomImmutableNSArray.timesCopyWithZoneWasCalled += 1
     return self
   }
 
   @objc
-  override func object(at index: Int) -> AnyObject {
+  override func object(at index: Int) -> Any {
     CustomImmutableNSArray.timesObjectAtIndexWasCalled += 1
     return _data[index]
   }
@@ -386,7 +377,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
-  var result = nsa as! Array<TestBridgedValueTy>
+  var result = nsa as AnyObject as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
 
   // Delete the value from NSMutableArray.
@@ -535,22 +526,22 @@ for index in [ -100, -1, 3, 4, 100 ] {
 ArrayTestSuite.test("BridgedToObjC/Verbatim/objectAtIndex") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
 
-  var v: AnyObject = a.object(at: 0)
+  var v: AnyObject = a.object(at: 0) as AnyObject
   expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, to: UInt.self)
 
-  v = a.object(at: 1)
+  v = a.object(at: 1) as AnyObject
   expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, to: UInt.self)
 
-  v = a.object(at: 2)
+  v = a.object(at: 2) as AnyObject
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -565,7 +556,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -580,7 +571,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfRefTypeVerbatimBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -591,7 +582,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+  let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
   a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -608,12 +599,12 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
-  buffer.deallocateCapacity(3)
+  buffer.deallocate(capacity: 3)
   _fixLifetime(a)
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -621,7 +612,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/copyWithZone") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
-  let copy: AnyObject = a.copy(with: nil)
+  let copy: AnyObject = a.copy(with: nil) as AnyObject
   expectEqual(
     unsafeBitCast(a, to: UInt.self), unsafeBitCast(copy, to: UInt.self))
 }
@@ -707,15 +698,15 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/ObjectEnumerator/FastEnumeration/Use
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3)
 
-  var v: AnyObject = a[0]
+  var v: AnyObject = a[0] as AnyObject
   expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[1]
+  v = a[1] as AnyObject
   expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[2]
+  v = a[2] as AnyObject
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
@@ -731,17 +722,18 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Reallocate") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
   // Bridge back to native array.
-  var native: [TestObjCValueTy] = convertNSArrayToArray(
-    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3))
+  var native: [TestObjCValueTy] = 
+    getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 3) as! Array
+  
   let identity1 = unsafeBitCast(native, to: UInt.self)
 
   // Mutate elements, but don't change count.
@@ -807,22 +799,22 @@ for index in [ -100, -1, 3, 4, 100 ] {
 ArrayTestSuite.test("BridgedToObjC/Custom/objectAtIndex") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
-  var v: AnyObject = a.object(at: 0)
+  var v: AnyObject = a.object(at: 0) as AnyObject
   expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, to: UInt.self)
 
-  v = a.object(at: 1)
+  v = a.object(at: 1) as AnyObject
   expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, to: UInt.self)
 
-  v = a.object(at: 2)
+  v = a.object(at: 2) as AnyObject
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -838,7 +830,7 @@ for indexRange in [
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 0, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<0))
     expectCrashLater()
@@ -853,7 +845,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
     .code {
     let a = getBridgedNSArrayOfValueTypeCustomBridged(
       numElements: 3, capacity: 16)
-    let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+    let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
     a.available_getObjects(
       AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
     expectCrashLater()
@@ -864,7 +856,7 @@ for indexRange in [ 0..<4, -2..<(-1), -1..<2, 2..<4, 4..<5 ] as [Range<Int>] {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
-  let buffer = UnsafeMutablePointer<AnyObject>(allocatingCapacity: 16)
+  let buffer = UnsafeMutablePointer<AnyObject>.allocate(capacity: 16)
   a.available_getObjects(
     AutoreleasingUnsafeMutablePointer(buffer), range: NSRange(0..<3))
 
@@ -881,12 +873,12 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
   for i in 0..<3 {
-    expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-    expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-    expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+    expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+    expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+    expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
-  buffer.deallocateCapacity(3)
+  buffer.deallocate(capacity: 3)
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -895,7 +887,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
 
 ArrayTestSuite.test("BridgedToObjC/Custom/copyWithZone") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
-  let copy: AnyObject = a.copy(with: nil)
+  let copy: AnyObject = a.copy(with: nil) as AnyObject
   expectEqual(
     unsafeBitCast(a, to: UInt.self),
     unsafeBitCast(copy, to: UInt.self))
@@ -1000,15 +992,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/ObjectEnumerator/FastEnumeration/UseFr
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
-  var v: AnyObject = a[0]
+  var v: AnyObject = a[0] as AnyObject
   expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[1]
+  v = a[1] as AnyObject
   expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[2]
+  v = a[2] as AnyObject
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
@@ -1024,9 +1016,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }
@@ -1034,15 +1026,15 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Cast") {
 ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 3)
 
-  var v: AnyObject = a[0]
+  var v: AnyObject = a[0] as AnyObject
   expectEqual(10, (v as! TestObjCValueTy).value)
   let idValue0 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[1]
+  v = a[1] as AnyObject
   expectEqual(20, (v as! TestObjCValueTy).value)
   let idValue1 = unsafeBitCast(v, to: UInt.self)
 
-  v = a[2]
+  v = a[2] as AnyObject
   expectEqual(30, (v as! TestObjCValueTy).value)
   let idValue2 = unsafeBitCast(v, to: UInt.self)
 
@@ -1058,9 +1050,9 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Reallocate") {
 
   // Check that mutating the native array did not affect the bridged array.
   expectEqual(3, a.count)
-  expectEqual(idValue0, unsafeBitCast(a.object(at: 0), to: UInt.self))
-  expectEqual(idValue1, unsafeBitCast(a.object(at: 1), to: UInt.self))
-  expectEqual(idValue2, unsafeBitCast(a.object(at: 2), to: UInt.self))
+  expectEqual(idValue0, unsafeBitCast(a.object(at: 0) as AnyObject, to: UInt.self))
+  expectEqual(idValue1, unsafeBitCast(a.object(at: 1) as AnyObject, to: UInt.self))
+  expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
 }

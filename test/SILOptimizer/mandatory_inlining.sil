@@ -1,10 +1,24 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
 
 protocol CP : class {
   func f() -> Self
+}
+
+protocol P2 {
+  var c: Int32 { get }
+}
+
+extension P2 {
+  func s() -> Int32
+}
+
+struct L {
+  var start: Int32 { get }
+  @sil_stored let o: P2
+  init(o: P2)
 }
 
 sil @plus : $@convention(thin) (Int64, Int64) -> Int64
@@ -845,3 +859,47 @@ sil shared [transparent] @identity_closure : $@convention(thin) (Builtin.Int8) -
 bb0(%0 : $Builtin.Int8):
   return %0 : $Builtin.Int8
 }
+
+sil [transparent] @P2_s : $@convention(method) <Self where Self : P2> (@in_guaranteed Self) -> Int32 {
+bb0(%0 : $*Self):
+  %2 = alloc_stack $Self
+  copy_addr %0 to [initialization] %2 : $*Self
+  %4 = witness_method $Self, #P2.c!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %5 = apply %4<Self>(%2) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %2 : $*Self
+  %7 = integer_literal $Builtin.Int32, 1
+  %8 = struct_extract %5 : $Int32, #Int32._value
+  %9 = integer_literal $Builtin.Int1, -1
+  %10 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %7 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 0
+  %12 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %12 : $Builtin.Int1
+  %14 = struct $Int32 (%11 : $Builtin.Int32)
+  dealloc_stack %2 : $*Self
+  return %14 : $Int32
+}
+
+// Check that P2_s call can be properly inlined and the resulting witness_method instruction
+// uses the opened archetype from the caller.
+// CHECK-LABEL: sil hidden @L_start
+// CHECK: open_existential_addr{{.*}}$*@[[OPENED_ARCHETYPE:opened\("[A-Z0-9-]+"\) P2]]
+// CHECK: witness_method $@[[OPENED_ARCHETYPE]], #P2.c!getter.1, %{{[0-9]+}} : $*@[[OPENED_ARCHETYPE]]
+// CHECK: return
+sil hidden @L_start : $@convention(method) (@in_guaranteed L) -> Int32 {
+bb0(%0 : $*L):
+  %2 = struct_element_addr %0 : $*L, #L.o
+  %3 = alloc_stack $P2
+  copy_addr %2 to [initialization] %3 : $*P2
+  %5 = open_existential_addr %3 : $*P2 to $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
+  %6 = function_ref @P2_s : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  %7 = apply %6<@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P2> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %5 : $*@opened("5C6E227C-235E-11E6-AA98-B8E856428C60") P2
+  deinit_existential_addr %3 : $*P2
+  dealloc_stack %3 : $*P2
+  return %7 : $Int32
+}
+
+sil_default_witness_table hidden P2 {
+  no_default
+}
+

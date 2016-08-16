@@ -35,6 +35,30 @@ protocol P0 {
   func g(_ ds: Self) // okay
 }
 
+extension P0 {
+  func h() -> Self { // okay
+    func g(_ t : Self) -> Self { // okay
+      return t
+    }
+    return g(self)
+  }
+}
+
+protocol P1: class {
+  func f() -> Self // okay
+
+  func g(_ ds: Self) // okay
+}
+
+extension P1 {
+  func h() -> Self { // okay
+    func g(_ t : Self) -> Self { // okay
+      return t
+    }
+    return g(self)
+  }
+}
+
 // ----------------------------------------------------------------------------
 // The 'self' type of a Self method is based on Self
 class C1 {
@@ -45,8 +69,8 @@ class C1 {
     // FIXME: below diagnostic should complain about C1 -> Self conversion
     if b { return C1(int: 5) } // expected-error{{cannot convert return expression of type 'C1' to return type 'Self'}}
 
-    // One can use .dynamicType to attempt to construct an object of type Self.
-    if !b { return self.dynamicType.init(int: 5) }
+    // One can use `type(of:)` to attempt to construct an object of type Self.
+    if !b { return type(of: self).init(int: 5) }
 
     // Can't utter Self within the body of a method.
     var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}

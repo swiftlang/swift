@@ -133,7 +133,9 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   // Define the getter.
   auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
                                                  rawInterfaceType,
-                                                 rawType);
+                                                 rawType,
+                                                 /*isStatic=*/false,
+                                                 /*isFinal=*/false);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // Define the property.
@@ -141,9 +143,12 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
     = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_rawValue, rawType,
+                                     C.Id_rawValue,
                                      rawInterfaceType,
-                                     getterDecl);
+                                     rawType,
+                                     getterDecl,
+                                     /*isStatic=*/false,
+                                     /*isFinal=*/false);
   
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
@@ -304,16 +309,11 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   Type selfMetatype = MetatypeType::get(selfType->getInOutObjectType());
   
   Type allocType;
-  Type initType;
-  if (genericParams) {
+  if (genericParams)
     allocType = PolymorphicFunctionType::get(selfMetatype, type, genericParams);
-    initType = PolymorphicFunctionType::get(selfType, type, genericParams);
-  } else {
+  else
     allocType = FunctionType::get(selfMetatype, type);
-    initType = FunctionType::get(selfType, type);
-  }
   initDecl->setType(allocType);
-  initDecl->setInitializerType(initType);
 
   // Compute the interface type of the initializer.
   Type retInterfaceType
@@ -340,7 +340,8 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->setAccessibility(enumDecl->getFormalAccess());
+  initDecl->setAccessibility(std::max(Accessibility::Internal,
+                                      enumDecl->getFormalAccess()));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration

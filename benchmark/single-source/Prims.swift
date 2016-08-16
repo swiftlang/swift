@@ -23,8 +23,8 @@
 import TestsUtils
 
 class PriorityQueue {
-  final var heap : Array<EdgeCost>
-  final var graphIndexToHeapIndexMap : Array<Int?>
+  final var heap: Array<EdgeCost>
+  final var graphIndexToHeapIndexMap: Array<Int?>
 
   // Create heap for graph with NUM nodes.
   init(Num: Int) {
@@ -132,9 +132,9 @@ class PriorityQueue {
   func dump() {
     print("QUEUE")
     for nodeCost in heap {
-      let to : Int = nodeCost.to
-      let from : Int = nodeCost.from
-      let cost : Double = nodeCost.cost
+      let to: Int = nodeCost.to
+      let from: Int = nodeCost.from
+      let cost: Double = nodeCost.cost
       print("(\(from)->\(to), \(cost))")
     }
   }
@@ -151,8 +151,8 @@ class PriorityQueue {
 }
 
 struct GraphNode {
-  var id : Int
-  var adjList : Array<Int>
+  var id: Int
+  var adjList: Array<Int>
 
   init(i : Int) {
     id = i
@@ -161,14 +161,14 @@ struct GraphNode {
 }
 
 struct EdgeCost {
-  var to : Int
-  var cost : Double
+  var to: Int
+  var cost: Double
   var from: Int
 }
 
 struct Edge : Equatable {
-  var start : Int
-  var end : Int
+  var start: Int
+  var end: Int
 }
 
 func ==(lhs: Edge, rhs: Edge) -> Bool {

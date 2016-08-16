@@ -192,6 +192,25 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplaceChars(SourceLoc Start,
   return *this;
 }
 
+InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
+                                                      SourceRange R2) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+
+  auto &SM = Engine->SourceMgr;
+  // Convert from a token range to a CharSourceRange
+  auto charRange1 = toCharSourceRange(SM, R1);
+  auto charRange2 = toCharSourceRange(SM, R2);
+  // Extract source text.
+  auto text1 = SM.extractText(charRange1);
+  auto text2 = SM.extractText(charRange2);
+
+  Engine->getActiveDiagnostic()
+    .addFixIt(Diagnostic::FixIt(charRange1, text2));
+  Engine->getActiveDiagnostic()
+    .addFixIt(Diagnostic::FixIt(charRange2, text1));
+  return *this;
+}
+
 void InFlightDiagnostic::flush() {
   if (!IsActive)
     return;

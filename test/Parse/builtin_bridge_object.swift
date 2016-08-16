@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift -parse-stdlib
 
+precedencegroup AssignmentPrecedence { assignment: true }
+
 var word: Builtin.Word
 
 class C {}

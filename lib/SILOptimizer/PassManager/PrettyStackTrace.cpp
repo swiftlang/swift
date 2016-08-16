@@ -18,7 +18,8 @@
 using namespace swift;
 
 void PrettyStackTraceSILFunctionTransform::print(llvm::raw_ostream &out) const {
-  out << "While running SILFunctionTransform \"" << SFT->getName()
+  out << "While running pass #" << PassNumber
+      << " SILFunctionTransform \"" << SFT->getName()
       << "\" on SILFunction ";
   if (!SFT->getFunction()) {
     out << " <<null>>";
@@ -30,5 +31,6 @@ void PrettyStackTraceSILFunctionTransform::print(llvm::raw_ostream &out) const {
 }
 
 void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
-  out << "While running SILModuleTransform \"" << SMT->getName() << "\".\n";
+  out << "While running pass #" << PassNumber
+      << " SILModuleTransform \"" << SMT->getName() << "\".\n";
 }

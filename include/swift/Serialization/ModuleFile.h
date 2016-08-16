@@ -43,6 +43,7 @@ class ProtocolConformance;
 /// A serialized module, along with the tools to access it.
 class ModuleFile : public LazyMemberLoader {
   friend class SerializedASTFile;
+  friend class SILDeserializer;
   using Status = serialization::Status;
 
   /// A reference back to the AST representation of the file.
@@ -75,6 +76,9 @@ class ModuleFile : public LazyMemberLoader {
 
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
+
+  /// A callback to be invoked every time a type was deserialized.
+  llvm::function_ref<void(Type)> DeserializedTypeCallback;
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -276,6 +280,7 @@ private:
 
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
+  std::unique_ptr<SerializedDeclTable> PrecedenceGroupDecls;
   std::unique_ptr<SerializedDeclTable> ExtensionDecls;
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
@@ -524,6 +529,12 @@ public:
   ///
   /// If none is found, returns null.
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
+
+  /// Searches the module's precedence groups for one with the given
+  /// name and fixity.
+  ///
+  /// If none is found, returns null.
+  PrecedenceGroupDecl *lookupPrecedenceGroup(Identifier name);
 
   /// Adds any imported modules to the given vector.
   void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,

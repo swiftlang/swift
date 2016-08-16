@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | FileCheck %s --check-prefix=HOIST
-// RUN: %target-sil-opt -enable-sil-verify-all  -abcopts  %s | FileCheck %s --check-prefix=RANGECHECK
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -enable-abcopts=1 %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate -dce -simplify-cfg -abcopts -dce -enable-abcopts -enable-abc-hoisting %s | %FileCheck %s --check-prefix=HOIST
+// RUN: %target-sil-opt -enable-sil-verify-all  -abcopts  %s | %FileCheck %s --check-prefix=RANGECHECK
 
 sil_stage canonical
 
@@ -132,7 +132,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // CHECK: [[IDX4:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD1]]
   %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
-  %27 = pointer_to_address %26 : $Builtin.RawPointer to $*Builtin.Int32
+  %27 = pointer_to_address %26 : $Builtin.RawPointer to [strict] $*Builtin.Int32
   %29 = store %x1 to %27 : $*Builtin.Int32
   %l4 = load %0 : $*ArrayInt
   retain_value %5 : $Builtin.NativeObject
@@ -595,7 +595,7 @@ bb4:
   retain_value %55 : $Builtin.NativeObject
   %42 = apply %40(%37, %53) : $@convention(method) (Int32, @owned ArrayInt) -> UnsafeMutablePointerInt
   %43 = struct_extract %42 : $UnsafeMutablePointerInt, #UnsafeMutablePointerInt._rawValue
-  %44 = pointer_to_address %43 : $Builtin.RawPointer to $*Int32
+  %44 = pointer_to_address %43 : $Builtin.RawPointer to [strict] $*Int32
   store %0 to %44 : $*Int32
   br bb1(%21 : $Builtin.Int32)
 
@@ -742,7 +742,7 @@ bb4:
   retain_value %55 : $Builtin.NativeObject
   %42 = apply %40(%37, %53) : $@convention(method) (Int32, @owned ArrayInt) -> UnsafeMutablePointerInt
   %43 = struct_extract %42 : $UnsafeMutablePointerInt, #UnsafeMutablePointerInt._rawValue
-  %44 = pointer_to_address %43 : $Builtin.RawPointer to $*IntTupleStruct
+  %44 = pointer_to_address %43 : $Builtin.RawPointer to [strict] $*IntTupleStruct
   %45 = struct_element_addr %44 : $*IntTupleStruct, #IntTupleStruct.tuple
   %46 = tuple_element_addr %45 : $*(Int32, Int32), 0
   store %0 to %46 : $*Int32

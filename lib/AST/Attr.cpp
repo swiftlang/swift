@@ -23,6 +23,7 @@
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
@@ -46,7 +47,7 @@ TypeAttrKind TypeAttributes::getAttrKindFromString(StringRef Str) {
 /// Return the name (like "autoclosure") for an attribute ID.
 const char *TypeAttributes::getAttrName(TypeAttrKind kind) {
   switch (kind) {
-  default: assert(0 && "Invalid attribute ID");
+  default: llvm_unreachable("Invalid attribute ID");
 #define TYPE_ATTR(X) case TAK_##X: return #X;
 #include "swift/AST/Attr.def"
   }
@@ -248,16 +249,8 @@ void DeclAttributes::print(ASTPrinter &Printer,
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
-    if (std::find(Options.ExcludeAttrList.begin(),
-                  Options.ExcludeAttrList.end(),
-                  DA->getKind()) != Options.ExcludeAttrList.end())
+    if (Options.excludeAttrKind(DA->getKind()))
       continue;
-    if (!Options.ExclusiveAttrList.empty()) {
-      if (std::find(Options.ExclusiveAttrList.begin(),
-                    Options.ExclusiveAttrList.end(),
-                    DA->getKind()) == Options.ExclusiveAttrList.end())
-        continue;
-    }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isShortAvailable(DA) ? shortAvailableAttributes :
@@ -305,6 +298,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_ShowInInterface:
+  case DAK_Rethrows:
     return false;
   default:
     break;
@@ -341,7 +335,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
   }
 
   Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  defer { Printer.printStructurePost(PrintStructureKind::BuiltinAttribute); };
+  SWIFT_DEFER {
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+  };
 
   switch (getKind()) {
   case DAK_Semantics:
@@ -543,11 +539,16 @@ StringRef DeclAttribute::getAttrName() const {
     switch (cast<AbstractAccessibilityAttr>(this)->getAccess()) {
     case Accessibility::Private:
       return "private";
+    case Accessibility::FilePrivate:
+      return "fileprivate";
     case Accessibility::Internal:
       return "internal";
     case Accessibility::Public:
       return "public";
+    case Accessibility::Open:
+      return "open";
     }
+    llvm_unreachable("bad accessibility kind");
 
   case DAK_Ownership:
     switch (cast<OwnershipAttr>(this)->get()) {
@@ -556,6 +557,7 @@ StringRef DeclAttribute::getAttrName() const {
     case Ownership::Unowned:   return "unowned";
     case Ownership::Unmanaged: return "unowned(unsafe)";
     }
+    llvm_unreachable("bad ownership kind");
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:

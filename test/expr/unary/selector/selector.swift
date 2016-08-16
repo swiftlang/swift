@@ -65,8 +65,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   _ = #selector(P1.method5(_:b:)) // expected-error{{static member 'method5(_:b:)' cannot be used on protocol metatype 'P1.Protocol'}}
   _ = #selector(p1.method4)
   _ = #selector(p1.method4(_:b:))
-  _ = #selector(p1.dynamicType.method5)
-  _ = #selector(p1.dynamicType.method5(_:b:))
+  _ = #selector(type(of: p1).method5)
+  _ = #selector(type(of: p1).method5(_:b:))
 
   // Interesting expressions that refer to methods.
   _ = #selector(Swift.AnyObject.method1)
@@ -110,4 +110,28 @@ func testParseErrors3(_ c1: C1) {
 func testParseErrors4() {
   // Subscripts
   _ = #selector(C1.subscript) // expected-error{{type 'C1.Type' has no subscript members}}
+}
+
+// SR-1827
+
+let optionalSel: Selector? = nil
+
+switch optionalSel {
+case #selector(C1.method1)?:
+  break
+}
+
+@objc class SR1827 {
+  func bar() {}
+}
+
+switch optionalSel {
+case #selector(SR1827.bar): // expected-error{{expression pattern of type 'Selector' cannot match values of type 'Selector?'}} {{26-26=?}}
+  break
+case #selector(SR1827.bar)!: // expected-error{{cannot force unwrap value of non-optional type 'Selector'}}
+  break
+case #selector(SR1827.bar)?:
+  break
+default:
+  break
 }

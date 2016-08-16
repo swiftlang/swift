@@ -277,6 +277,7 @@ private:
   friend class ValueUseIterator;
   template <unsigned N> friend class FixedOperandList;
   template <unsigned N> friend class TailAllocatedOperandList;
+  friend class TrailingOperandsList;
 };
 
 /// A class which adapts an array of Operands into an array of Values.
@@ -464,6 +465,31 @@ public:
     }
   }
 
+  /// Initialize this operand list.
+  ///
+  /// The dynamic operands are actually out of order: logically they
+  /// will placed after the fixed operands, not before them.  But
+  /// the variadic arguments have to come last.
+  template <class... T>
+  TailAllocatedOperandList(SILInstruction *user,
+                           ArrayRef<SILValue> dynamicArgs,
+                           ArrayRef<SILValue> additionalDynamicArgs,
+                           T&&... fixedArgs)
+      : NumExtra(dynamicArgs.size() + additionalDynamicArgs.size()),
+        Buffer{ { user, std::forward<T>(fixedArgs) }... } {
+    static_assert(sizeof...(fixedArgs) == N, "wrong number of initializers");
+
+    Operand *dynamicSlot = Buffer + N;
+    for (auto value : dynamicArgs) {
+      new (dynamicSlot++) Operand(user, value);
+    }
+
+    for (auto value : additionalDynamicArgs) {
+      new (dynamicSlot++) Operand(user, value);
+    }
+ }
+
+
   ~TailAllocatedOperandList() {
     for (auto &op : getDynamicAsArray()) {
       op.~Operand();
@@ -564,6 +590,37 @@ public:
   /// Indexes into the full list of operands.
   Operand &operator[](unsigned i) { return asArray()[i]; }
   const Operand &operator[](unsigned i) const { return asArray()[i]; }
+};
+
+/// A helper class for initializing the list of trailing operands.
+class TrailingOperandsList {
+public:
+  static void InitOperandsList(Operand *p, SILInstruction *user,
+                               SILValue operand, ArrayRef<SILValue> operands) {
+    assert(p && "Trying to initialize operands using a nullptr");
+    new (p++) Operand(user, operand);
+    for (auto op : operands) {
+      new (p++) Operand(user, op);
+    }
+  }
+  static void InitOperandsList(Operand *p, SILInstruction *user,
+                               SILValue operand0, SILValue operand1,
+                               ArrayRef<SILValue> operands) {
+    assert(p && "Trying to initialize operands using a nullptr");
+    new (p++) Operand(user, operand0);
+    new (p++) Operand(user, operand1);
+    for (auto op : operands) {
+      new (p++) Operand(user, op);
+    }
+  }
+
+  static void InitOperandsList(Operand *p, SILInstruction *user,
+                               ArrayRef<SILValue> operands) {
+    assert(p && "Trying to initialize operands using a nullptr");
+    for (auto op : operands) {
+      new (p++) Operand(user, op);
+    }
+  }
 };
 
 /// SILValue hashes just like a pointer.

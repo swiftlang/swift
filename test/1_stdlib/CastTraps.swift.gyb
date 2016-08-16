@@ -63,7 +63,8 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 {
   let o = ${t1}() as Any
   expectCrashLater()
-  o as! ${t2}
+  let r = o as! ${t2}
+  _blackHole(r)
 }
 
 %   end
@@ -87,7 +88,8 @@ CastTrapsTestSuite.test("${t1}__${t2}")
 {
   let o = ${t1}() as AnyObject
   expectCrashLater()
-  o as! ${t2}
+  let r = o as! ${t2}
+  _blackHole(r)
 }
 
 %   end

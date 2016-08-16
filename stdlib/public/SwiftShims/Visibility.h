@@ -59,11 +59,16 @@
 # define SWIFT_RUNTIME_EXPORT __attribute__((__visibility__("default")))
 #endif
 
-#elif __CYGWIN__
-# define SWIFT_RUNTIME_EXPORT 
 #else
-// __dllexport/__dllimport for Windows?
-# error "Unimplemented object format"
+# if defined(__CYGWIN__)
+#  define SWIFT_RUNTIME_EXPORT
+# else
+#  if defined(swiftCore_EXPORTS)
+#   define SWIFT_RUNTIME_EXPORT __declspec(dllexport)
+#  else
+#   define SWIFT_RUNTIME_EXPORT __declspec(dllimport)
+#  endif
+# endif
 #endif
 
 /// Attribute for runtime-stdlib SPI interfaces.

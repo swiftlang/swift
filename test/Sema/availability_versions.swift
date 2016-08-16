@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module
-// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -disable-objc-attr-requires-foundation-module -parse %s 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
-// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -parse -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
+// RUN: not %target-swift-frontend -target x86_64-apple-macosx10.50 -parse -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | %FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
 
 // REQUIRES: OS=macosx
 
@@ -937,7 +937,7 @@ class SomeGenericClass<T> { }
 class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_51 : SomeGenericClass<ProtocolAvailableOn10_51> { // expected-error {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
 }
 
-func GenericWhereClause<T where T: ProtocolAvailableOn10_51>(_ t: T) { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
+func GenericWhereClause<T>(_ t: T) where T: ProtocolAvailableOn10_51 { // expected-error * {{'ProtocolAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
@@ -1011,7 +1011,7 @@ func useUnavailableExtension() {
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
 // Default availability reflects minimum deployment: 10.9 and up
 
-  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  if #available(OSX 10.9, *) { // no-warning
     let _ = globalFuncAvailableOn10_9()
   }
   
@@ -1023,7 +1023,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
     }
   }
 
-  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}}
   } else {
     // Make sure we generate a warning about an unnecessary check even if the else branch of if is dead.
     if #available(OSX 10.51, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
@@ -1032,7 +1032,7 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
 
   // This 'if' is strictly to limit the scope of the guard fallthrough
   if p {
-    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}}
       // Make sure we generate a warning about an unnecessary check even if the else branch of guard is dead.
       if #available(OSX 10.51, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
       }
@@ -1068,15 +1068,12 @@ func functionWithUnavailableInDeadBranch() {
 
     localFuncAvailableOn10_51() // no-warning
 
-    // We still want to error on references to explicitly unavailable symbols
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 
   guard #available(iOS 8.0, *) else {
     _ = globalFuncAvailableOn10_51() // no-warning
 
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 }
@@ -1235,8 +1232,7 @@ public func fixitForReferenceInGlobalFunctionWithDeclModifier() {
       // expected-note@-3 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.51, *)\n}}
 }
 
-@noreturn
-func fixitForReferenceInGlobalFunctionWithAttribute() {
+func fixitForReferenceInGlobalFunctionWithAttribute() -> Never {
   functionAvailableOn10_51()
     // expected-error@-1 {{'functionAvailableOn10_51()' is only available on OS X 10.51 or newer}}
     // expected-note@-2 {{add 'if #available' version check}} {{3-29=if #available(OSX 10.51, *) {\n      functionAvailableOn10_51()\n  } else {\n      // Fallback on earlier versions\n  }}}
@@ -1625,6 +1621,5 @@ func useShortFormAvailable() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 
-    // CHECK:error: 'unavailableWins()' is unavailable
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
 }

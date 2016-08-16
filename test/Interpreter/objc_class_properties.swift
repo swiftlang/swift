@@ -171,28 +171,28 @@ ClassProperties.test("optionalProp") {
 }
 
 class NamingConflictSubclass : PropertyNamingConflict {
-  override var prop: AnyObject? { return nil }
-  override class var prop: AnyObject? { return NamingConflictSubclass() }
+  override var prop: Any? { return nil }
+  override class var prop: Any? { return NamingConflictSubclass() }
 }
 
 ClassProperties.test("namingConflict") {
   let obj = PropertyNamingConflict()
-  expectTrue(obj === obj.prop)
-  expectEmpty(obj.dynamicType.prop)
+  expectTrue(obj === obj.prop.map { $0 as AnyObject })
+  expectEmpty(type(of: obj).prop)
   expectEmpty(PropertyNamingConflict.prop)
 
   let sub = NamingConflictSubclass()
   expectEmpty(sub.prop)
-  expectNotEmpty(sub.dynamicType.prop)
+  expectNotEmpty(type(of: sub).prop)
   expectNotEmpty(NamingConflictSubclass.prop)
 }
 
 extension NamingConflictSubclass : PropertyNamingConflictProto {
-  var protoProp: AnyObject? {
+  var protoProp: Any? {
     get { return self }
     set {}
   }
-  class var protoProp: AnyObject? {
+  class var protoProp: Any? {
     get { return nil }
     set {}
   }
@@ -200,8 +200,8 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
 
 ClassProperties.test("namingConflict/protocol") {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
-  expectTrue(obj === obj.protoProp)
-  expectEmpty(obj.dynamicType.protoProp)
+  expectTrue(obj === obj.protoProp.map { $0 as AnyObject })
+  expectEmpty(type(of: obj).protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
   expectEmpty(type.protoProp)

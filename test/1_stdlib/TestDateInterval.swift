@@ -23,12 +23,8 @@ class TestDateIntervalSuper { }
 class TestDateInterval : TestDateIntervalSuper {
     func dateWithString(_ str: String) -> Date {
         let formatter = DateFormatter()
-	if #available(iOS 9, *){
-           formatter.calendar = Calendar(identifier: .gregorian)!
-	}else{
-	   formatter.calendar = Calendar(calendarIdentifier: .gregorian)!
-	}
-        formatter.locale = Locale(localeIdentifier: "en_US")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
         return formatter.date(from: str)! as Date
     }
@@ -133,6 +129,42 @@ class TestDateInterval : TestDateIntervalSuper {
             expectFalse(testInterval.contains(earlierStart))
         }
     }
+
+    func test_AnyHashableContainingDateInterval() {
+        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
+            let start = dateWithString("2010-05-17 14:49:47 -0700")
+            let duration = 10000000.0
+            let values: [DateInterval] = [
+                DateInterval(start: start, duration: duration),
+                DateInterval(start: start, duration: duration / 2),
+                DateInterval(start: start, duration: duration / 2),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual(DateInterval.self, type(of: anyHashables[0].base))
+            expectEqual(DateInterval.self, type(of: anyHashables[1].base))
+            expectEqual(DateInterval.self, type(of: anyHashables[2].base))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
+
+    func test_AnyHashableCreatedFromNSDateInterval() {
+        if #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) {
+            let start = dateWithString("2010-05-17 14:49:47 -0700")
+            let duration = 10000000.0
+            let values: [NSDateInterval] = [
+                NSDateInterval(start: start, duration: duration),
+                NSDateInterval(start: start, duration: duration / 2),
+                NSDateInterval(start: start, duration: duration / 2),
+            ]
+            let anyHashables = values.map(AnyHashable.init)
+            expectEqual(DateInterval.self, type(of: anyHashables[0].base))
+            expectEqual(DateInterval.self, type(of: anyHashables[1].base))
+            expectEqual(DateInterval.self, type(of: anyHashables[2].base))
+            expectNotEqual(anyHashables[0], anyHashables[1])
+            expectEqual(anyHashables[1], anyHashables[2])
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -141,5 +173,7 @@ DateIntervalTests.test("test_compareDateIntervals") { TestDateInterval().test_co
 DateIntervalTests.test("test_isEqualToDateInterval") { TestDateInterval().test_isEqualToDateInterval() }
 DateIntervalTests.test("test_checkIntersection") { TestDateInterval().test_checkIntersection() }
 DateIntervalTests.test("test_validIntersections") { TestDateInterval().test_validIntersections() }
+DateIntervalTests.test("test_AnyHashableContainingDateInterval") { TestDateInterval().test_AnyHashableContainingDateInterval() }
+DateIntervalTests.test("test_AnyHashableCreatedFromNSDateInterval") { TestDateInterval().test_AnyHashableCreatedFromNSDateInterval() }
 runAllTests()
 #endif

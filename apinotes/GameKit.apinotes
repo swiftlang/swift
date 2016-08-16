@@ -1,3 +1,4 @@
+---
 Name:            GameKit
 Classes:
   - Name: GKLocalPlayer
@@ -5,3 +6,12 @@ Classes:
       - Selector:        'localPlayer'
         MethodKind:      Class
         FactoryAsInit:   C
+Tags:
+- Name: GKErrorCode
+  NSErrorDomain: GKErrorDomain
+- Name: GKGameSessionErrorCode
+  NSErrorDomain: GKGameSessionErrorDomain
+- Name: GKSessionError
+  NSErrorDomain: GKSessionErrorDomain
+- Name: GKVoiceChatServiceError
+  NSErrorDomain: GKVoiceChatServiceErrorDomain

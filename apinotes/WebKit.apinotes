@@ -197,3 +197,6 @@ Classes:
     Nullability:
     - O
     NullabilityOfRet: S
+Tags:
+- Name: WKErrorCode
+  NSErrorDomain: WKErrorDomain

@@ -37,21 +37,21 @@
 ///     extension Sequence {
 ///       /// Returns an array containing the results of
 ///       ///
-///       ///   p.reduce(initial, combine: combine)
+///       ///   p.reduce(initial, nextPartialResult)
 ///       ///
 ///       /// for each prefix `p` of `self`, in order from shortest to
 ///       /// longest.  For example:
 ///       ///
-///       ///     (1..<6).scan(0, combine: +) // [0, 1, 3, 6, 10, 15]
+///       ///     (1..<6).scan(0, +) // [0, 1, 3, 6, 10, 15]
 ///       ///
-///       /// - Complexity: O(N)
+///       /// - Complexity: O(n)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         combine: @noescape (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
-///           result.append(combine(result.last!, x))
+///           result.append(nextPartialResult(result.last!, x))
 ///         }
 ///         return result
 ///       }
@@ -64,13 +64,13 @@
 ///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
-///           nextElement = base.next().map { combine(result, $0) }
+///           nextElement = base.next().map { nextPartialResult(result, $0) }
 ///           return result
 ///         }
 ///       }
 ///       private var nextElement: ResultElement? // The next result of next().
 ///       private var base: Base                  // The underlying iterator.
-///       private let combine: (ResultElement, Base.Element) -> ResultElement
+///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -78,11 +78,11 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), combine: combine)
+///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
 ///       }
 ///       private let initial: ResultElement
 ///       private let base: Base
-///       private let combine:
+///       private let nextPartialResult:
 ///         (ResultElement, Base.Iterator.Element) -> ResultElement
 ///     }
 ///
@@ -91,20 +91,20 @@
 ///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
 ///       ///
-///       ///   p.reduce(initial, combine: combine)
+///       ///   p.reduce(initial, nextPartialResult)
 ///       ///
 ///       /// for each prefix `p` of `self`, in order from shortest to
 ///       /// longest.  For example:
 ///       ///
-///       ///     Array((1..<6).lazy.scan(0, combine: +)) // [0, 1, 3, 6, 10, 15]
+///       ///     Array((1..<6).lazy.scan(0, +)) // [0, 1, 3, 6, 10, 15]
 ///       ///
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         combine: (ResultElement, Iterator.Element) -> ResultElement
+///         _ nextPartialResult: (ResultElement, Iterator.Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, combine: combine)
+///           initial: initial, base: self, nextPartialResult)
 ///       }
 ///     }
 ///
@@ -197,7 +197,7 @@ extension LazySequenceProtocol {
   }
 }
 
-@available(*, unavailable, renamed: "LazyCollectionProtocol")
+@available(*, unavailable, renamed: "LazySequenceProtocol")
 public typealias LazySequenceType = LazySequenceProtocol
 
 extension LazySequenceProtocol {

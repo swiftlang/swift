@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
-// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
 // XFAIL: broken_std_regex
 
 #line 17 "abc.swift"
@@ -100,9 +100,6 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
   @IBOutlet @objc var v3: String
 
-// CHECK: <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f0() {}
-  @noreturn func f0() {}
-
 // CHECK: <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f1() {}
   @available(*, unavailable) func f1() {}
 
@@ -111,9 +108,6 @@ class Attributes {
 
 // CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f3() {}
   @IBAction @available(*, unavailable) func f3() {}
-
-// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available</attr-builtin>(*, unavailable) <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f4() {}
-  @IBAction @available(*, unavailable) @noreturn func f4() {}
 
 // CHECK: <attr-builtin>mutating</attr-builtin> <kw>func</kw> func_mutating_1() {}
   mutating func func_mutating_1() {}
@@ -168,6 +162,18 @@ func foo(n: Float) -> Int {
     return 100009
 }
 
+///- returns: single-line, no space
+// CHECK: ///- <doc-comment-field>returns</doc-comment-field>: single-line, no space
+
+/// - returns: single-line, 1 space
+// CHECK: /// - <doc-comment-field>returns</doc-comment-field>: single-line, 1 space
+
+///  - returns: single-line, 2 spaces
+// CHECK: ///  - <doc-comment-field>returns</doc-comment-field>: single-line, 2 spaces
+
+///       - returns: single-line, more spaces
+// CHECK: ///       - <doc-comment-field>returns</doc-comment-field>: single-line, more spaces
+
 // CHECK: <kw>protocol</kw> Prot {
 protocol Prot {
   // CHECK: <kw>typealias</kw> Blarg
@@ -180,20 +186,28 @@ protocol Prot {
   var protocolProperty2: Int { get set }
 }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* { <kw>associativity</kw> left <kw>precedence</kw> <int>140</int> }{{$}}
-infix operator *-* { associativity left precedence 140 }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-* : FunnyPrecedence{{$}}
+infix operator *-* : FunnyPrecedence
+
+// CHECK: <kw>precedencegroup</kw> FunnyPrecedence
+// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
+precedencegroup FunnyPrecedence {
+  associativity: left
+  higherThan: MultiplicationPrecedence
+}
 
 // CHECK: <kw>func</kw> *-*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* { <kw>associativity</kw> left }{{$}}
-infix operator *-+* { associativity left }
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *-+* : FunnyPrecedence
+infix operator *-+* : FunnyPrecedence
 
 // CHECK: <kw>func</kw> *-+*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *-+*(l: Int, r: Int) -> Int { return l }
 
-// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--* {}{{$}}
-infix operator *--* {}
+// CHECK: <attr-builtin>infix</attr-builtin> <kw>operator</kw> *--*{{$}}
+infix operator *--*
 
 // CHECK: <kw>func</kw> *--*(l: <type>Int</type>, r: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> l }{{$}}
 func *--*(l: Int, r: Int) -> Int { return l }
@@ -259,10 +273,14 @@ func test3(o: AnyObject) {
   let x = o as! MyCls
 }
 
-// CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
+// CHECK: <kw>func</kw> test4(inout a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
   // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
+
+// CHECK: <kw>func</kw> test4b(a: <kw>inout</kw> <type>Int</type>) {{{$}}
+func test4b(a: inout Int) {
+}
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
 class MySubClass : MyCls {
@@ -487,8 +505,45 @@ let file = #fileLiteral(resourceName: "cloud.png")
 let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
 // CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
 
+let rgb = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1),
+           #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1),
+           #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)]
+// CHECK: <kw>let</kw> rgb = [<object-literal>#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)</object-literal>,
+// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)</object-literal>,
+// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)</object-literal>]
+
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
+
+func keywordAsLabel1(in: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel1(in: <type>Int</type>) {}
+func keywordAsLabel2(for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel2(for: <type>Int</type>) {}
+func keywordAsLabel3(if: Int, for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel3(if: <type>Int</type>, for: <type>Int</type>) {}
+func keywordAsLabel4(_: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel4(<kw>_</kw>: <type>Int</type>) {}
+func keywordAsLabel5(_: Int, for: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel5(<kw>_</kw>: <type>Int</type>, for: <type>Int</type>) {}
+func keywordAsLabel6(if let: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel6(if <kw>let</kw>: <type>Int</type>) {}
+
+func foo1() {
+// CHECK: <kw>func</kw> foo1() {
+  keywordAsLabel1(in: 1)
+// CHECK: keywordAsLabel1(in: <int>1</int>)
+  keywordAsLabel2(for: 1)
+// CHECK: keywordAsLabel2(for: <int>1</int>)
+  keywordAsLabel3(if: 1, for: 2)
+// CHECK: keywordAsLabel3(if: <int>1</int>, for: <int>2</int>)
+  keywordAsLabel5(1, for: 2)
+// CHECK: keywordAsLabel5(<int>1</int>, for: <int>2</int>)
+
+  _ = (if: 0, for: 2)
+// CHECK: <kw>_</kw> = (if: <int>0</int>, for: <int>2</int>)
+  _ = (_: 0, _: 2)
+// CHECK: <kw>_</kw> = (<kw>_</kw>: <int>0</int>, <kw>_</kw>: <int>2</int>)
+}
 
 // Keep this as the last test
 /**

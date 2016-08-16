@@ -142,11 +142,14 @@ public:
   /// null type if one of the ParamDecls does not have a type set for it yet.
   Type getType(const ASTContext &C) const;
   
+  /// Return a TupleType or ParenType for this parameter list written in terms
+  /// of interface types.
+  Type getInterfaceType(DeclContext *DC) const;
+
   /// Return the full function type for a set of curried parameter lists that
-  /// returns the specified result type.  This returns a null type if one of the
-  /// ParamDecls does not have a type set for it yet.
-  ///
-  static Type getFullType(Type resultType, ArrayRef<ParameterList*> PL);
+  /// returns the specified result type written in terms of interface types.
+  static Type getFullInterfaceType(Type resultType, ArrayRef<ParameterList*> PL,
+                                   DeclContext *DC);
   
   
   /// Return the full source range of this parameter.

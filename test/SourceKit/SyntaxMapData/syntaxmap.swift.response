@@ -361,7 +361,17 @@
     {
       key.kind: source.lang.swift.syntaxtype.doccomment,
       key.offset: 666,
-      key.length: 59
+      key.length: 13
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.doccomment.field,
+      key.offset: 679,
+      key.length: 8
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.doccomment,
+      key.offset: 687,
+      key.length: 38
     },
     {
       key.kind: source.lang.swift.syntaxtype.keyword,

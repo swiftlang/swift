@@ -99,7 +99,7 @@ class Foo2 {
 // RUN: %sourcekitd-test -req=format -line=65 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=69 -length=1 %s >>%t.response
-// RUN: FileCheck --strict-whitespace %s <%t.response
+// RUN: %FileCheck --strict-whitespace %s <%t.response
 
 //                        "  func foo(Value1 : Int,"
 // CHECK: key.sourcetext: "           Value2 : Int) {"
@@ -153,13 +153,13 @@ class Foo2 {
 // CHECK: key.sourcetext: "                     5)"
 
 //                        "    func foo6<T1: Testable,"
-// CHECK: key.sourcetext: "              T2: Testable,"
+// CHECK: key.sourcetext: "        T2: Testable,"
 
 //                        "     T2: Testable,"
-// CHECK: key.sourcetext: "     T3: Testable,"
+// CHECK: key.sourcetext: "        T3: Testable,"
 
 //                        "           T3: Testable,"
-// CHECK: key.sourcetext: "           T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
+// CHECK: key.sourcetext: "        T4: where T4 : Testable>(t1 : T1, t2 : T2, t3 : T2) {}"
 
 //                        "    func foo7(i1: Int, i2: Int,"
 // CHECK: key.sourcetext: "              i3: Int, i4: Int,"

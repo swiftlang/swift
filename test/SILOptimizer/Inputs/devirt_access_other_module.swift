@@ -1,5 +1,5 @@
 public class ExternalClass {
-  private func foo() {}
+  fileprivate func foo() {}
 }
 
 public func getExternalClass() -> ExternalClass {

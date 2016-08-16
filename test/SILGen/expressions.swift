@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
 
-struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {
+struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {}
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -29,7 +29,7 @@ struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible 
   init(stringLiteral value: SillyString) { }
 }
 
-struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralConvertible {
+struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -516,7 +516,7 @@ func testDiscardLValue() {
 
 
 func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
-  return a.dynamicType
+  return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
 // CHECK: bb0(%0 : $Super1):
@@ -526,7 +526,7 @@ func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
 struct NonTrivialStruct { var c : Super1 }
 
 func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
-  return a.dynamicType
+  return type(of: a)
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : $NonTrivialStruct):

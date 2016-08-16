@@ -3,6 +3,399 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0136](https://github.com/apple/swift-evolution/blob/master/proposals/0136-memory-layout-of-values.md) and [SE-0101](https://github.com/apple/swift-evolution/blob/master/proposals/0101-standardizing-sizeof-naming.md)
+
+  The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
+  Instead, these memory layout properties for a type `T` are now spelled
+  `MemoryLayout<T>.size`, `MemoryLayout<T>.stride`, and
+  `MemoryLayout<T>.alignment`, respectively.
+
+  The functions `sizeofValue()`, `strideofValue()`, and `alignofValue()` have
+  been renamed `MemoryLayout.size(ofValue:)`, `MemoryLayout.stride(ofValue:)`,
+  and `MemoryLayout.alignment(ofValue:)`.
+
+* [SE-125](https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
+
+  The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
+  have been removed. The function `isKnownUniquelyReferenced()` should be called
+  instead. The class `NonObjectiveCBase` which classes using
+  `isUniquelyReferenced()` needed to inherit from was removed.
+
+  The method `ManagedBufferPointer.holdsUniqueReference` was renamed to
+  `ManagedBufferPointer.isUniqueReference`.
+
+  ```swift
+  // old
+  class SwiftKlazz : NonObjectiveCBase {}
+  expectTrue(isUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.holdsUniqueReference() {
+    print("not unique")
+  }
+
+
+  // new
+  class SwiftKlazz {}
+  expectTrue(isKnownUniquelyReferenced(SwiftKlazz()))
+
+  var managedPtr : ManagedBufferPointer = ...
+  if !managedPtr.isUniqueReference() {
+    print("not unique")
+  }
+
+  ```
+
+* [SE-124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
+
+  The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
+  to be spelled with an explicit `bitPattern` label.
+
+  ```swift
+  let x: ObjectIdentifier = ...
+
+  // old
+  let u = UInt(x)
+  let i = Int(x)
+
+  // new
+  let u = UInt(bitPattern: x)
+  let i = Int(bitPattern: x)
+  ```
+
+* [SE-120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
+
+  The collection methods `partition()` and `partition(isOrderedBefore:)` have
+  been removed from Swift. They were replaced by the method `partition(by:)`
+  which takes an unary predicate.
+
+  Calls to the `partition()` method can be replaced by the following code.
+
+  ```swift
+  // old
+  let p = c.partition()
+
+  // new
+  let p = c.first.flatMap({ first in
+      c.partition(by: { $0 >= first })
+  }) ?? c.startIndex
+  ```
+
+* [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
+
+  Closure parameters are non-escaping by default, rather than explicitly being
+  annotated `@noescape`. Use `@escaping` to say that a closure parameter may
+  escape. `@autoclosure(escaping)` is now spelled `@autoclosure @escaping`.
+  `@noescape` and `@autoclosure(escaping)` are deprecated.
+
+* [SE-0115](https://github.com/apple/swift-evolution/blob/master/proposals/0115-literal-syntax-protocols.md)
+
+  To clarify the role of `*LiteralConvertible` protocols, they have 
+  been renamed to `ExpressibleBy*Literal`.  No requirements of these 
+  protocols have changed.
+
+* [SE-0107](https://github.com/apple/swift-evolution/blob/master/proposals/0107-unsaferawpointer.md)
+
+  An `Unsafe[Mutable]RawPointer` type has been introduced. It replaces
+  `Unsafe[Mutable]Pointer<Void>`. Conversion from `UnsafePointer<T>`
+  to `UnsafePointer<U>` has been disallowed. `Unsafe[Mutable]RawPointer`
+  provides an API for untyped memory access, and an API for binding memory
+  to a type. Binding memory allows for safe conversion between pointer types.
+  See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
+  `withMemoryRebound(to:capacity:)`.
+
+* [SE-0096](https://github.com/apple/swift-evolution/blob/master/proposals/0096-dynamictype.md):
+
+  The `dynamicType` keyword has been removed from Swift.  In its place a new
+  primitive function `type(of:)` has been added to the language.  Existing code
+  that uses the `.dynamicType` member to retrieve the type of an expression 
+  should migrate to this new primitive.  Code that is using `.dynamicType` in 
+  conjunction with `sizeof` should migrate to the `MemoryLayout` structure provided by
+  [SE-0101](https://github.com/apple/swift-evolution/blob/master/proposals/0101-standardizing-sizeof-naming.md).
+
+* [SE-0113](https://github.com/apple/swift-evolution/blob/master/proposals/0113-rounding-functions-on-floatingpoint.md)
+
+  The following two methods were added to `FloatingPoint`:
+
+  ```swift
+  func rounded(_ rule: FloatingPointRoundingRule) -> Self
+  mutating func round( _ rule: FloatingPointRoundingRule)
+  ```
+
+  These bind the IEEE 754 roundToIntegral operations. They provide the
+  functionality of the C / C++ `round()`, `ceil()`, `floor()`, and `trunc()`
+  functions and other rounding operations as well.
+
+  As a follow-on to the work of SE-0113 and SE-0067, the following
+  mathematical operations in the `Darwin.C` and `glibc` modules now operate
+  on any type conforming to `FloatingPoint`: `fabs`, `sqrt`, `fma`,
+  `remainder`, `fmod`, `ceil`, `floor`, `round`, and `trunc`.
+
+  See also the changes associated with SE-0067.
+
+* [SE-0067](https://github.com/apple/swift-evolution/blob/master/proposals/0067-floating-point-protocols.md)
+
+  The `FloatingPoint` protocol has been expanded to include most IEEE 754
+  required operations. A number of useful properties have been added to the
+  protocol as well, representing quantities like the largest finite value or
+  the smallest positive normal value (these correspond to the macros such as
+  FLT_MAX defined in C).
+
+  While almost all of the changes are additive, there are four changes that
+  will impact existing code:
+
+  - The `%` operator is no longer available for `FloatingPoint` types. It
+  was difficult to use correctly, and its semantics did not actually match
+  those of the corresponding integer operation, making it something of an
+  attractive nuisance. The new method `formTruncatingRemainder(dividingBy:)`
+  provides the old semantics if they are needed.
+
+  - The static property `.NaN` has been renamed `.nan`.
+
+  - The static property `.quietNaN` was redundant and has been removed. Use
+  `.nan` instead.
+
+  - The predicate `isSignaling` has been renamed `isSignalingNaN`.
+
+  See also the changes associated with SE-0113.
+
+* [SE-0111](https://github.com/apple/swift-evolution/blob/master/proposals/0111-remove-arg-label-type-significance.md):
+
+  Argument labels have been removed from Swift function types. Instead, they are
+  part of the name of a function, subscript, or initializer. Calls to a function
+  or initializer, or uses of a subscript, still require argument labels, as they
+  always have:
+
+  ```swift
+    func doSomething(x: Int, y: Int) { }
+    doSomething(x: 0, y: 0)     // argument labels are required
+  ```
+
+  However, unapplied references to functions or initializers no longer carry
+  argument labels. For example:
+
+  ```swift
+  let f = doSomething(x:y:)     // inferred type is now (Int, Int) -> Void
+  ```
+
+  Additionally, explicitly-written function types can no longer carry argument
+  labels, although one can still provide parameter name for documentation
+  purposes using the '_' in the argument label position:
+
+  ```swift
+  typealias CompletionHandler =
+     (token: Token, error: Error?) -> Void   // error: function types cannot have argument labels
+
+  typealias CompletionHandler =
+     (_ token: Token, _ error: Error?) -> Void   // error: okay: names are for documentation purposes
+  ```
+
+* [SE-0025](https://github.com/apple/swift-evolution/blob/master/proposals/0025-scoped-access-level.md): A declaration marked as `private` can now only be accessed within the lexical scope it is declared in (essentially the enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere in that file, as in Swift 2. The access level formerly known as `private` is now called `fileprivate`.
+
+* [SE-0131](https://github.com/apple/swift-evolution/blob/master/proposals/0131-anyhashable.md):
+  The standard library provides a new type `AnyHashable` for use in heterogenous
+  hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
+  now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
+
+* [SE-0102](https://github.com/apple/swift-evolution/blob/master/proposals/0102-noreturn-bottom-type.md)
+  The `@noreturn` attribute on function declarations and function types has been removed,
+  in favor of an empty `Never` type:
+
+  ```swift
+  @noreturn func fatalError(msg: String) { ... }  // old
+  func fatalError(msg: String) -> Never { ... }   // new
+
+  func performOperation<T>(continuation: @noreturn T -> ()) { ... }  // old
+  func performOperation<T>(continuation: T -> Never) { ... }         // new
+  ```
+
+* [SE-0116](https://github.com/apple/swift-evolution/blob/master/proposals/0116-id-as-any.md):
+  Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
+  Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
+  `[AnyHashable: Any]`, respectively.
+
+* [SE-0072](https://github.com/apple/swift-evolution/blob/master/proposals/0072-eliminate-implicit-bridging-conversions.md):
+  Bridging conversions are no longer implicit. The conversion from a Swift value type to
+  its corresponding object can be forced with `as`, e.g. `string as NSString`. Any Swift
+  value can also be converted to its boxed `id` representation with `as AnyObject`.
+
+* Collection subtype conversions and dynamic casts now work with protocol types:
+
+    ```swift
+    protocol P {}; extension Int: P {}
+    var x: [Int] = [1, 2, 3]
+    var p: [P] = x
+    var x2 = p as! [Int]
+    ```
+
+* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
+  prefix and suffix of all strings.
+
+* [SE-0128](https://github.com/apple/swift-evolution/blob/master/proposals/0128-unicodescalar-failable-initializer.md)
+
+  Some UnicodeScalar initializers (ones that are non-failable) now return an Optional, 
+  i.e., in case a UnicodeScalar can not be constructed, nil is returned.
+
+  ```swift
+  // Old
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  let ucode = UnicodeScalar(codepoint) // Program crashes at this point.
+  string.append(ucode)
+  ``` 
+
+  After marking the initializer as failable, users can write code like this and the
+  program will execute fine even if the codepoint isn't valid.
+
+  ```swift
+  // New 
+  var string = ""
+  let codepoint: UInt32 = 55357 // this is invalid
+  if let ucode = UnicodeScalar(codepoint) {
+    string.append(ucode)
+  } else {
+    // do something else
+  }
+  ``` 
+
+* [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md):
+  The `protocol<...>` composition construct has been removed. In its
+  place, an infix type operator `&` has been introduced.
+
+  ```swift
+  let a: Foo & Bar
+  let b = value as? A & B & C
+  func foo<T : Foo & Bar>(x: T) { … }
+  func bar(x: Foo & Bar) { … }
+  typealias G = GenericStruct<Foo & Bar>
+  ```
+
+  The empty protocol composition, the `Any` type, was previously 
+  defined as being `protocol<>`. This has been removed from the 
+  standard library and `Any` is now a keyword with the same behaviour.
+
+* [SE-0091](https://github.com/apple/swift-evolution/blob/master/proposals/0091-improving-operators-in-protocols.md):
+  Operators can now be defined within types or extensions thereof. For example:
+
+  ```swift
+  struct Foo: Equatable {
+    let value: Int
+
+    static func ==(lhs: Foo, rhs: Foo) -> Bool {
+      return lhs.value == rhs.value
+    }
+  }
+  ```
+
+  Such operators must be declared as `static` (or, within a class, `class
+  final`), and have the same signature as their global counterparts. As part of
+  this change, operator requirements declared in protocols must also be
+  explicitly declared `static`:
+
+  ```swift
+  protocol Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool
+  }
+  ```
+
+  Note that the type checker performance optimization described by SE-0091 is
+  not yet implemented.
+
+* [SE-0099](https://github.com/apple/swift-evolution/blob/master/proposals/0099-conditionclauses.md):
+  Condition clauses in `if`, `guard`, and `while` statements now use a more
+  regular syntax. Each pattern or optional binding must be prefixed with `case`
+  or `let` respectively, and all conditions are separated by `,` instead of
+  `where`.
+
+  ```swift
+  // before
+  if let a = a, b = b where a == b { }
+
+  // after
+  if let a = a, let b = b, a == b { }
+  ```
+
+* [SE-0112](https://github.com/apple/swift-evolution/blob/master/proposals/0112-nserror-bridging.md):
+  The `NSError` type is now bridged to the Swift `Error` protocol type
+  (formerly called `ErrorProtocol` in Swift 3, `ErrorType` in Swift 2)
+  in Objective-C APIs, much like other Objective-C types are
+  bridged to Swift (e.g., `NSString` being bridged to `String`). For
+  example, the `UIApplicationDelegate` method
+  `applicate(_:didFailToRegisterForRemoteNotificationsWithError:)`
+  changes from accepting an `NSError` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: NSError)
+  ```
+
+  to accepting an `Error` argument:
+
+  ```swift
+  optional func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error)
+  ```
+
+  Additionally, error types imported from Cocoa[Touch] maintain all of
+  the information in the corresponding `NSError`, so it is no longer
+  necessary to `catch let as NSError` to extract (e.g.) the user-info
+  dictionary. Specific also error types contain typed accessors for
+  their common user-info keys. For example:
+
+  ```swift
+  catch let error as CocoaError where error.code == .fileReadNoSuchFileError {
+    print("No such file: \(error.url)")
+  }
+  ```
+
+  Finally, Swift-defined error types can provide localized error
+  descriptions by adopting the new `LocalizedError` protocol, e.g.,
+
+  ```swift
+  extension HomeworkError : LocalizedError {
+    var errorDescription: String? {
+      switch self {
+      case .forgotten: return NSLocalizedString("I forgot it")
+      case .lost: return NSLocalizedString("I lost it")
+      case .dogAteIt: return NSLocalizedString("The dog ate it")
+      }
+    }
+  }
+  ```
+
+  Similarly, the new `RecoverableError` and `CustomNSError` protocols
+  allow additional control over the handling of the error.
+
+
+* [SE-0060](https://github.com/apple/swift-evolution/blob/master/proposals/0060-defaulted-parameter-order.md):
+  Function parameters with default arguments must now be specified in
+  declaration order. A call site must always supply the arguments it provides
+  to a function in their declared order:
+
+    ```swift
+    func requiredArguments(a: Int, b: Int, c: Int) {}
+    func defaultArguments(a: Int = 0, b: Int = 0, c: Int = 0) {}
+
+    requiredArguments(a: 0, b: 1, c: 2)
+    requiredArguments(b: 0, a: 1, c: 2) // error
+    defaultArguments(a: 0, b: 1, c: 2)
+    defaultArguments(b: 0, a: 1, c: 2) // error
+    ```
+
+    Arbitrary labeled parameters with default arguments may still be elided, as
+    long as the specified arguments follow declaration order:
+
+    ```swift
+    defaultArguments(a: 0) // ok
+    defaultArguments(b: 1) // ok
+    defaultArguments(c: 2) // ok
+    defaultArguments(a: 1, c: 2) // ok
+    defaultArguments(b: 1, c: 2) // ok
+    defaultArguments(c: 1, b: 2) // error
+    ```
+
+* Traps from force-unwrapping nil `Optional`s now show the source location
+  of the force unwrap operator.
+
 * [SE-0093](https://github.com/apple/swift-evolution/blob/master/proposals/0093-slice-base.md): Slice types now have a `base` property that allows public readonly access to their base collections.
 
 * Nested generic functions may now capture bindings from the environment, for example:
@@ -108,6 +501,9 @@ Swift 3.0
   - Foundation container classes `NS[Mutable]Array`, `NS[Mutable]Set`, and
     `NS[Mutable]Dictionary` are still imported as nongeneric classes for
     the time being.
+
+* [SE-0036](https://github.com/apple/swift-evolution/blob/master/proposals/0036-enum-dot.md): 
+  Enum elements can no longer be accessed as instance members in instance methods.
 
 * As part of the changes for SE-0055 (see below), the *pointee* types of
   imported pointers (e.g. the `id` in `id *`) are no longer assumed to always
@@ -279,6 +675,9 @@ Swift 3.0
     ```swift
     person.valueForKeyPath(#keyPath(Person.bestFriend.lastName))
     ```
+
+**If you are adding a new entry, add it to the top of the file, not here!**
+
 
 Swift 2.2
 ---------
@@ -5017,15 +5416,15 @@ Swift 2.2
     var x = Int8(-129)
     // error: integer literal overflows when stored into 'Int8'
 
-    var y : Int = 0xFFFF_FFFF_FFFF_FFFF_F
+    var y: Int = 0xFFFF_FFFF_FFFF_FFFF_F
     // error: integer literal overflows when stored into 'Int'
     ```
 
   Overflows in constant integer expressions are also reported by the compiler.
 
     ```swift
-    var x : Int8 = 125
-    var y : Int8 = x + 125
+    var x: Int8 = 125
+    var y: Int8 = x + 125
     // error: arithmetic operation '125 + 125' (on type 'Int8') results in
     //        an overflow
     ```

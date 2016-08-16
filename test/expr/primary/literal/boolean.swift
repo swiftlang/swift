@@ -11,7 +11,7 @@ func defaultBoolLiterals() {
   var _: Bool = b
 }
 
-struct CustomBool : BooleanLiteralConvertible {
+struct CustomBool : ExpressibleByBooleanLiteral {
   let value: Bool
 
   init(booleanLiteral value: Bool) {

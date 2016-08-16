@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontend
+add_swift_library(swiftFrontend STATIC
   CompilerInvocation.cpp
   DiagnosticVerifier.cpp
   Frontend.cpp

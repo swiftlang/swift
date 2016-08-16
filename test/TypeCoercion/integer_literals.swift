@@ -31,7 +31,7 @@ func overflow_check() {
 }
 
 // Coercion chaining.
-struct meters : IntegerLiteralConvertible { 
+struct meters : ExpressibleByIntegerLiteral { 
   var value : Int8
   
   init(_ value: Int8) {
@@ -44,10 +44,10 @@ struct meters : IntegerLiteralConvertible {
   }
 }
 
-struct supermeters : IntegerLiteralConvertible { // expected-error{{type 'supermeters' does not conform to protocol 'IntegerLiteralConvertible'}}
+struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}}
   var value : meters
   
-  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'IntegerLiteralType' (aka 'meters') does not conform to '_BuiltinIntegerLiteralConvertible'}}
+  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'supermeters.IntegerLiteralType' (aka 'meters') does not conform to '_ExpressibleByBuiltinIntegerLiteral'}}
   init(_integerLiteral value: meters) {
     self.value = value
   }

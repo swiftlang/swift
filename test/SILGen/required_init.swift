@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 func subclassFloatLiteral() -> Bar {
   let x: Bar = 1.0
@@ -7,7 +7,7 @@ func subclassFloatLiteral() -> Bar {
 // CHECK-LABEL: sil hidden @_TF13required_init20subclassFloatLiteralFT_CS_3Bar
 // CHECK:         class_method {{%.*}} : $@thick Foo.Type, #Foo.init!allocator.1
 
-class Foo: FloatLiteralConvertible {
+class Foo: ExpressibleByFloatLiteral {
   required init(floatLiteral: Float) { }
 
   func identify() {}

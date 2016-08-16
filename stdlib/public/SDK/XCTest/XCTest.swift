@@ -44,20 +44,20 @@ func _XCTFailureDescription(_ assertionType: _XCTAssertionType, _ formatIndex: U
 // --- Exception Support ---
 
 @_silgen_name("_XCTRunThrowableBlockBridge")
-func _XCTRunThrowableBlockBridge(_: @noescape @convention(block) () -> Void) -> NSDictionary
+func _XCTRunThrowableBlockBridge(_: @convention(block) () -> Void) -> NSDictionary
 
 /// The Swift-style result of evaluating a block which may throw an exception.
 enum _XCTThrowableBlockResult {
   case success
-  case failedWithError(error: ErrorProtocol)
+  case failedWithError(error: Error)
   case failedWithException(className: String, name: String, reason: String)
   case failedWithUnknownException
 }
 
 /// Asks some Objective-C code to evaluate a block which may throw an exception or error,
 /// and if it does consume the exception and return information about it.
-func _XCTRunThrowableBlock(_ block: @noescape () throws -> Void) -> _XCTThrowableBlockResult {
-  var blockErrorOptional: ErrorProtocol?
+func _XCTRunThrowableBlock(_ block: () throws -> Void) -> _XCTThrowableBlockResult {
+  var blockErrorOptional: Error?
   
   let d = _XCTRunThrowableBlockBridge({
     do {
@@ -171,19 +171,19 @@ public func XCTAssertNotNil(_ expression: @autoclosure () throws -> Any?, _ mess
   }
 }
 
-public func XCTAssert(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssert(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   // XCTAssert is just a cover for XCTAssertTrue.
   XCTAssertTrue(expression, message, file: file, line: line)
 }
 
-public func XCTAssertTrue(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
+public func XCTAssertTrue(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) -> Void {
   let assertionType = _XCTAssertionType.`true`
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = try expression().boolValue
+    expressionValueOptional = try expression()
   }
   
   switch result {
@@ -207,14 +207,14 @@ public func XCTAssertTrue(_ expression: @autoclosure () throws -> Boolean, _ mes
   }
 }
 
-public func XCTAssertFalse(_ expression: @autoclosure () throws -> Boolean, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
+public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
   let assertionType = _XCTAssertionType.`false`
   
   // evaluate the expression exactly once
   var expressionValueOptional: Bool?
   
   let result = _XCTRunThrowableBlock {
-    expressionValueOptional = try expression().boolValue
+    expressionValueOptional = try expression()
   }
   
   switch result {
@@ -996,9 +996,9 @@ public func XCTAssertLessThanOrEqual<T : Comparable>(_ expression1: @autoclosure
   }
 }
 
-public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (error: ErrorProtocol) -> Void = { _ in }) -> Void {
+public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line, _ errorHandler: (_ error: Error) -> Void = { _ in }) -> Void {
   // evaluate expression exactly once
-  var caughtErrorOptional: ErrorProtocol?
+  var caughtErrorOptional: Error?
   
   let result = _XCTRunThrowableBlock {
     do {
@@ -1011,7 +1011,7 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T, _
   switch result {
   case .success:
     if let caughtError = caughtErrorOptional {
-      errorHandler(error: caughtError)
+      errorHandler(caughtError)
     } else {
       _XCTRegisterFailure(true, "XCTAssertThrowsError failed: did not throw an error", message, file, line)
     }

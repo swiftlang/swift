@@ -30,7 +30,7 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
-  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> AnyObject {
+  @objc(copyWithZone:) override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self
@@ -63,10 +63,10 @@ func createNSStringTemporaryFile()
 var NSStringAPIs = TestSuite("NSStringAPIs")
 
 NSStringAPIs.test("Encodings") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectNotEqual(0, availableEncodings.count)
 
-  let defaultCStringEncoding = String.defaultCStringEncoding()
+  let defaultCStringEncoding = String.defaultCStringEncoding
   expectTrue(availableEncodings.contains(defaultCStringEncoding))
 
   expectNotEqual("", String.localizedName(of: .utf8))
@@ -192,20 +192,22 @@ NSStringAPIs.test("init(contentsOf:usedEncoding:error:)") {
 NSStringAPIs.test("init(cString_:encoding:)") {
   expectOptionalEqual("foo, a basmati bar!",
       String(cString: 
-          "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
+          "foo, a basmati bar!", encoding: String.defaultCStringEncoding))
 }
 
 NSStringAPIs.test("init(utf8String:)") {
   var s = "foo あいう"
-  var up = UnsafeMutablePointer<UInt8>(allocatingCapacity: 100)
+  var up = UnsafeMutablePointer<UInt8>.allocate(capacity: 100)
   var i = 0
   for b in s.utf8 {
     up[i] = b
     i += 1
   }
   up[i] = 0
-  expectOptionalEqual(s, String(utf8String: UnsafePointer(up)))
-  up.deallocateCapacity(100)
+  let cstr = UnsafeMutableRawPointer(up)
+    .bindMemory(to: CChar.self, capacity: 100)
+  expectOptionalEqual(s, String(utf8String: cstr))
+  up.deallocate(capacity: 100)
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
@@ -262,22 +264,18 @@ func expectLocalizedEquality(
   _ localeID: String? = nil,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
-  stackTrace: SourceLocStack = SourceLocStack(),  
+  stackTrace: SourceLocStack = SourceLocStack(),
   file: String = #file, line: UInt = #line
 ) {
   let trace = stackTrace.pushIf(showFrame, file: file, line: line)
 
   let locale = localeID.map {
-    Locale(localeIdentifier: $0)
-  } ?? Locale.current()
+    Locale(identifier: $0)
+  } ?? Locale.current
   
   expectEqual(
     expected, op(locale),
-    message(), stackTrace: trace)
-  
-  expectEqual(
-    op(Locale.system()), op(nil),
-    message(), stackTrace: trace)
+    message(), stackTrace: trace)  
 }
 
 NSStringAPIs.test("capitalizedString(with:)") {
@@ -360,9 +358,9 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
   }
 
   expectEqual(ComparisonResult.orderedSame,
-      "abc".compare("abc", locale: Locale.current()))
+      "abc".compare("abc", locale: Locale.current))
   expectEqual(ComparisonResult.orderedSame,
-      "абв".compare("абв", locale: Locale.current()))
+      "абв".compare("абв", locale: Locale.current))
 }
 
 NSStringAPIs.test("completePath(into:caseSensitive:matchesInto:filterTypes)") {
@@ -580,7 +578,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
 }
 
 NSStringAPIs.test("fastestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".fastestEncoding))
 }
 
@@ -834,8 +832,6 @@ NSStringAPIs.test("init(format:locale:_:...)") {
   var world: NSString = "world"
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, world, 42))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), world, 42))
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
@@ -843,13 +839,6 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
   let args: [CVarArg] = [ world, 42 ]
   expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
       locale: nil, arguments: args))
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
-      locale: Locale.system(), arguments: args))
-}
-
-NSStringAPIs.test("lastPathComponent") {
-  expectEqual("bar", "/foo/bar".lastPathComponent)
-  expectEqual("абв", "/foo/абв".lastPathComponent)
 }
 
 NSStringAPIs.test("utf16Count") {
@@ -1037,13 +1026,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
 }
 
 NSStringAPIs.test("pathComponents") {
-  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents)
-  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents)
-}
-
-NSStringAPIs.test("pathExtension") {
-  expectEqual("", "/foo/bar".pathExtension)
-  expectEqual("txt", "/foo/bar.txt".pathExtension)
+  expectEqual([ "/", "foo", "bar" ] as [NSString], ("/foo/bar" as NSString).pathComponents as [NSString])
+  expectEqual([ "/", "абв", "где" ] as [NSString], ("/абв/где" as NSString).pathComponents as [NSString])
 }
 
 NSStringAPIs.test("precomposedStringWithCanonicalMapping") {
@@ -1327,7 +1311,7 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
 }
 
 NSStringAPIs.test("smallestEncoding") {
-  let availableEncodings: [String.Encoding] = String.availableStringEncodings()
+  let availableEncodings: [String.Encoding] = String.availableStringEncodings
   expectTrue(availableEncodings.contains("abc".smallestEncoding))
 }
 
@@ -1365,24 +1349,11 @@ NSStringAPIs.test("appendingFormat(_:_:...)") {
       .appendingFormat("def %@ %ld", formatArg, 42))
 }
 
-NSStringAPIs.test("appendingPathComponent(_:)") {
-  expectEqual("", "".appendingPathComponent(""))
-  expectEqual("a.txt", "".appendingPathComponent("a.txt"))
-  expectEqual("/tmp/a.txt", "/tmp".appendingPathComponent("a.txt"))
-}
-
 NSStringAPIs.test("appending(_:)") {
   expectEqual("", "".appending(""))
   expectEqual("a", "a".appending(""))
   expectEqual("a", "".appending("a"))
   expectEqual("さ\u{3099}", "さ".appending("\u{3099}"))
-}
-
-NSStringAPIs.test("deletingLastPathComponent") {
-  expectEqual("", "".deletingLastPathComponent)
-  expectEqual("/", "/".deletingLastPathComponent)
-  expectEqual("/", "/tmp".deletingLastPathComponent)
-  expectEqual("/tmp", "/tmp/a.txt".deletingLastPathComponent)
 }
 
 NSStringAPIs.test("folding(options:locale:)") {
@@ -1603,22 +1574,6 @@ NSStringAPIs.test("replacingPercentEscapes(using:)/rdar18029471")
       using: .ascii))
 }
 
-NSStringAPIs.test("resolvingSymlinksInPath") {
-  // <rdar://problem/18030188> Difference between
-  // resolvingSymlinksInPath and stringByStandardizingPath is unclear
-  expectEqual("", "".resolvingSymlinksInPath)
-  expectEqual(
-    "/var", "/private/var/tmp////..//".resolvingSymlinksInPath)
-}
-
-NSStringAPIs.test("standardizingPath") {
-  // <rdar://problem/18030188> Difference between
-  // resolvingSymlinksInPath and standardizingPath is unclear
-  expectEqual("", "".standardizingPath)
-  expectEqual(
-    "/var", "/private/var/tmp////..//".standardizingPath)
-}
-
 NSStringAPIs.test("trimmingCharacters(in:)") {
   expectEqual("", "".trimmingCharacters(
     in: CharacterSet.decimalDigits))
@@ -1640,10 +1595,10 @@ NSStringAPIs.test("trimmingCharacters(in:)") {
 }
 
 NSStringAPIs.test("NSString.stringsByAppendingPaths(_:)") {
-  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []))
+  expectEqual([] as [NSString], ("" as NSString).strings(byAppendingPaths: []) as [NSString])
   expectEqual(
     [ "/tmp/foo", "/tmp/bar" ] as [NSString],
-    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]))
+    ("/tmp" as NSString).strings(byAppendingPaths: [ "foo", "bar" ]) as [NSString])
 }
 
 NSStringAPIs.test("substring(from:)") {

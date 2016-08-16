@@ -14,6 +14,180 @@
 import Darwin
 
 //===----------------------------------------------------------------------===//
+// CGAffineTransform
+//===----------------------------------------------------------------------===//
+
+extension CGAffineTransform: Equatable {}
+public func ==(lhs: CGAffineTransform, rhs: CGAffineTransform) -> Bool {
+  return lhs.__equalTo(rhs)
+}
+
+//===----------------------------------------------------------------------===//
+// CGColor
+//===----------------------------------------------------------------------===//
+
+extension CGColor {
+  @available(OSX 10.3, iOS 2.0, *)
+  public var components: [CGFloat]? {
+    guard let pointer = self.__unsafeComponents else { return nil }
+    let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
+    return Array(buffer)
+  }
+
+#if os(macOS)
+  public class var white: CGColor
+   { return CGColor.__constantColor(for: CGColor.__whiteColorName)! }
+
+  public class var black: CGColor
+   { return CGColor.__constantColor(for: CGColor.__blackColorName)! }
+
+  public class var clear: CGColor
+   { return CGColor.__constantColor(for: CGColor.__clearColorName)! }
+#endif
+}
+
+extension CGColor: Equatable {}
+public func ==(lhs: CGColor, rhs: CGColor) -> Bool {
+  return lhs.__equalTo(rhs)
+}
+
+
+//===----------------------------------------------------------------------===//
+// CGColorSpace
+//===----------------------------------------------------------------------===//
+
+extension CGColorSpace {
+  public var colorTable: [UInt8]? {
+    guard self.model == .indexed else { return nil }
+    var table = [UInt8](repeating: 0, count: self.__colorTableCount)
+    self.__unsafeGetColorTable(&table)
+    return table
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// CGContext
+//===----------------------------------------------------------------------===//
+
+extension CGContext {
+
+  public func setLineDash(phase: CGFloat, lengths: [CGFloat]) {
+    self.__setLineDash(phase: phase, lengths: lengths, count: lengths.count)
+  }
+
+  public func move(to point: CGPoint) {
+    self.__moveTo(x: point.x, y: point.y)
+  }
+
+  public func addLine(to point: CGPoint) {
+    self.__addLineTo(x: point.x, y: point.y)
+  }
+
+  public func addCurve(to end: CGPoint, control1: CGPoint, control2: CGPoint) {
+    self.__addCurveTo(cp1x: control1.x, cp1y: control1.y,
+     cp2x: control2.x, cp2y: control2.y, endingAtX: end.x, y: end.y)
+  }
+
+  public func addQuadCurve(to end: CGPoint, control: CGPoint) {
+    self.__addQuadCurveTo(cpx: control.x, cpy: control.y,
+     endingAtX: end.x, y: end.y)
+  }
+
+  public func addRects(_ rects: [CGRect]) {
+    self.__addRects(rects, count: rects.count)
+  }
+
+  public func addLines(between points: [CGPoint]) {
+    self.__addLines(between: points, count: points.count)
+  }
+
+  public func addArc(center: CGPoint, radius: CGFloat, startAngle: CGFloat,
+   endAngle: CGFloat, clockwise: Bool) {
+    self.__addArc(centerX: center.x, y: center.y, radius: radius,
+     startAngle: startAngle, endAngle: endAngle, clockwise: clockwise ? 1 : 0)
+  }
+
+  public func addArc(tangent1End: CGPoint, tangent2End: CGPoint,
+   radius: CGFloat) {
+    self.__addArc(x1: tangent1End.x, y1: tangent1End.y, 
+    x2: tangent2End.x, y2: tangent2End.y, radius: radius)
+  }
+
+  /// Fills the current path using the specified rule (winding by default).
+  ///
+  /// Any open subpath is implicitly closed.
+  public func fillPath(using rule: CGPathFillRule = .winding) {
+    switch rule {
+      case .winding: self.__fillPath()
+      case .evenOdd: self.__eoFillPath()
+    }
+  }
+  
+  /// Intersects the current path with the current clipping region and uses the
+  /// result as the new clipping region for subsequent drawing.
+  ///
+  /// Uses the specified fill rule (winding by default) to determine which
+  /// areas to treat as the interior of the clipping region. When evaluating
+  /// the path, any open subpath is implicitly closed.
+  public func clip(using rule: CGPathFillRule = .winding) {
+    switch rule {
+      case .winding: self.__clip()
+      case .evenOdd: self.__eoClip()
+    }
+  }
+
+  public func fill(_ rects: [CGRect]) {
+    self.__fill(rects, count: rects.count)
+  }
+
+  public func strokeLineSegments(between points: [CGPoint]) {
+    self.__strokeLineSegments(between: points, count: points.count)
+  }
+
+  public func clip(to rects: [CGRect]) {
+    self.__clip(to: rects, count: rects.count)
+  }
+
+  public func draw(_ image: CGImage, in rect: CGRect, byTiling: Bool = false) {
+    if byTiling {
+      self.__draw(in: rect, byTiling: image)
+    } else {
+      self.__draw(in: rect, image: image)
+    }
+  }
+
+  public var textPosition: CGPoint {
+    get { return self.__textPosition }
+    set { self.__setTextPosition(x: newValue.x, y: newValue.y) }
+  }
+
+  public func showGlyphs(_ glyphs: [CGGlyph], at positions: [CGPoint]) {
+    precondition(glyphs.count == positions.count)
+    self.__showGlyphs(glyphs, atPositions: positions, count: glyphs.count)
+  }
+
+}
+
+//===----------------------------------------------------------------------===//
+// CGDataProvider
+//===----------------------------------------------------------------------===//
+
+// TODO: replace init(UnsafePointer<UInt8>) with init(String)
+// blocked on rdar://problem/27444567
+
+//===----------------------------------------------------------------------===//
+// CGDirectDisplay
+//===----------------------------------------------------------------------===//
+
+#if os(macOS)
+public func CGGetLastMouseDelta() -> (x: Int32, y: Int32) {
+  var pair: (x: Int32, y: Int32) = (0, 0)
+  __CGGetLastMouseDelta(&pair.x, &pair.y)
+  return pair
+}
+#endif
+
+//===----------------------------------------------------------------------===//
 // CGGeometry
 //===----------------------------------------------------------------------===//
 
@@ -31,6 +205,15 @@ public extension CGPoint {
   @_transparent // @fragile
   init(x: Double, y: Double) {
     self.init(x: CGFloat(x), y: CGFloat(y))
+  }
+  
+  init?(dictionaryRepresentation dict: CFDictionary) {
+    var point = CGPoint()
+    if CGPoint.__setFromDictionaryRepresentation(dict, &point) {
+      self = point
+    } else {
+      return nil
+    }
   }
 }
 
@@ -70,6 +253,15 @@ public extension CGSize {
   @_transparent // @fragile
   init(width: Double, height: Double) {
     self.init(width: CGFloat(width), height: CGFloat(height))
+  }
+
+  init?(dictionaryRepresentation dict: CFDictionary) {
+    var size = CGSize()
+    if CGSize.__setFromDictionaryRepresentation(dict, &size) {
+      self = size
+    } else {
+      return nil
+    }
   }
 }
 
@@ -146,44 +338,23 @@ public extension CGRect {
               size: CGSize(width: width, height: height))
   }
 
-  @_transparent // @fragile
-  mutating func standardizeInPlace() {
-    self = standardized
+  init?(dictionaryRepresentation dict: CFDictionary) {
+    var rect = CGRect()
+    if CGRect.__setFromDictionaryRepresentation(dict, &rect) {
+      self = rect
+    } else {
+      return nil
+    }
   }
 
   @_transparent // @fragile
-  mutating func makeIntegralInPlace() {
-    self = integral
-  }
-
-  @_transparent // @fragile
-  mutating func insetInPlace(dx: CGFloat, dy: CGFloat) {
-    self = insetBy(dx: dx, dy: dy)
-  }
-
-  @_transparent // @fragile
-  mutating func offsetInPlace(dx: CGFloat, dy: CGFloat) {
-    self = offsetBy(dx: dx, dy: dy)
-  }
-
-  @_transparent // @fragile
-  mutating func formUnion(_ rect: CGRect) {
-    self = union(rect)
-  }
-
-  @_transparent // @fragile
-  mutating func formIntersection(_ rect: CGRect) {
-    self = intersection(rect)
-  }
-
-  @_transparent // @fragile
-  func divide(_ atDistance: CGFloat, fromEdge: CGRectEdge)
+  func divided(atDistance: CGFloat, from fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
     var slice = CGRect.zero
     var remainder = CGRect.zero
-    divide(slice: &slice, remainder: &remainder, amount: atDistance,
-           edge: fromEdge)
+    self.__divided(slice: &slice, remainder: &remainder, atDistance: atDistance,
+           from: fromEdge)
     return (slice, remainder)
   }
 }
@@ -220,5 +391,167 @@ extension CGAffineTransform {
    @_transparent // @fragile
    get { return CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
  }
+}
+
+//===----------------------------------------------------------------------===//
+// CGImage
+//===----------------------------------------------------------------------===//
+
+extension CGImage {
+  public func copy(maskingColorComponents components: [CGFloat]) -> CGImage? {
+    return self.__copy(maskingColorComponents: UnsafePointer(components))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// CGLayer
+//===----------------------------------------------------------------------===//
+
+// TODO: remove auxiliaryInfo parameter from CGLayer.init,
+// or at least give it a default value (empty/nil)
+// blocked on rdar://problem/27444567
+extension CGContext {
+  public func draw(_ layer: CGLayer, in rect: CGRect) {
+    self.__draw(in: rect, layer: layer)
+  }
+
+  public func draw(_ layer: CGLayer, at point: CGPoint) {
+    self.__draw(at: point, layer: layer)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// CGPath & CGMutablePath
+//===----------------------------------------------------------------------===//
+
+// TODO: Make this a nested type (CGPath.FillRule)
+public enum CGPathFillRule: Int {
+  /// Nonzero winding number fill rule.
+  /// 
+  /// This rule plots a ray from the interior of the region to be evaluated
+  /// toward the bounds of the drawing, and sums the closed path elements
+  /// that the ray crosses: +1 for counterclockwise paths, -1 for clockwise.
+  /// If the sum is zero, the region is left empty; if the sum is nonzero,
+  /// the region is filled.
+  case winding
+  
+  /// Even-Odd fill rule.
+  /// 
+  /// This rule plots a ray from the interior of the region to be evaluated
+  /// toward the bounds of the drawing, and sums the closed path elements
+  /// that the ray crosses.
+  /// If the sum is an even numner, the region is left empty; if the sum is
+  /// an odd number, the region is filled.
+  case evenOdd
+}
+
+extension CGPath {
+  public func copy(dashingWithPhase phase: CGFloat, lengths: [CGFloat],
+   transform: CGAffineTransform = .identity) -> CGPath {
+    return CGPath(__byDashing: self, transform: [transform],
+     phase: phase, lengths: lengths, count: lengths.count)!
+    // force unwrap / non-optional return ok: underlying func returns nil
+    // only on bad input that we've made impossible (self and transform)
+  }
+
+  public func copy(strokingWithWidth lineWidth: CGFloat, lineCap: CGLineCap,
+   lineJoin: CGLineJoin, miterLimit: CGFloat,
+   transform: CGAffineTransform = .identity) -> CGPath {
+    return CGPath(__byStroking: self, transform: [transform],
+     lineWidth: lineWidth, lineCap: lineCap, lineJoin: lineJoin,
+     miterLimit: miterLimit)! 
+    // force unwrap / non-optional return ok: underlying func returns nil
+    // only on bad input that we've made impossible (self and transform)
+  }
+  
+  public func contains(_ point: CGPoint, using rule: CGPathFillRule = .winding,
+   transform: CGAffineTransform = .identity) -> Bool {
+    return self.__containsPoint(transform: [transform],
+     point: point, eoFill: (rule == .evenOdd))
+  }
+}
+
+extension CGPath: Equatable {}
+public func ==(lhs: CGPath, rhs: CGPath) -> Bool {
+  return lhs.__equalTo(rhs)
+}
+
+extension CGMutablePath {
+
+  public func addRoundedRect(in rect: CGRect, cornerWidth: CGFloat,
+   cornerHeight: CGFloat, transform: CGAffineTransform = .identity) {
+    self.__addRoundedRect(transform: [transform], rect: rect,
+     cornerWidth: cornerWidth, cornerHeight: cornerHeight)
+  }
+
+  public func move(to point: CGPoint,
+   transform: CGAffineTransform = .identity) {
+    self.__moveTo(transform: [transform], x: point.x, y: point.y)
+  }
+
+  public func addLine(to point: CGPoint,
+   transform: CGAffineTransform = .identity) {
+    self.__addLineTo(transform: [transform], x: point.x, y: point.y)
+  }
+
+  public func addQuadCurve(to end: CGPoint, control: CGPoint,
+   transform: CGAffineTransform = .identity) {
+    self.__addQuadCurve(transform: [transform], cpx: control.x, cpy: control.y,
+     endingAtX: end.x, y: end.y)
+  }
+
+  public func addCurve(to end: CGPoint, control1: CGPoint, control2: CGPoint,
+   transform: CGAffineTransform = .identity) {
+    self.__addCurve(transform: [transform], cp1x: control1.x, cp1y: control1.y,
+     cp2x: control2.x, cp2y: control2.y, endingAtX: end.x, y: end.y)
+  }
+
+  public func addRect(_ rect: CGRect,
+   transform: CGAffineTransform = .identity) {
+    self.__addRect(transform: [transform], rect: rect)
+  }
+
+  public func addRects(_ rects: [CGRect],
+   transform: CGAffineTransform = .identity) {
+    self.__addRects(transform: [transform], rects: rects, count: rects.count)
+  }
+
+  public func addLines(between points: [CGPoint],
+   transform: CGAffineTransform = .identity) {
+    self.__addLines(transform: [transform],
+     between: points, count: points.count)
+  }
+
+  public func addEllipse(in rect: CGRect,
+   transform: CGAffineTransform = .identity) {
+    self.__addEllipse(transform: [transform], rect: rect)
+  }
+
+  public func addRelativeArc(center: CGPoint, radius: CGFloat,
+   startAngle: CGFloat, delta: CGFloat,
+   transform: CGAffineTransform = .identity) {
+    self.__addRelativeArc(transform: [transform], x: center.x, y: center.y,
+     radius: radius, startAngle: startAngle, delta: delta)
+  }
+  
+  public func addArc(center: CGPoint, radius: CGFloat,
+   startAngle: CGFloat, endAngle: CGFloat, clockwise: Bool,
+   transform: CGAffineTransform = .identity) {
+    self.__addArc(transform: [transform], x: center.x, y: center.y,
+     radius: radius, startAngle: startAngle, endAngle: endAngle,
+     clockwise: clockwise)
+  }
+
+  public func addArc(tangent1End: CGPoint, tangent2End: CGPoint,
+   radius: CGFloat, transform: CGAffineTransform = .identity) {
+    self.__addArc(transform: [transform], x1: tangent1End.x, y1: tangent1End.y,
+     x2: tangent2End.x, y2: tangent2End.y, radius: radius)
+  }
+
+  public func addPath(_ path: CGPath,
+   transform: CGAffineTransform = .identity) {
+    self.__addPath(transform: [transform], path: path)
+  }
+  
 }
 

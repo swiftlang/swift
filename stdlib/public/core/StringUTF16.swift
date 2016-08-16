@@ -131,7 +131,7 @@ extension String {
     ///     }
     ///     // Prints "[32, 60, 51, 32, 9829, 65038, 32, 55357, 56472]"
     ///     // Prints " <3 ♥︎ 💘"
-    public struct Index : Comparable {
+    public struct Index {
       // Foundation needs access to these fields so it can expose
       // random access
       public // SPI(Foundation)
@@ -314,11 +314,11 @@ extension String {
       return UTF16View(_core)
     }
     set {
-      self = String(newValue)
+      self = String(describing: newValue)
     }
   }
 
-  /// Creates a string corresponding to the given sequence of UTF-8 code units.
+  /// Creates a string corresponding to the given sequence of UTF-16 code units.
   ///
   /// If `utf16` contains unpaired UTF-16 surrogates, the result is `nil`.
   ///
@@ -356,18 +356,22 @@ extension String {
   public typealias UTF16Index = UTF16View.Index
 }
 
-// FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
-//        assuming String.UTF8View.Index continues to exist
-public func == (
-  lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
-) -> Bool {
-  return lhs._offset == rhs._offset
-}
+extension String.UTF16View.Index : Comparable {
+  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+  //        assuming String.UTF8View.Index continues to exist
+  public static func == (
+    lhs: String.UTF16View.Index,
+    rhs: String.UTF16View.Index
+  ) -> Bool {
+    return lhs._offset == rhs._offset
+  }
 
-public func < (
-  lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
-) -> Bool {
-  return lhs._offset < rhs._offset
+  public static func < (
+    lhs: String.UTF16View.Index,
+    rhs: String.UTF16View.Index
+  ) -> Bool {
+    return lhs._offset < rhs._offset
+  }
 }
 
 // Index conversions
@@ -407,7 +411,7 @@ extension String.UTF16View.Index {
       "Invalid String.UTF8Index for this UTF-16 view")
 
     // Detect positions that have no corresponding index.
-    if !utf8Index._isOnUnicodeScalarBoundary {
+    if !utf8Index._isOnUnicodeScalarBoundary(in: core) {
       return nil
     }
     _offset = utf8Index._coreIndex

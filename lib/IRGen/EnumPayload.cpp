@@ -84,11 +84,15 @@ template<typename Fn>
 static void withValueInPayload(IRGenFunction &IGF,
                                const EnumPayload &payload,
                                llvm::Type *valueType,
+                               int numBitsUsedInValue,
                                unsigned payloadOffset,
                                Fn &&f) {
   auto &DataLayout = IGF.IGM.DataLayout;
-  int valueBitWidth = DataLayout.getTypeSizeInBits(valueType);
-  
+  int valueTypeBitWidth = DataLayout.getTypeSizeInBits(valueType);
+  int valueBitWidth =
+      numBitsUsedInValue < 0 ? valueTypeBitWidth : numBitsUsedInValue;
+  assert(numBitsUsedInValue <= valueTypeBitWidth);
+
   // Find the elements we need to touch.
   // TODO: Linear search through the payload elements is lame.
   MutableArrayRef<EnumPayload::LazyValue> payloads = payload.PayloadValues;
@@ -107,7 +111,7 @@ static void withValueInPayload(IRGenFunction &IGF,
     
       f(payloads.front(),
         payloadBitWidth, payloadValueOffset,
-        valueBitWidth, valueOffset);
+        valueTypeBitWidth, valueOffset);
       
       // If we used the entire value, we're done.
       valueOffset += valueChunkWidth;
@@ -121,8 +125,9 @@ static void withValueInPayload(IRGenFunction &IGF,
 }
 
 void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
-                              unsigned payloadOffset) {
-  withValueInPayload(IGF, *this, value->getType(), payloadOffset,
+                              unsigned payloadOffset,
+                              int numBitsUsedInValue) {
+  withValueInPayload(IGF, *this, value->getType(), numBitsUsedInValue, payloadOffset,
     [&](LazyValue &payloadValue,
         unsigned payloadBitWidth,
         unsigned payloadValueOffset,
@@ -182,7 +187,7 @@ void EnumPayload::insertValue(IRGenFunction &IGF, llvm::Value *value,
 llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
                                        unsigned payloadOffset) const {
   llvm::Value *result = nullptr;
-  withValueInPayload(IGF, *this, type, payloadOffset,
+  withValueInPayload(IGF, *this, type, -1, payloadOffset,
     [&](LazyValue &payloadValue,
         unsigned payloadBitWidth,
         unsigned payloadValueOffset,

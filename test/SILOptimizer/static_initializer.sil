@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-opt | %FileCheck %s
 
 import Builtin
 import Swift
@@ -45,7 +45,7 @@ sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
 bb0:
   %0 = function_ref @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int32
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
   %3 = load %2 : $*Int32
   return %3 : $Int32
 }

@@ -16,6 +16,7 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `BidirectionalCollection` protocol instead, because it has a more complete
 /// interface.
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
 public protocol BidirectionalIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -167,7 +168,7 @@ extension BidirectionalIndexable {
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`
 /// models that accept the default associated `SubSequence`,
 /// `BidirectionalSlice<Self>`.
-extension BidirectionalIndexable where SubSequence == BidirectionalSlice<Self> {
+extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> {
   public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return BidirectionalSlice(base: self, bounds: bounds)

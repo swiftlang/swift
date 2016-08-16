@@ -1,12 +1,12 @@
-// RUN: %swift -interpret %s | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g -- | FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g -- a b c | FileCheck %s -check-prefix=CHECK-THREE
+// RUN: %swift -interpret %s | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %swift -interpret %s -Onone -g | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %swift -interpret %s -Onone -g -- | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %swift -interpret %s -Onone -g -- a b c | %FileCheck %s -check-prefix=CHECK-THREE
 
 // REQUIRES: swift_interpreter
 
 print("Begin arguments")
-for arg in Process.arguments { print(arg) }
+for arg in CommandLine.arguments { print(arg) }
 print("End arguments")
 
 // CHECK-NONE: Begin arguments
@@ -21,8 +21,8 @@ print("End arguments")
 // CHECK-THREE-NEXT: End arguments
 
 print("Begin unsafeArgv")
-for i in 0...Int(Process.argc) {
-  print(Process.unsafeArgv[i].map { String(cString: $0) } ?? "(null)")
+for i in 0...Int(CommandLine.argc) {
+  print(CommandLine.unsafeArgv[i].map { String(cString: $0) } ?? "(null)")
 }
 print("End unsafeArgv")
 

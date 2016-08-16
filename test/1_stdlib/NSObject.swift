@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=watchos
 
 import Foundation
 
@@ -43,7 +44,7 @@ func printIdentity(_ lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsN
 
 print("NoisyEqual ==")
 class NoisyEqual : NSObject {
-  override func isEqual(_ rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: Any?) -> Bool {
     print("wow much equal")
     return super.isEqual(rhs)
   }
@@ -71,10 +72,10 @@ let o1 = NSObject.init()
 let o2 = NSObject.init()
 printIdentity(o1, o2, "o1", "o2")
 printEquality(o1, o2, "o1", "o2")
-printIdentity(o1, 10, "o1", "10")
-printEquality(o1, 10, "o1", "10")
-printIdentity(10, o1, "10", "o1")
-printEquality(10, o1, "10", "o1")
+printIdentity(o1, 10 as NSNumber, "o1", "10")
+printEquality(o1, 10 as NSNumber, "o1", "10")
+printIdentity(10 as NSNumber, o1, "10", "o1")
+printEquality(10 as NSNumber, o1, "10", "o1")
 print("done NSObject ==")
 // CHECK: NSObject ==
 // CHECK-NEXT: o1 === o1
@@ -164,7 +165,7 @@ class ValueLike : NSObject {
     super.init()
   }
 
-  override func isEqual(_ rhs: AnyObject?) -> Bool {
+  override func isEqual(_ rhs: Any?) -> Bool {
     if let rhs2 = rhs as? ValueLike {
       return x == rhs2.x
     }

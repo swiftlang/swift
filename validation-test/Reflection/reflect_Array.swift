@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Array
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Array 2>&1 | FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Array 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
@@ -48,24 +48,6 @@ reflect(object: obj)
 // CHECK-32:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // CHECK-32:               (field name=rawValue offset=0
 // CHECK-32:                 (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1)))))))))
-
-reflect(any: obj)
-
-// CHECK-64: Reflecting an existential.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (class reflect_Array.TestClass)
-
-// CHECK-64: Type info:
-// CHECK-64: (reference kind=strong refcounting=native)
-
-// CHECK-32: Reflecting an existential.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (class reflect_Array.TestClass)
-
-// CHECK-32: Type info:
-// CHECK-32: (reference kind=strong refcounting=native)
 
 doneReflecting()
 

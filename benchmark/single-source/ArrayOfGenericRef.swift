@@ -20,7 +20,7 @@ protocol Constructible {
   init(e:Element)
 }
 class ConstructibleArray<T:Constructible> {
-  var array : [T]
+  var array: [T]
 
   init(_ e:T.Element) {
     array = [T]()
@@ -33,7 +33,7 @@ class ConstructibleArray<T:Constructible> {
 
 class GenericRef<T> : Constructible {
   typealias Element=T
-  var x : T
+  var x: T
   required init(e:T) { self.x = e }
 }
 
@@ -56,7 +56,7 @@ func genCommonRefArray() {
 
 // Reuse the same enum value for each element.
 class RefArray<T> {
-  var array : [T]
+  var array: [T]
 
   init(_ i:T, count:Int = 10_000) {
     array = [T](repeating: i, count: count)
@@ -73,7 +73,7 @@ func genRefEnumArray() {
 
 struct GenericVal<T> : Constructible {
   typealias Element=T
-  var x : T
+  var x: T
   init(e:T) { self.x = e }
 }
 

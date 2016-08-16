@@ -117,6 +117,10 @@ struct SILDeclRef {
     /// References the generator for a default argument of a function.
     DefaultArgGenerator,
 
+    /// References the initializer expression for a stored property
+    /// of a nominal type.
+    StoredPropertyInitializer,
+
     /// References the ivar initializer for the ClassDecl in loc.
     ///
     /// Only classes that are allocated using Objective-C's allocation
@@ -260,6 +264,11 @@ struct SILDeclRef {
   /// a function.
   bool isDefaultArgGenerator() const {
     return kind == Kind::DefaultArgGenerator;
+  }
+  /// True if the SILDeclRef references the initializer for a stored property
+  /// of a nominal type.
+  bool isStoredPropertyInitializer() const {
+    return kind == Kind::StoredPropertyInitializer;
   }
   
   /// \brief True if the function should be treated as transparent.

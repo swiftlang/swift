@@ -3,12 +3,12 @@
 // RUN: %target-parse-verify-swift -show-diagnostics-after-fatal %s
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
-// RUN: FileCheck -check-prefix=NO-TYPEREPR %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck -check-prefix=NO-TYPEREPR %s -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -strict-whitespace < %t.printed.txt
-// RUN: FileCheck -check-prefix=TYPEREPR %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck -check-prefix=TYPEREPR %s -strict-whitespace < %t.printed.txt
 
 //===---
 //===--- Helper types.
@@ -119,17 +119,17 @@ enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} //
 // NO-TYREPR: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
-enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}}
+enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not expressible by any literal}}
 // expected-error@-1{{type 'EnumWithInheritance3' does not conform to protocol 'RawRepresentable'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance3 : <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance3 : FooClass {{{$}}
 
-enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}}
+enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not expressible by any literal}}
 // expected-error@-1{{type 'EnumWithInheritance4' does not conform to protocol 'RawRepresentable'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}}
+enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not expressible by any literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}}
 // expected-error@-1{{type 'EnumWithInheritance5' does not conform to protocol 'RawRepresentable'}}
 // NO-TYREPR: {{^}}enum EnumWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}enum EnumWithInheritance5 : FooClass, BarClass {{{$}}

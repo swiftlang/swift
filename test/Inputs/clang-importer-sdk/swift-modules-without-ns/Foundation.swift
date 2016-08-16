@@ -46,10 +46,6 @@ internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
 }
 
 extension String : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
   }
@@ -70,10 +66,6 @@ extension String : _ObjectiveCBridgeable {
 }
 
 extension Int : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -96,10 +88,6 @@ extension Int : _ObjectiveCBridgeable {
 }
 
 extension Array : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSArray {
     return NSArray()
   }
@@ -122,10 +110,6 @@ extension Array : _ObjectiveCBridgeable {
 }
 
 extension Dictionary : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSDictionary {
     return NSDictionary()
   }
@@ -148,10 +132,6 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 extension Set : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public func _bridgeToObjectiveC() -> NSSet {
     return NSSet()
   }
@@ -174,10 +154,6 @@ extension Set : _ObjectiveCBridgeable {
 }
 
 extension CGFloat : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
@@ -200,10 +176,6 @@ extension CGFloat : _ObjectiveCBridgeable {
 }
 
 extension NSRange : _ObjectiveCBridgeable {
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   public func _bridgeToObjectiveC() -> NSValue {
     return NSValue()
   }
@@ -229,13 +201,13 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 }
 
-extension NSError : ErrorProtocol {
+extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
 
-@_silgen_name("swift_convertNSErrorToErrorProtocol")
-func _convertNSErrorToErrorProtocol(_ string: NSError?) -> ErrorProtocol
+@_silgen_name("swift_convertNSErrorToError")
+func _convertNSErrorToError(_ string: NSError?) -> Error
 
-@_silgen_name("swift_convertErrorProtocolToNSError")
-func _convertErrorProtocolToNSError(_ string: ErrorProtocol) -> NSError
+@_silgen_name("swift_convertErrorToNSError")
+func _convertErrorToNSError(_ string: Error) -> NSError

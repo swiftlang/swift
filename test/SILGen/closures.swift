@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 import Swift
 
@@ -162,7 +162,7 @@ func small_closure_capture(_ x: Int) -> Int {
 
 
 // CHECK-LABEL: sil hidden @_TF8closures35small_closure_capture_with_argument
-func small_closure_capture_with_argument(_ x: Int) -> (y: Int) -> Int {
+func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   var x = x
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
@@ -178,15 +178,15 @@ func small_closure_capture_with_argument(_ x: Int) -> (y: Int) -> Int {
 // CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned @box Int) -> Int
 // CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $@box Int):
 // CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
-// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TZFsoi1pFTSiSi_Si{{.*}}
+// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: release [[XBOX]]
 // CHECK: return [[RET]]
 
 // CHECK-LABEL: sil hidden @_TF8closures24small_closure_no_capture
-func small_closure_no_capture() -> (y: Int) -> Int {
-  // CHECK:   [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures24small_closure_no_captureFT_FT1ySi_SiU_FSiSi]] : $@convention(thin) (Int) -> Int
+func small_closure_no_capture() -> (_ y: Int) -> Int {
+  // CHECK:   [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures24small_closure_no_captureFT_FSiSiU_FSiSi]] : $@convention(thin) (Int) -> Int
   // CHECK:   [[ANON_THICK:%[0-9]+]] = thin_to_thick_function [[ANON]] : ${{.*}} to $@callee_owned (Int) -> Int
   // CHECK:   return [[ANON_THICK]]
   return { $0 }
@@ -328,7 +328,7 @@ func closeOverLetLValue() {
 
 // Use an external function so inout deshadowing cannot see its body.
 @_silgen_name("takesNoEscapeClosure")
-func takesNoEscapeClosure(fn : @noescape () -> Int)
+func takesNoEscapeClosure(fn : () -> Int)
 
 struct StructWithMutatingMethod {
   var x = 42

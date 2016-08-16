@@ -22,6 +22,7 @@ import TestsUtils
 import DriverUtils
 import Ackermann
 import AngryPhonebook
+import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
 import ArrayInClass
@@ -52,6 +53,7 @@ import Hanoi
 import Hash
 import Histogram
 import Integrate
+import IterateData
 import Join
 import LinkedList
 import MapReduce
@@ -100,6 +102,7 @@ import XorLoop
 
 precommitTests = [
   "AngryPhonebook": run_AngryPhonebook,
+  "AnyHashableWithAClass": run_AnyHashableWithAClass,
   "Array2D": run_Array2D,
   "ArrayAppend": run_ArrayAppend,
   "ArrayAppendReserved": run_ArrayAppendReserved,
@@ -139,6 +142,7 @@ precommitTests = [
   "HashTest": run_HashTest,
   "Histogram": run_Histogram,
   "Integrate": run_Integrate,
+  "IterateData": run_IterateData,
   "Join": run_Join,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,

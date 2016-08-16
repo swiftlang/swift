@@ -19,7 +19,7 @@ import StdlibUnittest
 
 func testTrapsAreNoreturn(i: Int) -> Int {
   // Don't need a return statement in 'case' statements because these functions
-  // are @noreturn.
+  // never return.
   switch i {
   case 2:
     preconditionFailure("cannot happen")

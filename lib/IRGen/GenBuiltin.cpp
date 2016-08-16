@@ -487,7 +487,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto underscore = BuiltinName.find('_');
     StringRef SubOp = BuiltinName.substr(0, underscore);
     
-    auto SubOpcode = StringSwitch<AtomicRMWInst::BinOp>(SubOp)
+    AtomicRMWInst::BinOp SubOpcode = StringSwitch<AtomicRMWInst::BinOp>(SubOp)
       .Case("xchg", AtomicRMWInst::Xchg)
       .Case("add",  AtomicRMWInst::Add)
       .Case("sub",  AtomicRMWInst::Sub)

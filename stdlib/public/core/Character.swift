@@ -61,8 +61,8 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 public struct Character :
-  _BuiltinExtendedGraphemeClusterLiteralConvertible,
-  ExtendedGraphemeClusterLiteralConvertible, Equatable, Hashable, Comparable {
+  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
+  ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
 
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
@@ -92,7 +92,7 @@ public struct Character :
       shift += 8
     }
 
-    UTF8.encode(scalar, sendingOutputTo: output)
+    UTF8.encode(scalar, into: output)
     asInt |= (~0) << shift
     _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
   }
@@ -176,14 +176,14 @@ public struct Character :
     let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
-    let bits = sizeofValue(initialUTF8) &* 8 &- 1
+    let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
       _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
-      if let native = s._core.nativeBuffer
-              where native.start == UnsafeMutablePointer(s._core._baseAddress!){
+      if let native = s._core.nativeBuffer,
+         native.start == s._core._baseAddress! {
         _representation = .large(native._storage)
         return
       }
@@ -297,14 +297,14 @@ public struct Character :
         _SmallUTF8(u8).makeIterator(),
         from: UTF8.self, to: UTF16.self,
         stoppingOnError: false,
-        sendingOutputTo: output)
+        into: output)
       self.data = u16
     }
 
     /// The position of the first element in a non-empty collection.
     ///
     /// In an empty collection, `startIndex == endIndex`.
-    var startIndex : Int {
+    var startIndex: Int {
       return 0
     }
 
@@ -313,7 +313,7 @@ public struct Character :
     /// `endIndex` is not a valid argument to `subscript`, and is always
     /// reachable from `startIndex` by zero or more applications of
     /// `successor()`.
-    var endIndex : Int {
+    var endIndex: Int {
       return Int(count)
     }
 
@@ -353,6 +353,14 @@ public struct Character :
   internal var _representation: Representation
 }
 
+extension Character : CustomStringConvertible {
+  public var description: String {
+    return String(describing: self)
+  }
+}
+
+extension Character : LosslessStringConvertible {}
+
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
   public var debugDescription: String {
@@ -391,30 +399,35 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   }
 }
 
-public func ==(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) == String(rhs)
+extension Character : Equatable {
+  public static func == (lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) == String(rhs)
+    }
   }
 }
 
-public func <(lhs: Character, rhs: Character) -> Bool {
-  switch (lhs._representation, rhs._representation) {
-  case let (.small(lbits), .small(rbits)) where
-    // Note: This is consistent with Foundation but unicode incorrect.
-    // See String._compareASCII.
-    Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-    && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-    return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
-  default:
-    // FIXME(performance): constructing two temporary strings is extremely
-    // wasteful and inefficient.
-    return String(lhs) < String(rhs)
+extension Character : Comparable {
+  public static func < (lhs: Character, rhs: Character) -> Bool {
+    switch (lhs._representation, rhs._representation) {
+    case let (.small(lbits), .small(rbits)) where
+      // Note: This is consistent with Foundation but unicode incorrect.
+      // See String._compareASCII.
+      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
+      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
+      return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
+    default:
+      // FIXME(performance): constructing two temporary strings is extremely
+      // wasteful and inefficient.
+      return String(lhs) < String(rhs)
+    }
   }
 }
+

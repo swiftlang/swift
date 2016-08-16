@@ -21,7 +21,7 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         _handle = _MutableHandle(adoptingReference: NSPersonNameComponents())
     }
     
-    private init(reference: NSPersonNameComponents) {
+    fileprivate init(reference: NSPersonNameComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
@@ -75,22 +75,40 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         return _handle.map { $0.hash }
     }
     
-    public var description: String { return _handle.map { $0.description } }
-    public var debugDescription: String { return _handle.map { $0.debugDescription } }
+    @available(OSX 10.11, iOS 9.0, *)
+    public static func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
+        // Don't copy references here; no one should be storing anything
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+    }
 }
 
 @available(OSX 10.11, iOS 9.0, *)
-public func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
-    // Don't copy references here; no one should be storing anything
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+extension PersonNameComponents : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    public var description: String {
+        return self.customMirror.children.reduce("") {
+            $0.appending("\($1.label ?? ""): \($1.value) ")
+        }
+    }
+    
+    public var debugDescription: String {
+        return self.description
+    }
+
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        if let r = namePrefix { c.append((label: "namePrefix", value: r)) }
+        if let r = givenName { c.append((label: "givenName", value: r)) }
+        if let r = middleName { c.append((label: "middleName", value: r)) }
+        if let r = familyName { c.append((label: "familyName", value: r)) }
+        if let r = nameSuffix { c.append((label: "nameSuffix", value: r)) }
+        if let r = nickname { c.append((label: "nickname", value: r)) }
+        if let r = phoneticRepresentation { c.append((label: "phoneticRepresentation", value: r)) }
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 @available(OSX 10.11, iOS 9.0, *)
 extension PersonNameComponents : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSPersonNameComponents.self
     }
@@ -117,3 +135,13 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+@available(OSX 10.11, iOS 9.0, *)
+extension NSPersonNameComponents : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as PersonNameComponents)
+    }
+}
+

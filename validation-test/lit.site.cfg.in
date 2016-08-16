@@ -1,3 +1,15 @@
+# swift/validation-test/lit.site.cfg.in ---------------------------*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# -----------------------------------------------------------------------------
+
 import sys
 import platform
 
@@ -7,14 +19,16 @@ config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
 config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
 config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.swift_src_root = "@SWIFT_SOURCE_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
-config.targets_to_build = "@TARGETS_TO_BUILD@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.variant_sdk = "@VARIANT_SDK@"
+config.swift_test_results_dir = \
+    lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
@@ -43,6 +57,13 @@ else:
 
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
+
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

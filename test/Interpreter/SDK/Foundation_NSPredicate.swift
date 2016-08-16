@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // rdar://16726530
 
@@ -7,7 +7,7 @@
 import Foundation
 
 // Test overlain variadic methods.
-let s = Predicate(format: "(lastName like[cd] %@) AND (birthday > %@)", "LLLL", "BBBB")
+let s = NSPredicate(format: "(lastName like[cd] %@) AND (birthday > %@)", "LLLL", "BBBB")
 print(s.predicateFormat)
 
 // CHECK: lastName LIKE[cd] "LLLL" AND birthday > "BBBB"

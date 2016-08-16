@@ -1,5 +1,5 @@
 // RUN: %target-parse-verify-swift
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 struct S<T> {}
 
@@ -66,12 +66,12 @@ struct FloatElement : HasElt {
   typealias Element = Float
 }
 @_specialize(FloatElement)
-@_specialize(IntElement) // expected-error{{'<T : HasElt where T.Element == Float> (T) -> ()' (aka '<T : HasElt where T.Element == Float> T -> ()') requires the types 'Element' (aka 'Int') and 'Float' be equivalent}}
-func sameTypeRequirement<T : HasElt where T.Element == Float>(_ t: T) {}
+@_specialize(IntElement) // expected-error{{'<T : HasElt where T.Element == Float> (T) -> ()' requires the types 'IntElement.Element' (aka 'Int') and 'Float' be equivalent}}
+func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 class Base {}
 class Sub : Base {}
 class NonSub {}
 @_specialize(Sub)
-@_specialize(NonSub) // expected-error{{'<T : Base> (T) -> ()' (aka '<T : Base> T -> ()') requires that 'NonSub' inherit from 'Base'}}
+@_specialize(NonSub) // expected-error{{'<T : Base> (T) -> ()' requires that 'NonSub' inherit from 'Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}

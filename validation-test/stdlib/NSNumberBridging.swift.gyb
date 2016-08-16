@@ -1,0 +1,291 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
+
+import Foundation
+import CoreGraphics
+import StdlibUnittest
+
+let NSNumberTests = TestSuite("NSNumber")
+
+extension Int {
+  static var _interestingValues: [Int] {
+    return [
+      Int.min,
+      Int.min + 1,
+      Int.max,
+      Int.max - 1,
+      0,
+      -1, 1,
+      -42, 42,
+    ]
+  }
+}
+
+extension UInt {
+  static var _interestingValues: [UInt] {
+    return [
+      UInt.min,
+      UInt.min + 1,
+      UInt.max,
+      UInt.max - 1,
+      42,
+    ]
+  }
+}
+
+% for Self in ['Float', 'Double', 'CGFloat']:
+extension ${Self} {
+  static var _interestingValues: [${Self}] {
+    return [
+      -${Self}.infinity,
+      -${Self}.greatestFiniteMagnitude,
+      -1.0,
+      -${Self}.ulpOfOne,
+      -${Self}.leastNormalMagnitude,
+      -0.0,
+      0.0,
+      ${Self}.leastNormalMagnitude,
+      ${Self}.ulpOfOne,
+      1.0,
+      ${Self}.greatestFiniteMagnitude,
+      ${Self}.infinity,
+      ${Self}.nan,
+    ]
+  }
+}
+% end
+
+extension Bool {
+  static var _interestingValues: [Bool] {
+    return [false, true]
+  }
+}
+
+% for Self in ['Int', 'UInt', 'Float', 'Double', 'CGFloat']:
+NSNumberTests.test("${Self}.init(_: NSNumber)")
+  .forEach(in: ${Self}._interestingValues) {
+  input in
+%   if Self in ['Float', 'Double']:
+  expectEqual(input.bitPattern, ${Self}(NSNumber(value: input)).bitPattern)
+%   elif Self == 'CGFloat':
+  expectEqual(input.bitPattern, ${Self}(NSNumber(value: input.native)).bitPattern)
+%   else:
+  expectEqual(input, ${Self}(NSNumber(value: input)))
+%   end
+}
+% end
+
+NSNumberTests.test("Bool.init(_: NSNumber)") {
+  expectFalse(Bool(NSNumber(value: false)))
+  expectTrue(Bool(NSNumber(value: true)))
+
+  expectFalse(Bool(NSNumber(value: 0)))
+  expectTrue(Bool(NSNumber(value: 1)))
+  expectTrue(Bool(NSNumber(value: 2)))
+  expectFailure {
+#if os(OSX)
+    // FIXME: failure due to rdar://problem/27514021.
+    expectTrue(Bool(NSNumber(value: Int.min)))
+#else
+    // The above does not consistently fail on all platforms.
+    expectTrue(false)
+#endif
+  }
+  expectTrue(Bool(NSNumber(value: Int.min + 1)))
+  expectTrue(Bool(NSNumber(value: Int.max)))
+}
+
+func isTypePreservingNSNumber(_ n: NSNumber) -> Bool {
+  let className = String(describing: type(of: n))
+  return className.range(of: "_SwiftTypePreservingNSNumber") != nil
+}
+
+NSNumberTests.test("isTypePreservingNSNumber(_:)") {
+  expectFalse(isTypePreservingNSNumber(NSNumber(value: 42)))
+  expectFalse(isTypePreservingNSNumber(NSNumber(value: false)))
+}
+
+NSNumberTests.test("_SwiftTypePreservingNSNumber.classForCoder") {
+  // Check that internal subclass is not achived.
+  let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
+  expectTrue(isTypePreservingNSNumber(n))
+  expectEqual("NSNumber", String(describing: n.classForCoder))
+  expectEqual("NSNumber", String(describing: n.classForKeyedArchiver!))
+}
+
+NSNumberTests.test("_SwiftTypePreservingNSNumber.init(coder:)")
+  .crashOutputMatches("_SwiftTypePreservingNSNumber should not be archived.")
+  .code {
+  let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
+  expectTrue(isTypePreservingNSNumber(n))
+  let _SwiftTypePreservingNSNumberType: NSNumber.Type = type(of: n)
+  let coder = NSKeyedUnarchiver(forReadingWith: Data([0]))
+  expectCrashLater()
+  _ = _SwiftTypePreservingNSNumberType.init(coder: coder)
+}
+
+NSNumberTests.test("_SwiftTypePreservingNSNumber.copy(zone:)") {
+  let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
+  expectTrue(isTypePreservingNSNumber(n))
+  let copy = n.copy() as! AnyObject
+  expectTrue(n === copy)
+}
+
+% for Self in ['Int', 'UInt']:
+extension ${Self} {
+  func toNSNumberByteArray() -> [UInt8] {
+    var v = self
+    var result: [UInt8] = []
+    for _ in 0 ..< MemoryLayout<${Self}>.size {
+      result.append(UInt8(v & 0xff))
+      v = v >> 8
+    }
+    return result
+  }
+}
+% end
+
+% for Self in ['Float', 'Double']:
+extension ${Self} {
+  func toNSNumberByteArray() -> [UInt8] {
+    var v = self.bitPattern
+    var result: [UInt8] = []
+    for _ in 0 ..< MemoryLayout.size(ofValue: v) {
+      result.append(UInt8(v & 0xff))
+      v = v >> 8
+    }
+    return result
+  }
+}
+% end
+
+extension CGFloat {
+  func toNSNumberByteArray() -> [UInt8] {
+    return native.toNSNumberByteArray()
+  }
+}
+
+extension Bool {
+  func toNSNumberByteArray() -> [UInt8] {
+    return self ? [1] : [0]
+  }
+}
+
+func testNSNumberGetValueAndObjCType(
+  instance n: NSNumber,
+  expectedBytes: [UInt8],
+  expectedObjCType: String
+) {
+  var a = [UInt8](repeating: 0xaa, count: 32)
+  var b = [UInt8](repeating: 0xbb, count: 32)
+  n.getValue(&a)
+  n.getValue(&b)
+  let ab = Array(zip(a, b))
+  let count = ab.index { $0.0 == 0xaa && $0.1 == 0xbb }!
+  // Check that `getValue` does not overwrite more bytes than needed.
+  expectEqual(expectedBytes.count, count)
+  expectEqualSequence(expectedBytes, a[0..<count])
+  expectEqualSequence(expectedBytes, b[0..<count])
+
+  let objCType = String(cString: n.objCType)
+  expectEqual(expectedObjCType, objCType)
+}
+
+% for Self in ['Int', 'UInt', 'Float', 'Double', 'CGFloat', 'Bool']:
+NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType")
+  .forEach(in: ${Self}._interestingValues) {
+  input in
+  let bridgedNSNumber = input._bridgeToObjectiveC()
+  expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
+
+  let expectedObjCType: String
+%   if Self == 'Int':
+#if arch(i386) || arch(arm)
+  expectedObjCType = "i"
+#elseif arch(x86_64) || arch(arm64)
+  expectedObjCType = "q"
+#else
+  _UnknownArchError()
+#endif
+%   elif Self == 'UInt':
+#if arch(i386) || arch(arm)
+  expectedObjCType = "I"
+#elseif arch(x86_64) || arch(arm64)
+  expectedObjCType = "Q"
+#else
+  _UnknownArchError()
+#endif
+%   elif Self == 'Float':
+  expectedObjCType = "f"
+%   elif Self == 'Double':
+  expectedObjCType = "d"
+%   elif Self == 'CGFloat':
+#if arch(i386) || arch(arm)
+  expectedObjCType = "f"
+#elseif arch(x86_64) || arch(arm64)
+  expectedObjCType = "d"
+#else
+  _UnknownArchError()
+#endif
+%   elif Self == 'Bool':
+  expectedObjCType = "B"
+%   else:
+  _UnknownTypeError()
+%   end
+
+  testNSNumberGetValueAndObjCType(
+    instance: bridgedNSNumber,
+    expectedBytes: input.toNSNumberByteArray(),
+    expectedObjCType: expectedObjCType)
+}
+% end
+
+% for Self in ['Int', 'UInt', 'Float', 'Double', 'CGFloat', 'Bool']:
+NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNSNumber) with a custom AnyHashable")
+  .forEach(in: ${Self}._interestingValues) {
+  input in
+  // Bridged NSNumbers preserve the Swift type when put into AnyHashable.
+  let bridgedNSNumber = input._bridgeToObjectiveC()
+  expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
+  expectNotEmpty(bridgedNSNumber._toCustomAnyHashable())
+
+  // Explicitly constructed NSNumbers don't have a special AnyHashable
+  // representation.
+%   if Self == 'CGFloat':
+  let explicitNSNumber = NSNumber(value: input.native)
+%   else:
+  let explicitNSNumber = NSNumber(value: input)
+%   end
+  expectFalse(isTypePreservingNSNumber(explicitNSNumber))
+  expectEmpty(explicitNSNumber._toCustomAnyHashable())
+  expectTrue(
+    Set(["__NSCFNumber", "__NSCFBoolean"]).contains(
+      String(describing: type(of: AnyHashable(explicitNSNumber).base))))
+  expectEqual(AnyHashable(explicitNSNumber), AnyHashable(explicitNSNumber))
+
+  let ah = AnyHashable(bridgedNSNumber)
+  expectEqual(${Self}.self, type(of: ah.base))
+%   if Self in ['Float', 'Double', 'CGFloat']:
+  // FIXME: remove special cases for floating point when we fix their
+  // conformances to Equatable.
+  if !input.isNaN {
+    expectEqual(input, ah.base as! ${Self})
+    expectEqual(AnyHashable(input), ah)
+  } else {
+    expectNotEqual(input, ah.base as! ${Self})
+    expectNotEqual(AnyHashable(input), ah)
+  }
+%   else:
+  expectEqual(input, ah.base as! ${Self})
+  expectEqual(AnyHashable(input), ah)
+%   end
+
+  // Bridged and explicitly constructed NSNumbers have different AnyHashable
+  // representations.
+  expectNotEqual(AnyHashable(explicitNSNumber), ah)
+}
+% end
+
+runAllTests()
+

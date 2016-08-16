@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // <rdar://problem/17014037>
 // REQUIRES: OS=macosx
@@ -22,10 +22,10 @@ func hangCanary(_ o: AnyObject) {
 
 class FooLayer: CALayer {
   var black: CGColor
-  var white: CGColor = CGColor.constantColor(for: CGColor.white)!
+  var white: CGColor = CGColor.white
 
   override init() {
-    black = CGColor.constantColor(for: CGColor.black)!
+    black = CGColor.black
     super.init()
     hangCanary(self)
   }

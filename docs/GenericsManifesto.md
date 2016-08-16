@@ -29,7 +29,7 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
-```
+```Swift
 protocol Sequence {
   associatedtype Iterator : IteratorProtocol
   ...
@@ -43,7 +43,7 @@ The compiler currently rejects this protocol, which is unfortunate: it effective
 
 Currently, a generic type cannot be nested within another generic type, e.g.
 
-```
+```Swift
 struct X<T> {
   struct Y<U> { }  // currently ill-formed, but should be possible
 }
@@ -55,7 +55,7 @@ There isn't much to say about this: the compiler simply needs to be improved to 
 
 Currently, a constrained extension cannot use a same-type constraint to make a type parameter equivalent to a concrete type. For example:
 
-```
+```Swift
 extension Array where Element == String {
   func makeSentence() -> String {
     // uppercase first string, concatenate with spaces, add a period, whatever
@@ -74,7 +74,7 @@ There are a number of Swift declarations that currently cannot have generic para
 
 Typealiases could be allowed to carry generic parameters. They would still be aliases (i.e., they would not introduce new types). For example:
 
-```
+```Swift
 typealias StringDictionary<Value> = Dictionary<String, Value>
 
 var d1 = StringDictionary<Int>()
@@ -85,7 +85,7 @@ var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dict
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 
-```
+```Swift
 extension Collection {
   subscript<Indices: Sequence where Indices.Iterator.Element == Index>(indices: Indices) -> [Iterator.Element] {
     get {
@@ -110,7 +110,9 @@ extension Collection {
 
 `let` constants could be allowed to have generic parameters, such that they produce differently-typed values depending on how they are used. For example, this is particularly useful for named literal values, e.g.,
 
-```let π<T : FloatLiteralConvertible>: T = 3.141592653589793238462643383279502884197169399```
+```Swift
+let π<T : ExpressibleByFloatLiteral>: T = 3.141592653589793238462643383279502884197169399
+```
 
 The Clang importer could make particularly good use of this when importing macros.
 
@@ -118,7 +120,7 @@ The Clang importer could make particularly good use of this when importing macro
 
 Extensions themselves could be parameterized, which would allow some structural pattern matching on types. For example, this would permit one to extend an array of optional values, e.g.,
 
-```
+```Swift
 extension<T> Array where Element == T? {
   var someValues: [T] {
     var result = [T]()
@@ -132,7 +134,7 @@ extension<T> Array where Element == T? {
 
 We can generalize this to protocol extensions:
 
-```
+```Swift
 extension<T> Sequence where Element == T? {
   var someValues: [T] {
     var result = [T]()
@@ -146,7 +148,7 @@ extension<T> Sequence where Element == T? {
 
 Note that when one is extending nominal types, we could simplify the syntax somewhat to make the same-type constraint implicit in the syntax:
 
-```
+```Swift
 extension<T> Array<T?> {
   var someValues: [T] {
     var result = [T]()
@@ -160,7 +162,7 @@ extension<T> Array<T?> {
 
 When we're working with concrete types, we can use that syntax to improve the extension of concrete versions of generic types (per "Concrete same-type requirements", above), e.g.,
 
-```
+```Swift
 extension Array<String> {
   func makeSentence() -> String {
     // uppercase first string, concatenate with spaces, add a period, whatever
@@ -177,7 +179,7 @@ There are a number of minor extensions we can make to the generics system that d
 
 Currently, a new protocol can inherit from other protocols, introduce new associated types, and add new conformance constraints to associated types (by redeclaring an associated type from an inherited protocol). However, one cannot express more general constraints. Building on the example from "Recursive protocol constraints", we really want the element type of a `Sequence`'s `SubSequence` to be the same as the element type of the `Sequence`, e.g.,
 
-```
+```Swift
 protocol Sequence {
   associatedtype Iterator : IteratorProtocol
   ...
@@ -191,7 +193,7 @@ Hanging the `where` clause off the associated type protocol is not ideal, but th
 
 Now that associated types have their own keyword (thanks!), it's reasonable to bring back `typealias`. Again with the `Sequence` protocol:
 
-```
+```Swift
 protocol Sequence {
   associatedtype Iterator : IteratorProtocol
   typealias Element = Iterator.Element   // rejoice! now we can refer to SomeSequence.Element rather than SomeSequence.Iterator.Element
@@ -202,21 +204,21 @@ protocol Sequence {
 
 Generic parameters could be given the ability to provide default arguments, which would be used in cases where the type argument is not specified and type inference could not determine the type argument. For example:
 
-```
+```Swift
 public final class Promise<Value, Reason=Error> { ... }
 
-func getRandomPromise() -> Promise<Int, ErrorProtocol> { ... }
+func getRandomPromise() -> Promise<Int, Error> { ... }
 
 var p1: Promise<Int> = ...
 var p2: Promise<Int, Error> = p1     // okay: p1 and p2 have the same type Promise<Int, Error>
-var p3: Promise = getRandomPromise() // p3 has type Promise<Int, ErrorProtocol> due to type inference
+var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to type inference
 ```
 
 ### Generalized `class` constraints
 
 The `class` constraint can currently only be used for defining protocols. We could generalize it to associated type and type parameter declarations, e.g.,
 
-```
+```Swift
 protocol P {
   associatedtype A : class
 }
@@ -226,7 +228,7 @@ func foo<T : class>(t: T) { }
 
 As part of this, the magical `AnyObject` protocol could be replaced with an existential with a class bound, so that it becomes a typealias:
 
-```
+```Swift
 typealias AnyObject = protocol<class>
 ```
 
@@ -236,7 +238,7 @@ See the "Existentials" section, particularly "Generalized existentials", for mor
 
 When a superclass conforms to a protocol and has one of the protocol's requirements satisfied by a member of a protocol extension, that member currently cannot be overridden by a subclass. For example:
 
-```
+```Swift
 protocol P {
   func foo()
 }
@@ -268,7 +270,7 @@ Unlike the minor extensions, major extensions to the generics model provide more
 
 Conditional conformances express the notion that a generic type will conform to a particular protocol only under certain circumstances. For example, `Array` is `Equatable` only when its elements are `Equatable`:
 
-```
+```Swift
 extension Array : Equatable where Element : Equatable { }
 
 func ==<T : Equatable>(lhs: Array<T>, rhs: Array<T>) -> Bool { ... }
@@ -276,7 +278,7 @@ func ==<T : Equatable>(lhs: Array<T>, rhs: Array<T>) -> Bool { ... }
 
 Conditional conformances are a potentially very powerful feature. One important aspect of this feature is how to deal with or avoid overlapping conformances. For example, imagine an adaptor over a `Sequence` that has conditional conformances to `Collection` and `MutableCollection`:
 
-```
+```Swift
 struct SequenceAdaptor<S: Sequence> : Sequence { }
 extension SequenceAdaptor : Collection where S: Collection { ... }
 extension SequenceAdaptor : MutableCollection where S: MutableCollection { }
@@ -284,7 +286,7 @@ extension SequenceAdaptor : MutableCollection where S: MutableCollection { }
 
 This should almost certainly be permitted, but we need to cope with or reject "overlapping" conformances:
 
-```
+```Swift
 extension SequenceAdaptor : Collection where S: SomeOtherProtocolSimilarToCollection { } // trouble: two ways for SequenceAdaptor to conform to Collection
 ```
 
@@ -294,7 +296,7 @@ See the section on "Private conformances" for more about the issues with having 
 
 Currently, a generic parameter list contains a fixed number of generic parameters. If one has a type that could generalize to any number of generic parameters, the only real way to deal with it today involves creating a set of types. For example, consider the standard library's `zip` function. It returns one of these when provided with two arguments to zip together:
 
-```
+```Swift
 public struct Zip2Sequence<Sequence1 : Sequence,
                            Sequence2 : Sequence> : Sequence { ... }
 
@@ -305,7 +307,7 @@ public func zip<Sequence1 : Sequence, Sequence2 : Sequence>(
 
 Supporting three arguments would require copy-pasting code:
 
-```
+```Swift
 public struct Zip3Sequence<Sequence1 : Sequence,
                            Sequence2 : Sequence,
                            Sequence3 : Sequence> : Sequence { ... }
@@ -317,12 +319,12 @@ public func zip<Sequence1 : Sequence, Sequence2 : Sequence, Sequence3 : Sequence
 
 Variadic generics would allow us to abstract over a set of generic parameters. The syntax below is hopelessly influenced by [C++11 variadic templates](http://www.jot.fm/issues/issue_2008_02/article2/) (sorry), where putting an ellipsis ("...") to the left of a declaration makes it a "parameter pack" containing zero or more parameters and putting an ellipsis to the right of a type/expression/etc. expands the parameter packs within that type/expression into separate arguments. The important part is that we be able to meaningfully abstract over zero or more generic parameters, e.g.:
 
-```
+```Swift
 public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zero or more type parameters, each of which conforms to IteratorProtocol
   public typealias Element = (Iterators.Element...)                       // a tuple containing the element types of each iterator in Iterators
 
   var (...iterators): (Iterators...)    // zero or more stored properties, one for each type in Iterators 
-  var reachedEnd: Bool = false
+  var reachedEnd = false
 
   public mutating func next() -> Element? {
     if reachedEnd { return nil }
@@ -347,7 +349,7 @@ public struct ZipSequence<...Sequences : Sequence> : Sequence {
 
 Such a design could also work for function parameters, so we can pack together multiple function arguments with different types, e.g.,
 
-```
+```Swift
 public func zip<... Sequences : SequenceType>(... sequences: Sequences...) 
             -> ZipSequence<Sequences...> {
   return ZipSequence(sequences...)
@@ -356,7 +358,7 @@ public func zip<... Sequences : SequenceType>(... sequences: Sequences...)
 
 Finally, this could tie into the discussions about a tuple "splat" operator. For example:
 
-```
+```Swift
 func apply<... Args, Result>(fn: (Args...) -> Result,    // function taking some number of arguments and producing Result
                            args: (Args...)) -> Result {  // tuple of arguments
   return fn(args...)                                     // expand the arguments in the tuple "args" into separate arguments
@@ -367,21 +369,21 @@ func apply<... Args, Result>(fn: (Args...) -> Result,    // function taking some
 
 Currently, only nominal types (classes, structs, enums, protocols) can be extended. One could imagine extending structural types—particularly tuple types—to allow them to, e.g., conform to protocols. For example, pulling together variadic generics, parameterized extensions, and conditional conformances, one could express "a tuple type is `Equatable` if all of its element types are `Equatable`":
 
-```
+```Swift
 extension<...Elements : Equatable> (Elements...) : Equatable {   // extending the tuple type "(Elements...)" to be Equatable
 }
 ```
 
 There are some natural bounds here: one would need to have actual structural types. One would not be able to extend every type:
 
-```
+```Swift
 extension<T> T { // error: neither a structural nor a nominal type
 }
 ```
 
 And before you think you're cleverly making it possible to have a conditional conformance that makes every type `T` that conforms to protocol `P` also conform to protocol `Q`, see the section "Conditional conformances via protocol extensions", below:
 
-```
+```Swift
 extension<T : P> T : Q { // error: neither a structural nor a nominal type
 }
 ```
@@ -395,7 +397,7 @@ There are a number of potential improvements we could make to the generics synta
 
 Currently, protocol members can never have implementations. We could allow one to provide such implementations to be used as the default if a conforming type does not supply an implementation, e.g.,
 
-```
+```Swift
 protocol Bag {
   associatedtype Element : Equatable
   func contains(element: Element) -> Bool
@@ -418,7 +420,7 @@ struct IntBag : Bag {
 
 One can get this effect with protocol extensions today, hence the classification of this feature as a (mostly) syntactic improvement:
 
-```
+```Swift
 protocol Bag {
   associatedtype Element : Equatable
   func contains(element: Element) -> Bool
@@ -440,13 +442,13 @@ extension Bag {
 
 The `where` clause of generic functions comes very early in the declaration, although it is generally of much less concern to the client than the function parameters and result type that follow it. This is one of the things that contributes to "angle bracket blindness". For example, consider the `containsAll` signature above:
 
-```
+```Swift
 func containsAll<S: Sequence where Sequence.Iterator.Element == Element>(elements: S) -> Bool
 ```
 
 One could move the `where` clause to the end of the signature, so that the most important parts—name, generic parameter, parameters, result type—precede it:
 
-```
+```Swift
 func containsAll<S: Sequence>(elements: S) -> Bool 
        where Sequence.Iterator.Element == Element
 ```
@@ -455,19 +457,19 @@ func containsAll<S: Sequence>(elements: S) -> Bool
 
 The `protocol<...>` syntax is a bit of an oddity in Swift. It is used to compose protocols together, mostly to create values of existential type, e.g.,
 
-```
+```Swift
 var x: protocol<NSCoding, NSCopying>
 ```
 
 It's weird that it's a type name that starts with a lowercase letter, and most Swift developers probably never deal with this feature unless they happen to look at the definition of `Any`:
 
-```
+```Swift
 typealias Any = protocol<>
 ```
 
 "Any" might be a better name for this functionality. `Any` without brackets could be a keyword for "any type", and "Any" followed by brackets could take the role of `protocol<>` today:
 
-```
+```Swift
 var x: Any<NSCoding, NSCopying>
 ```
 
@@ -482,7 +484,7 @@ There are a number of features that get discussed from time-to-time, while they 
 
 Only the requirements of protocols currently use dynamic dispatch, which can lead to surprises:
 
-```
+```Swift
 protocol P {
   func foo()
 }
@@ -512,7 +514,7 @@ Swift could adopt a model where members of protocol extensions are dynamically d
 
 When specifying generic arguments for a generic type, the arguments are always positional: `Dictionary<String, Int>` is a `Dictionary` whose `Key` type is `String` and whose `Value` type is `Int`, by convention. One could permit the arguments to be labeled, e.g.,
 
-```
+```Swift
 var d: Dictionary<Key: String, Value: Int>
 ```
 
@@ -522,7 +524,7 @@ Such a feature makes more sense if Swift gains default generic arguments, becaus
 
 Currently, Swift's generic parameters are always types. One could imagine allowing generic parameters that are values, e.g.,
 
-```
+```Swift
 struct MultiArray<T, let Dimensions: Int> { // specify the number of dimensions to the array
   subscript (indices: Int...) -> T {
     get {
@@ -538,7 +540,7 @@ A suitably general feature might allow us to express fixed-length array or vecto
 
 Higher-kinded types allow one to express the relationship between two different specializations of the same nominal type within a protocol. For example, if we think of the `Self` type in a protocol as really being `Self<T>`, it allows us to talk about the relationship between `Self<T>` and `Self<U>` for some other type `U`. For example, it could allow the `map` operation on a collection to return a collection of the same kind but with a different operation, e.g.,
 
-```
+```Swift
 let intArray: Array<Int> = ...
 intArray.map { String($0) } // produces Array<String>
 let intSet: Set<Int> = ...
@@ -547,7 +549,7 @@ intSet.map { String($0) }   // produces Set<String>
 
 Potential syntax borrowed from [one thread on higher-kinded types](https://lists.swift.org/pipermail/swift-evolution/Week-of-Mon-20151214/002736.html) uses `~=` as a "similarity" constraint to describe a `Functor` protocol:
 
-```
+```Swift
 protocol Functor {
   associatedtype A
   func fmap<FB where FB ~= Self>(f: A -> FB.A) -> FB
@@ -558,13 +560,13 @@ protocol Functor {
 
 The type arguments of a generic function are always determined via type inference. For example, given:
 
-```
+```Swift
 func f<T>(t: T)
 ```
 
 one cannot directly specify `T`: either one calls `f` (and `T` is determined via the argument's type) or one uses `f` in a context where it is given a particular function type (e.g., `let x: (Int) -> Void = f`  would infer `T = Int`). We could permit explicit specialization here, e.g.,
 
-```
+```Swift
 let x = f<Int> // x has type (Int) -> Void
 ```
 
@@ -576,7 +578,7 @@ Features in this category have been requested at various times, but they don't f
 
 One of the most commonly requested features is the ability to parameterize protocols themselves. For example, a protocol that indicates that the `Self` type can be constructed from some specified type `T`:
 
-```
+```Swift
 protocol ConstructibleFromValue<T> {
   init(_ value: T)
 }
@@ -584,7 +586,7 @@ protocol ConstructibleFromValue<T> {
 
 Implicit in this feature is the ability for a given type to conform to the protocol in two different ways. A `Real` type might be constructible from both `Float` and `Double`, e.g.,
 
-```
+```Swift
 struct Real { ... }
 extension Real : ConstructibleFrom<Float> {
   init(_ value: Float) { ... }
@@ -596,7 +598,7 @@ extension Real : ConstructibleFrom<Double> {
 
 Most of the requests for this feature actually want a different feature. They tend to use a parameterized `Sequence` as an example, e.g.,
 
-```
+```Swift
 protocol Sequence<Element> { ... }
 
 func foo(strings: Sequence<String>) {  /// works on any sequence containing Strings
@@ -612,7 +614,7 @@ More importantly, modeling `Sequence` with generic parameters rather than associ
 
 Right now, a protocol conformance can be no less visible than the minimum of the conforming type's access and the protocol's access. Therefore, a public type conforming to a public protocol must provide the conformance publicly. One could imagine removing that restriction, so that one could introduce a private conformance:
 
-```
+```Swift
 public protocol P { }
 public struct X { }
 extension X : internal P { ... } // X conforms to P, but only within this module
@@ -620,7 +622,7 @@ extension X : internal P { ... } // X conforms to P, but only within this module
 
 The main problem with private conformances is the interaction with dynamic casting. If I have this code:
 
-```
+```Swift
 func foo(value: Any) {
   if let x = value as? P { print("P") }
 }
@@ -634,7 +636,7 @@ Under what circumstances should it print "P"? If `foo()` is defined within the s
 
 We often get requests to make a protocol conform to another protocol. This is, effectively, the expansion of the notion of "Conditional conformances" to protocol extensions. For example:
 
-```
+```Swift
 protocol P {
   func foo()
 }
@@ -669,7 +671,7 @@ The generics system doesn't seem like a good candidate for a reduction in scope;
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 
-```
+```Swift
 protocol IteratorProtocol {
   associatedtype Element
   mutating func next() -> Element?
@@ -691,7 +693,7 @@ Existentials aren't really generics per se, but the two systems are closely inte
 
 The restrictions on existential types came from an implementation limitation, but it is reasonable to allow a value of protocol type even when the protocol has Self constraints or associated types. For example, consider `IteratorProtocol` again and how it could be used as an existential:
 
-```
+```Swift
 protocol IteratorProtocol {
   associatedtype Element
   mutating func next() -> Element?
@@ -703,13 +705,13 @@ it.next()   // if this is permitted, it could return an "Any?", i.e., the existe
 
 Additionally, it is reasonable to want to constrain the associated types of an existential, e.g., "a `Sequence` whose element type is `String`" could be expressed by putting a where clause into `protocol<...>` or `Any<...>` (per "Renaming `protocol<...>` to `Any<...>`"):
 
-```
+```Swift
 let strings: Any<Sequence where .Iterator.Element == String> = ["a", "b", "c"]
 ```
 
 The leading `.` indicates that we're talking about the dynamic type, i.e., the `Self` type that's conforming to the `Sequence` protocol. There's no reason why we cannot support arbitrary `where` clauses within the `Any<...>`. This very-general syntax is a bit unwieldy, but common cases can easily be wrapped up in a generic typealias (see the section "Generic typealiases" above):
 
-```
+```Swift
 typealias AnySequence<Element> = Any<Sequence where .Iterator.Element == Element>
 let strings: AnySequence<String> = ["a", "b", "c"]
 ```
@@ -718,7 +720,7 @@ let strings: AnySequence<String> = ["a", "b", "c"]
 
 Generalized existentials as described above will still have trouble with protocol requirements that involve `Self` or associated types in function parameters. For example, let's try to use `Equatable` as an existential:
 
-```
+```Swift
 protocol Equatable {
   func ==(lhs: Self, rhs: Self) -> Bool
   func !=(lhs: Self, rhs: Self) -> Bool
@@ -731,7 +733,7 @@ if e1 == e2 { ... } // error: e1 and e2 don't necessarily have the same dynamic 
 
 One explicit way to allow such operations in a type-safe manner is to introduce an "open existential" operation of some sort, which extracts and gives a name to the dynamic type stored inside an existential. For example:
 
-```  
+```Swift
 if let storedInE1 = e1 openas T {     // T is a the type of storedInE1, a copy of the value stored in e1
   if let storedInE2 = e2 as? T {      // is e2 also a T?
     if storedInE1 == storedInE2 { ... } // okay: storedInT1 and storedInE2 are both of type T, which we know is Equatable

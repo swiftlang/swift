@@ -14,8 +14,6 @@
 import Swift
 
 struct _Prespecialize {
-  class C {}
-
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
   static internal func _specializeArrays() {

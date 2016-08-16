@@ -390,8 +390,8 @@ public:
     return MangledName == "Ps9AnyObject_";
   }
 
-  bool isErrorProtocol() const {
-    return MangledName == "Ps13ErrorProtocol_";
+  bool isError() const {
+    return MangledName == "Ps5Error_";
   }
 
   const std::string &getMangledName() const {

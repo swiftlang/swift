@@ -77,7 +77,7 @@ Boxes
 ~~~~~
 
 These are used for heap-allocating mutable values captured in closures, for
-indirect enum cases, and for ErrorProtocol existential values. They have an
+indirect enum cases, and for Error existential values. They have an
 identifying isa pointer and reference count, but the isa pointer is shared by
 all boxes and thus does not describe the heap layout of the box.
 

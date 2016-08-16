@@ -219,14 +219,22 @@ enum class NameLookupFlags {
   KnownPrivate = 0x01,
   /// Whether name lookup should be able to find protocol members.
   ProtocolMembers = 0x02,
+  /// Whether we should map the requirement to the witness if we
+  /// find a protocol member and the base type is a concrete type.
+  ///
+  /// If this is not set but ProtocolMembers is set, we will
+  /// find protocol extension members, but not protocol requirements
+  /// that do not yet have a witness (such as inferred associated
+  /// types, or witnesses for derived conformances).
+  PerformConformanceCheck = 0x04,
   /// Whether to perform 'dynamic' name lookup that finds @objc
   /// members of any class or protocol.
-  DynamicLookup = 0x04,
+  DynamicLookup = 0x08,
   /// Whether we're only looking for types.
-  OnlyTypes = 0x08,
+  OnlyTypes = 0x10,
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
-  IgnoreAccessibility = 0x10,
+  IgnoreAccessibility = 0x20,
 };
 
 /// A set of options that control name lookup.
@@ -239,19 +247,24 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 
 /// Default options for member name lookup.
 const NameLookupOptions defaultMemberLookupOptions
-  = NameLookupFlags::DynamicLookup | NameLookupFlags::ProtocolMembers;
+  = NameLookupFlags::DynamicLookup |
+    NameLookupFlags::ProtocolMembers |
+    NameLookupFlags::PerformConformanceCheck;
 
 /// Default options for constructor lookup.
 const NameLookupOptions defaultConstructorLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+  = NameLookupFlags::ProtocolMembers |
+    NameLookupFlags::PerformConformanceCheck;
 
 /// Default options for member type lookup.
 const NameLookupOptions defaultMemberTypeLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+  = NameLookupFlags::ProtocolMembers |
+    NameLookupFlags::PerformConformanceCheck;
 
 /// Default options for unqualified name lookup.
 const NameLookupOptions defaultUnqualifiedLookupOptions
-  = NameLookupFlags::ProtocolMembers;
+  = NameLookupFlags::ProtocolMembers |
+    NameLookupFlags::PerformConformanceCheck;
 
 /// Describes the result of comparing two entities, of which one may be better
 /// or worse than the other, or they are unordered.
@@ -319,12 +332,16 @@ enum TypeResolutionFlags : unsigned {
   /// Whether we are validating the type for SIL.
   TR_SILType = 0x10,
 
+  /// Whether we are parsing a SIL file.  Not the same as TR_SILType,
+  /// because the latter is not set if we're parsing an AST type.
+  TR_SILMode = 0x20,
+
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
-  TR_FunctionInput = 0x20,
+  TR_FunctionInput = 0x40,
 
   /// Whether this is the immediate input type to a function type,
-  TR_ImmediateFunctionInput = 0x40,
+  TR_ImmediateFunctionInput = 0x80,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.
@@ -460,12 +477,18 @@ public:
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
-  /// Caches whether a particular type is accessible from a particular file
-  /// unit.
+  using TypeAccessScopeCacheMap = llvm::DenseMap<Type, const DeclContext *>;
+
+  /// Caches the outermost scope where a particular type can be used, relative
+  /// to a particular file.
+  ///
+  /// The file is used to handle things like \c \@testable. A null-but-present
+  /// value means the type is public.
   ///
   /// This can't use CanTypes because typealiases may have more limited types
   /// than their underlying types.
-  llvm::DenseMap<Type, Accessibility> TypeAccessibilityCache;
+  llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
+    TypeAccessScopeCache;
 
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
@@ -734,6 +757,8 @@ public:
                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
+  void validateDecl(OperatorDecl *decl);
+  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Resolves the accessibility of the given declaration.
   void validateAccessibility(ValueDecl *D);
@@ -774,6 +799,7 @@ public:
   /// to be in a correct and valid form.
   ///
   /// \param type The generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
@@ -786,8 +812,8 @@ public:
   /// error.
   ///
   /// \see applyUnboundGenericArguments
-  Type applyGenericArguments(Type type, SourceLoc loc, DeclContext *dc,
-                             GenericIdentTypeRepr *generic,
+  Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
+                             DeclContext *dc, GenericIdentTypeRepr *generic,
                              bool isGenericSignature,
                              GenericTypeResolver *resolver);
 
@@ -797,7 +823,8 @@ public:
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
   ///
-  /// \param unbound The unbound generic type to which to apply arguments.
+  /// \param type The unbound generic type to which to apply arguments.
+  /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
@@ -809,8 +836,8 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(UnboundGenericType *unbound, SourceLoc loc,
-                                    DeclContext *dc,
+  Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
+                                    SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     bool isGenericSignature,
                                     GenericTypeResolver *resolver);
@@ -960,11 +987,6 @@ public:
     handleExternalDecl(nominal);
   }
 
-  /// Determine attributes for the given function and curry level, with a level
-  /// of 0 indicating the innermost function.
-  AnyFunctionType::ExtInfo
-  applyFunctionTypeAttributes(AbstractFunctionDecl *func, unsigned i);
-
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
@@ -1018,6 +1040,12 @@ public:
                       GenericSignature *outerSignature,
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
+
+  /// Finalize the given generic parameter list, assigning archetypes to
+  /// the generic parameters.
+  void finalizeGenericParamList(ArchetypeBuilder &builder,
+                                GenericParamList *genericParams,
+                                DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///
@@ -1189,12 +1217,17 @@ public:
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
   ///
+  /// \param baseCS If this type checking process is the simplification of
+  /// another constraint system, set the original constraint system. \c null
+  /// otherwise
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            TypeLoc convertType = TypeLoc(),
                            ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           ExprTypeCheckListener *listener = nullptr);
+                           ExprTypeCheckListener *listener = nullptr,
+                           constraints::ConstraintSystem *baseCS = nullptr);
 
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            ExprTypeCheckListener *listener) {
@@ -1362,7 +1395,8 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                            TypeResolutionOptions options,
-                           GenericTypeResolver *resolver = nullptr);
+                           GenericTypeResolver *resolver = nullptr,
+                           TypeLoc tyLoc = TypeLoc());
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);
 
@@ -1370,7 +1404,7 @@ public:
   /// contextual type.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool coerceParameterListToType(ParameterList *P, DeclContext *dc, Type type);
+  bool coerceParameterListToType(ParameterList *P, ClosureExpr *CE, AnyFunctionType *FN);
 
   
   /// Type-check an initialized variable pattern declaration.
@@ -1579,6 +1613,10 @@ public:
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
 
+  /// Mark any _BridgedNSError/_BridgedStoredNSError/related
+  /// conformances in the given type as "used".
+  void useBridgedNSErrorConformances(DeclContext *dc, Type type);
+
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".
@@ -1657,6 +1695,14 @@ public:
                                   NameLookupOptions options
                                     = defaultConstructorLookupOptions);
 
+  /// Given an expression that's known to be an infix operator,
+  /// look up its precedence group.
+  PrecedenceGroupDecl *
+  lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
+
+  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
+                                             SourceLoc nameLoc);
+
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);
 
@@ -1710,7 +1756,8 @@ public:
   /// the given set of declarations.
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
-                     bool isSpecialized = false);
+                     bool isSpecialized,
+                     FunctionRefKind functionRefKind);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.
@@ -1951,6 +1998,7 @@ public:
   /// Check for a typo correction.
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
+                             Type baseTypeOrNull,
                              DeclName name,
                              SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,

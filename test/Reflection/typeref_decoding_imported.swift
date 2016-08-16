@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/ImportedTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/libTypesToReflect.%target-dylib-extension -I %S/Inputs
-// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-reflection-dump -binary-filename %t/libTypesToReflect.%target-dylib-extension | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 // CHECK-32: FIELDS:
 // CHECK-32: =======
@@ -25,7 +25,7 @@
 // CHECK-32: ==============
 
 // CHECK-32: - __C.MyCStruct:
-// CHECK-32: Size: 9
+// CHECK-32: Size: 12
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 12
 // CHECK-32: NumExtraInhabitants: 0
@@ -43,7 +43,7 @@
 // CHECK-32: NumExtraInhabitants: 0
 
 // CHECK-i386: - __C.MyCStructWithBitfields:
-// CHECK-i386: Size: 2
+// CHECK-i386: Size: 4
 // CHECK-i386: Alignment: 4
 // CHECK-i386: Stride: 4
 // CHECK-i386: NumExtraInhabitants: 0
@@ -81,7 +81,7 @@
 // CHECK-64: ==============
 
 // CHECK-64: - __C.MyCStruct:
-// CHECK-64: Size: 17
+// CHECK-64: Size: 24
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 24
 // CHECK-64: NumExtraInhabitants: 0
@@ -99,7 +99,7 @@
 // CHECK-64: NumExtraInhabitants: 0
 
 // CHECK-64: - __C.MyCStructWithBitfields:
-// CHECK-64: Size: 2
+// CHECK-64: Size: 4
 // CHECK-64: Alignment: 4
 // CHECK-64: Stride: 4
 // CHECK-64: NumExtraInhabitants: 0

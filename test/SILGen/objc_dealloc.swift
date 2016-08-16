@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -10,6 +10,12 @@ func onDestruct() { }
 @requires_stored_property_inits
 class SwiftGizmo : Gizmo {
   var x = X()
+
+  // CHECK-LABEL: sil hidden [transparent] @_TIvC12objc_dealloc10SwiftGizmo1xCS_1Xi : $@convention(thin) () -> @owned X
+  // CHECK:      [[FN:%.*]] = function_ref @_TFC12objc_dealloc1XCfT_S0_ : $@convention(method) (@thick X.Type) -> @owned X
+  // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick X.Type
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thick X.Type) -> @owned X
+  // CHECK-NEXT: return [[RESULT]] : $X
 
   // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoc
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
@@ -34,7 +40,7 @@ class SwiftGizmo : Gizmo {
     // CHECK-NOT: ref_element_addr
 
     // Call super -dealloc.
-    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : Gizmo -> () , $@convention(objc_method) (Gizmo) -> ()
+    // CHECK:   [[SUPER_DEALLOC:%[0-9]+]] = super_method [[SELF]] : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> () , $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   [[SUPER:%[0-9]+]] = upcast [[SELF]] : $SwiftGizmo to $Gizmo
     // CHECK:   [[SUPER_DEALLOC_RESULT:%[0-9]+]] = apply [[SUPER_DEALLOC]]([[SUPER]]) : $@convention(objc_method) (Gizmo) -> ()
     // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
@@ -55,9 +61,8 @@ class SwiftGizmo : Gizmo {
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
-  // CHECK:        [[XCTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc1XC
-  // CHECK-NEXT:   [[XMETA:%[0-9]+]] = metatype $@thick X.Type
-  // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XCTOR]]([[XMETA]]) : $@convention(method) (@thick X.Type) -> @owned X
+  // CHECK:        [[XINIT:%[0-9]+]] = function_ref @_TIvC12objc_dealloc10SwiftGizmo1xCS_1Xi
+  // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x
   // CHECK-NEXT:   assign [[XOBJ]] to [[X]] : $*X
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo

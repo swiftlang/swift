@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class C {
   required init() { }
@@ -7,7 +7,7 @@ class C {
 // CHECK-LABEL: sil hidden @_TF12dynamic_init15testDynamicInit
 func testDynamicInit(cm: C.Type) {
   // CHECK: bb0([[CM:%[0-9]+]] : $@thick C.Type):
-  // CHECK:   [[METHOD:%[0-9]+]] = class_method [[CM]] : $@thick C.Type, #C.init!allocator.1 : C.Type -> () -> C , $@convention(method) (@thick C.Type) -> @owned C
+  // CHECK:   [[METHOD:%[0-9]+]] = class_method [[CM]] : $@thick C.Type, #C.init!allocator.1 : (C.Type) -> () -> C , $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   [[C_OBJ:%[0-9]+]] = apply [[METHOD]]([[CM]]) : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   strong_release [[C_OBJ]] : $C
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()

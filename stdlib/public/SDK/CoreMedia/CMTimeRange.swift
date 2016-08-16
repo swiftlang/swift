@@ -52,10 +52,10 @@ extension CMTimeRange {
     return CMTimeRangeGetIntersection(self, otherRange)
   }
   public func containsTime(_ time: CMTime) -> Bool {
-    return CMTimeRangeContainsTime(self, time).boolValue
+    return CMTimeRangeContainsTime(self, time)
   }
   public func containsTimeRange(_ range: CMTimeRange) -> Bool {
-    return CMTimeRangeContainsTimeRange(self, range).boolValue
+    return CMTimeRangeContainsTimeRange(self, range)
   }
 }
 
@@ -76,10 +76,10 @@ extension CMTimeRange : Equatable {}
 
 // CMTimeRangeEqual
 public func == (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
-  return CMTimeRangeEqual(range1, range2).boolValue
+  return CMTimeRangeEqual(range1, range2)
 }
 
 public func != (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
-  return !CMTimeRangeEqual(range1, range2).boolValue
+  return !CMTimeRangeEqual(range1, range2)
 }
 

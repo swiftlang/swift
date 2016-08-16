@@ -39,7 +39,6 @@ func test1() {
 protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}
 
 // Explicit conformance checks (successful).
-protocol Any { }
 
 protocol CustomStringConvertible { func print() } // expected-note{{protocol requires function 'print()' with type '() -> ()'}} expected-note{{protocol requires}} expected-note{{protocol requires}} expected-note{{protocol requires}}
 
@@ -71,7 +70,7 @@ class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'N
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
-  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(format: TestFormat) -> ()'}}
+  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(TestFormat) -> ()'}}
 }
 
 // Circular protocols
@@ -102,13 +101,6 @@ protocol C : E { }
 protocol H : E { }
 protocol E { }
 
-struct disallownonglobal { protocol P {} } // expected-error {{declaration is only valid at file scope}}
-
-protocol disallownestp { protocol P {} } // expected-error {{type not allowed here}}
-protocol disallownests { struct S {} } // expected-error {{type not allowed here}}
-protocol disallownestc { class C {} } // expected-error {{type not allowed here}}
-protocol disallownesto { enum O {} } // expected-error {{type not allowed here}}
-
 //===----------------------------------------------------------------------===//
 // Associated types
 //===----------------------------------------------------------------------===//
@@ -125,7 +117,7 @@ struct IsNotSimpleAssoc : SimpleAssoc {} // expected-error{{type 'IsNotSimpleAss
 
 protocol StreamWithAssoc {
   associatedtype Element
-  func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> Element'}}
+  func get() -> Element // expected-note{{protocol requires function 'get()' with type '() -> NotAStreamType.Element'}}
 }
 
 struct AnRange<Int> : StreamWithAssoc {
@@ -178,7 +170,7 @@ extension IntIterator : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> Int {}
 }
 
@@ -208,7 +200,7 @@ struct HasNoDefaultArg : ProtoWithDefaultArg {
 // Variadic function requirements
 //===----------------------------------------------------------------------===//
 protocol IntMaxable {
-  func intmax(first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(first: Int, rest: Int...) -> Int'}}
+  func intmax(first: Int, rest: Int...) -> Int // expected-note 2{{protocol requires function 'intmax(first:rest:)' with type '(Int, Int...) -> Int'}}
 }
 
 struct HasIntMax : IntMaxable {
@@ -216,18 +208,18 @@ struct HasIntMax : IntMaxable {
 }
 
 struct NotIntMax1 : IntMaxable  { // expected-error{{type 'NotIntMax1' does not conform to protocol 'IntMaxable'}}
-  func intmax(first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: [Int]) -> Int'}}
+  func intmax(first: Int, rest: [Int]) -> Int {} // expected-note{{candidate has non-matching type '(Int, [Int]) -> Int'}}
 }
 
 struct NotIntMax2 : IntMaxable { // expected-error{{type 'NotIntMax2' does not conform to protocol 'IntMaxable'}}
-  func intmax(first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(first: Int, rest: Int) -> Int'}}
+  func intmax(first: Int, rest: Int) -> Int {} // expected-note{{candidate has non-matching type '(Int, Int) -> Int'}}
 }
 
 //===----------------------------------------------------------------------===//
 // 'Self' type
 //===----------------------------------------------------------------------===//
 protocol IsEqualComparable {
-  func isEqual(other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(other: WrongIsEqual) -> Bool'}}
+  func isEqual(other: Self) -> Bool // expected-note{{protocol requires function 'isEqual(other:)' with type '(WrongIsEqual) -> Bool'}}
 }
 
 struct HasIsEqual : IsEqualComparable {
@@ -235,7 +227,7 @@ struct HasIsEqual : IsEqualComparable {
 }
 
 struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual' does not conform to protocol 'IsEqualComparable'}}
-  func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(other: Int) -> Bool'}}
+  func isEqual(other: Int) -> Bool {}  // expected-note{{candidate has non-matching type '(Int) -> Bool'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -318,18 +310,18 @@ func StaticProtocolGenericFunc<t : StaticP>(_: t) {
 // Operators
 //===----------------------------------------------------------------------===//
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Int : Eq { }
 
 // Matching prefix/postfix.
-prefix operator <> {}
-postfix operator <> {}
+prefix operator <>
+postfix operator <>
 
 protocol IndexValue {
-  prefix func <> (_ max: Self) -> Int
-  postfix func <> (min: Self) -> Int
+  static prefix func <> (_ max: Self) -> Int
+  static postfix func <> (min: Self) -> Int
 }
 
 prefix func <> (max: Int) -> Int  { return 0 }
@@ -424,7 +416,7 @@ protocol P1 {
 protocol P2 {
 }
 
-struct X3<T : P1 where T.Assoc : P2> { }
+struct X3<T : P1> where T.Assoc : P2 {}
 
 struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}}
   func getX1() -> X3<X4> { return X3() }

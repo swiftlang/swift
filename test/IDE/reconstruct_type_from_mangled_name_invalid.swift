@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
 
 struct GS<T> {
 // CHECK: decl: struct GS<T> for 'GS'

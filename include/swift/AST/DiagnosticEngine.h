@@ -378,6 +378,10 @@ namespace swift {
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
       return fixItReplaceChars(Start, End, {});
     }
+
+    /// \brief Add two replacement fix-it exchanging source ranges to the
+    /// currently-active diagnostic.
+    InFlightDiagnostic &fixItExchange(SourceRange R1, SourceRange R2);
   };
 
   /// \brief Class to track, map, and remap diagnostic severity and fatality

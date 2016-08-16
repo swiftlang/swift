@@ -16,18 +16,18 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(Locale)") {
   // these locales happens to be the same as the actual current locale.
   do {
     let result = withOverriddenLocaleCurrentLocale(
-      Locale(localeIdentifier: "en_US")) {
+      Locale(identifier: "en_US") as NSLocale) {
       () -> Int in
-      expectEqual("en_US", Locale.current().localeIdentifier)
+      expectEqual("en_US", Locale.current.identifier)
       return 42
     }
     expectEqual(42, result)
   }
   do {
     let result = withOverriddenLocaleCurrentLocale(
-      Locale(localeIdentifier: "uk")) {
+      Locale(identifier: "uk") as NSLocale) {
       () -> Int in
-      expectEqual("uk", Locale.current().localeIdentifier)
+      expectEqual("uk", Locale.current.identifier)
       return 42
     }
     expectEqual(42, result)
@@ -36,13 +36,13 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(Locale)") {
 
 FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(Locale)/nested") {
   withOverriddenLocaleCurrentLocale(
-    Locale(localeIdentifier: "uk")) {
+    Locale(identifier: "uk") as NSLocale) {
     () -> Void in
 
     expectCrashLater()
 
     withOverriddenLocaleCurrentLocale(
-      Locale(localeIdentifier: "uk")) {
+      Locale(identifier: "uk") as NSLocale) {
       () -> Void in
 
       return ()
@@ -56,7 +56,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenLocaleCurrentLocale("en_US") {
       () -> Int in
-      expectEqual("en_US", Locale.current().localeIdentifier)
+      expectEqual("en_US", Locale.current.identifier)
       return 42
     }
     expectEqual(42, result)
@@ -64,7 +64,7 @@ FoundationExtrasTests.test("withOverriddenLocaleCurrentLocale(String)") {
   do {
     let result = withOverriddenLocaleCurrentLocale("uk") {
       () -> Int in
-      expectEqual("uk", Locale.current().localeIdentifier)
+      expectEqual("uk", Locale.current.identifier)
       return 42
     }
     expectEqual(42, result)

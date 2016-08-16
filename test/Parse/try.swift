@@ -1,11 +1,20 @@
 // RUN: %target-parse-verify-swift
 
 // Intentionally has lower precedence than assignments and ?:
-infix operator %%%% { associativity none precedence 50 }
+infix operator %%%% : LowPrecedence
+precedencegroup LowPrecedence {
+  associativity: none
+  lowerThan: AssignmentPrecedence
+}
 func %%%%<T,U>(x:T, y:U) -> Int { return 0 }
 
 // Intentionally has lower precedence between assignments and ?:
-infix operator %%% { associativity none precedence 95 }
+infix operator %%% : MiddlingPrecedence
+precedencegroup MiddlingPrecedence {
+  associativity: none
+  higherThan: AssignmentPrecedence
+  lowerThan: TernaryPrecedence
+}
 func %%%<T,U>(x:T, y:U) -> Int { return 1 }
 
 func foo() throws -> Int { return 0 }
@@ -31,7 +40,7 @@ a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of 
 var b = true ? try! foo() : try! bar() + 0
 var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}
 
-infix operator ?+= { associativity right precedence 90 assignment }
+infix operator ?+= : AssignmentPrecedence
 func ?+=(lhs: inout Int?, rhs: Int?) {
   lhs = lhs! + rhs!
 }
@@ -42,10 +51,10 @@ i = try? foo() + bar()
 i ?+= try? foo() + bar()
 i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}} // expected-warning {{result of operator '%%%%' is unused}}
 i ?+= try? foo() %%% bar()
-_ = foo() < try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
-_ = (try? foo()) < bar() // expected-error {{call can throw but is not marked with 'try'}}
-_ = foo() < (try? bar()) // expected-error {{call can throw but is not marked with 'try'}}
-_ = (try? foo()) < (try? bar())
+_ = foo() == try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) == bar() // expected-error {{call can throw but is not marked with 'try'}}
+_ = foo() == (try? bar()) // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) == (try? bar())
 
 let j = true ? try? foo() : try? bar() + 0
 let k = true ? try? foo() : try? bar() %%% 0 // expected-error {{'try?' following conditional operator does not cover everything to its right}}
@@ -68,7 +77,7 @@ func test() throws -> Int {
   ; // Reset parser.
 
   try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
-  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorProtocol'}}
+  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'Error'}}
   try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
 }
 
@@ -83,7 +92,7 @@ let _ = (try? "foo"*"bar") ?? 0
 
 
 // <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows
-func rethrowsDispatchError(handleError: ((ErrorProtocol) throws -> ()), body: () throws -> ()) rethrows {
+func rethrowsDispatchError(handleError: ((Error) throws -> ()), body: () throws -> ()) rethrows {
   do {
     body()   // expected-error {{call can throw but is not marked with 'try'}}
   } catch {
@@ -110,11 +119,11 @@ let _: String = doubleOptional // expected-error {{cannot convert value of type 
 func maybeThrow() throws {}
 try maybeThrow() // okay
 try! maybeThrow() // okay
-try? maybeThrow() // expected-warning {{result of 'try?' is unused}}
+try? maybeThrow() // okay since return type of maybeThrow is Void
 _ = try? maybeThrow() // okay
 
 let _: () -> Void = { try! maybeThrow() } // okay
-let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?' is unused}}
+let _: () -> Void = { try? maybeThrow() } // okay since return type of maybeThrow is Void
 
 
 if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=((}} {{21-21=) != nil)}}

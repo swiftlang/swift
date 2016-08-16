@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | FileCheck %s -implicit-check-not="FAILURE"
+// RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
@@ -45,7 +45,7 @@ func f1() {
 
   s1ins.s1f1()
 // CHECK: type: Mystruct1
-// CHECK: type: Mystruct1 -> () -> Int
+// CHECK: type: (Mystruct1) -> () -> Int
 
   if let ifletf1 = Int?(1) {
 // FIXME: lookup incorrect for if let binding.
@@ -65,29 +65,29 @@ class Myclass2 {
     arr1.append(1)
 // FIXME: missing append()
 // CHECK: dref: FAILURE	for 'append' usr=s:FSa6appendFxT_
-// CHECK: type: @lvalue Array<Int> -> Int -> ()
+// CHECK: type: (@lvalue Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
 // CHECK: type: Array<Mystruct1>
 
     arr2.append(Mystruct1())
-// CHECK: type: @lvalue Array<Mystruct1> -> Mystruct1 -> ()
+// CHECK: type: (@lvalue Array<Mystruct1>) -> (Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
 // CHECK: type: Array<Myclass1>
 
     arr3.append(Myclass1())
-// CHECK: type: @lvalue Array<Myclass1> -> Myclass1 -> ()
+// CHECK: type: (@lvalue Array<Myclass1>) -> (Myclass1) -> ()
 
     _ = Myclass2.init()
 // CHECK: dref: init()
   }
 }
 
-struct MyGenStruct1<T, U: StringLiteralConvertible, V: Sequence> {
-// CHECK: decl: struct MyGenStruct1<T, U : StringLiteralConvertible, V : Sequence>
+struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
+// CHECK: decl: struct MyGenStruct1<T, U : ExpressibleByStringLiteral, V : Sequence>
 // FIXME: why are these references to the base type?
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
 // CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeFn<T>(_ f : (T) -> T?) {}
 func liftOptional(_ x : Int) -> Int? { return x }
@@ -29,7 +29,7 @@ func test0() {
 
 // CHECK-LABEL: sil hidden @_TF10reabstract10testThrowsFP_T_
 // CHECK:         function_ref @_TTRXFo_iT__iT__XFo___
-// CHECK:         function_ref @_TTRXFo_iT__iT_zoPs13ErrorProtocol__XFo__zoPS___
+// CHECK:         function_ref @_TTRXFo_iT__iT_zoPs5Error__XFo__zoPS___
 func testThrows(_ x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
@@ -48,7 +48,7 @@ func notFun(_ c: inout C, i: Int) {}
 func testInoutOpaque(_ c: C, i: Int) {
   var c = c
   let box = Box(t: notFun)
-  box.t(&c, i: i)
+  box.t(&c, i)
 }
 
 // CHECK-LABEL: sil hidden @_TF10reabstract15testInoutOpaqueFTCS_1C1iSi_T_

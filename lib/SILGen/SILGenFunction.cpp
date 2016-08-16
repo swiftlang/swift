@@ -35,10 +35,12 @@ using namespace Lowering;
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
   : SGM(SGM), F(F),
     B(*this, createBasicBlock()),
+    OpenedArchetypesTracker(F),
     CurrentSILLoc(F.getLocation()),
     Cleanups(*this)
 {
   B.setCurrentDebugScope(F.getDebugScope());
+  B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been
@@ -118,6 +120,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
   case SILDeclRef::Kind::IVarDestroyer:
@@ -232,6 +236,28 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     canGuarantee = false;
   
   for (auto capture : captureInfo.getCaptures()) {
+    if (capture.isDynamicSelfMetadata()) {
+      // The parameter type is the static Self type, but the value we
+      // want to pass is the dynamic Self type, so upcast it.
+      auto dynamicSelfMetatype = MetatypeType::get(
+          captureInfo.getDynamicSelfType(),
+          MetatypeRepresentation::Thick)
+              ->getCanonicalType();
+      auto staticSelfMetatype = MetatypeType::get(
+          captureInfo.getDynamicSelfType()->getSelfType(),
+          MetatypeRepresentation::Thick)
+              ->getCanonicalType();
+      SILType dynamicSILType = SILType::getPrimitiveObjectType(
+          dynamicSelfMetatype);
+      SILType staticSILType = SILType::getPrimitiveObjectType(
+          staticSelfMetatype);
+
+      SILValue value = B.createMetatype(loc, dynamicSILType);
+      value = B.createUpcast(loc, value, staticSILType);
+      capturedArgs.push_back(ManagedValue::forUnmanaged(value));
+      continue;
+    }
+
     auto *vd = capture.getDecl();
 
     switch (SGM.Types.getDeclCaptureKind(capture)) {

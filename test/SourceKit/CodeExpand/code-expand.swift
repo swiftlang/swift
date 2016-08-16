@@ -1,4 +1,4 @@
-// RUN: %sourcekitd-test -req=expand-placeholder %s | FileCheck %s
+// RUN: %sourcekitd-test -req=expand-placeholder %s | %FileCheck %s
 
 foo(x: <#T##() -> Void#>)
 // CHECK:      foo {
@@ -15,7 +15,7 @@ anArr.indexOfObjectPassingTest(<#T##predicate: ((AnyObject!, Int, UnsafePointer<
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
-anArr.indexOfObjectPassingTest(<#T##predicate: ((obj: AnyObject!, idx: Int, stop: UnsafePointer<ObjCBool>) -> Bool)?##((obj: AnyObject!, idx: Int, stop: UnsafePointer<ObjCBool>) -> Bool)?#>)
+anArr.indexOfObjectPassingTest(<#T##predicate: ((_ obj: AnyObject!, _ idx: Int, _ stop: UnsafePointer<ObjCBool>) -> Bool)?##((_ obj: AnyObject!, _ idx: Int, _ stop: UnsafePointer<ObjCBool>) -> Bool)?#>)
 // CHECK:      anArr.indexOfObjectPassingTest { (obj, idx, stop) -> Bool in
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
@@ -54,3 +54,28 @@ func f1() {
   bar(<#T##d: () -> ()##() -> ()#>)
 }
 // CHECK-NOT: bar { () -> () in
+
+func f1() {
+  bar(<#T##d: () -> ()##() -> ()#>, <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK:   bar({
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	}, {
+// CHECK-NEXT:	<#code#>
+// CHECK-NEXT:	})
+
+
+func f1() {
+  bar(a : <#T##d: () -> ()##() -> ()#>, b : <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK: bar(a : {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }, b : {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: })
+
+
+func f1() {
+  bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
+}
+// CHECK: bar(a : {}}, <#T##d: () -> ()##() -> ()#>)

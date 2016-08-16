@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -o - | FileCheck %s
-
-// XFAIL: linux
+// RUN: %target-swift-frontend -O -primary-file %s -emit-sil -o - | %FileCheck %s
 
 // check if the compiler does not crash if a function is specialized
 // which contains a collection cast

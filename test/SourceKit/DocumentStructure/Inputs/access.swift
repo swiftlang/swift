@@ -3,6 +3,7 @@ class DefAccess {
   public var pubProp : Int = 0
   private var privProp : Int = 0
   internal func intFunc() {}
+  fileprivate func fpFunc() {}
 }
 
 public class PubAccess {
@@ -10,6 +11,7 @@ public class PubAccess {
   public var pubProp : Int = 0
   private var privProp : Int = 0
   internal func intFunc() {}
+  fileprivate func fpFunc() {}
 
   class Nested {
     func defFunc() {}
@@ -21,6 +23,7 @@ internal class IntAccess {
   public var pubProp : Int = 0
   private var privProp : Int = 0
   internal func intFunc() {}
+  fileprivate func fpFunc() {}
 }
 
 private class PrivAccess {
@@ -28,7 +31,8 @@ private class PrivAccess {
   public var pubProp : Int = 0
   private var privProp : Int = 0
   internal func intFunc() {}
-  
+  fileprivate func fpFunc() {}
+
   class Nested {
     func defFunc() {}
   }
@@ -47,6 +51,10 @@ public enum PubEnum {
 private(set) var defPrivSetProp : Int = 0;
 
 public private(set) var pubPrivSetProp : Int {
+  get { return 0; }
+  set { }
+}
+public fileprivate(set) var pubFPSetProp : Int {
   get { return 0; }
   set { }
 }

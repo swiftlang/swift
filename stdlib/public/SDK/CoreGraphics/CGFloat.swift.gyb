@@ -166,16 +166,16 @@ public struct CGFloat {
       exponent: exponent, significand: significand.native)
   }
 
+  public mutating func round(_ rule: FloatingPointRoundingRule) {
+    native.round(rule)
+  }
+
   public var nextUp: CGFloat {
     return CGFloat(native.nextUp)
   }
 
-  public var nextDown: CGFloat {
-    return CGFloat(native.nextDown)
-  }
-
-  public static func abs(_ x: CGFloat) -> CGFloat {
-    return CGFloat(NativeType.abs(x.native))
+  public var magnitude: CGFloat {
+    return CGFloat(Swift.abs(native))
   }
 
   public mutating func negate() {
@@ -202,8 +202,6 @@ public struct CGFloat {
     native.formTruncatingRemainder(dividingBy: other.native)
   }
 
-  /*  TODO: Need to call C sqrt and fma or llvm sqrt and fma intrinsics
-   *  for these to be implemented on the underlying types.
   public mutating func formRemainder(dividingBy other: CGFloat) {
     native.formRemainder(dividingBy: other.native)
   }
@@ -215,7 +213,6 @@ public struct CGFloat {
   public mutating func addProduct(_ lhs: CGFloat, _ rhs: CGFloat) {
     native.addProduct(lhs.native, rhs.native)
   }
-  */
 
   public func isEqual(to other: CGFloat) -> Bool {
     return self.native.isEqual(to: other.native)
@@ -297,6 +294,11 @@ extension CGFloat {
 
   @available(*, unavailable, renamed: "greatestFiniteMagnitude")
   public static var max: CGFloat {
+    fatalError("unavailable")
+  }
+
+  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  public static func abs(_ x: CGFloat) -> CGFloat {
     fatalError("unavailable")
   }
 }
@@ -604,26 +606,6 @@ public func tgamma(_ x: CGFloat) -> CGFloat {
 }
 
 @_transparent
-public func fabs(_ x: CGFloat) -> CGFloat {
-  return CGFloat(fabs(x.native))
-}
-
-@_transparent
-public func sqrt(_ x: CGFloat) -> CGFloat {
-  return CGFloat(sqrt(x.native))
-}
-
-@_transparent
-public func ceil(_ x: CGFloat) -> CGFloat {
-  return CGFloat(ceil(x.native))
-}
-
-@_transparent
-public func floor(_ x: CGFloat) -> CGFloat {
-  return CGFloat(floor(x.native))
-}
-
-@_transparent
 public func nearbyint(_ x: CGFloat) -> CGFloat {
   return CGFloat(nearbyint(x.native))
 }
@@ -631,16 +613,6 @@ public func nearbyint(_ x: CGFloat) -> CGFloat {
 @_transparent
 public func rint(_ x: CGFloat) -> CGFloat {
   return CGFloat(rint(x.native))
-}
-
-@_transparent
-public func round(_ x: CGFloat) -> CGFloat {
-  return CGFloat(round(x.native))
-}
-
-@_transparent
-public func trunc(_ x: CGFloat) -> CGFloat {
-  return CGFloat(trunc(x.native))
 }
 
 @_transparent
@@ -656,16 +628,6 @@ public func hypot(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
 @_transparent
 public func pow(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
   return CGFloat(pow(lhs.native, rhs.native))
-}
-
-@_transparent
-public func fmod(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
-  return CGFloat(fmod(lhs.native, rhs.native))
-}
-
-@_transparent
-public func remainder(_ lhs: CGFloat, _ rhs: CGFloat) -> CGFloat {
-  return CGFloat(remainder(lhs.native, rhs.native))
 }
 
 @_transparent
@@ -756,11 +718,6 @@ public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
 @_transparent
 public func nan(_ tag: String) -> CGFloat {
   return CGFloat(nan(tag) as CGFloat.NativeType)
-}
-
-@_transparent
-public func fma(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) -> CGFloat {
-  return CGFloat(fma(x.native, y.native, z.native))
 }
 
 @_transparent

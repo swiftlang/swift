@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
 // CHECK:         [[SHADOW:%.*]] = alloc_box $Optional<Int>
@@ -45,7 +45,7 @@ func assign_iuo_lvalue_implicit(_ s: inout S!, _ y: Int) {
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@in Int) -> @out Int
 func assign_optional_lvalue_reabstracted(_ x: inout ((Int) -> Int)?,
-                                         _ y: (Int) -> Int) {
+                                         _ y: @escaping (Int) -> Int) {
   x! = y
 }
 

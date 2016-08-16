@@ -755,8 +755,7 @@ void Lexer::lexOperatorIdentifier() {
 
       // Otherwise, it is probably a missing member.
       diagnose(TokStart, diag::expected_member_name);
-      //return formToken(tok::unknown, TokStart);
-      return lexImpl();
+      return formToken(tok::unknown, TokStart);
     }
     case '?':
       if (leftBound)
@@ -806,7 +805,7 @@ void Lexer::lexOperatorIdentifier() {
   return formToken(leftBound ? tok::oper_postfix : tok::oper_prefix, TokStart);
 }
 
-/// lexDollarIdent - Match $[0-9a-zA-Z_$]*
+/// lexDollarIdent - Match $[0-9a-zA-Z_$]+
 void Lexer::lexDollarIdent() {
   const char *tokStart = CurPtr-1;
   assert(*tokStart == '$');
@@ -827,10 +826,15 @@ void Lexer::lexDollarIdent() {
     }
   }
 
-  // It's always an error to see a standalone $, and we reserve
-  // $nonNumeric for persistent bindings in the debugger.
-  if (CurPtr == tokStart + 1 || !isAllDigits) {
-    if (!isAllDigits && !LangOpts.EnableDollarIdentifiers)
+  // It's always an error to see a standalone $
+  if (CurPtr == tokStart + 1) {
+    diagnose(tokStart, diag::expected_dollar_numeric);
+    return formToken(tok::unknown, tokStart);
+  }
+
+  // We reserve $nonNumeric for persistent bindings in the debugger.
+  if (!isAllDigits) {
+    if (!LangOpts.EnableDollarIdentifiers)
       diagnose(tokStart, diag::expected_dollar_numeric);
 
     // Even if we diagnose, we go ahead and form an identifier token,
@@ -862,8 +866,11 @@ void Lexer::lexHexNumber() {
   if (*CurPtr != '.' && *CurPtr != 'p' && *CurPtr != 'P')
     return formToken(tok::integer_literal, TokStart);
   
+  const char *PtrOnDot = nullptr;
+
   // (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?
   if (*CurPtr == '.') {
+    PtrOnDot = CurPtr;
     ++CurPtr;
     
     // If the character after the '.' is not a digit, assume we have an int
@@ -876,6 +883,11 @@ void Lexer::lexHexNumber() {
     while (isHexDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
     if (*CurPtr != 'p' && *CurPtr != 'P') {
+      if (!isDigit(PtrOnDot[1])) {
+        // e.g: 0xff.description
+        CurPtr = PtrOnDot;
+        return formToken(tok::integer_literal, TokStart);
+      }
       diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
       return formToken(tok::unknown, TokStart);
     }
@@ -885,10 +897,19 @@ void Lexer::lexHexNumber() {
   assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
   ++CurPtr;
   
-  if (*CurPtr == '+' || *CurPtr == '-')
+  bool signedExponent = false;
+  if (*CurPtr == '+' || *CurPtr == '-') {
     ++CurPtr;  // Eat the sign.
+    signedExponent = true;
+  }
 
   if (!isDigit(*CurPtr)) {
+    if (PtrOnDot && !isDigit(PtrOnDot[1]) && !signedExponent) {
+      // e.g: 0xff.fpValue, 0xff.fp
+      CurPtr = PtrOnDot;
+      return formToken(tok::integer_literal, TokStart);
+    }
+    // Note: 0xff.fp+otherExpr can be valid expression. But we don't accept it.
     diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
     return formToken(tok::unknown, TokStart);
   }

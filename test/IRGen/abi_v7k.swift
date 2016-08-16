@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -module-name test_v7k | FileCheck %s
-// RUN: %target-swift-frontend -S -primary-file %s -module-name test_v7k | FileCheck -check-prefix=V7K %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -module-name test_v7k | %FileCheck %s
+// RUN: %target-swift-frontend -S -primary-file %s -module-name test_v7k | %FileCheck -check-prefix=V7K %s
 
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
@@ -194,10 +194,20 @@ func testMultiP(x: MultiPayload) -> Double {
 }
 
 // CHECK-LABEL: define hidden float @_TF8test_v7k7testOpt{{.*}}(i32, i1)
-// CHECK: [[ID:%[0-9]+]] = load float, float* 
+// CHECK: entry:
+// CHECK: br i1 %1, {{.*}}, label %[[PAYLOADLABEL:.*]]
+// CHECK: <label>:[[PAYLOADLABEL]]
+// CHECK: [[ID:%[0-9]+]] = bitcast i32 %0 to float
 // CHECK: ret float [[ID]]
 // V7K-LABEL: __TF8test_v7k7testOpt
-// V7K: vldr s0
+// V7K:         tst     r1, #1
+// V7K:         str     r0, [r7, #-4]
+// V7K:         beq     [[RET:LBB.*]]
+// V7K: [[RET]]:
+// V7K:         ldr     r0, [r7, #-4]
+// V7K:         vmov    s0, r0
+// V7K:         mov     sp, r7
+// V7K:         pop     {r7, pc}
 func testOpt(x: Float?) -> Float {
   return x!
 }
@@ -275,7 +285,7 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax2{{.*}}({{%Sq.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax2{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax2
 // We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
 // V7K: cmp r1, r2
@@ -303,7 +313,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax3{{.*}}({{%Sq.*}} noalias nocapture sret, i32, i32)
+// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax3{{.*}}({{%GSq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax3
 struct Ret {
   var min:Int

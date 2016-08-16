@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -module-name Swift -parse-stdlib %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 enum Optional<Wrapped> {
   case none
@@ -110,30 +110,30 @@ func genericMetatypeToGenericMetatype<U>(_ x: U.Type) {
 // CHECK-LABEL: sil hidden @_TFs27static_metatype_of_metatypeFVs1SMMS_
 // CHECK:         metatype $@thin S.Type.Type
 func static_metatype_of_metatype(_ x: S) -> S.Type.Type {
-  return x.dynamicType.dynamicType
+  return type(of: type(of: x))
 }
 
 // CHECK-LABEL: sil hidden @_TFs26class_metatype_of_metatypeFCs1CMMS_
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick C.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick C.Type.Type, [[METATYPE]]
 func class_metatype_of_metatype(_ x: C) -> C.Type.Type {
-  return x.dynamicType.dynamicType
+  return type(of: type(of: x))
 }
 
 // CHECK-LABEL: sil hidden @_TFs28generic_metatype_of_metatype
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick T.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick T.Type.Type, [[METATYPE]]
 func generic_metatype_of_metatype<T>(_ x: T) -> T.Type.Type {
-  return x.dynamicType.dynamicType
+  return type(of: type(of: x))
 }
 
 // FIXME rdar://problem/18419772
 /*
-func existential_metatype_of_metatype(_ x: protocol<>) -> protocol<>.Type.Type {
-  return x.dynamicType.dynamicType
+func existential_metatype_of_metatype(_ x: Any) -> Any.Type.Type {
+ return type(of: type(of: x))
 }
  */
 
-func function_metatype_of_metatype(_ x: () -> ()) -> (() -> ()).Type.Type {
-  return x.dynamicType.dynamicType
+func function_metatype_of_metatype(_ x: @escaping () -> ()) -> (() -> ()).Type.Type {
+  return type(of: type(of: x))
 }

@@ -49,8 +49,7 @@ UnaryIntrinsicFunctions = [
     'cos', 'sin',
     'exp', 'exp2',
     'log', 'log10', 'log2',
-    'fabs',
-    'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
+    'nearbyint', 'rint',
 ]
 
 def TypedUnaryIntrinsicFunctions():

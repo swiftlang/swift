@@ -94,6 +94,10 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
+def suppress_argument_labels_in_types :
+  Flag<["-"], "suppress-argument-labels-in-types">,
+  HelpText<"SE-0111: Suppress argument labels in types">;
+
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
@@ -107,6 +111,9 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
+
+def autolink_library : Separate<["-"], "autolink-library">,
+  HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 
@@ -216,9 +223,6 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
-def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
-  HelpText<"Enable experimental 'switch' pattern matching features">;
-
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
@@ -226,6 +230,10 @@ def enable_experimental_property_behaviors :
 def enable_experimental_nested_generic_types :
   Flag<["-"], "enable-experimental-nested-generic-types">,
   HelpText<"Enable experimental support for nested generic types">;
+
+def enable_experimental_collection_casts :
+  Flag<["-"], "enable-experimental-collection-casts">,
+  HelpText<"Enable experimental support for general collection casting">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -238,10 +246,6 @@ def enable_infer_import_as_member :
 def enable_swift_newtype :
   Flag<["-"], "enable-swift-newtype">,
   HelpText<"Enable the swift_newtype attribute">;
-
-def enable_strip_ns_prefix :
-  Flag<["-"], "enable-strip-ns-prefix">,
-  HelpText<"Strip 'NS' prefix from Foundation entities">;
 
 def swift3_migration :
   Flag<["-"], "swift3-migration">,
@@ -345,7 +349,7 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
-def enable_protocol_typealiases: Flag<["-"], "enable-protocol-typealiases">,
-  HelpText<"Enable typealiases inside protocol declarations">;
+def enable_id_as_any: Flag<["-"], "enable-id-as-any">,
+  HelpText<"Enable importing ObjC 'id' as Swift 'Any' type">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

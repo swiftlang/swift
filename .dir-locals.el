@@ -14,6 +14,7 @@
 
 ((nil
   (tab-width . 2)
+  (fill-column . 80)
   (eval .
         ;; Load the Swift project's settings.  To suppress this action
         ;; you can put "(provide 'swift-project-settings)" in your
@@ -36,9 +37,6 @@
  (c++-mode
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
- (swift-mode
-  (whitespace-style . (face lines indentation:space))
-  (eval . (whitespace-mode)))
  (objc-mode
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
@@ -46,6 +44,9 @@
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
  (swift-mode
+  (whitespace-style . (face lines indentation:space))
+  (eval . (whitespace-mode))
+  (swift-basic-offset . 2)
   (tab-always-indent . t)))
 
 ;; Local Variables:

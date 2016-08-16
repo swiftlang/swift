@@ -73,6 +73,7 @@
 #endif
 
 // Keywords that start decls.
+DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(class)
 DECL_KEYWORD(deinit)
 DECL_KEYWORD(enum)
@@ -83,13 +84,14 @@ DECL_KEYWORD(init)
 DECL_KEYWORD(inout)
 DECL_KEYWORD(let)
 DECL_KEYWORD(operator)
+DECL_KEYWORD(precedencegroup)
 DECL_KEYWORD(protocol)
 DECL_KEYWORD(struct)
 DECL_KEYWORD(subscript)
 DECL_KEYWORD(typealias)
-DECL_KEYWORD(associatedtype)
 DECL_KEYWORD(var)
 
+DECL_KEYWORD(fileprivate)
 DECL_KEYWORD(internal)
 DECL_KEYWORD(private)
 DECL_KEYWORD(public)
@@ -127,7 +129,7 @@ STMT_KEYWORD(catch)
 
 // Expression keywords.
 KEYWORD(as)
-KEYWORD(dynamicType)
+KEYWORD(Any)
 KEYWORD(false)
 KEYWORD(is)
 KEYWORD(nil)
@@ -190,7 +192,6 @@ POUND_KEYWORD(elseif)
 POUND_KEYWORD(endif)
 POUND_KEYWORD(keyPath)
 POUND_KEYWORD(line)
-POUND_KEYWORD(setline)
 POUND_KEYWORD(sourceLocation)
 POUND_KEYWORD(selector)
 
@@ -200,9 +201,9 @@ POUND_CONFIG(available)
 
 // Declaratively define object literals, including their
 // corresponding protocols.
-POUND_OBJECT_LITERAL(fileLiteral, "file reference", FileReferenceLiteralConvertible)
-POUND_OBJECT_LITERAL(imageLiteral, "image", ImageLiteralConvertible)
-POUND_OBJECT_LITERAL(colorLiteral, "color", ColorLiteralConvertible)
+POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
+POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
+POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
 
 POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
 POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)

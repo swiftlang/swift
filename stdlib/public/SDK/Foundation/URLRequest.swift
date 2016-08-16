@@ -15,7 +15,7 @@
 @available(*, deprecated, message: "Please use the struct type URLRequest")
 public typealias MutableURLRequest = NSMutableURLRequest
 
-public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equatable, Hashable {
+public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     public typealias ReferenceType = NSURLRequest
     public typealias CachePolicy = NSURLRequest.CachePolicy
     public typealias NetworkServiceType = NSURLRequest.NetworkServiceType
@@ -25,8 +25,8 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     */
     internal var _handle: _MutableHandle<NSMutableURLRequest>
     
-    internal mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape (NSMutableURLRequest) -> ReturnType) -> ReturnType {
-        if !isUniquelyReferencedNonObjC(&_handle) {
+    internal mutating func _applyMutation<ReturnType>(_ whatToDo : (NSMutableURLRequest) -> ReturnType) -> ReturnType {
+        if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._uncopiedReference()
             _handle = _MutableHandle(reference: ref)
         }
@@ -41,7 +41,7 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
         _handle = _MutableHandle(adoptingReference: NSMutableURLRequest(url: url, cachePolicy: cachePolicy, timeoutInterval: timeoutInterval))
     }
 
-    private init(_bridged request: NSURLRequest) {
+    fileprivate init(_bridged request: NSURLRequest) {
         _handle = _MutableHandle(reference: request.mutableCopy() as! NSMutableURLRequest)
     }
     
@@ -67,7 +67,7 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     
     /// Returns the timeout interval of the receiver.
     /// - discussion: The timeout interval specifies the limit on the idle
-    /// interval alloted to a request in the process of loading. The "idle
+    /// interval allotted to a request in the process of loading. The "idle
     /// interval" is defined as the period of time that has passed since the
     /// last instance of load activity occurred for a request that is in the
     /// process of loading. Hence, when an instance of load activity occurs
@@ -111,7 +111,7 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
     }
     
     /// `true` if the receiver is allowed to use the built in cellular radios to
-    /// satify the request, `false` otherwise.
+    /// satisfy the request, `false` otherwise.
     @available(OSX 10.8, iOS 6.0, *)
     public var allowsCellularAccess: Bool {
         get {
@@ -233,24 +233,44 @@ public struct URLRequest : ReferenceConvertible, CustomStringConvertible, Equata
         return _handle.map { $0.hashValue }
     }
     
-    public var description: String {
-        return _handle.map { $0.description }
-    }
-
-    public var debugDescription: String {
-        return _handle.map { $0.debugDescription }
+    public static func ==(lhs: URLRequest, rhs: URLRequest) -> Bool {
+        return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
     }
 }
 
-public func ==(lhs: URLRequest, rhs: URLRequest) -> Bool {
-    return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
+extension URLRequest : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+
+    public var description: String {
+        if let u = url {
+            return u.description
+        } else {
+            return "url: nil"
+        }
+    }
+    
+    public var debugDescription: String {
+        return self.description
+    }
+    
+    public var customMirror: Mirror {
+        var c: [(label: String?, value: Any)] = []
+        c.append((label: "url", value: url))
+        c.append((label: "cachePolicy", value: cachePolicy.rawValue))
+        c.append((label: "timeoutInterval", value: timeoutInterval))
+        c.append((label: "mainDocumentURL", value: mainDocumentURL))
+        c.append((label: "networkServiceType", value: networkServiceType))
+        c.append((label: "allowsCellularAccess", value: allowsCellularAccess))
+        c.append((label: "httpMethod", value: httpMethod))
+        c.append((label: "allHTTPHeaderFields", value: allHTTPHeaderFields))
+        c.append((label: "httpBody", value: httpBody))
+        c.append((label: "httpBodyStream", value: httpBodyStream))
+        c.append((label: "httpShouldHandleCookies", value: httpShouldHandleCookies))
+        c.append((label: "httpShouldUsePipelining", value: httpShouldUsePipelining))
+        return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
+    }
 }
 
 extension URLRequest : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSURLRequest.self
     }
@@ -275,3 +295,12 @@ extension URLRequest : _ObjectiveCBridgeable {
         return result!
     }
 }
+
+extension NSURLRequest : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as URLRequest)
+    }
+}
+

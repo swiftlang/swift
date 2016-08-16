@@ -2,11 +2,11 @@
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
-// RUN: %llvm-profdata show %t/default.profdata -function=f_internal | FileCheck %s --check-prefix=CHECK-INTERNAL
-// RUN: %llvm-profdata show %t/default.profdata -function=f_private | FileCheck %s --check-prefix=CHECK-PRIVATE
-// RUN: %llvm-profdata show %t/default.profdata -function=f_public | FileCheck %s --check-prefix=CHECK-PUBLIC
-// RUN: %llvm-profdata show %t/default.profdata -function=main | FileCheck %s --check-prefix=CHECK-MAIN
-// RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | FileCheck %s --check-prefix=CHECK-COV
+// RUN: %llvm-profdata show %t/default.profdata -function=f_internal | %FileCheck %s --check-prefix=CHECK-INTERNAL
+// RUN: %llvm-profdata show %t/default.profdata -function=f_private | %FileCheck %s --check-prefix=CHECK-PRIVATE
+// RUN: %llvm-profdata show %t/default.profdata -function=f_public | %FileCheck %s --check-prefix=CHECK-PUBLIC
+// RUN: %llvm-profdata show %t/default.profdata -function=main | %FileCheck %s --check-prefix=CHECK-MAIN
+// RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | %FileCheck %s --check-prefix=CHECK-COV
 // RUN: rm -rf %t
 
 // REQUIRES: profile_runtime

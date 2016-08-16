@@ -34,19 +34,21 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 }
 
 func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
-  let className: NSString = NSStringFromClass(d.dynamicType) as NSString
+  let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return className.range(of: "_NativeDictionaryStorageOwner").length > 0
 }
 
 func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
-  let className: NSString = NSStringFromClass(d.dynamicType) as NSString
+  let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return className.range(of: "NSDictionary").length > 0 ||
     className.range(of: "NSCFDictionary").length > 0
 }
 
 func isNativeNSArray(_ d: NSArray) -> Bool {
-  let className: NSString = NSStringFromClass(d.dynamicType) as NSString
-  return className.range(of: "_SwiftDeferredNSArray").length > 0
+  let className: NSString = NSStringFromClass(type(of: d)) as NSString
+  return ["_SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
+    className.range(of: $0).length > 0
+  }
 }
 
 var _objcKeyCount = _stdlib_AtomicInt(0)
@@ -82,7 +84,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
   }
 
   @objc(copyWithZone:)
-  func copy(with zone: NSZone?) -> AnyObject {
+  func copy(with zone: NSZone?) -> Any {
     return TestObjCKeyTy(value)
   }
 
@@ -91,7 +93,7 @@ class TestObjCKeyTy : NSObject, NSCopying {
     return value.description
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
@@ -134,7 +136,7 @@ class TestObjCInvalidKeyTy {
   }
 
   @objc
-  func isEqual(_ object: AnyObject!) -> Bool {
+  func isEqual(_ object: Any!) -> Bool {
     fatalError()
   }
 
@@ -205,7 +207,7 @@ class TestObjCEquatableValueTy : NSObject {
     serial = -serial
   }
 
-  override func isEqual(_ object: AnyObject!) -> Bool {
+  override func isEqual(_ object: Any!) -> Bool {
     if let other = object {
       if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
@@ -254,10 +256,6 @@ struct TestBridgedKeyTy
 
   var hashValue: Int {
     return _hashValue
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
   }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
@@ -324,10 +322,6 @@ struct TestBridgedValueTy : CustomStringConvertible, _ObjectiveCBridgeable {
     return value.description
   }
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   func _bridgeToObjectiveC() -> TestObjCValueTy {
     TestBridgedValueTy.bridgeOperations += 1
     return TestObjCValueTy(value)
@@ -383,10 +377,6 @@ struct TestBridgedEquatableValueTy
   var description: String {
     assert(serial > 0, "dead TestBridgedValueTy")
     return value.description
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
   }
 
   func _bridgeToObjectiveC() -> TestObjCEquatableValueTy {
@@ -584,7 +574,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
     }
     for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr![i]!
-      let value: AnyObject = d.object(forKey: key)!
+      let value: AnyObject = d.object(forKey: key)! as AnyObject
       let kv = (key, value)
       sink(kv)
       itemsReturned += 1
@@ -609,7 +599,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     a, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -621,8 +611,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
-    let value: AnyObject = d.object(forKey: key)!
-    let kv = (key, value)
+    let value: AnyObject = d.object(forKey: key)! as AnyObject
+    let kv = (key as AnyObject, value)
     sink(kv)
   }
 }
@@ -633,7 +623,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
   for value in objcValues {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -642,7 +632,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ a: NSArray,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject) -> ()) -> Void,
-  _ convertValue: (AnyObject) -> Int
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
   _makeExpectedArrayContents(expected)
@@ -677,7 +667,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkArrayFastEnumerationFromSwift(
   _ expected: [Int],
   _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertValue: (AnyObject) -> Int
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
@@ -690,7 +680,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkArrayFastEnumerationFromObjC(
   _ expected: [Int],
   _ a: NSArray, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertValue: (AnyObject) -> Int
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
@@ -704,7 +694,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ expected: [Int],
   _ a: NSArray,
   maxFastEnumerationItems: Int,
-  _ convertValue: (AnyObject) -> Int
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, { a.objectEnumerator() },
@@ -721,7 +711,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ s: NSSet,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject) -> ()) -> Void,
-  _ convertMember: (AnyObject) -> Int
+  _ convertMember: @escaping (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
     _makeExpectedSetContents(expected)
@@ -757,7 +747,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
   for value in objcValues {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -768,7 +758,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   slurpFastEnumerationFromSwift(
     s, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink(value)
+    sink(value as AnyObject)
   }
 }
 
@@ -815,7 +805,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkSetFastEnumerationFromSwift(
   _ expected: [Int],
   _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertMember: (AnyObject) -> Int
+  _ convertMember: @escaping (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
@@ -828,7 +818,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkSetFastEnumerationFromObjC(
   _ expected: [Int],
   _ s: NSSet, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertMember: (AnyObject) -> Int
+  _ convertMember: @escaping (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
@@ -842,7 +832,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ expected: [Int],
   _ s: NSSet,
   maxFastEnumerationItems: Int,
-  _ convertMember: (AnyObject) -> Int
+  _ convertMember: @escaping (AnyObject) -> Int
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, { s.objectEnumerator() },
@@ -860,8 +850,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
   for i in 0..<objcPairs.count/2 {
-    let key: AnyObject = objcPairs[i * 2]
-    let value: AnyObject = objcPairs[i * 2 + 1]
+    let key = objcPairs[i * 2] as AnyObject
+    let value = objcPairs[i * 2 + 1] as AnyObject
     let kv = (key, value)
     sink(kv)
   }
@@ -872,8 +862,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ d: NSDictionary,
   _ makeEnumerator: () -> NSFastEnumeration,
   _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2) -> ()) -> Void,
-  _ convertKey: (AnyObject) -> Int,
-  _ convertValue: (AnyObject) -> Int
+  _ convertKey: @escaping (AnyObject) -> Int,
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
     _makeExpectedDictionaryContents(expected)
@@ -908,8 +898,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkDictionaryFastEnumerationFromSwift(
   _ expected: [(Int, Int)],
   _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertKey: (AnyObject) -> Int,
-  _ convertValue: (AnyObject) -> Int
+  _ convertKey: @escaping (AnyObject) -> Int,
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
@@ -922,8 +912,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
  func checkDictionaryFastEnumerationFromObjC(
   _ expected: [(Int, Int)],
   _ d: NSDictionary, _ makeEnumerator: () -> NSFastEnumeration,
-  _ convertKey: (AnyObject) -> Int,
-  _ convertValue: (AnyObject) -> Int
+  _ convertKey: @escaping (AnyObject) -> Int,
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
@@ -937,8 +927,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   _ expected: [(Int, Int)],
   _ d: NSDictionary,
   maxFastEnumerationItems: Int,
-  _ convertKey: (AnyObject) -> Int,
-  _ convertValue: (AnyObject) -> Int
+  _ convertKey: @escaping (AnyObject) -> Int,
+  _ convertValue: @escaping (AnyObject) -> Int
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, { d.keyEnumerator() },

@@ -11,23 +11,38 @@
 #
 # ----------------------------------------------------------------------------
 #
-# Fails if the input file is named "bad.swift"; otherwise dispatches to
-# update-dependencies.py.
+# Fails if the input file is named "bad.swift" or "crash.swift"; otherwise
+# dispatches to update-dependencies.py. "crash.swift" gives an exit code
+# other than 1.
 #
 # ----------------------------------------------------------------------------
 
 from __future__ import print_function
 
 import os
+import shutil
 import sys
 
 assert sys.argv[1] == '-frontend'
 
 primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
 
-if os.path.basename(primaryFile) == 'bad.swift':
+if (os.path.basename(primaryFile) == 'bad.swift' or
+        os.path.basename(primaryFile) == 'crash.swift'):
     print("Handled", os.path.basename(primaryFile))
-    sys.exit(1)
 
-dir = os.path.dirname(os.path.abspath(__file__))
-execfile(os.path.join(dir, "update-dependencies.py"))
+    # Replace the dependencies file with the input file.
+    try:
+        depsFile = sys.argv[sys.argv.index(
+            '-emit-reference-dependencies-path') + 1]
+        shutil.copyfile(primaryFile, depsFile)
+    except ValueError:
+        pass
+
+    if os.path.basename(primaryFile) == 'bad.swift':
+        sys.exit(1)
+    else:
+        sys.exit(129)
+
+execDir = os.path.dirname(os.path.abspath(__file__))
+execfile(os.path.join(execDir, "update-dependencies.py"))

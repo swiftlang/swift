@@ -1,0 +1,150 @@
+// An end-to-end test to ensure local variables have debug info.  This
+// test only verifies that the variables show up in the debug info at
+// all. There are other tests testing liveness and representation.
+
+// RUN: %gyb %s -o %t.swift
+// RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
+// RUN: %target-swift-frontend %t.swift -g -c -o %t.o
+// RUN: llvm-dwarfdump --debug-dump=info %t.o \
+// RUN:   | %FileCheck %t.swift --check-prefix=DWARF
+// RUN: %target-swift-frontend %t.swift -O -g -emit-ir -o - \
+// RUN:   | %FileCheck %t.swift --check-prefix=OPTZNS
+
+// OPTZNS-NOT: alloca{{.*}}.addr
+
+public class C {
+  let member : Int
+  init(_ i : Int) { member = i }
+  func isZero() -> Bool { return member == 0 }
+}
+
+public struct S {
+  let i : Int32 = -1
+  let j : Int32 = 2
+}
+
+func use<T>(_ x: T) {}
+func variable_use<T>(_ x: inout T) {}
+
+% def derive_name((type, val)):
+%   return (type.replace('<', '_').replace(' ', '_').replace(',', '_')
+%               .replace('?', '_').replace('>', '_')
+%               .replace('[', '_').replace(']', '_'), type, val)
+% for name, type, val in map(derive_name,
+%   [("UInt64", "64"), ("UInt32", "32"), ("Int64", "64"), ("Int32", "32"),
+%    ("Int", "42"), ("UInt", "42"), ("C", "C(42)"), ("String", '"string"'),
+%    ("Dictionary<UInt64, String>", '[1:"entry"]'),
+%    ("Float", "2.71"), ("Double", "3.14"), ("[UInt64]", "[1, 2, 3]"),
+%    ("S", "S()")]):
+
+public func constant_${name}() -> ${type} {
+  let v : ${type} = ${val}
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}constant_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  return v
+}
+
+public func constvar_${name}() {
+  var v : ${type} = ${val}
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}constvar_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  variable_use(&v)
+}
+
+public func let_${name}() {
+  let v : ${type} = constant_${name}()
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}let_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: {{(DW_AT_location)|(DW_AT_const_value)}}
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  use(v)
+}
+
+public func optional_${name}() -> ${type}? {
+  return constant_${name}();
+}
+
+public func guard_let_${name}() {
+  let opt : ${type}? = optional_${name}()
+  // CHECK: !DILocalVariable(name: "opt",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}guard_let_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name
+  // DWARF-SAME: "{{(opt)|(val)}}"
+  guard let val = opt else {
+    use(opt)
+    fatalError()
+  }
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name
+  // DWARF-SAME: "{{(opt)|(val)}}"
+  use(val)
+}
+
+public func var_${name}() {
+  var v : ${type} = constant_${name}()
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}var_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_variable
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  variable_use(&v)
+}
+
+public func arg_${name}(_ v: ${type}) {
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}arg_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_formal_parameter
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  use(v)
+}
+
+public func arg_inout_${name}(_ v: inout ${type}) {
+  // CHECK: !DILocalVariable(name: "v",{{.*}} line: [[@LINE-1]]
+  // DWARF: DW_TAG_subprogram
+  // DWARF: DW_AT_name {{.*}}arg_inout_${name}
+  // DWARF-NOT: DW_TAG_subprogram
+  // DWARF: DW_TAG_formal_parameter
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_location
+  // DWARF-NOT: DW_TAG
+  // DWARF: DW_AT_name {{.*}}"v"
+  variable_use(&v)
+}

@@ -14,12 +14,6 @@ Classes:
   - Selector: 'appendSampleBuffer:'
     SwiftName: append(_:)
     MethodKind: Instance
-  - Selector: 'appendPixelBuffer:withPresentationTime:'
-    SwiftName: append(_:withPresentationTime:)
-    MethodKind: Instance
-  - Selector: 'appendTimedMetadataGroup:'
-    SwiftName: append(_:)
-    MethodKind: Instance
 - Name: AVAssetWriterInputPixelBufferAdaptor
   Methods:
   - Selector: 'appendPixelBuffer:withPresentationTime:'
@@ -98,7 +92,7 @@ Classes:
 - Name: AVVideoComposition
   Methods:
   - Selector: 'videoCompositionWithPropertiesOfAsset:'
-    SwiftName: init(withPropertiesOf:)
+    SwiftName: init(propertiesOf:)
     MethodKind: Instance
   - Selector: 'videoCompositionWithAsset:applyingCIFiltersWithHandler:'
     SwiftName: init(asset:filterApplier:)
@@ -137,7 +131,6 @@ Classes:
   - Selector: 'initWithURL:fileType:error:'
     SwiftName: init(outputURL:fileType:)
     MethodKind: Instance
-    Availability: nonswift
   - Selector: 'canApplyOutputSettings:forMediaType:'
     SwiftName: canApply(outputSettings:forMediaType:)
     MethodKind: Instance
@@ -243,3 +236,8 @@ Functions:
 Enumerators:
 - Name: AVMovieWritingAddMovieHeaderToDestination
   SwiftName: addMovieHeaderToDestination
+- Name: AVMusicSequenceLoadSMF_ChannelsToTracks
+  SwiftName: smfChannelsToTracks
+Tags:
+- Name: AVError
+  NSErrorDomain: AVFoundationErrorDomain

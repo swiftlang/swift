@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -O -o - -verify | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -O -o - -verify | %FileCheck %s
 
 sil_stage canonical
 
@@ -136,11 +136,11 @@ bb2:                                              // Preds: bb1
   br bb4                                          // id: %27
 
 bb3:                                              // Preds: bb1
-  %28 = function_ref @fatalError : $@convention(thin) @noreturn () -> () // user: %32
+  %28 = function_ref @fatalError : $@convention(thin) () -> Never // user: %32
   %29 = tuple ()
   %30 = tuple ()
   %31 = tuple ()
-  %32 = apply %28() : $@convention(thin) @noreturn () -> ()
+  %32 = apply %28() : $@convention(thin) () -> Never
   unreachable                                     // id: %33
 
 bb4:                                              // Preds: bb2
@@ -459,4 +459,4 @@ bb0(%0 : $UInt32):
   return %13 : $Int8                             // id: %14
 }
 
-sil [noinline] @fatalError : $@convention(thin) @noreturn () -> ()
+sil [noinline] @fatalError : $@convention(thin) () -> Never

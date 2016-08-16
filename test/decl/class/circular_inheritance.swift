@@ -11,3 +11,18 @@ class Isomorphism : Automorphism { }
 class Automorphism : Automorphism { } // expected-error{{circular class inheritance Automorphism}}
 
 let _ = A()
+
+// This should probably be made to work, but for now test that it produces a crappy
+// diagnostic instead of crashing
+
+class Left : Right.Hand {
+  class Hand {}
+}
+
+class Right : Left.Hand { // expected-error {{'Hand' is not a member type of 'Left'}}
+  class Hand {}
+}
+
+class Outer {
+  class Inner : Outer {}
+}

@@ -94,7 +94,7 @@ bool ArrayAllocation::mapInitializationStores() {
 
   // Match initialization stores.
   // %83 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
-  // %84 = pointer_to_address %83 : $Builtin.RawPointer to $*Int
+  // %84 = pointer_to_address %83 : $Builtin.RawPointer to strict $*Int
   // store %85 to %84 : $*Int
   // %87 = integer_literal $Builtin.Word, 1
   // %88 = index_addr %84 : $*Int, %87 : $Builtin.Word

@@ -123,9 +123,6 @@ class FunctionSignatureTransform {
   /// will use during our optimization.
   llvm::SmallVector<ResultDescriptor, 4> &ResultDescList;
 
-  /// May dynamically bind to self.
-  bool MayDynamicBindSelf;
-
   /// Does this function have a caller inside current module
   bool hasCaller;
 
@@ -134,12 +131,6 @@ class FunctionSignatureTransform {
 
   /// Return a function type based on ArgumentDescList and ResultDescList.
   CanSILFunctionType createOptimizedSILFunctionType();
-
-  // This implicitly asserts that a function binding dynamic self has a 
-  // self metadata argument or object from which self metadata can be obtained.
-  bool isArgumentABIRequired(SILArgument *Arg) {
-    return MayDynamicBindSelf && (F->getSelfMetadataArgument() == Arg);
-  }
 
 private:
   /// ----------------------------------------------------------///
@@ -241,7 +232,7 @@ public:
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
     : F(F), NewF(nullptr), PM(PM), AA(AA), RCIA(RCIA), FM(FM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
-      ResultDescList(RDL), MayDynamicBindSelf(computeMayBindDynamicSelf(F)),
+      ResultDescList(RDL),
       hasCaller(hasCaller) {}
 
   /// Return the optimized function.
@@ -483,9 +474,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue = NormalBlock->createBBArg(ResultType, 0);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
-    SILType ErrorProtocol =
+    SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
-    auto *ErrorArg = ErrorBlock->createBBArg(ErrorProtocol, 0);
+    auto *ErrorArg = ErrorBlock->createBBArg(Error, 0);
     Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
@@ -499,7 +490,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Set up the return results.
-  if (NewF->getLoweredFunctionType()->isNoReturn()) {
+  if (NewF->isNoReturnFunction()) {
     Builder.createUnreachable(Loc);
   } else {
     Builder.createReturn(Loc, ReturnValue);
@@ -526,13 +517,11 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
     }
 
     // Check whether argument is dead.
-    A.IsEntirelyDead = true;
-    A.IsEntirelyDead &= !isArgumentABIRequired(Args[i]);
-    A.IsEntirelyDead &= !hasNonTrivialNonDebugUse(Args[i]); 
-    SignatureOptimize |= A.IsEntirelyDead;
-
-    if (A.IsEntirelyDead && Args[i]->isSelf()) {
-      shouldModifySelfArgument = true;
+    if (!hasNonTrivialNonDebugUse(Args[i])) {
+      A.IsEntirelyDead = true;
+      SignatureOptimize = true;
+      if (Args[i]->isSelf())
+        shouldModifySelfArgument = true;
     }
   }
   return SignatureOptimize;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }
@@ -134,7 +134,7 @@ func while_loop_multi() {
   // CHECK: br [[LOOP_EXIT0]]
 
   // CHECK: [[LOOP_BODY]]([[B:%[0-9]+]] : $String):
-  while let a = foo(), b = bar() {
+  while let a = foo(), let b = bar() {
     // CHECK:   debug_value [[B]] : $String, let, name "b"
     // CHECK:   debug_value [[A]] : $String, let, name "c"
     // CHECK:   release_value [[B]]
@@ -229,7 +229,7 @@ func if_multi_where() {
   // CHECK:   strong_release [[BBOX]]
   // CHECK:   release_value [[A]]
   // CHECK:   br [[IF_DONE:bb[0-9]+]]
-  if let a = foo(), var b = bar() where a == b {
+  if let a = foo(), var b = bar(), a == b {
     // CHECK: [[IF_BODY]]:
     // CHECK:   strong_release [[BBOX]]
     // CHECK:   release_value [[A]]
@@ -329,7 +329,7 @@ func testCaseBool(_ value : Bool?) {
     marker_1()
   }
 
-  // CHECK:   bb3:                                              // Preds: bb0 bb1 bb2
+  // CHECK:   bb3:                                              // Preds: bb2 bb1 bb0
   // CHECK:   switch_enum %0 : $Optional<Bool>, case #Optional.some!enumelt.1: bb4, default bb6
 
   // CHECK:   bb4(
@@ -340,7 +340,7 @@ func testCaseBool(_ value : Bool?) {
   // CHECK: function_ref @_TF16if_while_binding8marker_2FT_T_
   // CHECK: br bb6{{.*}}                                      // id: %15
 
-  // CHECK: bb6:                                              // Preds: bb3 bb4 bb5
+  // CHECK: bb6:                                              // Preds: bb5 bb4 bb3
   if case false? = value {
     marker_2()
   }

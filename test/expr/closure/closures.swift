@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-var func6 : (fn : (Int,Int) -> Int) -> ()
+var func6 : (_ fn : ((Int, Int)) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
 func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to parameters}}
@@ -31,12 +31,12 @@ func funcdecl5(_ a: Int, _ y: Int) {
   funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{14-14= _ in}}
   
   
-  func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
-  func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  func6({$0 + $1})       // Closure with two named anonymous arguments
+  func6({($0) + $1})    // Closure with sequence expr inferred type
+  func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
-  var testfunc : ((), Int) -> Int
+  var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
 
   funcdecl5(1, 2) // recursion.
@@ -50,22 +50,22 @@ func funcdecl5(_ a: Int, _ y: Int) {
   funcdecl1(123, 444)
   
   // Calls.
-  4()  // expected-error {{cannot call value of non-function type 'Int'}}
+  4()  // expected-error {{cannot call value of non-function type 'Int'}}{{4-6=}}
   
   
   // rdar://12017658 - Infer some argument types from func6.
-  func6(fn: { a, b -> Int in a+b})
+  func6({ a, b -> Int in a+b})
   // Return type inference.
-  func6(fn: { a,b in a+b })
+  func6({ a,b in a+b })
   
   // Infer incompatible type.
-  func6(fn: {a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{21-26=Int}}  // Pattern doesn't need to name arguments.
-  func6(fn: { _,_ in 4 })
+  func6({a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{17-22=Int}}  // Pattern doesn't need to name arguments.
+  func6({ _,_ in 4 })
   
-  func6(fn: {a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
+  func6({a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
   
   // TODO: This diagnostic can be improved: rdar://22128205
-  func6(fn: {(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
+  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '((Int, Int)) -> Int'}}
 
   
   
@@ -128,8 +128,8 @@ func anonymousClosureArgsInClosureWithArgs() {
   var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
 }
 
-func doStuff(_ fn : () -> Int) {}
-func doVoidStuff(_ fn : () -> ()) {}
+func doStuff(_ fn : @escaping () -> Int) {}
+func doVoidStuff(_ fn : @escaping () -> ()) {}
 
 // <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
 class ExplicitSelfRequiredTest {
@@ -259,10 +259,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{type of expression is ambiguous without more context}}
-  // FIXME: This diagnostic should be improved, we can infer a type for the closure expr from
-  // its body (by trying really hard in diagnostic generation) and say that we need an explicit
-  // contextual result specified because we don't do cross-statement type inference or something.
+let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
           if (i > 10) { return true }
           else { return false }
         }()

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // Test IR generation via execution for Self.
@@ -93,6 +93,45 @@ print("C() as class existential")
 // CHECK-NEXT: After second call
 // CHECK-NEXT: Destroying C
 callDynamicSelfClassExistential(C())
+
+print("-------------------------------")
+
+class Z {
+  let name: String
+
+  init(name: String) {
+    self.name = name
+  }
+
+  func testCaptures(x: Int) -> Self {
+    let fn1 = {
+      print("First: \(self.name)")
+    }
+    fn1()
+
+    let fn2 = { [weak self] in
+      if let strongSelf = self {
+        print("Second: \(strongSelf.name)")
+      }
+    }
+    fn2()
+
+    let fn3 = {
+      print("Third: \(self.name)")
+      print("Third: \(x)")
+    }
+    fn3()
+
+    return self
+  }
+
+}
+
+// CHECK: First: Leeloo
+// CHECK-NEXT: Second: Leeloo
+// CHECK-NEXT: Third: Leeloo
+// CHECK-NEXT: Third: 42
+Z(name: "Leeloo").testCaptures(x: 42)
 
 // CHECK-NEXT: Done
 print("Done")

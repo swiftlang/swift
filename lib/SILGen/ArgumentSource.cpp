@@ -49,6 +49,16 @@ void ArgumentSource::rewriteType(CanType newType) & {
   }
 }
 
+bool ArgumentSource::requiresCalleeToEvaluate() {
+  switch (StoredKind) {
+  case Kind::RValue:
+  case Kind::LValue:
+    return false;
+  case Kind::Expr:
+    return isa<TupleShuffleExpr>(asKnownExpr());
+  }
+}
+
 RValue ArgumentSource::getAsRValue(SILGenFunction &gen, SGFContext C) && {
   assert(!isLValue());
   if (isRValue())

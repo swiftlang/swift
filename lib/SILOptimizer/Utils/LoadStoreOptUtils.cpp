@@ -214,7 +214,11 @@ LSLocation::enumerateLSLocation(SILModule *M, SILValue Mem,
     return;
 
   // Construct a Location to represent the memory written by this instruction.
-  SILValue UO = getUnderlyingObject(Mem);
+  // ProjectionPath currently does not handle mark_dependence so stop our
+  // underlying object search at these instructions.
+  // We still get a benefit if we cse mark_dependence instructions and then
+  // merge loads from them.
+  SILValue UO = getUnderlyingObjectStopAtMarkDependence(Mem);
   LSLocation L(UO, ProjectionPath::getProjectionPath(UO, Mem));
 
   // If we can't figure out the Base or Projection Path for the memory location,

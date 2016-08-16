@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable | %FileCheck %s
 
 import Builtin
 import Swift
@@ -118,7 +118,7 @@ bb6:
 // CHECK-LABEL:sil @InfLoop
 // CHECK: bb0:
 // CHECK-NEXT:  br bb1
-// CHECK:bb1:                                              // Preds: bb0 bb3
+// CHECK:bb1:                                              // Preds: bb3 bb0
 // CHECK-NEXT:  br bb2
 // CHECK:bb2:                                              // Preds: bb1
 // CHECK-NEXT:  br bb3
@@ -129,10 +129,9 @@ bb6:
 class B { }
 class E : B { }
 
-sil @exit : $@convention(thin) @noreturn () -> () {
+sil @exit : $@convention(thin) () -> Never {
 bb0:
-  %1 = tuple ()
-  return %1 : $()
+  br bb0
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
@@ -146,8 +145,8 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %7 = strong_release %3 : $B                        // CHECK: strong_release
   %8 = strong_release %1 : $@box B  // CHECK-NEXT: strong_release
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never
+  %10 = apply %9() : $@convention(thin) () -> Never
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %11 = tuple()
   %12 = return %11 : $()                      
@@ -175,8 +174,8 @@ bb0(%0:  $B, %1: $Builtin.Int1):
 bb1:                                              
   %22 = br bb2
 bb2:                                              
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never
+  %10 = apply %9() : $@convention(thin) () -> Never
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
   %32 = tuple ()                                
   %33 = return %32 : $()
@@ -224,8 +223,8 @@ bb4(%6 : $Int):
 
 sil @code_removed_after_a_call_to_noreturn : $@convention(thin) (Int, Builtin.Int1) -> () {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
-  %6 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %7 = apply %6() : $@convention(thin) @noreturn () -> ()
+  %6 = function_ref @exit : $@convention(thin) () -> Never
+  %7 = apply %6() : $@convention(thin) () -> Never
   cond_br %1, bb1, bb2
 bb1:                                              // Preds: bb0
   br bb2
@@ -370,22 +369,22 @@ bb0:
   unreachable
 }
 
-sil @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
+sil @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
 
 // CHECK-LABEL:sil @try_apply_1
 // CHECK:    bb1(
 // CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb2(
 // CHECK-NEXT: throw
-sil @try_apply_1 : $@convention(thin) () -> @error ErrorProtocol {
+sil @try_apply_1 : $@convention(thin) () -> @error Error {
 bb0:
-  %0 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
-  try_apply %0() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb1, error bb2
-bb1(%1 : $()):
+  %0 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
+  try_apply %0() : $@convention(thin) () -> (Never, @error Error), normal bb1, error bb2
+bb1(%1 : $Never):
   %2 = tuple ()
   return %2 : $()
-bb2(%3 : $ErrorProtocol):
-  throw %3 : $ErrorProtocol
+bb2(%3 : $Error):
+  throw %3 : $Error
 }
 
 // CHECK-LABEL:sil @try_apply_2
@@ -393,19 +392,19 @@ bb2(%3 : $ErrorProtocol):
 // CHECK-NEXT: {{ unreachable}}
 // CHECK:    bb4(
 // CHECK-NEXT: throw
-sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error ErrorProtocol {
+sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error Error {
 bb0(%0 : $Builtin.Int1):
-  %1 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
+  %1 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
   cond_br %0, bb1, bb2
 bb1:
-  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb3, error bb4
+  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4
 bb2:
-  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb3, error bb4
-bb3(%2 : $()):
+  try_apply %1() : $@convention(thin) () -> (Never, @error Error), normal bb3, error bb4
+bb3(%2 : $Never):
   %3 = tuple ()
   return %3 : $()
-bb4(%4 : $ErrorProtocol):
-  throw %4 : $ErrorProtocol
+bb4(%4 : $Error):
+  throw %4 : $Error
 }
 
 // This should arguably be ill-formed.
@@ -416,13 +415,12 @@ bb4(%4 : $ErrorProtocol):
 // CHECK:      try_apply
 // CHECK:    bb2(
 // CHECK-NEXT: throw
-sil @try_apply_3 : $@convention(thin) () -> @error ErrorProtocol {
-bb0:
-  %0 = tuple ()
-  br bb1(%0 : $())
-bb1(%1 : $()):
-  %2 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorProtocol
-  try_apply %2() : $@convention(thin) @noreturn () -> @error ErrorProtocol, normal bb1, error bb2
-bb2(%3 : $ErrorProtocol):
-  throw %3 : $ErrorProtocol
+sil @try_apply_3 : $@convention(thin) (Never) -> @error Error {
+bb0(%0 : $Never):
+  br bb1(%0 : $Never)
+bb1(%1 : $Never):
+  %2 = function_ref @throwing_noreturn : $@convention(thin) () -> (Never, @error Error)
+  try_apply %2() : $@convention(thin) () -> (Never, @error Error), normal bb1, error bb2
+bb2(%3 : $Error):
+  throw %3 : $Error
 }

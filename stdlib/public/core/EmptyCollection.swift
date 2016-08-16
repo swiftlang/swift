@@ -21,7 +21,7 @@
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
-  /// Construct an instance.
+  /// Creates an instance.
   public init() {}
 
   /// Returns `nil`, indicating that there are no more elements.
@@ -32,7 +32,7 @@ public struct EmptyIterator<Element> : IteratorProtocol, Sequence {
 
 /// A collection whose element type is `Element` but that is always empty.
 public struct EmptyCollection<Element> :
-  RandomAccessCollection, MutableCollection, Equatable
+  RandomAccessCollection, MutableCollection
 {
   /// A type that represents a valid position in the collection.
   ///
@@ -42,7 +42,7 @@ public struct EmptyCollection<Element> :
   public typealias IndexDistance = Int
   public typealias SubSequence = EmptyCollection<Element>
 
-  /// Construct an instance.
+  /// Creates an instance.
   public init() {}
 
   /// Always zero, just like `endIndex`.
@@ -57,7 +57,7 @@ public struct EmptyCollection<Element> :
 
   /// Always traps.
   ///
-  /// EmptyCollection does not have any element indices, so it is not
+  /// `EmptyCollection` does not have any element indices, so it is not
   /// possible to advance indices.
   public func index(after i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
@@ -65,22 +65,20 @@ public struct EmptyCollection<Element> :
 
   /// Always traps.
   ///
-  /// EmptyCollection does not have any element indices, so it is not
+  /// `EmptyCollection` does not have any element indices, so it is not
   /// possible to advance indices.
   public func index(before i: Index) -> Index {
     _preconditionFailure("EmptyCollection can't advance indices")
   }
 
   /// Returns an empty iterator.
-  ///
-  /// - Complexity: O(1).
   public func makeIterator() -> EmptyIterator<Element> {
     return EmptyIterator()
   }
 
-  /// Access the element at `position`.
+  /// Accesses the element at the given position.
   ///
-  /// Should never be called, since this collection is always empty.
+  /// Must never be called, since this collection is always empty.
   public subscript(position: Index) -> Element {
     get {
       _preconditionFailure("Index out of range")
@@ -145,17 +143,19 @@ public struct EmptyCollection<Element> :
   public typealias Indices = CountableRange<Int>
 }
 
-public func == <Element>(
-  lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
-) -> Bool {
-  return true
+extension EmptyCollection : Equatable {
+  public static func == (
+    lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
+  ) -> Bool {
+    return true
+  }
 }
 
 @available(*, unavailable, renamed: "EmptyIterator")
 public struct EmptyGenerator<Element> {}
 
 extension EmptyIterator {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> EmptyIterator<Element> {
     Builtin.unreachable()
   }

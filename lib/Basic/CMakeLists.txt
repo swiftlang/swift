@@ -58,7 +58,7 @@ generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
-add_swift_library(swiftBasic
+add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
   Demangle.cpp

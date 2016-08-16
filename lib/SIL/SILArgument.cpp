@@ -26,12 +26,6 @@ using namespace swift;
 SILArgument::SILArgument(SILBasicBlock *ParentBB, SILType Ty,
                          const ValueDecl *D)
   : ValueBase(ValueKind::SILArgument, Ty), ParentBB(ParentBB), Decl(D) {
-  // Function arguments need to have a decl.
-  assert(
-    !ParentBB->getParent()->isBare() &&
-    ParentBB->getParent()->size() == 1
-          ? D != nullptr
-          : true);
   ParentBB->insertArgument(ParentBB->bbarg_end(), this);
 }
 

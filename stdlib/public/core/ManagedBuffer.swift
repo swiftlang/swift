@@ -12,42 +12,65 @@
 
 import SwiftShims
 
-/// A common base class for classes that need to be non-`@objc`,
-/// recognizably in the type system.
-///
-/// - SeeAlso: `isUniquelyReferenced`
-public class NonObjectiveCBase {
-  public init() {}
-}
-
-/// A base class of `ManagedBuffer<Value, Element>`, used during
+/// A class whose instances contain a property of type `Header` and raw
+/// storage for an array of `Element`, whose size is determined at
 /// instance creation.
 ///
-/// During instance creation, in particular during
-/// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
-/// `value` property is as-yet uninitialized, and therefore
-/// `ManagedProtoBuffer` does not offer access to the as-yet
-/// uninitialized `value` property of `ManagedBuffer`.
-public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
+/// Note that the `Element` array is suitably-aligned **raw memory**.
+/// You are expected to construct and---if necessary---destroy objects
+/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
+/// Typical usage stores a count and capacity in `Header` and destroys
+/// any live elements in the `deinit` of a subclass.
+/// - Note: Subclasses must not have any stored properties; any storage
+///   needed should be included in `Header`.
+open class ManagedBuffer<Header, Element> {
+
+  /// Create a new instance of the most-derived class, calling
+  /// `factory` on the partially-constructed object to generate
+  /// an initial `Header`.
+  public final class func create(
+    minimumCapacity: Int,
+    makingHeaderWith factory: (
+      ManagedBuffer<Header, Element>) throws -> Header
+  ) rethrows -> ManagedBuffer<Header, Element> {
+
+    let p = try ManagedBufferPointer<Header, Element>(
+      bufferClass: self,
+      minimumCapacity: minimumCapacity,
+      makingHeaderWith: { buffer, _ in
+        try factory(
+          unsafeDowncast(buffer, to: ManagedBuffer<Header, Element>.self))
+      })
+
+    return unsafeDowncast(p.buffer, to: ManagedBuffer<Header, Element>.self)
+  }
+
+  /// Destroy the stored Header.
+  deinit {
+    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
+      _ = $0.deinitialize()
+    }
+  }
+
   /// The actual number of elements that can be stored in this object.
   ///
-  /// This value may be nontrivial to compute; it is usually a good
-  /// idea to store this information in the "value" area when
+  /// This header may be nontrivial to compute; it is usually a good
+  /// idea to store this information in the "header" area when
   /// an instance is created.
   public final var capacity: Int {
-    let p = ManagedBufferPointer<Value, Element>(self)
+    let p = ManagedBufferPointer<Header, Element>(self)
     return p.capacity
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
-  /// `Value`.
+  /// `Header`.
   ///
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
-  public final func withUnsafeMutablePointerToValue<R>(
-    _ body: (UnsafeMutablePointer<Value>) -> R
-  ) -> R {
-    return withUnsafeMutablePointers { (v, e) in return body(v) }
+  public final func withUnsafeMutablePointerToHeader<R>(
+    _ body: (UnsafeMutablePointer<Header>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutablePointers { (v, e) in return try body(v) }
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
@@ -56,20 +79,41 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) -> R
-  ) -> R {
-    return withUnsafeMutablePointers { return body($0.1) }
+    _ body: (UnsafeMutablePointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutablePointers { return try body($0.1) }
   }
 
-  /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
+  /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
   /// and raw `Element` storage.
   ///
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
-    _ body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
-  ) -> R {
-    return ManagedBufferPointer(self).withUnsafeMutablePointers(body)
+    _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try ManagedBufferPointer(self).withUnsafeMutablePointers(body)
+  }
+
+  /// The stored `Header` instance.
+  ///
+  /// During instance creation, in particular during
+  /// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
+  /// `header` property is as-yet uninitialized, and therefore
+  /// reading the `header` property during `ManagedBuffer.create` is undefined.
+  public final var header: Header {
+    addressWithNativeOwner {
+      return (
+        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
+          UnsafePointer($0)
+        },
+        Builtin.castToNativeObject(self))
+    }
+    mutableAddressWithNativeOwner {
+      return (
+        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader { $0 },
+        Builtin.castToNativeObject(self))
+    }
   }
 
   //===--- internal/private API -------------------------------------------===//
@@ -80,57 +124,8 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   }
 }
 
-/// A class whose instances contain a property of type `Value` and raw
-/// storage for an array of `Element`, whose size is determined at
-/// instance creation.
-///
-/// Note that the `Element` array is suitably-aligned **raw memory**.
-/// You are expected to construct and---if necessary---destroy objects
-/// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
-/// Typical usage stores a count and capacity in `Value` and destroys
-/// any live elements in the `deinit` of a subclass.
-/// - Note: Subclasses must not have any stored properties; any storage
-///   needed should be included in `Value`.
-public class ManagedBuffer<Value, Element>
-  : ManagedProtoBuffer<Value, Element> {
-
-  /// Create a new instance of the most-derived class, calling
-  /// `initializeValue` on the partially-constructed object to
-  /// generate an initial `Value`.
-  public final class func create(
-    minimumCapacity: Int,
-    initialValue: (ManagedProtoBuffer<Value, Element>) -> Value
-  ) -> ManagedBuffer<Value, Element> {
-
-    let p = ManagedBufferPointer<Value, Element>(
-      bufferClass: self,
-      minimumCapacity: minimumCapacity,
-      initialValue: { buffer, _ in
-        initialValue(
-          unsafeDowncast(buffer, to: ManagedProtoBuffer<Value, Element>.self))
-      })
-
-    return unsafeDowncast(p.buffer, to: ManagedBuffer<Value, Element>.self)
-  }
-
-  /// Destroy the stored Value.
-  deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.deinitialize() }
-  }
-
-  /// The stored `Value` instance.
-  public final var value: Value {
-    unsafeAddress {
-      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { UnsafePointer($0) }
-    }
-    unsafeMutableAddress {
-      return ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0 }
-    }
-  }
-}
-
 /// Contains a buffer object, and provides access to an instance of
-/// `Value` and contiguous storage for an arbitrary number of
+/// `Header` and contiguous storage for an arbitrary number of
 /// `Element` instances stored in that buffer.
 ///
 /// For most purposes, the `ManagedBuffer` class works fine for this
@@ -140,7 +135,7 @@ public class ManagedBuffer<Value, Element>
 ///
 /// A valid buffer class is non-`@objc`, with no declared stored
 ///   properties.  Its `deinit` must destroy its
-///   stored `Value` and any constructed `Element`s.
+///   stored `Header` and any constructed `Element`s.
 ///
 /// Example Buffer Class
 /// --------------------
@@ -149,66 +144,68 @@ public class ManagedBuffer<Value, Element>
 ///        typealias Manager = ManagedBufferPointer<(Int, String), Element>
 ///        deinit {
 ///          Manager(unsafeBufferObject: self).withUnsafeMutablePointers {
-///            (pointerToValue, pointerToElements) -> Void in
+///            (pointerToHeader, pointerToElements) -> Void in
 ///            pointerToElements.deinitialize(count: self.count)
-///            pointerToValue.deinitialize()
+///            pointerToHeader.deinitialize()
 ///          }
 ///        }
 ///
-///        // All properties are *computed* based on members of the Value
+///        // All properties are *computed* based on members of the Header
 ///        var count: Int {
-///          return Manager(unsafeBufferObject: self).value.0
+///          return Manager(unsafeBufferObject: self).header.0
 ///        }
 ///        var name: String {
-///          return Manager(unsafeBufferObject: self).value.1
+///          return Manager(unsafeBufferObject: self).header.1
 ///        }
 ///      }
 ///
 @_fixed_layout
-public struct ManagedBufferPointer<Value, Element> : Equatable {
+public struct ManagedBufferPointer<Header, Element> : Equatable {
 
-  /// Create with new storage containing an initial `Value` and space
+  /// Create with new storage containing an initial `Header` and space
   /// for at least `minimumCapacity` `element`s.
   ///
   /// - parameter bufferClass: The class of the object used for storage.
   /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
-  /// - parameter initialValue: A function that produces the initial
-  ///   `Value` instance stored in the buffer, given the `buffer`
+  /// - parameter factory: A function that produces the initial
+  ///   `Header` instance stored in the buffer, given the `buffer`
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
   ///
   /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
-  ///   stored `Value` and any constructed `Element`s.
+  ///   stored `Header` and any constructed `Element`s.
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
-    initialValue: (buffer: AnyObject, capacity: (AnyObject) -> Int) -> Value
-  ) {
-    self = ManagedBufferPointer(bufferClass: bufferClass, minimumCapacity: minimumCapacity)
+    makingHeaderWith factory:
+      (_ buffer: AnyObject, _ capacity: (AnyObject) -> Int) throws -> Header
+  ) rethrows {
+    self = ManagedBufferPointer(
+      bufferClass: bufferClass, minimumCapacity: minimumCapacity)
 
-    // initialize the value field
-    withUnsafeMutablePointerToValue {
-      $0.initialize(with: 
-        initialValue(
-          buffer: self.buffer,
-          capacity: {
+    // initialize the header field
+    try withUnsafeMutablePointerToHeader {
+      $0.initialize(to: 
+        try factory(
+          self.buffer,
+          {
             ManagedBufferPointer(unsafeBufferObject: $0).capacity
           }))
     }
     // FIXME: workaround for <rdar://problem/18619176>.  If we don't
-    // access value somewhere, its addressor gets linked away
-    _ = value
+    // access header somewhere, its addressor gets linked away
+    _ = header
   }
 
   /// Manage the given `buffer`.
   ///
   /// - Precondition: `buffer` is an instance of a non-`@objc` class whose
-  ///   `deinit` destroys its stored `Value` and any constructed `Element`s.
+  ///   `deinit` destroys its stored `Header` and any constructed `Element`s.
   public init(unsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._checkValidBufferClass(buffer.dynamicType)
+    ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
 
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
   }
@@ -223,17 +220,17 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// it in this specialized constructor.
   @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(buffer.dynamicType)
+    ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
     self._nativeBuffer = Builtin.castToNativeObject(buffer)
   }
 
-  /// The stored `Value` instance.
-  public var value: Value {
-    unsafeAddress {
-      return UnsafePointer(_valuePointer)
+  /// The stored `Header` instance.
+  public var header: Header {
+    addressWithNativeOwner {
+      return (UnsafePointer(_headerPointer), _nativeBuffer)
     }
-    unsafeMutableAddress {
-      return _valuePointer
+    mutableAddressWithNativeOwner {
+      return (_headerPointer, _nativeBuffer)
     }
   }
 
@@ -245,21 +242,21 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// The actual number of elements that can be stored in this object.
   ///
   /// This value may be nontrivial to compute; it is usually a good
-  /// idea to store this information in the "value" area when
+  /// idea to store this information in the "header" area when
   /// an instance is created.
   public var capacity: Int {
-    return (_capacityInBytes &- _My._elementOffset) / strideof(Element.self)
+    return (_capacityInBytes &- _My._elementOffset) / MemoryLayout<Element>.stride
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
-  /// `Value`.
+  /// `Header`.
   ///
   /// - Note: This pointer is only valid
   ///   for the duration of the call to `body`.
-  public func withUnsafeMutablePointerToValue<R>(
-    _ body: @noescape (UnsafeMutablePointer<Value>) -> R
-  ) -> R {
-    return withUnsafeMutablePointers { (v, e) in return body(v) }
+  public func withUnsafeMutablePointerToHeader<R>(
+    _ body: (UnsafeMutablePointer<Header>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutablePointers { (v, e) in return try body(v) }
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
@@ -268,42 +265,33 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Note: This pointer is only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
-    _ body: (UnsafeMutablePointer<Element>) -> R
-  ) -> R {
-    return withUnsafeMutablePointers { return body($0.1) }
+    _ body: (UnsafeMutablePointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutablePointers { return try body($0.1) }
   }
 
-  /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
+  /// Call `body` with `UnsafeMutablePointer`s to the stored `Header`
   /// and raw `Element` storage.
   ///
   /// - Note: These pointers are only valid for the duration of the
   ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
-    _ body: @noescape (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>) -> R
-  ) -> R {
-    let result = body(_valuePointer, _elementPointer)
-    _fixLifetime(_nativeBuffer)
-    return result
+    _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(_nativeBuffer) }
+    return try body(_headerPointer, _elementPointer)
   }
 
   /// Returns `true` iff `self` holds the only strong reference to its buffer.
   ///
   /// See `isUniquelyReferenced` for details.
-  public mutating func holdsUniqueReference() -> Bool {
+  public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
-  }
-
-  /// Returns `true` iff either `self` holds the only strong reference
-  /// to its buffer or the pinned has been 'pinned'.
-  ///
-  /// See `isUniquelyReferenced` for details.
-  public mutating func holdsUniqueOrPinnedReference() -> Bool {
-    return _isUniqueOrPinned(&_nativeBuffer)
   }
 
   //===--- internal/private API -------------------------------------------===//
 
-  /// Create with new storage containing space for an initial `Value`
+  /// Create with new storage containing space for an initial `Header`
   /// and at least `minimumCapacity` `element`s.
   ///
   /// - parameter bufferClass: The class of the object used for storage.
@@ -313,7 +301,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// - Precondition: `minimumCapacity >= 0`, and the type indicated by
   ///   `bufferClass` is a non-`@objc` class with no declared stored
   ///   properties.  The `deinit` of `bufferClass` must destroy its
-  ///   stored `Value` and any constructed `Element`s.
+  ///   stored `Header` and any constructed `Element`s.
   internal init(
     bufferClass: AnyClass,
     minimumCapacity: Int
@@ -340,7 +328,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
       "ManagedBufferPointer must have non-negative capacity")
 
     let totalSize = _My._elementOffset
-      +  minimumCapacity * strideof(Element.self)
+      +  minimumCapacity * MemoryLayout<Element>.stride
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
       bufferType: _uncheckedBufferClass,
@@ -352,9 +340,9 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// - Note: It is an error to use the `value` property of the resulting
+  /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
-  internal init(_ buffer: ManagedProtoBuffer<Value, Element>) {
+  internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.castToNativeObject(buffer)
   }
 
@@ -364,11 +352,11 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _debugPrecondition(
-      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
+      _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         !creating
         && _class_getInstancePositiveExtentSize(bufferClass)
-          == _valueOffset + sizeof(Value.self)),
+          == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
     _debugPrecondition(
@@ -381,11 +369,11 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
     _sanityCheck(
-      _class_getInstancePositiveExtentSize(bufferClass) == sizeof(_HeapObject.self)
+      _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         !creating
         && _class_getInstancePositiveExtentSize(bufferClass)
-          == _valueOffset + sizeof(Value.self)),
+          == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
     _sanityCheck(
@@ -397,8 +385,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// The required alignment for allocations of this type, minus 1
   internal static var _alignmentMask: Int {
     return max(
-      alignof(_HeapObject.self),
-      max(alignof(Value.self), alignof(Element.self))) &- 1
+      MemoryLayout<_HeapObject>.alignment,
+      max(MemoryLayout<Header>.alignment, MemoryLayout<Element>.alignment)) &- 1
   }
 
   /// The actual number of bytes allocated for this object.
@@ -407,24 +395,25 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
-  internal var _address: UnsafePointer<UInt8> {
-    return UnsafePointer(Builtin.bridgeToRawPointer(_nativeBuffer))
+  internal var _address: UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
-  /// Offset from the allocated storage for `self` to the stored `Value`
-  internal static var _valueOffset: Int {
+  /// Offset from the allocated storage for `self` to the stored `Header`
+  internal static var _headerOffset: Int {
     _onFastPath()
     return _roundUp(
-      sizeof(_HeapObject.self),
-      toAlignment: alignof(Value.self))
+      MemoryLayout<_HeapObject>.size,
+      toAlignment: MemoryLayout<Header>.alignment)
   }
 
-  /// An **unmanaged** pointer to the storage for the `Value`
+  /// An **unmanaged** pointer to the storage for the `Header`
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
-  internal var _valuePointer: UnsafeMutablePointer<Value> {
+  internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
-    return UnsafeMutablePointer(_address + _My._valueOffset)
+    return (_address + _My._headerOffset).assumingMemoryBound(
+      to: Header.self)
   }
 
   /// An **unmanaged** pointer to the storage for `Element`s.  Not
@@ -432,23 +421,28 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// dangle.
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
-    return UnsafeMutablePointer(_address + _My._elementOffset)
+    return (_address + _My._elementOffset).assumingMemoryBound(
+      to: Element.self)
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   internal static var _elementOffset: Int {
     _onFastPath()
     return _roundUp(
-      _valueOffset + sizeof(Value.self),
-      toAlignment: alignof(Element.self))
+      _headerOffset + MemoryLayout<Header>.size,
+      toAlignment: MemoryLayout<Element>.alignment)
+  }
+
+  internal mutating func _isUniqueOrPinnedReference() -> Bool {
+    return _isUniqueOrPinned(&_nativeBuffer)
   }
 
   internal var _nativeBuffer: Builtin.NativeObject
 }
 
-public func == <Value, Element>(
-  lhs: ManagedBufferPointer<Value, Element>,
-  rhs: ManagedBufferPointer<Value, Element>
+public func == <Header, Element>(
+  lhs: ManagedBufferPointer<Header, Element>,
+  rhs: ManagedBufferPointer<Header, Element>
 ) -> Bool {
   return lhs._address == rhs._address
 }
@@ -456,98 +450,132 @@ public func == <Value, Element>(
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
+/// Returns a Boolean value indicating whether the given object is a
+/// class instance known to have a single strong reference.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementating
+/// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = self.createModified(myStorage, arg)
-///       }
+///         if isKnownUniquelyReferenced(&myStorage) {
+///             myStorage.modifyInPlace(arg)
+///         } else {
+///             myStorage = self.createModified(myStorage, arg)
+///         }
 ///     }
 ///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(_ object: inout T) -> Bool
+/// Weak references do not affect the result of this function.
+///
+/// This function is safe to use for mutating functions in multithreaded code
+/// because a false positive implies that there is already a user-level data
+/// race on the value being mutated.
+///
+/// - Parameter object: An instance of a class. This function does *not* modify
+///   `object`; the use of `inout` is an implementation artifact.
+/// - Returns: `true` if `object` is a known to have a
+///   single strong reference; otherwise, `false`.
+public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
-internal func isUniquelyReferencedOrPinnedNonObjC<T : AnyObject>(_ object: inout T) -> Bool {
+internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
 
-/// Returns `true` iff `object` is a non-`@objc` class instance with a single
-/// strong reference.
+/// Returns a Boolean value indicating whether the given object is a
+/// class instance known to have a single strong reference.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * Weak references do not affect the result of this function.
-///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementating
+/// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferenced(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = myStorage.createModified(arg)
-///       }
+///         if isKnownUniquelyReferenced(&myStorage) {
+///             myStorage.modifyInPlace(arg)
+///         } else {
+///             myStorage = self.createModified(myStorage, arg)
+///         }
 ///     }
 ///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
-public func isUniquelyReferenced<T : NonObjectiveCBase>(
-  _ object: inout T
-) -> Bool {
-  return _isUnique(&object)
-}
-
-/// Returns `true` iff `object` is a non-`@objc` class instance with
-/// a single strong reference.
+/// Weak references do not affect the result of this function.
 ///
-/// * Does *not* modify `object`; the use of `inout` is an
-///   implementation artifact.
-/// * If `object` is an Objective-C class instance, returns `false`.
-/// * Weak references do not affect the result of this function.
+/// This function is safe to use for mutating functions in multithreaded code
+/// because a false positive implies that there is already a user-level data
+/// race on the value being mutated.
 ///
-/// Useful for implementing the copy-on-write optimization for the
-/// deep storage of value types:
-///
-///     mutating func modifyMe(_ arg: X) {
-///       if isUniquelyReferencedNonObjC(&myStorage) {
-///         myStorage.modifyInPlace(arg)
-///       }
-///       else {
-///         myStorage = self.createModified(myStorage, arg)
-///       }
-///     }
-///
-/// This function is safe to use for `mutating` functions in
-/// multithreaded code because a false positive would imply that there
-/// is already a user-level data race on the value being mutated.
-public func isUniquelyReferencedNonObjC<T : AnyObject>(
+/// - Parameter object: An instance of a class. This function does *not* modify
+///   `object`; the use of `inout` is an implementation artifact.
+/// - Returns: `true` if `object` is a known to have a
+///   single strong reference; otherwise, `false`. If `object` is `nil`, the
+///   return value is `false`.
+public func isKnownUniquelyReferenced<T : AnyObject>(
   _ object: inout T?
 ) -> Bool {
   return _isUnique(&object)
 }
 
+
+@available(*, unavailable, renamed: "ManagedBuffer")
+public typealias ManagedProtoBuffer<Header, Element> =
+  ManagedBuffer<Header, Element>
+
+extension ManagedBuffer {
+  @available(*, unavailable, renamed: "create(minimumCapacity:makingHeaderWith:)")
+  public final class func create(
+    _ minimumCapacity: Int,
+    initialValue: (ManagedBuffer<Header, Element>) -> Header
+  ) -> ManagedBuffer<Header, Element> {
+    Builtin.unreachable()
+  }
+}
+
 extension ManagedBufferPointer {
+  @available(*, unavailable, renamed: "init(bufferClass:minimumCapacity:makingHeaderWith:)")
+  public init(
+    bufferClass: AnyClass,
+    minimumCapacity: Int,
+    initialValue: (_ buffer: AnyObject, _ allocatedCount: (AnyObject) -> Int) -> Header
+  ) {
+    Builtin.unreachable()
+  }
+
   @available(*, unavailable, renamed: "capacity")
   public var allocatedElementCount: Int {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "isUniqueReference")
+  public mutating func holdsUniqueReference() -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, message: "this API is no longer available")
+  public mutating func holdsUniqueOrPinnedReference() -> Bool {
+    Builtin.unreachable()
+  }
+}
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferenced<T>(
+  _ object: inout T
+) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message: "use isKnownUniquelyReferenced instead")
+public class NonObjectiveCBase {}
+
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferencedNonObjC<T : AnyObject>(
+_ object: inout T
+) -> Bool {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "isKnownUniquelyReferenced")
+public func isUniquelyReferencedNonObjC<T : AnyObject>(
+  _ object: inout T?
+) -> Bool {
+  Builtin.unreachable()
 }

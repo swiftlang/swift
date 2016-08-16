@@ -51,10 +51,10 @@ public func differentWrapped<
   return a.getValue() != b.getValue()
 }
 
-@noreturn @_silgen_name("exit") public func exit () -> ()
+@_silgen_name("exit") public func exit () -> Never
 
-@noreturn public func testNoReturnAttr() -> () { exit() }
-@noreturn public func testNoReturnAttrPoly<T>(x: T) -> () { exit() }
+public func testNoReturnAttr() -> Never { exit() }
+public func testNoReturnAttrPoly<T>(x: T) -> Never { exit() }
 
 
 @_silgen_name("primitive") public func primitive()

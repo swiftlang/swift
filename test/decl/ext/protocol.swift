@@ -78,12 +78,12 @@ protocol SelfP1 {
 protocol SelfP2 {
 }
 
-func acceptSelfP1<T, U : SelfP1 where U.AssocType == T>(_ t: T, _ u: U) -> T {
+func acceptSelfP1<T, U : SelfP1>(_ t: T, _ u: U) -> T where U.AssocType == T {
   return t
 }
 
 extension SelfP1 {
-  final func tryAcceptSelfP1<Z : SelfP1 where Z.AssocType == Self>(_ z: Z) -> Self {
+  final func tryAcceptSelfP1<Z : SelfP1>(_ z: Z)-> Self where Z.AssocType == Self  {
     return acceptSelfP1(self, z)
   }
 }
@@ -221,7 +221,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'AssocP4' (aka 'Bool')}}
+  s4d.extP4Int() // expected-error{{'Int' is not convertible to 'S4d.AssocP4' (aka 'Bool')}}
   _ = b1
 }
 
@@ -498,7 +498,7 @@ struct SConforms8c : PConforms8 {
 }
 
 func testSConforms8c() {
-  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'Assoc' (aka 'Int')}}
+  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert value of type 'String' to specified type 'SConforms8c.Assoc' (aka 'Int')}}
   _ = s
   let i: SConforms8c.Assoc = 5
   _ = i
@@ -871,9 +871,9 @@ protocol BadProto2 { }
 extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot have an inheritance clause}}
 
 extension BadProto2 {
-  struct S { } // expected-error{{type 'S' cannot be defined within a protocol extension}}
-  class C { } // expected-error{{type 'C' cannot be defined within a protocol extension}}
-  enum E { } // expected-error{{type 'E' cannot be defined within a protocol extension}}
+  struct S { } // expected-error{{type 'S' cannot be nested in protocol extension of 'BadProto2'}}
+  class C { } // expected-error{{type 'C' cannot be nested in protocol extension of 'BadProto2'}}
+  enum E { } // expected-error{{type 'E' cannot be nested in protocol extension of 'BadProto2'}}
 }
 
 extension BadProto1 {
@@ -899,3 +899,11 @@ class BadClass1 : BadProto1 {
   func foo() { }
   override var prop: Int { return 5 } // expected-error{{property does not override any property from its superclass}}
 }
+
+protocol BadProto5 {
+  associatedtype T1 // expected-note{{protocol requires nested type 'T1'}}
+  associatedtype T2 // expected-note{{protocol requires nested type 'T2'}}
+  associatedtype T3 // expected-note{{protocol requires nested type 'T3'}}
+}
+
+class BadClass5 : BadProto5 {} // expected-error{{type 'BadClass5' does not conform to protocol 'BadProto5'}}

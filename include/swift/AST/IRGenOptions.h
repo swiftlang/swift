@@ -48,7 +48,9 @@ enum class IRGenOutputKind : unsigned {
 enum class IRGenDebugInfoKind : unsigned {
   None,       /// No debug info.
   LineTables, /// Line tables only.
-  Normal      /// Line tables + DWARF types.
+  ASTTypes,   /// Line tables + AST type references.
+  DwarfTypes, /// Line tables + AST type references + DWARF types.
+  Normal = ASTTypes /// The setting LLDB prefers.
 };
 
 enum class IRGenEmbedMode : unsigned {
@@ -194,6 +196,18 @@ public:
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableLLVMARCOpts;
     return Hash;
+  }
+
+  /// Should LLVM IR value names be emitted and preserved?
+  bool shouldProvideValueNames() const {
+    // If the command line contains an explicit request about whether to add
+    // LLVM value names, honor it.  Otherwise, add value names only if the
+    // final result is textual LLVM assembly.
+    if (HasValueNamesSetting) {
+      return ValueNames;
+    } else {
+      return OutputKind == IRGenOutputKind::LLVMAssembly;
+    }
   }
 };
 

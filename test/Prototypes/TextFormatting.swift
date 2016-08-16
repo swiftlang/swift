@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // Text Formatting Prototype
@@ -154,7 +154,7 @@ extension String : XPrintable {
 }
 
 /// \brief An integral type that can be printed
-protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
+protocol XPrintableInteger : ExpressibleByIntegerLiteral, Comparable, SignedNumber, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 
@@ -202,7 +202,7 @@ func _writePositive<T:XPrintableInteger, S: XOutputStream>(
   var digit = UInt32((value % radix).toInt())
   var baseCharOrd : UInt32 = digit <= 9 ? UnicodeScalar("0").value 
                                         : UnicodeScalar("A").value - 10
-  stream.append(String(UnicodeScalar(baseCharOrd + digit)))
+  stream.append(String(UnicodeScalar(baseCharOrd + digit)!))
   return nDigits + 1
 }
 
@@ -349,7 +349,7 @@ xprintln(toPrettyString(424242~>format(radix:16, width:8)))
 // CHECK-NEXT: |   67932|
 
 var zero = "0"
-xprintln(toPrettyString(-434343~>format(width:8, fill:zero)))
+xprintln(toPrettyString(-434343~>format(fill:zero, width:8)))
 // CHECK-NEXT: |-0434343|
 
 xprintln(toPrettyString(-42~>format(radix:13, width:8)))

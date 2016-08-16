@@ -43,7 +43,7 @@ protocol P8 {
 
 // Inheritable: operator requirement.
 protocol P9 {
-  func ==(x: Self, y: Self) -> Bool 
+  static func ==(x: Self, y: Self) -> Bool 
 }
 
 // Never inheritable: method with 'Self' in a non-contravariant position.
@@ -53,7 +53,7 @@ protocol P10 {
 
 // Never inheritable: method with 'Self' in curried position.
 protocol P11 {
-  func f11() -> (x: Self) -> Int
+  func f11() -> (_ x: Self) -> Int
 }
 
 // Inheritable: parameter is a function returning 'Self'.
@@ -119,7 +119,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f10(_ arr: [A]) { } // expected-error{{protocol 'P10' requirement 'f10' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
 
   // P11
-  func f11() -> (x: A) -> Int { return { x in 5 } }
+  func f11() -> (_ x: A) -> Int { return { x in 5 } }
 }
 
 // P9
@@ -206,7 +206,7 @@ final class A9 : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f10(_ arr: [A9]) { }
 
   // P11
-  func f11() -> (x: A9) -> Int { return { x in 5 } }
+  func f11() -> (_ x: A9) -> Int { return { x in 5 } }
 }
 
 // P9

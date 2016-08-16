@@ -1,0 +1,269 @@
+---
+Name: GameplayKit
+Classes:
+- Name: GKComponent
+  Methods:
+  - Selector: 'updateWithDeltaTime:'
+    SwiftName: update(deltaTime:)
+    MethodKind: Instance
+- Name: GKComponentSystem
+  Methods:
+  - Selector: 'addComponentWithEntity:'
+    SwiftName: addComponent(foundIn:)
+    MethodKind: Instance
+  - Selector: 'removeComponentWithEntity:'
+    SwiftName: removeComponent(foundIn:)
+    MethodKind: Instance
+  - Selector: 'updateWithDeltaTime:'
+    SwiftName: update(deltaTime:)
+    MethodKind: Instance
+- Name: GKCompositeBehavior
+  Methods:
+  - Selector: 'behaviorWithBehaviors:andWeights:'
+    SwiftName: init(behaviors:weights:)
+    MethodKind: Instance
+- Name: GKDecisionNode
+  Methods:
+  - Selector: 'createBranchWithValue:attribute:'
+    SwiftName: createBranch(value:attribute:)
+    MethodKind: Instance
+  - Selector: 'createBranchWithPredicate:attribute:'
+    SwiftName: createBranch(predicate:attribute:)
+    MethodKind: Instance
+  - Selector: 'createBranchWithWeight:attribute:'
+    SwiftName: createBranch(weight:attribute:)
+    MethodKind: Instance
+- Name: GKEntity
+  Methods:
+  - Selector: 'updateWithDeltaTime:'
+    SwiftName: update(deltaTime:)
+    MethodKind: Instance
+- Name: GKGameModel
+  Methods:
+  - Selector: 'unapplyGameModelUpdate:'
+    SwiftName: unapply(_:)
+    MethodKind: Instance
+- Name: GKGoal
+  Methods:
+  - Selector: 'goalToSeekAgent:'
+    SwiftName: init(toSeek:)
+    MethodKind: Instance
+  - Selector: 'goalToFleeAgent:'
+    SwiftName: init(toFlee:)
+    MethodKind: Instance
+  - Selector: 'goalToInterceptAgent:maxPredictionTime:'
+    SwiftName: init(toIntercept:maxPredictionTime:)
+    MethodKind: Instance
+- Name: GKGraph
+  Methods:
+  - Selector: 'initWithNodes:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+  - Selector: 'connectNodeToLowestCostNode:bidirectional:'
+    SwiftName: connectToLowestCostNode(node:bidirectional:)
+    MethodKind: Instance
+  - Selector: 'removeNodes:'
+    SwiftName: remove(_:)
+    MethodKind: Instance
+  - Selector: 'addNodes:'
+    SwiftName: add(_:)
+    MethodKind: Instance
+- Name: GKGridGraph
+  Methods:
+  - Selector: 'nodeAtGridPosition:'
+    SwiftName: node(atGridPosition:)
+    MethodKind: Instance
+  - Selector: 'connectNodeToAdjacentNodes:'
+    SwiftName: connectToAdjacentNodes(node:)
+    MethodKind: Instance
+  - Selector: 'initWithNodes:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+- Name: GKMeshGraph
+  Methods:
+  - Selector: 'connectNodeUsingObstacles:'
+    SwiftName: connectUsingObstacles(node:)
+    MethodKind: Instance
+  - Selector: 'initWithNodes:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+- Name: GKNoise
+  Methods:
+  - Selector: 'initWithNoiseSource:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+  - Selector: 'initWithNoiseSource:gradientColors:'
+    SwiftName: init(_:gradientColors:)
+    MethodKind: Instance
+  - Selector: 'clampWithLowerBound:upperBound:'
+    SwiftName: clamp(lowerBound:upperBound:)
+    MethodKind: Instance
+  - Selector: 'raiseToPower:'
+    SwiftName: raiseToPower(_:)
+    MethodKind: Instance
+  - Selector: 'applyTurbulenceWithFrequency:power:roughness:seed:'
+    SwiftName: applyTurbulence(frequency:power:roughness:seed:)
+    MethodKind: Instance
+  - Selector: 'remapValuesToCurveWithControlPoints:'
+    SwiftName: remapValues(toCurveWithControlPoints:)
+    MethodKind: Instance
+  - Selector: 'remapValuesToTerracesWithPeaks:terracesInverted:'
+    SwiftName: remapValues(toTerracesWithPeaks:terracesInverted:)
+    MethodKind: Instance
+  - Selector: 'addWithNoise:'
+    SwiftName: add(_:)
+    MethodKind: Instance
+  - Selector: 'multiplyWithNoise:'
+    SwiftName: multiply(_:)
+    MethodKind: Instance
+  - Selector: 'minimumWithNoise:'
+    SwiftName: minimum(_:)
+    MethodKind: Instance
+  - Selector: 'maximumWithNoise:'
+    SwiftName: maximum(_:)
+    MethodKind: Instance
+  - Selector: 'raiseToPowerWithNoise:'
+    SwiftName: raiseToPower(_:)
+    MethodKind: Instance
+  - Selector: 'displaceXWithNoise:yWithNoise:zWithNoise:'
+    SwiftName: displaceWithNoises(x:y:z:)
+    MethodKind: Instance
+- Name: GKNoiseMap
+  Methods:
+  - Selector: 'initWithNoise:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+  - Selector: 'initWithNoise:size:origin:sampleCount:seamless:'
+    SwiftName: init(_:size:origin:sampleCount:seamless:)
+    MethodKind: Instance
+  - Selector: 'valueAtPosition:'
+    SwiftName: value(at:)
+    MethodKind: Instance
+  - Selector: 'interpolatedValueAtPosition:'
+    SwiftName: interpolatedValue(at:)
+    MethodKind: Instance
+  - Selector: 'setValue:atPosition:'
+    SwiftName: setValue(_:at:)
+    MethodKind: Instance
+- Name: GKObstacleGraph
+  Methods:
+  - Selector: 'connectNodeUsingObstacles:'
+    SwiftName: connectUsingObstacles(node:)
+    MethodKind: Instance
+  - Selector: 'connectNodeUsingObstacles:ignoringObstacles:'
+    SwiftName: connectUsingObstacles(node:ignoring:)
+    MethodKind: Instance
+  - Selector: 'connectNodeUsingObstacles:ignoringBufferRadiusOfObstacles:'
+    SwiftName: connectUsingObstacles(node:ignoringBufferRadiusOf:)
+    MethodKind: Instance
+  - Selector: 'initWithNodes:'
+    SwiftName: init(_:)
+    MethodKind: Instance
+- Name: GKOctree
+  Methods:
+  - Selector: 'addElement:withPoint:'
+    SwiftName: add(_:at:)
+    MethodKind: Instance
+  - Selector: 'addElement:withBox:'
+    SwiftName: add(_:in:)
+    MethodKind: Instance
+  - Selector: 'elementsAtPoint:'
+    SwiftName: elements(at:)
+    MethodKind: Instance
+  - Selector: 'removeElement:'
+    SwiftName: remove(_:)
+    MethodKind: Instance
+  - Selector: 'removeElement:withNode:'
+    SwiftName: remove(_:using:)
+    MethodKind: Instance
+- Name: GKQuadtree
+  Methods:
+  - Selector: 'addElement:withPoint:'
+    SwiftName: add(_:at:)
+    MethodKind: Instance
+  - Selector: 'addElement:withQuad:'
+    SwiftName: add(_:in:)
+    MethodKind: Instance
+  - Selector: 'elementsAtPoint:'
+    SwiftName: elements(at:)
+    MethodKind: Instance
+  - Selector: 'removeElement:'
+    SwiftName: remove(_:)
+    MethodKind: Instance
+  - Selector: 'removeElement:withNode:'
+    SwiftName: remove(_:using:)
+    MethodKind: Instance
+- Name: GKRtree
+  Methods:
+  - Selector: 'addElement:boundingRectMin:boundingRectMax:splitStrategy:'
+    SwiftName: add(_:boundingRectMin:boundingRectMax:splitStrategy:)
+    MethodKind: Instance
+  - Selector: 'removeElement:boundingRectMin:boundingRectMax:'
+    SwiftName: remove(_:boundingRectMin:boundingRectMax:)
+    MethodKind: Instance
+- Name: NSArray
+  Methods:
+  - Selector: 'shuffledArrayWithRandomSource:'
+    SwiftName: shuffled(using:)
+    MethodKind: Instance
+- Name: GKARC4RandomSource 
+  Methods:
+  - Selector: 'dropValuesWithCount:'
+    SwiftName: dropValues(_:)
+    MethodKind: Instance
+- Name: GKRuleSystem
+  Methods:
+  - Selector: 'addRule:'
+    SwiftName: add(_:)
+    MethodKind: Instance
+  - Selector: 'addRulesFromArray:'
+    SwiftName: add(_:)
+    MethodKind: Instance
+- Name: GKRule
+  Methods:
+  - Selector: 'evaluatePredicateWithSystem:'
+    SwiftName: evaluatePredicate(in:)
+    MethodKind: Instance
+  - Selector: 'performActionWithSystem:'
+    SwiftName: performAction(in:)
+    MethodKind: Instance
+  - Selector: 'ruleWithBlockPredicate:action:'
+    SwiftName: init(evaluator:action:)
+    MethodKind: Instance
+- Name: GKState
+  Methods:
+  - Selector: 'didEnterWithPreviousState:'
+    SwiftName: didEnter(from:)
+    MethodKind: Instance
+  - Selector: 'updateWithDeltaTime:'
+    SwiftName: update(deltaTime:)
+    MethodKind: Instance
+  - Selector: 'willExitWithNextState:'
+    SwiftName: willExit(to:)
+    MethodKind: Instance
+- Name: GKStateMachine
+  Methods:
+  - Selector: 'updateWithDeltaTime:'
+    SwiftName: update(deltaTime:)
+    MethodKind: Instance
+  - Selector: 'canEnterState:'
+    SwiftName: canEnter(:_)
+    MethodKind: Instance
+  - Selector: 'enterState:'
+    SwiftName: enter(_:)
+    MethodKind: Instance
+  - Selector: 'stateForClass:'
+    MethodKind: Instance
+    SwiftPrivate: true
+- Name: SKTileMapNode
+  Methods:
+  - Selector: 'tileMapNodesWithTileSet:columns:rows:tileSize:fromNoiseMap:tileTypeNoiseMapThresholds:'
+    SwiftName: tileMapNodes(tileSet:columns:rows:tileSize:from:tileTypeNoiseMapThresholds:)
+    MethodKind: Class
+
+Protocols:
+- Name: GKRandom
+  Methods:
+  - Selector: 'nextIntWithUpperBound:'
+    SwiftName: nextInt(upperBound:)
+    MethodKind: Instance

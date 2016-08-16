@@ -13,12 +13,11 @@
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/Concurrency.h"
+#include "SourceKit/SwiftLang/Factory.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "gtest/gtest.h"
-
-// FIXME: Portability.
-#include <dispatch/dispatch.h>
 
 using namespace SourceKit;
 using namespace llvm;
@@ -96,20 +95,14 @@ struct TestCursorInfo {
 };
 
 class CursorInfoTest : public ::testing::Test {
-  SourceKit::Context Ctx{ getRuntimeLibPath() };
+  SourceKit::Context Ctx{ getRuntimeLibPath(), SourceKit::createSwiftLangSupport };
   std::atomic<int> NumTasks;
-  dispatch_semaphore_t TaskSema = nullptr;
 
 public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
   void SetUp() {
     NumTasks = 0;
-    TaskSema = dispatch_semaphore_create(0);
-  }
-
-  void TearDown() {
-    dispatch_release(TaskSema);
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
@@ -133,7 +126,7 @@ public:
   TestCursorInfo getCursor(const char *DocName, unsigned Offset,
                            ArrayRef<const char *> CArgs) {
     auto Args = makeArgs(DocName, CArgs);
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    Semaphore sema(0);
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(DocName, Offset, Args,
@@ -142,38 +135,13 @@ public:
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;
         TestInfo.DeclarationLoc = Info.DeclarationLoc;
-        dispatch_semaphore_signal(sema);
+        sema.signal();
       });
 
-    dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60);
-    bool expired = dispatch_semaphore_wait(sema, when);
+    bool expired = sema.wait(60 * 1000);
     if (expired)
       llvm::report_fatal_error("check took too long");
-    dispatch_release(sema);
     return TestInfo;
-  }
-
-  void checkCursorAsync(const char *DocName, unsigned Offset,
-                        ArrayRef<const char *> CArgs,
-                        StringRef ExpectedName, StringRef ExpectedTypename) {
-    auto Args = makeArgs(DocName, CArgs);
-    ++NumTasks;
-    getLang().getCursorInfo(DocName, Offset, Args,
-      [this, ExpectedName, ExpectedTypename](const CursorInfo &Info) {
-        EXPECT_EQ(ExpectedName, Info.Name);
-        EXPECT_EQ(ExpectedTypename, Info.TypeName);
-
-        int Num = --NumTasks;
-        if (Num == 0)
-          dispatch_semaphore_signal(TaskSema);
-      });
-  }
-
-  void waitForChecks() {
-    dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC * 60);
-    bool expired = dispatch_semaphore_wait(TaskSema, when);
-    if (expired)
-      llvm::report_fatal_error("checks took too long");
   }
 
   unsigned findOffset(StringRef Val, StringRef Text) {

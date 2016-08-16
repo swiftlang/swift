@@ -12,10 +12,9 @@ Classes:
     MethodKind: Class
     FactoryAsInit: C
 - Name: UIPrintInteractionController
-  Methods:
-  - Selector: 'sharedPrintController'
-    SwiftName: shared()
-    MethodKind: Class
+  Properties:
+  - Name: 'sharedPrintController'
+    SwiftName: shared
 - Name: NSLayoutAnchor
   Methods:
   - Selector: 'constraintEqualToAnchor:'
@@ -196,10 +195,10 @@ Classes:
     SwiftName: size(forNumberOfPages:)
     MethodKind: Instance
 - Name: UIPasteboard
+  Properties:
+  - Name: pasteboardTypes
+    SwiftName: types
   Methods:
-  - Selector: pasteboardTypes
-    SwiftName: types()
-    MethodKind: Instance
   - Selector: 'containsPasteboardTypes:'
     SwiftName: contains(pasteboardTypes:)
     MethodKind: Instance
@@ -242,6 +241,16 @@ Classes:
   - Selector: 'touchesShouldCancelInContentView:'
     SwiftName: touchesShouldCancel(in:)
     MethodKind: Instance
+- Name: UIStoryboardSegue
+  Properties:
+  - Name: sourceViewController
+    SwiftName: source
+  - Name: destinationViewController
+    SwiftName: destination
+- Name: UIStoryboardUnwindSegueSource
+  Properties:
+  - Name: sourceViewController
+    SwiftName: source
 - Name: UIUserNotificationSettings
   Methods:
   - Selector: 'settingsForTypes:categories:'
@@ -287,6 +296,18 @@ Classes:
     SwiftName: sendEvent(_:)
     MethodKind: Instance
 Protocols:
+- Name: UIAppearance
+  Methods:
+  - Selector: 'appearanceWhenContainedInInstancesOfClasses:'
+    SwiftName: 'appearance(whenContainedInInstancesOf:)'
+    MethodKind: Class
+  - Selector: 'appearanceForTraitCollection:'
+    SwiftName: 'appearance(for:)'
+    MethodKind: Class
+  - Selector: 'appearanceForTraitCollection:whenContainedInInstancesOfClasses:'
+    SwiftName: 'appearance(for:whenContainedInInstancesOf:)'
+    MethodKind: Class
+
 - Name: UIBarPositioningDelegate
   Methods:
   - Selector: 'positionForBar:'
@@ -377,6 +398,17 @@ Protocols:
   - Selector: 'tabBarController:interactionControllerForAnimationController:'
     SwiftName: tabBarController(_:interactionControllerFor:)
     MethodKind: Instance
+- Name: UIViewControllerAnimatedTransitioning
+  Methods:
+  - Selector: 'transitionDuration:'
+    SwiftName: 'transitionDuration(using:)'
+    MethodKind: Instance
+  - Selector: 'animateTransition:'
+    SwiftName: 'animateTransition(using:)'
+    MethodKind: Instance
+  - Selector: 'interruptibleAnimatorForTransition:'
+    SwiftName: 'interruptibleAnimator(using:)'
+    MethodKind: Instance
 - Name: UIViewControllerTransitioningDelegate
   Methods:
   - Selector: 'animationControllerForPresentedController:presentingController:sourceController:'
@@ -386,10 +418,10 @@ Protocols:
     SwiftName: 'animationController(forDismissed:)'
     MethodKind: Instance
   - Selector: 'interactionControllerForPresentation:'
-    SwiftName: 'interactionControllerForPresentation(_:)'
+    SwiftName: 'interactionControllerForPresentation(using:)'
     MethodKind: Instance
   - Selector: 'interactionControllerForDismissal:'
-    SwiftName: 'interactionControllerForDismissal(_:)'
+    SwiftName: 'interactionControllerForDismissal(using:)'
     MethodKind: Instance
   - Selector: 'presentationControllerForPresentedViewController:presentingViewController:sourceViewController:'
     SwiftName: 'presentationController(forPresented:presenting:source:)'
@@ -405,5 +437,7 @@ Enumerators:
   SwiftName: normal
 - Name: UIDocumentStateNormal
   SwiftName: normal
+- Name: UIPrinterJobTypeUnknown
+  SwiftName: unknown
 - Name: UIUserInterfaceIdiomTV
   SwiftName: tv

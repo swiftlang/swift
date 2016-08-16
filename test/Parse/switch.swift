@@ -64,7 +64,7 @@ case _ where x % 2 == 0,
   x = 1
 case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+case _ where 0: // expected-error {{'Int' is not convertible to 'Bool'}}
   x = 0
 default:
   x = 1
@@ -278,4 +278,31 @@ func f0(values: [Whatever]) { // expected-note {{did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }
+}
+
+// sr-720
+enum Whichever {
+  case Thing
+  static let title = "title"
+  static let alias: Whichever = .Thing
+}
+func f1(x: String, y: Whichever) {
+  switch x {
+    case Whichever.title: // Ok. Don't emit diagnostics for static member of enum.
+        break
+    case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
+        break
+    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+        break
+    default:
+      break
+  }
+  switch y {
+    case Whichever.Thing: // Ok.
+        break
+    case Whichever.alias: // Ok. Don't emit diagnostics for static member of enum.
+        break
+    case Whichever.title: // expected-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
+        break
+  }
 }

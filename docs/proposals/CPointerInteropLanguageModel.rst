@@ -61,7 +61,7 @@ accept any of the following:
   array, and lifetime-extended for the duration of the callee.
 
 As a special case, when a function is declared as taking an
-``UnsafeMutablePointer<Void>`` argument, it can accept the same operands as
+``UnsafeMutableRawPointer`` argument, it can accept the same operands as
 ``UnsafeMutablePointer<T>`` for any type T.
 
 So if you have a function declared::
@@ -80,7 +80,7 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func bar(_ x: UnsafeMutablePointer<Void>)
+  func bar(_ x: UnsafeMutableRawPointer)
 
 You can call it as any of::
 
@@ -139,7 +139,7 @@ accept any of the following:
   array, and lifetime-extended for the duration of the callee.
 
 As a special case, when a function is declared as taking an
-``UnsafePointer<Void>`` argument, it can accept the same operands as
+``UnsafeRawPointer`` argument, it can accept the same operands as
 ``UnsafePointer<T>`` for any type ``T``. Pointers to certain integer
 types can furthermore interoperate with strings; see `Strings`_ below.
 
@@ -158,7 +158,7 @@ You can call it as any of::
 
 And if you have a function declared::
 
-  func zang(_ x: UnsafePointer<Void>)
+  func zang(_ x: UnsafeRawPointer)
 
 You can call it as any of::
 
@@ -175,7 +175,7 @@ You can call it as any of::
   zang(ints)
 
 A type checker limitation prevents array literals from being passed directly
-to ``UnsafePointer<Void>`` arguments without type annotation. As a
+to ``UnsafeRawPointer`` arguments without type annotation. As a
 workaround, you can bind the array literal to a constant, as above, or 
 specify the array type with ``as``::
 

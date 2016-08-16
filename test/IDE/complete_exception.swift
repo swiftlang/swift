@@ -1,64 +1,64 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH1 | %FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=THROW1 > %t.throw1
-// RUN: FileCheck %s -check-prefix=THROW1 < %t.throw1
-// RUN: FileCheck %s -check-prefix=THROW1-LOCAL < %t.throw1
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH2 | FileCheck %s -check-prefix=CATCH2
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=THROW2 | FileCheck %s -check-prefix=THROW2
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH3 | FileCheck %s -check-prefix=CATCH3
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH1 | FileCheck %s -check-prefix=CATCH1
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW1 | FileCheck %s -check-prefix=THROW1
+// RUN: %FileCheck %s -check-prefix=THROW1 < %t.throw1
+// RUN: %FileCheck %s -check-prefix=THROW1-LOCAL < %t.throw1
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH2 | %FileCheck %s -check-prefix=CATCH2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=THROW2 | %FileCheck %s -check-prefix=THROW2
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH3 | %FileCheck %s -check-prefix=CATCH3
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH1 | %FileCheck %s -check-prefix=CATCH1
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW1 | %FileCheck %s -check-prefix=THROW1
 
 // FIXME: <rdar://problem/21001526> No dot code completion results in switch case or catch stmt at top-level
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | FileCheck %s -check-prefix=CATCH2
-// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | FileCheck %s -check-prefix=THROW2
+// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | %FileCheck %s -check-prefix=CATCH2
+// RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | %FileCheck %s -check-prefix=THROW2
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH1 > %t.inside_catch1
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch1
-// RUN: FileCheck %s -check-prefix=IMPLICIT_ERROR < %t.inside_catch1
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch1
+// RUN: %FileCheck %s -check-prefix=IMPLICIT_ERROR < %t.inside_catch1
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH2 > %t.inside_catch2
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch2
-// RUN: FileCheck %s -check-prefix=EXPLICIT_ERROR_E < %t.inside_catch2
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch2
+// RUN: %FileCheck %s -check-prefix=EXPLICIT_ERROR_E < %t.inside_catch2
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH3 > %t.inside_catch3
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch3
-// RUN: FileCheck %s -check-prefix=EXPLICIT_NSERROR_E < %t.inside_catch3
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch3
+// RUN: %FileCheck %s -check-prefix=EXPLICIT_NSERROR_E < %t.inside_catch3
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH4 > %t.inside_catch4
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch4
-// RUN: FileCheck %s -check-prefix=EXPLICIT_ERROR_PAYLOAD_I < %t.inside_catch4
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch4
+// RUN: %FileCheck %s -check-prefix=EXPLICIT_ERROR_PAYLOAD_I < %t.inside_catch4
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH5 > %t.inside_catch5
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch5
-// RUN: FileCheck %s -check-prefix=EXPLICIT_ERROR_E < %t.inside_catch5
-// RUN: FileCheck %s -check-prefix=NO_ERROR_AND_A < %t.inside_catch5
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch5
+// RUN: %FileCheck %s -check-prefix=EXPLICIT_ERROR_E < %t.inside_catch5
+// RUN: %FileCheck %s -check-prefix=NO_ERROR_AND_A < %t.inside_catch5
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH6 > %t.inside_catch6
-// RUN: FileCheck %s -check-prefix=STMT < %t.inside_catch6
-// RUN: FileCheck %s -check-prefix=NO_E < %t.inside_catch6
-// RUN: FileCheck %s -check-prefix=NO_ERROR_AND_A < %t.inside_catch6
+// RUN: %FileCheck %s -check-prefix=STMT < %t.inside_catch6
+// RUN: %FileCheck %s -check-prefix=NO_E < %t.inside_catch6
+// RUN: %FileCheck %s -check-prefix=NO_ERROR_AND_A < %t.inside_catch6
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT1 | FileCheck %s -check-prefix=ERROR_DOT
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT2 | FileCheck %s -check-prefix=ERROR_DOT
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT3 | FileCheck %s -check-prefix=NSERROR_DOT
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | FileCheck %s -check-prefix=INT_DOT
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT1 | %FileCheck %s -check-prefix=ERROR_DOT
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT2 | %FileCheck %s -check-prefix=ERROR_DOT
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT3 | %FileCheck %s -check-prefix=NSERROR_DOT
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=INSIDE_CATCH_ERR_DOT4 | %FileCheck %s -check-prefix=INT_DOT
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_INSIDE_CATCH1 > %t.top_level_inside_catch1
-// RUN: FileCheck %s -check-prefix=STMT < %t.top_level_inside_catch1
-// RUN: FileCheck %s -check-prefix=IMPLICIT_ERROR < %t.top_level_inside_catch1
+// RUN: %FileCheck %s -check-prefix=STMT < %t.top_level_inside_catch1
+// RUN: %FileCheck %s -check-prefix=IMPLICIT_ERROR < %t.top_level_inside_catch1
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_INSIDE_CATCH_ERR_DOT1 | FileCheck %s -check-prefix=ERROR_DOT
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_INSIDE_CATCH_ERR_DOT1 | %FileCheck %s -check-prefix=ERROR_DOT
 
 // REQUIRES: objc_interop
 
 import Foundation // importer SDK
 
-protocol ErrorPro1 : ErrorProtocol {}
-class Error1 : ErrorProtocol {}
-class Error2 : ErrorProtocol {}
+protocol ErrorPro1 : Error {}
+class Error1 : Error {}
+class Error2 : Error {}
 class Error3 {}
-extension Error3 : ErrorProtocol{}
-enum Error4 : ErrorProtocol {
+extension Error3 : Error{}
+enum Error4 : Error {
   case E1
   case E2(Int32)
 }
@@ -95,7 +95,7 @@ func test002() {
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]{{; name=.+$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getNSError()[#NSError#]{{; name=.+$}}
 
-// If we could prove that there is no way to get to an ErrorProtocol value by
+// If we could prove that there is no way to get to an Error value by
 // starting from these, we could remove them.  But that may be infeasible in
 // the presence of overloaded operators.
 // THROW1-DAG: Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
@@ -149,14 +149,14 @@ func test006() {
   } catch {
     #^INSIDE_CATCH1^#
   }
-// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#ErrorProtocol#]; name=error
+// IMPLICIT_ERROR: Decl[LocalVar]/Local:  error[#Error#]; name=error
 }
 func test007() {
   do {
   } catch let e {
     #^INSIDE_CATCH2^#
   }
-// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#ErrorProtocol#]; name=e
+// EXPLICIT_ERROR_E: Decl[LocalVar]/Local: e[#Error#]; name=e
 }
 func test008() {
   do {

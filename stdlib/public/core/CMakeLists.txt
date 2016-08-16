@@ -17,6 +17,7 @@
 # configuring with -DSWIFT_CHECK_ESSENTIAL_STDLIB=YES
 set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
@@ -28,7 +29,6 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
-  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -37,12 +37,15 @@ set(SWIFTLIB_ESSENTIAL
   CocoaArray.swift
   Collection.swift
   CollectionAlgorithms.swift.gyb
+  Comparable.swift
   CompilerProtocols.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
   CTypes.swift
+  DebuggerSupport.swift
   EmptyCollection.swift
+  Equatable.swift
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
@@ -52,7 +55,13 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  Hashable.swift
   HashedCollections.swift.gyb
+  # WORKAROUND: This file name is not sorted alphabetically in the list because
+  # if we do so, the compiler crashes.
+  AnyHashable.swift
+  # END WORKAROUND
+  HashedCollectionsAnyHashableExtensions.swift.gyb
   Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
@@ -61,12 +70,14 @@ set(SWIFTLIB_ESSENTIAL
   InputStream.swift
   IntegerArithmetic.swift.gyb
   IntegerParsing.swift.gyb
+  Integers.swift.gyb
   Join.swift
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift.gyb
+  MemoryLayout.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
@@ -117,6 +128,7 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  UnsafeRawPointer.swift.gyb
   WriteBackMutableSlice.swift
   )
 
@@ -129,7 +141,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
-  Process.swift
+  CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
@@ -137,10 +149,10 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-set(swift_core_link_flags)
+set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
-set(swift_stdlib_compile_flags)
+set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
@@ -162,7 +174,7 @@ else()
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
       OUTPUT_VARIABLE ENV_SYSTEMROOT)
 
@@ -184,12 +196,12 @@ if(SWIFT_STDLIB_SIL_DEBUGGING)
 endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
-  add_swift_library(swift_stdlib_essential SHARED IS_STDLIB IS_STDLIB_CORE
+  add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
-add_swift_library(swiftCore SHARED IS_STDLIB IS_STDLIB_CORE
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
   # build system know that there's a rule to produce the shims

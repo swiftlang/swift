@@ -806,10 +806,10 @@ static bool isTestCandidate(ValueDecl *D) {
     return false;
 
   // 2. ...on a class or extension (not a struct)...
-  auto NTD = getNominalParent(D);
-  if (!NTD)
+  auto parentNTD = getNominalParent(D);
+  if (!parentNTD)
     return false;
-  if (!isa<ClassDecl>(NTD))
+  if (!isa<ClassDecl>(parentNTD))
     return false;
 
   // 3. ...that returns void...
@@ -825,10 +825,10 @@ static bool isTestCandidate(ValueDecl *D) {
 
   // 5. ...is of at least 'internal' accessibility (unless we can use
   //    Objective-C reflection)...
-#if SWIFT_OBJC_INTEROP
-  if (D->getFormalAccess() < Accessibility::Internal)
+  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
+      (D->getFormalAccess() < Accessibility::Internal ||
+      parentNTD->getFormalAccess() < Accessibility::Internal))
     return false;
-#endif
 
   // 6. ...and starts with "test".
   if (FD->getName().str().startswith("test"))

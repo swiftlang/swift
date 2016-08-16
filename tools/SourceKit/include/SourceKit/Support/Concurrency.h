@@ -17,6 +17,55 @@
 
 namespace SourceKit {
 
+class Semaphore {
+public:
+  Semaphore(long count) {
+    ImplObj = Impl::create(count);
+  }
+  ~Semaphore() {
+    if (ImplObj)
+      Impl::release(ImplObj);
+  }
+
+  void signal() {
+    Impl::signal(ImplObj);
+  }
+
+  bool wait() {
+    return Impl::wait(ImplObj);
+  }
+
+  bool wait(long milliseconds) {
+    return Impl::wait(ImplObj, milliseconds);
+  }
+
+  Semaphore(const Semaphore &Other) = delete;
+  Semaphore(Semaphore &&Other) {
+    ImplObj = std::move(Other.ImplObj);
+    Other.ImplObj = Impl::Ty();
+  }
+
+  Semaphore &operator=(const Semaphore &Other) = delete;
+  Semaphore &operator=(Semaphore &&Other) {
+    Semaphore Tmp(std::move(Other));
+    std::swap(ImplObj, Tmp.ImplObj);
+    return *this;
+  }
+private:
+  // Platform-specific implementation.
+  struct Impl {
+    typedef void *Ty;
+    static Ty create(long count);
+    static void signal(Ty Obj);
+    static bool wait(Ty Obj);
+    static bool wait(Ty Obj, long milliseconds);
+    static void retain(Ty Obj);
+    static void release(Ty Obj);
+  };
+
+  Impl::Ty ImplObj;
+};
+
 class WorkQueue {
 public:
   enum class Dequeuing {

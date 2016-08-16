@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 enum Medal {
@@ -105,7 +105,7 @@ func olympicGames(_ g1: Gymnast) -> Gymnast {
   let f4: (Steroids) -> () = f3()
   f4(Steroids())
 
-  let f5: () -> Int = g1.dynamicType.currentYear
+  let f5: () -> Int = type(of: g1).currentYear
   print(f5())
 
   return g1

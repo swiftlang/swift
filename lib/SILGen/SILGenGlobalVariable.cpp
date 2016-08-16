@@ -26,7 +26,10 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
                                                       ForDefinition_t forDef) {
   // First, get a mangled name for the declaration.
   std::string mangledName;
-  {
+
+  if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
+    mangledName = SILGenName->Name;
+  } else {
     Mangler mangler;
     mangler.mangleGlobalVariableFull(gDecl);
     mangledName = mangler.finalize();
@@ -98,8 +101,9 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
                               {}, {});
     // FIXME: It'd be nice if the result of the accessor was natively an
     // address.
-    addr = B.createPointerToAddress(loc, addr,
-                             getLoweredType(var->getType()).getAddressType());
+    addr = B.createPointerToAddress(
+      loc, addr, getLoweredType(var->getType()).getAddressType(),
+      /*isStrict*/ true);
     return ManagedValue::forLValue(addr);
   }
 

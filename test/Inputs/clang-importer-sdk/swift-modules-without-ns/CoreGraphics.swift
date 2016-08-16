@@ -35,7 +35,7 @@ public func ==(lhs: CGFloat, rhs: CGFloat) -> Bool {
   return lhs.value == rhs.value
 }
 
-extension CGFloat : IntegerLiteralConvertible, Equatable {
+extension CGFloat : ExpressibleByIntegerLiteral, Equatable {
   public init(integerLiteral value: UnderlyingType) {
     self.value = value
   }

@@ -19,3 +19,6 @@ Classes:
   - Selector: 'getPlaylistWithUUID:creationMetadata:completionHandler:'
     SwiftName: 'getPlaylist(with:creationMetadata:completionHandler:)'
     MethodKind: Instance
+Tags:
+- Name: MPErrorCode
+  NSErrorDomain: MPErrorDomain

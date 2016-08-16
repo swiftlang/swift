@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o %t.ll
-// RUN: FileCheck %s < %t.ll
-// RUN: FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
-// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
+// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
+// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | %FileCheck %s --check-prefix=SIL-CHECK
 
 func markUsed<T>(_ t: T) {}
 
@@ -25,14 +25,14 @@ switch p {
       // Verify that the branch has a location >= the cleanup.
       // SIL-CHECK-NEXT:  br{{.*}}line:[[@LINE-3]]:17:cleanup
       // CHECK-SCOPES: call {{.*}}markUsed
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X1:[0-9]+]]
-      // CHECK-SCOPES-SAME:                        !dbg ![[X1LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.value
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X2:[0-9]+]]
-      // CHECK-SCOPES-SAME:                        !dbg ![[X2LOC:[0-9]+]]
-      // CHECK-SCOPES: call void @llvm.dbg.value
-      // CHECK-SCOPES: call void @llvm.dbg.value({{.*}}metadata ![[X3:[0-9]+]]
-      // CHECK-SCOPES-SAME:                        !dbg ![[X3LOC:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X1:[0-9]+]],
+      // CHECK-SCOPES-SAME:                         !dbg ![[X1LOC:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg
+      // CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X2:[0-9]+]],
+      // CHECK-SCOPES-SAME:                         !dbg ![[X2LOC:[0-9]+]]
+      // CHECK-SCOPES: call void @llvm.dbg
+      // CHECK-SCOPES: call void @llvm.dbg{{.*}}metadata ![[X3:[0-9]+]],
+      // CHECK-SCOPES-SAME:                         !dbg ![[X3LOC:[0-9]+]]
       // CHECK-SCOPES: !DILocalVariable(name: "x",
     case (let x, let y) where x == -y:
       // Verify that all variables end up in separate appropriate scopes.

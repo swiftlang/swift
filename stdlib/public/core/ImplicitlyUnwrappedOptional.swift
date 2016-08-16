@@ -14,7 +14,7 @@
 ///
 /// *Deprecated.*
 @_fixed_layout
-public enum ImplicitlyUnwrappedOptional<Wrapped> : NilLiteralConvertible {
+public enum ImplicitlyUnwrappedOptional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of the existence of
   // `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
   // the library intrinsics below.
@@ -45,7 +45,7 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
   public var description: String {
     switch self {
     case .some(let value):
-      return String(value)
+      return String(describing: value)
     case .none:
       return "nil"
     }
@@ -71,7 +71,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .some(let x):
-      return Swift._bridgeToObjectiveC(x)!
+      return Swift._bridgeAnythingToObjectiveC(x)
     }
   }
 
@@ -95,10 +95,6 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
     return false
   }
 
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(Wrapped.self)
-  }
-
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> Wrapped! {
     var result: ImplicitlyUnwrappedOptional<Wrapped>?
@@ -116,14 +112,14 @@ extension ImplicitlyUnwrappedOptional {
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func map<U>(
-    _ f: @noescape (Wrapped) throws -> U
+    _ f: (Wrapped) throws -> U
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, message: "Has been removed in Swift 3.")
   public func flatMap<U>(
-      _ f: @noescape (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
+      _ f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
   ) rethrows -> ImplicitlyUnwrappedOptional<U> {
     Builtin.unreachable()
   }

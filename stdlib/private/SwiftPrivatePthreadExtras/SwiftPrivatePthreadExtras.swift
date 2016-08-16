@@ -17,7 +17,7 @@
 
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
@@ -27,30 +27,30 @@ internal class PthreadBlockContext {
   /// Execute the block, and return an `UnsafeMutablePointer` to memory
   /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
   /// block.
-  func run() -> UnsafeMutablePointer<Void> { fatalError("abstract") }
+  func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
 }
 
 internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
   let block: (Argument) -> Result
   let arg: Argument
 
-  init(block: (Argument) -> Result, arg: Argument) {
+  init(block: @escaping (Argument) -> Result, arg: Argument) {
     self.block = block
     self.arg = arg
     super.init()
   }
 
-  override func run() -> UnsafeMutablePointer<Void> {
-    let result = UnsafeMutablePointer<Result>(allocatingCapacity: 1)
-    result.initialize(with: block(arg))
-    return UnsafeMutablePointer(result)
+  override func run() -> UnsafeMutableRawPointer {
+    let result = UnsafeMutablePointer<Result>.allocate(capacity: 1)
+    result.initialize(to: block(arg))
+    return UnsafeMutableRawPointer(result)
   }
 }
 
 /// Entry point for `pthread_create` that invokes a block context.
 internal func invokeBlockContext(
-  _ contextAsVoidPointer: UnsafeMutablePointer<Void>?
-) -> UnsafeMutablePointer<Void>! {
+  _ contextAsVoidPointer: UnsafeMutableRawPointer?
+) -> UnsafeMutableRawPointer! {
   // The context is passed in +1; we're responsible for releasing it.
   let context = Unmanaged<PthreadBlockContext>
     .fromOpaque(contextAsVoidPointer!)
@@ -62,7 +62,7 @@ internal func invokeBlockContext(
 /// Block-based wrapper for `pthread_create`.
 public func _stdlib_pthread_create_block<Argument, Result>(
   _ attr: UnsafePointer<pthread_attr_t>?,
-  _ start_routine: (Argument) -> Result,
+  _ start_routine: @escaping (Argument) -> Result,
   _ arg: Argument
 ) -> (CInt, pthread_t?) {
   let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
@@ -95,12 +95,14 @@ public func _stdlib_pthread_join<Result>(
   _ thread: pthread_t,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
-  var threadResultPtr: UnsafeMutablePointer<Void>? = nil
-  let result = pthread_join(thread, &threadResultPtr)
+  var threadResultRawPtr: UnsafeMutableRawPointer? = nil
+  let result = pthread_join(thread, &threadResultRawPtr)
   if result == 0 {
-    let threadResult = UnsafeMutablePointer<Result>(threadResultPtr!).pointee
-    threadResultPtr!.deinitialize()
-    threadResultPtr!.deallocateCapacity(1)
+    let threadResultPtr = threadResultRawPtr!.assumingMemoryBound(
+      to: Result.self)
+    let threadResult = threadResultPtr.pointee
+    threadResultPtr.deinitialize()
+    threadResultPtr.deallocate(capacity: 1)
     return (result, threadResult)
   } else {
     return (result, nil)
@@ -111,7 +113,8 @@ public class _stdlib_Barrier {
   var _pthreadBarrier: _stdlib_pthread_barrier_t
 
   var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_pthread_barrier_t> {
-    return UnsafeMutablePointer(_getUnsafePointerToStoredProperties(self))
+    return _getUnsafePointerToStoredProperties(self)
+      .assumingMemoryBound(to: _stdlib_pthread_barrier_t.self)
   }
 
   public init(threadCount: Int) {

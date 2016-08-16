@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -32,7 +32,7 @@ class Generic<T>: NSObject {
 
 // CHECK-LABEL: sil hidden @_TFC18objc_generic_class11SubGeneric1D : $@convention(method) <U, V> (@owned SubGeneric1<U, V>) -> () {
 // CHECK:       bb0([[SELF:%.*]] : $SubGeneric1<U, V>):
-// CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> Generic<T> -> () -> () , $@convention(objc_method) <τ_0_0> (Generic<τ_0_0>) -> ()
+// CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> (Generic<T>) -> () -> () , $@convention(objc_method) <τ_0_0> (Generic<τ_0_0>) -> ()
 // CHECK:         [[SUPER:%.*]] = upcast [[SELF:%.*]] : $SubGeneric1<U, V> to $Generic<Int>
 // CHECK:         apply [[SUPER_DEALLOC]]<Int>([[SUPER]])
 class SubGeneric1<U, V>: Generic<Int> {

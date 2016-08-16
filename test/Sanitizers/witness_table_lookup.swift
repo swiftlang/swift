@@ -27,7 +27,7 @@ protocol P {
   associatedtype E : Q, Q2
 }
 struct B<T : Q> : Q, Q2 {
-  static func foo() { consume(self.dynamicType) }
+  static func foo() { consume(type(of: self)) }
 }
 struct A<T : Q where T : Q2> : P {
   typealias E = B<T>
@@ -37,10 +37,10 @@ func foo<T : P>(_ t: T) {
   T.E.foo()
 }
 struct EasyType : Q, Q2 {
-    static func foo() { consume(self.dynamicType) }
+    static func foo() { consume(type(of: self)) }
 }
 extension Int : Q, Q2 {
-  static func foo() { consume(self.dynamicType) }
+  static func foo() { consume(type(of: self)) }
 }
 
 // Execute concurrently.

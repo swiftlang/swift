@@ -56,7 +56,7 @@ public extension NSGradient {
     self.init(
       colors: objects.map { $0.0 },
       atLocations: objects.map { $0.1 },
-      colorSpace: NSColorSpace.genericRGB())
+      colorSpace: NSColorSpace.genericRGB)
   }
 }
 
@@ -67,7 +67,7 @@ public func NSApplicationMain(
   _ argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
 ) -> Int32
 
-extension NSColor : _ColorLiteralConvertible {
+extension NSColor : _ExpressibleByColorLiteral {
   public required convenience init(colorLiteralRed red: Float, green: Float,
                                    blue: Float, alpha: Float) {
     self.init(srgbRed: CGFloat(red), green: CGFloat(green),
@@ -77,7 +77,7 @@ extension NSColor : _ColorLiteralConvertible {
 
 public typealias _ColorLiteralType = NSColor
 
-extension NSImage : _ImageLiteralConvertible {
+extension NSImage : _ExpressibleByImageLiteral {
   private convenience init!(failableImageLiteral name: String) {
     self.init(named: name)
   }

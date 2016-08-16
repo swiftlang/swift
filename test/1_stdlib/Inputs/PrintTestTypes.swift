@@ -121,8 +121,8 @@ public class ClassVeryPrintable : CustomStringConvertible,
   }
 }
 
-public struct MyString : StringLiteralConvertible,
-  StringInterpolationConvertible {
+public struct MyString : ExpressibleByStringLiteral,
+  ExpressibleByStringInterpolation {
 
   public init(str: String) {
     value = str
@@ -151,7 +151,7 @@ public struct MyString : StringLiteralConvertible,
   }
 
   public init<T>(stringInterpolationSegment expr: T) {
-    self.init(str: "<segment " + String(expr) + ">")
+    self.init(str: "<segment " + String(describing: expr) + ">")
   }
 }
 

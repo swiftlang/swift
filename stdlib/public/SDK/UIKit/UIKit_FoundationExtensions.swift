@@ -25,7 +25,7 @@ public extension IndexPath {
     /// The section of this index path, when used with `UITableView`.
     ///
     /// - precondition: The index path must have exactly two elements.
-    public var section : Int {
+    public var section: Int {
         get {
             precondition(count == 2, "Invalid index path for use with UITableView. This index path must contain exactly two indices specifying the section and row.")
             return self[0]
@@ -39,7 +39,7 @@ public extension IndexPath {
     /// The row of this index path, when used with `UITableView`.
     ///
     /// - precondition: The index path must have exactly two elements.
-    public var row : Int {
+    public var row: Int {
         get {
             precondition(count == 2, "Invalid index path for use with UITableView. This index path must contain exactly two indices specifying the section and row.")
             return self[1]
@@ -62,7 +62,7 @@ public extension IndexPath {
     /// The item of this index path, when used with `UICollectionView`.
     ///
     /// - precondition: The index path must have exactly two elements.
-    public var item : Int {
+    public var item: Int {
         get {
             precondition(count == 2, "Invalid index path for use with UICollectionView. This index path must contain exactly two indices specifying the section and item.")
             return self[1]

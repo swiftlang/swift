@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -array-element-propagation %s | FileCheck %s
+// RUN: %target-sil-opt -array-element-propagation %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -70,7 +70,7 @@ sil @propagate01 : $@convention(thin) () -> () {
   debug_value %7 : $MyArray<MyInt>
   debug_value %8 : $UnsafeMutablePointer<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
   %12 = struct $MyInt (%11 : $Builtin.Int64)
   store %12 to %10 : $*MyInt
@@ -160,7 +160,7 @@ sil @propagate_with_get_element_returning_direct_result : $@convention(thin) () 
   debug_value %7 : $MyArray<MyInt>
   debug_value %8 : $UnsafeMutablePointer<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
   %12 = struct $MyInt (%11 : $Builtin.Int64)
   store %12 to %10 : $*MyInt
@@ -232,7 +232,7 @@ sil @repeated_initialization : $@convention(thin) () -> () {
   %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
   %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
   %12 = struct $MyInt (%11 : $Builtin.Int64)
   store %12 to %10 : $*MyInt
@@ -279,7 +279,7 @@ sil @unknown_use : $@convention(thin) () -> () {
   %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
   %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
-  %10 = pointer_to_address %9 : $Builtin.RawPointer to $*MyInt
+  %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
   %12 = struct $MyInt (%11 : $Builtin.Int64)
   store %12 to %10 : $*MyInt

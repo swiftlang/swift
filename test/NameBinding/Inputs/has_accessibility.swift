@@ -14,9 +14,9 @@ public struct Foo {
   private static func z() {}
 }
 
-public class Base {
+open class Base {
   internal func method() {}
-  public internal(set) var value = 0
+  open internal(set) var value = 0
 }
 
 public class HiddenMethod {

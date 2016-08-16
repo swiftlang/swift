@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Swift
@@ -13,7 +13,6 @@ public extension _ObjectiveCBridgeable {
 
 struct Butt: _ObjectiveCBridgeable {
   typealias _ObjectiveCType = NSCloud
-  static func _isBridgedToObjectiveC() -> Bool
   func _bridgeToObjectiveC() -> NSCloud
   static func _forceBridgeFromObjectiveC(_ source: NSCloud,
                                          result: inout Butt?)

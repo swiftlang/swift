@@ -13,12 +13,6 @@
 @_exported import Foundation // Clang module
 
 
-@_silgen_name("__NSNotificationCreate")
-internal func __NSNotificationCreate(_ name: NSString, _ object: AnyObject?, _ userInfo: AnyObject?) -> NSNotification
-
-@_silgen_name("__NSNotificationUserInfo")
-internal func __NSNotificationUserInfo(_ notif: NSNotification) -> AnyObject?
-
 /**
  `Notification` encapsulates information broadcast to observers via a `NotificationCenter`.
 */
@@ -31,15 +25,15 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     /// An object that the poster wishes to send to observers.
     ///
     /// Typically this is the object that posted the notification.
-    public var object: AnyObject?
+    public var object: Any?
     
     /// Storage for values or objects related to this notification.
-    public var userInfo: [String : Any]?
+    public var userInfo: [AnyHashable : Any]?
     
     /// Initialize a new `Notification`.
     ///
     /// The default value for `userInfo` is nil.
-    public init(name: Name, object: AnyObject? = nil, userInfo: [String : Any]? = nil) {
+    public init(name: Name, object: Any? = nil, userInfo: [AnyHashable : Any]? = nil) {
         self.name = name
         self.object = object
         self.userInfo = userInfo
@@ -50,7 +44,7 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
     }
     
     public var description: String {
-        return "name = \(name.rawValue),  object = \(object), userInfo = \(userInfo)"
+        return "name = \(name.rawValue), object = \(object), userInfo = \(userInfo)"
     }
     
     public var debugDescription: String {
@@ -59,57 +53,60 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
 
     // FIXME: Handle directly via API Notes
     public typealias Name = NSNotification.Name
+
+    /// Compare two notifications for equality.
+    public static func ==(lhs: Notification, rhs: Notification) -> Bool {
+        if lhs.name.rawValue != rhs.name.rawValue {
+            return false
+        }
+        if let lhsObj = lhs.object {
+            if let rhsObj = rhs.object {
+                if lhsObj as AnyObject !== rhsObj as AnyObject {
+                    return false
+                }
+            } else {
+                return false
+            }
+        } else if rhs.object != nil {
+            return false
+        }
+        if lhs.userInfo != nil {
+            if rhs.userInfo != nil {
+                // user info must be compared in the object form since the userInfo in swift is not comparable
+                return lhs._bridgeToObjectiveC() == rhs._bridgeToObjectiveC()
+            } else {
+                return false
+            }
+        } else if rhs.userInfo != nil {
+            return false
+        }
+        return true
+    }
 }
 
-/// Compare two notifications for equality.
-///
-/// - note: Notifications that contain non NSObject values in userInfo will never compare as equal. This is because the type information is not preserved in the `userInfo` dictionary.
-public func ==(lhs: Notification, rhs: Notification) -> Bool {
-    if lhs.name.rawValue != rhs.name.rawValue {
-        return false
-    }
-    if let lhsObj = lhs.object {
-        if let rhsObj = rhs.object {
-            if lhsObj !== rhsObj {
-                return false
-            }
-        } else {
-            return false
+extension Notification: CustomReflectable {
+    public var customMirror: Mirror {
+        var children: [(label: String?, value: Any)] = []
+        children.append((label: "name", value: self.name.rawValue))
+        if let o = self.object {
+            children.append((label: "object", value: o))
         }
-    } else if rhs.object != nil {
-        return false
-    }
-    if let lhsUserInfo = lhs.userInfo {
-        if let rhsUserInfo = rhs.userInfo {
-            if lhsUserInfo.count != rhsUserInfo.count {
-                return false
-            }
-            return _NSUserInfoDictionary.compare(lhsUserInfo, rhsUserInfo)
-        } else {
-            return false
+        if let u = self.userInfo {
+            children.append((label: "userInfo", value: u))
         }
-    } else if rhs.userInfo != nil {
-        return false
+        let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.class)
+        return m
     }
-    return true
 }
 
 extension Notification : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSNotification.self
     }
     
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSNotification {
-        if let info = userInfo {
-            return __NSNotificationCreate(name.rawValue as NSString, object, _NSUserInfoDictionary.bridgeValue(from: info))
-        }
-
-        return NSNotification(name: name, object: object, userInfo: nil)    
+        return NSNotification(name: name, object: object, userInfo: userInfo)
     }
     
     public static func _forceBridgeFromObjectiveC(_ x: NSNotification, result: inout Notification?) {
@@ -119,18 +116,7 @@ extension Notification : _ObjectiveCBridgeable {
     }
     
     public static func _conditionallyBridgeFromObjectiveC(_ x: NSNotification, result: inout Notification?) -> Bool {
-        if let userInfo = __NSNotificationUserInfo(x) {
-            if let info : [String : Any]? = _NSUserInfoDictionary.bridgeReference(from: userInfo) {
-                result = Notification(name: x.name, object: x.object, userInfo: info)
-                return true
-            } else {
-                result = nil
-                return false // something terrible went wrong...
-            }
-        } else {
-            result = Notification(name: x.name, object: x.object, userInfo: nil)
-        }
-        
+        result = Notification(name: x.name, object: x.object, userInfo: x.userInfo)
         return true
     }
 
@@ -141,11 +127,11 @@ extension Notification : _ObjectiveCBridgeable {
     }
 }
 
-extension NotificationCenter {
-  // Note: rdar://problem/26177286
-  // Note: should be removed with Foundation epoch 8 along with the signature
-  // below.
-  @nonobjc public final func addObserver(_ observer: AnyObject, selector aSelector: Selector, name aName: Notification.Name, object anObject: AnyObject?) {
-    self.addObserver(observer, selector: aSelector, name: aName.rawValue, object: anObject)
-  }
+extension NSNotification : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as Notification)
+    }
 }
+

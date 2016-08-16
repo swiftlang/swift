@@ -293,12 +293,47 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->getOverriddenDecl())
         return;
 
-      // Initializers cannot be found by dynamic lookup.
-      if (isa<ConstructorDecl>(D))
+      // Ensure that the declaration has a type.
+      if (!D->hasType()) {
+        if (!TypeResolver) return;
+        TypeResolver->resolveDeclSignature(D);
+        if (!D->hasType()) return;
+      }
+
+      switch (D->getKind()) {
+#define DECL(ID, SUPER) \
+      case DeclKind::ID:
+#define VALUE_DECL(ID, SUPER)
+#include "swift/AST/DeclNodes.def"
+        llvm_unreachable("not a ValueDecl!");
+
+      // Types cannot be found by dynamic lookup.
+      case DeclKind::GenericTypeParam:
+      case DeclKind::AssociatedType:
+      case DeclKind::TypeAlias:
+      case DeclKind::Enum:
+      case DeclKind::Class:
+      case DeclKind::Struct:
+      case DeclKind::Protocol:
         return;
 
-      // Check if we already reported a decl with the same signature.
-      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+      // Initializers cannot be found by dynamic lookup.
+      case DeclKind::Constructor:
+      case DeclKind::Destructor:
+        return;
+
+      // These cases are probably impossible here but can also just
+      // be safely ignored.
+      case DeclKind::EnumElement:
+      case DeclKind::Param:
+      case DeclKind::Module:
+        return;
+
+      // For other kinds of values, check if we already reported a decl
+      // with the same signature.
+
+      case DeclKind::Func: {
+        auto FD = cast<FuncDecl>(D);
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
         (void)FD;
 
@@ -311,17 +346,23 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         auto Signature = std::make_pair(D->getName(), T);
         if (!FunctionsReported.insert(Signature).second)
           return;
-      } else if (isa<SubscriptDecl>(D)) {
+        break;
+      }
+
+      case DeclKind::Subscript: {
         auto Signature = D->getType()->getCanonicalType();
         if (!SubscriptsReported.insert(Signature).second)
           return;
-      } else if (isa<VarDecl>(D)) {
+        break;
+      }
+
+      case DeclKind::Var: {
         auto Signature =
             std::make_pair(D->getName(), D->getType()->getCanonicalType());
         if (!PropertiesReported.insert(Signature).second)
           return;
-      } else {
-        llvm_unreachable("unhandled decl kind");
+        break;
+      }
       }
 
       if (isDeclVisibleInLookupMode(D, LS, CurrDC, TypeResolver))
@@ -675,7 +716,7 @@ public:
     }
 
     // Does it make sense to substitute types?
-    bool shouldSubst = !isa<UnboundGenericType>(BaseTy.getPointer()) &&
+    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
                        !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
                        !BaseTy->isAnyExistentialType();
     ModuleDecl *M = DC->getParentModule();
@@ -790,7 +831,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
         DC = DC->getParent();
 
         if (DC->getAsProtocolExtensionContext())
-          ExtendedType = DC->getProtocolSelf()->getArchetype();
+          ExtendedType = DC->getSelfTypeInContext();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
@@ -799,9 +840,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
       // Look in the generic parameters after checking our local declaration.
       GenericParams = AFD->getGenericParams();
-    } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
+    } else if (auto CE = dyn_cast<ClosureExpr>(DC)) {
       if (Loc.isValid()) {
-        auto CE = cast<ClosureExpr>(ACE);
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
         if (auto P = CE->getParameters()) {
           namelookup::FindLocalVal(SM, Loc, Consumer).checkParameterList(P);

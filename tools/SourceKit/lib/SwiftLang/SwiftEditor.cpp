@@ -956,17 +956,23 @@ void SwiftEditorDocument::Implementation::buildSwiftInv(
 namespace  {
 
 static UIdent getAccessibilityUID(Accessibility Access) {
+  static UIdent AccessOpen("source.lang.swift.accessibility.open");
   static UIdent AccessPublic("source.lang.swift.accessibility.public");
   static UIdent AccessInternal("source.lang.swift.accessibility.internal");
+  static UIdent AccessFilePrivate("source.lang.swift.accessibility.fileprivate");
   static UIdent AccessPrivate("source.lang.swift.accessibility.private");
 
   switch (Access) {
   case Accessibility::Private:
     return AccessPrivate;
+  case Accessibility::FilePrivate:
+    return AccessFilePrivate;
   case Accessibility::Internal:
     return AccessInternal;
   case Accessibility::Public:
     return AccessPublic;
+  case Accessibility::Open:
+    return AccessOpen;
   }
 }
 
@@ -1351,6 +1357,7 @@ public:
 };
 
 class PlaceholderExpansionScanner {
+
 public:
   struct Param {
     CharSourceRange NameRange;
@@ -1360,9 +1367,14 @@ public:
   };
 
 private:
+
+  struct ClosureInfo {
+    std::vector<Param> Params;
+    CharSourceRange ReturnTypeRange;
+  };
+
   SourceManager &SM;
-  std::vector<Param> Params;
-  CharSourceRange ReturnTypeRange;
+  ClosureInfo TargetClosureInfo;
   EditorPlaceholderExpr *PHE = nullptr;
 
   class PlaceholderFinder: public ASTWalker {
@@ -1384,61 +1396,80 @@ private:
     }
   };
 
+  class ClosureTypeWalker: public ASTWalker {
+    SourceManager &SM;
+    ClosureInfo &Info;
+  public:
+    bool FoundFunctionTypeRepr = false;
+    explicit ClosureTypeWalker(SourceManager &SM, ClosureInfo &Info) : SM(SM),
+      Info(Info) { }
+
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
+        FoundFunctionTypeRepr = true;
+        if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
+          for (auto *ArgTR : TTR->getElements()) {
+            CharSourceRange NR;
+            CharSourceRange TR;
+            auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
+            if (NTR && NTR->hasName()) {
+              NR = CharSourceRange(NTR->getNameLoc(),
+                                   NTR->getName().getLength());
+              ArgTR = NTR->getTypeRepr();
+            }
+            SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
+                                                       ArgTR->getEndLoc());
+            TR = CharSourceRange(SM, ArgTR->getStartLoc(), SRE);
+            Info.Params.emplace_back(NR, TR);
+          }
+        } else if (FTR->getArgsTypeRepr()) {
+          CharSourceRange TR;
+          TR = CharSourceRange(SM, FTR->getArgsTypeRepr()->getStartLoc(),
+                               Lexer::getLocForEndOfToken(SM,
+                                        FTR->getArgsTypeRepr()->getEndLoc()));
+          Info.Params.emplace_back(CharSourceRange(), TR);
+        }
+        if (auto *RTR = FTR->getResultTypeRepr()) {
+          SourceLoc SRE = Lexer::getLocForEndOfToken(SM, RTR->getEndLoc());
+          Info.ReturnTypeRange = CharSourceRange(SM, RTR->getStartLoc(), SRE);
+        }
+      }
+      return !FoundFunctionTypeRepr;
+    }
+
+    bool walkToTypeReprPost(TypeRepr *T) override {
+      // If we just visited the FunctionTypeRepr, end traversal.
+      return !FoundFunctionTypeRepr;
+    }
+
+  };
+
+  bool containClosure(Expr *E) {
+    if (E->getStartLoc().isInvalid())
+      return false;
+    EditorPlaceholderExpr *Found;
+    ClosureInfo Info;
+    ClosureTypeWalker ClosureWalker(SM, Info);
+    PlaceholderFinder Finder(E->getStartLoc(), Found);
+    E->walk(Finder);
+    if (Found) {
+      if (auto TR = Found->getTypeLoc().getTypeRepr()) {
+        TR->walk(ClosureWalker);
+        return ClosureWalker.FoundFunctionTypeRepr;
+      }
+    }
+    E->walk(ClosureWalker);
+    return ClosureWalker.FoundFunctionTypeRepr;
+  }
+
   bool scanClosureType(SourceFile &SF, SourceLoc PlaceholderLoc) {
-    Params.clear();
-    ReturnTypeRange = CharSourceRange();
+    TargetClosureInfo.Params.clear();
+    TargetClosureInfo.ReturnTypeRange = CharSourceRange();
     PlaceholderFinder Finder(PlaceholderLoc, PHE);
     SF.walk(Finder);
     if (!PHE || !PHE->getTypeForExpansion())
       return false;
-
-    class ClosureTypeWalker: public ASTWalker {
-    public:
-      PlaceholderExpansionScanner &S;
-      bool FoundFunctionTypeRepr = false;
-      explicit ClosureTypeWalker(PlaceholderExpansionScanner &S)
-        :S(S) { }
-
-      bool walkToTypeReprPre(TypeRepr *T) override {
-        if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
-          FoundFunctionTypeRepr = true;
-          if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
-            for (auto *ArgTR : TTR->getElements()) {
-              CharSourceRange NR;
-              CharSourceRange TR;
-              auto *NTR = dyn_cast<NamedTypeRepr>(ArgTR);
-              if (NTR && NTR->hasName()) {
-                NR = CharSourceRange(NTR->getNameLoc(),
-                                     NTR->getName().getLength());
-                ArgTR = NTR->getTypeRepr();
-              }
-              SourceLoc SRE = Lexer::getLocForEndOfToken(S.SM,
-                                                         ArgTR->getEndLoc());
-              TR = CharSourceRange(S.SM, ArgTR->getStartLoc(), SRE);
-              S.Params.emplace_back(NR, TR);
-            }
-          } else if (FTR->getArgsTypeRepr()) {
-            CharSourceRange TR;
-            TR = CharSourceRange(S.SM, FTR->getArgsTypeRepr()->getStartLoc(),
-                                 Lexer::getLocForEndOfToken(S.SM,
-                                   FTR->getArgsTypeRepr()->getEndLoc()));
-            S.Params.emplace_back(CharSourceRange(), TR);
-          }
-          if (auto *RTR = FTR->getResultTypeRepr()) {
-            SourceLoc SRE = Lexer::getLocForEndOfToken(S.SM, RTR->getEndLoc());
-            S.ReturnTypeRange = CharSourceRange(S.SM, RTR->getStartLoc(), SRE);
-          }
-        }
-        return !FoundFunctionTypeRepr;
-      }
-
-      bool walkToTypeReprPost(TypeRepr *T) override {
-        // If we just visited the FunctionTypeRepr, end traversal.
-        return !FoundFunctionTypeRepr;
-      }
-
-    } PW(*this);
-
+    ClosureTypeWalker PW(SM, TargetClosureInfo);
     PHE->getTypeForExpansion()->walk(PW);
     return PW.FoundFunctionTypeRepr;
   }
@@ -1512,6 +1543,22 @@ private:
     return std::make_pair(CE, true);
   }
 
+  bool shouldUseTrailingClosureInTuple(TupleExpr *TE,
+                                       SourceLoc PlaceHolderStartLoc) {
+    if (!TE->getElements().empty()) {
+      for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
+        bool IsLast = I == N - 1;
+        Expr *E = TE->getElement(I);
+        if (IsLast) {
+          return E->getStartLoc() == PlaceHolderStartLoc;
+        } else if (containClosure(E)) {
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
 public:
   explicit PlaceholderExpansionScanner(SourceManager &SM) : SM(SM) { }
 
@@ -1543,13 +1590,13 @@ public:
       if (isa<ParenExpr>(Args)) {
         UseTrailingClosure = true;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        if (!TE->getElements().empty())
-          UseTrailingClosure =
-            TE->getElements().back()->getStartLoc() == PlaceholderStartLoc;
+        UseTrailingClosure = shouldUseTrailingClosureInTuple(TE,
+                                                          PlaceholderStartLoc);
       }
     }
 
-    Callback(Args, UseTrailingClosure, Params, ReturnTypeRange);
+    Callback(Args, UseTrailingClosure, TargetClosureInfo.Params,
+             TargetClosureInfo.ReturnTypeRange);
     return true;
   }
 

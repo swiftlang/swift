@@ -8,9 +8,10 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-TRACE = '''_ message: @autoclosure () -> String = "",
-  showFrame: Bool = true,
+TRACE = '''
+  _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
   file: String = #file, line: UInt = #line'''
 
 stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'

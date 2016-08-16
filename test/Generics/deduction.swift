@@ -208,9 +208,7 @@ func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<
-  R : IteratorProtocol where R.Element : IsBefore
->(_ range: R) { }
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
@@ -221,7 +219,7 @@ func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
 // Deduction for member operators
 //===----------------------------------------------------------------------===//
 protocol Addable {
-  func +(x: Self, y: Self) -> Self
+  static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
   u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
@@ -261,11 +259,11 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
 }
 
 // <rdar://problem/15104554>
-postfix operator <*> {}
+postfix operator <*>
 
 protocol MetaFunction {
   associatedtype Result
-  postfix func <*> (_: Self) -> Result?
+  static postfix func <*> (_: Self) -> Result?
 }
 
 protocol Bool_ {}

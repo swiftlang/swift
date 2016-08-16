@@ -22,6 +22,12 @@
 using namespace swift;
 using namespace reflection;
 
+[[noreturn]]
+static void unreachable(const char *Message) {
+  std::cerr << "fatal error: " << Message << "\n";
+  std::abort();
+}
+
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   std::ostream &OS;
   unsigned Indent;
@@ -354,7 +360,7 @@ unsigned NominalTypeTrait::getDepth() const {
     case TypeRefKind::BoundGeneric:
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:
-      assert(false && "Asked for depth on non-nominal typeref");
+      unreachable("Asked for depth on non-nominal typeref");
     }
   }
 
@@ -663,7 +669,7 @@ public:
       break;
     }
     default:
-      assert(false && "Unknown base type");
+      unreachable("Unknown base type");
     }
 
     assert(TypeWitness);

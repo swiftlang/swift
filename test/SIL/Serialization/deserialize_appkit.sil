@@ -1,10 +1,11 @@
 // Make sure that we can deserialize AppKit.
 // RUN: %target-sil-opt %platform-sdk-overlay-dir/AppKit.swiftmodule > /dev/null
-// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/AppKit.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/AppKit.swiftmodule | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown
 
-// REQUIRES: rdar://23805004
+// FIXME: rdar://23805004 Non-fragile shared functions are incorrectly being referenced in fragile functions
+// REQUIRES: rdar23805004

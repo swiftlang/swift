@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-enum MSV : ErrorProtocol {
+enum MSV : Error {
   case Foo, Bar, Baz
   case CarriesInt(Int)
 
@@ -8,7 +8,7 @@ enum MSV : ErrorProtocol {
   var code: Int { return 0 }
 }
 
-func opaque_error() -> ErrorProtocol { return MSV.Foo }
+func opaque_error() -> Error { return MSV.Foo }
 
 func one() {
   do {
@@ -37,7 +37,7 @@ func one() {
 
   do {
     throw opaque_error()
-  } catch is ErrorProtocol {  // expected-warning {{'is' test is always true}}
+  } catch is Error {  // expected-warning {{'is' test is always true}}
   }
   
   func foo() throws {}
@@ -110,7 +110,15 @@ func postThrows() -> Int throws { // expected-error{{'throws' may only occur bef
   return 5
 }
 
+func postThrows2() -> throws Int { // expected-error{{'throws' may only occur before '->'}}{{20-22=throws}}{{23-29=->}}
+  return try postThrows()
+}
+
 func postRethrows(_ f: () throws -> Int) -> Int rethrows { // expected-error{{'rethrows' may only occur before '->'}}{{42-42=rethrows }}{{48-57=}}
+  return try f()
+}
+
+func postRethrows2(_ f: () throws -> Int) -> rethrows Int { // expected-error{{'rethrows' may only occur before '->'}}{{43-45=rethrows}}{{46-54=->}}
   return try f()
 }
 

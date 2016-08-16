@@ -23,22 +23,8 @@
 #include "Visibility.h"
 
 #ifdef __cplusplus
-namespace swift {
-
-template <unsigned PointerSize> struct RuntimeTarget;
-using HostTarget = RuntimeTarget<sizeof(uintptr_t)>;
-
-template <typename Target> struct TargetMetadata;
-using Metadata = TargetMetadata<InProcess>;
-  
-extern "C" {
-#else
-typedef struct Metadata Metadata;
-#define bool _Bool
+namespace swift { extern "C" {
 #endif
-
-SWIFT_RUNTIME_EXPORT
-bool swift_objc_class_usesNativeSwiftReferenceCounting(const void *);
 
 /// Return an NSString to be used as the Mirror summary of the object
 SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -58,12 +44,7 @@ const char *_swift_stdlib_strtod_clocale(const char *nptr, double *outResult);
 /// overflow.
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
-  
-/// Return the superclass, if any.  The result is nullptr for root
-/// classes and class protocol types.
-SWIFT_RUNTIME_STDLIB_INTERFACE
-const Metadata *_swift_class_getSuperclass(const Metadata *);
-  
+
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void _swift_stdlib_flockfile_stdout(void);
 SWIFT_RUNTIME_STDLIB_INTERFACE

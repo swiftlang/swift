@@ -161,8 +161,8 @@ XCTestTestSuite.test("XCTAssertEqual/Dictionary<T, U>") {
     }
 
     dynamic func test_whenDictionariesAreNotEqual_fails() {
-      XCTAssertEqual(["foo": ["bar": "baz"]],
-                     ["foo": ["bar": "flim"]])
+      XCTAssertEqual(["foo": ["bar": "baz"] as NSDictionary],
+                     ["foo": ["bar": "flim"] as NSDictionary])
     }
   }
 

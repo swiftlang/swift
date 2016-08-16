@@ -118,7 +118,7 @@ private:
 
 class BasicCalleeAnalysis : public SILAnalysis {
   SILModule &M;
-  CalleeCache *Cache;
+  std::unique_ptr<CalleeCache> Cache;
 
 public:
   BasicCalleeAnalysis(SILModule *M)
@@ -129,17 +129,15 @@ public:
   }
 
   virtual void invalidate(SILAnalysis::InvalidationKind K) {
-    if (K & InvalidationKind::Functions) {
-      delete Cache;
-      Cache = nullptr;
-    }
+    if (K & InvalidationKind::Functions)
+      Cache.reset();
   }
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) { invalidate(K); }
 
   CalleeList getCalleeList(FullApplySite FAS) {
     if (!Cache)
-      Cache = new CalleeCache(M);
+      Cache = llvm::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(FAS);
   }

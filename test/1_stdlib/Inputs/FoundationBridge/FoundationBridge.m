@@ -1,4 +1,17 @@
+//===--- FoundationBridge.m -----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 #import "FoundationBridge.h"
+#import <objc/runtime.h>
 
 @implementation ObjectBehaviorVerifier {
     NSMutableArray *_actions;
@@ -184,3 +197,50 @@ NSData *returnsData() {
 BOOL identityOfData(NSData *data) {
     return data == returnsData();
 }
+
+
+@implementation CalendarBridgingTester
+
+- (NSCalendar *)autoupdatingCurrentCalendar {
+    return [NSCalendar autoupdatingCurrentCalendar];
+}
+
+- (BOOL)verifyAutoupdatingCalendar:(NSCalendar *)calendar {
+    Class autoCalendarClass = (Class)objc_lookUpClass("_NSAutoCalendar");
+    if (autoCalendarClass && [calendar isKindOfClass:autoCalendarClass]) {
+        return YES;
+    } else {
+        autoCalendarClass = (Class)objc_lookUpClass("NSAutoCalendar");
+        return [calendar isKindOfClass:autoCalendarClass];
+    }
+}
+
+@end
+
+@implementation TimeZoneBridgingTester
+
+- (NSTimeZone *)autoupdatingCurrentTimeZone {
+    return [NSTimeZone localTimeZone];
+}
+
+- (BOOL)verifyAutoupdatingTimeZone:(NSTimeZone *)tz {
+    Class autoTimeZoneClass = (Class)objc_lookUpClass("__NSLocalTimeZone");
+    return [tz isKindOfClass:autoTimeZoneClass];
+
+}
+@end
+
+@implementation LocaleBridgingTester
+
+- (NSLocale *)autoupdatingCurrentLocale {
+    return [NSLocale autoupdatingCurrentLocale];
+}
+
+- (BOOL)verifyAutoupdatingLocale:(NSLocale *)locale {
+    Class autoLocaleClass = (Class)objc_lookUpClass("NSAutoLocale");
+    return [locale isKindOfClass:autoLocaleClass];
+}
+
+@end
+
+

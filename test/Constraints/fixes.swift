@@ -17,7 +17,7 @@ func f6(_ a: A, _: Int) { }
 func createB() -> B { }  // expected-note {{found this candidate}}
 func createB(_ i: Int) -> B { } // expected-note {{found this candidate}}
 
-func f7(_ a: A, _: () -> Int) -> B { }
+func f7(_ a: A, _: @escaping () -> Int) -> B { }
 func f7(_ a: A, _: Int) -> Int { }
 
 // Forgot the '()' to call a function.
@@ -87,7 +87,7 @@ func maybeFn() -> ((Int) -> Int)? { }
 
 func extraCall() {
   var i = 7
-  i = i() // expected-error{{cannot call value of non-function type 'Int'}}
+  i = i() // expected-error{{cannot call value of non-function type 'Int'}}{{8-10=}}
 
   maybeFn()(5) // expected-error{{value of optional type '((Int) -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
 }
@@ -121,8 +121,8 @@ co ? true : false // expected-error{{optional type 'C?' cannot be used as a bool
 !co ? false : true // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
 ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{1-1=(}} {{5-5= != nil)}}
 !ciuo ? false : true // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
-!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{4-4= == nil)}}
-!ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '== nil' instead}}{{1-2=}} {{2-2=(}} {{6-6= == nil)}}
+!co // expected-error{{optional type 'C?' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{4-4= != nil)}}
+!ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
 
 // Forgotten ! or ?
 var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}

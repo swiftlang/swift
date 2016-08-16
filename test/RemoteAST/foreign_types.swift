@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test -sdk %S/../IRGen/Inputs %s | FileCheck %s
+// RUN: %target-swift-remoteast-test -sdk %S/../IRGen/Inputs %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

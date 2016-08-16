@@ -69,12 +69,10 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (Tok.is(tok::colon)) {
       (void)consumeToken();
       ParserResult<TypeRepr> Ty;
-      if (Tok.getKind() == tok::identifier ||
-          Tok.getKind() == tok::code_complete) {
-        Ty = parseTypeIdentifier();
-      } else if (Tok.getKind() == tok::kw_protocol) {
-        Ty = parseTypeComposition();
-      } else if (Tok.getKind() == tok::kw_class) {
+      
+      if (Tok.isAny(tok::identifier, tok::code_complete, tok::kw_protocol, tok::kw_Any)) {
+        Ty = parseTypeIdentifierOrTypeComposition();
+      } else if (Tok.is(tok::kw_class)) {
         diagnose(Tok, diag::unexpected_class_constraint);
         diagnose(Tok, diag::suggest_anyobject, Name)
           .fixItReplace(Tok.getLoc(), "AnyObject");
@@ -136,12 +134,12 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     if (startsWithGreater(Tok))
       RAngleLoc = consumeStartingGreater();
     else
-      RAngleLoc = Tok.getLoc();
+      Invalid = true;
   } else {
     RAngleLoc = consumeStartingGreater();
   }
 
-  if (GenericParams.empty())
+  if (GenericParams.empty() || Invalid)
     return nullptr;
 
   return makeParserResult(GenericParamList::create(Context, LAngleLoc,
@@ -169,6 +167,56 @@ ParserResult<GenericParamList> Parser::maybeParseGenericParams() {
     outer_gpl = gpl;
   } while (startsWithLess(Tok));
   return makeParserResult(gpl);
+}
+
+void
+Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
+                                              GenericParams) {
+  if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
+    return;
+
+
+
+  auto WhereRangeInsideBrackets = GenericParams->getWhereClauseSourceRange();
+
+  // Move everything immediately following the last generic parameter
+  // as written all the way to the right angle bracket (">")
+  auto LastGenericParam = GenericParams->getParams().back();
+  auto EndOfLastGenericParam =
+      Lexer::getLocForEndOfToken(SourceMgr, LastGenericParam->getEndLoc());
+
+  CharSourceRange RemoveWhereRange { SourceMgr,
+    EndOfLastGenericParam,
+    GenericParams->getRAngleLoc()
+  };
+
+  auto WhereCharRange =
+    Lexer::getCharSourceRangeFromSourceRange(SourceMgr,
+                                  GenericParams->getWhereClauseSourceRange());
+
+  SmallString<64> Buffer;
+  llvm::raw_svector_ostream WhereClauseText(Buffer);
+  WhereClauseText << SourceMgr.extractText(Tok.is(tok::kw_where)
+                                           ? WhereCharRange
+                                           : RemoveWhereRange);
+
+  // If, for some reason, there was a where clause in both locations, we're
+  // adding to the list of requirements, so tack on a comma here before
+  // inserting it at the head of the later where clause.
+  if (Tok.is(tok::kw_where))
+    WhereClauseText << ',';
+
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
+                       diag::where_inside_brackets);
+  Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
+                        RemoveWhereRange.getEnd());
+
+  if (Tok.is(tok::kw_where)) {
+    Diag.fixItReplace(Tok.getLoc(), WhereClauseText.str());
+  } else {
+    Diag.fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
+                     WhereClauseText.str());
+  }
 }
 
 /// parseGenericWhereClause - Parse a 'where' clause, which places additional
@@ -212,12 +260,8 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       // Parse the protocol or composition.
-      ParserResult<TypeRepr> Protocol;
-      if (Tok.is(tok::kw_protocol)) {
-        Protocol = parseTypeComposition();
-      } else {
-        Protocol = parseTypeIdentifier();
-      }
+      ParserResult<TypeRepr> Protocol = parseTypeIdentifierOrTypeComposition();
+      
       if (Protocol.isNull()) {
         Status.setIsParseError();
         if (Protocol.hasCodeCompletion())
@@ -265,7 +309,8 @@ ParserStatus Parser::parseGenericWhereClause(
 /// Parse a free-standing where clause attached to a declaration, adding it to
 /// a generic parameter list that may (or may not) already exist.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericParamList *&genericParams) {
+parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
+                                    WhereClauseKind kind) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
   
   // Push the generic arguments back into a local scope so that references will
@@ -289,9 +334,7 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams) {
     return result;
 
   if (!genericParams)
-    genericParams = GenericParamList::create(Context, SourceLoc(),
-                                             {}, WhereLoc, Requirements,
-                                             SourceLoc());
+    diagnose(WhereLoc, diag::where_without_generic_params, unsigned(kind));
   else
     genericParams = GenericParamList::create(Context,
                                              genericParams->getLAngleLoc(),

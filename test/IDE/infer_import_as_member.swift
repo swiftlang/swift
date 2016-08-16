@@ -1,11 +1,12 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=InferImportAsMember -always-argument-labels -enable-infer-import-as-member > %t.printed.A.txt
 // RUN: %target-swift-frontend -parse -import-objc-header %S/Inputs/custom-modules/CollisionImportAsMember.h -I %t -I %S/Inputs/custom-modules %s -enable-infer-import-as-member -verify
-// RUN: FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
+// RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 
 // REQUIRES: objc_interop
 
 import InferImportAsMember
 let mine = IAMStruct1()
+let _ = mine.getCollisionNonProperty(1)
 
 // TODO: more cases, eventually exhaustive, as we start inferring the result we
 // want
@@ -75,6 +76,9 @@ let mine = IAMStruct1()
 // PRINT-NEXT:    init(fuzzy fuzzy: ())
 // PRINT-NEXT:    init(fuzzyWithFuzzyName fuzzyWithFuzzyName: ())
 // PRINT-NEXT:    init(fuzzyName fuzzyName: ())
+//
+// PRINT-NEXT:    func getCollisionNonProperty(_ _: Int32) -> Float
+//
 // PRINT-NEXT:  }
 //
 // PRINT-NEXT:  func __IAMStruct1IgnoreMe(_ s: IAMStruct1) -> Double

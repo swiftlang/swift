@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-let opts: BinarySearchingOptions = [.firstEqual, .insertionIndex]
+let opts: NSBinarySearchingOptions = [.firstEqual, .insertionIndex]
 
 // CHECK: true
 print(opts.intersection([.lastEqual, .insertionIndex]) == .insertionIndex)
@@ -13,4 +13,4 @@ print(opts.intersection([.lastEqual, .insertionIndex]) == .insertionIndex)
 print(!opts.intersection(.lastEqual).isEmpty)
 
 // CHECK: {{^}}0 0{{$}}
-print("\(([] as BinarySearchingOptions).rawValue) \(BinarySearchingOptions(rawValue: 0).rawValue)")
+print("\(([] as NSBinarySearchingOptions).rawValue) \(NSBinarySearchingOptions(rawValue: 0).rawValue)")

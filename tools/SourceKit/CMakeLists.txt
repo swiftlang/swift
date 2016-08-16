@@ -249,11 +249,10 @@ macro(add_sourcekit_executable name)
       set_target_properties(${name}
         PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbol,_main")
-
-      if(SWIFT_ANALYZE_CODE_COVERAGE)
-        set_property(TARGET "${name}" APPEND_STRING PROPERTY
-          LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
-      endif()
+    endif()
+    if(SWIFT_ANALYZE_CODE_COVERAGE)
+      set_property(TARGET "${name}" APPEND_STRING PROPERTY
+        LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
     endif()
   endif()
   add_sourcekit_default_compiler_flags("${name}")
@@ -506,6 +505,20 @@ include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/include
   ${SOURCEKIT_SOURCE_DIR}/include
 )
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  include_directories(AFTER ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+  add_library(dispatch SHARED IMPORTED)
+  set_target_properties(dispatch PROPERTIES
+                        IMPORTED_LOCATION ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/.libs/libdispatch.so)
+
+  add_library(swiftCore SHARED IMPORTED)
+  set_target_properties(swiftCore PROPERTIES
+                        IMPORTED_LOCATION ${SOURCEKIT_BINARY_DIR}/lib/swift/linux/libswiftCore.so)
+
+  set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+endif()
 
 add_subdirectory(lib)
 add_subdirectory(tools)

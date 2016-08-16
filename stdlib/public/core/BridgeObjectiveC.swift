@@ -19,14 +19,6 @@
 public protocol _ObjectiveCBridgeable {
   associatedtype _ObjectiveCType : AnyObject
 
-  /// Returns `true` iff instances of `Self` can be converted to
-  /// Objective-C.  Even if this method returns `true`, a given
-  /// instance of `Self._ObjectiveCType` may, or may not, convert
-  /// successfully to `Self`; for example, an `NSArray` will only
-  /// convert successfully to `[String]` if it contains only
-  /// `NSString`s.
-  static func _isBridgedToObjectiveC() -> Bool
-
   /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType
 
@@ -106,10 +98,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
   public typealias _ObjectiveCType = AnyObject
 
-  public static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   public func _bridgeToObjectiveC() -> AnyObject {
     return value
   }
@@ -149,49 +137,30 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 // implementations.
 //===----------------------------------------------------------------------===//
 
-/// Attempt to convert `x` to its Objective-C representation.
+/// Bridge an arbitrary value to an Objective-C object.
 ///
 /// - If `T` is a class type, it is always bridged verbatim, the function
 ///   returns `x`;
 ///
-/// - otherwise, `T` conforms to `_ObjectiveCBridgeable`:
-///   + if `T._isBridgedToObjectiveC()` returns `false`, then the
-///     result is empty;
-///   + otherwise, returns the result of `x._bridgeToObjectiveC()`;
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`,
+///   returns the result of `x._bridgeToObjectiveC()`;
 ///
-/// - otherwise, the result is empty.
-public func _bridgeToObjectiveC<T>(_ x: T) -> AnyObject? {
+/// - otherwise, we use **boxing** to bring the value into Objective-C.
+///   The value is wrapped in an instance of a private Objective-C class
+///   that is `id`-compatible and dynamically castable back to the type of
+///   the boxed value, but is otherwise opaque.
+///
+/// COMPILER_INTRINSIC
+public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
   }
-  return _bridgeNonVerbatimToObjectiveC(x)
+  return _bridgeAnythingNonVerbatimToObjectiveC(x)
 }
 
-public func _bridgeToObjectiveCUnconditional<T>(_ x: T) -> AnyObject {
-  let optResult: AnyObject? = _bridgeToObjectiveC(x)
-  _precondition(optResult != nil,
-      "value failed to bridge from Swift type to a Objective-C type")
-  return optResult!
-}
-
-/// Same as `_bridgeToObjectiveCUnconditional`, but autoreleases the
-/// return value if `T` is bridged non-verbatim.
-func _bridgeToObjectiveCUnconditionalAutorelease<T>(_ x: T) -> AnyObject
-{
-  if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, to: AnyObject.self)
-  }
-  guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
-    _preconditionFailure(
-      "Dictionary key failed to bridge from Swift type to a Objective-C type")
-  }
-
-  _autorelease(bridged)
-  return bridged
-}
-
-@_silgen_name("_swift_bridgeNonVerbatimToObjectiveC")
-func _bridgeNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject?
+/// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
+public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
@@ -217,8 +186,10 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 @_silgen_name("_forceBridgeFromObjectiveC_bridgeable")
-public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
-  (_ x: T._ObjectiveCType, _: T.Type) -> T {
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
+  _ x: T._ObjectiveCType,
+  _: T.Type
+) -> T {
   var result: T?
   T._forceBridgeFromObjectiveC(x, result: &result)
   return result!
@@ -231,8 +202,6 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>
 ///   - if the dynamic type of `x` is `T` or a subclass of it, it is bridged
 ///     verbatim, the function returns `x`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
-///   + if `T._isBridgedToObjectiveC()` returns `false`, then the result is
-///     empty;
 ///   + otherwise, if the dynamic type of `x` is not `T._ObjectiveCType`
 ///     or a subclass of it, the result is empty;
 ///   + otherwise, returns the result of
@@ -270,6 +239,27 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
   _ result: inout T?
 )
 
+/// Helper stub to upcast to Any and store the result to an inout Any?
+/// on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimFromObjectiveCToAny")
+public func _bridgeNonVerbatimFromObjectiveCToAny(
+    _ x: AnyObject,
+    _ result: inout Any?
+) {
+  result = x as Any
+}
+
+/// Helper stub to upcast to Optional on the C++ runtime's behalf.
+// COMPILER_INTRINSIC
+@_silgen_name("_swift_bridgeNonVerbatimBoxedValue")
+public func _bridgeNonVerbatimBoxedValue<NativeType>(
+    _ x: UnsafePointer<NativeType>,
+    _ result: inout NativeType?
+) {
+  result = x.pointee
+}
+
 /// Runtime optional to conditionally perform a bridge from an object to a value
 /// type.
 ///
@@ -288,8 +278,7 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(
 /// representation.
 ///
 /// - If `T` is a class type, returns `true`;
-/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`, returns
-///   `T._isBridgedToObjectiveC()`.
+/// - otherwise, returns whether `T` conforms to `_ObjectiveCBridgeable`.
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true
@@ -366,7 +355,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// Retrieve the value the pointer points to.
     @_transparent get {
       // We can do a strong load normally.
-      return UnsafeMutablePointer<Pointee>(self).pointee
+      return unsafeBitCast(self, to: UnsafeMutablePointer<Pointee>.self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -377,15 +366,22 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     @_transparent nonmutating set {
       // Autorelease the object reference.
       typealias OptionalAnyObject = AnyObject?
-      Builtin.retain(unsafeBitCast(newValue, to: OptionalAnyObject.self))
-      Builtin.autorelease(unsafeBitCast(newValue, to: OptionalAnyObject.self))
+      let newAnyObject = unsafeBitCast(newValue, to: OptionalAnyObject.self)
+      Builtin.retain(newAnyObject)
+      Builtin.autorelease(newAnyObject)
       // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      typealias OptionalOpaquePointer = OpaquePointer?
-      let p = UnsafeMutablePointer<OptionalOpaquePointer>(
-        UnsafeMutablePointer<Pointee>(self))
-      p.pointee = unsafeBitCast(newValue, to: OptionalOpaquePointer.self)
+      typealias OptionalUnmanaged = Unmanaged<AnyObject>?
+      UnsafeMutablePointer<Pointee>(_rawValue).withMemoryRebound(
+        to: OptionalUnmanaged.self, capacity: 1) {
+        if let newAnyObject = newAnyObject {
+          $0.pointee = Unmanaged.passUnretained(newAnyObject)
+        }
+        else {
+          $0.pointee = nil
+        }
+      }
     }
   }
 
@@ -406,6 +402,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent public
   init<U>(_ from: UnsafeMutablePointer<U>) {
     self._rawValue = from._rawValue
@@ -418,6 +417,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// This is inherently unsafe; UnsafeMutablePointer assumes the
   /// referenced memory has +1 strong ownership semantics, whereas
   /// AutoreleasingUnsafeMutablePointer implies +0 semantics.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent public
   init?<U>(_ from: UnsafeMutablePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -428,6 +430,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent
   init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
@@ -439,9 +444,46 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// This is inherently unsafe because UnsafePointers do not imply
   /// mutability.
+  ///
+  /// - Warning: Accessing `pointee` as a type that is unrelated to
+  ///   the underlying memory's bound type is undefined.
   @_transparent
   init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
+    self.init(unwrapped)
+  }
+}
+
+extension UnsafeMutableRawPointer {
+  /// Convert from `AutoreleasingUnsafeMutablePointer`.
+  @_transparent
+  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+    _rawValue = other._rawValue
+  }
+
+  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  ///
+  /// Returns nil if `other` is nil.
+  @_transparent
+  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(unwrapped)
+  }
+}
+
+extension UnsafeRawPointer {
+  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  @_transparent
+  public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
+    _rawValue = other._rawValue
+  }
+
+  /// Convert other `AutoreleasingUnsafeMutablePointer`.
+  ///
+  /// Returns nil if `other` is nil.
+  @_transparent
+  public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
+    guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
 }
@@ -454,7 +496,7 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 }
 
 @_transparent
-public func == <Pointee> (
+public func == <Pointee>(
   lhs: AutoreleasingUnsafeMutablePointer<Pointee>,
   rhs: AutoreleasingUnsafeMutablePointer<Pointee>
 ) -> Bool {
@@ -464,22 +506,22 @@ public func == <Pointee> (
 @_fixed_layout
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
-  internal var _item0: UnsafePointer<Void>?
-  internal var _item1: UnsafePointer<Void>?
-  internal var _item2: UnsafePointer<Void>?
-  internal var _item3: UnsafePointer<Void>?
-  internal var _item4: UnsafePointer<Void>?
-  internal var _item5: UnsafePointer<Void>?
-  internal var _item6: UnsafePointer<Void>?
-  internal var _item7: UnsafePointer<Void>?
-  internal var _item8: UnsafePointer<Void>?
-  internal var _item9: UnsafePointer<Void>?
-  internal var _item10: UnsafePointer<Void>?
-  internal var _item11: UnsafePointer<Void>?
-  internal var _item12: UnsafePointer<Void>?
-  internal var _item13: UnsafePointer<Void>?
-  internal var _item14: UnsafePointer<Void>?
-  internal var _item15: UnsafePointer<Void>?
+  internal var _item0: UnsafeRawPointer?
+  internal var _item1: UnsafeRawPointer?
+  internal var _item2: UnsafeRawPointer?
+  internal var _item3: UnsafeRawPointer?
+  internal var _item4: UnsafeRawPointer?
+  internal var _item5: UnsafeRawPointer?
+  internal var _item6: UnsafeRawPointer?
+  internal var _item7: UnsafeRawPointer?
+  internal var _item8: UnsafeRawPointer?
+  internal var _item9: UnsafeRawPointer?
+  internal var _item10: UnsafeRawPointer?
+  internal var _item11: UnsafeRawPointer?
+  internal var _item12: UnsafeRawPointer?
+  internal var _item13: UnsafeRawPointer?
+  internal var _item14: UnsafeRawPointer?
+  internal var _item15: UnsafeRawPointer?
 
   @_transparent
   internal var count: Int {
@@ -504,8 +546,8 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(sizeofValue(self) >=
-                   sizeof(Optional<UnsafePointer<Void>>.self) * count)
+    _sanityCheck(MemoryLayout.size(ofValue: self) >=
+                   MemoryLayout<Optional<UnsafeRawPointer>>.size * count)
   }
 }
 
@@ -523,4 +565,5 @@ extension AutoreleasingUnsafeMutablePointer {
     Builtin.unreachable()
   }
 }
+
 #endif

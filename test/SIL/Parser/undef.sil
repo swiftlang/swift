@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
 sil_stage raw
 
 import Builtin
@@ -69,6 +69,8 @@ bb0:
   index_addr undef : $*(), undef : $Builtin.Int64
   // CHECK: index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
   index_raw_pointer undef : $Builtin.RawPointer, undef : $Builtin.Int64
+  // CHECK: bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
+  bind_memory undef : $Builtin.RawPointer, undef : $Builtin.Word to $*S
 
   // Reference Counting
 
@@ -184,10 +186,10 @@ bb0:
   init_existential_metatype undef : $@thick C.Type, $@thick P.Type
   // CHECK: open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
   open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002") P).Type
-  // CHECK: open_existential_box undef : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorProtocol
-  open_existential_box undef : $ErrorProtocol to $*@opened("01234567-89AB-CDEF-0123-000000000003") ErrorProtocol
-  // CHECK: dealloc_existential_box undef : $ErrorProtocol, $()
-  dealloc_existential_box undef : $ErrorProtocol, $()
+  // CHECK: open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
+  open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003") Error
+  // CHECK: dealloc_existential_box undef : $Error, $()
+  dealloc_existential_box undef : $Error, $()
 
   // Blocks
 
@@ -204,6 +206,8 @@ bb0:
   address_to_pointer undef : $*() to $Builtin.RawPointer
   // CHECK: pointer_to_address undef : $Builtin.RawPointer to $*()
   pointer_to_address undef : $Builtin.RawPointer to $*()
+  // CHECK: pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
+  pointer_to_address undef : $Builtin.RawPointer to [strict] $*()
   // CHECK: unchecked_ref_cast undef : $C to $D
   unchecked_ref_cast undef : $C to $D
   // CHECK: unchecked_addr_cast undef : $*D to $*C
@@ -363,11 +367,11 @@ bb2:
 
 sil @try_apply_test : $() -> () {
 bb0:
-  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorProtocol, normal bb1, error bb2
-  try_apply undef(undef) : $@convention(thin) (()) -> @error ErrorProtocol, normal bb1, error bb2
+  // CHECK: try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
+  try_apply undef(undef) : $@convention(thin) (()) -> @error Error, normal bb1, error bb2
 bb1(%1 : $()):
   br bb3
-bb2(%2 : $ErrorProtocol):
+bb2(%2 : $Error):
   br bb3
 bb3:
   return undef : $()

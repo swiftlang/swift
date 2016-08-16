@@ -1030,7 +1030,24 @@ extern NSString *NSHTTPRequestKey;
 -(void)messageSomeObject:(nonnull id)object selector:(SEL)selector;
 @end
 
-@interface NSSoapDispenser<Fragrance> : NSObject
+@interface NSOperation : NSObject
+@end
+
+@interface NSProgress : NSObject
+@end
+
+@protocol NSProgressReporting <NSObject>
+@property (readonly) NSProgress *progress;
+@end
+
+@interface NSIdLover: NSObject
+
+- (id _Nonnull)makesId;
+- (void)takesId:(id _Nonnull)x;
+- (void)takesArrayOfId:(const id _Nonnull * _Nonnull)x;
+- (void)takesNullableId:(id _Nullable)x;
+
+@property (strong) id propertyOfId;
 
 @end
 
@@ -1044,3 +1061,14 @@ typedef NS_ENUM(NSUInteger, NSClothingStyle) {
   NSClothingStyleHippie
 };
 static const NSClothingStyle NSClothingStyleOfficeCasual __attribute__((availability(swift,unavailable,replacement="NSClothingStyleSemiFormal"))) = NSClothingStyleSemiFormal;
+
+void acceptError(NSError * _Nonnull error);
+NSError * _Nonnull produceError(void);
+NSError * _Nullable produceOptionalError(void);
+
+extern NSString * const FictionalServerErrorDomain;
+
+typedef enum __attribute__((ns_error_domain(FictionalServerErrorDomain))) FictionalServerErrorCode : NSInteger {
+  FictionalServerErrorMeltedDown = 1
+} FictionalServerErrorCode;
+

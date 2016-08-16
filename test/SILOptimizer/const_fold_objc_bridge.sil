@@ -1,0 +1,111 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+@objc class ObjCClass {}
+
+struct Str: _ObjectiveCBridgeable {
+  func _bridgeToObjectiveC() -> ObjCClass
+  static func _forceBridgeFromObjectiveC(_ source: ObjCClass,
+                                         result: inout Str?)
+  static func _conditionallyBridgeFromObjectiveC(_ source: ObjCClass,
+                                         result: inout Str?) -> Bool
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ObjCClass?) -> Str
+
+  // Make it a non-trivial type
+  var x: AnyObject?
+}
+
+// CHECK-LABEL: sil @checked_cast_with_take_always
+// CHECK: [[A:%[0-9]+]] = alloc_stack
+// CHECK: [[S:%[0-9]+]] = load %0
+// CHECK-NOT: retain
+// CHECK: [[D:%[0-9]+]] = apply %{{[0-9]+}}([[S]])
+// CHECK: release_value [[S]]
+// CHECK: store [[D]] to [[A]]
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: return
+sil @checked_cast_with_take_always : $@convention(thin) (@in Str) -> ObjCClass {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br take_always Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = load %b : $*ObjCClass
+  dealloc_stack %b : $*ObjCClass
+  return %r : $ObjCClass
+}
+
+// CHECK-LABEL: sil @checked_cast_with_take_on_success
+// CHECK: [[A:%[0-9]+]] = alloc_stack
+// CHECK: [[S:%[0-9]+]] = load %0
+// CHECK-NOT: retain
+// CHECK: [[D:%[0-9]+]] = apply %{{[0-9]+}}([[S]])
+// CHECK-NOT: release
+// CHECK: store [[D]] to [[A]]
+// CHECK: bb1:
+// CHECK-NEXT: release_value [[S]]
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: return
+sil @checked_cast_with_take_on_success : $@convention(thin) (@in Str) -> ObjCClass {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br take_on_success Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = load %b : $*ObjCClass
+  dealloc_stack %b : $*ObjCClass
+  return %r : $ObjCClass
+}
+
+// CHECK-LABEL: sil @checked_cast_with_copy_on_success
+// CHECK: [[A:%[0-9]+]] = alloc_stack
+// CHECK: [[S:%[0-9]+]] = load %0
+// CHECK: retain_value [[S]]
+// CHECK: [[D:%[0-9]+]] = apply %{{[0-9]+}}([[S]])
+// CHECK: release_value [[S]]
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: return
+sil @checked_cast_with_copy_on_success : $@convention(thin) (@in Str) -> ObjCClass {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br copy_on_success Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = load %b : $*ObjCClass
+  dealloc_stack %b : $*ObjCClass
+  return %r : $ObjCClass
+}
+

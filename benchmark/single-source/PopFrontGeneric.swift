@@ -17,33 +17,31 @@ let arrayCount = 1024
 
 // This test case exposes rdar://17440222 which caused rdar://17974483 (popFront
 // being really slow).
+protocol MyArrayBufferProtocol : MutableCollection, RandomAccessCollection {
+  associatedtype Element
 
-func _arrayReplace<B: _ArrayBufferProtocol, C: Collection
-  where C.Iterator.Element == B.Element, B.Index == Int
-  >(
-  _ target: inout B, _ subRange: Range<Int>, _ newValues: C
-) {
-  _precondition(
-    subRange.lowerBound >= 0,
-    "Array replace: subRange start is negative")
+  mutating func myReplace<C>(
+    _ subRange: Range<Int>,
+    with newValues: C
+  ) where C : Collection, C.Iterator.Element == Element
+}
 
-  _precondition(
-    subRange.upperBound <= target.endIndex,
-    "Array replace: subRange extends past the end")
-
-  let oldCount = target.count
-  let eraseCount = subRange.count
-  let insertCount = numericCast(newValues.count) as Int
-  let growth = insertCount - eraseCount
-
-  if target.requestUniqueMutableBackingBuffer(minimumCapacity: oldCount + growth) != nil {
-    target.replace(subRange: subRange, with: insertCount, elementsOf: newValues)
-  }
-  else {
-    _preconditionFailure("Should not get here?")
+extension Array : MyArrayBufferProtocol {
+  mutating func myReplace<C>(
+    _ subRange: Range<Int>,
+    with newValues: C
+  ) where C : Collection, C.Iterator.Element == Element {
+    replaceSubrange(subRange, with: newValues)
   }
 }
 
+func myArrayReplace<
+  B: MyArrayBufferProtocol,
+  C: Collection
+>(_ target: inout B, _ subRange: Range<Int>, _ newValues: C)
+  where C.Iterator.Element == B.Element, B.Index == Int {
+  target.myReplace(subRange, with: newValues)
+}
 
 @inline(never)
 public func run_PopFrontArrayGeneric(_ N: Int) {
@@ -55,7 +53,7 @@ public func run_PopFrontArrayGeneric(_ N: Int) {
       a.append(contentsOf: orig)
       while a.count != 0 {
         result += a[0]
-        _arrayReplace(&a._buffer, 0..<1, EmptyCollection())
+        myArrayReplace(&a, 0..<1, EmptyCollection())
       }
       CheckResults(result == arrayCount, "IncorrectResults in StringInterpolation: \(result) != \(arrayCount)")
     }

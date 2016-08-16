@@ -1,0 +1,16 @@
+---
+Name: Metal
+Tags:
+- Name: MTLCommandBufferError
+  SwiftName: MTLCommandBufferErrorDomain
+- Name: MTLLibraryError
+  SwiftName: MTLLibraryErrorDomain
+- Name: MTLRenderPipelineError
+  SwiftName: MTLRenderPipelineErrorDomain
+Enumerators:
+- Name: MTLResourceStorageModeShared
+  SwiftName: storageModeShared
+- Name: MTLStorageModeShared
+  SwiftName: shared
+- Name: MTLTextureUsageUnknown
+  SwiftName: unknown

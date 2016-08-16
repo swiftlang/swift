@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | FileCheck %s -check-prefix=BAD_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | FileCheck %s -check-prefix=BAD_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_1 | %FileCheck %s -check-prefix=BAD_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BAD_MEMBERS_2 | %FileCheck %s -check-prefix=BAD_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_CALLED_IN_PLACE_1 | %FileCheck %s -check-prefix=WITH_GLOBAL
 
 class BadMembers1 {
   var prop: Int {
@@ -36,7 +36,7 @@ func badMembers2(_ a: BadMembers2) {
 
 func globalFunc() {}
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | FileCheck %s -check-prefix=WITH_GLOBAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LET_COMPUTED | %FileCheck %s -check-prefix=WITH_GLOBAL
 class C {
   let x : Int { #^LET_COMPUTED^# }
 }
@@ -56,12 +56,12 @@ while true {
 }
 
 // rdar://problem/21197042
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
-struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
+struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Key[#Key#]; name=Key
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#Value#]; name=Value
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/CurrNominal: Key[#Key#]; name=Key
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#CustomGenericCollection.Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
 
   var count: Int { #^GENERIC_PARAM_AND_ASSOC_TYPE^# }
@@ -69,7 +69,7 @@ struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
 
 // rdar://problem/21796881
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21796881
-extension NilLiteralConvertible {
+extension ExpressibleByNilLiteral {
    var nil: Self { #^RDAR_21796881^# }
 }
 
@@ -126,13 +126,13 @@ protocol Fooable {
 }
 
 // rdar://problem/22688199
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | FileCheck %s -check-prefix=FLIP_CURRIED
-func curried(_ a: Int)(b1: Int, b2: Int) { }
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | %FileCheck %s -check-prefix=FLIP_CURRIED
+func curried(_ a: Int)(_ b1: Int, _ b2: Int) { }
 func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
-// FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#b1: Int#}, {#b2: Int#})[#Int -> ()#]
+// FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#Int#}, {#Int#})[#(Int) -> ()#]
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {
@@ -147,7 +147,7 @@ func rdar22835966() {
   }
 }
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | FileCheck %s -check-prefix=INVALID_TYPE_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
 struct Foo {
   let a: Anosuchtype
   let b: Bnosuchtype
@@ -160,13 +160,13 @@ func rdar22834017() {
 // FIXME: We could provide a useful completion here. rdar://problem/22846558
 // INVALID_TYPE_INIT-NOT: Begin completions
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | FileCheck %s -check-prefix=RDAR_23173692
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
   return IndexingIterator(#^RDAR_23173692^#)
 }
 // RDAR_23173692: Begin completions
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22769393 | FileCheck %s -check-prefix=RDAR_22769393
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22769393 | %FileCheck %s -check-prefix=RDAR_22769393
 public enum PropertyListItem {
   case PLString(String)
   case PLDict([String:PropertyListItem])

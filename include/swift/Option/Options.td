@@ -29,6 +29,9 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
+// The option should be accepted by swift-format
+def SwiftFormatOption : OptionFlag;
+
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -99,7 +102,7 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftFormatOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -121,7 +124,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption]>,
+         NoInteractiveOption, SwiftFormatOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -293,18 +296,47 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
 def g_Group : OptionGroup<"<debug info options>">;
 
 def g : Flag<["-"], "g">, Group<g_Group>, Flags<[FrontendOption]>,
-  HelpText<"Emit debug info">;
+  HelpText<"Emit debug info. "
+           "This is the preferred setting for debugging with LLDB.">;
 def gnone : Flag<["-"], "gnone">, Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Don't emit debug info">;
 def gline_tables_only : Flag<["-"], "gline-tables-only">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit minimal debug info for backtraces only">;
+def gdwarf_types : Flag<["-"], "gdwarf-types">,
+  Group<g_Group>, Flags<[FrontendOption]>,
+  HelpText<"Emit full DWARF type info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
+
+// Code formatting options
+
+def code_formatting_Group : OptionGroup<"<code formatting options>">;
+
+def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Use tabs for indentation.">;
+
+def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Overwrite input file with formatted file.">;
+
+def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Width of tab character.">, MetaVarName<"<n>">;
+
+def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
+
+def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
+           "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // File types
 

@@ -1,7 +1,9 @@
-add_swift_library(swiftAppKit IS_SDK_OVERLAY
+add_swift_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   AppKit.swift
   AppKit_FoundationExtensions.swift
   NSError.swift
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX
   SWIFT_MODULE_DEPENDS ObjectiveC Foundation CoreData CoreImage
   FRAMEWORK_DEPENDS AppKit)

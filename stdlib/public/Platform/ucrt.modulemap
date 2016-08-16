@@ -1,0 +1,102 @@
+//===--- ucrt.modulemap ---------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module ucrt [system] {
+  module C {
+    module complex {
+      header "complex.h"
+      export *
+    }
+
+    module ctype {
+      header "ctype.h"
+      export *
+    }
+
+    module errno {
+      header "errno.h"
+      export *
+    }
+
+    module fenv {
+      header "fenv.h"
+      export *
+    }
+
+    module inttypes {
+      header "inttypes.h"
+      export *
+    }
+
+    module locale {
+      header "locale.h"
+      export *
+    }
+
+    module math {
+      header "math.h"
+      export *
+    }
+
+    module signal {
+      header "signal.h"
+      export *
+    }
+
+    module stddef {
+      header "stddef.h"
+      export *
+    }
+
+    module stdio {
+      header "stdio.h"
+      export *
+    }
+
+    module stdlib {
+      header "stdlib.h"
+      export *
+    }
+
+    module string {
+      header "string.h"
+      export *
+    }
+
+    module time {
+      header "time.h"
+      export *
+    }
+
+    module POSIX {
+      module sys {
+        export *
+
+        module stat {
+          header "sys/stat.h"
+          export *
+        }
+
+        module types {
+          header "sys/types.h"
+          export *
+        }
+
+        module utime {
+          header "sys/utime.h"
+          export *
+        }
+      }
+    }
+  }
+}
+

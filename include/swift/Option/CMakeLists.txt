@@ -1,3 +1,3 @@
 set(LLVM_TARGET_DEFINITIONS Options.td)
-tablegen(LLVM Options.inc -gen-opt-parser-defs)
-add_public_tablegen_target(SwiftOptions)
+swift_tablegen(Options.inc -gen-opt-parser-defs)
+swift_add_public_tablegen_target(SwiftOptions)

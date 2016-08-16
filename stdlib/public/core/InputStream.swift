@@ -12,17 +12,22 @@
 
 import SwiftShims
 
-/// Returns `Character`s read from standard input through the end of the
-/// current line or until EOF is reached, or `nil` if EOF has already been
-/// reached.
+/// Returns a string read from standard input through the end of the current
+/// line or until EOF is reached.
 ///
-/// If `strippingNewline` is `true`, newline characters and character
-/// combinations will be stripped from the result.  This is the default.
+/// Standard input is interpreted as `UTF-8`. Invalid bytes are replaced by
+/// Unicode [replacement characters][rc].
 ///
-/// Standard input is interpreted as `UTF-8`.  Invalid bytes
-/// will be replaced by Unicode [replacement characters](http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character).
+/// [rc]:
+/// http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+///
+/// - Parameter strippingNewline: If `true`, newline characters and character
+///   combinations are stripped from the result; otherwise, newline characters
+///   or character combinations are preserved. The default is `true`.
+/// - Returns: The string of characters read from standard input. If EOF has
+///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  var linePtrVar: UnsafeMutablePointer<CChar>? = nil
+  var linePtrVar: UnsafeMutablePointer<UInt8>? = nil
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil
@@ -41,8 +46,8 @@ public func readLine(strippingNewline: Bool = true) -> String? {
     // <rdar://problem/20013999> Recognize Unicode newlines in readLine()
     //
     // Recognize only LF and CR+LF combinations for now.
-    let cr = CChar(UInt8(ascii: "\r"))
-    let lf = CChar(UInt8(ascii: "\n"))
+    let cr = UInt8(ascii: "\r")
+    let lf = UInt8(ascii: "\n")
     if readBytes == 1 && linePtr[0] == lf {
       return ""
     }
@@ -61,8 +66,13 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   }
   let result = String._fromCodeUnitSequenceWithRepair(UTF8.self,
     input: UnsafeMutableBufferPointer(
-      start: UnsafeMutablePointer<UTF8.CodeUnit>(linePtr),
+      start: linePtr,
       count: readBytes)).0
   _swift_stdlib_free(linePtr)
   return result
+}
+
+@available(*, unavailable, renamed: "readLine(strippingNewline:)")
+public func readLine(stripNewline: Bool = true) -> String? {
+  Builtin.unreachable()
 }

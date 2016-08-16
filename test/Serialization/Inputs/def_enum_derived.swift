@@ -1,3 +1,3 @@
 extension Breakfast : RawRepresentable {}
 
-extension Breakfast : ErrorProtocol {}
+extension Breakfast : Error {}

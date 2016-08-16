@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -25,7 +25,7 @@ if unsafeNil == nil {
 }
 
 do {
-  try FileManager.`default`().removeItem(at: URL(string:"/this/file/does/not/exist")!)
+  try FileManager.default.removeItem(at: URL(string:"/this/file/does/not/exist")!)
 } catch {
   print("ok !removed")
   // CHECK: ok !removed

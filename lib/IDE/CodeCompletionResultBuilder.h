@@ -115,6 +115,11 @@ public:
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
+    case Accessibility::FilePrivate:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "fileprivate ");
+      break;
     case Accessibility::Internal:
       // 'internal' is the default, don't add it.
       break;
@@ -122,6 +127,11 @@ public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
+      break;
+    case Accessibility::Open:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "open ");
       break;
     }
   }
@@ -417,9 +427,10 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-  void addBraceStmtWithCursor() {
-    addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, " {}");
+  void addBraceStmtWithCursor(StringRef Description = "") {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor,
+        Description);
   }
 
   void addWhitespace(StringRef space) {

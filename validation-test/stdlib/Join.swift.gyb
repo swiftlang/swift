@@ -277,7 +277,7 @@ collections += [(array, 'RandomAccess') for array in other_array_types]
 %     label = ''
 %   end
 
-JoinTestSuite.test("${Base}.join()") {
+JoinTestSuite.test("${Base}.joined(separator:)") {
   for test in joinWithSeparatorTests {
     let elements = ${Base}(${label} test.elements.map {
       ${Base}(${label} $0)
@@ -288,7 +288,7 @@ JoinTestSuite.test("${Base}.join()") {
   }
 }
 
-JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
+JoinTestSuite.test("${Base}.joined(separator:)/_copyToContiguousArray()") {
   for test in joinWithSeparatorTests {
     let elements = ${Base}(${label} test.elements.map {
       ${Base}(${label} $0)
@@ -301,47 +301,43 @@ JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
 
 % end
 
-func join(_ separator: String, _ elements: [String]) -> String {
-  return elements.joined(separator: separator)
-}
-
-JoinTestSuite.test("String.joined(separator:)") {
-  //
-  // Test the free function.
-  //
+JoinTestSuite.test("Sequence<String>.joined(separator:)") {
+  // Default separator (empty).
+  expectEqual("",       [].joined())
+  expectEqual("",       [""].joined())
+  expectEqual("",       ["", ""].joined())
+  expectEqual("",       ["", "", ""].joined())
+  expectEqual("a",      ["a"].joined())
+  expectEqual("ab",     ["a", "b"].joined())
+  expectEqual("abc",    ["a", "b", "c"].joined())
+  expectEqual("abcdef", ["ab", "cd", "ef"].joined())
 
   // Empty separator.
-  expectEqual("",    join("", []))
-  expectEqual("",    join("", [""]))
-  expectEqual("",    join("", ["", ""]))
-  expectEqual("",    join("", ["", "", ""]))
-  expectEqual("a",   join("", ["a"]))
-  expectEqual("ab",  join("", ["a", "b"]))
-  expectEqual("abc", join("", ["a", "b", "c"]))
-  expectEqual("abcdef", join("", ["ab", "cd", "ef"]))
+  expectEqual("",       [].joined(separator: ""))
+  expectEqual("",       [""].joined(separator: ""))
+  expectEqual("",       ["", ""].joined(separator: ""))
+  expectEqual("",       ["", "", ""].joined(separator: ""))
+  expectEqual("a",      ["a"].joined(separator: ""))
+  expectEqual("ab",     ["a", "b"].joined(separator: ""))
+  expectEqual("abc",    ["a", "b", "c"].joined(separator: ""))
+  expectEqual("abcdef", ["ab", "cd", "ef"].joined(separator: ""))
 
   // 1-element separator.
-  expectEqual("",      join("x", [""]))
-  expectEqual("x",     join("x", ["", ""]))
-  expectEqual("xx",    join("x", ["", "", ""]))
-  expectEqual("a",     join("x", ["a"]))
-  expectEqual("axb",   join("x", ["a", "b"]))
-  expectEqual("axbxc", join("x", ["a", "b", "c"]))
-  expectEqual("abxcdxef", join("x", ["ab", "cd", "ef"]))
+  expectEqual("",         [""].joined(separator: "x"))
+  expectEqual("x",        ["", ""].joined(separator: "x"))
+  expectEqual("xx",       ["", "", ""].joined(separator: "x"))
+  expectEqual("a",        ["a"].joined(separator: "x"))
+  expectEqual("axb",      ["a", "b"].joined(separator: "x"))
+  expectEqual("axbxc",    ["a", "b", "c"].joined(separator: "x"))
+  expectEqual("abxcdxef", ["ab", "cd", "ef"].joined(separator: "x"))
 
   // 2-element separator.
-  expectEqual("",        join("xy", [""]))
-  expectEqual("xy",      join("xy", ["", ""]))
-  expectEqual("xyxy",    join("xy", ["", "", ""]))
-  expectEqual("a",       join("xy", ["a"]))
-  expectEqual("axyb",    join("xy", ["a", "b"]))
-  expectEqual("axybxyc", join("xy", ["a", "b", "c"]))
-  expectEqual("abxycdxyef", join("xy", ["ab", "cd", "ef"]))
-
-  //
-  // Test forwarding instance function.
-  //
-
+  expectEqual("",           [""].joined(separator: "xy"))
+  expectEqual("xy",         ["", ""].joined(separator: "xy"))
+  expectEqual("xyxy",       ["", "", ""].joined(separator: "xy"))
+  expectEqual("a",          ["a"].joined(separator: "xy"))
+  expectEqual("axyb",       ["a", "b"].joined(separator: "xy"))
+  expectEqual("axybxyc",    ["a", "b", "c"].joined(separator: "xy"))
   expectEqual("abxycdxyef", ["ab", "cd", "ef"].joined(separator: "xy"))
 }
 

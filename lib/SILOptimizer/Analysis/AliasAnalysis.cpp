@@ -329,21 +329,18 @@ static bool isTypedAccessOracle(SILInstruction *I) {
 /// given value is directly derived from a memory location, it cannot
 /// alias. Call arguments also cannot alias because they must follow \@in, @out,
 /// @inout, or \@in_guaranteed conventions.
-///
-/// FIXME: pointer_to_address should contain a flag that indicates whether the
-/// address is aliasing. Currently, we aggressively assume that
-/// pointer-to-address is never used for type punning, which is not yet
-/// clearly specified by our UnsafePointer API.
 static bool isAddressRootTBAASafe(SILValue V) {
   if (auto *Arg = dyn_cast<SILArgument>(V))
     return Arg->isFunctionArg();
+
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(V))
+    return PtrToAddr->isStrict();
 
   switch (V->getKind()) {
   default:
     return false;
   case ValueKind::AllocStackInst:
   case ValueKind::AllocBoxInst:
-  case ValueKind::PointerToAddressInst:
     return true;
   }
 }
@@ -644,9 +641,9 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 }
 
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
-  // Treat applications of @noreturn functions as decrementing ref counts. This
+  // Treat applications of no-return functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
-  if (FAS.getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
+  if (FAS.isCalleeNoReturn())
     return true;
 
   /// If the pointer cannot escape to the function we are done.

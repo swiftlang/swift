@@ -11,8 +11,8 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -parse-as-library %t/protocols.swiftmodule -parse -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/protocols.h
-// RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
+// RUN: %FileCheck %s < %t/protocols.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
 
 // REQUIRES: objc_interop
@@ -67,15 +67,16 @@ protocol CustomNameType2 {}
 
   func testRawAnyTypes(_ any: AnyObject, other: AnyObject.Type)
 
-  func testSingleProtocolTypes(_ a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
-  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
-  func testComposition(_ x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
+  func testSingleProtocolTypes(_ a : A, aAgain a2: A, b: B, bAgain b2: B, both: A & B)
+  func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: A.Type, b: B.Type, bAgain b2: B.Type, both: (A & B).Type)
+  func testComposition(_ x: A & ZZZ, meta xClass: (A & ZZZ).Type)
 
   func testOptional(_ opt: A?, meta m: A.Type?)
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
-// CHECK-NEXT: init
+// CHECK-NEXT: initWithCoder
+// CHECK-NEXT: init SWIFT_UNAVAILABLE
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
 class MyObject : NSObject, NSCoding {

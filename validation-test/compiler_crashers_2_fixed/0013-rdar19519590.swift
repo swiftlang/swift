@@ -5,7 +5,7 @@ protocol SourceTargetTransformable {
     associatedtype Target
   
     // FIXME: should really be a typealias once we support that
-    associatedtype Transformer = Source -> Target
+    associatedtype Transformer = (Source) -> Target
 }
 
 
@@ -32,7 +32,7 @@ struct PiecewiseTransformedIteratorOf<
         if let source: Transformable.Source = source {
             let transformer: Transformable.Transformer? = transformerIterator.next()
             if let transformer: Transformable.Transformer = transformer {
-                let tfunc: (Source -> Target)? = transformer as? (Source -> Target)
+                let tfunc: ((Source) -> Target)? = transformer as? ((Source) -> Target)
                 if let tfunc = tfunc {
                     return tfunc(source)
                 }

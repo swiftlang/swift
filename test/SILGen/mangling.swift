@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -32,22 +32,22 @@ prefix operator +- {}
 postfix operator +- {}
 infix operator +- {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingop2psurFxT_
+// CHECK-LABEL: sil hidden @_TF8manglingop2psurFxT_
 prefix func +- <T>(a: T) {}
-// CHECK-LABEL: sil hidden @_TZF8manglingoP2psurFxT_
+// CHECK-LABEL: sil hidden @_TF8manglingoP2psurFxT_
 postfix func +- <T>(a: T) {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingoi2psurFTxx_T_
+// CHECK-LABEL: sil hidden @_TF8manglingoi2psurFTxx_T_
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingop2psurFT1ax1bx_T_
+// CHECK-LABEL: sil hidden @_TF8manglingop2psurFT1ax1bx_T_
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_TZF8manglingoP2psurFT1ax1bx_T_
+// CHECK-LABEL: sil hidden @_TF8manglingoP2psurFT1ax1bx_T_
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingXoi7p_qcaDcFTSiSi_Si
+// CHECK-LABEL: sil hidden @_TF8manglingXoi7p_qcaDcFTSiSi_Si
 func «+»(a: Int, b: Int) -> Int { return a + b }
 
 protocol Foo {}
@@ -55,13 +55,13 @@ protocol Bar {}
 
 // Ensure protocol list manglings are '_' terminated regardless of length
 // CHECK-LABEL: sil hidden @_TF8mangling12any_protocolFP_T_
-func any_protocol(_: protocol<>) {}
+func any_protocol(_: Any) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12one_protocolFPS_3Foo_T_
 func one_protocol(_: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling18one_protocol_twiceFTPS_3Foo_PS0___T_
 func one_protocol_twice(_: Foo, _: Foo) {}
 // CHECK-LABEL: sil hidden @_TF8mangling12two_protocolFPS_3BarS_3Foo_T_
-func two_protocol(_: protocol<Foo, Bar>) {}
+func two_protocol(_: Foo & Bar) {}
 
 // Ensure archetype depths are mangled correctly.
 class Zim<T> {
@@ -73,7 +73,7 @@ class Zim<T> {
 
 // Don't crash mangling single-protocol "composition" types.
 // CHECK-LABEL: sil hidden @_TF8mangling27single_protocol_compositionFT1xPS_3Foo__T_
-func single_protocol_composition(x x: protocol<Foo>) {}
+func single_protocol_composition(x x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
@@ -134,7 +134,7 @@ func fooA<T: HasAssocType>(_: T) {}
 // CHECK-LABEL: sil hidden @_TF8mangling4fooBuRxS_12HasAssocTypewx5AssocS_9AssocReqtrFxT_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
 func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_: T) {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_
+// CHECK-LABEL: sil hidden @_TF8manglingoi2qqFTSiSi_T_
 func ??(x: Int, y: Int) {}
 
 struct InstanceAndClassProperty {
@@ -157,25 +157,25 @@ func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error ErrorProtocol)
+// CHECK-LABEL: sil hidden @_TF8mangling3barFzT_Si : $@convention(thin) () -> (Int, @error Error)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF8mangling12curry1ThrowsFzT_T_ : $@convention(thin) () -> @error Error
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error ErrorProtocol)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry2ThrowsFzT_FT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> (), @error Error)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error ErrorProtocol
+// CHECK-LABEL: sil hidden @_TF8mangling6curry3FT_FzT_T_ : $@convention(thin) () -> @owned @callee_owned () -> @error Error
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error ErrorProtocol, @error ErrorProtocol)
+// CHECK-LABEL: sil hidden @_TF8mangling12curry3ThrowsFzT_FzT_T_ : $@convention(thin) () -> (@owned @callee_owned () -> @error Error, @error Error)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

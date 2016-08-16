@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-usrs -source-filename %s | FileCheck %s -strict-whitespace
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
 
 import macros
 
@@ -88,7 +88,7 @@ class SubCls : MyCls, Prot {
 }
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuRxS_4Protwx5BlargS_5Prot2rFxSi{{$}}
-func genFn<T : Prot where T.Blarg : Prot2>(_ p : T) -> Int {}
+func genFn<T : Prot>(_ p : T) -> Int where T.Blarg : Prot2 {}
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}
 func bar(_ x: Int) -> (Int, Float) {}

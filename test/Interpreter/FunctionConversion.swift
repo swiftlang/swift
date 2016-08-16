@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// REQUIRES: rdar24874073
 //
 
 import StdlibUnittest
@@ -84,20 +83,20 @@ func a1(s: AddrOnly?) -> AddrOnly {
 }
 
 FunctionConversionTestSuite.test("Optional") {
-  let g11: Trivial -> Trivial? = t1
-  let g12: Trivial! -> Trivial? = t1
+  let g11: (Trivial) -> Trivial? = t1
+  let g12: (Trivial!) -> Trivial? = t1
 
   expectEqual(22, g11(Trivial(n: 11))?.n)
   expectEqual(24, g12(Trivial(n: 12))?.n)
 
-  let g21: Loadable? -> Loadable? = l1
-  let g22: Loadable! -> Loadable? = l1
+  let g21: (Loadable?) -> Loadable? = l1
+  let g22: (Loadable!) -> Loadable? = l1
 
   expectEqual(42, g21(Loadable(n: 21))?.n)
   expectEqual(44, g22(Loadable(n: 22))?.n)
 
-  let g31: AddrOnly? -> AddrOnly? = a1
-  let g32: AddrOnly! -> AddrOnly? = a1
+  let g31: (AddrOnly?) -> AddrOnly? = a1
+  let g32: (AddrOnly!) -> AddrOnly? = a1
 
   expectEqual(62, g31(AddrOnly(n: 31))?.n)
   expectEqual(64, g32(AddrOnly(n: 32))?.n)
@@ -128,25 +127,25 @@ func a3(s: Quilt?) -> AddrOnly {
 }
 
 FunctionConversionTestSuite.test("Existential") {
-  let g11: Trivial -> Patchwork = t2
-  let g12: Trivial? -> Patchwork = t3
-  let g13: Patchwork -> Patchwork = t2
+  let g11: (Trivial) -> Patchwork = t2
+  let g12: (Trivial?) -> Patchwork = t3
+  let g13: (Patchwork) -> Patchwork = t2
 
   expectEqual(11, g11(Trivial(n: 11)).n)
   expectEqual(12, g12(Trivial(n: 12)).n)
   expectEqual(13, g13(Trivial(n: 13)).n)
 
-  let g21: Loadable -> Patchwork = l2
-  let g22: Loadable? -> Patchwork = l3
-  let g23: Patchwork -> Patchwork = l2
+  let g21: (Loadable) -> Patchwork = l2
+  let g22: (Loadable?) -> Patchwork = l3
+  let g23: (Patchwork) -> Patchwork = l2
 
   expectEqual(21, g21(Loadable(n: 21)).n)
   expectEqual(22, g22(Loadable(n: 22)).n)
   expectEqual(23, g23(Loadable(n: 23)).n)
 
-  let g31: AddrOnly -> Patchwork = a2
-  let g32: AddrOnly -> Patchwork = a3
-  let g33: Patchwork -> Patchwork = a2
+  let g31: (AddrOnly) -> Patchwork = a2
+  let g32: (AddrOnly) -> Patchwork = a3
+  let g33: (Patchwork) -> Patchwork = a2
 
   expectEqual(31, g31(AddrOnly(n: 31)).n)
   expectEqual(32, g32(AddrOnly(n: 32)).n)
@@ -158,10 +157,10 @@ func em(t: Quilt.Type?) -> Trivial.Type {
 }
 
 FunctionConversionTestSuite.test("ExistentialMetatype") {
-  let g1: Trivial.Type -> Patchwork.Type = em
-  let g2: Trivial.Type? -> Patchwork.Type = em
-  let g3: Patchwork.Type -> Patchwork.Type = em
-  let g4: Patchwork.Type -> Any = em
+  let g1: (Trivial.Type) -> Patchwork.Type = em
+  let g2: (Trivial.Type?) -> Patchwork.Type = em
+  let g3: (Patchwork.Type) -> Patchwork.Type = em
+  let g4: (Patchwork.Type) -> Any = em
 
   let result1 = g1(Trivial.self)
   let result2 = g2(Trivial.self)
@@ -183,8 +182,8 @@ func c2(p: Parent?) -> (Child, Trivial) {
 }
 
 FunctionConversionTestSuite.test("ClassUpcast") {
-  let g1: Child -> (Parent, Trivial?) = c1
-  let g2: Child -> (Parent?, Trivial?) = c2
+  let g1: (Child) -> (Parent, Trivial?) = c1
+  let g2: (Child) -> (Parent?, Trivial?) = c2
 
   expectEqual(g1(Child(n: 2)).0.n, 2)
   expectEqual(g2(Child(n: 4)).0!.n, 4)
@@ -199,9 +198,9 @@ func cm2(p: Parent.Type?) -> (Child.Type, Trivial) {
 }
 
 FunctionConversionTestSuite.test("ClassMetatypeUpcast") {
-  let g1: Child.Type -> (Parent.Type, Trivial?) = cm1
-  let g2: Child.Type -> (Parent.Type, Trivial?) = cm2
-  let g3: Child.Type? -> (Parent.Type?, Trivial?) = cm2
+  let g1: (Child.Type) -> (Parent.Type, Trivial?) = cm1
+  let g2: (Child.Type) -> (Parent.Type, Trivial?) = cm2
+  let g3: (Child.Type?) -> (Parent.Type?, Trivial?) = cm2
 
   let result1 = g1(Child.self)
   let result2 = g2(Child.self)
@@ -216,26 +215,26 @@ func sq(i: Int) -> Int {
   return i * i
 }
 
-func f1(f: Any) -> Int -> Int {
-  return f as! (Int -> Int)
+func f1(f: Any) -> (Int) -> Int {
+  return f as! ((Int) -> Int)
 }
 
 FunctionConversionTestSuite.test("FuncExistential") {
-  let g11: (Int -> Int) -> Any = f1
+  let g11: ((Int) -> Int) -> Any = f1
 
-  expectEqual(100, f1(g11(sq))(10))
+  expectEqual(100, f1(f: g11(sq))(10))
 }
 
 func generic1<T>(t: Parent) -> (T, Trivial) {
   return (t as! T, Trivial(n: 0))
 }
 
-func generic2<T : Parent>(f: Parent -> (T, Trivial), t: T) -> Child -> (Parent, Trivial?) {
+func generic2<T : Parent>(f: @escaping (Parent) -> (T, Trivial), t: T) -> (Child) -> (Parent, Trivial?) {
   return f
 }
 
 FunctionConversionTestSuite.test("ClassArchetypeUpcast") {
-  let g11: Child -> (Parent, Trivial?) = generic2(generic1, t: Child(n: 10))
+  let g11: (Child) -> (Parent, Trivial?) = generic2(f: generic1, t: Child(n: 10))
   expectEqual(10, g11(Child(n: 10)).0.n)
 }
 

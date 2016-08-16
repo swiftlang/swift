@@ -16,13 +16,15 @@ def get_arguments():
     stripped. The reason why we print out the line with whitespace stripped is
     that in the case where there is a lot of redundant whitespace, the output
     becomes hard to read and no value is provided in terms of finding the line
-    in question."""))
+    in question.
+
+    Exits with 1 if it finds any violating lines, 0 otherwise."""))
 
     parser.add_argument('infile', nargs='?', type=argparse.FileType('r'),
                         default=sys.stdin,
                         help=textwrap.dedent("""The file to read input from. If
                         no file is provided, stdin is used."""))
-    parser.add_argument('-o', type=argparse.FileType('w'),
+    parser.add_argument('-o', '--output', type=argparse.FileType('w'),
                         default=sys.stdout,
                         help=textwrap.dedent("""The file to print to. If no
                              file is provided, stdout is used"""),
@@ -37,17 +39,15 @@ def get_arguments():
 
 args = get_arguments()
 
-count = 0
 found_violation = False
 
-for l in args.infile:
+for lineno, line in enumerate(args.infile, start=1):
     # sys.stdin.readlines() includes a newline. So we subtract 1 from our
     # length to get the "true" line length.
-    length = len(l) - int(args.count_newline)
+    length = len(line) - int(args.count_newline)
     if length > args.max_length:
         found_violation = True
-        print("line: {}. length: {}: {}".format(count, length, l.strip()),
+        print("line: {}. length: {}: {}".format(lineno, length, line.strip()),
               file=args.outfile)
-    count += 1
 
 sys.exit(found_violation)

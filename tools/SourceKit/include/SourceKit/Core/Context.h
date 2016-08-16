@@ -15,6 +15,7 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include <memory>
 #include <string>
 
@@ -32,7 +33,9 @@ class Context {
   std::unique_ptr<NotificationCenter> NotificationCtr;
 
 public:
-  explicit Context(StringRef RuntimeLibPath);
+  Context(StringRef RuntimeLibPath,
+          llvm::function_ref<
+              std::unique_ptr<LangSupport>(Context &)> LangSupportFactoryFn);
   ~Context();
 
   StringRef getRuntimeLibPath() const { return RuntimeLibPath; }

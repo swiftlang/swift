@@ -492,6 +492,11 @@ OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
   return File.lookupOperator(name, fixity);
 }
 
+PrecedenceGroupDecl *
+SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
+  return File.lookupPrecedenceGroup(name);
+}
+
 void SerializedASTFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                            VisibleDeclConsumer &consumer,
                                            NLKind lookupKind) const {

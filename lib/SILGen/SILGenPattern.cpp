@@ -71,18 +71,6 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << "is ";
     cast<IsPattern>(p)->getCastTypeLoc().getType()->print(os);
     break;
-  case PatternKind::NominalType: {
-    auto np = cast<NominalTypePattern>(p);
-    np->getType()->print(os);
-    os << '(';
-    interleave(np->getElements(),
-               [&](const NominalTypePattern::Element &elt) {
-                 os << elt.getProperty()->getName() << ":";
-               },
-               [&]{ os << ", "; });
-    os << ')';
-    return;
-  }
   case PatternKind::EnumElement: {
     auto eep = cast<EnumElementPattern>(p);
     os << '.' << eep->getName();
@@ -117,7 +105,6 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   
   // Tuple and nominal-type patterns are not themselves directly refutable.
   case PatternKind::Tuple:
-  case PatternKind::NominalType:
     return false;
 
   // isa and enum-element patterns are refutable, at least in theory.
@@ -165,13 +152,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
       n = getNumSpecializationsRecursive(elt.getPattern(), n);
     return n;
   }
-  case PatternKind::NominalType: {
-    auto nom = cast<NominalTypePattern>(p);
-    for (auto &elt : nom->getElements())
-      n = getNumSpecializationsRecursive(elt.getSubPattern(), n);
-    return n;
-  }
-
+  
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
@@ -230,7 +211,6 @@ static bool isWildcardPattern(const Pattern *p) {
   // Non-wildcards.
   case PatternKind::Tuple:
   case PatternKind::Is:
-  case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
@@ -281,7 +261,6 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   case PatternKind::Tuple:
   case PatternKind::Named:
   case PatternKind::Any:
-  case PatternKind::NominalType:
   case PatternKind::Bool:
   case PatternKind::Expr: {
     // These kinds are only similar to the same kind.
@@ -459,10 +438,6 @@ private:
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
                          const FailureHandler &failure);
-  void emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
-                               ConsumableManagedValue src,
-                               const SpecializationHandler &handleSpec,
-                               const FailureHandler &failure);
   void emitIsDispatch(ArrayRef<RowToSpecialize> rows,
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
@@ -1031,16 +1006,20 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
   bool hasGuard = guardExpr != nullptr;
   assert(!hasGuard || !clauses[row].isIrrefutable());
 
-  auto stmt = clauses[row].getClientData<CaseStmt>();
-  ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
-  bool hasMultipleItems = labelItems.size() > 1;
-  
+  auto stmt = clauses[row].getClientData<Stmt>();
+  assert(isa<CaseStmt>(stmt) || isa<CatchStmt>(stmt));
+
+  bool hasMultipleItems = false;
+  if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
+    hasMultipleItems = caseStmt->getCaseLabelItems().size() > 1;
+  }
+
   // Bind the rest of the patterns.
   bindIrrefutablePatterns(clauses[row], args, !hasGuard, hasMultipleItems);
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), stmt, [&]{
+    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt), [&]{
       this->emitGuardBranch(guardExpr, guardExpr, failure);
     });
   }
@@ -1072,7 +1051,6 @@ void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
   switch (pattern->getKind()) {
   // Non-wildcard patterns.
   case PatternKind::Tuple:
-  case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
@@ -1135,7 +1113,6 @@ void PatternMatchEmission::bindIrrefutablePattern(Pattern *pattern,
   switch (pattern->getKind()) {
   // Non-wildcard patterns.
   case PatternKind::Tuple:
-  case PatternKind::NominalType:
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
   case PatternKind::Bool:
@@ -1341,8 +1318,6 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     return emitTupleDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::Is:
     return emitIsDispatch(rowsToSpecialize, arg, handler, failure);
-  case PatternKind::NominalType:
-    return emitNominalTypeDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::EnumElement:
   case PatternKind::OptionalSome:
     return emitEnumElementDispatch(rowsToSpecialize, arg, handler, failure);
@@ -1427,86 +1402,6 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     auto pattern = cast<TuplePattern>(rows[i].Pattern);
     for (auto &elt : pattern->getElements()) {
       specializedRows[i].Patterns.push_back(elt.getPattern());
-    }
-  }
-
-  // Maybe revert to the original cleanups during failure branches.
-  const FailureHandler *innerFailure = &outerFailure;
-  FailureHandler specializedFailure = [&](SILLocation loc) {
-    ArgUnforwarder unforwarder(SGF);
-    unforwarder.unforwardBorrowedValues(src, destructured);
-    outerFailure(loc);
-  };
-  if (ArgUnforwarder::requiresUnforwarding(src))
-    innerFailure = &specializedFailure;
-
-  // Recurse.
-  handleCase(destructured, specializedRows, *innerFailure);
-}
-
-/// Perform specialized dispatch for a sequence of NominalTypePatterns.
-void PatternMatchEmission::
-emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
-                        ConsumableManagedValue src,
-                        const SpecializationHandler &handleCase,
-                        const FailureHandler &outerFailure) {
-  // First, collect all the properties we'll need to match on.
-  // Also remember the first pattern which matched that property.
-  llvm::SmallVector<std::pair<VarDecl*, Pattern*>, 4> properties;
-  llvm::DenseMap<VarDecl*, unsigned> propertyIndexes;
-  for (auto &row : rows) {
-    for (auto &elt : cast<NominalTypePattern>(row.Pattern)->getElements()) {
-      VarDecl *property = elt.getProperty();
-
-      // Try to insert the property in the map at the next available
-      // index.  If the entry already exists, it won't change.
-      auto result = propertyIndexes.insert({property, properties.size()});
-      if (result.second) {
-        properties.push_back({property,
-                              const_cast<Pattern*>(elt.getSubPattern())});
-      }
-    }
-  }
-
-  // Get values for all the properties.
-  SmallVector<ConsumableManagedValue, 4> destructured;
-  for (auto &entry : properties) {
-    VarDecl *property = entry.first;
-    Pattern *firstMatcher = entry.second;
-
-    // FIXME: does this properly handle getters at all?
-    ManagedValue aggMV = src.asUnmanagedValue();
-
-    SILLocation loc = firstMatcher;
-
-    // TODO: project stored properties directly
-    // TODO: need to get baseFormalType from AST
-    CanType baseFormalType = aggMV.getType().getSwiftRValueType();
-    auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, baseFormalType, false,
-                                             property,
-                                             // FIXME: No generic substitutions.
-                                             {}, AccessSemantics::Ordinary,
-                                             firstMatcher->getType(),
-                                             // TODO: Avoid copies on
-                                             // address-only types.
-                                             SGFContext())
-      .getAsSingleValue(SGF, loc);
-    destructured.push_back(ConsumableManagedValue::forOwned(val));
-  }
-
-  // Construct the specialized rows.
-  SmallVector<SpecializedRow, 4> specializedRows;
-  specializedRows.resize(rows.size());
-  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
-    specializedRows[i].RowIndex = rows[i].RowIndex;
-    specializedRows[i].Patterns.resize(destructured.size(), nullptr);
-
-    auto pattern = cast<NominalTypePattern>(rows[i].Pattern);
-    for (auto &elt : pattern->getElements()) {
-      auto propertyIndex = propertyIndexes.find(elt.getProperty())->second;
-      assert(!specializedRows[i].Patterns[propertyIndex]);
-      specializedRows[i].Patterns[propertyIndex] =
-        const_cast<Pattern*>(elt.getSubPattern());
     }
   }
 
@@ -2182,6 +2077,12 @@ public:
 
 void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt *stmt,
                                                       const llvm::function_ref<void(void)> &f) {
+  // Early exit for CatchStmt
+  if (!stmt) {
+    f();
+    return;
+  }
+
   ArrayRef<CaseLabelItem> labelItems = stmt->getCaseLabelItems();
   auto expectedPattern = labelItems[0].getPattern();
   
@@ -2265,8 +2166,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
             
             for (auto cmv : argArray) {
               if (cmv.getValue() == value) {
-                if (cmv.hasCleanup())
-                  B.createRetainValue(CurrentSILLoc, value, Atomicity::Atomic);
+                B.createRetainValue(CurrentSILLoc, value, Atomicity::Atomic);
                 break;
               }
             }

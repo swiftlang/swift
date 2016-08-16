@@ -16,17 +16,17 @@ import Foundation
 #if os(iOS)
 @available(iOS 10.0, *)
 extension INSetDefrosterSettingsInCarIntent {
-    @nonobjc
-    public convenience init(enable: Bool?, defroster: INCarDefroster) {
-        self.init(__enable: enable.map { NSNumber(value: $0) },
-                  defroster: defroster)
-    }
+  @nonobjc
+  public convenience init(
+    enable: Bool? = nil, defroster: INCarDefroster = .unknown
+  ) {
+    self.init(__enable: enable.map { NSNumber(value: $0) },
+      defroster: defroster)
+  }
 
-    @nonobjc  
-    public final var enable: Bool? {
-        get {
-            return __enable?.boolValue
-        }
-    }
+  @nonobjc
+  public final var enable: Bool? {
+    return __enable?.boolValue
+  }
 }
 #endif

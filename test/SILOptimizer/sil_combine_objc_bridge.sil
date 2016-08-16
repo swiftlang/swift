@@ -1,6 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // REQUIRES: objc_interop
+
+// TODO: Update optimizer for id-as-Any changes.
 
 sil_stage canonical
 
@@ -20,9 +22,6 @@ class AnNSArray {
 struct AnArray<T> : _ObjectiveCBridgeable {
   @sil_stored var Buffer : Builtin.NativeObject
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
   func _bridgeToObjectiveC() -> AnNSArray {
     return AnNSArray()
   }
@@ -129,30 +128,30 @@ bb0(%0 : $AnArray<AnyObject>):
   return %4 : $AnArray<AnyObject>
 }
 
-struct Unbridged {
+struct PlainStruct {
 }
 
-// CHECK-LABEL: sil @failing_bridge_from_to_owned
-// CHECK: apply
-// CHECK: apply
+// CHECK-LABEL: sil @plain_struct_bridge_from_to_owned
+// CHECK-NOT: apply
+// CHECK-NOT: apply
 // CHECK: return
-sil @failing_bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+sil @plain_struct_bridge_from_to_owned : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
-  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
-  %2 = apply %1<Unbridged>(%0) : $@convention(thin) <Unbridged> (@owned AnNSArray) -> @owned AnArray<Unbridged>
-  retain_value %2 : $AnArray<Unbridged>
-  release_value %2 : $AnArray<Unbridged>
-  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
-  %4 = apply %3<Unbridged>(%2) : $@convention(method) <Unbridged> (@owned AnArray<Unbridged>) -> @owned AnNSArray
+  %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <PlainStruct> (@owned AnNSArray) -> @owned AnArray<PlainStruct>
+  %2 = apply %1<PlainStruct>(%0) : $@convention(thin) <PlainStruct> (@owned AnNSArray) -> @owned AnArray<PlainStruct>
+  retain_value %2 : $AnArray<PlainStruct>
+  release_value %2 : $AnArray<PlainStruct>
+  %3 = function_ref @bridgeToObjectiveC : $@convention(method) <PlainStruct> (@owned AnArray<PlainStruct>) -> @owned AnNSArray
+  %4 = apply %3<PlainStruct>(%2) : $@convention(method) <PlainStruct> (@owned AnArray<PlainStruct>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil @failing_bridge_from_to_owned_generic
-// CHECK: apply
-// CHECK: apply
+// CHECK-LABEL: sil @plain_struct_bridge_from_to_owned_generic
+// CHECK-NOT: apply
+// CHECK-NOT: apply
 // CHECK: return
 
-sil @failing_bridge_from_to_owned_generic : $@convention(thin) <T>(@owned AnNSArray) -> @owned AnNSArray {
+sil @plain_struct_bridge_from_to_owned_generic : $@convention(thin) <T>(@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
   %2 = apply %1<T>(%0) : $@convention(thin) <T2> (@owned AnNSArray) -> @owned AnArray<T2>
@@ -163,25 +162,25 @@ bb0(%0 : $AnNSArray):
   return %4 : $AnNSArray
 }
 
-// CHECK-LABEL: sil @failing_bridge_from_to_owned_recursive_type
-// CHECK: apply
-// CHECK: apply
+// CHECK-LABEL: sil @plain_struct_from_to_owned_recursive_type
+// CHECK-NOT: apply
+// CHECK-NOT: apply
 // CHECK: return
 
-sil @failing_bridge_from_to_owned_recursive_type : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
+sil @plain_struct_from_to_owned_recursive_type : $@convention(thin) (@owned AnNSArray) -> @owned AnNSArray {
 bb0(%0 : $AnNSArray):
   %1 = function_ref @bridgeFromObjectiveC : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
-  %2 = apply %1<AnArray<Unbridged>>(%0) : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
-  retain_value %2 : $AnArray<AnArray<Unbridged>>
-  release_value %2 : $AnArray<AnArray<Unbridged>>
+  %2 = apply %1<AnArray<PlainStruct>>(%0) : $@convention(thin) <T> (@owned AnNSArray) -> @owned AnArray<T>
+  retain_value %2 : $AnArray<AnArray<PlainStruct>>
+  release_value %2 : $AnArray<AnArray<PlainStruct>>
   %3 = function_ref @bridgeToObjectiveC : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
-  %4 = apply %3<AnArray<Unbridged>>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
+  %4 = apply %3<AnArray<PlainStruct>>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
 
 // CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
 // CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveC
-// CHECK: retain_value
+// CHECK-NOT: retain
 // CHECK: apply
 // CHECK: release_value
 // CHECK: upcast %{{.*}} : $NSArray to $NSObject

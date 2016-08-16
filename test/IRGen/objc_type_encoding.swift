@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s -check-prefix=CHECK-%target-os
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s -check-prefix=CHECK-%target-os
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -81,7 +81,7 @@ func testId(_ s: AnyObject) -> AnyObject { return self }
 // CHECK-ios: private unnamed_addr constant [11 x i8] c"@24@0:8@16\00"
 // CHECK-tvos: private unnamed_addr constant [11 x i8] c"@24@0:8@16\00"
 
-@objc func comp1(_ a: protocol<P1, P2>, b: protocol<P1, P2, P3>) -> protocol<P1,P2> { return a }
+@objc func comp1(_ a: P1 & P2, b: P1 & P2 & P3) -> P1 & P2 { return a }
 // CHECK-macosx: private unnamed_addr constant [14 x i8] c"@32@0:8@16@24\00"
 // CHECK-ios: private unnamed_addr constant [14 x i8] c"@32@0:8@16@24\00"
 // CHECK-tvos: private unnamed_addr constant [14 x i8] c"@32@0:8@16@24\00"
@@ -157,7 +157,7 @@ func testArchetype(_ work: P3) {
 }
 
 @objc protocol MyProtocol {
-	func myMethod2(_ arg : protocol<NSRuncing, NSFunging>)
+	func myMethod2(_ arg : NSRuncing & NSFunging)
         func readWithAuthorization(_ authData : Gizmo, reply : (NSView, NSSpoon) -> Void)
         func doSomething(_ context: MyCustomObject)
 }

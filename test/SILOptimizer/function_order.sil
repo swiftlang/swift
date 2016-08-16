@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -function-order-printer -o /dev/null | FileCheck --check-prefix=CHECK %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -function-order-printer -o /dev/null | %FileCheck --check-prefix=CHECK %s
 
 sil_stage canonical
 
@@ -340,7 +340,7 @@ private protocol private_proto_4 {
 }
 
 public class private_proto_public_class_private_method : private_proto_4 {
-  private func theMethod()
+  fileprivate func theMethod()
 }
 
 private func call_through_private_proto_4<T : private_proto_4>(x: T)

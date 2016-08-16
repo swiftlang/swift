@@ -63,7 +63,7 @@ class CodeCompletionStringChunk {
 
 public:
   enum class ChunkKind {
-    /// "internal", "private" or "public".
+    /// "public", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
     /// such as @"availability".
@@ -409,6 +409,7 @@ enum class CodeCompletionDeclKind {
   InstanceVar,
   LocalVar,
   GlobalVar,
+  PrecedenceGroup,
 };
 
 enum class CodeCompletionLiteralKind {

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift %s -aa=basic-aa -aa-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -module-name Swift %s -aa=basic-aa -aa-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -24,7 +24,7 @@ enum Optional<T> {
 // CHECK-NEXT: MayAlias
 sil @index_addr_inst_with_unknown_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
-  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %214 = index_addr %212 : $*Int, %1 : $Builtin.Word
   %2114 = index_addr %212 : $*Int, %1 : $Builtin.Word
   br bb1
@@ -42,7 +42,7 @@ bb1:
 sil @index_addr_inst_with_same_constant_index : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   %6 = integer_literal $Builtin.Word, 2
-  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
   %2114 = index_addr %212 : $*Int, %6 : $Builtin.Word
   br bb1
@@ -61,7 +61,7 @@ sil @index_addr_inst_with_different_constant_index : $@convention(thin) (Builtin
 bb0(%0 : $Builtin.RawPointer):
   %6 = integer_literal $Builtin.Word, 2
   %7 = integer_literal $Builtin.Word, 3 
-  %212 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %212 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
   %214 = index_addr %212 : $*Int, %6 : $Builtin.Word
   %2114 = index_addr %212 : $*Int, %7 : $Builtin.Word
   br bb1
@@ -563,7 +563,7 @@ bb0(%0 : $X):
 
 // CHECK-LABEL: @alloc_stack_and_addr_cast
 // CHECK: PAIR #1.
-// CHECK-NEXT:   %0 = alloc_stack $C{{.*}}                             // users: %1, %2
+// CHECK-NEXT:   %0 = alloc_stack $C{{.*}}                             // users: %2, %1
 // CHECK-NEXT:   %1 = unchecked_addr_cast %0 : $*C to $*Optional<C>
 // CHECK-NEXT: MayAlias
 sil @alloc_stack_and_addr_cast : $@convention(thin) () -> () {

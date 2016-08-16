@@ -131,7 +131,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   program = KernelSource.withCString {
     (p: UnsafePointer<CChar>) -> cl_program in
     var s: UnsafePointer? = p
-    return withUnsafeMutablePointer(&s) {
+    return withUnsafeMutablePointer(to: &s) {
       return clCreateProgramWithSource(context, 1, $0, nil, &err)
     }
   }
@@ -168,15 +168,15 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Create the input and output arrays in device memory for our calculation
   //
-  guard var input = clCreateBuffer(context,  cl_mem_flags(CL_MEM_READ_ONLY),  sizeof(Float.self) * count, nil, nil),
-        var output = clCreateBuffer(context, cl_mem_flags(CL_MEM_WRITE_ONLY), sizeof(Float.self) * count, nil, nil) else {
+  guard var input = clCreateBuffer(context,  cl_mem_flags(CL_MEM_READ_ONLY),  MemoryLayout<Float>.size * count, nil, nil),
+        var output = clCreateBuffer(context, cl_mem_flags(CL_MEM_WRITE_ONLY), MemoryLayout<Float>.size * count, nil, nil) else {
     print("Error: Failed to allocate device memory!")
     exit(1)
   }
   
   // Write our data set into the input array in device memory 
   //
-  err = clEnqueueWriteBuffer(commands, input, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, data, 0, nil, nil)
+  err = clEnqueueWriteBuffer(commands, input, cl_bool(CL_TRUE), 0, MemoryLayout<Float>.size * count, data, 0, nil, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to write to source array!")
@@ -186,13 +186,17 @@ tests.test("clSetKernelArgsListAPPLE") {
   // Set the arguments to our compute kernel
   //
   err = 0
-  err = withUnsafePointers(&input, &output, &count) {
-    inputPtr, outputPtr, countPtr in
-    clSetKernelArgsListAPPLE(
-      kernel!, 3,
-      0, sizeof(cl_mem.self), inputPtr,
-      1, sizeof(cl_mem.self), outputPtr,
-      2, sizeofValue(count), countPtr)
+  err = withUnsafePointer(to: &input) {
+    inputPtr in withUnsafePointer(to: &output) {
+      outputPtr in withUnsafePointer(to: &count) {
+        countPtr in
+        clSetKernelArgsListAPPLE(
+          kernel!, 3,
+          0, MemoryLayout<cl_mem>.size, inputPtr,
+          1, MemoryLayout<cl_mem>.size, outputPtr,
+          2, MemoryLayout.size(ofValue: count), countPtr)
+      }
+    }
   }
 
   
@@ -204,7 +208,7 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Get the maximum work group size for executing the kernel on the device
   //
-  err = clGetKernelWorkGroupInfo(kernel, device_id, cl_kernel_work_group_info(CL_KERNEL_WORK_GROUP_SIZE), sizeofValue(local), &local, nil)
+  err = clGetKernelWorkGroupInfo(kernel, device_id, cl_kernel_work_group_info(CL_KERNEL_WORK_GROUP_SIZE), MemoryLayout.size(ofValue: local), &local, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to retrieve kernel work group info! \(err)")
@@ -228,7 +232,7 @@ tests.test("clSetKernelArgsListAPPLE") {
 
   // Read back the results from the device to verify the output
   //
-  err = clEnqueueReadBuffer(commands, output, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, &results, cl_uint(0), nil, nil)
+  err = clEnqueueReadBuffer(commands, output, cl_bool(CL_TRUE), 0, MemoryLayout<Float>.size * count, &results, cl_uint(0), nil, nil)
   if (err != CL_SUCCESS)
   {
     print("Error: Failed to read output array! \(err)")

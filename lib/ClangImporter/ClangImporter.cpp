@@ -48,6 +48,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
@@ -316,22 +317,25 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-    // Enable modules.
-    "-fmodules",
+  invocationArgStrs.insert(
+      invocationArgStrs.end(),
+      {
 
-    // Enable implicit module maps (this option is implied by "-fmodules").
-    "-fimplicit-module-maps",
+          // Enable modules
+          "-fmodules",
+          "-fmodules-validate-system-headers",
+          "-Werror=non-modular-include-in-framework-module",
+          // Enable implicit module maps (implied by "-fmodules")
+          "-fimplicit-module-maps",
+          "-Xclang", "-fmodule-feature", "-Xclang", "swift",
 
-    // Don't emit LLVM IR.
-    "-fsyntax-only",
+          // Don't emit LLVM IR.
+          "-fsyntax-only",
 
-    SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
-    "-fretain-comments-from-system-headers",
-    "-fmodules-validate-system-headers",
-    "-Werror=non-modular-include-in-framework-module",
-    "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-  });
+          "-fretain-comments-from-system-headers",
+
+          SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
@@ -353,11 +357,20 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
 
+      // Request new APIs from AppKit.
+      "-DSWIFT_SDK_OVERLAY_APPKIT_EPOCH=2",
+
       // Request new APIs from Foundation.
-      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=7",
+      "-DSWIFT_SDK_OVERLAY_FOUNDATION_EPOCH=8",
 
       // Request new APIs from SceneKit.
-      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=2",
+      "-DSWIFT_SDK_OVERLAY2_SCENEKIT_EPOCH=3",
+
+      // Request new APIs from GameplayKit.
+      "-DSWIFT_SDK_OVERLAY_GAMEPLAYKIT_EPOCH=1",
+
+      // Request new APIs from SpriteKit.
+      "-DSWIFT_SDK_OVERLAY_SPRITEKIT_EPOCH=1",
 
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=2",
@@ -370,6 +383,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       // Request new APIs from CoreGraphics.
       "-DSWIFT_SDK_OVERLAY_COREGRAPHICS_EPOCH=0",
+
+      // Request new APIs from UIKit.
+      "-DSWIFT_SDK_OVERLAY_UIKIT_EPOCH=2",
     });
 
     // Get the version of this compiler and pass it to
@@ -840,22 +856,28 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
   for (const auto &macro : pp.macros(false)) {
     // Find the local history of this macro directive.
     clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
-    if (!MD) continue;
 
     // Walk the history.
     for (; MD; MD = MD->getPrevious()) {
-      // Check whether we have a macro defined in this module.
-      auto info = pp.getMacroInfo(macro.first);
-      if (!info || info->isFromASTFile() || info->isBuiltinMacro()) continue;
+      // Don't look at any definitions that are followed by undefs.
+      // FIXME: This isn't quite correct across explicit submodules -- one
+      // submodule might define a macro, while another defines and then
+      // undefines the same macro. If they are processed in that order, the
+      // history will have the undef at the end, and we'll miss the first
+      // definition.
+      if (isa<clang::UndefMacroDirective>(MD))
+        break;
 
       // Only interested in macro definitions.
       auto *defMD = dyn_cast<clang::DefMacroDirective>(MD);
       if (!defMD) continue;
 
+      // Is this definition from this module?
+      auto info = defMD->getInfo();
+      if (!info || info->isFromASTFile()) continue;
+
       // If we hit a builtin macro, we're done.
-      if (auto info = defMD->getInfo()) {
-        if (info->isBuiltinMacro()) break;
-      }
+      if (info->isBuiltinMacro()) break;
 
       // If we hit a macro with invalid or predefined location, we're done.
       auto loc = defMD->getLocation();
@@ -866,7 +888,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
       // Add this entry.
       auto name = importMacroName(macro.first, info, clangCtx);
       if (name.empty()) continue;
-      table.addEntry(name, info, clangCtx.getTranslationUnitDecl());
+      table.addEntry(name, info, clangCtx.getTranslationUnitDecl(), &pp);
     }
   }
 }
@@ -1289,12 +1311,12 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   else if (ctx.LangOpts.Target.isMacOSX()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macosx"; };
+      [](StringRef Platform) { return Platform == "macos"; };
     } else {
       PlatformAvailabilityFilter =
       [](StringRef Platform) {
-        return Platform == "macosx" ||
-               Platform == "macosx_app_extension"; };
+        return Platform == "macos" ||
+               Platform == "macos_app_extension"; };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     DeprecatedAsUnavailableFilter =
@@ -1304,13 +1326,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     };
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
-  }
-
-  // Prepopulate the set of module prefixes.
-  // FIXME: Hard-coded list should move into the module map language.
-  if (ctx.LangOpts.StripNSPrefix) {
-    ModulePrefixes["Foundation"] = "NS";
-    ModulePrefixes["ObjectiveC"] = "NS";
   }
 }
 
@@ -1813,8 +1828,7 @@ static unsigned stripModulePrefixLength(
   // Check whether this is a known Foundation entity that conflicts with the
   // standard library.
   if (auto known = getKnownFoundationEntity(baseName))
-    if (nameConflictsWithStandardLibrary(*known))
-      return 0;
+    return 0;
 
   // If the character following the prefix is a '_', eat that, too.
   unsigned prefixLen = prefixPos->second.size();
@@ -2712,12 +2726,24 @@ auto ClangImporter::Implementation::importFullName(
   bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    StringRef removePrefix =
-      getEnumConstantNamePrefix(enumDecl, &clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+
+    StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
       baseName = baseName.substr(removePrefix.size());
       strippedPrefix = true;
     }
+  }
+
+  // If the error is an error enum, it will be mapped to the 'Code'
+  // enum nested within an NSError-containing struct. Strip the word
+  // "Code" off the end of the name, if it's there, because it's
+  // redundant.
+  if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
+    auto enumInfo = getEnumInfo(enumDecl, &clangSema.getPreprocessor());
+    if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
+        camel_case::getLastWord(baseName) == "Code")
+      baseName = baseName.substr(0, baseName.size() - 4);
   }
 
   auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
@@ -3259,12 +3285,11 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
 
     if (objcClass) {
       if (auto objcSuperclass = objcClass->getSuperClass()) {
-        if (auto getterMethod
-              = objcSuperclass->lookupInstanceMethod(
-                  objcProperty->getGetterName())) {
-          if (!shouldSuppressDeclImport(getterMethod))
-            return true;
-        }
+        auto getterMethod =
+            objcSuperclass->lookupMethod(objcProperty->getGetterName(),
+                                         objcProperty->isInstanceProperty());
+        if (getterMethod && !shouldSuppressDeclImport(getterMethod))
+          return true;
       }
     }
 
@@ -4114,11 +4139,12 @@ void ClangModuleUnit::collectLinkLibraries(
 }
 
 StringRef ClangModuleUnit::getFilename() const {
-  if (!clangModule) {
+  if (!clangModule)
     return "<imports>";
-  }
-  return clangModule->getASTFile()
-    ? clangModule->getASTFile()->getName() : StringRef();
+  if (const clang::FileEntry *F = clangModule->getASTFile())
+    if (F->getName())
+      return F->getName();
+  return StringRef();
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
@@ -4420,7 +4446,6 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
                             Impl.InferImportAsMember,
-                            Impl.SwiftContext.LangOpts.StripNSPrefix,
                             Impl.HonorSwiftNewtypeAttr);
 }
 

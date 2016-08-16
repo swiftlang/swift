@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: @_specialize(Int, Float)
 // CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)
@@ -48,7 +48,7 @@ public class ASubscriptable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
 
   init(capacity: Int) {
-    storage = UnsafeMutablePointer<Element>(allocatingCapacity: capacity)
+    storage = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
   }
 
   public subscript(i: Int) -> Element {
@@ -76,7 +76,7 @@ public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
 
   init(capacity: Int) {
-    storage = UnsafeMutablePointer<Element>(allocatingCapacity: capacity)
+    storage = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
   }
 
   public subscript(i: Int) -> Element {

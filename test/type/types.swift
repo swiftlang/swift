@@ -3,8 +3,9 @@
 var a : Int
 
 func test() {
-  var y : a   // expected-error {{use of undeclared type 'a'}} expected-note {{here}}
-  var z : y   // expected-error {{'y' is not a type}}
+  var y : a   // expected-error {{use of undeclared type 'a'}}
+  var z : y   // expected-error {{use of undeclared type 'y'}}
+  var w : Swift.print   // expected-error {{no type named 'print' in module 'Swift'}}
 }
 
 var b : (Int) -> Int = { $0 }
@@ -156,7 +157,18 @@ class r21949448 {
 }
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
-let _ : Int -> Float // expected-warning {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
+let _ : inout Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{18-18=)}}
+func testNoParenFunction(x: Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{32-32=)}}
+func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{38-38=)}}
 
-
-
+func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{15-34=UnsafeRawPointer}}
+func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{15-39=UnsafeMutableRawPointer}}
+class C {
+  func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{17-36=UnsafeRawPointer}}
+  func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{17-41=UnsafeMutableRawPointer}}
+  func foo3() {
+    let _ : UnsafePointer<Void> // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{13-32=UnsafeRawPointer}}
+    let _ : UnsafeMutablePointer<Void> // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{13-39=UnsafeMutableRawPointer}}
+  }
+}

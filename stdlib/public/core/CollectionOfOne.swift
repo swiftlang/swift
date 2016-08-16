@@ -39,7 +39,7 @@ public struct IteratorOverOne<Element> : IteratorProtocol, Sequence {
 public struct CollectionOfOne<Element>
   : MutableCollection, RandomAccessCollection {
 
-  /// Construct an instance containing just `element`.
+  /// Creates an instance containing just `element`.
   public init(_ element: Element) {
     self._element = element
   }
@@ -81,7 +81,7 @@ public struct CollectionOfOne<Element>
     return IteratorOverOne(_elements: _element)
   }
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position == 0`.
   public subscript(position: Int) -> Element {
@@ -136,7 +136,7 @@ extension CollectionOfOne : CustomReflectable {
 public struct GeneratorOfOne<Element> {}
 
 extension IteratorOverOne {
-  @available(*, unavailable, renamed: "makeIterator")
+  @available(*, unavailable, renamed: "makeIterator()")
   public func generate() -> IteratorOverOne<Element> {
     Builtin.unreachable()
   }

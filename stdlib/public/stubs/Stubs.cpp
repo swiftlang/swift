@@ -261,14 +261,14 @@ extern "C" uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
+ssize_t swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_MSC_VER)
   if (LinePtr == nullptr)
     return -1;
 
   ssize_t Capacity = 0;
   ssize_t Pos = 0;
-  char *ReadBuf = nullptr;
+  unsigned char *ReadBuf = nullptr;
 
   _lock_file(stdin);
 
@@ -285,7 +285,8 @@ ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
     if (Capacity - Pos <= 1) {
       // Capacity changes to 128, 128*2, 128*4, 128*8, ...
       Capacity = Capacity ? Capacity * 2 : 128;
-      char *NextReadBuf = static_cast<char *>(realloc(ReadBuf, Capacity));
+      char *NextReadBuf =
+        static_cast<unsigned char *>(realloc(ReadBuf, Capacity));
       if (NextReadBuf == nullptr) {
         if (ReadBuf)
           free(ReadBuf);
@@ -308,7 +309,7 @@ ssize_t swift::swift_stdlib_readLine_stdin(char **LinePtr) {
   return Pos;
 #else
   size_t Capacity = 0;
-  return getline(LinePtr, &Capacity, stdin);
+  return getline((char **)LinePtr, &Capacity, stdin);
 #endif
 }
 
@@ -384,7 +385,11 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 
 #endif
 
-#if defined(__linux__) && defined(__arm__)
+// FIXME: ideally we would have a slow path here for Windows which would be
+// lowered to instructions as though MSVC had generated.  There does not seem to
+// be a MSVC provided multiply with overflow detection that I can see, but this
+// avoids an unnecessary dependency on compiler-rt for a single function.
+#if (defined(__linux__) && defined(__arm__)) || defined(_MSC_VER)
 // Similar to above, but with mulodi4.  Perhaps this is
 // something that shouldn't be done, and is a bandaid over
 // some other lower-level architecture issue that I'm

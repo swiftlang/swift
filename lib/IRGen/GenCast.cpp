@@ -163,9 +163,10 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
       break;
     }
 
-  // If the destination type is a foreign class or a non-specific
+  // If the destination type is a CF type or a non-specific
   // class-bounded archetype, use the most general cast entrypoint.
-  } else if (toType.is<ArchetypeType>() || destClass->isForeign()) {
+  } else if (toType.is<ArchetypeType>() ||
+             destClass->getForeignClassKind()==ClassDecl::ForeignKind::CFType) {
     metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
 
     switch (mode) {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime-%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime-%target-ptrsize
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -96,6 +96,8 @@ import Swift
 // CHECK-32: %O4enum32MultiPayloadAddressOnlySpareBits = type <{ [8 x i8], [1 x i8] }>
 
 // CHECK: [[DYNAMIC_SINGLETON:%O4enum16DynamicSingleton.*]] = type <{}>
+
+// CHECK: %O4enum40MultiPayloadLessThan32BitsWithEmptyCases = type <{ [1 x i8], [1 x i8] }>
 
 // -- Dynamic metadata template carries a value witness table pattern
 //    we fill in on instantiation.
@@ -2332,7 +2334,7 @@ entry(%e : $MultiPayloadClassGeneric<C>):
 }
 
 enum MultiPayloadAddressOnlyFixed {
-  case X(protocol<>)
+  case X(Any)
   case Y(Builtin.Int32)
 }
 
@@ -2628,3 +2630,51 @@ bb4:
 // CHECK-64:         %5 = or i128 %2, %4
 // --                             0x1__0000_0000_0000_0000
 // CHECK-64:         %6 = or i128 %5, 18446744073709551616
+
+// CHECK-LABEL: define linkonce_odr hidden i32 @_TwugO4enum40MultiPayloadLessThan32BitsWithEmptyCases(%swift.opaque* %value
+// CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value to %O4enum40MultiPayloadLessThan32BitsWithEmptyCases*
+// CHECK:  [[VAL01:%.*]] = bitcast %O4enum40MultiPayloadLessThan32BitsWithEmptyCases* [[VAL00]] to i8*
+// CHECK:  [[VAL02:%.*]] = load {{.*}} [[VAL01]]
+// CHECK:  [[VAL03:%.*]] = getelementptr inbounds {{.*}} [[VAL00]], i32 0, i32 1
+// CHECK:  [[VAL04:%.*]] = bitcast {{.*}} [[VAL03]] to i2*
+// CHECK:  [[VAL05:%.*]] = load {{.*}} [[VAL04]]
+// CHECK:  [[VAL06:%.*]] = zext i2 [[VAL05]] to i32
+// CHECK:  [[VAL07:%.*]] = sub i32 [[VAL06]], 2
+// CHECK:  [[VAL08:%.*]] = zext i8 [[VAL02]] to i32
+// CHECK:  [[VAL09:%.*]] = and i32 [[VAL08]], 255
+// CHECK:  [[VAL10:%.*]] = icmp sge i32 [[VAL07]], 0
+// CHECK:  [[VAL11:%.*]] = select i1 [[VAL10]], i32 [[VAL09]], i32 [[VAL07]]
+// CHECK:  ret i32 [[VAL11]]
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwuiO4enum40MultiPayloadLessThan32BitsWithEmptyCases(%swift.opaque* %value, i32 %tag
+// CHECK: entry:
+// CHECK:  [[VAL00:%.*]] = bitcast %swift.opaque* %value
+// CHECK:  [[VAL01:%.*]] = icmp sge i32 %tag, 0
+// CHECK:  br i1 [[VAL01]], label %[[TLABEL:.*]], label %[[FLABEL:.*]]
+
+// CHECK: <label>:[[TLABEL]]
+// CHECK:  [[VAL03:%.*]] = trunc i32 %tag to i8
+// CHECK:  [[VAL04:%.*]] = bitcast %O4enum40MultiPayloadLessThan32BitsWithEmptyCases* [[VAL00]] to i8*
+// CHECK:  store i8 [[VAL03]], i8* [[VAL04]]
+// CHECK:  [[VAL05:%.*]] = getelementptr inbounds {{.*}} [[VAL00]], i32 0, i32 1
+// CHECK:  [[VAL06:%.*]] = bitcast [1 x i8]* [[VAL05]] to i2*
+// CHECK:  store i2 -2, i2* [[VAL06]]
+// CHECK:  br label %[[RLABEL:.*]]
+
+// CHECK: <label>:[[FLABEL]]
+// CHECK:  [[VAL08:%.*]] = add i32 %tag, 2
+// CHECK:  [[VAL09:%.*]] = trunc i32 [[VAL08]] to i2
+// CHECK:  [[VAL10:%.*]] = getelementptr inbounds {{.*}} [[VAL00]], i32 0, i32 1
+// CHECK:  [[VAL11:%.*]] = bitcast [1 x i8]* [[VAL10]] to i2*
+// CHECK:  store i2 [[VAL09]], i2* [[VAL11]]
+// CHECK:  br label %[[RLABEL]]
+
+// CHECK: <label>:[[RLABEL]]
+// CHECK:  ret void
+
+enum MultiPayloadLessThan32BitsWithEmptyCases {
+  case A
+  case B
+  case C(Builtin.Int8)
+  case D(Builtin.Int8)
+}

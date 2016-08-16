@@ -7,11 +7,10 @@
 
 % import os.path
 % import gyb
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal, sliceTypeName, defaultIndicesForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
-import SwiftPrivate
 
 
 var CollectionTypeTests = TestSuite("Collection")
@@ -106,10 +105,10 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    _ transform: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
-    return try _data.filter(transform)
+    return try _data.filter(isIncluded)
   }
 
 %   end
@@ -120,27 +119,27 @@ struct MinimalCollectionWith${Implementation}Filter<Element>
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
-  includeElement: @noescape (OpaqueValue<Int>) -> Bool
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(includeElement)
+  var result = sequence.filter(isIncluded)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
 
 func callStaticCollectionFilter(
   _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
-  includeElement: @noescape (OpaqueValue<Int>) -> Bool
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(includeElement)
+  var result = sequence.filter(isIncluded)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
 
 func callGenericCollectionFilter<S : Collection>(
   _ sequence: S,
-  includeElement: @noescape (S.Iterator.Element) -> Bool
+  _ isIncluded: (S.Iterator.Element) -> Bool
 ) -> [S.Iterator.Element] {
-  var result = sequence.filter(includeElement)
+  var result = sequence.filter(isIncluded)
   expectType(Array<S.Iterator.Element>.self, &result)
   return result
 }
@@ -242,7 +241,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalCollectionWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -256,7 +255,7 @@ struct MinimalCollectionWith${Implementation}Map<Element>
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -265,7 +264,7 @@ func callStaticCollectionMap<T>(
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -274,7 +273,7 @@ func callStaticCollectionMap<T>(
 
 func callGenericCollectionMap<C : Collection, T>(
   _ collection: C,
-  transform: @noescape (C.Iterator.Element) -> T
+  transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -780,6 +779,16 @@ CollectionTypeTests.test("Collection/suffix(from:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// partition(by:)
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("partition(by:)/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.partition(by: { _ in true })
+  expectCustomizable(tester, tester.log.partitionBy)
+}
+
+//===----------------------------------------------------------------------===//
 // _withUnsafeMutableBufferPointerIfSupported()
 //===----------------------------------------------------------------------===//
 
@@ -788,5 +797,48 @@ CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") 
   _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
   expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
 }
+
+
+//===----------------------------------------------------------------------===//
+// Associated Type Inference
+//===----------------------------------------------------------------------===//
+
+// This section verifies that only the absolutely minimal protocol requirements
+// are required to declare each kind of collection. All remaining requirements
+// and associated types should be either inferred from the declared properties
+// and methods or inherited as defaults via protocol extension.
+
+struct FatalIndex : Comparable { }
+func <(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = 'Fatal' + Collection
+%   Slice = sliceTypeName(Traversal, False, False)
+%   Indices = defaultIndicesForTraversal(Traversal)
+
+struct ${Self}<T> : ${Collection} {
+  var startIndex: FatalIndex { fatalError() }
+  var endIndex: FatalIndex { fatalError() }
+  subscript(i: FatalIndex) -> T { fatalError() }
+  func index(after i: FatalIndex) -> FatalIndex { fatalError() }
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  func index(before i: FatalIndex) -> FatalIndex { fatalError() }
+%   end
+}
+
+CollectionTypeTests.test("AssociatedTypes/${Collection}") {
+  typealias C = ${Self}<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: ${Slice}<C>.self,
+    indexType: FatalIndex.self,
+    indexDistanceType: Int.self,
+    indicesType: ${Indices}<C>.self)
+}
+% end
+
 
 runAllTests()

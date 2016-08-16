@@ -62,6 +62,7 @@ struct FooStruct1 {
   init()
   init(x: Int32, y: Double)
 }
+typealias FooStruct1Pointer = UnsafeMutablePointer<FooStruct1>
 
 struct FooStruct2 {
   var x: Int32
@@ -94,12 +95,12 @@ func fooFunc3(_ a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int
   Very good
   fooFuncWithBlock function.
 */
-func fooFuncWithBlock(_ blk: ((Float) -> Int32)!)
+func fooFuncWithBlock(_ blk: (@escaping (Float) -> Int32)!)
 
-func fooFuncWithFunctionPointer(_ fptr: (@convention(c) (Float) -> Int32)!)
+func fooFuncWithFunctionPointer(_ fptr: (@escaping @convention(c) (Float) -> Int32)!)
 
-@noreturn func fooFuncNoreturn1()
-@noreturn func fooFuncNoreturn2()
+func fooFuncNoreturn1() -> Never
+func fooFuncNoreturn2() -> Never
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -217,12 +218,24 @@ class FooClassDerived : FooClassBase, FooProtocolDerived {
   class func fooProtoClassFunc()
 }
 
+typealias typedef_int_t = Int32
+
 /* FOO_MACRO_1 is the answer */
 var FOO_MACRO_1: Int32 { get }
 var FOO_MACRO_2: Int32 { get }
 var FOO_MACRO_3: Int32 { get } // Don't use FOO_MACRO_3 on Saturdays.
 var FOO_MACRO_4: UInt32 { get }
 var FOO_MACRO_5: UInt64 { get }
+var FOO_MACRO_6: typedef_int_t { get }
+var FOO_MACRO_7: typedef_int_t { get }
+var FOO_MACRO_8: Int8 { get }
+var FOO_MACRO_9: Int32 { get }
+var FOO_MACRO_10: Int16 { get }
+var FOO_MACRO_11: Int { get }
+var FOO_MACRO_OR: Int32 { get }
+var FOO_MACRO_AND: Int32 { get }
+var FOO_MACRO_BITWIDTH: UInt64 { get }
+var FOO_MACRO_SIGNED: Int32 { get }
 
 var FOO_MACRO_REDEF_1: Int32 { get }
 
@@ -285,6 +298,9 @@ class FooClassWithClassProperties : FooClassBase {
   init!()
   convenience init!(float f: Float)
 }
+
+@available(*, unavailable, message: "use 'nil' instead of this imported macro")
+var FOO_NIL: ()
 
 class FooUnavailableMembers : FooClassBase {
   convenience init!(int i: Int32)

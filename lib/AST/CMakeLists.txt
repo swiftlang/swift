@@ -1,4 +1,4 @@
-add_swift_library(swiftAST
+add_swift_library(swiftAST STATIC
   ArchetypeBuilder.cpp
   ASTContext.cpp
   ASTDumper.cpp
@@ -38,6 +38,7 @@ add_swift_library(swiftAST
   SourceEntityWalker.cpp
   Substitution.cpp
   Type.cpp
+  TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
@@ -70,7 +71,7 @@ add_swift_library(swiftAST
   COMPONENT_DEPENDS
     bitreader bitwriter irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
+    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )
 
 if(NOT SWIFT_BUILT_STANDALONE)

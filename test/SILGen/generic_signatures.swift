@@ -15,7 +15,7 @@ class C {}
 func a<T>(x: T) {}
 func b<T: P>(x: G<T>, y: T.Assoc) {}
 func c<T where T: P>(x: T, y: T.Assoc) {}
-func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
+func d<T: P, U: P & Q>(x: T, y: U) {}
 func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
 // FIXME: Same-type constraints expose a typechecker bug.
 // <rdar://problem/15730168>
@@ -34,7 +34,7 @@ struct Foo<V> {
   func a<T>(x: T) {}
   func b<T: P>(x: G<T>, y: T.Assoc) {}
   func c<T where T: P>(x: T, y: T.Assoc) {}
-  func d<T: P, U: protocol<P, Q>>(x: T, y: U) {}
+  func d<T: P, U: P & Q>(x: T, y: U) {}
   func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
   func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
   func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
@@ -77,7 +77,7 @@ func concreteJungle<T where T : Fooable, T.Foo == C>(t: T.Foo) -> C {
   return c
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(f: (T.Foo) -> C) -> T.Foo {
+func concreteJungle<T where T : Fooable, T.Foo == C>(f: @escaping (T.Foo) -> C) -> T.Foo {
   let ff: (C) -> T.Foo = f
   return ff(C())
 }

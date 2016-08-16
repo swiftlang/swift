@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -parse-stdlib -module-name Swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir -parse-stdlib -module-name Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public protocol AnyObject: class {}
 // CHECK-LABEL: @_TMps9AnyObject = {{(protected )?}}constant %swift.protocol {
@@ -8,8 +8,8 @@ public protocol AnyObject: class {}
 // CHECK:         i16 0,
 // CHECK:         i32 0 }
 
-public protocol ErrorProtocol {}
-// CHECK-LABEL: @_TMps13ErrorProtocol = {{(protected )?}}constant %swift.protocol {
+public protocol Error {}
+// CHECK-LABEL: @_TMps5Error = {{(protected )?}}constant %swift.protocol {
 // --                 0x0000_0087: special protocol 02, non-class, witness, swift
 // CHECK:         i32 135,
 // CHECK:         i16 0,

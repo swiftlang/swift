@@ -1558,7 +1558,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
     llvm_unreachable("bad declaration kind");
   }
 
-  assert(decl->getGenericParams());
+  assert(decl->isGenericContext());
 
   // Look to see if we've already emitted this type under a different
   // set of arguments.  We cache under the unbound type, which should
@@ -1567,7 +1567,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   // FIXME: this isn't really inherently good; we might want to use
   // different type implementations for different applications.
   assert(decl->getDeclaredType()->isCanonical());
-  assert(decl->getDeclaredType()->is<UnboundGenericType>());
+  assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
   auto &Cache = Types.IndependentCache;
   auto entry = Cache.find(key);
@@ -1660,13 +1660,15 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 
   SmallVector<ProtocolDecl *, 4> protocols;
   type->getAnyExistentialTypeProtocols(protocols);
-
-  typeName.append("protocol<");
-  for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
-    if (i) typeName.push_back(',');
-    LinkEntity::forNonFunction(protocols[i]).mangle(typeName);
+  
+  if (protocols.empty()) {
+    typeName.append("Any");
+  } else {
+    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+      if (i) typeName.push_back('&');
+      LinkEntity::forNonFunction(protocols[i]).mangle(typeName);
+    }
   }
-  typeName.push_back('>');
   return llvm::StructType::create(getLLVMContext(), typeName.str());
 }
 

@@ -103,16 +103,21 @@ public func < (
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
-% for kind in [ 'Value', 'Class' ]:
+% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
 %   Self = 'MinimalHashable%s' % kind
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public struct ${Self} : Equatable, Hashable {
+public ${decl_keyword} ${Self} : Equatable, Hashable {
   public static var timesEqualEqualWasCalled: Int = 0
   public static var timesHashValueWasCalled: Int = 0
+
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+  public static var hashValueImpl =
+    ResettableValue<(Int) -> Int>({ $0.hashValue })
 
   public var value: Int
   public var identity: Int
@@ -129,7 +134,7 @@ public struct ${Self} : Equatable, Hashable {
 
   public var hashValue: Int {
     ${Self}.timesHashValueWasCalled += 1
-    return value.hashValue
+    return ${Self}.hashValueImpl.value(value)
   }
 }
 
@@ -138,7 +143,52 @@ public func == (
   rhs: ${Self}
 ) -> Bool {
   ${Self}.timesEqualEqualWasCalled += 1
-  return lhs.value == rhs.value
+  return ${Self}.equalImpl.value(lhs.value, rhs.value)
+}
+
+% end
+
+% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
+%   Self = 'GenericMinimalHashable%s' % kind
+
+public var ${Self}_timesEqualEqualWasCalled: Int = 0
+public var ${Self}_timesHashValueWasCalled: Int = 0
+
+public var ${Self}_equalImpl = ResettableValue<(Any, Any) -> Bool>(
+  { _, _ in fatalError("${Self}_equalImpl is not set yet"); () })
+public var ${Self}_hashValueImpl = ResettableValue<(Any) -> Int>(
+  { _ in fatalError("${Self}_hashValueImpl is not set yet"); () })
+
+/// A type that conforms only to `Equatable` and `Hashable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
+  public var value: Wrapped
+  public var identity: Int
+
+  public init(_ value: Wrapped) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Wrapped, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+
+  public var hashValue: Int {
+    ${Self}_timesHashValueWasCalled += 1
+    return ${Self}_hashValueImpl.value(value)
+  }
+}
+
+public func == <Wrapped>(
+  lhs: ${Self}<Wrapped>,
+  rhs: ${Self}<Wrapped>
+) -> Bool {
+  ${Self}_timesEqualEqualWasCalled += 1
+  return ${Self}_equalImpl.value(lhs.value, rhs.value)
 }
 
 % end

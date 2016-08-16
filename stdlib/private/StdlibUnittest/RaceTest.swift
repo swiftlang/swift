@@ -40,14 +40,14 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(_ code: @noescape () -> Void) {
+func autoreleasepool(invoking code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()
@@ -596,7 +596,9 @@ internal struct ClosureBasedRaceTest : RaceTestWithPerTrialData {
   ) {}
 }
 
-public func runRaceTest(trials: Int, threads: Int? = nil, body: () -> ()) {
+public func runRaceTest(
+  trials: Int, threads: Int? = nil, invoking body: @escaping () -> ()
+) {
   ClosureBasedRaceTest.thread = body
   runRaceTest(ClosureBasedRaceTest.self, trials: trials, threads: threads)
 }

@@ -1,12 +1,21 @@
-// RUN: %target-swift-frontend -primary-file %s -O -g -S  | FileCheck %s --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
+// RUN: %target-swift-frontend -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
 
 import Builtin
 import Swift
 
 // Make sure we emit two traps.
 
-// CHECK-LABEL:       _test_cond_fail:
+// CHECK-LABEL:       test_cond_fail:
 // CHECK:             .cfi_startproc
+// CHECK-OPT-macosx:  ## InlineAsm Start
+// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-linux:   ##APP
+// CHECK-OPT-linux:   ##NO_APP
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-linux-NOT:  ##APP
+// CHECK-NOOPT-linux-NOT:  ##NO_APP
 // CHECK-x86_64:      ud2
 // CHECK-i386:        ud2
 // CHECK-arm64:       brk
@@ -16,6 +25,14 @@ import Swift
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       trap
 // CHECK-NOT:         .cfi_endproc
+// CHECK-OPT-macosx:  ## InlineAsm Start
+// CHECK-OPT-macosx:  ## InlineAsm End
+// CHECK-OPT-linux:   ##APP
+// CHECK-OPT-linux:   ##NO_APP
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm Start
+// CHECK-NOOPT-macosx-NOT: ## InlineAsm End
+// CHECK-NOOPT-linux-NOT:  ##APP
+// CHECK-NOOPT-linux-NOT:  ##NO_APP
 // CHECK-x86_64:      ud2
 // CHECK-i386:        ud2
 // CHECK-arm64:       brk

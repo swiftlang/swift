@@ -59,35 +59,35 @@ var simdTestSuite = TestSuite("simd")
 
 simdTestSuite.test("sizes") {
 //  C interop requires that vector be the right size.
-  expectEqual(8, sizeof(float2.self))
-  expectEqual(16, sizeof(float3.self))
-  expectEqual(16, sizeof(float4.self))
-  expectEqual(8, sizeof(int2.self))
-  expectEqual(16, sizeof(int3.self))
-  expectEqual(16, sizeof(int4.self))
-  expectEqual(16, sizeof(double2.self))
-  expectEqual(32, sizeof(double3.self))
-  expectEqual(32, sizeof(double4.self))
+  expectEqual(8, MemoryLayout<float2>.size)
+  expectEqual(16, MemoryLayout<float3>.size)
+  expectEqual(16, MemoryLayout<float4>.size)
+  expectEqual(8, MemoryLayout<int2>.size)
+  expectEqual(16, MemoryLayout<int3>.size)
+  expectEqual(16, MemoryLayout<int4>.size)
+  expectEqual(16, MemoryLayout<double2>.size)
+  expectEqual(32, MemoryLayout<double3>.size)
+  expectEqual(32, MemoryLayout<double4>.size)
 
-  expectEqual(16, sizeof(float2x2.self))
-  expectEqual(32, sizeof(float2x3.self))
-  expectEqual(32, sizeof(float2x4.self))
-  expectEqual(24, sizeof(float3x2.self))
-  expectEqual(48, sizeof(float3x3.self))
-  expectEqual(48, sizeof(float3x4.self))
-  expectEqual(32, sizeof(float4x2.self))
-  expectEqual(64, sizeof(float4x3.self))
-  expectEqual(64, sizeof(float4x4.self))
+  expectEqual(16, MemoryLayout<float2x2>.size)
+  expectEqual(32, MemoryLayout<float2x3>.size)
+  expectEqual(32, MemoryLayout<float2x4>.size)
+  expectEqual(24, MemoryLayout<float3x2>.size)
+  expectEqual(48, MemoryLayout<float3x3>.size)
+  expectEqual(48, MemoryLayout<float3x4>.size)
+  expectEqual(32, MemoryLayout<float4x2>.size)
+  expectEqual(64, MemoryLayout<float4x3>.size)
+  expectEqual(64, MemoryLayout<float4x4>.size)
 
-  expectEqual(32, sizeof(double2x2.self))
-  expectEqual(64, sizeof(double2x3.self))
-  expectEqual(64, sizeof(double2x4.self))
-  expectEqual(48, sizeof(double3x2.self))
-  expectEqual(96, sizeof(double3x3.self))
-  expectEqual(96, sizeof(double3x4.self))
-  expectEqual(64, sizeof(double4x2.self))
-  expectEqual(128, sizeof(double4x3.self))
-  expectEqual(128, sizeof(double4x4.self))
+  expectEqual(32, MemoryLayout<double2x2>.size)
+  expectEqual(64, MemoryLayout<double2x3>.size)
+  expectEqual(64, MemoryLayout<double2x4>.size)
+  expectEqual(48, MemoryLayout<double3x2>.size)
+  expectEqual(96, MemoryLayout<double3x3>.size)
+  expectEqual(96, MemoryLayout<double3x4>.size)
+  expectEqual(64, MemoryLayout<double4x2>.size)
+  expectEqual(128, MemoryLayout<double4x3>.size)
+  expectEqual(128, MemoryLayout<double4x4>.size)
 }
 
 simdTestSuite.test("vector init") {
@@ -99,24 +99,24 @@ simdTestSuite.test("vector init") {
 
   //  Check empty initializer.
   var ${vec} = ${vectype}()
-  expectEqual(${[0]*size}, ${vec}, sameValue: same)
+  expectEqualTest(${[0]*size}, ${vec}, sameValue: same)
 
   //  Check literal initializer.
   ${vec} = ${vectype}(2)
-  expectEqual(${[2]*size}, ${vec}, sameValue: same)
+  expectEqualTest(${[2]*size}, ${vec}, sameValue: same)
 
   //  Check scalar initializer.
-  expectEqual(${vectype}(${type}(2)), ${vec}, sameValue: same)
+  expectEqualTest(${vectype}(${type}(2)), ${vec}, sameValue: same)
 
   //  Check elementwise initializer.
   ${vec} = ${vectype}(${', '.join(map(lambda i: str(i), range(size)))})
-  expectEqual(${range(size)}, ${vec}, sameValue: same)
+  expectEqualTest(${range(size)}, ${vec}, sameValue: same)
 
   //  Check labeled elementwise initializer.
   ${vec} = ${vectype}(${', '.join(map(lambda i:
                       component[i][1:] + ':' + str(i),
                       range(size)))})
-  expectEqual(${range(size)}, ${vec}, sameValue: same)
+  expectEqualTest(${range(size)}, ${vec}, sameValue: same)
 
   //  Previous checks implicitly use the array initializer, so we're good
   //  with that one already.
@@ -141,7 +141,7 @@ simdTestSuite.test("vector elements") {
 
   //  Check getting and setting [i]
   for i in 0..<${size} { ${vec}[i] = ${vec}[i]/2 }
-  expectEqual(${vec}, ${range(size)}, sameValue: same)
+  expectEqualTest(${vec}, ${range(size)}, sameValue: same)
 
 %   end # for size in [2,3,4]
 % end # for type in scalar_types
@@ -245,7 +245,7 @@ simdTestSuite.test("matrix init") {
 
   //  Check empty initializer.
   var ${mat} = ${mattype}()
-  expectEqual(${mat}, ${mattype}(${[[0]*rows]*cols}), sameValue: same)
+  expectEqualTest(${mat}, ${mattype}(${[[0]*rows]*cols}), sameValue: same)
 
   //  Check scalar initializer.
   ${mat} = ${mattype}(2)
@@ -280,7 +280,7 @@ simdTestSuite.test("matrix init") {
   }
 
   //  Round-trip through C matrix type.
-  expectEqual(${mat}, ${mattype}(${mat}.cmatrix), sameValue: same)
+  expectEqualTest(${mat}, ${mattype}(${mat}.cmatrix), sameValue: same)
 
 %     end # for rows
 %   end # for cols
@@ -311,10 +311,10 @@ simdTestSuite.test("matrix elements") {
   for i in 0..<${cols} {
     ${mat}[i] = ${type}(i+1)*${basis}[i]
   }
-  expectEqual(
+  expectEqualTest(
     ${mat}, ${mattype}(diagonal:${range(1, diagsize + 1)}), sameValue: same)
   for i in 0..<${cols} {
-    expectEqual(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
+    expectEqualTest(${mat}[i], ${type}(i + 1)*${basis}[i], sameValue: same)
   }
 
   //  Check getting and setting elements (and transpose).

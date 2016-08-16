@@ -177,6 +177,11 @@ BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 
+/// LoadRaw has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// It's address does not adhere to strict aliasing.
+BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 
@@ -306,6 +311,9 @@ BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
 BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
                       Special)
 
+/// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
+BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -315,13 +323,13 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
   BUILTIN(Id, Name, Attrs)
 #endif
 
-/// willThrow: ErrorProtocol -> ()
+/// willThrow: Error -> ()
 BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
-/// unexpectedError: ErrorProtocol -> ()
+/// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 
-/// errorInMain: ErrorProtocol -> ()
+/// errorInMain: Error -> ()
 BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 
 /// IsOptionalType : T.Type -> Bool
@@ -423,10 +431,10 @@ BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 
-/// unreachable has type @noreturn () -> ()
+/// unreachable has type () -> Never
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
 
-/// conditionallyUnreachable has type @noreturn () -> ()
+/// conditionallyUnreachable has type () -> Never
 BUILTIN_MISC_OPERATION(CondUnreachable, "conditionallyUnreachable", "", Special)
 
 /// DestroyArray has type (T.Type, Builtin.RawPointer, Builtin.Word) -> ()

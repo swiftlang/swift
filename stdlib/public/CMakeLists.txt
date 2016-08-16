@@ -1,26 +1,43 @@
 # C++ code in the runtime and standard library should generally avoid
 # introducing static constructors or destructors.
-set(SWIFT_CORE_CXX_FLAGS)
+set(SWIFT_RUNTIME_CXX_FLAGS)
+set(SWIFT_RUNTIME_LINK_FLAGS)
+set(SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS)
+set(SWIFT_RUNTIME_SWIFT_LINK_FLAGS)
+
+if(SWIFT_RUNTIME_USE_SANITIZERS)
+  # TODO: Refactor this
+  list(FIND SWIFT_RUNTIME_USE_SANITIZERS "Thread" THREAD_INDEX)
+  if (NOT THREAD_INDEX EQUAL -1)
+    list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-fsanitize=thread")
+    list(APPEND SWIFT_RUNTIME_LINK_FLAGS "-fsanitize=thread")
+    list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-sanitize=thread")
+    list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-fsanitize=thread")
+  endif()
+endif()
+
+set(SWIFT_RUNTIME_CORE_CXX_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}")
+set(SWIFT_RUNTIME_CORE_LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
-  list(APPEND SWIFT_CORE_CXX_FLAGS "-mcmodel=large")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-mcmodel=large")
 endif()
 
 check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
 if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
-  list(APPEND SWIFT_CORE_CXX_FLAGS "-Wglobal-constructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wglobal-constructors")
 endif()
 
 check_cxx_compiler_flag("-Wexit-time-destructors" CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
 if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
-  list(APPEND SWIFT_CORE_CXX_FLAGS "-Wexit-time-destructors")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-Wexit-time-destructors")
 endif()
 
 # We don't want runtime C++ code to export symbols we didn't explicitly
 # choose to.
 check_cxx_compiler_flag("-fvisibility=hidden" CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
 if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
-  list(APPEND SWIFT_CORE_CXX_FLAGS "-fvisibility=hidden")
+  list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
 endif()
 
 if(SWIFT_BUILD_STDLIB)
@@ -31,6 +48,9 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+endif()
+
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(Reflection)
   add_subdirectory(SwiftRemoteMirror)
 endif()

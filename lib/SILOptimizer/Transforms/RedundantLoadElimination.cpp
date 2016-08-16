@@ -179,7 +179,7 @@ namespace {
 constexpr unsigned MaxLSLocationBBMultiplicationNone = 128*128;
 
 /// we could run optimistic RLE on functions with less than 64 basic blocks
-/// and 64 locations which is a sizeable function.
+/// and 64 locations which is a sizable function.
 constexpr unsigned MaxLSLocationBBMultiplicationPessimistic = 64*64;
 
 /// forward declaration.

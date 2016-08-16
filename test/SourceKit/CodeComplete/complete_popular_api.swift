@@ -17,18 +17,18 @@ struct Foo {
   var zmeh: Int
 }
 
-// XFAIL: broken_std_regex
+// REQUIRES: objc_interop
 // RUN: %sourcekitd-test -req=complete.open -pos=2:1 -req-opts=hidelowpriority=0 %s -- %s > %t.nopopular.top
 // RUN: %sourcekitd-test -req=complete.open -pos=3:5 %s -- %s > %t.nopopular.foo
-// RUN: FileCheck %s -check-prefix=NOPOP_TOP < %t.nopopular.top
-// RUN: FileCheck %s -check-prefix=NOPOP_FOO < %t.nopopular.foo
+// RUN: %FileCheck %s -check-prefix=NOPOP_TOP < %t.nopopular.top
+// RUN: %FileCheck %s -check-prefix=NOPOP_FOO < %t.nopopular.foo
 
 // RUN: %sourcekitd-test -req=complete.setpopularapi -req-opts=popular=%s.popular,unpopular=%s.unpopular \
 // RUN:               == -req=complete.open -req-opts=hidelowpriority=0 -pos=2:1 %s -- %s > %t.popular.top
 // RUN: %sourcekitd-test -req=complete.setpopularapi -req-opts=popular=%s.popular,unpopular=%s.unpopular \
 // RUN:               == -req=complete.open -pos=3:5 %s -- %s > %t.popular.foo
-// RUN: FileCheck %s -check-prefix=POP_TOP < %t.popular.top
-// RUN: FileCheck %s -check-prefix=POP_FOO < %t.popular.foo
+// RUN: %FileCheck %s -check-prefix=POP_TOP < %t.popular.top
+// RUN: %FileCheck %s -check-prefix=POP_FOO < %t.popular.foo
 
 // NOPOP_TOP: key.name: "bad()
 // NOPOP_TOP: key.name: "good()
@@ -56,7 +56,7 @@ struct Foo {
 
 
 // RUN: %complete-test -hide-none -fuzz -group=none -popular="%s.popular" -unpopular="%s.unpopular" -tok=POPULAR_STMT_0 %s -- -I %S/Inputs > %t.popular.stmt.0
-// RUN: FileCheck %s -check-prefix=POPULAR_STMT_0 < %t.popular.stmt.0
+// RUN: %FileCheck %s -check-prefix=POPULAR_STMT_0 < %t.popular.stmt.0
 
 import PopularAPI
 var globalColor = 0
@@ -79,17 +79,15 @@ struct OuterNominal {
 // POPULAR_STMT_0:   localColor
 // POPULAR_STMT_0:   fromDerivedColor
 // POPULAR_STMT_0:   fromSuperColor
-// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   good()
-// POPULAR_STMT_0:   globalColor
-// POPULAR_STMT_0:   okay()
+// POPULAR_STMT_0:   fromOuterNominalColor
 // POPULAR_STMT_0:   DDModuleColor
 // POPULAR_STMT_0:   CCModuleColor
-// bad() ends up here because it's an unpopular global but that's still
-// generally better than "other module" results.
-// POPULAR_STMT_0:   bad()
 // POPULAR_STMT_0:   EEModuleColor
+// POPULAR_STMT_0:   globalColor
+// POPULAR_STMT_0:   okay()
 // POPULAR_STMT_0:   ModuleCollaborate
+// POPULAR_STMT_0:   bad()
 // POPULAR_STMT_0: ]
 // POPULAR_STMT_0-LABEL: Results for filterText: col [
 // POPULAR_STMT_0:   argColor
@@ -118,7 +116,7 @@ struct Outer {
   struct ABFont {}
 }
 
-// RUN: %complete-test -hide-none -fuzz -group=none -popular="%s.popular" -unpopular="%s.unpopular" -tok=POPULAR_VS_PREFIX_1 %s -- -I %S/Inputs | FileCheck %s -check-prefix=POPULAR_VS_PREFIX_1
+// RUN: %complete-test -hide-none -fuzz -group=none -popular="%s.popular" -unpopular="%s.unpopular" -tok=POPULAR_VS_PREFIX_1 %s -- -I %S/Inputs | %FileCheck %s -check-prefix=POPULAR_VS_PREFIX_1
 func testPopularityVsPrefixMatch1() {
   let x: Outer.#^POPULAR_VS_PREFIX_1,,AB,ABT^#
 }

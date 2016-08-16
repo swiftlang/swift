@@ -13,25 +13,25 @@
 import ObjectiveC
 import Foundation
 
-internal var _temporaryLocaleCurrentLocale: Locale? = nil
+internal var _temporaryLocaleCurrentLocale: NSLocale? = nil
 
-extension Locale {
+extension NSLocale {
   @objc
-  public class func _swiftUnittest_currentLocale() -> Locale {
+  public class func _swiftUnittest_currentLocale() -> NSLocale {
     return _temporaryLocaleCurrentLocale!
   }
 }
 
 public func withOverriddenLocaleCurrentLocale<Result>(
-  _ temporaryLocale: Locale,
-  _ body: @noescape () -> Result
+  _ temporaryLocale: NSLocale,
+  _ body: () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
-    Locale.self, #selector(Locale.current))
+    NSLocale.self, #selector(getter: NSLocale.current))
   precondition(oldMethod != nil, "could not find +[Locale currentLocale]")
 
   let newMethod = class_getClassMethod(
-    Locale.self, #selector(Locale._swiftUnittest_currentLocale))
+    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale))
   precondition(newMethod != nil, "could not find +[Locale _swiftUnittest_currentLocale]")
 
   precondition(_temporaryLocaleCurrentLocale == nil,
@@ -48,14 +48,14 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 
 public func withOverriddenLocaleCurrentLocale<Result>(
   _ temporaryLocaleIdentifier: String,
-  _ body: @noescape () -> Result
+  _ body: () -> Result
 ) -> Result {
   precondition(
-    Locale.availableLocaleIdentifiers().contains(temporaryLocaleIdentifier),
+    NSLocale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
     "requested locale \(temporaryLocaleIdentifier) is not available")
 
   return withOverriddenLocaleCurrentLocale(
-    Locale(localeIdentifier: temporaryLocaleIdentifier), body)
+    NSLocale(localeIdentifier: temporaryLocaleIdentifier), body)
 }
 
 /// Executes the `body` in an autorelease pool if the platform does not
@@ -65,10 +65,10 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 /// return-autoreleased optimization.)
 @inline(never)
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
-  _ body: @noescape () -> Void
+  invoking body: () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
-  autoreleasepool(body)
+  autoreleasepool(invoking: body)
 #else
   body()
 #endif
@@ -82,6 +82,7 @@ internal func _stdlib_NSArray_getObjects(
   rangeLength: Int)
 
 extension NSArray {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
   ) {
@@ -101,6 +102,7 @@ func _stdlib_NSDictionary_getObjects(
 )
 
 extension NSDictionary {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
     andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?

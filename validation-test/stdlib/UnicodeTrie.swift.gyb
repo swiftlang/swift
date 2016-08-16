@@ -101,13 +101,13 @@ class NonContiguousNSString : NSString {
       from: UTF32.self,
       to: UTF16.self,
       stoppingOnError: true,
-      sendingOutputTo: output)
+      into: output)
     expectFalse(hadError)
     self.init(encoded)
   }
 
   @objc(copyWithZone:)
-  override func copy(with zone: NSZone?) -> AnyObject {
+  override func copy(with zone: NSZone?) -> Any {
     // Ensure that copying this string produces a class that CoreFoundation
     // does not know about.
     return self

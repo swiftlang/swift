@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Onone -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=DEBUG
-// RUN: %target-swift-frontend -module-name OptimizationOptions -O -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=RELEASE
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Ounchecked -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=UNCHECKED
-// RUN: %target-swift-frontend -module-name OptimizationOptions -Oplayground -emit-sil -primary-file %s 2>&1 | FileCheck %s --check-prefix=PLAYGROUND
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Onone -emit-sil -primary-file %s 2>&1 | %FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -module-name OptimizationOptions -O -emit-sil -primary-file %s 2>&1 | %FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Ounchecked -emit-sil -primary-file %s 2>&1 | %FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -module-name OptimizationOptions -Oplayground -emit-sil -primary-file %s 2>&1 | %FileCheck %s --check-prefix=PLAYGROUND
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_asserts
@@ -58,14 +58,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
 // DEBUG-DAG: "Human nature ..."
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose fatal errors.
 // PLAYGROUND-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
 // PLAYGROUND-DAG: "Human nature ..."
 // PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 
 // In release mode keep succinct fatal errors (trap).
@@ -88,7 +88,7 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // DEBUG-DAG: "fatal error"
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 // DEBUG: return
 
@@ -96,7 +96,7 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // PLAYGROUND-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // PLAYGROUND-DAG: "fatal error"
 // PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 // PLAYGROUND: return
 
@@ -120,14 +120,14 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
 // DEBUG-DAG: "fatal error"
 // DEBUG-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// DEBUG: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
 // In playground mode keep verbose partial safety checks.
 // PLAYGROUND-LABEL: _TF19OptimizationOptions25test_partial_safety_checkFTSiSi_Si
 // PLAYGROUND-DAG: "fatal error"
 // PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @_TTOS_nndd__TFs18_fatalErrorMessageFTVs12StaticStringS_S_Su_T_
-// PLAYGROUND: apply %[[FATAL_ERROR]]{{.*}} @noreturn
+// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
 // PLAYGROUND: unreachable
 
 // In release mode remove partial safety checks.

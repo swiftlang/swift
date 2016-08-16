@@ -21,8 +21,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}
 
-if (1) {} // expected-error{{type 'Int' does not conform to protocol 'Boolean'}}
-if 1 {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
+if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used with array literal}}
@@ -99,11 +99,11 @@ func test17875634() {
   var col = 2
   var coord = (row, col)
 
-  match += (1, 2) // expected-error{{argument type '(Int, Int)' does not conform to expected type 'Sequence'}}
+  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
 
-  match += (row, col) // expected-error{{argument type '(@lvalue Int, @lvalue Int)' does not conform to expected type 'Sequence'}}
+  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
 
-  match += coord // expected-error{{argument type '@lvalue (Int, Int)' does not conform to expected type 'Sequence'}}
+  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}} expected-note {{overloads for '+=' exist}}
 
   match.append(row, col) // expected-error{{extra argument in call}}
 
@@ -131,7 +131,7 @@ func test20770032() {
 
 
 
-func tuple_splat1(_ a : Int, _ b : Int) {
+func tuple_splat1(_ a : Int, _ b : Int) { // expected-note {{'tuple_splat1' declared here}}
   let x = (1,2)
   tuple_splat1(x)          // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
   tuple_splat1(1, 2)       // Ok.

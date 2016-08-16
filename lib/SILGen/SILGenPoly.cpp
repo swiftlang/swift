@@ -459,7 +459,8 @@ ManagedValue Transform::transform(ManagedValue v,
     auto class2 = outputSubstType->getClassOrBoundGenericClass();
 
     // CF <-> Objective-C via toll-free bridging.
-    if (class1->isForeign() != class2->isForeign()) {
+    if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
+        (class2->getForeignClassKind() == ClassDecl::ForeignKind::CFType)) {
        return ManagedValue(SGF.B.createUncheckedRefCast(Loc,
                                                         v.getValue(),
                                                         loweredResultTy),
@@ -771,6 +772,16 @@ static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
   temp.finishInitialization(SGF);
 }
 
+/// If the type is a single-element tuple, return the element type.
+static CanType getSingleTupleElement(CanType type) {
+  if (auto tupleType = dyn_cast<TupleType>(type)) {
+    if (tupleType->getNumElements() == 1)
+      return tupleType.getElementType(0);
+  }
+
+  return type;
+}
+
 namespace {
   class TranslateArguments {
     SILGenFunction &SGF;
@@ -803,7 +814,7 @@ namespace {
         if (inputOrigType.isTuple() &&
             inputOrigType.getNumTupleElements() == 1) {
           inputOrigType = inputOrigType.getTupleElementType(0);
-          inputSubstType = cast<TupleType>(inputSubstType).getElementType(0);
+          inputSubstType = getSingleTupleElement(inputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }
@@ -811,7 +822,7 @@ namespace {
         if (outputOrigType.isTuple() &&
             outputOrigType.getNumTupleElements() == 1) {
           outputOrigType = outputOrigType.getTupleElementType(0);
-          outputSubstType = cast<TupleType>(outputSubstType).getElementType(0);
+          outputSubstType = getSingleTupleElement(outputSubstType);
           return translate(inputOrigType, inputSubstType,
                            outputOrigType, outputSubstType);
         }
@@ -2574,6 +2585,26 @@ RValue SILGenFunction::emitSubstToOrigValue(SILLocation loc, RValue &&v,
                               AbstractionPattern(substType), substType,
                               origType, substType,
                               ctxt);
+}
+
+ManagedValue
+SILGenFunction::emitMaterializedRValueAsOrig(Expr *expr,
+                                             AbstractionPattern origType) {  
+  // Create a temporary.
+  auto &origTL = getTypeLowering(origType, expr->getType());
+  auto temporary = emitTemporary(expr, origTL);
+
+  // Emit the reabstracted r-value.
+  auto result =
+    emitRValueAsOrig(expr, origType, origTL, SGFContext(temporary.get()));
+
+  // Force the result into the temporary.
+  if (!result.isInContext()) {
+    temporary->copyOrInitValueInto(*this, expr, result, /*init*/ true);
+    temporary->finishInitialization(*this);
+  }
+
+  return temporary->getManagedAddress();
 }
 
 ManagedValue

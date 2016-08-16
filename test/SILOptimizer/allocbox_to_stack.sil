@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -allocbox-to-stack | %FileCheck %s
 
 import Builtin
 
@@ -132,7 +132,7 @@ bb0:
   %8 = load %1a : $*Int
   %9 = strong_release %1 : $@box Int
   %10 = address_to_pointer %1a : $*Int to $Builtin.RawPointer
-  %11 = pointer_to_address %10 : $Builtin.RawPointer to $*Int
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*Int
   %12 = load %11 : $*Int
   %13 = return %8 : $Int
   // CHECK: return

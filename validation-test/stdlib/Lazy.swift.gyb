@@ -624,7 +624,7 @@ func expectSequencePassthrough<
   S : LazySequenceProtocol, Base : LoggingType,
   Base.Iterator.Element == S.Iterator.Element
 >(_ s: S, base: Base, arbitraryElement: S.Iterator.Element, count: Int) {
-  let baseType = base.dynamicType
+  let baseType = type(of: base)
 
   SequenceLog.makeIterator.expectIncrement(baseType) { _ = s.makeIterator() }
   SequenceLog.underestimatedCount.expectIncrement(baseType) {
@@ -633,17 +633,17 @@ func expectSequencePassthrough<
   SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
     _ = s._customContainsEquatableElement(arbitraryElement)
   }
-  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
-    _ = s._copyToNativeArrayBuffer()
+  SequenceLog._copyToContiguousArray.expectIncrement(baseType) {
+    _ = s._copyToContiguousArray()
   }
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
-    let buf = UnsafeMutablePointer<S.Iterator.Element>(allocatingCapacity: count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
   
     let end = s._copyContents(initializing: buf)
     expectTrue(end <= buf + count)
     buf.deinitialize(count: end - buf)
-    buf.deallocateCapacity(count)
+    buf.deallocate(capacity: count)
   }
 }
 
@@ -697,7 +697,7 @@ tests.test("LazyCollection/Passthrough") {
     count: Int(expected.count))
 
   let s = base.lazy
-  let baseType = base.dynamicType
+  let baseType = type(of: base)
   let startIndex = CollectionLog.startIndex.expectIncrement(baseType) {
     s.startIndex
   }
@@ -752,11 +752,11 @@ tests.test("MapSequence/Passthrough") {
   let expected = (0..<100).map(OpaqueValue.init)
   let base = LoggingSequence(wrapping: expected)
   let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
-  CollectionLog.underestimatedCount.expectIncrement(base.dynamicType) {
+  CollectionLog.underestimatedCount.expectIncrement(type(of: base)) {
     _ = mapped.underestimatedCount
   }
   // Not exactly passthrough because we wrap the result
-  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+  CollectionLog.makeIterator.expectIncrement(type(of: base)) {
     _ = mapped.makeIterator()
   }
 }
@@ -800,27 +800,27 @@ tests.test("LazyMapCollection/Passthrough") {
   let base = LoggingCollection(wrapping: expected)
   let mapped = base.lazy.map { OpaqueValue(Double($0.value) / 2.0) }
 
-  let startIndex = CollectionLog.startIndex.expectIncrement(base.dynamicType) {
+  let startIndex = CollectionLog.startIndex.expectIncrement(type(of: base)) {
     mapped.startIndex
   }
-  let endIndex = CollectionLog.endIndex.expectIncrement(base.dynamicType) {
+  let endIndex = CollectionLog.endIndex.expectIncrement(type(of: base)) {
     mapped.endIndex
   }
   // Not exactly passthrough, because mapping transforms the result
-  CollectionLog.subscriptIndex.expectIncrement(base.dynamicType) {
+  CollectionLog.subscriptIndex.expectIncrement(type(of: base)) {
     _ = mapped[startIndex]
   }
-  CollectionLog.isEmpty.expectIncrement(base.dynamicType) {
+  CollectionLog.isEmpty.expectIncrement(type(of: base)) {
     _ = mapped.isEmpty
   }
-  CollectionLog.first.expectIncrement(base.dynamicType) {
+  CollectionLog.first.expectIncrement(type(of: base)) {
     _ = mapped.first
   }
-  CollectionLog.underestimatedCount.expectIncrement(base.dynamicType) {
+  CollectionLog.underestimatedCount.expectIncrement(type(of: base)) {
     _ = mapped.underestimatedCount
   }
   // Not exactly passthrough because we wrap the result
-  CollectionLog.makeIterator.expectIncrement(base.dynamicType) {
+  CollectionLog.makeIterator.expectIncrement(type(of: base)) {
     _ = mapped.makeIterator()
   }
 }
@@ -1057,7 +1057,7 @@ tests.test("LazyFilterSequence") {
   // Try again using explicit construction
   filtered = LazyFilterSequence(
     _base: MinimalSequence(elements: base),
-    whereElementsSatisfy: { x in calls += 1; return x.value % 2 == 0})
+    { x in calls += 1; return x.value % 2 == 0})
 
   expectEqual(100, calls)
 
@@ -1219,19 +1219,19 @@ do {
     tests.test("FlattenSequence/\(data)") {
       var base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      checkSequence(expected, base.flatten(), resiliencyChecks: .none)
+      checkSequence(expected, base.joined(), resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
 
       // checkSequence consumed base, so reassign
       base = MinimalSequence(
         elements: data.map { MinimalSequence(elements: $0) })
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
       expectEqual(
         expected.count, calls,
-        "unexpected laziness in \(flattened.dynamicType)")
+        "unexpected laziness in \(type(of: flattened))")
     }
 
     tests.test("FlattenSequence/Lazy/\(data)") {
@@ -1240,10 +1240,10 @@ do {
         elements: data.map { MinimalSequence(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
-      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
+      expectEqual(0, calls, "unexpected eagerness in \(type(of: flattened))")
     }
 
   % for Traversal in 'Forward', 'Bidirectional':
@@ -1252,7 +1252,7 @@ do {
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
       check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
 
       // Checking that flatten doesn't introduce laziness
@@ -1260,7 +1260,7 @@ do {
       _ = flattened.map { _ in calls += 1 }
       expectLE(
         expected.count, calls,
-        "unexpected laziness in \(flattened.dynamicType)")
+        "unexpected laziness in \(type(of: flattened))")
     }
 
     tests.test("Flatten${TraversalCollection}/Lazy\(data)") {
@@ -1269,11 +1269,11 @@ do {
         elements: data.map { Minimal${TraversalCollection}(elements: $0) }
       ).lazy.map { $0 }
 
-      let flattened = base.flatten()
+      let flattened = base.joined()
 
       var calls = 0
       _ = flattened.map { _ in calls += 1 }
-      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
+      expectEqual(0, calls, "unexpected eagerness in \(type(of: flattened))")
     }
   % end
   }

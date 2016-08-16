@@ -21,6 +21,7 @@ set(SWIFT_BENCH_MODULES
     single-source/unit-tests/StackPromo
     single-source/Ackermann
     single-source/AngryPhonebook
+    single-source/AnyHashableWithAClass
     single-source/Array2D
     single-source/ArrayAppend
     single-source/ArrayInClass
@@ -51,6 +52,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/Histogram
     single-source/Integrate
+    single-source/IterateData
     single-source/Join
     single-source/LinkedList
     single-source/MapReduce

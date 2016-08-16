@@ -20,11 +20,11 @@ public protocol MySequence {
   var underestimatedCount: Int { get }
 
   func map<T>(
-    @noescape _ transform: (Iterator.Element) -> T
+    _ transform: (Iterator.Element) -> T
   ) -> [T]
 
   func filter(
-    @noescape _ includeElement: (Iterator.Element) -> Bool
+    _ isIncluded: (Iterator.Element) -> Bool
   ) -> [Iterator.Element]
 
   func _customContainsEquatableElement(
@@ -32,11 +32,11 @@ public protocol MySequence {
   ) -> Bool?
 
   func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R?
 
-  func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Iterator.Element>
+  func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element>
 
   func _copyContents(
     initializing ptr: UnsafeMutablePointer<Iterator.Element>
@@ -48,13 +48,13 @@ extension MySequence {
   }
 
   public func map<T>(
-    @noescape _ transform: (Iterator.Element) -> T
+    _ transform: (Iterator.Element) -> T
   ) -> [T] {
     return []
   }
 
   public func filter(
-    @noescape _ includeElement: (Iterator.Element) -> Bool
+    _ isIncluded: (Iterator.Element) -> Bool
   ) -> [Iterator.Element] {
     return []
   }
@@ -66,13 +66,13 @@ extension MySequence {
   }
 
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     return nil
   }
 
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Iterator.Element> {
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element> {
     fatalError()
   }
 
@@ -111,7 +111,7 @@ extension MyCollection {
     return startIndex == endIndex
   }
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     return preprocess(self)
   }
@@ -182,7 +182,7 @@ extension LoggingType {
   }
   
   public var selfType: Any.Type {
-    return self.dynamicType
+    return type(of: self)
   }
 }
 
@@ -224,7 +224,7 @@ public class SequenceLog {
   public static var filter = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
-  public static var _copyToNativeArrayBuffer = TypeIndexed(0)
+  public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)
 }
 
@@ -249,17 +249,17 @@ extension LoggingSequenceType
   }
 
   public func map<T>(
-    @noescape _ transform: (Base.Iterator.Element) -> T
+    _ transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     Log.map[selfType] += 1
     return base.map(transform)
   }
 
   public func filter(
-    @noescape _ includeElement: (Base.Iterator.Element) -> Bool
+    _ isIncluded: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     Log.filter[selfType] += 1
-    return base.filter(includeElement)
+    return base.filter(isIncluded)
   }
   
   public func _customContainsEquatableElement(
@@ -273,7 +273,7 @@ extension LoggingSequenceType
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     Log._preprocessingPass[selfType] += 1
     return base._preprocessingPass { _ in preprocess(self) }
@@ -281,10 +281,10 @@ extension LoggingSequenceType
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
-    Log._copyToNativeArrayBuffer[selfType] += 1
-    return base._copyToNativeArrayBuffer()
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+    Log._copyToContiguousArray[selfType] += 1
+    return base._copyToContiguousArray()
   }
 
   /// Copy a Sequence into an array.

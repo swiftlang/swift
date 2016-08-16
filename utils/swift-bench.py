@@ -42,9 +42,20 @@ import subprocess
 import sys
 
 
-# Calculate the population standard deviation
-def pstdev(l):
-    return (sum((x - sum(l) / float(len(l))) ** 2 for x in l) / len(l)) ** 0.5
+def pstdev(sample):
+    """Given a list of numbers, return the population standard deviation.
+
+    For a population x_1, x_2, ..., x_N with mean M, the standard deviation
+    is defined as
+
+        sqrt( 1/N * [ (x_1 - M)^2 + (x_2 - M)^2 + ... + (x_N - M)^2 ] )
+    """
+    if len(sample) == 0:
+        raise ValueError("Cannot calculate the standard deviation of an "
+                         "empty list!")
+    mean = sum(sample) / float(len(sample))
+    inner = 1.0 / len(sample) * (sum((x - mean) ** 2 for x in sample))
+    return math.sqrt(inner)
 
 
 class SwiftBenchHarness(object):
@@ -140,13 +151,13 @@ func Consume(x: Int) { if False() { println(x) } }
 func main() {
   var N = 1
   var name = ""
-  if Process.arguments.count > 1 {
-    N = Process.arguments[1].toInt()!
+  if CommandLine.arguments.count > 1 {
+    N = CommandLine.arguments[1].toInt()!
   }
 """
         main_body = """
   name = "%s"
-  if Process.arguments.count <= 2 || Process.arguments[2] == name {
+  if CommandLine.arguments.count <= 2 || CommandLine.arguments[2] == name {
     let start = __mach_absolute_time__()
     for _ in 1...N {
       bench_%s()

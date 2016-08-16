@@ -120,7 +120,7 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
   }
 
   class D {
-    final var array1 [Int] // 'array1' cannot be overridden by a computed property.
+    final var array1: [Int] // 'array1' cannot be overridden by a computed property.
     var array2: [Int]      // 'array2' *can* be overridden by a computed property.
   }
 
@@ -134,17 +134,17 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
      d.array2[i] = ... // Will access D.array2 through dynamic dispatch.
   }
 
-Advice: Use 'private' when declaration does not need to be accessed outside of file
------------------------------------------------------------------------------------
+Advice: Use 'private' and 'fileprivate' when declaration does not need to be accessed outside of file
+-----------------------------------------------------------------------------------------------------
 
-Applying the ``private`` keyword to a declaration restricts the visibility of
-the declaration to the file in which it is declared. This allows the compiler to
-be able to ascertain all other potentially overriding declarations. Thus the
-absence of any such declarations enables the compiler to infer the ``final``
-keyword automatically and remove indirect calls for methods and field accesses
-accordingly. For instance in the following, ``e.doSomething()`` and
-``f.myPrivateVar``, will be able to be accessed directly assuming ``E``, ``F``
-do not have any overriding declarations in the same file:
+Applying the ``private`` or ``fileprivate`` keywords to a declaration restricts
+the visibility of the declaration to the file in which it is declared. This
+allows the compiler to be able to ascertain all other potentially overriding
+declarations. Thus the absence of any such declarations enables the compiler to
+infer the ``final`` keyword automatically and remove indirect calls for methods
+and field accesses accordingly. For instance in the following,
+``e.doSomething()`` and ``f.myPrivateVar``, will be able to be accessed directly
+assuming ``E``, ``F`` do not have any overriding declarations in the same file:
 
 ::
 
@@ -153,7 +153,7 @@ do not have any overriding declarations in the same file:
   }
 
   class F {
-    private var myPrivateVar : Int
+    fileprivate var myPrivateVar : Int
   }
 
   func usingE(_ e: E) {
@@ -319,8 +319,8 @@ generics. Some more examples of generics:
 
   func myAlgorithm(_ a: [T], length: Int) { ... }
 
-  // The compiler can specialize code of MyStack[Int]
-  var stackOfInts: MyStack[Int]
+  // The compiler can specialize code of MyStack<Int>
+  var stackOfInts: MyStack<Int>
   // Use stack of ints.
   for i in ... {
     stack.push(...)
@@ -522,7 +522,7 @@ count operations are expensive and unavoidable when using Swift classes.
 Advice: Use unmanaged references to avoid reference counting overhead
 ---------------------------------------------------------------------
 
-Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not public api and will go
+Note, ``Unmanaged<T>._withUnsafeGuaranteedRef`` is not a public API and will go
 away in the future. Therefore, don't use it in code that you can not change in
 the future.
 
@@ -530,7 +530,7 @@ In performance-critical code you can choose to use unmanaged references. The
 ``Unmanaged<T>`` structure allows developers to disable automatic reference
 counting for a specific reference.
 
-When you do this you need to make sure that there exists another reference to
+When you do this, you need to make sure that there exists another reference to
 instance held by the ``Unmanaged`` struct instance for the duration of the use
 of ``Unmanaged`` (see `Unmanaged.swift`_ for more details) that keeps the instance
 alive.
@@ -599,7 +599,8 @@ Footnotes
 
 .. [#] i.e. a direct load of a class's field or a direct call to a function.
 
-.. [#] Explain what COW is here.
+.. [#] An optimization technique in which a copy will be made if and only if 
+        a modification happens to the original copy, otherwise a pointer will be given.
 
 .. [#] In certain cases the optimizer is able to via inlining and ARC
        optimization remove the retain, release causing no copy to occur.

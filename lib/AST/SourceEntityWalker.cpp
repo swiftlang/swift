@@ -109,6 +109,12 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     Loc = OpD->getLoc();
     if (Loc.isValid())
       NameLen = OpD->getName().getLength();
+
+  } else if (auto PrecD = dyn_cast<PrecedenceGroupDecl>(D)) {
+    Loc = PrecD->getLoc();
+    if (Loc.isValid())
+      NameLen = PrecD->getName().getLength();
+
   } else {
     return true;
   }
@@ -420,11 +426,13 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
 
   ArrayRef<Identifier> ArgNames = TupleE->getElementNames();
   ArrayRef<SourceLoc> ArgLocs = TupleE->getElementNameLocs();
-  assert(ArgNames.size() == ArgLocs.size());
   for (auto i : indices(ArgNames)) {
     Identifier Name = ArgNames[i];
+    if (Name.empty())
+      continue;
+
     SourceLoc Loc = ArgLocs[i];
-    if (Name.empty() || Loc.isInvalid())
+    if (Loc.isInvalid())
       continue;
 
     CharSourceRange Range{ Loc, Name.getLength() };

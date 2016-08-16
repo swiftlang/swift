@@ -53,9 +53,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
-    // ErrorProtocol._code
+    // Error._code
     if (name.isSimpleName(ctx.Id_code_))
-      return getRequirement(KnownProtocolKind::ErrorProtocol);
+      return getRequirement(KnownProtocolKind::Error);
 
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
@@ -93,26 +93,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   return nullptr;
 }
 
-void DerivedConformance::insertOperatorDecl(ASTContext &C,
-                                            IterableDeclContext *scope,
-                                            Decl *member) {
-  // Find the module.
-  auto mod = member->getModuleContext();
-
-  // Add it to the module in a DerivedFileUnit.
-  mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(member));
-
-  // Add it as a derived global decl to the nominal type.
-  auto oldDerived = scope->getDerivedGlobalDecls();
-  auto oldSize = std::distance(oldDerived.begin(), oldDerived.end());
-  auto newDerived = C.Allocate<Decl*>(oldSize + 1);
-
-  std::move(oldDerived.begin(), oldDerived.end(), newDerived.begin());
-  newDerived[oldSize] = member;
-
-  scope->setDerivedGlobalDecls(newDerived);
-}
-
 DeclRefExpr *
 DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   ASTContext &C = fn->getASTContext();
@@ -126,7 +106,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  NominalTypeDecl *typeDecl,
                                                  Type propertyInterfaceType,
                                                  Type propertyContextType,
-                                                 bool isStatic) {
+                                                 bool isStatic,
+                                                 bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
   auto selfDecl = ParamDecl::createUnboundSelf(SourceLoc(), parentDC, isStatic);
@@ -144,6 +125,12 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                      TypeLoc::withoutLoc(propertyContextType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+
+  // If this is supposed to be a final method, mark it as such.
+  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
+  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+      !getterDecl->isFinal())
+    getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the type of the getter.
   GenericParamList *genericParams = getterDecl->getGenericParamsOfContext();
@@ -171,7 +158,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   } else
     interfaceType = type;
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->setAccessibility(typeDecl->getFormalAccess());
+  getterDecl->setAccessibility(std::max(typeDecl->getFormalAccess(),
+                                        Accessibility::Internal));
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -190,7 +178,8 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                                                    Type propertyInterfaceType,
                                                    Type propertyContextType,
                                                    FuncDecl *getterDecl,
-                                                   bool isStatic) {
+                                                   bool isStatic,
+                                                   bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
@@ -201,8 +190,14 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
-  propDecl->setAccessibility(typeDecl->getFormalAccess());
+  propDecl->setAccessibility(getterDecl->getFormalAccess());
   propDecl->setInterfaceType(propertyInterfaceType);
+
+  // If this is supposed to be a final property, mark it as such.
+  assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
+  if (isFinal && parentDC->getAsClassOrClassExtensionContext() &&
+      !propDecl->isFinal())
+    propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);

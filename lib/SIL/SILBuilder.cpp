@@ -40,10 +40,8 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  auto extInfo = SILFunctionType::ExtInfo(
-                                        SILFunctionType::Representation::Thick,
-                                        FTI->isNoReturn(),
-                                        FTI->isPseudogeneric());
+  auto extInfo = FTI->getExtInfo().withRepresentation(
+      SILFunctionType::Representation::Thick);
 
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us, converting the
@@ -79,8 +77,8 @@ SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
   if (!SILType::canRefCast(Op->getType(), ResultTy, M))
     return nullptr;
 
-  return insert(
-      new (M) UncheckedRefCastInst(getSILDebugLocation(Loc), Op, ResultTy));
+  return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
+                                             ResultTy, F, OpenedArchetypes));
 }
 
 // Create the appropriate cast instruction based on result type.
@@ -89,16 +87,16 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILType Ty) {
   auto &M = F.getModule();
   if (Ty.isTrivial(M))
-    return insert(
-        new (M) UncheckedTrivialBitCastInst(getSILDebugLocation(Loc), Op, Ty));
+    return insert(UncheckedTrivialBitCastInst::create(
+        getSILDebugLocation(Loc), Op, Ty, F, OpenedArchetypes));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
-    return refCast;  
+    return refCast;
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
-  return insert(
-      new (M) UncheckedBitwiseCastInst(getSILDebugLocation(Loc), Op, Ty));
+  return insert(UncheckedBitwiseCastInst::create(getSILDebugLocation(Loc), Op,
+                                                 Ty, F, OpenedArchetypes));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,

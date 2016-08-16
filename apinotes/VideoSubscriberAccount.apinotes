@@ -1,0 +1,5 @@
+---
+Name: VideoSubscriberAccount
+Tags:
+- Name: VSErrorCode
+  NSErrorDomain: VSErrorDomain

@@ -48,6 +48,7 @@ struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSet</ref> {
   <decl:Constructor><loc>init()</loc></decl>
   <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>, <decl:Param>y: <ref:Struct>Double</ref></decl>)</loc></decl>
 }</decl>
+<decl:TypeAlias>typealias <loc>FooStruct1Pointer</loc> = <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>FooStruct1</ref>></decl>
 <decl:Struct>struct <loc>FooStruct2</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
@@ -72,10 +73,10 @@ var <loc>fooIntVar</loc>: <ref:Struct>Int32</ref></decl>
 func <loc>fooFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>func <loc>fooFunc1AnonymousParam(<decl:Param>_: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>func <loc>fooFunc3(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ b: <ref:Struct>Float</ref></decl>, <decl:Param>_ c: <ref:Struct>Double</ref></decl>, <decl:Param>_ d: <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>Int32</ref>>!</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
-<decl:Func>func <loc>fooFuncWithBlock(<decl:Param>_ blk: ((<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
-<decl:Func>func <loc>fooFuncWithFunctionPointer(<decl:Param>_ fptr: (@convention(c) (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
-<decl:Func>@noreturn func <loc>fooFuncNoreturn1()</loc></decl>
-<decl:Func>@noreturn func <loc>fooFuncNoreturn2()</loc></decl>
+<decl:Func>func <loc>fooFuncWithBlock(<decl:Param>_ blk: (@escaping (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
+<decl:Func>func <loc>fooFuncWithFunctionPointer(<decl:Param>_ fptr: (@escaping @convention(c) (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
+<decl:Func>func <loc>fooFuncNoreturn1()</loc> -> <ref:Enum>Never</ref></decl>
+<decl:Func>func <loc>fooFuncNoreturn2()</loc> -> <ref:Enum>Never</ref></decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -113,7 +114,7 @@ func <loc>fooFuncWithComment5()</loc></decl>
 <decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func <loc>redeclaredInMultipleModulesFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
 <decl:Func>@available(*, unavailable, message: "Variadic function is unavailable")
-func <loc>fooFuncUsingVararg(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ varargs: <ref:TypeAlias>Any</ref>...</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+func <loc>fooFuncUsingVararg(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ varargs: Any...</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
 protocol <loc>FooProtocolBase</loc> {
@@ -181,11 +182,22 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   func <loc>fooProtoFuncWithExtraIndentation2()</loc></decl>
   <decl:Func>class func <loc>fooProtoClassFunc()</loc></decl>
 }</decl>
+<decl:TypeAlias>typealias <loc>typedef_int_t</loc> = <ref:Struct>Int32</ref></decl>
 <decl:Var>var <loc>FOO_MACRO_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_3</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_4</loc>: <ref:Struct>UInt32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_5</loc>: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_6</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_7</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_8</loc>: <ref:Struct>Int8</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_9</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_10</loc>: <ref:Struct>Int16</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_11</loc>: <ref:Struct>Int</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_OR</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_AND</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_BITWIDTH</loc>: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_SIGNED</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_REDEF_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Var>var <loc>FOO_MACRO_REDEF_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Func>func <loc>theLastDeclInFoo()</loc></decl>
@@ -235,6 +247,8 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
 }</decl>
+<decl:Var>@available(*, unavailable, message: "use 'nil' instead of this imported macro")
+var <loc>FOO_NIL</loc>: ()</decl>
 <decl:Class>class <loc>FooUnavailableMembers</loc> : <ref:Class>FooClassBase</ref> {
   <decl:Constructor>convenience <loc>init!(<decl:Param>int i: <ref:Struct>Int32</ref></decl>)</loc></decl>
   <decl:Func>@available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")

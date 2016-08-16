@@ -21,6 +21,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
+#include "SourceKit/SwiftLang/Factory.h"
 
 #include "swift/Basic/DemangleWrappers.h"
 
@@ -87,6 +88,8 @@ static LazySKDUID RequestEditorOpenHeaderInterface(
     "source.request.editor.open.interface.header");
 static LazySKDUID RequestEditorOpenSwiftSourceInterface(
     "source.request.editor.open.interface.swiftsource");
+static LazySKDUID RequestEditorOpenSwiftTypeInterface(
+    "source.request.editor.open.interface.swifttype");
 static LazySKDUID RequestEditorExtractTextFromComment(
     "source.request.editor.extract.comment");
 static LazySKDUID RequestEditorClose("source.request.editor.close");
@@ -132,7 +135,8 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
-  GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath());
+  GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
+                                     SourceKit::createSwiftLangSupport);
   GlobalCtx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }
@@ -203,6 +207,10 @@ static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                ArrayRef<const char *> Args,
                                ResponseReceiver Rec);
+
+static void
+editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
+                             ResponseReceiver Rec);
 
 static sourcekitd_response_t editorExtractTextFromComment(StringRef Source);
 
@@ -502,6 +510,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!FileName.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
     return editorOpenSwiftSourceInterface(*Name, *FileName, Args, Rec);
+  }
+
+  if (ReqUID == RequestEditorOpenSwiftTypeInterface) {
+    Optional<StringRef> Usr = Req.getString(KeyUSR);
+    if (!Usr.hasValue())
+      return Rec(createErrorRequestInvalid("missing 'key.usr'"));
+    return editorOpenSwiftTypeInterface(*Usr, Args, Rec);
   }
 
   if (ReqUID == RequestEditorExtractTextFromComment) {
@@ -1326,6 +1341,10 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
     Elem.setBool(KeyIsSystem, true);
   if (!Info.TypeInterface.empty())
     Elem.set(KeyTypeInterface, Info.TypeInterface);
+  if (!Info.TypeUSR.empty())
+    Elem.set(KeyTypeUsr, Info.TypeUSR);
+  if (!Info.ContainerTypeUSR.empty())
+    Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
 
   return Rec(RespBuilder.createResponse());
 }
@@ -1816,6 +1835,18 @@ editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
                                                   /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, EditC);
+}
+
+static void
+editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
+                             ResponseReceiver Rec) {
+  auto EditC = std::make_shared<SKEditorConsumer>(Rec,
+                                                  /*EnableSyntaxMap=*/true,
+                                                  /*EnableStructure=*/true,
+                                                  /*EnableDiagnostics=*/false,
+                                                  /*SyntacticOnly=*/false);
+  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+  Lang.editorOpenTypeInterface(*EditC, Args, TypeUsr);
 }
 
 static sourcekitd_response_t editorExtractTextFromComment(StringRef Source) {

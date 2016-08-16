@@ -8,21 +8,21 @@ The Swift Array Design
 
 .. raw:: html
 
-   <style>
-   tt {
-     background-color: #f2f2f2;
-   }
-   div.content ul > li {
-    background: none;
-    padding: 0 0 0 0.5em;
-    list-style-image: none;
-    list-style-type: disc;
+    <style>
+    tt {
+      background-color: #f2f2f2;
     }
-   a:link {
-       color: #AB6023;
-       font-weight: normal
-   }
-   </style>
+    div.content ul > li {
+      background: none;
+      padding: 0 0 0 0.5em;
+      list-style-image: none;
+      list-style-type: disc;
+    }
+    a:link {
+      color: #AB6023;
+      font-weight: normal
+    }
+    </style>
 
 Goals
 -----

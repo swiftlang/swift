@@ -94,9 +94,23 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       switch(Tok.getKind()) {
-#define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
+#define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
+        if (Tok.getKind() != tok::kw__ &&
+            0 < I && I < Tokens.size() - 1 &&
+            (Tokens[I-1].getKind() == tok::l_paren ||
+             Tokens[I-1].getKind() == tok::comma) &&
+            (Tokens[I+1].getKind() == tok::colon ||
+             Tokens[I+1].getKind() == tok::identifier ||
+             Tokens[I+1].isKeyword())) {
+          // Keywords are allowed as argument labels and should be treated as
+          // identifiers.  The exception is '_' which is not a name.
+          Kind = SyntaxNodeKind::Identifier;
+        } else {
+          Kind = SyntaxNodeKind::Keyword;
+        }
+        break;
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
       case tok::pound_##Name:
@@ -245,7 +259,7 @@ static const char *const RegexStrURL =
 #define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
   #Keyword "|"
 static const char *const RegexStrDocCommentField =
-  "^[ ]?- ("
+  "^[ ]*- ("
 #include "swift/Markup/SimpleFields.def"
   "returns):";
 
@@ -445,12 +459,15 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
       CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, E);
       SyntaxStructureNode SN;
-      SN.Kind = SyntaxStructureKind::Parameter;
+      SN.Kind = SyntaxStructureKind::Argument;
       SN.NameRange = NR;
       SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
-      if (NR.isValid())
+      if (NR.isValid()) {
         SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
                                                                   E->getEndLoc()));
+        passTokenNodesUntil(NR.getStart(),
+                            PassNodesBehavior::ExcludeNodeAtLocation);
+      }
       else
         SN.Range = SN.BodyRange;
 
@@ -515,6 +532,12 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
+  } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
+    for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
+      SourceLoc NameLoc = Tup->getElementNameLoc(I);
+      if (NameLoc.isValid())
+        passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
+    }
   }
 
   return { true, E };
@@ -532,12 +555,13 @@ void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
   for (const auto &elt : cond) {
     if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
 
-    SmallVector<CharSourceRange, 5> PlatformRanges;
-    elt.getAvailability()->getPlatformKeywordRanges(PlatformRanges);
-    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
-                  [&](CharSourceRange &Range) {
-                    passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-                  });
+    SmallVector<SourceLoc, 5> PlatformLocs;
+    elt.getAvailability()->getPlatformKeywordLocs(PlatformLocs);
+    std::for_each(PlatformLocs.begin(), PlatformLocs.end(),
+                  [&](SourceLoc loc) {
+      auto range = charSourceRangeFromSourceRange(SM, loc);
+      passNonTokenNode({SyntaxNodeKind::Keyword, range});
+    });
   }
 }
 
@@ -842,8 +866,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SourceLoc ArgStart = PD->getSourceRange().Start;
       SN.NameRange = CharSourceRange(ArgStart, PD->getArgumentName().getLength());
       passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
-      const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
-        Identifier;
     }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
@@ -915,16 +937,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
         return false;
 
+  } else if (auto PrecD = dyn_cast<PrecedenceGroupDecl>(D)) {
+    // Highlight specifiers like "associativity" or "assignment" as keywords.
+    SmallVector<CharSourceRange, 3> KeywordsRanges;
+    PrecD->collectOperatorKeywordRanges(KeywordsRanges);
+    for (auto &Range : KeywordsRanges) {
+      passNonTokenNode({SyntaxNodeKind::Keyword, Range});
+    };
+
   } else if (auto OperD = dyn_cast<OperatorDecl>(D)) {
-    // If the operator is infix operator, highlight specifiers like
-    // "associativity" or "assignment" as keywords.
-    if (auto IFO = dyn_cast<InfixOperatorDecl>(OperD)) {
-      SmallVector<CharSourceRange, 3> KeywordsRanges;
-      IFO->collectOperatorKeywordRanges(KeywordsRanges);
-      for (auto &Range : KeywordsRanges) {
-        passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-      };
-    }
     if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
           CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
       return false;

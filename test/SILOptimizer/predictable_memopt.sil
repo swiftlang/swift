@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-memopt  | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-memopt  | %FileCheck %s
 
 import Builtin
 import Swift
@@ -88,7 +88,7 @@ bb0(%0 : $Int):
 
 
 struct AddressOnlyStruct {
-  var a : protocol<>
+  var a : Any
   var b : Int
 }
 
@@ -333,20 +333,6 @@ bb0:
   %15 = tuple ()
   return %15 : $()
 // CHECK-NEXT: strong_release [[CVAL]]
-}
-
-// rdar://15887292 - PredictableMemoryOptimizations crashes on load from init_existential_addr
-// CHECK-LABEL: sil @init_existential_crash
-sil @init_existential_crash : $() -> () {
-  %99 = alloc_stack $Boolean
-  %100 = init_existential_addr %99 : $*Boolean, $Bool
-  %105 = integer_literal $Builtin.Int1, 0
-  %106 = struct $Bool (%105 : $Builtin.Int1)
-  store %106 to %100 : $*Bool
-  %108 = struct_element_addr %100 : $*Bool, #Bool._value
-  %109 = load %108 : $*Builtin.Int1
-  dealloc_stack %99 : $*Boolean
-  return undef : $()
 }
 
 // <rdar://problem/17755462> Predictable memory opts removes refcount operation

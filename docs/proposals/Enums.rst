@@ -276,17 +276,17 @@ An enum can obtain a compiler-derived 'RawRepresentable' conformance by
 declaring "inheritance" from its raw type in the following
 circumstances:
 
-- The inherited raw type must be IntegerLiteralConvertible,
-  FloatLiteralConvertible, CharLiteralConvertible, and/or
-  StringLiteralConvertible.
+- The inherited raw type must be ExpressibleByIntegerLiteral,
+  ExpressibleByExtendedGraphemeClusterLiteral, ExpressibleByFloatLiteral,
+  and/or ExpressibleByStringLiteral.
 - None of the cases of the enum may have non-void payloads.
 
 If an enum declares a raw type, then its cases may declare raw
 values. raw values must be integer, float, character, or string
 literals, and must be unique within the enum. If the raw type is
-IntegerLiteralConvertible, then the raw values default to
+ExpressibleByIntegerLiteral, then the raw values default to
 auto-incrementing integer literal values starting from '0', as in C. If the
-raw type is not IntegerLiteralConvertible, the raw values must
+raw type is not ExpressibleByIntegerLiteral, the raw values must
 all be explicitly declared::
 
   enum Color : Int {
@@ -302,7 +302,7 @@ all be explicitly declared::
 
   enum NSChangeDictionaryKey : String {
     // All raw values are required because String is not
-    // IntegerLiteralConvertible
+    // ExpressibleByIntegerLiteral
     case NSKeyValueChangeKindKey = "NSKeyValueChangeKindKey"
     case NSKeyValueChangeNewKey = "NSKeyValueChangeNewKey"
     case NSKeyValueChangeOldKey = "NSKeyValueChangeOldKey"

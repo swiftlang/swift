@@ -1,5 +1,6 @@
 set(sources
   CoreFoundationShims.h
+  DispatchShims.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
@@ -11,7 +12,7 @@ set(sources
   SwiftStdint.h
   UnicodeShims.h
   Visibility.h
-  module.map
+  module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
@@ -52,7 +53,8 @@ if(SWIFT_BUILT_STANDALONE)
 
       # FIXME: if we want to support separate Clang builds and mix different
       # build configurations of Clang and Swift, this line should be adjusted.
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang/${CLANG_VERSION}")
+      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang/${CLANG_VERSION}"
+      "${SWIFT_PATH_TO_CLANG_BUILD}/${LLVM_BUILD_TYPE}/lib/clang/${CLANG_VERSION}")
 
   set(clang_headers_location)
   foreach(loc ${clang_headers_locations})

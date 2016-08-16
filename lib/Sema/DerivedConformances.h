@@ -88,13 +88,13 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
   
-/// Derive an ErrorProtocol requirement for an enum type.
+/// Derive an Error requirement for an enum type.
 ///
 /// A unique string representation of the enum type will be used as the domain
 /// for members of the enum, and each case will have its own integer code.
 ///
 /// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveErrorProtocol(TypeChecker &tc,
+ValueDecl *deriveError(TypeChecker &tc,
                                Decl *parentDecl,
                                NominalTypeDecl *type,
                                ValueDecl *requirement);
@@ -107,19 +107,14 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
                                 NominalTypeDecl *type,
                                 ValueDecl *requirement);
 
-/// Insert an operator declaration associated with a declaration
-/// context. The operator declaration is added at global scope.
-void insertOperatorDecl(ASTContext &C,
-                        IterableDeclContext *scope,
-                        Decl *member);
-
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        Decl *parentDecl,
                                        NominalTypeDecl *typeDecl,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
-                                       bool isStatic = false);
+                                       bool isStatic,
+                                       bool isFinal);
 
 /// Declare a read-only property with an existing getter.
 std::pair<VarDecl *, PatternBindingDecl *>
@@ -130,7 +125,8 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
                                Type propertyInterfaceType,
                                Type propertyContextType,
                                FuncDecl *getterDecl,
-                               bool isStatic = false);
+                               bool isStatic,
+                               bool isFinal);
 
 
 /// Build a reference to the 'self' decl of a derived function.

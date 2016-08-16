@@ -178,12 +178,14 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (CD->getEffectiveAccess()) {
-  case Accessibility::Public:
+  case Accessibility::Open:
     return false;
+  case Accessibility::Public:
   case Accessibility::Internal:
     if (!M.isWholeModule())
       return false;
     break;
+  case Accessibility::FilePrivate:
   case Accessibility::Private:
     break;
   }
@@ -197,12 +199,14 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
   if (CHA) {
     if (!CHA->hasKnownDirectSubclasses(CD)) {
       switch (CD->getEffectiveAccess()) {
-      case Accessibility::Public:
+      case Accessibility::Open:
         return false;
+      case Accessibility::Public:
       case Accessibility::Internal:
         if (!M.isWholeModule())
           return false;
         break;
+      case Accessibility::FilePrivate:
       case Accessibility::Private:
         break;
       }

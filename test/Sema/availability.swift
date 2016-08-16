@@ -86,7 +86,7 @@ let unavailableOnOSX: Int = 0 // expected-note{{explicitly marked unavailable he
 let unavailableOniOS: Int = 0
 @available(iOS, unavailable) @available(OSX, unavailable)
 let unavailableOnBothA: Int = 0 // expected-note{{explicitly marked unavailable here}}
-@available(OSX, unavailable)
+@available(OSX, unavailable) @available(iOS, unavailable)
 let unavailableOnBothB: Int = 0 // expected-note{{explicitly marked unavailable here}}
 
 @available(OSX, unavailable)
@@ -98,14 +98,50 @@ typealias UnavailableOnBothA = Int // expected-note{{explicitly marked unavailab
 @available(OSX, unavailable) @available(iOS, unavailable)
 typealias UnavailableOnBothB = Int // expected-note{{explicitly marked unavailable here}}
 
+@available(macOS, unavailable)
+let unavailableOnMacOS: Int = 0 // expected-note{{explicitly marked unavailable here}}
+@available(macOS, unavailable)
+typealias UnavailableOnMacOS = Int // expected-note{{explicitly marked unavailable here}}
+
+@available(OSXApplicationExtension, unavailable)
+let unavailableOnOSXAppExt: Int = 0
+@available(macOSApplicationExtension, unavailable)
+let unavailableOnMacOSAppExt: Int = 0
+
+@available(OSXApplicationExtension, unavailable)
+typealias UnavailableOnOSXAppExt = Int
+@available(macOSApplicationExtension, unavailable)
+typealias UnavailableOnMacOSAppExt = Int
+
 func testPlatforms() {
   _ = unavailableOnOSX // expected-error{{unavailable}}
   _ = unavailableOniOS
   _ = unavailableOnBothA // expected-error{{unavailable}}
   _ = unavailableOnBothB // expected-error{{unavailable}}
+  _ = unavailableOnMacOS // expected-error{{unavailable}}
+  _ = unavailableOnOSXAppExt
+  _ = unavailableOnMacOSAppExt
 
   let _: UnavailableOnOSX = 0 // expected-error{{unavailable}}
   let _: UnavailableOniOS = 0
   let _: UnavailableOnBothA = 0 // expected-error{{unavailable}}
   let _: UnavailableOnBothB = 0 // expected-error{{unavailable}}
+  let _: UnavailableOnMacOS = 0 // expected-error{{unavailable}}
+  let _: UnavailableOnOSXAppExt = 0
+  let _: UnavailableOnMacOSAppExt = 0
 }
+
+struct VarToFunc {
+  @available(*, unavailable, renamed: "function()")
+  var variable: Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+
+  @available(*, unavailable, renamed: "function()")
+  func oldFunction() -> Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+
+  func function() -> Int {
+    _ = variable // expected-error{{'variable' has been renamed to 'function()'}}{{9-17=function()}}
+    _ = oldFunction() //expected-error{{'oldFunction()' has been renamed to 'function()'}}{{9-20=function}}
+    return 42
+  }
+}
+

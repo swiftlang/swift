@@ -68,6 +68,14 @@ public:
     return result;
   }
 
+  // Retrieve a cache entry for a trivially representable type that can also
+  // be optional.
+  static ForeignRepresentationInfo forBridgedError() {
+    ForeignRepresentationInfo result;
+    result.Storage = { 0, ForeignRepresentableKind::BridgedError };
+    return result;
+  }
+
   /// Retrieve the foreign representable kind.
   ForeignRepresentableKind getKind() const {
     return Storage.getInt();
@@ -86,6 +94,7 @@ public:
       llvm_unreachable("this type is not representable");
 
     case ForeignRepresentableKind::Trivial:
+    case ForeignRepresentableKind::BridgedError:
       return nullptr;
 
     case ForeignRepresentableKind::Bridged: {
@@ -119,6 +128,9 @@ public:
 
       return true;
     }
+
+    case ForeignRepresentableKind::BridgedError:
+      return true;
 
     case ForeignRepresentableKind::Object:
     case ForeignRepresentableKind::StaticBridged:

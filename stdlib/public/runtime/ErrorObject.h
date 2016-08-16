@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements the object representation of the standard ErrorProtocol
+// This implements the object representation of the standard Error
 // protocol type, which represents recoverable errors in the language. This
 // implementation is designed to interoperate efficiently with Cocoa libraries
 // by:
 // - allowing for NSError and CFError objects to "toll-free bridge" to
-//   ErrorProtocol existentials, which allows for cheap Cocoa to Swift interop
+//   Error existentials, which allows for cheap Cocoa to Swift interop
 // - allowing a native Swift error to lazily "become" an NSError when
 //   passed into Cocoa, allowing for cheap Swift to Cocoa interop
 //
@@ -26,6 +26,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "SwiftHashableSupport.h"
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
@@ -63,19 +64,34 @@ using SwiftErrorHeader = HeapObject;
 
 #endif
 
-/// The layout of the Swift ErrorProtocol box.
+/// The layout of the Swift Error box.
 struct SwiftError : SwiftErrorHeader {
   // By inheriting OpaqueNSError, the SwiftError structure reserves enough
   // space within itself to lazily emplace an NSError instance, and gets
   // Core Foundation's refcounting scheme.
 
   /// The type of Swift error value contained in the box.
-  /// This is only available for native Swift errors.
+  /// This member is only available for native Swift errors.
   const Metadata *type;
-  /// The ErrorProtocol witness table.
-  /// This is only available for native Swift errors.
+
+  /// The witness table for `Error` conformance.
+  /// This member is only available for native Swift errors.
   const WitnessTable *errorConformance;
-  
+
+#if SWIFT_OBJC_INTEROP
+  /// The base type that introduces the `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableBaseType()`.
+  mutable std::atomic<const Metadata *> hashableBaseType;
+
+  /// The witness table for `Hashable` conformance.
+  /// This member is only available for native Swift errors.
+  /// This member is lazily-initialized.
+  /// Instead of using it directly, call `getHashableConformance()`.
+  mutable std::atomic<const hashable_support::HashableWitnessTable *> hashableConformance;
+#endif
+
   /// Get a pointer to the value contained inside the indirectly-referenced
   /// box reference.
   static const OpaqueValue *getIndirectValue(const SwiftError * const *ptr) {
@@ -120,15 +136,25 @@ struct SwiftError : SwiftErrorHeader {
 #if SWIFT_OBJC_INTEROP
   /// Get the type of the contained value.
   const Metadata *getType() const;
-  /// Get the ErrorProtocol protocol witness table for the contained type.
+  /// Get the Error protocol witness table for the contained type.
   const WitnessTable *getErrorConformance() const;
 #else
   /// Get the type of the contained value.
   const Metadata *getType() const { return type; }
-  /// Get the ErrorProtocol protocol witness table for the contained type.
+  /// Get the Error protocol witness table for the contained type.
   const WitnessTable *getErrorConformance() const { return errorConformance; }
 #endif
-  
+
+#if SWIFT_OBJC_INTEROP
+  /// Get the base type that conforms to `Hashable`.
+  /// Returns NULL if the type does not conform.
+  const Metadata *getHashableBaseType() const;
+
+  /// Get the `Hashable` protocol witness table for the contained type.
+  /// Returns NULL if the type does not conform.
+  const hashable_support::HashableWitnessTable *getHashableConformance() const;
+#endif
+
   // Don't copy or move, please.
   SwiftError(const SwiftError &) = delete;
   SwiftError(SwiftError &&) = delete;
@@ -158,7 +184,7 @@ struct ErrorValueResult {
   const WitnessTable *errorConformance;
 };
 
-/// Extract a pointer to the value, the type metadata, and the ErrorProtocol
+/// Extract a pointer to the value, the type metadata, and the Error
 /// protocol witness from an error object.
 ///
 /// The "scratch" pointer should point to an uninitialized word-sized
@@ -185,9 +211,9 @@ extern "C" void swift_unexpectedError(SwiftError *object)
 
 #if SWIFT_OBJC_INTEROP
 
-/// Initialize an ErrorProtocol box to make it usable as an NSError instance.
+/// Initialize an Error box to make it usable as an NSError instance.
 SWIFT_RUNTIME_EXPORT
-extern "C" id swift_bridgeErrorProtocolToNSError(SwiftError *errorObject);
+extern "C" id swift_bridgeErrorToNSError(SwiftError *errorObject);
 
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
 /// implementation using the _ObjectiveCBridgeableErrorType protocol.
@@ -202,7 +228,18 @@ bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,
 /// Get the NSError Objective-C class.
 Class getNSErrorClass();
 
+/// Get the NSError metadata.
+const Metadata *getNSErrorMetadata();
+
 #endif
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
+
+SWIFT_RUNTIME_EXPORT
+extern "C"
+const size_t _swift_lldb_sizeof_SwiftError;
 
 } // namespace swift
 

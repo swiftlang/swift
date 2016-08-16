@@ -70,7 +70,7 @@ if #available(iOS 9.1, tvOS 9.2, *) {
 if #available(iOS 8.0, tvOS 9.2, *) {
 }
 
-if #available(iOS 9.2, tvOS 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; minimum deployment target ensures guard will always be true}}
+if #available(iOS 9.2, tvOS 8.0, *) { // no-warning
 }
 
 

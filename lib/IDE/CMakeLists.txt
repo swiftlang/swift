@@ -1,10 +1,10 @@
-add_swift_library(swiftIDE
+add_swift_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CommentConversion.cpp
   Formatting.cpp
   ModuleInterfacePrinting.cpp
-  ReconstructType.cpp
+  TypeReconstruction.cpp
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp

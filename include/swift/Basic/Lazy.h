@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_LAZY_H
 #define SWIFT_BASIC_LAZY_H
 
+#include <memory>
 #ifdef __APPLE__
 #include <dispatch/dispatch.h>
 #else

@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
-// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
+// RUN: %target-swift-frontend -O -module-name devirt_default_case -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
 func action(_ n:Int) -> ()
 
 // public class
-public class Base1 {
+open class Base1 {
   @inline(never) func inner() { action(1)}
   func middle() { inner() }
 // Check that call to Base1.middle cannot be devirtualized
@@ -19,7 +19,7 @@ public class Base1 {
 }
 
 // public class
-public class Derived1 : Base1 {
+open class Derived1 : Base1 {
   override func inner() { action(2) }
   @inline(never) final override func middle() { inner() }
 }
@@ -144,9 +144,9 @@ class Derived4 : Base4 {
   @inline(never) override func foo() { }
 }
 
-public class Base5 {
+open class Base5 {
   @inline(never)
-  public func test() { 
+  open func test() { 
     foo() 
   }
   
@@ -156,7 +156,7 @@ public class Base5 {
 class Derived5 : Base5 {
 }
 
-public class C6 { 
+open class C6 { 
   func bar() -> Int { return 1 } 
 }
 
@@ -199,14 +199,14 @@ public func externalEntryPoint() {
   callIt(Base3(), Base4(), Base5())
 }
 
-public class M {
+open class M {
   func foo() -> Int32 {
     return 0
   }
 }
 
 
-public class M1: M {
+open class M1: M {
   @inline(never)
   override func foo() -> Int32 {
     return 1

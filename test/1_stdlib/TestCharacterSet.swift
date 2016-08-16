@@ -21,9 +21,9 @@ class TestCharacterSetSuper { }
 #endif
 
 class TestCharacterSet : TestCharacterSetSuper {
-    let capitalA = UnicodeScalar(0x0041) // LATIN CAPITAL LETTER A
-    let capitalB = UnicodeScalar(0x0042) // LATIN CAPITAL LETTER B
-    let capitalC = UnicodeScalar(0x0043) // LATIN CAPITAL LETTER C
+    let capitalA = UnicodeScalar(0x0041)! // LATIN CAPITAL LETTER A
+    let capitalB = UnicodeScalar(0x0042)! // LATIN CAPITAL LETTER B
+    let capitalC = UnicodeScalar(0x0043)! // LATIN CAPITAL LETTER C
     
     func testBasicConstruction() {
         // Create a character set
@@ -74,17 +74,27 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectTrue(secondCharacterSet.contains(capitalC), "Character set must not contain our letter")
         expectTrue(thirdCharacterSet.contains(capitalC), "Character set must contain our letter")
     }
+
+    func testMutability_mutableCopyCrash() {
+        let cs = CharacterSet(charactersIn: "ABC")
+        (cs as NSCharacterSet).mutableCopy() // this should not crash
+    }
     
+    func testMutability_SR_1782() {
+        var nonAlphanumeric = CharacterSet.alphanumerics.inverted
+        nonAlphanumeric.remove(charactersIn: " ") // this should not crash
+    }
+
     func testRanges() {
         // Simple range check
-        let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)...UnicodeScalar(0x5A))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5B)))
+        let asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5B)!))
         
         // Some string filtering tests
-        let asciiLowercase = CharacterSet(charactersIn: UnicodeScalar(0x61)...UnicodeScalar(0x7B))
+        let asciiLowercase = CharacterSet(charactersIn: UnicodeScalar(0x61)!...UnicodeScalar(0x7B)!)
         let testString = "helloHELLOhello"
         let expected = "HELLO"
         
@@ -93,23 +103,23 @@ class TestCharacterSet : TestCharacterSetSuper {
     }
     
     func testInsertAndRemove() {
-        var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)...UnicodeScalar(0x5A))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        var asciiUppercase = CharacterSet(charactersIn: UnicodeScalar(0x41)!...UnicodeScalar(0x5A)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
         
-        asciiUppercase.remove(UnicodeScalar(0x49))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x49)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(UnicodeScalar(0x49)!)
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x49)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x5A)!))
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
        
 
         // Zero-length range
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)..<UnicodeScalar(0x41))
-        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x41)!)
+        expectTrue(asciiUppercase.contains(UnicodeScalar(0x41)!))
 
-        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)..<UnicodeScalar(0x42))
-        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x41)))
+        asciiUppercase.remove(charactersIn: UnicodeScalar(0x41)!..<UnicodeScalar(0x42)!)
+        expectTrue(!asciiUppercase.contains(UnicodeScalar(0x41)!))
         
         asciiUppercase.remove(charactersIn: "Z")
         expectTrue(!asciiUppercase.contains(UnicodeScalar(0x5A)))
@@ -133,6 +143,43 @@ class TestCharacterSet : TestCharacterSetSuper {
         result = string.components(separatedBy: set)
         expectEqual(2, result.count)
     }
+
+    // MARK: -
+    func test_classForCoder() {
+        // confirm internal bridged impl types are not exposed to archival machinery
+        let cs = CharacterSet() as NSCharacterSet
+        let expected: AnyClass = NSCharacterSet.self as AnyClass
+        expectTrue(cs.classForCoder == expected)
+        expectTrue(cs.classForKeyedArchiver == expected)
+    }
+
+    func test_AnyHashableContainingCharacterSet() {
+        let values: [CharacterSet] = [
+            CharacterSet(charactersIn: "ABC"),
+            CharacterSet(charactersIn: "XYZ"),
+            CharacterSet(charactersIn: "XYZ")
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(CharacterSet.self, type(of: anyHashables[0].base))
+        expectEqual(CharacterSet.self, type(of: anyHashables[1].base))
+        expectEqual(CharacterSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSCharacterSet() {
+        let values: [NSCharacterSet] = [
+            NSCharacterSet(charactersIn: "ABC"),
+            NSCharacterSet(charactersIn: "XYZ"),
+            NSCharacterSet(charactersIn: "XYZ"),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(CharacterSet.self, type(of: anyHashables[0].base))
+        expectEqual(CharacterSet.self, type(of: anyHashables[1].base))
+        expectEqual(CharacterSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 
@@ -140,9 +187,14 @@ class TestCharacterSet : TestCharacterSetSuper {
 var CharacterSetTests = TestSuite("TestCharacterSet")
 CharacterSetTests.test("testBasicConstruction") { TestCharacterSet().testBasicConstruction() }
 CharacterSetTests.test("testMutability_copyOnWrite") { TestCharacterSet().testMutability_copyOnWrite() }
+CharacterSetTests.test("testMutability_mutableCopyCrash") { TestCharacterSet().testMutability_mutableCopyCrash() }
+CharacterSetTests.test("testMutability_SR_1782") { TestCharacterSet().testMutability_SR_1782() }
 CharacterSetTests.test("testRanges") { TestCharacterSet().testRanges() }
 CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAndRemove() }
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
+CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
+CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacterSet().test_AnyHashableContainingCharacterSet() }
+CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 runAllTests()
 #endif
 

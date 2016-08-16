@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 
 // Test if all methods which go into a vtable have at least the visibility of its class.
 // Reason: Derived classes from "outside" still have to put the less visible base members
@@ -7,37 +7,37 @@
 class Base {
   // CHECK: define hidden void @_TFC14method_linkage4Base{{.*}}3foofT_T_
   @inline(never)
-  private func foo() {
+  fileprivate func foo() {
   }
 
   // CHECK: define internal void @_TFC14method_linkage4Base{{.*}}3barfT_T_
   @inline(never)
-  private final func bar() {
+  fileprivate final func bar() {
   }
 
   // CHECK: define hidden void @_TFC14method_linkage4Base{{.*}}5otherfT_T_
   @inline(never)
-  private func other() {
+  fileprivate func other() {
   }
 }
 class Derived : Base {
   // CHECK: define hidden void @_TFC14method_linkage7Derived{{.*}}3foofT_T_
   @inline(never)
-  private final override func foo() {
+  fileprivate final override func foo() {
   }
 }
 
 extension Base {
   // CHECK: define internal void @_TFC14method_linkage4Base{{.*}}7extfuncfT_T_
   @inline(never)
-  private func extfunc() {
+  fileprivate func extfunc() {
   }
 }
 
 public class PublicClass {
   // CHECK: define{{( protected)?}} void @_TFC14method_linkage11PublicClass{{.*}}4pfoofT_T_
   @inline(never)
-  private func pfoo() {
+  fileprivate func pfoo() {
   }
 
   // CHECK: define{{( protected)?}} void @_TFC14method_linkage11PublicClass4pbarfT_T_

@@ -187,7 +187,7 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
     }
     
     /**
-     Inverts the transformation matrix if possible. Matricies with a determinant that is less than
+     Inverts the transformation matrix if possible. Matrices with a determinant that is less than
      the smallest valid representation of a double value greater than zero are considered to be 
      invalid for representing as an inverse. If the input AffineTransform can potentially fall into
      this case then the inverted() method is suggested to be used instead since that will return
@@ -254,19 +254,16 @@ extension AffineTransform : ReferenceConvertible, Hashable, CustomStringConverti
     public var debugDescription: String {
         return description
     }
-}
 
-public func ==(lhs: AffineTransform, rhs: AffineTransform) -> Bool {
-    return lhs.m11 == rhs.m11 && lhs.m12 == rhs.m12 &&
-           lhs.m21 == rhs.m21 && lhs.m22 == rhs.m22 &&
-           lhs.tX == rhs.tX && lhs.tY == rhs.tY
+    public static func ==(lhs: AffineTransform, rhs: AffineTransform) -> Bool {
+        return lhs.m11 == rhs.m11 && lhs.m12 == rhs.m12 &&
+               lhs.m21 == rhs.m21 && lhs.m22 == rhs.m22 &&
+               lhs.tX == rhs.tX && lhs.tY == rhs.tY
+    }
+
 }
 
 extension AffineTransform : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSAffineTransform.self
     }
@@ -293,6 +290,14 @@ extension AffineTransform : _ObjectiveCBridgeable {
         var result: AffineTransform?
         _forceBridgeFromObjectiveC(x!, result: &result)
         return result!
+    }
+}
+
+extension NSAffineTransform : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as AffineTransform)
     }
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inout-deshadow | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inout-deshadow | %FileCheck %s
 
 sil_stage canonical
 
@@ -86,22 +86,22 @@ bb0(%0 : $*NontrivialStruct):
 // Inout deshadowing should *not* deshadow inouts that are copied to temporaries for use by
 // @in arguments. <rdar://problem/16105449>
 
-sil @in_argument : $@convention(thin) (@in protocol<>) -> ()
+sil @in_argument : $@convention(thin) (@in Any) -> ()
 
 // CHECK-LABEL: sil @inout_argument_passed_to_in_argument
-sil @inout_argument_passed_to_in_argument : $@convention(thin) (@inout protocol<>) -> () {
-// CHECK:       bb0([[INOUT:%.*]] : $*protocol<>):
-entry(%0 : $*protocol<>):
-  %f = function_ref @in_argument : $@convention(thin) (@in protocol<>) -> ()
-  %x = alloc_stack $protocol<>
+sil @inout_argument_passed_to_in_argument : $@convention(thin) (@inout Any) -> () {
+// CHECK:       bb0([[INOUT:%.*]] : $*Any):
+entry(%0 : $*Any):
+  %f = function_ref @in_argument : $@convention(thin) (@in Any) -> ()
+  %x = alloc_stack $Any
   // CHECK:       copy_addr [[INOUT]] to [initialization]
-  copy_addr %0 to [initialization] %x : $*protocol<>
-  %z = apply %f(%x) : $@convention(thin) (@in protocol<>) -> ()
-  dealloc_stack %x : $*protocol<>
+  copy_addr %0 to [initialization] %x : $*Any
+  %z = apply %f(%x) : $@convention(thin) (@in Any) -> ()
+  dealloc_stack %x : $*Any
   return %z : $()
 }
 
-sil @makeError : $@convention(thin) () -> @owned ErrorProtocol
+sil @makeError : $@convention(thin) () -> @owned Error
 
 struct MyStruct<T> {
   @sil_stored var placeholder: T
@@ -112,7 +112,7 @@ struct MyStruct<T> {
 
 // Verify that we deshadow in functions that throw.
 // CHECK-LABEL: throwing
-sil hidden @throwing : $@convention(method) <T> (Bool, @inout MyStruct<T>) -> @error ErrorProtocol {
+sil hidden @throwing : $@convention(method) <T> (Bool, @inout MyStruct<T>) -> @error Error {
 // CHECK: bb0
 bb0(%0 : $Bool, %1 : $*MyStruct<T>):
   %2 = alloc_stack $MyStruct<T>
@@ -124,13 +124,13 @@ bb0(%0 : $Bool, %1 : $*MyStruct<T>):
 
 // CHECK: bb1
 bb1:
-  %7 = function_ref @makeError : $@convention(thin) () -> @owned ErrorProtocol
-  %8 = apply %7() : $@convention(thin) () -> @owned ErrorProtocol
-  %9 = builtin "willThrow"(%8 : $ErrorProtocol) : $()
+  %7 = function_ref @makeError : $@convention(thin) () -> @owned Error
+  %8 = apply %7() : $@convention(thin) () -> @owned Error
+  %9 = builtin "willThrow"(%8 : $Error) : $()
 // CHECK-NOT: copy_addr
   copy_addr [take] %2 to %1 : $*MyStruct<T>
   dealloc_stack %2 : $*MyStruct<T>
-  throw %8 : $ErrorProtocol
+  throw %8 : $Error
 
 // CHECK: bb2
 bb2:

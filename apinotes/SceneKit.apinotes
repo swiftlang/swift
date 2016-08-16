@@ -1,0 +1,308 @@
+---
+Name: SceneKit
+
+Protocols:
+# The below are methods for which overlays provide better implementations
+- Name: SCNBoundingVolume
+  Methods:
+  - Selector: 'getBoundingBoxMin:max:'
+    SwiftPrivate: true
+    MethodKind: Instance
+  - Selector: 'setBoundingBoxMin:max:'
+    SwiftPrivate: true
+    MethodKind: Instance
+  - Selector: 'getBoundingSphereCenter:radius:'
+    SwiftPrivate: true
+    MethodKind: Instance
+
+#
+# New wrapper types will be made for these typedefs, and we want to nest them
+#
+Typedefs:
+- Name: SCNGeometrySourceSemantic
+  SwiftName: SCNGeometrySource.Semantic
+- Name: SCNLightType
+  SwiftName: SCNLight.LightType
+- Name: SCNLightingModel
+  SwiftName: SCNMaterial.LightingModel
+- Name: SCNParticleProperty
+  SwiftName: SCNParticleSystem.ParticleProperty
+- Name: SCNPhysicsShapeOption
+  SwiftName: SCNPhysicsShape.Option
+- Name: SCNPhysicsShapeType
+  SwiftName: SCNPhysicsShape.ShapeType
+- Name: SCNPhysicsTestOption
+  SwiftName: SCNPhysicsWorld.TestOption
+- Name: SCNPhysicsTestSearchMode
+  SwiftName: SCNPhysicsWorld.TestSearchMode
+- Name: SCNSceneAttribute
+  SwiftName: SCNScene.Attribute
+- Name: SCNSceneSourceAnimationImportPolicy
+  SwiftName: SCNSceneSource.AnimationImportPolicy
+- Name: SCNSceneSourceLoadingOption
+  SwiftName: SCNSceneSource.LoadingOption
+- Name: SCNViewOption
+  SwiftName: SCNView.Option
+
+#
+# Name overrides for globals that we will be nesting onto our new wrapper types
+#
+Globals:
+- Name: SCNHitTestFirstFoundOnlyKey
+  SwiftName: SCNHitTestOption.firstFoundOnly
+- Name: SCNHitTestSortResultsKey
+  SwiftName: SCNHitTestOption.sortResults
+- Name: SCNHitTestClipToZRangeKey
+  SwiftName: SCNHitTestOption.clipToZRange
+- Name: SCNHitTestBackFaceCullingKey
+  SwiftName: SCNHitTestOption.backFaceCulling
+- Name: SCNHitTestBoundingBoxOnlyKey
+  SwiftName: SCNHitTestOption.boundingBoxOnly
+- Name: SCNHitTestIgnoreChildNodesKey
+  SwiftName: SCNHitTestOption.ignoreChildNodes
+- Name: SCNHitTestRootNodeKey
+  SwiftName: SCNHitTestOption.rootNode
+- Name: SCNHitTestIgnoreHiddenNodesKey
+  SwiftName: SCNHitTestOption.ignoreHiddenNodes
+# FIXME: All of these are on nested types, which is not supported by swift_name
+# yet. Once it is, make these fully qualified
+- Name: SCNPhysicsShapeTypeKey
+  SwiftName: type
+- Name: SCNPhysicsShapeKeepAsCompoundKey
+  SwiftName: keepAsCompound
+- Name: SCNPhysicsShapeScaleKey
+  SwiftName: scale
+- Name: SCNPhysicsTestCollisionBitMaskKey
+  SwiftName: collisionBitMask
+- Name: SCNPhysicsTestSearchModeKey
+  SwiftName: searchMode
+- Name: SCNPhysicsTestBackfaceCullingKey
+  SwiftName: backfaceCulling
+- Name: SCNSceneStartTimeAttributeKey
+  SwiftName: startTime
+- Name: SCNSceneEndTimeAttributeKey
+  SwiftName: endTime
+- Name: SCNSceneFrameRateAttributeKey
+  SwiftName: frameRate
+- Name: SCNSceneUpAxisAttributeKey
+  SwiftName: upAxis
+- Name: SCNSceneSourceCreateNormalsIfAbsentKey
+  SwiftName: createNormalsIfAbsent
+- Name: SCNSceneSourceCheckConsistencyKey
+  SwiftName: checkConsistency
+- Name: SCNSceneSourceFlattenSceneKey
+  SwiftName: flattenScene
+- Name: SCNSceneSourceUseSafeModeKey
+  SwiftName: useSafeMode
+- Name: SCNSceneSourceAssetDirectoryURLsKey
+  SwiftName: assetDirectoryURLs
+- Name: SCNSceneSourceOverrideAssetURLsKey
+  SwiftName: overrideAssetURLs
+- Name: SCNSceneSourceStrictConformanceKey
+  SwiftName: strictConformance
+- Name: SCNSceneSourceConvertUnitsToMetersKey
+  SwiftName: convertUnitsToMeters
+- Name: SCNSceneSourceConvertToYUpKey
+  SwiftName: convertToYUp
+- Name: SCNSceneSourceAnimationImportPolicyKey
+  SwiftName: animationImportPolicy
+- Name: SCNPreferredRenderingAPIKey
+  SwiftName: preferredRenderingAPI
+- Name: SCNPreferredDeviceKey
+  SwiftName: preferredDevice
+- Name: SCNPreferLowPowerDeviceKey
+  SwiftName: preferLowPowerDevice
+
+#
+# API Renaming
+#
+Protocols:
+- Name: SCNActionable
+  Methods:
+  - Selector: 'runAction:'
+    MethodKind: Instance
+    SwiftName: runAction(_:)
+  - Selector: 'runAction:completionHandler:'
+    MethodKind: Instance
+    SwiftName: runAction(_:completionHandler:)
+  - Selector: 'runAction:forKey:'
+    MethodKind: Instance
+    SwiftName: runAction(_:forKey:)
+  - Selector: 'runAction:forKey:completionHandler:'
+    MethodKind: Instance
+    SwiftName: runAction(_:forKey:completionHandler:)
+- Name: SCNAnimatable
+  Methods:
+  - Selector: 'addAnimation:forKey:'
+    MethodKind: Instance
+    SwiftName: addAnimation(_:forKey:)
+  - Selector: 'isAnimationForKeyPaused:'
+    MethodKind: Instance
+    SwiftName: isAnimationPaused(forKey:)
+  - Selector: 'setSpeed:forAnimationKey:'
+    MethodKind: Instance
+    SwiftName: setAnimationSpeed(_:forKey:)
+- Name: SCNSceneRenderer
+  Methods:
+  - Selector: 'hitTest:options:'
+    MethodKind: Instance
+    SwiftName: hitTest(_:options:)
+  - Selector: 'isNodeInsideFrustum:withPointOfView:'
+    MethodKind: Instance
+    SwiftName: isNode(_:insideFrustumOf:)
+  - Selector: 'nodesInsideFrustumWithPointOfView:'
+    MethodKind: Instance
+    SwiftName: nodesInsideFrustum(of:)
+  - Selector: 'prepareObjects:withCompletionHandler:'
+    MethodKind: Instance
+    SwiftName: prepare(_:completionHandler:)
+- Name: SCNBufferStream
+  Methods:
+  - Selector: 'writeBytes:length:'
+    MethodKind: Instance
+    SwiftName: writeBytes(_:count:)
+- Name: SCNShadable
+  Methods:
+  - Selector: 'handleBindingOfSymbol:usingBlock:'
+    MethodKind: Instance
+    SwiftName: handleBinding(ofSymbol:handler:)
+  - Selector: 'handleUnbindingOfSymbol:usingBlock:'
+    MethodKind: Instance
+    SwiftName: handleUnbinding(ofSymbol:handler:)
+
+Classes:
+- Name: SCNAction
+  Methods:
+  - Selector: 'rotateToX:y:z:duration:shortestUnitArc:'
+    MethodKind: Class
+    SwiftName: rotateTo(x:y:z:duration:usesShortestUnitArc:)
+  - Selector: 'rotateByAngle:aroundAxis:duration:'
+    MethodKind: Class
+    SwiftName: rotate(by:around:duration:)
+  - Selector: 'fadeInWithDuration:'
+    MethodKind: Class
+    SwiftName: fadeIn(duration:)
+  - Selector: 'fadeOutWithDuration:'
+    MethodKind: Class
+    SwiftName: fadeOut(duration:)
+  - Selector: 'waitForDuration:'
+    MethodKind: Class
+    SwiftName: wait(duration:)
+  - Selector: 'waitForDuration:withRange:'
+    MethodKind: Class
+    SwiftName: wait(duration:withRange:)
+  - Selector: 'customActionWithDuration:actionBlock:'
+    MethodKind: Class
+    SwiftName: customAction(duration:action:)
+  - Selector: 'playAudioSource:waitForCompletion:'
+    MethodKind: Class
+    SwiftName: playAudio(_:waitForCompletion:)
+- Name: SCNLookAtConstraint
+  Properties:
+  - Name: gimbalLockEnabled
+    SwiftName: isGimbalLockEnabled
+- Name: SCNIKConstraint
+  Methods:
+  - Selector: 'inverseKinematicsConstraintWithChainRootNode:'
+    MethodKind: Class
+    SwiftName: inverseKinematicsConstraint(chainRootNode:)
+- Name: SCNGeometry
+  Methods:
+  - Selector: 'materialWithName:'
+    MethodKind: Instance
+    SwiftName: material(named:)
+  - Selector: 'geometrySourcesForSemantic:'
+    MethodKind: Instance
+    SwiftName: getGeometrySources(for:) # FIXME: is this the best name?
+- Name: SCNGeometrySource
+  Methods:
+  - Selector: 'geometrySourceWithData:semantic:vectorCount:floatComponents:componentsPerVector:bytesPerComponent:dataOffset:dataStride:'
+    MethodKind: Class
+    SwiftName: 'init(data:semantic:vectorCount:usesFloatComponents:componentsPerVector:bytesPerComponent:dataOffset:dataStride:)'
+  Properties:
+  - Name: floatComponents
+    SwiftName: usesFloatComponents
+- Name: SCNMaterial
+  Properties:
+  - Name: lightingModelName
+    SwiftName: lightingModel
+- Name: SCNMorpher
+  Methods:
+  - Selector: 'weightForTargetAtIndex:'
+    MethodKind: Instance
+    SwiftName: weight(forTargetAt:)
+- Name: SCNNode
+  Methods:
+  - Selector: 'hitTestWithSegmentFromPoint:toPoint:options:'
+    MethodKind: Instance
+    SwiftName: hitTestWithSegment(from:to:options:)
+- Name: SCNParticleSystem
+  Properties:
+  - Name: affectedByGravity
+    SwiftName: isAffectedByGravity
+  - Name: affectedByPhysicsFields
+    SwiftName: isAffectedByPhysicsFields
+  Methods:
+  - Selector: 'handleEvent:forProperties:withBlock:'
+    MethodKind: Instance
+    SwiftName: handle(_:forProperties:handler:)
+  - Selector: 'addModifierForProperties:atStage:withBlock:'
+    MethodKind: Instance
+    SwiftName: addModifier(forProperties:at:modifier:)
+  - Selector: 'removeModifiersOfStage:'
+    MethodKind: Instance
+    SwiftName: removeModifiers(at:)
+- Name: SCNScene
+  Methods:
+  - Selector: 'addParticleSystem:withTransform:'
+    MethodKind: Instance
+    SwiftName: addParticleSystem(_:transform:)
+- Name: SCNPhysicsBody
+  Methods:
+  - Selector: 'applyForce:impulse:'
+    MethodKind: Instance
+    SwiftName: applyForce(_:asImpulse:)
+  - Selector: 'applyForce:atPosition:impulse:'
+    MethodKind: Instance
+    SwiftName: applyForce(_:at:asImpulse:)
+  - Selector: 'applyTorque:impulse:'
+    MethodKind: Instance
+    SwiftName: applyTorque(_:asImpulse:)
+- Name: SCNPhysicsField
+  Methods:
+  - Selector: 'noiseFieldWithSmoothness:animationSpeed:'
+    MethodKind: Class
+    SwiftName: noiseField(smoothness:animationSpeed:)
+  - Selector: 'turbulenceFieldWithSmoothness:animationSpeed:'
+    MethodKind: Class
+    SwiftName: turbulenceField(smoothness:animationSpeed:)
+- Name: SCNPhysicsWorld
+  Methods:
+  - Selector: 'addBehavior:'
+    MethodKind: Instance
+    SwiftName: addBehavior(_:)
+  - Selector: 'removeBehavior:'
+    MethodKind: Instance
+    SwiftName: removeBehavior(_:)
+  - Selector: 'rayTestWithSegmentFromPoint:toPoint:options:'
+    MethodKind: Instance
+    SwiftName: rayTestWithSegment(from:to:options:)
+  - Selector: 'contactTestBetweenBody:andBody:options:'
+    MethodKind: Instance
+    SwiftName: contactTestBetween(_:_:options:)
+  - Selector: 'contactTestWithBody:options:'
+    MethodKind: Instance
+    SwiftName: contactTest(with:options:)
+  - Selector: 'convexSweepTestWithShape:fromTransform:toTransform:options:'
+    MethodKind: Instance
+    SwiftName: convexSweepTest(with:from:to:options:)
+- Name: SCNSceneSource
+  Methods:
+  - Selector: 'identifiersOfEntriesWithClass:'
+    MethodKind: Instance
+    SwiftName: identifiersOfEntries(withClass:)
+- Name: SCNProgram
+  Methods:
+  - Selector: 'handleBindingOfBufferNamed:frequency:usingBlock:'
+    MethodKind: Instance
+    SwiftName: handleBinding(ofBufferNamed:frequency:handler:)

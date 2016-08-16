@@ -7,7 +7,7 @@ struct NotObjCAble {
 
 @objc class ObjCClass {}
 
-dynamic prefix operator +!+ {}  // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{1-9=}}
+dynamic prefix operator +!+  // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{1-9=}}
 
 class Foo {
   dynamic init() {}

@@ -58,8 +58,7 @@ trie_generator.serialize(grapheme_cluster_break_property_table)
 
 #include <stdint.h>
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-const uint8_t _swift_stdlib_GraphemeClusterBreakPropertyTrieImpl[] = {
+static const uint8_t _swift_stdlib_GraphemeClusterBreakPropertyTrieImpl[] = {
 % for byte in trie_generator.trie_bytes:
   ${byte},
 % end
@@ -124,13 +123,13 @@ extended_grapheme_cluster_rules_matrix = \
 }%
 
 
-SWIFT_RUNTIME_STDLIB_INTERFACE
-const uint16_t _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl[] = {
+static const uint16_t _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl[] = {
 % for row in get_extended_grapheme_cluster_rules_matrix(grapheme_cluster_break_property_table):
   ${row},
 % end
 };
 
+extern "C"
 SWIFT_RUNTIME_STDLIB_INTERFACE
 const uint16_t *_swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrix =
     _swift_stdlib_ExtendedGraphemeClusterNoBoundaryRulesMatrixImpl;

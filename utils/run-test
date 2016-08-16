@@ -1,0 +1,270 @@
+#!/usr/bin/env python
+# utils/run-test - test runner for Swift -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from __future__ import print_function
+
+import argparse
+import multiprocessing
+import os
+import shutil
+import sys
+
+sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+
+from SwiftBuildSupport import SWIFT_SOURCE_ROOT  # noqa (E402)
+from swift_build_support import arguments  # noqa (E402)
+from swift_build_support import shell  # noqa (E402)
+from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
+
+
+TEST_MODES = [
+    'optimize_none',
+    'optimize',
+    'optimize_unchecked',
+    'only_executable',
+    'only_non_executable',
+]
+TEST_SUBSETS = [
+    'primary',
+    'validation',
+    'all',
+    'only_validation',
+    'only_long',
+]
+
+SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
+TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
+VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
+
+LIT_BIN_DEFAULT = os.path.join(SWIFT_SOURCE_ROOT, 'llvm',
+                               'utils', 'lit', 'lit.py')
+PROFDATA_MERGE = os.path.join(SWIFT_SOURCE_DIR,
+                              'utils', 'profdata_merge', 'main.py')
+host_target = StdlibDeploymentTarget.host_target().name
+
+
+def error_exit(msg):
+    print("%s: %s" % (os.path.basename(sys.argv[0]), msg), file=sys.stderr)
+    sys.exit(1)
+
+
+# Return true if the path looks like swift build directory.
+def is_swift_build_dir(path):
+    return (os.path.exists(os.path.join(path, "CMakeCache.txt")) and
+            os.path.isdir(os.path.join(path, "test-%s" % host_target)))
+
+
+# Return true if the swift build directory is configured with `Xcode`
+# generator.
+def is_build_dir_xcode(path):
+    return os.path.exists(os.path.join(path, 'Swift.xcodeproj'))
+
+
+# Return true if 'path' is sub path of 'd'
+def is_subpath(path, d):
+    path, d = os.path.abspath(path), os.path.abspath(d)
+    if os.path.isdir(path):
+        path = os.path.join(path, '')
+    d = os.path.join(d, '')
+    return path.startswith(d)
+
+
+# Convert test path in source directory to corresponding path in build
+# directory. If the path is not sub path of test directories in source,
+# return the path as is.
+def normalize_test_path(path, build_dir, variant):
+    for d, prefix in [(TEST_SOURCE_DIR, 'test-%s'),
+                      (VALIDATION_TEST_SOURCE_DIR, 'validation-test-%s')]:
+        if is_subpath(path, d):
+            return os.path.normpath(os.path.join(
+                build_dir,
+                prefix % variant,
+                os.path.relpath(path, d)))
+    return path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("paths", type=os.path.realpath,
+                        nargs="*", metavar="PATH",
+                        help="paths to test. Accept multiple. "
+                             "If --build-dir is not specified, these paths "
+                             "must be test paths in the Swift build "
+                             "directory. (default: primary test suite if "
+                             "--build-dir is specified, none otherwise)")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="run test with verbose output")
+    parser.add_argument("--build-dir", type=os.path.realpath, metavar="PATH",
+                        help="Swift build directory")
+    parser.add_argument("--build",
+                        choices=["true", "verbose", "skip"], default='true',
+                        help="build test dependencies before running tests "
+                             "(default: true)")
+    parser.add_argument("--target",
+                        type=arguments.type.shell_split,
+                        action=arguments.action.concat,
+                        dest="targets",
+                        help="stdlib deployment targets to test. Accept "
+                             "multiple (default: " + host_target + ")")
+    parser.add_argument("--mode",
+                        choices=TEST_MODES, default='optimize_none',
+                        help="test mode (default: optimize_none)")
+    parser.add_argument("--subset",
+                        choices=TEST_SUBSETS, default='primary',
+                        help="test subset (default: primary)")
+    parser.add_argument("--param",
+                        type=arguments.type.shell_split,
+                        action=arguments.action.concat,
+                        default=[],
+                        help="key=value parameters they are directly passed "
+                             "to lit command in addition to `mode` and "
+                             "`subset`. Accept multiple.")
+    parser.add_argument("--result-dir", type=os.path.realpath, metavar="PATH",
+                        help="directory to store test results (default: none)")
+    parser.add_argument("--merge-coverage",
+                        action=arguments.action.optional_bool,
+                        help="set to merge coverage profile")
+    parser.add_argument("--lit", default=LIT_BIN_DEFAULT, metavar="PATH",
+                        help="lit.py executable path "
+                             "(default: ${LLVM_SOURCE_DIR}/utils/lit/lit.py)")
+
+    args = parser.parse_args()
+
+    if args.merge_coverage:
+        if args.result_dir is None:
+            error_exit('Coverage needs --result-dir')
+
+    targets = args.targets
+    if targets is None:
+        targets = [host_target]
+
+    paths = []
+
+    build_dir = args.build_dir
+    if build_dir is not None:
+        # Fixup build directory.
+        # build_dir can be:
+        #   build-root/  # assuming we are to test host deployment target.
+        #   build-root/swift-{tool-deployment_target}/
+        for d in [
+                build_dir,
+                os.path.join(build_dir, 'swift-%s' % host_target)]:
+            if is_swift_build_dir(d):
+                build_dir = d
+                break
+        else:
+            error_exit("'%s' is not a swift build directory" % args.build_dir)
+
+        # If no path given, run primary test suite.
+        if not args.paths:
+            args.paths = [TEST_SOURCE_DIR]
+
+        # $ run-test --build-dir=<swift-build-dir> <test-dir-in-source> ... \
+        #       --target macosx-x86_64 --target iphonesimulator-i386
+        for target in targets:
+            paths += map(
+                lambda p: normalize_test_path(p, build_dir, target),
+                args.paths)
+
+    else:
+        # Otherwise, we assume all given paths are valid test paths in the
+        # build_dir.
+        paths = args.paths
+        if not paths:
+            error_exit("error: too few arguments")
+
+        if args.build != 'skip':
+            # Building dependencies requires `build_dir` set.
+            # Traverse the first test path to find the `build_dir`
+            d = os.path.dirname(paths[0])
+            while d not in ['', os.sep]:
+                if is_swift_build_dir(d):
+                    build_dir = d
+                    break
+                d = os.path.dirname(d)
+            else:
+                error_exit("Can't infer swift build directory")
+
+    # Ensure we have up to date test dependency
+    if args.build != 'skip' and is_build_dir_xcode(build_dir):
+        # We don't support Xcode Generator build yet.
+        print("warning: Building Xcode project is not supported yet. "
+              "Skipping...")
+        sys.stdout.flush()
+
+    elif args.build != 'skip':
+        dependency_targets = ["all", "SwiftUnitTests"]
+        upload_stdlib_targets = []
+        need_validation = any('/validation-test-' in path for path in paths)
+        for target in targets:
+            upload_stdlib_targets += ["upload-stdlib-%s" % target]
+            if need_validation:
+                dependency_targets += ["swift-stdlib-%s" % target]
+            else:
+                dependency_targets += ["swift-test-stdlib-%s" % target]
+
+        cmake_build = ['cmake', '--build', build_dir, '--']
+        if args.build == 'verbose':
+            cmake_build += ['-v']
+        cmake_build += ['-j%d' % multiprocessing.cpu_count()]
+
+        print("--- Building test dependencies %s ---" %
+              ', '.join(dependency_targets))
+        sys.stdout.flush()
+        shell.call(cmake_build + dependency_targets)
+        shell.call(cmake_build + upload_stdlib_targets)
+        print("--- Build finished ---")
+        sys.stdout.flush()
+
+    if args.result_dir is not None:
+        # Clear result directory
+        if os.path.exists(args.result_dir):
+            shutil.rmtree(args.result_dir)
+        os.makedirs(args.result_dir)
+
+    if args.verbose:
+        test_args = ["-a"]
+    else:
+        test_args = ["-sv"]
+
+    # Test parameters.
+    test_args += ['--param', 'swift_test_mode=%s' % args.mode,
+                  '--param', 'swift_test_subset=%s' % args.subset]
+
+    for param in args.param:
+        test_args += ['--param', param]
+
+    if args.result_dir:
+        test_args += ['--xunit-xml-output=%s' % os.path.join(args.result_dir,
+                                                             'lit-tests.xml')]
+
+    test_cmd = [sys.executable, args.lit] + test_args + paths
+
+    # Start merge worker
+    if args.merge_coverage:
+        merge_log = os.path.join(args.result_dir, 'profdata_merge.log')
+        profdata_merge_start = [sys.executable, PROFDATA_MERGE,
+                                '-l', merge_log,
+                                'start',
+                                '-o', args.result_dir]
+        shell.call(profdata_merge_start, echo=False)
+
+    # Do execute test
+    shell.call(test_cmd)
+
+    # Stop merge worker
+    if args.merge_coverage:
+        profdata_merge_start = [sys.executable, PROFDATA_MERGE, 'stop']
+        shell.call(shell.call, echo=False)
+
+if __name__ == "__main__":
+    main()

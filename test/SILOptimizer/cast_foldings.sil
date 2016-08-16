@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-combine %s | %FileCheck %s
 
 import Swift
 
@@ -58,7 +58,7 @@ entry:
 // CHECK-LABEL: sil @function_cast_throw_to_nothrow
 // CHECK:         builtin "int_trap"
 sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
-  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol) to () -> ()        in undef : $*(@in ()) -> @out ()
+  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () -> ()        in undef : $*(@in ()) -> @out ()
   return undef : $()
 }
 
@@ -66,7 +66,7 @@ sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
 // CHECK-LABEL: sil @function_cast_nothrow_to_throw
 // CHECK:         unconditional_checked_cast_addr
 sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
-  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol)
+  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@in ()) -> @out ()                 to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
   return undef : $()
 }
 
@@ -74,7 +74,7 @@ sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
 // CHECK:         load
 // CHECK:         store
 sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
-  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol) to () throws -> () in undef : $*(@in ()) -> (@out (), @error ErrorProtocol)
+  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@in ()) -> (@out (), @error Error) to () throws -> () in undef : $*(@in ()) -> (@out (), @error Error)
   return undef : $()
 }
 
@@ -104,3 +104,35 @@ bb0:
   dealloc_stack %1 : $*S
   return %6 : $AnyObject
 }
+
+// CHECK-LABEL: sil @destroy_source_of_removed_cast
+// CHECK: destroy_addr %0
+sil @destroy_source_of_removed_cast : $@convention(thin) (@in AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %2 = alloc_stack $Int
+  unconditional_checked_cast_addr take_always AnyObject in %0 : $*AnyObject to Int in %2 : $*Int
+  %3 = load %2 : $*Int
+  dealloc_stack %2 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+protocol P {}
+
+// CHECK-LABEL: sil @remove_dead_checked_cast
+// CHECK: bb0(%0 : $*AnyObject):
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: destroy_addr %0
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @remove_dead_checked_cast : $@convention(thin) (@in AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %5 = alloc_stack $P
+  unconditional_checked_cast_addr take_always AnyObject in %0 : $*AnyObject to P in %5 : $*P
+  destroy_addr %5 : $*P
+  dealloc_stack %5 : $*P
+  %r = tuple ()
+  return %r : $()
+}
+

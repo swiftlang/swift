@@ -211,7 +211,7 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
     return StringRef();
 
   swift::markup::MarkupContext MC;
-  auto DC = getDocComment(MC, D);
+  auto DC = getCascadingDocComment(MC, D);
   if (!DC.hasValue())
     return StringRef();
 

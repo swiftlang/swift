@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/PreprocessingRecord.h"
 #include "clang/Lex/Preprocessor.h"
@@ -27,6 +28,22 @@ using namespace ide;
 
 static inline StringRef getUSRSpacePrefix() {
   return "s:";
+}
+
+bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
+  using namespace Mangle;
+  Mangler Mangler(true);
+  Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
+  Mangler.finalize(OS);
+  return false;
+}
+
+bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
+  using namespace Mangle;
+  Mangler Mangler(true);
+  Mangler.mangleDeclTypeForDebugger(D);
+  Mangler.finalize(OS);
+  return false;
 }
 
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
@@ -39,7 +56,39 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
   ValueDecl *VD = const_cast<ValueDecl *>(D);
 
-  if (ClangNode ClangN = VD->getClangNode()) {
+  auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
+    ClangNode ClangN = D->getClangNode();
+    if (auto ClangD = ClangN.getAsDecl()) {
+      // NSErrorDomain causes the clang enum to be imported like this:
+      //
+      // struct MyError {
+      //     enum Code : Int32 {
+      //         case errFirst
+      //         case errSecond
+      //     }
+      //     static var errFirst: MyError.Code { get }
+      //     static var errSecond: MyError.Code { get }
+      // }
+      //
+      // The clang enum and enum constants are associated with both the
+      // struct/nested enum, and the static vars/enum cases.
+      // But we want unique USRs for the above symbols, so use the clang USR
+      // for the enum and enum cases, and the Swift USR for the struct and vars.
+      //
+      if (isa<clang::EnumDecl>(ClangD)) {
+        if (ClangD->hasAttr<clang::NSErrorDomainAttr>() && isa<StructDecl>(D))
+          return ClangNode();
+      } else if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
+        if (auto *ClangEnum = dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
+          if (ClangEnum->hasAttr<clang::NSErrorDomainAttr>() && isa<VarDecl>(D))
+            return ClangNode();
+        }
+      }
+    }
+    return ClangN;
+  };
+
+  if (ClangNode ClangN = interpretAsClangNode(D)) {
     llvm::SmallString<128> Buf;
     if (auto ClangD = ClangN.getAsDecl()) {
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buf);

@@ -52,3 +52,11 @@ public extension S1 {
 public protocol P2 {
   @objc optional func foo1()
 }
+
+public protocol P3 {
+  associatedtype T
+}
+
+public struct S2 : P3 {
+  public typealias T = S2
+}

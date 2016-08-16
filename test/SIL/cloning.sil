@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
 
 // Check cloning of instructions.
 

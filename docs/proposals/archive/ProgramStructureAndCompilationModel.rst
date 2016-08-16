@@ -3,6 +3,8 @@
 .. @raise litre.TestsAreMissing
 .. _ProgramStructureAndCompilationModel:
 
+.. highlight:: none
+
 Swift Program Structure and Compilation Model
 =============================================
 

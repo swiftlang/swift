@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 protocol AddrOnly {}
 
@@ -129,7 +129,7 @@ class Y: X<D> {
 // optional.
 
 class Foo {
-  func foo(x: (Int) -> Int) -> ((Int) -> Int)? {}
+  func foo(x: @escaping (Int) -> Int) -> ((Int) -> Int)? {}
 }
 
 class Bar: Foo {
@@ -164,7 +164,7 @@ class Noot : Aap {
   override func map() -> (S?) -> () -> Noot {}
 }
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<(Int) -> Int>
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foo{{.*}}
 // CHECK:         apply [[IMPL]]

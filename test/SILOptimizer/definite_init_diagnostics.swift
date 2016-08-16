@@ -414,7 +414,6 @@ class SomeDerivedClass : SomeClass {
 //  Delegating initializers
 //===----------------------------------------------------------------------===//
 
-
 class DelegatingCtorClass {
   var ivar: EmptyStruct
 
@@ -449,7 +448,7 @@ class DelegatingCtorClass {
   }                // expected-error {{self.init isn't called on all paths before returning from initializer}}
 
   convenience init(bool: Bool) {
-    doesntReturn()
+    doesNotReturn()
   }
 
   convenience init(double: Double) {
@@ -531,50 +530,15 @@ protocol TriviallyConstructible {
 }
 
 extension TriviallyConstructible {
-  init(up: Int) {
-    self.init()
-    go(up)
-  }
-
   init(down: Int) {
     go(down) // expected-error {{'self' used before self.init call}}
     self.init()
   }
 }
 
-class TrivialClass : TriviallyConstructible {
-  required init() {}
-
-  func go(_ x: Int) {}
-
-  convenience init(y: Int) {
-    self.init(up: y * y)
-  }
-}
-
-struct TrivialStruct : TriviallyConstructible {
-  init() {}
-
-  func go(_ x: Int) {}
-
-  init(y: Int) {
-    self.init(up: y * y)
-  }
-}
-
-enum TrivialEnum : TriviallyConstructible {
-  case NotSoTrivial
-
-  init() {
-    self = .NotSoTrivial
-  }
-
-  func go(_ x: Int) {}
-
-  init(y: Int) {
-    self.init(up: y * y)
-  }
-}
+//===----------------------------------------------------------------------===//
+//  Various bugs
+//===----------------------------------------------------------------------===//
 
 // rdar://16119509 - Dataflow problem where we reject valid code.
 class rdar16119509_Buffer {
@@ -608,8 +572,7 @@ class Foo {
 
 
 
-@noreturn
-func doesntReturn() {
+func doesNotReturn() -> Never {
   while true {}
 }
 
@@ -620,7 +583,7 @@ func testNoReturn1(_ b : Bool) -> Any {
   if b {
     a = 42
   } else {
-    doesntReturn()
+    doesNotReturn()
   }
 
   return a   // Ok, because the noreturn call path isn't viable.
@@ -639,10 +602,10 @@ func testNoReturn2(_ b : Bool) -> Any {
 }
 
 class PerpetualMotion {
-  @noreturn func start() {
+  func start() -> Never {
     repeat {} while true
   }
-  @noreturn static func stop() {
+  static func stop() -> Never {
     repeat {} while true
   }
 }

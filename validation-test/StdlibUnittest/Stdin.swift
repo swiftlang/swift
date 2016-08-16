@@ -6,7 +6,7 @@ import StdlibUnittest
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
 

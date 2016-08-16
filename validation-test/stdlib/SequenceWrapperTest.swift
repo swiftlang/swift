@@ -29,11 +29,11 @@ let indirect = LoggingSequence(wrapping: direct)
 let dispatchLog = base.log
 
 func expectWrapperDispatch<R1, R2>(
-  @autoclosure _ directOperation: () -> R1,
-  @autoclosure _ indirectOperation: () -> R2,
+  _ directOperation: @autoclosure () -> R1,
+  _ indirectOperation: @autoclosure () -> R2,
   _ counters: TypeIndexed<Int>,
   //===--- TRACE boilerplate ----------------------------------------------===//
-  @autoclosure _ message: () -> String = "",
+  _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = #file, line: UInt = #line
@@ -85,10 +85,10 @@ sequenceWrapperTests.test("Dispatch/_preprocessingPass") {
     dispatchLog._preprocessingPass)
 }
 
-sequenceWrapperTests.test("Dispatch/_copyToNativeArrayBuffer") {
+sequenceWrapperTests.test("Dispatch/_copyToContiguousArray") {
   expectWrapperDispatch(
-    direct._copyToNativeArrayBuffer(), indirect._copyToNativeArrayBuffer(),
-    dispatchLog._copyToNativeArrayBuffer)
+    direct._copyToContiguousArray(), indirect._copyToContiguousArray(),
+    dispatchLog._copyToContiguousArray)
 }
 
 runAllTests()

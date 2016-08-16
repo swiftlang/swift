@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | FileCheck %s 
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s 
 
 import Builtin
 import Swift
@@ -1145,4 +1145,13 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   store %3 to %1: $*Builtin.Int64
   %4 = load %1 : $*Builtin.Int64
   return %4 : $Builtin.Int64
+}
+
+sil @redundant_load_mark_dependence : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
+  %4 = load %2 : $*Builtin.Int64
+  %5 = load %2 : $*Builtin.Int64
+  %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
+  return %6 : $(Builtin.Int64, Builtin.Int64)
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s | %FileCheck %s
 
 struct A {}
 
@@ -7,8 +7,8 @@ enum Optionable<T> {
   case Nuttn
 }
 
-// CHECK-LABEL: sil hidden @_TF18switch_abstraction18enum_reabstractionFT1xGOS_10OptionableFVS_1AS1__1aS1__T_ : $@convention(thin) (@owned Optionable<A -> A>, A) -> ()
-// CHECK: switch_enum {{%.*}} : $Optionable<A -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
+// CHECK-LABEL: sil hidden @_TF18switch_abstraction18enum_reabstractionFT1xGOS_10OptionableFVS_1AS1__1aS1__T_ : $@convention(thin) (@owned Optionable<(A) -> A>, A) -> ()
+// CHECK: switch_enum {{%.*}} : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
 // CHECK: [[DEST]]([[ORIG:%.*]] : $@callee_owned (@in A) -> @out A):
 // CHECK:   [[REABSTRACT:%.*]] = function_ref @_TTR
 // CHECK:   [[SUBST:%.*]] = partial_apply [[REABSTRACT]]([[ORIG]])

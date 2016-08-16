@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -34,21 +34,21 @@ struct ReferenceStorageTypeLayout<T> {
   weak            var pwi: P!
 
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBO, i32 17)
-  unowned(safe)   var pqs:  protocol<P, Q>
+  unowned(safe)   var pqs:  P & Q
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
-  unowned(unsafe) var pqu:  protocol<P, Q>
+  unowned(unsafe) var pqu:  P & Q
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBO_, i32 17)
-  weak            var pqwo: protocol<P, Q>?
+  weak            var pqwo: (P & Q)?
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBO_, i32 17)
-  weak            var pqwi: protocol<P, Q>!
+  weak            var pqwi: (P & Q)!
 
   // -- Open-code layouts when there are witness tables.
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_bt, i32 0, i32 0)
-  unowned(safe)   var pqrs:  protocol<P, Q, NonObjC>
+  unowned(safe)   var pqrs:  P & Q & NonObjC
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_pod, i32 0, i32 0)
-  unowned(unsafe) var pqru:  protocol<P, Q, NonObjC>
+  unowned(unsafe) var pqru:  P & Q & NonObjC
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_1, i32 0, i32 0)
-  weak            var pqrwo: protocol<P, Q, NonObjC>?
+  weak            var pqrwo: (P & Q & NonObjC)?
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_1, i32 0, i32 0)
-  weak            var pqrwi: protocol<P, Q, NonObjC>!
+  weak            var pqrwi: (P & Q & NonObjC)!
 }

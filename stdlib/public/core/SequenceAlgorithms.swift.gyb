@@ -21,10 +21,10 @@ orderingExplanation = """\
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
-  /// - `isOrderedBefore(a, a)` is always `false`. (Irreflexivity)
-  /// - If `isOrderedBefore(a, b)` and `isOrderedBefore(b, c)` are both `true`,
-  ///   then `isOrderedBefore(a, c)` is also `true`. (Transitive
-  ///   comparability)
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
   /// - Two elements are *incomparable* if neither is ordered before the other
   ///   according to the predicate. If `a` and `b` are incomparable, and `b`
   ///   and `c` are incomparable, then `a` and `c` are also incomparable.
@@ -36,10 +36,10 @@ equivalenceExplanation = """\
   /// is, for any elements `a`, `b`, and `c`, the following conditions must
   /// hold:
   ///
-  /// - `isEquivalent(a, a)` is always `true`. (Reflexivity)
-  /// - `isEquivalent(a, b)` implies `isEquivalent(b, a)`. (Symmetry)
-  /// - If `isEquivalent(a, b)` and `isEquivalent(b, c)` are both `true`, then
-  ///   `isEquivalent(a, c)` is also `true`. (Transitivity)
+  /// - `areEquivalent(a, a)` is always `true`. (Reflexivity)
+  /// - `areEquivalent(a, b)` implies `areEquivalent(b, a)`. (Symmetry)
+  /// - If `areEquivalent(a, b)` and `areEquivalent(b, c)` are both `true`, then
+  ///   `areEquivalent(a, c)` is also `true`. (Transitivity)
   ///"""
 
 }%
@@ -56,7 +56,7 @@ extension Sequence {
   /// This example enumerates the characters of the string "Swift" and prints
   /// each character along with its place in the string.
   ///
-  ///     > for (n, c) in "Swift".characters.enumerated() {
+  ///     for (n, c) in "Swift".characters.enumerated() {
   ///         print("\(n): '\(c)'")
   ///     }
   ///     // Prints "0: 'S'"
@@ -64,6 +64,35 @@ extension Sequence {
   ///     // Prints "2: 'i'"
   ///     // Prints "3: 'f'"
   ///     // Prints "4: 't'"
+  ///
+  /// When enumerating a collection, the integer part of each pair is a counter
+  /// for the enumeration, not necessarily the index of the paired value.
+  /// These counters can only be used as indices in instances of zero-based,
+  /// integer-indexed collections, such as `Array` and `ContiguousArray`. For
+  /// other collections the counters may be out of range or of the wrong type
+  /// to use as an index. To iterate over the elements of a collection with its
+  /// indices, use the `zip(_:_:)` function.
+  ///
+  /// This example iterates over the indices and elements of a set, building a
+  /// list of indices of names with five or fewer letters.
+  ///
+  ///     let names: Set = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
+  ///     var shorterIndices: [SetIndex<String>] = []
+  ///     for (i, name) in zip(names.indices, names) {
+  ///         if name.characters.count <= 5 {
+  ///             shorterIndices.append(i)
+  ///         }
+  ///     }
+  ///
+  /// Now that the `shorterIndices` array holds the indices of the shorter
+  /// names in the `names` set, you can use those indices to access elements in
+  /// the set.
+  ///
+  ///     for i in shorterIndices {
+  ///         print(names[i])
+  ///     }
+  ///     // Prints "Sofia"
+  ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
   public func enumerated() -> EnumeratedSequence<Self> {
@@ -87,7 +116,7 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
   /// the comparison between elements.
   ///
 ${orderingExplanation}
-  /// This example shows how to use the `min(isOrderedBefore:)` method on a
+  /// This example shows how to use the `min(by:)` method on a
   /// dictionary to find the key-value pair with the lowest value.
   ///
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
@@ -95,11 +124,12 @@ ${orderingExplanation}
   ///     print(leastHue)
   ///     // Prints "Optional(("Coral", 16))"
   ///
-  /// - Parameter isOrderedBefore: A predicate that returns `true` if its first
-  ///   argument should be ordered before its second argument; otherwise,
-  ///   `false`.
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true`
+  ///   if its first argument should be ordered before its second
+  ///   argument; otherwise, `false`.
   /// - Returns: The sequence's minimum element, according to
-  ///   `isOrderedBefore`. If the sequence has no elements, returns `nil`.
+  ///   `areInIncreasingOrder`. If the sequence has no elements, returns
+  ///   `nil`.
   ///
   /// - SeeAlso: `min()`
 %   else:
@@ -115,18 +145,19 @@ ${orderingExplanation}
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
   ///
-  /// - SeeAlso: `min(isOrderedBefore:)`
+  /// - SeeAlso: `min(by:)`
 %   end
+  @warn_unqualified_access
   public func min(
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
-      if try isOrderedBefore(e, result) { result = e }
+      if try areInIncreasingOrder(e, result) { result = e }
 %   else:
       if e < result { result = e }
 %   end
@@ -139,7 +170,7 @@ ${orderingExplanation}
   /// as the comparison between elements.
   ///
 ${orderingExplanation}
-  /// This example shows how to use the `max(isOrderedBefore:)` method on a
+  /// This example shows how to use the `max(by:)` method on a
   /// dictionary to find the key-value pair with the highest value.
   ///
   ///     let hues = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
@@ -147,7 +178,7 @@ ${orderingExplanation}
   ///     print(greatestHue)
   ///     // Prints "Optional(("Heliotrope", 296))"
   ///
-  /// - Parameter isOrderedBefore:  A predicate that returns `true` if its
+  /// - Parameter areInIncreasingOrder:  A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
@@ -167,18 +198,19 @@ ${orderingExplanation}
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
   ///
-  /// - SeeAlso: `max(isOrderedBefore:)`
+  /// - SeeAlso: `max(by:)`
 %   end
+  @warn_unqualified_access
   public func max(
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var it = makeIterator()
     guard var result = it.next() else { return nil }
     for e in IteratorSequence(it) {
 %   if preds:
-      if try isOrderedBefore(result, e) { result = e }
+      if try areInIncreasingOrder(result, e) { result = e }
 %   else:
       if e > result { result = e }
 %   end
@@ -208,38 +240,43 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 ${equivalenceExplanation}
   /// - Parameters:
   ///   - possiblePrefix: A sequence to compare to this sequence.
-  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if the initial elements of the sequence are equivalent
-  ///   to the elements of `possiblePrefix`; otherwise, `false`. Returns
-  ///   `true` if `possiblePrefix` has no elements.
+  ///   to the elements of `possiblePrefix`; otherwise, `false`. If
+  ///   `possiblePrefix` has no elements, the return value is `true`.
   ///
   /// - SeeAlso: `starts(with:)`
 %   else:
   /// Returns a Boolean value indicating whether the initial elements of the
   /// sequence are the same as the elements in another sequence.
   ///
-  /// For example:
+  /// This example tests whether one countable range begins with the elements
+  /// of another countable range.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
   ///
   ///     print(b.starts(with: a))
   ///     // Prints "true"
+  ///
+  /// Passing a sequence with no elements or an empty collection as
+  /// `possiblePrefix` always results in `true`.
+  ///
   ///     print(b.starts(with: []))
   ///     // Prints "true"
   ///
   /// - Parameter possiblePrefix: A sequence to compare to this sequence.
   /// - Returns: `true` if the initial elements of the sequence are the same as
-  ///   the elements of `possiblePrefix`; otherwise, `false`. Returns `true`
-  ///   if `possiblePrefix` has no elements.
+  ///   the elements of `possiblePrefix`; otherwise, `false`. If
+  ///   `possiblePrefix` has no elements, the return value is `true`.
   ///
-  /// - SeeAlso: `starts(with:isEquivalent:)`
+  /// - SeeAlso: `starts(with:by:)`
 %   end
   public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
-    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -249,7 +286,7 @@ ${equivalenceExplanation}
     var possiblePrefixIterator = possiblePrefix.makeIterator()
     for e0 in self {
       if let e1 = possiblePrefixIterator.next() {
-        if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
+        if ${"try !areEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
       }
@@ -275,7 +312,7 @@ ${equivalenceExplanation}
 extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %   if preds:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain equivalent elements, using the given predicate as the
   /// equivalence test.
   ///
@@ -284,19 +321,20 @@ extension Sequence ${"" if preds else "where Iterator.Element : Equatable"} {
 ${equivalenceExplanation}
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
-  ///   - isEquivalent: A predicate that returns `true` if its two arguments
+  ///   - areEquivalent: A predicate that returns `true` if its two arguments
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
-  ///   using `isEquivalent` as the equivalence test; otherwise, `false.`
+  ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
   ///
   /// - SeeAlso: `elementsEqual(_:)`
 %   else:
-  /// Returns a Boolean value indicating whether the sequence and a given
+  /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain the same elements in the same order.
   ///
   /// At least one of the sequences must be finite.
   ///
-  /// For example:
+  /// This example tests whether one countable range shares the same elements
+  /// as another countable range and an array.
   ///
   ///     let a = 1...3
   ///     let b = 1...10
@@ -310,12 +348,12 @@ ${equivalenceExplanation}
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
   ///
-  /// - SeeAlso: `elementsEqual(_:isEquivalent:)`
+  /// - SeeAlso: `elementsEqual(_:by:)`
 %   end
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    isEquivalent: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -327,7 +365,7 @@ ${equivalenceExplanation}
     while true {
       switch (iter1.next(), iter2.next()) {
       case let (e1?, e2?):
-        if ${'try !isEquivalent(e1, e2)' if preds else 'e1 != e2'} {
+        if ${'try !areEquivalent(e1, e2)' if preds else 'e1 != e2'} {
           return false
         }
       case (_?, nil),
@@ -355,17 +393,17 @@ extension Sequence ${"" if preds else "where Iterator.Element : Comparable"} {
 
 %   if preds:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the given
+  /// sequence in a lexicographical (dictionary) ordering, using the given
   /// predicate to compare elements.
   ///
 ${orderingExplanation}
   /// - Parameters:
   ///   - other: A sequence to compare to this sequence.
-  ///   - isOrderedBefore:  A predicate that returns `true` if its first
+  ///   - areInIncreasingOrder:  A predicate that returns `true` if its first
   ///     argument should be ordered before its second argument; otherwise,
   ///     `false`.
   /// - Returns: `true` if this sequence precedes `other` in a dictionary
-  ///   ordering as ordered by `isOrderedBefore`; otherwise, `false`.
+  ///   ordering as ordered by `areInIncreasingOrder`; otherwise, `false`.
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting
@@ -374,10 +412,11 @@ ${orderingExplanation}
   /// - SeeAlso: `lexicographicallyPrecedes(_:)`
 %   else:
   /// Returns a Boolean value indicating whether the sequence precedes another
-  /// sequence in a lexicographical ("dictionary") ordering, using the
+  /// sequence in a lexicographical (dictionary) ordering, using the
   /// less-than operator (`<`) to compare elements.
   ///
-  /// For example:
+  /// This example uses the `lexicographicallyPrecedes` method to test which
+  /// array of integers comes first in a lexicographical ordering.
   ///
   ///     let a = [1, 2, 2, 2]
   ///     let b = [1, 2, 3, 4]
@@ -393,14 +432,15 @@ ${orderingExplanation}
   ///
   /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting
-  ///   strings to present to the end user, you should use `String` APIs that
+  ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-  /// - SeeAlso: `lexicographicallyPrecedes(_:isOrderedBefore:)`
+  /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    by areInIncreasingOrder: 
+      (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool
     where
@@ -412,10 +452,10 @@ ${orderingExplanation}
     while true {
       if let e1 = iter1.next() {
         if let e2 = iter2.next() {
-          if ${"try isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
+          if ${"try areInIncreasingOrder(e1, e2)" if preds else "e1 < e2"} {
             return true
           }
-          if ${"try isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
+          if ${"try areInIncreasingOrder(e2, e1)" if preds else "e2 < e1"} {
             return false
           }
           continue // Equivalent
@@ -501,7 +541,7 @@ extension Sequence {
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
   public func contains(
-    _ predicate: @noescape (${GElement}) throws -> Bool
+    where predicate: (${GElement}) throws -> Bool
   ) rethrows -> Bool {
     for e in self {
       if try predicate(e) {
@@ -520,40 +560,44 @@ extension Sequence {
   /// Returns the result of calling the given combining closure with each
   /// element of this sequence and an accumulating value.
   ///
-  /// The `combine` closure is called sequentially with an accumulating
-  /// value initialized to `initial` and each element of the sequence. This
-  /// example shows how to find the sum of an array of numbers.
+  /// The `nextPartialResult` closure is called sequentially with an
+  /// accumulating value initialized to `initialResult` and each
+  /// element of the sequence. This example shows how to find the sum
+  /// of an array of numbers.
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///     let addTwo: (Int, Int) -> Int = { x, y in x + y }
-  ///     let numberSum = numbers.reduce(0, combine: addTwo)
+  ///     let numberSum = numbers.reduce(0, addTwo)
   ///     // 'numberSum' == 10
   ///
-  /// When `numbers.reduce(_:combine:)` is called, the following steps
-  /// occur:
+  /// When `numbers.reduce(_:_:)` is called, the
+  /// following steps occur:
   ///
-  /// 1. The `combine` closure is called with the initial value and the
-  ///    first element of `numbers`, returning the sum: `1`.
+  /// 1. The `nextPartialResult` closure is called with the initial
+  ///    result and the first element of `numbers`, returning the sum:
+  ///    `1`.
   /// 2. The closure is called again repeatedly with the previous call's
   ///    return value and each element of the sequence.
   /// 3. When the sequence is exhausted, the last value returned from the
   ///    closure is returned to the caller.
   ///
   /// - Parameters:
-  ///   - initial: A value to use as the initial value for accumulation.
-  ///   - combine: A closure that combines an accumulating value and an
-  ///     element of the sequence into a new accumulating value, to be used
-  ///     in the next call of the `combine` closure or returned to the
-  ///     caller.
+  ///   - initialResult: the initial accumulating value.
+  ///   - nextPartialResult: A closure that combines an accumulating
+  ///     value and an element of the sequence into a new accumulating
+  ///     value, to be used in the next call of the
+  ///     `nextPartialResult` closure or returned to the caller.
   /// - Returns: The final accumulated value.
-  public func reduce<T>(
-    _ initial: T, combine: @noescape (T, ${GElement}) throws -> T
-  ) rethrows -> T {
-    var result = initial
+  public func reduce<Result>(
+    _ initialResult: Result,
+    _ nextPartialResult:
+      (_ partialResult: Result, ${GElement}) throws -> Result
+  ) rethrows -> Result {
+    var accumulator = initialResult
     for element in self {
-      result = try combine(result, element)
+      accumulator = try nextPartialResult(accumulator, element)
     }
-    return result
+    return accumulator
   }
 }
 
@@ -567,7 +611,7 @@ extension Sequence {
   ///
   /// The sequence must be finite.
   ///
-  /// - Complexity: O(N), where N is the length of the sequence.
+  /// - Complexity: O(*n*), where *n* is the length of the sequence.
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
@@ -607,7 +651,7 @@ extension Sequence {
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to
-  /// `Array(s.map(transform).flatten())`.
+  /// `Array(s.map(transform).joined())`.
   ///
   /// - Parameter transform: A closure that accepts an element of this
   ///   sequence as its argument and returns a sequence or collection.
@@ -615,9 +659,9 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  /// - SeeAlso: `flatten()`, `map(_:)`
+  /// - SeeAlso: `joined()`, `map(_:)`
   public func flatMap<SegmentOfResult : Sequence>(
-    _ transform: @noescape (${GElement}) throws -> SegmentOfResult
+    _ transform: (${GElement}) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.${GElement}] {
     var result: [SegmentOfResult.${GElement}] = []
     for element in self {
@@ -653,7 +697,7 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   public func flatMap<ElementOfResult>(
-    _ transform: @noescape (${GElement}) throws -> ElementOfResult?
+    _ transform: (${GElement}) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     var result: [ElementOfResult] = []
     for element in self {
@@ -666,34 +710,34 @@ extension Sequence {
 }
 
 extension Sequence {
-  @available(*, unavailable, renamed: "enumerated")
+  @available(*, unavailable, renamed: "enumerated()")
   public func enumerate() -> EnumeratedSequence<Self> {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "min")
+  @available(*, unavailable, renamed: "min(by:)")
   public func minElement(
-    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
+    _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "max")
+  @available(*, unavailable, renamed: "max(by:)")
   public func maxElement(
-    _ isOrderedBefore: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
+    _ isOrderedBefore: (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "reversed")
+  @available(*, unavailable, renamed: "reversed()")
   public func reverse() -> [Iterator.Element] {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "starts")
+  @available(*, unavailable, renamed: "starts(with:by:)")
   public func startsWith<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix,
-    isEquivalent: @noescape (Iterator.Element, Iterator.Element) throws -> Bool
+    _ possiblePrefix: PossiblePrefix,
+    isEquivalent: (Iterator.Element, Iterator.Element) throws -> Bool
   ) rethrows-> Bool
     where
     PossiblePrefix : Sequence,
@@ -701,34 +745,60 @@ extension Sequence {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "lexicographicallyPrecedes")
+  @available(*, unavailable, renamed: "elementsEqual(_:by:)")
+  public func elementsEqual<OtherSequence>(
+    _ other: OtherSequence,
+    isEquivalent isEquivalent: (${GElement}, ${GElement}) throws -> Bool
+  ) rethrows -> Bool
+    where
+    OtherSequence: Sequence,
+    OtherSequence.${GElement} == ${GElement} {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "lexicographicallyPrecedes(_:by:)")
   public func lexicographicalCompare<
     OtherSequence
   >(
     _ other: OtherSequence,
-    isOrderedBefore: @noescape (${GElement}, ${GElement}) throws -> Bool
+    isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
   ) rethrows -> Bool
     where
     OtherSequence : Sequence,
     OtherSequence.${GElement} == ${GElement} {
     Builtin.unreachable()
   }
+
+  @available(*, unavailable, renamed: "contains(where:)")
+  public func contains(
+    _ predicate: (${GElement}) throws -> Bool
+  ) rethrows -> Bool {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "reduce(_:_:)")
+  public func reduce<Result>(
+    _ initial: Result,
+    combine combine: (_ partialResult: Result, ${GElement}) throws -> Result
+  ) rethrows -> Result {
+    Builtin.unreachable()
+  }
 }
 
 extension Sequence where Iterator.Element : Comparable {
-  @available(*, unavailable, renamed: "min")
+  @available(*, unavailable, renamed: "min()")
   public func minElement() -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "max")
+  @available(*, unavailable, renamed: "max()")
   public func maxElement() -> Iterator.Element? {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "starts")
+  @available(*, unavailable, renamed: "starts(with:)")
   public func startsWith<PossiblePrefix>(
-    with possiblePrefix: PossiblePrefix
+    _ possiblePrefix: PossiblePrefix
   ) -> Bool
     where
     PossiblePrefix : Sequence,

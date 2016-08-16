@@ -33,8 +33,8 @@
 ///     // Prints "✈︎"
 @_fixed_layout
 public struct UnicodeScalar :
-  _BuiltinUnicodeScalarLiteralConvertible,
-  UnicodeScalarLiteralConvertible {
+  _ExpressibleByBuiltinUnicodeScalarLiteral,
+  ExpressibleByUnicodeScalarLiteral {
 
   var _value: UInt32
 
@@ -64,18 +64,28 @@ public struct UnicodeScalar :
 
   /// Creates a Unicode scalar with the specified numeric value.
   ///
+  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
+  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
+  ///   `0xE000...0x10FFFF`. In case of an invalid unicode scalar value, nil is
+  ///   returned.
+  ///
   /// For example, the following code sample creates a `UnicodeScalar` instance
   /// with a value of an emoji character:
   ///
   ///     let codepoint: UInt32 = 127881
   ///     let emoji = UnicodeScalar(codepoint)
-  ///     print(emoji)
+  ///     print(emoji!)
   ///     // Prints "🎉"
   ///
-  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
-  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
-  ///   `0xE000...0x10FFFF`.
-  public init(_ v: UInt32) {
+  /// In case of an invalid input value, nil is returned.
+  ///
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     if let emoji = UnicodeScalar(codepoint) {
+  ///       print(emoji)
+  ///     } else {
+  ///       // Do something else
+  ///     }
+  public init?(_ v: UInt32) {
     // Unicode 6.3.0:
     //
     //     D9.  Unicode codespace: A range of integers from 0 to 10FFFF.
@@ -85,29 +95,43 @@ public struct UnicodeScalar :
     //
     //     * As a result of this definition, the set of Unicode scalar values
     //     consists of the ranges 0 to D7FF and E000 to 10FFFF, inclusive.
-
-    _precondition(v < 0xD800 || v > 0xDFFF,
-        "high- and low-surrogate code points are not valid Unicode scalar values")
-    _precondition(v <= 0x10FFFF, "value is outside of Unicode codespace")
-
-    self._value = v
+    if (v < 0xD800 || v > 0xDFFF) && v <= 0x10FFFF {
+      self._value = v
+      return
+    }
+    // Return nil in case of invalid unicode scalar value.
+    return nil
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
+  ///
+  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
+  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
+  ///   `0xE000...0xFFFF`. In case of an invalid unicode scalar value, nil is
+  ///   returned.
   ///
   /// For example, the following code sample creates a `UnicodeScalar` instance
   /// with a value of `밥`, the Korean word for rice:
   ///
   ///     let codepoint: UInt16 = 48165
   ///     let bap = UnicodeScalar(codepoint)
-  ///     print(bap)
+  ///     print(bap!)
   ///     // Prints "밥"
   ///
-  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
-  ///   a valid Unicode scalar value, in the range `0...0xD7FF` or
-  ///   `0xE000...0xFFFF`.
-  public init(_ v: UInt16) {
-    self = UnicodeScalar(UInt32(v))
+  /// In case an invalid input value, nil is returned.
+  ///
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     if let bap = UnicodeScalar(codepoint) {
+  ///       print(bap)
+  ///     } else {
+  ///       // Do something else
+  ///     }
+  public init?(_ v: UInt16) {
+    if let us = UnicodeScalar(UInt32(v)) {
+      self = us
+    } else {
+      return nil
+    }
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
@@ -117,12 +141,12 @@ public struct UnicodeScalar :
   ///
   ///     let codepoint: UInt8 = 55
   ///     let seven = UnicodeScalar(codepoint)
-  ///     print(seven)
+  ///     print(seven!)
   ///     // Prints "7"
   ///
   /// - Parameter v: The code point to use for the scalar.
   public init(_ v: UInt8) {
-    self = UnicodeScalar(UInt32(v))
+    self._value = UInt32(v)
   }
 
   /// Creates a duplicate of the given Unicode scalar.
@@ -161,11 +185,11 @@ public struct UnicodeScalar :
     func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
       if nibble < 10 {
-        return String(UnicodeScalar(nibble+48))    // 48 = '0'
+        return String(UnicodeScalar(nibble+48)!)    // 48 = '0'
       } else {
         // FIXME: was UnicodeScalar(nibble-10+65), which is now
         // ambiguous.  <rdar://problem/18506025>
-        return String(UnicodeScalar(nibble+65-10)) // 65 = 'A'
+        return String(UnicodeScalar(nibble+65-10)!) // 65 = 'A'
       }
     }
 
@@ -247,14 +271,27 @@ public struct UnicodeScalar :
 }
 
 extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible {
-  /// An escaped textual representation of the Unicode scalar.
+  /// A textual representation of the Unicode scalar.
   public var description: String {
-    return "\"\(escaped(asASCII: false))\""
+    return String._fromWellFormedCodeUnitSequence(
+      UTF32.self,
+      input: repeatElement(self.value, count: 1))
   }
+
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
+  }
+}
+
+extension UnicodeScalar : LosslessStringConvertible {
+  public init?(_ description: String) {
+    let scalars = description.unicodeScalars
+    guard let v = scalars.first, scalars.count == 1 else {
+      return nil
+    }
+    self = v
   }
 }
 
@@ -271,6 +308,11 @@ extension UnicodeScalar : Hashable {
 extension UnicodeScalar {
   /// Creates a Unicode scalar with the specified numeric value.
   ///
+  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
+  ///   a valid Unicode scalar value, in the ranges `0...0xD7FF` or
+  ///   `0xE000...0x10FFFF`. In case of an invalid unicode scalar value, nil is
+  ///   returned.
+  ///
   /// For example, the following code sample creates a `UnicodeScalar` instance
   /// with a value of an emoji character:
   ///
@@ -279,11 +321,20 @@ extension UnicodeScalar {
   ///     print(emoji)
   ///     // Prints "🎉"
   ///
-  /// - Parameter v: The Unicode code point to use for the scalar. `v` must be
-  ///   a valid Unicode scalar value, in the ranges `0...0xD7FF` or
-  ///   `0xE000...0x10FFFF`.
-  public init(_ v: Int) {
-    self = UnicodeScalar(UInt32(v))
+  /// In case an invalid input value, nil is returned.
+  ///
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     if let emoji = UnicodeScalar(codepoint) {
+  ///       print(emoji)
+  ///     } else {
+  ///       // Do something else
+  ///     }
+  public init?(_ v: Int) {
+    if let us = UnicodeScalar(UInt32(v)) {
+      self = us
+    } else {
+      return nil
+    }
   }
 }
 
@@ -314,15 +365,16 @@ extension UInt64 {
   }
 }
 
-extension UnicodeScalar : Comparable, Equatable {
+extension UnicodeScalar : Equatable {
+  public static func == (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
-public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value == rhs.value
-}
-
-public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
-  return lhs.value < rhs.value
+extension UnicodeScalar : Comparable {
+  public static func < (lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
+    return lhs.value < rhs.value
+  }
 }
 
 extension UnicodeScalar {
@@ -352,10 +404,11 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
     return 0 + UTF16.width(value)
   }
 
-  /// Access the code unit at `position`.
+  /// Accesses the code unit at the specified position.
   ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
@@ -377,7 +430,7 @@ extension UnicodeScalar {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, renamed: "escaped")
+  @available(*, unavailable, renamed: "escaped(asASCII:)")
   public func escape(asASCII forceASCII: Bool) -> String {
     Builtin.unreachable()
   }

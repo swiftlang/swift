@@ -64,6 +64,9 @@ def check_interface_is_ascii : Flag<["-"], "check-interface-ascii">,
 def json_request_path: Separate<["-"], "json-request-path">,
   HelpText<"path to read a request in JSON format">;
 
+def dont_print_request : Flag<["-"], "dont-print-request">,
+  HelpText<"Don't print the request">;
+
 def print_response_as_json : Flag<["-"], "print-response-as-json">,
   HelpText<"Print the response as JSON output">;
 
@@ -81,3 +84,6 @@ def synthesized_extension : Flag<["-"], "synthesized-extension">,
 
 def interested_usr : Separate<["-"], "interested-usr">,
   HelpText<"Interested USR to calculate the containing group">;
+
+def async : Flag<["-"], "async">,
+  HelpText<"Perform request asynchronously">;

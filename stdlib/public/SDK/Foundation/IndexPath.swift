@@ -20,13 +20,13 @@
  
  Each index in an index path represents the index into an array of children from one node in the tree to another, deeper, node.
 */
-public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ArrayLiteralConvertible {
+public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableCollection, RandomAccessCollection, Comparable, ExpressibleByArrayLiteral {
     public typealias ReferenceType = NSIndexPath
     public typealias Element = Int
     public typealias Index = Array<Int>.Index
     public typealias Indices = DefaultRandomAccessIndices<IndexPath>
     
-    private var _indexes : Array<Int>
+    fileprivate var _indexes : Array<Int>
     
     /// Initialize an empty index path.
     public init() {
@@ -34,7 +34,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     }
     
     /// Initialize with a sequence of integers.
-    public init<ElementSequence : Sequence where ElementSequence.Iterator.Element == Element>(indexes: ElementSequence) {
+    public init<ElementSequence : Sequence>(indexes: ElementSequence)
+      where ElementSequence.Iterator.Element == Element {
         _indexes = indexes.map { $0 }
     }
     
@@ -145,7 +146,63 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         let me = self.makeReference()
         return me.hash
     }
+        
+    // MARK: - Bridging Helpers
     
+    fileprivate init(nsIndexPath: ReferenceType) {
+        let count = nsIndexPath.length
+        if count == 0 {
+            _indexes = []
+        } else {
+            var ptr = malloc(count * MemoryLayout<Element>.size)
+            defer { free(ptr) }
+
+            let elementPtr = ptr!.bindMemory(to: Element.self, capacity: count)
+            nsIndexPath.getIndexes(elementPtr, range: NSMakeRange(0, count))
+            
+            let buffer = UnsafeBufferPointer(start: elementPtr, count: count)
+            _indexes = buffer.map { $0 }
+        }
+    }
+    
+    fileprivate func makeReference() -> ReferenceType {
+        return _indexes.withUnsafeBufferPointer {
+            return ReferenceType(indexes: $0.baseAddress, length: $0.count)
+        }
+    }
+
+    public static func ==(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs._indexes == rhs._indexes
+    }
+
+    public static func +(lhs: IndexPath, rhs: IndexPath) -> IndexPath {
+        return lhs.appending(rhs)
+    }
+
+    public static func +=(lhs: inout IndexPath, rhs: IndexPath) {
+        lhs.append(rhs)
+    }
+
+    public static func <(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs.compare(rhs) == ComparisonResult.orderedAscending
+    }
+
+    public static func <=(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        let order = lhs.compare(rhs)
+        return order == ComparisonResult.orderedAscending || order == ComparisonResult.orderedSame
+    }
+
+    public static func >(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        return lhs.compare(rhs) == ComparisonResult.orderedDescending
+    }
+
+    public static func >=(lhs: IndexPath, rhs: IndexPath) -> Bool {
+        let order = lhs.compare(rhs)
+        return order == ComparisonResult.orderedDescending || order == ComparisonResult.orderedSame
+    }
+}
+
+extension IndexPath : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var description: String {
         return _indexes.description
     }
@@ -153,67 +210,13 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     public var debugDescription: String {
         return _indexes.debugDescription
     }
-    
-    // MARK: - Bridging Helpers
-    
-    private init(nsIndexPath: ReferenceType) {
-        let count = nsIndexPath.length
-        if count == 0 {
-            _indexes = []
-        } else {
-            var ptr = UnsafeMutablePointer<Element>(malloc(count * sizeof(Element)))
-            defer { free(ptr) }
-            
-            nsIndexPath.getIndexes(ptr!, range: NSMakeRange(0, count))
-            
-            let buffer = UnsafeBufferPointer(start: ptr, count: count)
-            _indexes = buffer.map { $0 }
-        }
+
+    public var customMirror: Mirror {
+        return _indexes.customMirror
     }
-    
-    private func makeReference() -> ReferenceType {
-        return _indexes.withUnsafeBufferPointer {
-            return ReferenceType(indexes: $0.baseAddress, length: $0.count)
-        }
-    }
-
-}
-
-public func ==(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs._indexes == rhs._indexes
-}
-
-public func +(lhs: IndexPath, rhs: IndexPath) -> IndexPath {
-    return lhs.appending(rhs)
-}
-
-public func +=(lhs: inout IndexPath, rhs: IndexPath) {
-    lhs.append(rhs)
-}
-
-public func <(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs.compare(rhs) == ComparisonResult.orderedAscending
-}
-
-public func <=(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    let order = lhs.compare(rhs)
-    return order == ComparisonResult.orderedAscending || order == ComparisonResult.orderedSame
-}
-
-public func >(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    return lhs.compare(rhs) == ComparisonResult.orderedDescending
-}
-
-public func >=(lhs: IndexPath, rhs: IndexPath) -> Bool {
-    let order = lhs.compare(rhs)
-    return order == ComparisonResult.orderedDescending || order == ComparisonResult.orderedSame
 }
 
 extension IndexPath : _ObjectiveCBridgeable {
-    public static func _isBridgedToObjectiveC() -> Bool {
-        return true
-    }
-    
     public static func _getObjectiveCType() -> Any.Type {
         return NSIndexPath.self
     }
@@ -236,3 +239,12 @@ extension IndexPath : _ObjectiveCBridgeable {
         return IndexPath(nsIndexPath: source!)
     }    
 }
+
+extension NSIndexPath : _HasCustomAnyHashableRepresentation {
+    // Must be @nonobjc to avoid infinite recursion during bridging.
+    @nonobjc
+    public func _toCustomAnyHashable() -> AnyHashable? {
+        return AnyHashable(self as IndexPath)
+    }
+}
+

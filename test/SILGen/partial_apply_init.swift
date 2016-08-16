@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -suppress-argument-labels-in-types %s | %FileCheck %s
 
 class C {
   init(x: Int) {}

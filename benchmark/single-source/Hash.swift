@@ -62,10 +62,10 @@ class Hash {
   // private:
 
   // Hash state:
-  final var messageLength : Int = 0
-  final var dataLength : Int = 0
+  final var messageLength: Int = 0
+  final var dataLength: Int = 0
   final var data = [UInt8](repeating: 0, count: 64)
-  final var blocksize : Int
+  final var blocksize: Int
 
   /// \brief Hash the internal data.
   func hash() {
@@ -158,10 +158,10 @@ class MD5 : Hash {
                       6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21]
 
   // State
-  var h0 : UInt32 = 0
-  var h1 : UInt32 = 0
-  var h2 : UInt32 = 0
-  var h3 : UInt32 = 0
+  var h0: UInt32 = 0
+  var h1: UInt32 = 0
+  var h2: UInt32 = 0
+  var h3: UInt32 = 0
 
   init() {
     super.init(64)
@@ -240,7 +240,7 @@ class MD5 : Hash {
     var b = h1
     var c = h2
     var d = h3
-    var f, g : UInt32
+    var f, g: UInt32
 
     // Main loop:
     for i in 0..<64 {
@@ -292,7 +292,7 @@ class MD5 : Hash {
   override
   func hashStateFast(_ Res: inout [UInt8]) {
 #if !NO_RANGE
-    var Idx : Int = 0
+    var Idx: Int = 0
     for h in [h0, h1, h2, h3] {
       toHexFast(h, &Res, Idx)
       Idx += 8
@@ -309,11 +309,11 @@ class MD5 : Hash {
 
 class SHA1 : Hash {
   // State
-  var h0 : UInt32 = 0
-  var h1 : UInt32 = 0
-  var h2 : UInt32 = 0
-  var h3 : UInt32 = 0
-  var h4 : UInt32 = 0
+  var h0: UInt32 = 0
+  var h1: UInt32 = 0
+  var h2: UInt32 = 0
+  var h3: UInt32 = 0
+  var h4: UInt32 = 0
 
   init() {
     super.init(64)
@@ -365,7 +365,7 @@ class SHA1 : Hash {
     var w = [UInt32](repeating: 0, count: 80)
 
     // Convert the Byte array to UInt32 array.
-    var word : UInt32 = 0
+    var word: UInt32 = 0
     for i in 0..<64 {
       word = word << 8
       word = word &+ UInt32(data[i])
@@ -387,7 +387,7 @@ class SHA1 : Hash {
     var C = h2
     var D = h3
     var E = h4
-    var K : UInt32, F : UInt32
+    var K: UInt32, F: UInt32
 
     for t in 0..<80 {
       if t < 20 {
@@ -403,7 +403,7 @@ class SHA1 : Hash {
         K = 0xca62c1d6
         F = B ^ C ^ D
       }
-      let Temp : UInt32 = rol(A,5) &+ F &+ E &+ w[t] &+ K
+      let Temp: UInt32 = rol(A,5) &+ F &+ E &+ w[t] &+ K
 
       E = D
       D = C
@@ -421,7 +421,7 @@ class SHA1 : Hash {
 
   override
   func hashState() -> String {
-    var Res : String = ""
+    var Res: String = ""
     for state in [h0, h1, h2, h3, h4] {
       Res += toHex(state)
     }
@@ -431,14 +431,14 @@ class SHA1 : Hash {
 
 class SHA256 :  Hash {
   // State
-  var h0 : UInt32 = 0
-  var h1 : UInt32 = 0
-  var h2 : UInt32 = 0
-  var h3 : UInt32 = 0
-  var h4 : UInt32 = 0
-  var h5 : UInt32 = 0
-  var h6 : UInt32 = 0
-  var h7 : UInt32 = 0
+  var h0: UInt32 = 0
+  var h1: UInt32 = 0
+  var h2: UInt32 = 0
+  var h3: UInt32 = 0
+  var h4: UInt32 = 0
+  var h5: UInt32 = 0
+  var h6: UInt32 = 0
+  var h7: UInt32 = 0
 
   var k : [UInt32] = [
    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -503,7 +503,7 @@ class SHA256 :  Hash {
     var w = [UInt32](repeating: 0, count: 64)
 
     // Convert the Byte array to UInt32 array.
-    var word : UInt32 = 0
+    var word: UInt32 = 0
     for i in 0..<64 {
       word = word << 8
       word = word &+ UInt32(data[i])
@@ -558,7 +558,7 @@ class SHA256 :  Hash {
 
   override
   func hashState() -> String {
-    var Res : String = ""
+    var Res: String = ""
     for state in [h0, h1, h2, h3, h4, h5, h6, h7] {
       Res += toHex(state)
     }
@@ -600,7 +600,7 @@ public func run_HashTest(_ N: Int) {
     }
 
     // Check that we don't crash on large strings.
-    var S : String = ""
+    var S: String = ""
     for _ in 1...size {
       S += "a"
       MD.reset()
@@ -609,7 +609,7 @@ public func run_HashTest(_ N: Int) {
 
     // Check that the order in which we push values does not change the result.
     MD.reset()
-    var L : String = ""
+    var L: String = ""
     for _ in 1...size {
       L += "a"
       MD.update("a")

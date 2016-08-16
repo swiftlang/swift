@@ -36,7 +36,7 @@ var s: String = optFunc("hi")
 // <rdar://problem/17652759> Default arguments cause crash with tuple permutation
 func testArgumentShuffle(_ first: Int = 7, third: Int = 9) {
 }
-testArgumentShuffle(third: 1, 2)
+testArgumentShuffle(third: 1, 2) // expected-error {{unnamed argument #2 must precede argument 'third'}} {{21-29=2}} {{31-32=third: 1}}
 
 
 
@@ -77,7 +77,7 @@ print(r22451001(5))  // expected-error {{argument passed to call that takes no a
 
 // SR-590 Passing two parameters to a function that takes one argument of type Any crashes the compiler
 // SR-1028: Segmentation Fault: 11 when superclass init takes parameter of type 'Any'
-func sr590(_ x: Any) {}
+func sr590(_ x: Any) {}  // expected-note {{'sr590' declared here}}
 sr590(3,4) // expected-error {{extra argument in call}}
 sr590() // expected-error {{missing argument for parameter #1 in call}}
 // Make sure calling with structural tuples still works.

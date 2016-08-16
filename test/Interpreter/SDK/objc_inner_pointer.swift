@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -28,7 +28,7 @@ autoreleasepool {
   repeat {
     let data = NSData(bytes: [2, 3, 5, 7] as [UInt8], length: 4)
     hangCanary(data)
-    bytes = UnsafeMutablePointer<UInt8>(data.bytes)
+    bytes = UnsafeMutablePointer<UInt8>(mutating: data.bytes.assumingMemoryBound(to: UInt8.self))
   } while false // CHECK-NOT: died
   print(bytes[0]) // CHECK:      2
   print(bytes[1]) // CHECK-NEXT: 3
@@ -44,7 +44,7 @@ autoreleasepool {
     let data = NSData(bytes: [11, 13, 17, 19] as [UInt8], length: 4)
     hangCanary(data)
     let dataAsAny: AnyObject = data
-    bytes = UnsafeMutablePointer<UInt8>(dataAsAny.bytes!)
+    bytes = UnsafeMutablePointer<UInt8>(mutating: dataAsAny.bytes!.assumingMemoryBound(to: UInt8.self))
   } while false // CHECK-NOT: died
   print(bytes[0]) // CHECK:      11
   print(bytes[1]) // CHECK-NEXT: 13

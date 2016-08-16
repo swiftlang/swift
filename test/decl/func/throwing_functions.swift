@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-enum Exception : ErrorProtocol { case A }
+enum Exception : Error { case A }
 
 // Basic syntax ///////////////////////////////////////////////////////////////
 func bar() throws -> Int { return 0 }
@@ -51,9 +51,9 @@ func partialApply2<T: Parallelogram>(_ t: T) {
 func barG<T>(_ t : T) throws -> T { return t }
 func fooG<T>(_ t : T) -> T { return t }
 
-var bGE: (i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(i: Int) -> Int'}}
-var bg: (i: Int) throws -> Int = barG
-var fG: (i: Int) throws -> Int = fooG
+var bGE: (_ i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(Int) -> Int'}}
+var bg: (_ i: Int) throws -> Int = barG
+var fG: (_ i: Int) throws -> Int = fooG
 
 func fred(_ callback: (UInt8) throws -> ()) throws { }
 
@@ -75,8 +75,8 @@ func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
 func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
                                xNonThrows: X<(String) -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' (aka 'X<String -> Int>') to expected argument type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>')}}
-  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' (aka 'X<String throws -> Int>') to expected argument type 'X<(String) -> Int>' (aka 'X<String -> Int>')}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' to expected argument type 'X<(String) throws -> Int>'}}
+  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' to expected argument type 'X<(String) -> Int>'}}
   specializedOnFuncType2(xNonThrows) // ok
 }
 
@@ -95,17 +95,17 @@ func testSubtypeResult2(_ x1: (String) -> ((Int) throws -> String),
   subtypeResult2(x2)
 }
 
-func subtypeArgument1(_ x: (fn: ((String) -> Int)) -> Int) { }
-func testSubtypeArgument1(_ x1: (fn: ((String) -> Int)) -> Int,
-                          x2: (fn: ((String) throws -> Int)) -> Int) {
+func subtypeArgument1(_ x: (_ fn: ((String) -> Int)) -> Int) { }
+func testSubtypeArgument1(_ x1: (_ fn: ((String) -> Int)) -> Int,
+                          x2: (_ fn: ((String) throws -> Int)) -> Int) {
   subtypeArgument1(x1)
   subtypeArgument1(x2)
 }
 
-func subtypeArgument2(_ x: (fn: ((String) throws -> Int)) -> Int) { }
-func testSubtypeArgument2(_ x1: (fn: ((String) -> Int)) -> Int,
-                          x2: (fn: ((String) throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: ((String) -> Int)) -> Int' to expected argument type '(fn: ((String) throws -> Int)) -> Int'}}
+func subtypeArgument2(_ x: (_ fn: ((String) throws -> Int)) -> Int) { }
+func testSubtypeArgument2(_ x1: (_ fn: ((String) -> Int)) -> Int,
+                          x2: (_ fn: ((String) throws -> Int)) -> Int) {
+  subtypeArgument2(x1) // expected-error{{cannot convert value of type '((@escaping (String) -> Int)) -> Int' to expected argument type '((@escaping (String) throws -> Int)) -> Int'}}
   subtypeArgument2(x2)
 }
 

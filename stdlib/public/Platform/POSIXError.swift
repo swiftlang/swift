@@ -1,145 +1,252 @@
-// FIXME: Only defining _POSIXError for Darwin at the moment.
+// FIXME: Only defining POSIXErrorCode for Darwin at the moment.
 
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing POSIX error codes.
-@objc public enum POSIXError : CInt {
+@objc public enum POSIXErrorCode : Int32 {
   // FIXME: These are the values for Darwin. We need to get the Linux
   // values as well.
-  case EPERM           = 1               /// Operation not permitted.
-  case ENOENT          = 2               /// No such file or directory.
-  case ESRCH           = 3               /// No such process.
-  case EINTR           = 4               /// Interrupted system call.
-  case EIO             = 5               /// Input/output error.
-  case ENXIO           = 6               /// Device not configured.
-  case E2BIG           = 7               /// Argument list too long.
-  case ENOEXEC         = 8               /// Exec format error.
-  case EBADF           = 9               /// Bad file descriptor.
-  case ECHILD          = 10              /// No child processes.
-  case EDEADLK         = 11              /// Resource deadlock avoided.
+  /// Operation not permitted.
+  case EPERM           = 1
+  /// No such file or directory.
+  case ENOENT          = 2
+  /// No such process.
+  case ESRCH           = 3
+  /// Interrupted system call.
+  case EINTR           = 4
+  /// Input/output error.
+  case EIO             = 5
+  /// Device not configured.
+  case ENXIO           = 6
+  /// Argument list too long.
+  case E2BIG           = 7
+  /// Exec format error.
+  case ENOEXEC         = 8
+  /// Bad file descriptor.
+  case EBADF           = 9
+  /// No child processes.
+  case ECHILD          = 10
+  /// Resource deadlock avoided.
+  case EDEADLK         = 11
                          /// 11 was EAGAIN.
-  case ENOMEM          = 12              /// Cannot allocate memory.
-  case EACCES          = 13              /// Permission denied.
-  case EFAULT          = 14              /// Bad address.
-  case ENOTBLK         = 15              /// Block device required.
-  case EBUSY           = 16              /// Device / Resource busy.
-  case EEXIST          = 17              /// File exists.
-  case EXDEV           = 18              /// Cross-device link.
-  case ENODEV          = 19              /// Operation not supported by device.
-  case ENOTDIR         = 20              /// Not a directory.
-  case EISDIR          = 21              /// Is a directory.
-  case EINVAL          = 22              /// Invalid argument.
-  case ENFILE          = 23              /// Too many open files in system.
-  case EMFILE          = 24              /// Too many open files.
-  case ENOTTY          = 25              /// Inappropriate ioctl for device.
-  case ETXTBSY         = 26              /// Text file busy.
-  case EFBIG           = 27              /// File too large.
-  case ENOSPC          = 28              /// No space left on device.
-  case ESPIPE          = 29              /// Illegal seek.
-  case EROFS           = 30              /// Read-only file system.
-  case EMLINK          = 31              /// Too many links.
-  case EPIPE           = 32              /// Broken pipe.
+  /// Cannot allocate memory.
+  case ENOMEM          = 12
+  /// Permission denied.
+  case EACCES          = 13
+  /// Bad address.
+  case EFAULT          = 14
+  /// Block device required.
+  case ENOTBLK         = 15
+  /// Device / Resource busy.
+  case EBUSY           = 16
+  /// File exists.
+  case EEXIST          = 17
+  /// Cross-device link.
+  case EXDEV           = 18
+  /// Operation not supported by device.
+  case ENODEV          = 19
+  /// Not a directory.
+  case ENOTDIR         = 20
+  /// Is a directory.
+  case EISDIR          = 21
+  /// Invalid argument.
+  case EINVAL          = 22
+  /// Too many open files in system.
+  case ENFILE          = 23
+  /// Too many open files.
+  case EMFILE          = 24
+  /// Inappropriate ioctl for device.
+  case ENOTTY          = 25
+  /// Text file busy.
+  case ETXTBSY         = 26
+  /// File too large.
+  case EFBIG           = 27
+  /// No space left on device.
+  case ENOSPC          = 28
+  /// Illegal seek.
+  case ESPIPE          = 29
+  /// Read-only file system.
+  case EROFS           = 30
+  /// Too many links.
+  case EMLINK          = 31
+  /// Broken pipe.
+  case EPIPE           = 32
 
 /// math software.
-  case EDOM            = 33              /// Numerical argument out of domain.
-  case ERANGE          = 34              /// Result too large.
+  /// Numerical argument out of domain.
+  case EDOM            = 33
+  /// Result too large.
+  case ERANGE          = 34
 
 /// non-blocking and interrupt i/o.
-  case EAGAIN          = 35              /// Resource temporarily unavailable.
-  public static var EWOULDBLOCK: POSIXError { return EAGAIN } /// Operation would block.
-  case EINPROGRESS     = 36              /// Operation now in progress.
-  case EALREADY        = 37              /// Operation already in progress.
+  /// Resource temporarily unavailable.
+  case EAGAIN          = 35
+  /// Operation would block.
+  public static var EWOULDBLOCK: POSIXErrorCode { return EAGAIN }
+  /// Operation now in progress.
+  case EINPROGRESS     = 36
+  /// Operation already in progress.
+  case EALREADY        = 37
 
 /// ipc/network software -- argument errors.
-  case ENOTSOCK        = 38              /// Socket operation on non-socket.
-  case EDESTADDRREQ    = 39              /// Destination address required.
-  case EMSGSIZE        = 40              /// Message too long.
-  case EPROTOTYPE      = 41              /// Protocol wrong type for socket.
-  case ENOPROTOOPT     = 42              /// Protocol not available.
-  case EPROTONOSUPPORT = 43              /// Protocol not supported.
-  case ESOCKTNOSUPPORT = 44              /// Socket type not supported.
-  case ENOTSUP         = 45              /// Operation not supported.
-  case EPFNOSUPPORT    = 46              /// Protocol family not supported.
-  case EAFNOSUPPORT    = 47              /// Address family not supported by protocol family.
-  case EADDRINUSE      = 48              /// Address already in use.
-  case EADDRNOTAVAIL   = 49              /// Can't assign requested address.
+  /// Socket operation on non-socket.
+  case ENOTSOCK        = 38
+  /// Destination address required.
+  case EDESTADDRREQ    = 39
+  /// Message too long.
+  case EMSGSIZE        = 40
+  /// Protocol wrong type for socket.
+  case EPROTOTYPE      = 41
+  /// Protocol not available.
+  case ENOPROTOOPT     = 42
+  /// Protocol not supported.
+  case EPROTONOSUPPORT = 43
+  /// Socket type not supported.
+  case ESOCKTNOSUPPORT = 44
+  /// Operation not supported.
+  case ENOTSUP         = 45
+  /// Protocol family not supported.
+  case EPFNOSUPPORT    = 46
+  /// Address family not supported by protocol family.
+  case EAFNOSUPPORT    = 47
+  /// Address already in use.
+  case EADDRINUSE      = 48
+  /// Can't assign requested address.
+  case EADDRNOTAVAIL   = 49
 
 /// ipc/network software -- operational errors
-  case ENETDOWN        = 50              /// Network is down.
-  case ENETUNREACH     = 51              /// Network is unreachable.
-  case ENETRESET       = 52              /// Network dropped connection on reset.
-  case ECONNABORTED    = 53              /// Software caused connection abort.
-  case ECONNRESET      = 54              /// Connection reset by peer.
-  case ENOBUFS         = 55              /// No buffer space available.
-  case EISCONN         = 56              /// Socket is already connected.
-  case ENOTCONN        = 57              /// Socket is not connected.
-  case ESHUTDOWN       = 58              /// Can't send after socket shutdown.
-  case ETOOMANYREFS    = 59              /// Too many references: can't splice.
-  case ETIMEDOUT       = 60              /// Operation timed out.
-  case ECONNREFUSED    = 61              /// Connection refused.
+  /// Network is down.
+  case ENETDOWN        = 50
+  /// Network is unreachable.
+  case ENETUNREACH     = 51
+  /// Network dropped connection on reset.
+  case ENETRESET       = 52
+  /// Software caused connection abort.
+  case ECONNABORTED    = 53
+  /// Connection reset by peer.
+  case ECONNRESET      = 54
+  /// No buffer space available.
+  case ENOBUFS         = 55
+  /// Socket is already connected.
+  case EISCONN         = 56
+  /// Socket is not connected.
+  case ENOTCONN        = 57
+  /// Can't send after socket shutdown.
+  case ESHUTDOWN       = 58
+  /// Too many references: can't splice.
+  case ETOOMANYREFS    = 59
+  /// Operation timed out.
+  case ETIMEDOUT       = 60
+  /// Connection refused.
+  case ECONNREFUSED    = 61
 
-  case ELOOP           = 62              /// Too many levels of symbolic links.
-  case ENAMETOOLONG    = 63              /// File name too long.
+  /// Too many levels of symbolic links.
+  case ELOOP           = 62
+  /// File name too long.
+  case ENAMETOOLONG    = 63
 
-  case EHOSTDOWN       = 64              /// Host is down.
-  case EHOSTUNREACH    = 65              /// No route to host.
-  case ENOTEMPTY       = 66              /// Directory not empty.
+  /// Host is down.
+  case EHOSTDOWN       = 64
+  /// No route to host.
+  case EHOSTUNREACH    = 65
+  /// Directory not empty.
+  case ENOTEMPTY       = 66
 
 /// quotas & mush.
-  case EPROCLIM        = 67              /// Too many processes.
-  case EUSERS          = 68              /// Too many users.
-  case EDQUOT          = 69              /// Disc quota exceeded.
+  /// Too many processes.
+  case EPROCLIM        = 67
+  /// Too many users.
+  case EUSERS          = 68
+  /// Disc quota exceeded.
+  case EDQUOT          = 69
 
 /// Network File System.
-  case ESTALE          = 70              /// Stale NFS file handle.
-  case EREMOTE         = 71              /// Too many levels of remote in path.
-  case EBADRPC         = 72              /// RPC struct is bad.
-  case ERPCMISMATCH    = 73              /// RPC version wrong.
-  case EPROGUNAVAIL    = 74              /// RPC prog. not avail.
-  case EPROGMISMATCH   = 75              /// Program version wrong.
-  case EPROCUNAVAIL    = 76              /// Bad procedure for program.
+  /// Stale NFS file handle.
+  case ESTALE          = 70
+  /// Too many levels of remote in path.
+  case EREMOTE         = 71
+  /// RPC struct is bad.
+  case EBADRPC         = 72
+  /// RPC version wrong.
+  case ERPCMISMATCH    = 73
+  /// RPC prog. not avail.
+  case EPROGUNAVAIL    = 74
+  /// Program version wrong.
+  case EPROGMISMATCH   = 75
+  /// Bad procedure for program.
+  case EPROCUNAVAIL    = 76
 
-  case ENOLCK          = 77              /// No locks available.
-  case ENOSYS          = 78              /// Function not implemented.
+  /// No locks available.
+  case ENOLCK          = 77
+  /// Function not implemented.
+  case ENOSYS          = 78
 
-  case EFTYPE          = 79              /// Inappropriate file type or format.
-  case EAUTH           = 80              /// Authentication error.
-  case ENEEDAUTH       = 81              /// Need authenticator.
+  /// Inappropriate file type or format.
+  case EFTYPE          = 79
+  /// Authentication error.
+  case EAUTH           = 80
+  /// Need authenticator.
+  case ENEEDAUTH       = 81
 
 /// Intelligent device errors.
-  case EPWROFF         = 82              /// Device power is off.
-  case EDEVERR         = 83              /// Device error, e.g. paper out.
+  /// Device power is off.
+  case EPWROFF         = 82
+  /// Device error, e.g. paper out.
+  case EDEVERR         = 83
 
-  case EOVERFLOW       = 84              /// Value too large to be stored in data type.
+  /// Value too large to be stored in data type.
+  case EOVERFLOW       = 84
 
 /// Program loading errors.
-  case EBADEXEC        = 85              /// Bad executable.
-  case EBADARCH        = 86              /// Bad CPU type in executable.
-  case ESHLIBVERS      = 87              /// Shared library version mismatch.
-  case EBADMACHO       = 88              /// Malformed Macho file.
+  /// Bad executable.
+  case EBADEXEC        = 85
+  /// Bad CPU type in executable.
+  case EBADARCH        = 86
+  /// Shared library version mismatch.
+  case ESHLIBVERS      = 87
+  /// Malformed Macho file.
+  case EBADMACHO       = 88
 
-  case ECANCELED       = 89              /// Operation canceled.
+  /// Operation canceled.
+  case ECANCELED       = 89
 
-  case EIDRM           = 90              /// Identifier removed.
-  case ENOMSG          = 91              /// No message of desired type.
-  case EILSEQ          = 92              /// Illegal byte sequence.
-  case ENOATTR         = 93              /// Attribute not found.
+  /// Identifier removed.
+  case EIDRM           = 90
+  /// No message of desired type.
+  case ENOMSG          = 91
+  /// Illegal byte sequence.
+  case EILSEQ          = 92
+  /// Attribute not found.
+  case ENOATTR         = 93
 
-  case EBADMSG         = 94              /// Bad message.
-  case EMULTIHOP       = 95              /// Reserved.
-  case ENODATA         = 96              /// No message available on STREAM.
-  case ENOLINK         = 97              /// Reserved.
-  case ENOSR           = 98              /// No STREAM resources.
-  case ENOSTR          = 99              /// Not a STREAM.
-  case EPROTO          = 100             /// Protocol error.
-  case ETIME           = 101             /// STREAM ioctl timeout.
+  /// Bad message.
+  case EBADMSG         = 94
+  /// Reserved.
+  case EMULTIHOP       = 95
+  /// No message available on STREAM.
+  case ENODATA         = 96
+  /// Reserved.
+  case ENOLINK         = 97
+  /// No STREAM resources.
+  case ENOSR           = 98
+  /// Not a STREAM.
+  case ENOSTR          = 99
+  /// Protocol error.
+  case EPROTO          = 100
+  /// STREAM ioctl timeout.
+  case ETIME           = 101
 
-  case ENOPOLICY       = 103             /// No such policy registered.
+  /// No such policy registered.
+  case ENOPOLICY       = 103
 
-  case ENOTRECOVERABLE = 104             /// State not recoverable.
-  case EOWNERDEAD      = 105             /// Previous owner died.
+  /// State not recoverable.
+  case ENOTRECOVERABLE = 104
+  /// Previous owner died.
+  case EOWNERDEAD      = 105
 
-  case EQFULL          = 106             /// Interface output queue is full.
-  public static var ELAST: POSIXError { return EQFULL } /// Must be equal largest errno.
+  /// Interface output queue is full.
+  case EQFULL          = 106
+  /// Must be equal largest errno.
+  public static var ELAST: POSIXErrorCode { return EQFULL }
 
   // FIXME: EOPNOTSUPP has different values depending on __DARWIN_UNIX03 and
   // KERNEL.

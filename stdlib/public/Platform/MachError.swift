@@ -1,88 +1,88 @@
 #if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
 /// Enumeration describing Mach error codes.
-@objc public enum MachError : CInt {
-  case KERN_SUCCESS                   = 0
+@objc public enum MachErrorCode : Int32 {
+  case success                   = 0
 
   /// Specified address is not currently valid.
-  case KERN_INVALID_ADDRESS           = 1
+  case invalidAddress           = 1
 
   /// Specified memory is valid, but does not permit the required
   /// forms of access.
-  case KERN_PROTECTION_FAILURE        = 2
+  case protectionFailure        = 2
 
   /// The address range specified is already in use, or no address
   /// range of the size specified could be found.  
-  case KERN_NO_SPACE                  = 3
+  case noSpace                  = 3
 
   /// The function requested was not applicable to this type of
   /// argument, or an argument is invalid.
-  case KERN_INVALID_ARGUMENT          = 4
+  case invalidArgument          = 4
 
   /// The function could not be performed.  A catch-all.
-  case KERN_FAILURE                   = 5
+  case failure                   = 5
 
   /// A system resource could not be allocated to fulfill this
   /// request.  This failure may not be permanent.
-  case KERN_RESOURCE_SHORTAGE         = 6
+  case resourceShortage         = 6
 
   /// The task in question does not hold receive rights for the port
   /// argument.
-  case KERN_NOT_RECEIVER              = 7
+  case notReceiver              = 7
 
   /// Bogus access restriction.
-  case KERN_NO_ACCESS                 = 8
+  case noAccess                 = 8
 
   /// During a page fault, the target address refers to a memory
   /// object that has been destroyed.  This failure is permanent.
-  case KERN_MEMORY_FAILURE            = 9
+  case memoryFailure            = 9
 
   /// During a page fault, the memory object indicated that the data
   /// could not be returned.  This failure may be temporary; future
   /// attempts to access this same data may succeed, as defined by the
   /// memory object.
-  case KERN_MEMORY_ERROR              = 10
+  case memoryError              = 10
 
   /// The receive right is already a member of the portset.
-  case KERN_ALREADY_IN_SET            = 11
+  case alreadyInSet             = 11
 
   /// The receive right is not a member of a port set.
-  case KERN_NOT_IN_SET                = 12
+  case notInSet                 = 12
 
   /// The name already denotes a right in the task.
-  case KERN_NAME_EXISTS               = 13
+  case nameExists               = 13
 
   /// The operation was aborted.  Ipc code will catch this and reflect
   /// it as a message error.
-  case KERN_ABORTED                   = 14
+  case aborted                  = 14
 
   /// The name doesn't denote a right in the task.
-  case KERN_INVALID_NAME              = 15
+  case invalidName              = 15
 
   /// Target task isn't an active task.
-  case KERN_INVALID_TASK              = 16
+  case invalidTask              = 16
 
   /// The name denotes a right, but not an appropriate right.
-  case KERN_INVALID_RIGHT             = 17
+  case invalidRight             = 17
 
   /// A blatant range error.
-  case KERN_INVALID_VALUE             = 18
+  case invalidValue             = 18
 
   /// Operation would overflow limit on user-references.
-  case KERN_UREFS_OVERFLOW            = 19
+  case userReferencesOverflow            = 19
 
   /// The supplied (port) capability is improper.
-  case KERN_INVALID_CAPABILITY        = 20
+  case invalidCapability        = 20
 
   /// The task already has send or receive rights for the port under
   /// another name.
-  case KERN_RIGHT_EXISTS              = 21
+  case rightExists              = 21
 
   /// Target host isn't actually a host.
-  case KERN_INVALID_HOST              = 22
+  case invalidHost              = 22
 
   /// An attempt was made to supply "precious" data for memory that is
   /// already present in a memory object.
-  case KERN_MEMORY_PRESENT            = 23
+  case memoryPresent            = 23
 
   /// A page was requested of a memory manager via
   /// memory_object_data_request for an object using a
@@ -94,99 +94,99 @@
   /// delivered via memory_object_data_error and is handled by the
   /// kernel (it forces the kernel to restart the fault). It will not
   /// be seen by users.
-  case KERN_MEMORY_DATA_MOVED         = 24
+  case memoryDataMoved          = 24
 
   /// A strategic copy was attempted of an object upon which a quicker
   /// copy is now possible.  The caller should retry the copy using
   /// vm_object_copy_quickly. This error code is seen only by the
   /// kernel.
-  case KERN_MEMORY_RESTART_COPY       = 25
+  case memoryRestartCopy        = 25
 
   /// An argument applied to assert processor set privilege was not a
   /// processor set control port.
-  case KERN_INVALID_PROCESSOR_SET     = 26
+  case invalidProcessorSet      = 26
 
   /// The specified scheduling attributes exceed the thread's limits.
-  case KERN_POLICY_LIMIT              = 27
+  case policyLimit              = 27
 
   /// The specified scheduling policy is not currently enabled for the
   /// processor set.
-  case KERN_INVALID_POLICY            = 28
+  case invalidPolicy            = 28
 
   /// The external memory manager failed to initialize the memory object.
-  case KERN_INVALID_OBJECT            = 29
+  case invalidObject            = 29
 
   /// A thread is attempting to wait for an event for which there is
   /// already a waiting thread.
-  case KERN_ALREADY_WAITING           = 30
+  case alreadyWaiting           = 30
 
   /// An attempt was made to destroy the default processor set.
-  case KERN_DEFAULT_SET               = 31
+  case defaultSet               = 31
 
   /// An attempt was made to fetch an exception port that is
   /// protected, or to abort a thread while processing a protected
   /// exception.
-  case KERN_EXCEPTION_PROTECTED       = 32
+  case exceptionProtected       = 32
 
   /// A ledger was required but not supplied.
-  case KERN_INVALID_LEDGER            = 33
+  case invalidLedger            = 33
 
   /// The port was not a memory cache control port.
-  case KERN_INVALID_MEMORY_CONTROL    = 34
+  case invalidMemoryControl     = 34
 
   /// An argument supplied to assert security privilege was not a host
   /// security port.
-  case KERN_INVALID_SECURITY          = 35
+  case invalidSecurity          = 35
 
   /// thread_depress_abort was called on a thread which was not
   /// currently depressed.
-  case KERN_NOT_DEPRESSED             = 36
+  case notDepressed             = 36
 
   /// Object has been terminated and is no longer available.
-  case KERN_TERMINATED                = 37
+  case terminated               = 37
 
   /// Lock set has been destroyed and is no longer available.
-  case KERN_LOCK_SET_DESTROYED        = 38
+  case lockSetDestroyed         = 38
 
   /// The thread holding the lock terminated before releasing the lock.
-  case KERN_LOCK_UNSTABLE             = 39
+  case lockUnstable             = 39
 
   /// The lock is already owned by another thread.
-  case KERN_LOCK_OWNED                = 40
+  case lockOwned                = 40
 
   /// The lock is already owned by the calling thread.
-  case KERN_LOCK_OWNED_SELF           = 41
+  case lockOwnedSelf            = 41
 
   /// Semaphore has been destroyed and is no longer available.
-  case KERN_SEMAPHORE_DESTROYED       = 42
+  case semaphoreDestroyed       = 42
 
   /// Return from RPC indicating the target server was terminated
   /// before it successfully replied.
-  case KERN_RPC_SERVER_TERMINATED     = 43
+  case rpcServerTerminated      = 43
 
   /// Terminate an orphaned activation.
-  case KERN_RPC_TERMINATE_ORPHAN      = 44
+  case rpcTerminateOrphan       = 44
 
   /// Allow an orphaned activation to continue executing.
-  case KERN_RPC_CONTINUE_ORPHAN       = 45
+  case rpcContinueOrphan        = 45
 
   /// Empty thread activation (No thread linked to it).
-  case KERN_NOT_SUPPORTED             = 46
+  case notSupported             = 46
 
   /// Remote node down or inaccessible.
-  case KERN_NODE_DOWN                 = 47
+  case nodeDown                 = 47
 
   /// A signalled thread was not actually waiting.
-  case KERN_NOT_WAITING               = 48
+  case notWaiting               = 48
 
   /// Some thread-oriented operation (semaphore_wait) timed out.
-  case KERN_OPERATION_TIMED_OUT       = 49
+  case operationTimedOut        = 49
 
   /// During a page fault, indicates that the page was rejected as a
   /// result of a signature check.
-  case KERN_CODESIGN_ERROR            = 50
+  case codesignError            = 50
 
   /// The requested property cannot be changed at this time.
-  case KERN_POLICY_STATIC             = 51
+  case policyStatic             = 51
 }
 #endif // os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
