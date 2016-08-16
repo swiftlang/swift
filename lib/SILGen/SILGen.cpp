@@ -319,15 +319,13 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   return found;
 }
 
-ProtocolConformance *
+Optional<ProtocolConformanceRef>
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return nullptr;
+  if (!proto) return None;
 
   // Find the conformance to _BridgedStoredNSError.
-  auto result = SwiftModule->lookupConformance(type, proto, nullptr);
-  if (result) return result->getConcrete();
-  return nullptr;
+  return SwiftModule->lookupConformance(type, proto, nullptr);
 }
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
