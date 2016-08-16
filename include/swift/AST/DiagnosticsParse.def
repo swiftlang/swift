@@ -381,6 +381,9 @@ ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
 
 WARNING(deprecated_operator_body,PointsToFirstBadToken,
         "operator should no longer be declared with body", ())
+WARNING(deprecated_operator_body_use_group,PointsToFirstBadToken,
+        "operator should no longer be declared with body; "
+        "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 

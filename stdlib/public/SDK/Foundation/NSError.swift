@@ -136,6 +136,9 @@ public extension Error {
   }
 }
 
+internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
+  label: "SwiftFoundation._errorDomainUserInfoProviderQueue")
+
 /// Retrieve the default userInfo dictionary for a given error.
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
 public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
@@ -149,7 +152,8 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
     // user-info value providers.
     let domain = error._domain
     if domain != NSCocoaErrorDomain {
-      if NSError.userInfoValueProvider(forDomain: domain) == nil {
+      _errorDomainUserInfoProviderQueue.sync {
+        if NSError.userInfoValueProvider(forDomain: domain) != nil { return }
         NSError.setUserInfoValueProvider(forDomain: domain) { (nsError, key) in
           let error = nsError as Error
 
