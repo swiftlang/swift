@@ -899,8 +899,8 @@ extern "C" void *swift_unknownWeakLoadStrong(WeakReference *ref);
 
 #else
 
-static inline void swift_unknownWeakLoadStrong(WeakReference *ref) {
-  swift_weakLoadStrong(ref);
+static inline void *swift_unknownWeakLoadStrong(WeakReference *ref) {
+  return static_cast<void *>(swift_weakLoadStrong(ref));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -918,8 +918,8 @@ extern "C" void *swift_unknownWeakTakeStrong(WeakReference *ref);
 
 #else
 
-static inline void swift_unknownWeakTakeStrong(WeakReference *ref) {
-  swift_weakTakeStrong(ref);
+static inline void *swift_unknownWeakTakeStrong(WeakReference *ref) {
+  return static_cast<void *>(swift_weakTakeStrong(ref));
 }
 
 #endif /* SWIFT_OBJC_INTEROP */

@@ -520,6 +520,7 @@ class FieldType {
   // some high bits as well.
   enum : int_type {
     Indirect = 1,
+    Weak = 2,
 
     TypeMask = ((uintptr_t)-1) & ~(alignof(void*) - 1),
   };
@@ -537,8 +538,17 @@ public:
                      | (indirect ? Indirect : 0));
   }
 
+  constexpr FieldType withWeak(bool weak) const {
+    return FieldType((Data & ~Weak)
+                     | (weak ? Weak : 0));
+  }
+
   bool isIndirect() const {
     return bool(Data & Indirect);
+  }
+
+  bool isWeak() const {
+    return bool(Data & Weak);
   }
 
   const Metadata *getType() const {
