@@ -4,9 +4,6 @@
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
 
-// FIXME: rdar://27341290 IR and asm checks for testOpt() are failing
-// XFAIL: *
-
 // CHECK-LABEL: define hidden float @_TF8test_v7k9addFloats{{.*}}(float, float)
 // CHECK: fadd float %0, %1
 // CHECK ret float
