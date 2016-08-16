@@ -261,12 +261,3 @@ func disable_unnamed_param_reorder(p: Int, _: String) {}
 disable_unnamed_param_reorder(0, "") // no change.
 
 prefix operator ***** {}
-
-func foo(an : Any) {
-  let a1 : AnyObject
-  a1 = an
-  let a2 : AnyObject?
-  a2 = an
-  let a3 : AnyObject!
-  a3 = an
-}
