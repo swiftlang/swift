@@ -711,6 +711,10 @@ public class NonObjCClass { }
   @objc func takeAndReturnGenericClass(_ x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
   // CHECK: - (FungibleContainer<id <Fungible>> * _Null_unspecified)takeAndReturnFungibleContainer:(FungibleContainer<Spoon *> * _Nonnull)x;
   @objc func takeAndReturnFungibleContainer(_ x: FungibleContainer<Spoon>) -> FungibleContainer<Fungible>! { fatalError("") }
+
+  typealias Dipper = Spoon
+  // CHECK: - (FungibleContainer<FungibleObject> * _Nonnull)fungibleContainerWithAliases:(FungibleContainer<Spoon *> * _Nullable)x;
+  @objc func fungibleContainerWithAliases(_ x: FungibleContainer<Dipper>?) -> FungibleContainer<FungibleObject> { fatalError("") }
 }
 // CHECK: @end
 

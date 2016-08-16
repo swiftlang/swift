@@ -86,3 +86,5 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 - (void)doThing:(__nonnull T<Pettable>)thing;
 @end
 
+typedef id <Fungible> FungibleObject;
+
