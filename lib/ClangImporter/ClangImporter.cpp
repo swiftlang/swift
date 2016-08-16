@@ -2564,6 +2564,11 @@ auto ClangImporter::Implementation::importFullName(
       else if (inference.isSetter())
         result.AccessorKind = ImportedAccessorKind::PropertySetter;
 
+      // Inits are factory. These C functions are neither convenience nor
+      // designated, as they return a fully formed object of that type.
+      if (inference.isInit())
+        result.InitKind = CtorInitializerKind::Factory;
+
       return result;
     }
   }

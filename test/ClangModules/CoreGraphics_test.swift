@@ -87,6 +87,15 @@ public func testColorRenames(color: CGColor,
 // CHECK:   ret void
 }
 
+// Test factory-ness of inferred imports
+extension CGMutablePath {
+  // CHECK-LABEL: define %{{.*}}CGMutablePath* {{.*}}CGMutablePath{{.*}}(i1{{.*}})
+  public convenience init(p: Bool) {
+    self.init()
+    // CHECK: tail call %struct.CGPath* @CGPathCreateMutable()
+  }
+}
+
 // CHECK-LABEL: define void {{.*}}testRenames{{.*}} {
 public func testRenames(transform: CGAffineTransform, context: CGContext,
                         point: CGPoint, size: CGSize, rect: CGRect,
