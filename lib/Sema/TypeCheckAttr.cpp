@@ -343,7 +343,7 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
-  if (type->isObjCExistentialType())
+  if (type->isObjCExistentialType() || type->isAny())
     return None; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
@@ -800,8 +800,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
         .highlight(param->getSourceRange());
       return true;
     }
-  } else if (ty->isObjCExistentialType()) {
-    // @objc existential types are okay
+  } else if (ty->isObjCExistentialType() || ty->isAny()) {
+    // @objc existential types are okay, as is Any.
     // Nothing to do.
   } else {
     // No other types are permitted.
