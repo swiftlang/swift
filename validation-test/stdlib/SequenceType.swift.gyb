@@ -972,6 +972,16 @@ SequenceTypeTests.test("dropLast/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
+// drop(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("drop(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.drop { _ in return false }
+  expectCustomizable(tester, tester.log.dropWhile)
+}
+
+//===----------------------------------------------------------------------===//
 // prefix()
 //===----------------------------------------------------------------------===//
 
@@ -979,6 +989,16 @@ SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.prefix(1)
   expectCustomizable(tester, tester.log.prefixMaxLength)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("prefix(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.prefix { _ in return false }
+  expectCustomizable(tester, tester.log.prefixWhile)
 }
 
 //===----------------------------------------------------------------------===//
