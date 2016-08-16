@@ -7,7 +7,7 @@ PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/
 cd $SWIFT_PATH
 rm -rf build
 mkdir -p build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
-cp $SWIFT_PATH/swift-3.0-PREVIEW-3/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
+cp $SWIFT_PATH/swift-PREVIEW/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
 cd swift
 rm -f *.tar.gz
 
