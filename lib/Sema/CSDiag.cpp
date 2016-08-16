@@ -3150,6 +3150,17 @@ static void eraseOpenedExistentials(Expr *&expr) {
                "didn't see this OVE in a containing OpenExistentialExpr?");
         return { true, value->second };
       }
+
+      // Handle collection upcasts specially so that we don't blow up on
+      // their embedded OVEs.
+      if (auto CDE = dyn_cast<CollectionUpcastConversionExpr>(expr)) {
+        if (auto result = CDE->getSubExpr()->walk(*this)) {
+          CDE->setSubExpr(result);
+          return { false, CDE };
+        } else {
+          return { true, CDE };
+        }
+      }
       
       return { true, expr };
     }
