@@ -128,8 +128,8 @@ public:
     /// editor buffer if the preceding CallParameterName was inserted.
     CallParameterColon,
 
-    /// A equal sign between parameter name and value. Used in decl attribute.
-    DeclAttrParamEqual,
+    /// A colon between parameter name and value. Used in decl attribute.
+    DeclAttrParamColon,
 
     /// Required parameter type.
     CallParameterType,
@@ -197,7 +197,7 @@ public:
            Kind == ChunkKind::CallParameterName ||
            Kind == ChunkKind::CallParameterInternalName ||
            Kind == ChunkKind::CallParameterColon ||
-           Kind == ChunkKind::DeclAttrParamEqual ||
+           Kind == ChunkKind::DeclAttrParamColon ||
            Kind == ChunkKind::DeclAttrParamKeyword ||
            Kind == ChunkKind::CallParameterType ||
            Kind == ChunkKind::CallParameterClosureType ||
