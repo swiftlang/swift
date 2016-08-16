@@ -5586,9 +5586,15 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 ParserResult<OperatorDecl>
 Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
                                 SourceLoc NameLoc, DeclAttributes &Attributes) {
-  SourceLoc LBraceLoc;
-  if (consumeIf(tok::l_brace, LBraceLoc)) {
-    diagnose(LBraceLoc, diag::deprecated_operator_body);
+  SourceLoc lBraceLoc;
+  if (consumeIf(tok::l_brace, lBraceLoc)) {
+    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+    if (Tok.is(tok::r_brace)) {
+      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
+                                                            NameLoc);
+      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
+    }
 
     skipUntilDeclRBrace();
     (void) consumeIf(tok::r_brace);
@@ -5604,9 +5610,15 @@ ParserResult<OperatorDecl>
 Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
                                  Identifier Name, SourceLoc NameLoc,
                                  DeclAttributes &Attributes) {
-  SourceLoc lbraceLoc;
-  if (consumeIf(tok::l_brace, lbraceLoc)) {
-    diagnose(lbraceLoc, diag::deprecated_operator_body);
+  SourceLoc lBraceLoc;
+  if (consumeIf(tok::l_brace, lBraceLoc)) {
+    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+    if (Tok.is(tok::r_brace)) {
+      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
+                                                            NameLoc);
+      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
+    }
 
     skipUntilDeclRBrace();
     (void) consumeIf(tok::r_brace);
@@ -5631,9 +5643,20 @@ Parser::parseDeclInfixOperator(SourceLoc operatorLoc, Identifier name,
     }
   }
 
-  SourceLoc lbraceLoc;
-  if (consumeIf(tok::l_brace, lbraceLoc)) {
-    diagnose(lbraceLoc, diag::deprecated_operator_body);
+  SourceLoc lBraceLoc;
+  if (consumeIf(tok::l_brace, lBraceLoc)) {
+    if (Tok.is(tok::r_brace)) {
+      SourceLoc lastGoodLoc = precedenceGroupNameLoc;
+      if (lastGoodLoc.isInvalid())
+        lastGoodLoc = nameLoc;
+      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
+                                                            lastGoodLoc);
+      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+      diagnose(lBraceLoc, diag::deprecated_operator_body)
+        .fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
+    } else {
+      diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
+    }
 
     skipUntilDeclRBrace();
     (void) consumeIf(tok::r_brace);
