@@ -2224,12 +2224,19 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Optional structs are not representable in (Objective-)C if they
-        // originally came from C, whether or not they are bridged. If they
-        // are defined in Swift, they are only representable if they are
-        // bridged (checked below).
+        // originally came from C, whether or not they are bridged, unless they
+        // came from swift_newtype. If they are defined in Swift, they are only
+        // representable if they are bridged (checked below).
         if (wasOptional) {
-          if (nominal->hasClangNode())
+          if (nominal->hasClangNode()) {
+            Type underlyingType =
+                nominal->getDeclaredType()->getSwiftNewtypeUnderlyingType();
+            if (underlyingType) {
+              return getForeignRepresentable(OptionalType::get(underlyingType),
+                                             language, dc);
+            }
             return failure();
+          }
           break;
         }
       }
