@@ -2762,6 +2762,18 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
+  // Bind archetype access paths if the type is generic.
+  if (type->isGenericContext()) {
+    auto declCtxt = type;
+    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
+      auto getInContext = [&](CanType type) -> CanType {
+        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type, nullptr)
+            ->getCanonicalType();
+      };
+      bindArchetypeAccessPaths(IGF, generics, getInContext);
+    }
+  }
+
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
