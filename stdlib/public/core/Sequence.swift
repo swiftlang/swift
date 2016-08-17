@@ -721,6 +721,14 @@ internal class _PrefixSequence<Base : IteratorProtocol>
         maxLength: Swift.min(maxLength, self._maxLength),
         taken: _taken))
   }
+  
+  internal func drop(
+    while predicate: (Base.Element) throws -> Bool
+  ) rethrows -> AnySequence<Base.Element> {
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: _iterator, nextElement: nil, predicate: predicate))
+  }
 }
 
 /// A sequence that lazily consumes and drops `n` elements from an underlying
@@ -1253,8 +1261,8 @@ extension Sequence where
   ///
   /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns `true` if the element should
-  ///		be included or `false` if it should be excluded. Once the predicate
-  ///		returns `false` it will not be called again.
+  ///   be included or `false` if it should be excluded. Once the predicate
+  ///   returns `false` it will not be called again.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   public func prefix(

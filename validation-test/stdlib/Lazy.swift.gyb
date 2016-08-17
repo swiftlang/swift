@@ -1295,16 +1295,6 @@ let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
   ([0, 10, 20, 30, 40],     40,     4),
   ([0, 10, 20, 30, 40],     99,     5) ]
 
-tests.test("LazyPrefixWhileIterator") {
-  let base = (1...10).lazy.prefix(while: { $0 < 4 })
-
-  var iter1 = base.makeIterator()
-  expectEqual(1, iter1.next())
-  expectEqual(2, iter1.next())
-  expectEqual(3, iter1.next())
-  expectEqual(nil, iter1.next())
-}
-
 % for Kind in 'Sequence', 'Forward', 'Bidirectional':
 %   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
 %   checkKind = 'ForwardCollection' if Kind == 'Forward' else Self
@@ -1364,16 +1354,6 @@ tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
 }
 
 //===--- LazyDropWhile ----------------------------------------------------===//
-
-tests.test("LazyDropWhileIterator") {
-  let base = (1...10).lazy.drop(while: { $0 < 4 })
-
-  var iter1 = base.makeIterator()
-  expectEqual(4, iter1.next())
-  expectEqual(5, iter1.next())
-  expectEqual(6, iter1.next())
-  expectEqual(7, iter1.next())
-}
 
 % for Kind in 'Sequence', 'Forward', 'Bidirectional':
 %   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
