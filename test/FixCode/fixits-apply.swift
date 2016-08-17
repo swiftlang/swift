@@ -1,8 +1,6 @@
 // RUN: not %swift -parse -target %target-triple %s -emit-fixits-path %t.remap -I %S/Inputs
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
-// REQUIRES: objc_interop
-
 class Base {}
 class Derived : Base {}
 
@@ -263,12 +261,3 @@ func disable_unnamed_param_reorder(p: Int, _: String) {}
 disable_unnamed_param_reorder(0, "") // no change.
 
 prefix operator ***** {}
-
-func foo(an : Any) {
-  let a1 : AnyObject
-  a1 = an
-  let a2 : AnyObject?
-  a2 = an
-  let a3 : AnyObject!
-  a3 = an
-}
