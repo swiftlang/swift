@@ -511,8 +511,8 @@ internal func _product<C1 : Collection, C2 : Collection>(
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable:
-      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping (
+      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,

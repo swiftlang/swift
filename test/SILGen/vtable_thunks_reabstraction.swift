@@ -31,7 +31,7 @@ class ConcreteValue<X>: Opaque<S> {
   override func inAndOutTuples(x: ObnoxiousTuple) -> ObnoxiousTuple { return x }
   override func variantOptionality(x: S?) -> S { return x! }
   override func variantOptionalityMetatypes(x: S.Type?) -> S.Type { return x! }
-  override func variantOptionalityFunctions(x: (@escaping (S) -> S)?) -> (S) -> S { return x! }
+  override func variantOptionalityFunctions(x: ((S) -> S)?) -> (S) -> S { return x! }
   override func variantOptionalityTuples(x: ObnoxiousTuple?) -> ObnoxiousTuple { return x! }
 }
 
@@ -42,7 +42,7 @@ class ConcreteClass<X>: Opaque<C> {
   override func inAndOutTuples(x: ObnoxiousTuple) -> ObnoxiousTuple { return x }
   override func variantOptionality(x: C?) -> C { return x! }
   override func variantOptionalityMetatypes(x: C.Type?) -> C.Type { return x! }
-  override func variantOptionalityFunctions(x: (@escaping (C) -> C)?) -> (C) -> C { return x! }
+  override func variantOptionalityFunctions(x: ((C) -> C)?) -> (C) -> C { return x! }
   override func variantOptionalityTuples(x: ObnoxiousTuple?) -> ObnoxiousTuple { return x! }
 }
 
