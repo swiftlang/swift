@@ -21,7 +21,7 @@ func f0(_ x: Int,
 
 func f1(_: @escaping (Int, Float) -> Int) { }
 
-func f2(_: (_: @escaping (Int) -> Int)) -> Int {}
+func f2(_: (_: (Int) -> Int)) -> Int {}
 
 func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 

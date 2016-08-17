@@ -293,14 +293,14 @@ func checkPointerCorrectness(_ check: Check,
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafeMutablePointer<Missile>, _ count: Int) -> Void), 
+  _ f: @escaping ((UnsafeMutablePointer<Missile>) -> (UnsafeMutablePointer<Missile>, _ count: Int) -> Void),
   _ m: Bool
 ) -> (Check) -> Void {
   return { checkPointerCorrectness($0, m, f) }
 }
 
 func checkPtr(
-  _ f: ((UnsafeMutablePointer<Missile>) -> (UnsafePointer<Missile>, _ count: Int) -> Void), 
+  _ f: @escaping ((UnsafeMutablePointer<Missile>) -> (UnsafePointer<Missile>, _ count: Int) -> Void),
   _ m: Bool
 ) -> (Check) -> Void {
   return {
