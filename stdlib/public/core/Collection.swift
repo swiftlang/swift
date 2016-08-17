@@ -1330,7 +1330,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   public func drop(
-    while predicate: @noescape (Iterator.Element) throws -> Bool
+    while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
     while try start != endIndex && predicate(self[start]) {
@@ -1374,7 +1374,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   public func prefix(
-    while predicate: @noescape (Iterator.Element) throws -> Bool
+    while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
     var end = startIndex
     while try end != endIndex && predicate(self[end]) {

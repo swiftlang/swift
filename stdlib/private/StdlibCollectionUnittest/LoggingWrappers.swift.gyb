@@ -266,7 +266,7 @@ public struct ${Self}<
   }
   
   public func drop(
-    while predicate: @noescape (Base.Iterator.Element) throws -> Bool
+    while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
     Log.dropWhile[selfType] += 1
     return try base.drop(while: predicate)
@@ -278,7 +278,7 @@ public struct ${Self}<
   }
   
   public func prefix(
-    while predicate: @noescape (Base.Iterator.Element) throws -> Bool
+    while predicate: (Base.Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
     Log.prefixWhile[selfType] += 1
     return try base.prefix(while: predicate)
