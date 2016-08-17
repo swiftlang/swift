@@ -1579,6 +1579,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
     
+    // T -> AnyHashable.
+    if (isAnyHashableType(desugar2)) {
+      // Don't allow this in operator contexts or we'll end up allowing
+      // 'T() == U()' for unrelated T and U that just happen to be Hashable.
+      // We can remove this special case when we implement operator hiding.
+      if (kind != TypeMatchKind::OperatorArgumentConversion) {
+        conversionsOrFixes.push_back(
+                              ConversionRestrictionKind::HashableToAnyHashable);
+      }
+    }
+
     // Metatype to object conversion.
     //
     // Class and protocol metatypes are interoperable with certain Objective-C
@@ -1649,15 +1660,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
-      // T -> AnyHashable.
-      } else if (isAnyHashableType(desugar2)) {
-        // Don't allow this in operator contexts or we'll end up allowing
-        // 'T() == U()' for unrelated T and U that just happen to be Hashable.
-        // We can remove this special case when we implement operator hiding.
-        if (kind != TypeMatchKind::OperatorArgumentConversion) {
-          conversionsOrFixes.push_back(
-            ConversionRestrictionKind::HashableToAnyHashable);
-        }
       }
     }
   }
