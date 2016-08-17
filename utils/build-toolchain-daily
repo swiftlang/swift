@@ -5,7 +5,7 @@ echo ========== Setup ===========
 SWIFT_PATH=/home/amr/swift
 PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 cd $SWIFT_PATH
-#rm -rf build
+rm -rf build
 mkdir -p build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
 cp $SWIFT_PATH/toolchains/swift-preview/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
 rm -f swift/*.tar.gz
