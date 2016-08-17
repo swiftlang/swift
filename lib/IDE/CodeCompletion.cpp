@@ -4137,9 +4137,12 @@ public:
     bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
                            !isKeywordSpecified("override");
 
-    if (missingDeclIntroducer && missingAccess)
-      Builder.addAccessControlKeyword(
-          std::min(VD->getFormalAccess(), AccessibilityOfContext));
+    if (missingDeclIntroducer && missingAccess) {
+      auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
+      // Only emit 'public', not needed otherwise.
+      if (Access >= Accessibility::Public)
+        Builder.addAccessControlKeyword(Access);
+    }
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.

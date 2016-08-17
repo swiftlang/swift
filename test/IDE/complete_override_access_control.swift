@@ -94,34 +94,34 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 
 // TEST_PRIVATE_ABC: Begin completions, 15 items
 // TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFunc(x: TagPB) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFunc(x: TagPC) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRW: TagPA
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRO: TagPA
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoBVarRW: TagPB
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoBVarRO: TagPB
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoCVarRW: TagPC
-// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoCVarRO: TagPC
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: TagPA
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: TagPB
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRW: TagPC
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRO: TagPC
 // TEST_PRIVATE_ABC: End completions
 
 // TEST_INTERNAL_ABC: Begin completions, 15 items
 // TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: fileprivate func protoAFunc(x: TagPA) {|}{{; name=.+$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: fileprivate func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    fileprivate var protoAVarRW: TagPA
-// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    fileprivate var protoAVarRO: TagPA
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: TagPA
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: TagPB
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRW: TagPC
@@ -130,16 +130,16 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 
 // TEST_PUBLIC_ABC: Begin completions, 15 items
 // TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: fileprivate func protoAFunc(x: TagPA) {|}{{; name=.+$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: fileprivate func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    fileprivate var protoAVarRW: TagPA
-// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    fileprivate var protoAVarRO: TagPA
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: TagPA
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: TagPB
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    public var protoCVarRW: TagPC
@@ -157,8 +157,8 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
 }
 
 // TEST_PRIVATE_DE: Begin completions, 2 items
-// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_DE: Begin completions, 2 items
 // TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
@@ -179,8 +179,8 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
 }
 
 // TEST_PRIVATE_ED: Begin completions, 2 items
-// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_ED: Begin completions, 2 items
 // TEST_INTERNAL_ED-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
@@ -201,8 +201,8 @@ public class TestPublicEF : ProtocolEPublic, ProtocolFPublic {
 }
 
 // TEST_PRIVATE_EF: Begin completions, 2 items
-// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: private func colliding() {|}{{; name=.+$}}
-// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: private func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
+// TEST_PRIVATE_EF-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_INTERNAL_EF: Begin completions, 2 items
 // TEST_INTERNAL_EF-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
