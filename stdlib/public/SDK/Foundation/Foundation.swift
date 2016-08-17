@@ -1007,7 +1007,12 @@ extension NSMutableDictionary {
     set {
       // FIXME: Unfortunate that the `NSCopying` check has to be done at
       // runtime.
-      self.setObject(newValue, forKey: key as AnyObject as! NSCopying)
+      let copyingKey = key as AnyObject as! NSCopying
+      if let newValue = newValue {
+        self.setObject(newValue, forKey: copyingKey)
+      } else {
+        self.removeObject(forKey: copyingKey)
+      }
     }
   }
 }
