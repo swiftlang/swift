@@ -28,6 +28,8 @@ class TestEnumLike : NSObject {
   func takesNewtypeArray(_ a: [EnumLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeDictionary:(NSDictionary<EnumLikeStringWrapper, EnumLikeStringWrapper> * _Nonnull)a;
   func takesNewtypeDictionary(_ a: [EnumLikeStringWrapper: EnumLikeStringWrapper]) {}
+  // CHECK: - (void)takesNewtypeOptional:(EnumLikeStringWrapper _Nullable)a;
+  func takesNewtypeOptional(_ a: EnumLikeStringWrapper?) {}
 }
 // CHECK: @end
 
@@ -39,6 +41,8 @@ class TestStructLike : NSObject {
   func takesNewtypeArray(_ a: [StructLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeDictionary:(NSDictionary<StructLikeStringWrapper, StructLikeStringWrapper> * _Nonnull)a;
   func takesNewtypeDictionary(_ a: [StructLikeStringWrapper: StructLikeStringWrapper]) {}
+  // CHECK: - (void)takesNewtypeOptional:(StructLikeStringWrapper _Nullable)a;
+  func takesNewtypeOptional(_ a: StructLikeStringWrapper?) {}
 }
 // CHECK: @end
 

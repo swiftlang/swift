@@ -5,6 +5,7 @@
 import AppKit
 import AVFoundation
 
+import Newtype
 import objc_ext
 import TestProtocols
 
@@ -597,5 +598,12 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
   // NSNumber
   let num = NSNumber(value: uint)
   let _: String = num.uintValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+}
+
+class NewtypeUser {
+  @objc func stringNewtype(a: SNTErrorDomain) {}
+  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {}
+  @objc func intNewtype(a: MyInt) {}
+  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
