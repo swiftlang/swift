@@ -6,6 +6,13 @@
 :Author: Jordan Rose
 :Author: John McCall
 
+.. note::
+
+    This document uses some Sphinx-specific features which are not available on
+    GitHub. For proper rendering, download and build the docs yourself. Jordan
+    Rose also posts occasional snapshots at
+    https://jrose-apple.github.io/swift-library-evolution/.
+
 One of Swift's primary design goals is to allow efficient execution of code
 without sacrificing load-time abstraction of implementation.
 
