@@ -639,7 +639,7 @@ func expectSequencePassthrough<
 
   SequenceLog._copyContents.expectIncrement(baseType) { () -> Void in
     let buf = UnsafeMutablePointer<S.Iterator.Element>.allocate(capacity: count)
-  
+
     let end = s._copyContents(initializing: buf)
     expectTrue(end <= buf + count)
     buf.deinitialize(count: end - buf)
@@ -955,9 +955,9 @@ tests.test("ReversedCollection/Lazy") {
   // Check that reversing a lazy collection, or lazy-ing a reverse
   // collection, produces the same lazy reverse collection.
   do {
-    
+
     let base = Array(stride(from: 11, through: 0, by: -1)).lazy.map { $0 }
-    
+
     typealias Base = LazyMapRandomAccessCollection<[Int], Int>
     ExpectType<Base>.test(base)
 
@@ -1279,5 +1279,138 @@ do {
   }
 }
 
-runAllTests()
+//===--- LazyPrefixWhile --------------------------------------------------===//
 
+let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
+  ([],                       0,     0),
+  ([0],                      0,     0),
+  ([0],                     99,     1),
+  ([0, 10],                  0,     0),
+  ([0, 10],                 10,     1),
+  ([0, 10],                 99,     2),
+  ([0, 10, 20, 30, 40],      0,     0),
+  ([0, 10, 20, 30, 40],     10,     1),
+  ([0, 10, 20, 30, 40],     20,     2),
+  ([0, 10, 20, 30, 40],     30,     3),
+  ([0, 10, 20, 30, 40],     40,     4),
+  ([0, 10, 20, 30, 40],     99,     5) ]
+
+% for Kind in 'Sequence', 'Forward', 'Bidirectional':
+%   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
+%   checkKind = 'ForwardCollection' if Kind == 'Forward' else Self
+tests.test("LazyPrefixWhile${Self}").forEach(in: prefixDropWhileTests) {
+  (data, value, pivot) in
+
+  let base = Minimal${Self}(elements: data)
+
+  var calls1 = 0
+  let prefixed = base.lazy.prefix(while: { calls1 += 1; return $0 != value })
+  let expected = data.prefix(upTo: pivot)
+  expectEqual(0, calls1)
+  check${checkKind}(expected, prefixed)
+
+  var calls2 = 0
+  _ = prefixed.map { _ in calls2 += 1 }
+  expectEqual(0, calls2, "unexpected eagerness in \(type(of: prefixed))")
+
+  % if Kind == 'Bidirectional':
+  check${checkKind}(expected.reversed(), prefixed.reversed())
+  % end
+}
+% end
+
+tests.test("LazyPrefixWhileSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyPrefixWhileSequence<Base>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+}
+
+tests.test("LazyPrefixWhileCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyPrefixWhileCollection<Base>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    subSequenceType: Slice<Subject>.self,
+    indexType: LazyPrefixWhileIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultIndices<Subject>.self)
+}
+
+tests.test("LazyPrefixWhileBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyPrefixWhileBidirectionalCollection<Base>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyPrefixWhileIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: LazyPrefixWhileIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultBidirectionalIndices<Subject>.self)
+}
+
+//===--- LazyDropWhile ----------------------------------------------------===//
+
+% for Kind in 'Sequence', 'Forward', 'Bidirectional':
+%   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
+%   checkKind = 'ForwardCollection' if Kind == 'Forward' else Self
+tests.test("LazyDropWhile${Self}").forEach(in: prefixDropWhileTests) {
+  (data, value, pivot) in
+
+  let base = Minimal${Self}(elements: data)
+
+  var calls1 = 0
+  let dropped = base.lazy.drop(while: { calls1 += 1; return $0 != value })
+  let expected = data.suffix(from: pivot)
+  expectEqual(0, calls1)
+  check${checkKind}(expected, dropped)
+
+  var calls2 = 0
+  _ = dropped.map { _ in calls2 += 1 }
+  expectEqual(0, calls2, "unexpected eagerness in \(type(of: dropped))")
+
+  % if Kind == 'Bidirectional':
+  check${checkKind}(expected.reversed(), dropped.reversed())
+  % end
+}
+% end
+
+tests.test("LazyDropWhileSequence/AssociatedTypes") {
+  typealias Base = MinimalSequence<OpaqueValue<Int>>
+  typealias Subject = LazyDropWhileSequence<Base>
+  expectSequenceAssociatedTypes(
+    sequenceType: Subject.self,
+    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+}
+
+tests.test("LazyDropWhileCollection/AssociatedTypes") {
+  typealias Base = MinimalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyDropWhileCollection<Base>
+  expectCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    subSequenceType: Slice<Subject>.self,
+    indexType: LazyDropWhileIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultIndices<Subject>.self)
+}
+
+tests.test("LazyDropWhileBidirectionalCollection/AssociatedTypes") {
+  typealias Base = MinimalBidirectionalCollection<OpaqueValue<Int>>
+  typealias Subject = LazyDropWhileBidirectionalCollection<Base>
+  expectBidirectionalCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: LazyDropWhileIterator<Base.Iterator>.self,
+    // FIXME(ABI): SubSequence should be `LazyFilterBidirectionalCollection<Base.Slice>`.
+    subSequenceType: BidirectionalSlice<Subject>.self,
+    indexType: LazyDropWhileIndex<Base>.self,
+    indexDistanceType: Base.IndexDistance.self,
+    indicesType: DefaultBidirectionalIndices<Subject>.self)
+}
+
+runAllTests()

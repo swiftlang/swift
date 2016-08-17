@@ -6,6 +6,13 @@
 :Author: Jordan Rose
 :Author: John McCall
 
+.. note::
+
+    This document uses some Sphinx-specific features which are not available on
+    GitHub. For proper rendering, download and build the docs yourself. Jordan
+    Rose also posts occasional snapshots at
+    https://jrose-apple.github.io/swift-library-evolution/.
+
 One of Swift's primary design goals is to allow efficient execution of code
 without sacrificing load-time abstraction of implementation.
 
@@ -167,7 +174,7 @@ document.
 Publishing Versioned API
 ========================
 
-A library's API is already marked with the ``public`` attribute, but if a
+A library's API is already marked with the ``public`` modifier, but if a
 client wants to work with multiple releases of the library, the API needs
 versioning information as well. A *versioned entity* represents anything with a
 runtime presence that a client may rely on; its version records when the entity
@@ -182,9 +189,12 @@ version of the library where the entity may be used.
   See `New Conformances`_, below.
 
 In a versioned library, any top-level public entity from the list above may not
-be made ``public`` without an appropriate version. A public entity declared
-within a versioned type (or an extension of a versioned type) will default to
-having the same version as the type.
+be made ``public`` (or ``open``) without an appropriate version. A public
+entity declared within a versioned type (or an extension of a versioned type)
+will default to having the same version as the type.
+
+In this document, the term "public" includes classes and members marked
+``open``.
 
 Code within a library may generally use all other entities declared within the
 library (barring their own availability checks), since the entire library is
@@ -286,8 +296,6 @@ The following changes are permitted:
 - Adding a default argument expression to a parameter.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- The ``@noreturn`` attribute may be added to a function. ``@noreturn`` is a
-  `versioned attribute`.
 - The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to a function without any additional versioning information.
 
@@ -299,7 +307,6 @@ No other changes are permitted; the following are particularly of note:
 - A versioned function may not add, remove, or reorder parameters, whether or
   not they have default arguments.
 - A versioned function that throws may not become non-throwing or vice versa.
-- ``@noreturn`` may not be removed from a function.
 - The ``@noescape`` attribute may not be added to or removed from a parameter.
   It is not a `versioned attribute` and so there is no way to guarantee that it
   is safe when a client deploys against older versions of the library.
@@ -952,16 +959,17 @@ Omitted from this list is the free addition of new members. Here classes are a
 little more restrictive than structs; they only allow the following changes:
 
 - Adding a new convenience initializer.
-- Adding a new designated initializer, if the class is not publicly
-  subclassable.
+- Adding a new designated initializer, if the class is not ``open``.
 - Adding a deinitializer.
 - Adding new, non-overriding method, subscript, or property.
-- Adding a new overriding member, though if the class is publicly-subclassable
-  the type of the member may not deviate from the member it overrides.
-  Changing the type could be incompatible with existing overrides in subclasses.
+- Adding a new overriding member, though if the class is ``open`` the type of
+  the member may not deviate from the member it overrides. Changing the type
+  could be incompatible with existing overrides in subclasses.
 
 Finally, classes allow the following changes that do not apply to structs:
 
+- A class may be marked ``open`` if it is not already marked ``final``.
+- A class may be marked ``final`` if it is not already marked ``open``.
 - Removing an explicit deinitializer. (A class with no declared deinitializer
   effectively has an implicit deinitializer.)
 - "Moving" a method, subscript, or property up to its superclass. The
@@ -972,8 +980,10 @@ Finally, classes allow the following changes that do not apply to structs:
   removed as long as the generic parameters, formal parameters, and return type
   *exactly* match the overridden declaration. Any existing callers should 
   automatically use the superclass implementation.
-- ``@noreturn`` may be only added to a method if it is not publicly
-  overridable.
+- Within an ``open`` class, any public method, subscript, or property may be
+  marked ``open`` if it is not already marked ``final``.
+- Any public method, subscript, or property may be marked ``final`` if it is not
+  already marked ``open``.
 - ``@IBOutlet``, ``@IBAction``, and ``@IBInspectable`` may be added to a member
   without providing any extra version information. Removing any of these is
   a `binary-compatible source-breaking change` if the member remains ``@objc``,
@@ -996,14 +1006,21 @@ Finally, classes allow the following changes that do not apply to structs:
     NSCollectionViewItem be a subclass of NSResponder or not? How would the
     compiler be able to enforce this?
 
+.. admonition:: TODO
+
+    Both ``final`` and ``open`` may be applied to a declaration after it has
+    been made public. However, these need to be treated as
+    `versioned attributes <versioned attribute>`. It's not clear what syntax
+    should be used for this.
+
 .. _NSCollectionViewItem: https://developer.apple.com/library/mac/documentation/Cocoa/Reference/NSCollectionViewItem_Class/index.html
 
 Other than those detailed above, no other changes to a class or its members
 are permitted. In particular:
 
-- ``final`` may not be added to *or* removed from a class or any of its members.
-  The presence of ``final`` enables optimization; its absence means there may
-  be subclasses/overrides that would be broken by the change.
+- ``open`` may not be removed from a class or its members.
+- ``final`` may not be removed from a class or its members. (The presence of
+  ``final`` enables optimization.)
 - ``dynamic`` may not be added to *or* removed from any members. Existing
   clients would not know to invoke the member dynamically.
 - A ``final`` override of a member may *not* be removed, even if the type
@@ -1012,9 +1029,6 @@ are permitted. In particular:
 - ``@objc`` and ``@nonobjc`` may not be added to or removed from the class or
   any existing members.
 - ``@NSManaged`` may not be added to or removed from any existing members.
-
-.. note:: These restrictions tie in with the ongoing discussions about
-  "``final``-by-default" and "non-publicly-subclassable-by-default".
 
 .. admonition:: TODO
 
@@ -1026,10 +1040,10 @@ are permitted. In particular:
 Initializers
 ------------
 
-New designated initializers may not be added to a publicly-subclassable class.
-This would change the inheritance of convenience initializers, which existing
-subclasses may depend on. A publicly-subclassable class also may not change
-a convenience initializer into a designated initializer or vice versa.
+New designated initializers may not be added to an ``open`` class. This would
+change the inheritance of convenience initializers, which existing subclasses
+may depend on. An ``open`` class also may not change a convenience initializer
+into a designated initializer or vice versa.
 
 A new ``required`` initializer may be added to a class only if it is a
 convenience initializer; that initializer may only call existing ``required``
@@ -1054,9 +1068,6 @@ top-level functions, but the potential for overrides complicates things a little
 - Adding a default argument expression to a parameter.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- The ``@noreturn`` attribute may be added to a public method only if it is
-  ``final`` or the class is not publicly subclassable. ``@noreturn`` is a
-  `versioned attribute`.
 - The ``@discardableResult`` and ``@warn_unqualified_access`` attributes may
   be added to a method without any additional versioning information.
 
@@ -1069,9 +1080,6 @@ If an inlineable method is overridden, the overriding method does not need to
 also be inlineable. Clients may only inline a method when they can devirtualize
 the call. (This does permit speculative devirtualization.)
 
-Any method that overrides a ``@noreturn`` method must also be marked
-``@noreturn``.
-
 
 Properties
 ----------
@@ -1080,8 +1088,7 @@ Class and instance properties allow *most* of the modifications permitted for
 struct properties, but the potential for overrides complicates things a little.
 Variable properties (those declared with ``var``) allow the following changes:
 
-- Adding (but not removing) a computed setter to a ``final`` property or a
-  property in a non-publicly-subclassable class.
+- Adding (but not removing) a computed setter to a non-``open`` property.
 - Adding or removing a non-public, non-versioned setter.
 - Changing from a stored property to a computed property, or vice versa, as
   long as a previously versioned setter is not removed.
@@ -1094,7 +1101,7 @@ Variable properties (those declared with ``var``) allow the following changes:
 - Adding or removing ``unowned`` from a variable.
 - Adding or removing ``@NSCopying`` to/from a variable.
 
-Adding a public setter to a computed property that may be overridden is a
+Adding a public setter to an ``open`` property is a
 `binary-compatible source-breaking change`; any existing overrides will not
 know what to do with the setter and will likely not behave correctly.
 
@@ -1117,12 +1124,12 @@ Subscripts
 Subscripts behave much like properties; they inherit the rules of their struct
 counterparts with a few small changes:
 
-- Adding (but not removing) a public setter to a ``final`` subscript or a
-  subscript is permitted in a non-publicly-subclassable class.
+- Adding (but not removing) a public setter to a non-``open`` subscript is
+  permitted.
 - Adding or removing a non-public, non-versioned setter is permitted.
 - Changing the body of an accessor is permitted.
 
-Adding a public setter to a subscript that may be overridden is a
+Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
 know what to do with the setter and will likely not behave correctly.
 
@@ -1245,18 +1252,18 @@ multiple kinds of flexibility.
 Versioning Internal Declarations
 ================================
 
-The initial discussion on versioning focused on ``public`` APIs, making sure
+The initial discussion on versioning focused on public APIs, making sure
 that a client knows what features they can use when a specific version of a
 library is present. Inlineable functions have much the same constraints, except
 the inlineable function is the client and the entities being used may not be
-``public``.
+public.
 
 Adding a versioning annotation to an ``internal`` entity promises that the
 entity will be available at link time in the containing module's binary. This
 makes it safe to refer to such an entity from an inlineable function. If the
-entity is ever made ``public``, its availability should not be changed; not
-only is it safe for new clients to rely on it, but *existing* clients require
-its presence as well.
+entity is ever made ``public`` or ``open``, its availability should not be
+changed; not only is it safe for new clients to rely on it, but *existing*
+clients require its presence as well.
 
 .. note::
 
@@ -1264,9 +1271,9 @@ its presence as well.
     imply everything that ``public`` does, such as requiring overrides to be
     ``public``.
 
-Because a versioned class member may eventually be made ``public``, it must be
-assumed that new overrides may eventually appear from outside the module unless
-the member is marked ``final`` or the class is not publicly subclassable.
+Because a versioned class member may eventually be made ``open``, it must be
+assumed that new overrides may eventually appear from outside the module if the
+class is marked ``open`` unless the member is marked ``final``.
 
 Non-public conformances are never considered versioned, even if both the
 conforming type and the protocol are versioned. A conformance is considered
@@ -1611,8 +1618,8 @@ of ``Summonable`` from the base class, but even that may not be possible if
 there are incompatible associated types involved (because changing a member
 typealias is not a safe change).
 
-One solution is to disallow adding a conformance for an existing protocol to a
-publicly-subclassable class.
+One solution is to disallow adding a conformance for an existing protocol to an
+``open`` class.
 
 
 Recompiling changes a protocol's implementation
@@ -1689,10 +1696,10 @@ document that affect language semantics:
 
 - `SE-0030 Property Behaviors`_
 - (draft) `Overridable methods in extensions`_
-- (planned) Making classes "sealed" by default
+- `SE-0117 Allow Allow distinguishing between public access and public overridability <SE-0117>`_
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) Default implementations in protocols
-- (planned) Generalized existentials (values of protocol type)
+- (planned) `Generalized existentials (values of protocol type) <Generics>`_
 - (planned) Open and closed enums
 - (planned) Removing the "constant" guarantee for 'let' across module boundaries
 - (planned) Syntax for declaring "versioned" entities and their features
@@ -1705,6 +1712,8 @@ document that affect language semantics:
 
 .. _SE-0030 Property Behaviors: https://github.com/apple/swift-evolution/blob/master/proposals/0030-property-behavior-decls.md
 .. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
+.. _SE-0117: https://github.com/apple/swift-evolution/blob/master/proposals/0117-non-public-subclassable-by-default.md
+.. _Generics: https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
 
 This does not mean all of these proposals need to be accepted, only that their
 acceptance or rejection will affect this document.
@@ -1723,7 +1732,7 @@ Glossary
   API
     An `entity` in a library that a `client` may use, or the collection of all
     such entities in a library. (If contrasting with `SPI`, only those entities
-    that are available to arbitrary clients.) Marked ``public`` in
+    that are available to arbitrary clients.) Marked ``public`` or ``open`` in
     Swift. Stands for "Application Programming Interface".
 
   availability context

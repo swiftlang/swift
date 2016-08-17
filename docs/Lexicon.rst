@@ -89,6 +89,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     different order, or when header files are modified to use forward
     declarations instead of direct includes.
 
+  LGTM
+    "Looks good to me." Used in code review to indicate approval with no further
+    comments.
+
   main module
     The module for the file or files currently being compiled.
 

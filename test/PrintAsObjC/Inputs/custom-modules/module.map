@@ -23,3 +23,7 @@ module OverrideBase [system] {
   header "override.h"
   export *
 }
+
+module OtherModule {
+  // Deliberately empty. Used by depends-on-swift-framework.swift.
+}

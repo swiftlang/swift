@@ -471,6 +471,18 @@ public protocol Sequence {
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   func dropLast(_ n: Int) -> SubSequence
 
+  /// Returns a subsequence by skipping elements while `predicate` returns
+  /// `true` and returning the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence
+
   /// Returns a subsequence, up to the specified maximum length, containing
   /// the initial elements of the sequence.
   ///
@@ -488,6 +500,18 @@ public protocol Sequence {
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   func prefix(_ maxLength: Int) -> SubSequence
+  
+  /// Returns a subsequence containing the initial elements until `predicate`
+  /// returns `false` and skipping the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element is a match.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence
 
   /// Returns a subsequence, up to the given maximum length, containing the
   /// final elements of the sequence.
@@ -696,6 +720,65 @@ internal class _PrefixSequence<Base : IteratorProtocol>
         _iterator: _iterator,
         maxLength: Swift.min(maxLength, self._maxLength),
         taken: _taken))
+  }
+  
+  internal func drop(
+    while predicate: (Base.Element) throws -> Bool
+  ) rethrows -> AnySequence<Base.Element> {
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: _iterator, nextElement: nil, predicate: predicate))
+  }
+}
+
+/// A sequence that lazily consumes and drops `n` elements from an underlying
+/// `Base` iterator before possibly returning the first available element.
+///
+/// The underlying iterator's sequence may be infinite.
+///
+/// This is a class - we require reference semantics to keep track
+/// of how many elements we've already dropped from the underlying sequence.
+internal class _DropWhileSequence<Base : IteratorProtocol>
+    : Sequence, IteratorProtocol {
+
+  internal var _iterator: Base
+  internal var _nextElement: Base.Element?
+
+  internal init(
+    iterator: Base,
+    nextElement: Base.Element?,
+    predicate: (Base.Element) throws -> Bool
+  ) rethrows {
+    self._iterator = iterator
+    self._nextElement = nextElement ?? _iterator.next()
+    
+    while try _nextElement.flatMap(predicate) == true {
+      _nextElement = _iterator.next()
+    }
+  }
+
+  internal func makeIterator() -> _DropWhileSequence<Base> {
+    return self
+  }
+
+  internal func next() -> Base.Element? {
+    guard _nextElement != nil else {
+      return _iterator.next()
+    }
+    
+    let next = _nextElement
+    _nextElement = nil
+    return next
+  }
+
+  internal func drop(
+    while predicate: (Base.Element) throws -> Bool
+  ) rethrows -> AnySequence<Base.Element> {
+    // If this is already a _DropWhileSequence, avoid multiple
+    // layers of wrapping and keep the same iterator.
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: _iterator, nextElement: _nextElement, predicate: predicate))
   }
 }
 
@@ -1128,6 +1211,23 @@ extension Sequence where
     }
     return AnySequence(result)
   }
+  
+  /// Returns a subsequence by skipping elements while `predicate` returns
+  /// `true` and returning the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns `true` if the element should
+  ///		be skipped or `false` if it should be included. Once the predicate
+  ///		returns `false` it will not be called again.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> AnySequence<Iterator.Element> {
+    return try AnySequence(
+      _DropWhileSequence(
+        iterator: makeIterator(), nextElement: nil, predicate: predicate))
+  }
 
   /// Returns a subsequence, up to the specified maximum length, containing the
   /// initial elements of the sequence.
@@ -1154,6 +1254,29 @@ extension Sequence where
     }
     return AnySequence(
       _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
+  }
+  
+  /// Returns a subsequence containing the initial elements until `predicate`
+  /// returns `false` and skipping the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns `true` if the element should
+  ///   be included or `false` if it should be excluded. Once the predicate
+  ///   returns `false` it will not be called again.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> AnySequence<Iterator.Element> {
+    var result: [Iterator.Element] = []
+
+    for element in self {
+      guard try predicate(element) else {
+        break
+      }
+      result.append(element)
+    }
+    return AnySequence(result)
   }
 }
 
