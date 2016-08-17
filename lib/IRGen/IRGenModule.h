@@ -133,25 +133,30 @@ class IRGenModule;
 
 /// A type descriptor for a field type accessor.
 class FieldTypeInfo {
-  llvm::PointerIntPair<CanType, 1, unsigned> Info;
+  llvm::PointerIntPair<CanType, 2, unsigned> Info;
   /// Bits in the "int" part of the Info pair.
   enum : unsigned {
     /// Flag indicates that the case is indirectly stored in a box.
     Indirect = 1,
+    /// Indicates a weak optional reference
+    Weak = 2,
   };
 
-  static unsigned getFlags(bool indirect) {
-    return (indirect ? Indirect : 0);
+  static unsigned getFlags(bool indirect, bool weak) {
+    return (indirect ? Indirect : 0)
+         | (weak ? Weak : 0);
     //   | (blah ? Blah : 0) ...
   }
 
 public:
-  FieldTypeInfo(CanType type, bool indirect)
-    : Info(type, getFlags(indirect))
+  FieldTypeInfo(CanType type, bool indirect, bool weak)
+    : Info(type, getFlags(indirect, weak))
   {}
 
   CanType getType() const { return Info.getPointer(); }
   bool isIndirect() const { return Info.getInt() & Indirect; }
+  bool isWeak() const { return Info.getInt() & Weak; }
+  bool hasFlags() const { return Info.getInt() != 0; }
 };
 
 /// The principal singleton which manages all of IR generation.
