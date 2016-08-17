@@ -180,6 +180,28 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectNotEqual(anyHashables[0], anyHashables[1])
         expectEqual(anyHashables[1], anyHashables[2])
     }
+
+    func test_superSet() {
+        let a = CharacterSet.letters.isSuperset(of: CharacterSet(charactersIn: "ab"))
+        expectTrue(a)
+    }
+
+    func test_union() {
+        let union = CharacterSet(charactersIn: "ab").union(CharacterSet(charactersIn: "cd"))
+        let expected = CharacterSet(charactersIn: "abcd")
+        expectEqual(expected, union)
+    }
+
+    func test_hasMember() {
+        let contains = CharacterSet.letters.hasMember(inPlane: 1)
+        expectTrue(contains)
+    }
+
+    func test_bitmap() {
+        let bitmap = CharacterSet(charactersIn: "ab").bitmapRepresentation
+        expectEqual(0x6, bitmap[12])
+        expectEqual(8192, bitmap.count)
+    }
 }
 
 
@@ -195,6 +217,10 @@ CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
 CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
 CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacterSet().test_AnyHashableContainingCharacterSet() }
 CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
+CharacterSetTests.test("test_superSet") { TestCharacterSet().test_superSet() }
+CharacterSetTests.test("test_union") { TestCharacterSet().test_union() }
+CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
+CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 runAllTests()
 #endif
 

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+import CoreFoundation
 
 private func _utfRangeToNSRange(_ inRange : Range<UnicodeScalar>) -> NSRange {
     return NSMakeRange(Int(inRange.lowerBound.value), Int(inRange.upperBound.value - inRange.lowerBound.value))
@@ -483,28 +484,37 @@ extension _SwiftNSCharacterSet {
     
     // Immutable
     
+    @objc(bitmapRepresentation)
     var bitmapRepresentation: Data {
         return _mapUnmanaged { $0.bitmapRepresentation }
     }
     
+    @objc(invertedSet)
     var inverted : CharacterSet {
         return _mapUnmanaged { $0.inverted }
     }
     
+    @objc(hasMemberInPlane:)
     func hasMember(inPlane plane: UInt8) -> Bool {
         return _mapUnmanaged {$0.hasMemberInPlane(plane) }
     }
     
+    @objc(characterIsMember:)
     func characterIsMember(_ member: unichar) -> Bool {
         return _mapUnmanaged { $0.characterIsMember(member) }
     }
     
+    @objc(longCharacterIsMember:)
     func longCharacterIsMember(_ member: UTF32Char) -> Bool {
         return _mapUnmanaged { $0.longCharacterIsMember(member) }
     }
     
+    @objc(isSupersetOfSet:)
     func isSuperset(of other: CharacterSet) -> Bool {
-        return _mapUnmanaged { $0.isSuperset(of: other) }
+        return _mapUnmanaged {
+            // this is a work around for <rdar://problem/27768939>
+            return CFCharacterSetIsSupersetOfSet($0 as CFCharacterSet, (other as NSCharacterSet).copy() as! CFCharacterSet)
+        }
     }
     
 }
