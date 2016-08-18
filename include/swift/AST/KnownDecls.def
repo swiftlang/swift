@@ -67,6 +67,8 @@ FUNC_DECL(ConditionallyBridgeFromObjectiveCBridgeable,
 
 FUNC_DECL(BridgeAnythingToObjectiveC,
           "_bridgeAnythingToObjectiveC")
+FUNC_DECL(BridgeAnyObjectToAny,
+          "_bridgeAnyObjectToAny")
 
 FUNC_DECL(ConvertToAnyHashable, "_convertToAnyHashable")
 
