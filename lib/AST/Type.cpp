@@ -89,10 +89,11 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
-bool TypeBase::isNever() {
+bool TypeBase::isUninhabited() {
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      return enumDecl == getASTContext().getNeverDecl();
+      if (enumDecl->getAllElements().empty())
+        return true;
   return false;
 }
 

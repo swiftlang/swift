@@ -72,7 +72,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 
 bool SILType::isNoReturnFunction() const {
   if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
-    return funcTy->getSILResult().getSwiftRValueType()->isNever();
+    return funcTy->getSILResult().getSwiftRValueType()->isUninhabited();
 
   return false;
 }

@@ -20,7 +20,7 @@ public var ci : c = c()
 
 open class d {
   private func m() -> Never {
-    return fatalError()
+    fatalError()
   }
 }
 
