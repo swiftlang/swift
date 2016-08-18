@@ -5,6 +5,8 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
+import StdlibUnicodeUnittest
+import StdlibUnittestFoundationExtras
 
 #if _runtime(_ObjC)
 import Foundation  // For NSRange
@@ -679,9 +681,9 @@ StringTests.test("COW/replaceSubrange/end") {
   }
 }
 
-func asciiString<
-  S: Sequence where S.Iterator.Element == Character
->(_ content: S) -> String {
+func asciiString<S: Sequence>(_ content: S) -> String 
+  where S.Iterator.Element == Character
+{
   var s = String()
   s.append(contentsOf: content)
   expectEqual(1, s._core.elementWidth)
@@ -999,6 +1001,43 @@ StringTests.test(
 #endif
 }
 
+#if _runtime(_ObjC)
+StringTests.test("String._fastCStringContents()") {
+  // ASCII tests
+  for i in 0..<128 {
+    // Non-nil check is sufficient to guarantee the string is ASCII
+    let s = NSString(UnicodeScalar(i)!)
+    let contents = s.available_fastCStringContents(false)
+    expectNotEqual(contents, nil)
+    
+    // Disregard NUL for equality checks
+    guard i != 0 else {
+      continue
+    }
+
+    let str = NSString(bytes: contents!, length: 1, .utf8)!
+    expectEqual(s, str)
+  }
+  // Random tests
+  for x in 1..<100 {
+    let s = randomGraphemeCluster(0, 9)
+    let cs = s as NSString
+    guard let contents = cs.available_fastCStringContents(false) else {
+      continue
+    }
+ 
+    // Slice tests
+    if !s.isEmpty {
+      let slice = s[0..<s.index(before: s.endIndex)] as NSString
+      expectEqual(slice.available_fastCStringContents(false), nil)
+    }
+  }
+  // UTF-16 test
+  let str = NSString(utf8String: "🏂☃❅❆❄︎⛄️❄️")! as String
+  expectEqual(_NSContiguousString(str._core).available_fastCStringContents(false), nil)
+}
+#endif
+
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
 #endif
@@ -1248,10 +1287,10 @@ StringTests.test("String.append(_: Character)") {
 
 internal func decodeCString<
   C : UnicodeCodec
-  where
-  C.CodeUnit : UnsignedInteger
 >(_ s: String, as codec: C.Type)
-  -> (result: String, repairsMade: Bool)? {
+  -> (result: String, repairsMade: Bool)?
+  where C.CodeUnit : UnsignedInteger  
+{
   let units = s.unicodeScalars.map({ $0.value }) + [0]
   return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)

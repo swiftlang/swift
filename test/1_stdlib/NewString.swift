@@ -5,6 +5,7 @@
 
 import Foundation
 import Swift
+import StdlibUnittestFoundationExtras
 
 // ==== Tests =====
 
@@ -113,6 +114,9 @@ func nonASCII() {
   // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
   var nsSliceUTF16 = newNSUTF16[i2..<i8] as NSString
   print("  \(repr(nsSliceUTF16))")
+
+  // CHECK-NEXT: fast C-String contents: nil
+  print("fast C-String contents: \(nsSliceUTF16.available_fastCStringContents(false))")
 
   // Check that we can recover the original buffer
   // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))

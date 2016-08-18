@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import StdlibUnittest
+import SwiftPrivate
 
 public struct UTFTest {
   public struct Flags : OptionSet {
@@ -422,7 +423,6 @@ public let utfTests: [UTFTest] = [
     scalars: [ 0x0010_FFFF ]),
 ]
 
-
 public struct UTF16Test {
   public let scalarsHead: [UInt32]
   public let scalarsRepairedTail: [UInt32]
@@ -669,4 +669,71 @@ public let utf16Tests = [
         [ 0xDC00, 0xD800, 0xD800, 0xDC00 ]),
   ],
 ]
+
+/// Single Unicode scalars that occupy a variety of bits in UTF-8.
+///
+/// These scalars should be "base characters" with regards to their position in
+/// a grapheme cluster.
+public let baseScalars: [UnicodeScalar] = [
+  // U+0065 LATIN SMALL LETTER E
+  "\u{0065}",
+
+  // U+006F LATIN SMALL LETTER O
+  "\u{006f}",
+
+  // U+00A9 COPYRIGHT SIGN
+  "\u{00a9}",
+
+  // U+0122 LATIN CAPITAL LETTER G WITH CEDILLA
+  "\u{0122}",
+
+  // U+0521 CYRILLIC SMALL LETTER EL WITH MIDDLE HOOK
+  "\u{0521}",
+
+  // U+0ED2 LAO DIGIT TWO
+  "\u{0ed2}",
+
+  // U+4587 CJK UNIFIED IDEOGRAPH-4587
+  "\u{4587}",
+
+  // U+B977 HANGUL SYLLABLE REUGS
+  "\u{b977}",
+
+  // U+BF01 HANGUL SYLLABLE BBENG
+  "\u{bf01}",
+
+  // U+1D452 MATHEMATICAL ITALIC SMALL E
+  "\u{1d452}",
+
+  // U+1E825 MENDE KIKAKUI SYLLABLE M163 EE
+  "\u{1e825}",
+
+  // U+10B9C4 (private use)
+  "\u{10b9c4}",
+]
+
+/// Single Unicode scalars that are "continuing characters" with regards to
+/// their position in a grapheme cluster.
+public let continuingScalars: [UnicodeScalar] = [
+  // U+0300 COMBINING GRAVE ACCENT
+  "\u{0300}",
+
+  // U+0308 COMBINING DIAERESIS
+  "\u{0308}",
+
+  // U+0903 DEVANAGARI SIGN VISARGA
+  "\u{0903}",
+
+  // U+200D ZERO WIDTH JOINER
+  "\u{200D}",
+]
+
+public func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
+  let n = pickRandom((minSize + 1)..<maxSize)
+  var result = String(pickRandom(baseScalars))
+  for _ in 0..<n {
+    result += String(pickRandom(continuingScalars))
+  }
+  return result
+}
 

@@ -113,3 +113,19 @@ extension NSDictionary {
       andKeys: keys)
   }
 }
+
+@_silgen_name("swift_stdlib_NSString__fastCStringContents")
+func _stdlib_NSString__fastCStringContents(
+  _ nsString: NSString,
+  _ nullTerminationRequired : Bool
+) -> UnsafeMutablePointer<Int8>?
+
+
+extension NSString {
+  @nonobjc // FIXME: there should be no need in this attribute.
+  public func available_fastCStringContents(
+    _ nullTerminationRequired : Bool
+  ) -> UnsafeMutablePointer<Int8>? {
+    return _stdlib_NSString__fastCStringContents(self, nullTerminationRequired)
+  }
+}
