@@ -428,6 +428,8 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   // owner now, we need to release the old owner to maintain the contract.
   if (owner->metadata->isAnyClass())
     swift_unknownRelease(owner);
+  else
+    swift_release(owner);
 
   return true;
 }

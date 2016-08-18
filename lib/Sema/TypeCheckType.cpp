@@ -1402,6 +1402,38 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   return false;
 }
 
+/// Whether the given DC is a noescape-by-default context, i.e. not a property
+/// setter
+static bool isDefaultNoEscapeContext(const DeclContext *DC) {
+  auto funcDecl = dyn_cast<FuncDecl>(DC);
+  return !funcDecl || !funcDecl->isSetter();
+}
+
+// Hack to apply context-specific @escaping to an AST function type.
+static Type adjustFunctionExtInfo(DeclContext *DC,
+                                  Type ty,
+                                  TypeResolutionOptions options) {
+  // Remember whether this is a function parameter.
+  bool isFunctionParam =
+    options.contains(TR_FunctionInput) ||
+    options.contains(TR_ImmediateFunctionInput);
+
+  bool defaultNoEscape = isFunctionParam && isDefaultNoEscapeContext(DC);
+
+  // Desugar here
+  auto *funcTy = ty->castTo<FunctionType>();
+  auto extInfo = funcTy->getExtInfo();
+  if (defaultNoEscape && !extInfo.isNoEscape()) {
+    extInfo = extInfo.withNoEscape();
+
+    // We lost the sugar to flip the isNoEscape bit
+    return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
+  }
+
+  // Note: original sugared type
+  return ty;
+}
+
 /// \brief Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(
        DeclContext *DC,
@@ -1431,6 +1463,11 @@ Type TypeChecker::resolveIdentifierType(
     Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
+
+  // Hack to apply context-specific @escaping to a typealias with an underlying
+  // function type.
+  if (result->is<FunctionType>())
+    result = adjustFunctionExtInfo(DC, result, options);
 
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
@@ -1637,13 +1674,6 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   return result;
 }
 
-/// Whether the given DC is a noescape-by-default context, i.e. not a property
-/// setter
-static bool isDefaultNoEscapeContext(const DeclContext *DC) {
-  auto funcDecl = dyn_cast<FuncDecl>(DC);
-  return !funcDecl || !funcDecl->isSetter();
-}
-
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
 
@@ -1651,15 +1681,13 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   // error type.
   if (repr->isInvalid()) return ErrorType::get(TC.Context);
 
-  // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TR_FunctionInput) ||
-    options.contains(TR_ImmediateFunctionInput);
-
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
-  if (!isa<InOutTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
-      !isa<AttributedTypeRepr>(repr)) {
+  if (!isa<InOutTypeRepr>(repr) &&
+      !isa<TupleTypeRepr>(repr) &&
+      !isa<AttributedTypeRepr>(repr) &&
+      !isa<FunctionTypeRepr>(repr) &&
+      !isa<IdentTypeRepr>(repr)) {
     options -= TR_ImmediateFunctionInput;
     options -= TR_FunctionInput;
   }
@@ -1686,11 +1714,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Function:
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
-      auto info = AnyFunctionType::ExtInfo().withNoEscape(
-          isFunctionParam &&
-          isDefaultNoEscapeContext(DC));
-      return resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options,
-                                    info);
+      auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
+      if (result && result->is<FunctionType>())
+        return adjustFunctionExtInfo(DC, result, options);
+      return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
 
@@ -1761,8 +1788,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   bool isFunctionParam =
     options.contains(TR_FunctionInput) ||
     options.contains(TR_ImmediateFunctionInput);
-  options -= TR_ImmediateFunctionInput;
-  options -= TR_FunctionInput;
 
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
@@ -1786,7 +1811,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         if (base) {
           Optional<MetatypeRepresentation> storedRepr;
           // The instance type is not a SIL type.
-          auto instanceOptions = options - TR_SILType;
+          auto instanceOptions = options;
+          instanceOptions -= TR_SILType;
+          instanceOptions -= TR_ImmediateFunctionInput;
+          instanceOptions -= TR_FunctionInput;
+
           auto instanceTy = resolveType(base, instanceOptions);
           if (!instanceTy || instanceTy->is<ErrorType>())
             return instanceTy;
@@ -1915,10 +1944,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->is<ErrorType>()) return ty;
-
-    for (auto i : FunctionAttrs)
-      attrs.clearAttribute(i);
-    attrs.convention = None;
   } else if (hasFunctionAttr && fnRepr) {
 
     FunctionType::Representation rep = FunctionType::Representation::Swift;
@@ -1962,29 +1987,54 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
-    bool defaultNoEscape = false;
-    if (isFunctionParam && !attrs.has(TAK_escaping)) {
-      defaultNoEscape = isDefaultNoEscapeContext(DC);
-    }
-
-    if (isFunctionParam && attrs.has(TAK_noescape) &&
-        isDefaultNoEscapeContext(DC)) {
+    if (attrs.has(TAK_noescape)) {
       // FIXME: diagnostic to tell user this is redundant and drop it
     }
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
-                                  defaultNoEscape | attrs.has(TAK_noescape),
+                                  attrs.has(TAK_noescape),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->is<ErrorType>()) return ty;
+  }
 
-    for (auto i : FunctionAttrs)
-      attrs.clearAttribute(i);
-    attrs.convention = None;
-  } else if (hasFunctionAttr) {
+  auto instanceOptions = options;
+  instanceOptions -= TR_ImmediateFunctionInput;
+  instanceOptions -= TR_FunctionInput;
+
+  // If we didn't build the type differently above, we might have
+  // a typealias pointing at a function type with the @escaping
+  // attribute. Resolve the type as if it were in non-parameter
+  // context, and then set isNoEscape if @escaping is not present.
+  if (!ty) ty = resolveType(repr, instanceOptions);
+  if (!ty || ty->is<ErrorType>()) return ty;
+
+  // Handle @escaping
+  if (hasFunctionAttr && ty->is<FunctionType>()) {
+    if (attrs.has(TAK_escaping)) {
+      // The attribute is meaningless except on parameter types.
+      if (!isFunctionParam) {
+        auto &SM = TC.Context.SourceMgr;
+        auto loc = attrs.getLoc(TAK_escaping);
+        auto attrRange = SourceRange(
+          loc.getAdvancedLoc(-1),
+          Lexer::getLocForEndOfToken(SM, loc));
+
+        TC.diagnose(loc, diag::escaping_function_type)
+            .fixItRemove(attrRange);
+      }
+
+      attrs.clearAttribute(TAK_escaping);
+    } else {
+      // No attribute; set the isNoEscape bit if we're in parameter context.
+      ty = adjustFunctionExtInfo(DC, ty, options);
+    }
+  }
+
+  if (hasFunctionAttr && !fnRepr) {
     // @autoclosure usually auto-implies @noescape, don't complain about both
     // of them.
     if (attrs.has(TAK_autoclosure))
@@ -1997,11 +2047,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(i);
       }
     }
-  } 
-
-  // If we didn't build the type differently above, build it normally now.
-  if (!ty) ty = resolveType(repr, options);
-  if (!ty || ty->is<ErrorType>()) return ty;
+  } else if (hasFunctionAttr && fnRepr) {
+    for (auto i : FunctionAttrs)
+      attrs.clearAttribute(i);
+    attrs.convention = None;
+  }
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
@@ -2056,6 +2106,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
   if (!inputTy || inputTy->is<ErrorType>()) return inputTy;
@@ -2120,6 +2173,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee) {
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+
   bool hasError = false;
 
   SmallVector<SILParameterInfo, 4> params;
@@ -2448,9 +2504,12 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   
   // If this is the top level of a function input list, peel off the
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
-  auto elementOptions = withoutContext(options);
-  if (options & TR_ImmediateFunctionInput)
-    elementOptions |= TR_FunctionInput;
+  auto elementOptions = options;
+  if (!repr->isParenType()) {
+    elementOptions = withoutContext(elementOptions);
+    if (options & TR_ImmediateFunctionInput)
+      elementOptions |= TR_FunctionInput;
+  }
   
   for (auto tyR : repr->getElements()) {
     NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR);

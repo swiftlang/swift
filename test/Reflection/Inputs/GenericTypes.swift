@@ -9,7 +9,7 @@ public class C1<T> : ClassBoundP {
   public let tuple: Tuple
   public let dependentMember: T
 
-  public init(aClass: C1<T>, aStruct: S1<T>, anEnum: E1<T>, function: Function, tuple: Tuple, dependentMember: T) {
+  public init(aClass: C1<T>, aStruct: S1<T>, anEnum: E1<T>, function: @escaping Function, tuple: Tuple, dependentMember: T) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum
@@ -29,7 +29,7 @@ public class C2<T: P1> {
   public let tuple: Tuple
   public let primaryArchetype: T
   public let dependentMember1: T.Inner
-  public init(aClass: C1<T>, aStruct: S1<T>, anEnum: E1<T>, function: Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Inner) {
+  public init(aClass: C1<T>, aStruct: S1<T>, anEnum: E1<T>, function: @escaping Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Inner) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum
@@ -51,7 +51,7 @@ public class C3<T: P2> {
   public let primaryArchetype: T
   public let dependentMember1: T.Outer
   public let dependentMember2: T.Outer.Inner
-  public init(aClass: C3<T>, aStruct: S3<T>, anEnum: E3<T>, function: Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Outer, dependentMember2: T.Outer.Inner) {
+  public init(aClass: C3<T>, aStruct: S3<T>, anEnum: E3<T>, function: @escaping Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Outer, dependentMember2: T.Outer.Inner) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum
@@ -99,7 +99,7 @@ public struct S3<T: P2> {
   public let primaryArchetype: T
   public let dependentMember1: T.Outer
   public let dependentMember2: T.Outer.Inner
-  public init(aClass: C3<T>, aStruct: Box<S3<T>>, anEnum: Box<E3<T>>, function: Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Outer, dependentMember2: T.Outer.Inner) {
+  public init(aClass: C3<T>, aStruct: Box<S3<T>>, anEnum: Box<E3<T>>, function: @escaping Function, tuple: Tuple, primaryArchetype: T, dependentMember1: T.Outer, dependentMember2: T.Outer.Inner) {
     self.aClass = aClass
     self.aStruct = aStruct
     self.anEnum = anEnum

@@ -42,8 +42,21 @@ class SILPassManager {
   /// A list of registered analysis.
   llvm::SmallVector<SILAnalysis *, 16> Analysis;
 
+  /// An entry in the FunctionWorkList.
+  struct WorklistEntry {
+    WorklistEntry(SILFunction *F) : F(F) { }
+
+    SILFunction *F;
+
+    /// The current position in the transform-list.
+    unsigned PipelineIdx = 0;
+
+    /// How many times the pipeline was restarted for the function.
+    unsigned NumRestarts = 0;
+  };
+
   /// The worklist of functions to be processed by function passes.
-  std::vector<SILFunction *> FunctionWorklist;
+  std::vector<WorklistEntry> FunctionWorklist;
 
   // Name of the current optimization stage for diagnostics.
   std::string StageName;
@@ -211,9 +224,8 @@ private:
   /// the module.
   void runModulePass(SILModuleTransform *SMT);
 
-  /// Run the passes in \p FuncTransforms on the function \p F.
-  void runPassesOnFunction(PassList FuncTransforms, SILFunction *F,
-                           bool runToCompletion);
+  /// Run the pass \p SFT on the function \p F.
+  void runPassOnFunction(SILFunctionTransform *SFT, SILFunction *F);
 
   /// Run the passes in \p FuncTransforms. Return true
   /// if the pass manager requested to stop the execution

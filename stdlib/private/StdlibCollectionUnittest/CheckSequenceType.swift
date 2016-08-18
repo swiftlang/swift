@@ -97,7 +97,7 @@ public struct EnumerateTest {
 public struct FilterTest {
   public let expected: [Int]
   public let sequence: [Int]
-  public let includeElement: @escaping (Int) -> Bool
+  public let includeElement: (Int) -> Bool
   public let loc: SourceLoc
 
   public init(
@@ -139,7 +139,7 @@ public struct FindTest {
 public struct FlatMapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> [Int32]
+  public let transform: (Int) -> [Int32]
   public let loc: SourceLoc
 
   public init(
@@ -158,7 +158,7 @@ public struct FlatMapTest {
 public struct FlatMapToOptionalTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> Int32?
+  public let transform: (Int) -> Int32?
   public let loc: SourceLoc
 
   public init(
@@ -224,7 +224,7 @@ public struct LexicographicallyPrecedesTest {
 public struct MapTest {
   public let expected: [Int32]
   public let sequence: [Int]
-  public let transform: @escaping (Int) -> Int32
+  public let transform: (Int) -> Int32
   public let loc: SourceLoc
 
   public init(
@@ -1458,7 +1458,7 @@ extension TestSuite {
 
     makeSequenceOfEquatable: @escaping ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) where
