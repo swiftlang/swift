@@ -711,18 +711,18 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // coalescing supertype bounds when we are able to compute the meet.
   auto addPotentialBinding = [&](PotentialBinding binding) {
     // If this is a non-defaulted supertype binding, check whether we can
-    // combine it with another supertype binding by computing the 'meet' of the
+    // combine it with another supertype binding by computing the 'join' of the
     // types.
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         !binding.BindingType->hasTypeVariable() &&
         !binding.DefaultedProtocol &&
         !binding.IsDefaultableBinding) {
       if (lastSupertypeIndex) {
-        // Can we compute a meet?
+        // Can we compute a join?
         auto &lastBinding = result.Bindings[*lastSupertypeIndex];
         if (auto meet =
-                Type::meet(lastBinding.BindingType, binding.BindingType)) {
-          // Replace the last supertype binding with the meet. We're done.
+                Type::join(lastBinding.BindingType, binding.BindingType)) {
+          // Replace the last supertype binding with the join. We're done.
           lastBinding.BindingType = meet;
           return;
         }
