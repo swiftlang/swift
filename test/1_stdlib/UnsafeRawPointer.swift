@@ -180,7 +180,7 @@ func checkRawPointerCorrectness(_ check: Check,
 }
 
 func checkPtr(
-  _ f: @escaping ((UnsafeMutableRawPointer)
+  _ f: ((UnsafeMutableRawPointer)
     -> (_ as: Int.Type, _ from: UnsafeMutablePointer<Int>, _ count: Int)
     -> UnsafeMutablePointer<Int>)
 ) -> (Check) -> Void {
@@ -188,7 +188,7 @@ func checkPtr(
 }
 
 func checkPtr(
-  _ f: @escaping ((UnsafeMutableRawPointer)
+  _ f: ((UnsafeMutableRawPointer)
     -> (_ as: Int.Type, _ from: UnsafePointer<Int>, _ count: Int)
     -> UnsafeMutablePointer<Int>)
 ) -> (Check) -> Void {

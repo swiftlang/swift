@@ -559,7 +559,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: () -> Iterator
+  internal var _makeUnderlyingIterator: @escaping () -> Iterator
 }
 
 /// A type-erased sequence.
