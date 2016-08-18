@@ -33,6 +33,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
@@ -48,7 +49,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
-                         bool SaveTemps)
+                         bool SaveTemps,
+                         bool ShowDriverTimeCompilation)
   : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
@@ -56,7 +58,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
-    SaveTemps(SaveTemps) {
+    SaveTemps(SaveTemps),
+    ShowDriverTimeCompilation(ShowDriverTimeCompilation) {
 };
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
@@ -421,13 +424,42 @@ int Compilation::performJobsImpl() {
   }
 
   int Result = EXIT_SUCCESS;
+  llvm::TimerGroup DriverTimerGroup("Driver Time Compilation");
+  llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
+    DriverTimers;
 
   // Set up a callback which will be called immediately after a task has
   // started. This callback may be used to provide output indicating that the
   // task began.
-  auto taskBegan = [this] (ProcessId Pid, void *Context) {
+  auto taskBegan = [&] (ProcessId Pid, void *Context) {
     // TODO: properly handle task began.
     const Job *BeganCmd = (const Job *)Context;
+
+    if (ShowDriverTimeCompilation) {
+      llvm::SmallString<128> TimerName;
+      llvm::raw_svector_ostream OS(TimerName);
+
+      OS << BeganCmd->getSource().getClassName();
+      for (auto A : BeganCmd->getSource().getInputs()) {
+        if (const InputAction *IA = dyn_cast<InputAction>(A)) {
+          OS << " " << IA->getInputArg().getValue();
+        }
+      }
+      for (auto J : BeganCmd->getInputs()) {
+        for (auto A : J->getSource().getInputs()) {
+          if (const InputAction *IA = dyn_cast<InputAction>(A)) {
+            OS << " " << IA->getInputArg().getValue();
+          }
+        }
+      }
+
+      DriverTimers.insert({
+        BeganCmd,
+        std::unique_ptr<llvm::Timer>(
+          new llvm::Timer(OS.str(), DriverTimerGroup))
+      });
+      DriverTimers[BeganCmd]->startTimer();
+    }
 
     // For verbose output, print out each command as it begins execution.
     if (Level == OutputLevel::Verbose)
@@ -444,6 +476,10 @@ int Compilation::performJobsImpl() {
   auto taskFinished = [&] (ProcessId Pid, int ReturnCode, StringRef Output,
                            void *Context) -> TaskFinishedResponse {
     const Job *FinishedCmd = (const Job *)Context;
+
+    if (ShowDriverTimeCompilation) {
+      DriverTimers[FinishedCmd]->stopTimer();
+    }
 
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
@@ -571,6 +607,10 @@ int Compilation::performJobsImpl() {
   auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
                             void *Context) -> TaskFinishedResponse {
     const Job *SignalledCmd = (const Job *)Context;
+
+    if (ShowDriverTimeCompilation) {
+      DriverTimers[SignalledCmd]->stopTimer();
+    }
 
     if (Level == OutputLevel::Parseable) {
       // Parseable output was requested.
@@ -721,6 +761,7 @@ int Compilation::performJobs() {
 
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
+      !ShowDriverTimeCompilation &&
       (SaveTemps || TempFilePaths.empty()) &&
       CompilationRecordPath.empty() &&
       Jobs.size() == 1) {

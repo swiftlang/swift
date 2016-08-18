@@ -369,6 +369,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
     ArgList->hasArg(options::OPT_continue_building_after_errors);
+  bool ShowDriverTimeCompilation =
+    ArgList->hasArg(options::OPT_driver_time_compilation);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -503,7 +505,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  DriverSkipExecution,
-                                                 SaveTemps));
+                                                 SaveTemps,
+                                                 ShowDriverTimeCompilation));
 
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
