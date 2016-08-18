@@ -727,7 +727,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
-                          DiagnosticEngine &Diags, bool isImmediate) {
+                          DiagnosticEngine &Diags,
+                          const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
@@ -745,6 +746,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
+  if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
+    Opts.DisableAvailabilityChecking = true;
   
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
@@ -1327,8 +1330,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags,
-                    FrontendOpts.actionIsImmediate())) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 

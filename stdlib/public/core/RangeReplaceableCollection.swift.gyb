@@ -22,6 +22,7 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `RangeReplaceableCollection` protocol instead, because it has a more
 /// complete interface.
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
 public protocol RangeReplaceableIndexable : Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.

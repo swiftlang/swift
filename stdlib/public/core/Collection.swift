@@ -15,6 +15,7 @@
 ///
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public protocol IndexableBase {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
@@ -156,6 +157,7 @@ public protocol IndexableBase {
 ///
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public protocol Indexable : IndexableBase {
   /// A type used to represent the number of steps between two indices, where
   /// one value is reachable from the other.
@@ -1727,3 +1729,4 @@ extension Collection where Iterator.Element : Equatable {
 
 @available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
+

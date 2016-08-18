@@ -54,7 +54,8 @@ func sortResultIgnored<
   array.sorted { $0 < $1 } // expected-warning {{result of call to 'sorted(by:)' is unused}}
 }
 
-struct GoodIndexable : Indexable {
+// expected-warning@+1 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
+struct GoodIndexable : Indexable { 
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
@@ -64,6 +65,7 @@ struct GoodIndexable : Indexable {
 }
 
 
+// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
 // expected-error@+1 {{type 'BadIndexable1' does not conform to protocol 'IndexableBase'}}
 struct BadIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
@@ -75,6 +77,7 @@ struct BadIndexable1 : Indexable {
   // Missing 'subscript(_:) -> SubSequence'.
 }
 
+// expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
 // expected-error@+1 {{type 'BadIndexable2' does not conform to protocol 'IndexableBase'}}
 struct BadIndexable2 : Indexable {
   var startIndex: Int { return 0 }
@@ -85,6 +88,7 @@ struct BadIndexable2 : Indexable {
   // Missing index(after:) -> Int
 }
 
+// expected-warning@+1 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead}}
 struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
@@ -97,6 +101,7 @@ struct GoodBidirectionalIndexable1 : BidirectionalIndexable {
 
 // We'd like to see: {{type 'BadBidirectionalIndexable' does not conform to protocol 'BidirectionalIndexable'}}
 // But the compiler doesn't generate that error.
+// expected-warning@+1 {{'BidirectionalIndexable' is deprecated: it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead}}
 struct BadBidirectionalIndexable : BidirectionalIndexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }

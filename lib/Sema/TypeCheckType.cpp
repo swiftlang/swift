@@ -1441,8 +1441,8 @@ Type TypeChecker::resolveIdentifierType(
   bool AllowPotentiallyUnavailableProtocol =
       options.contains(TR_InheritanceClause);
 
-  // Check the availability of the type. Skip checking for SIL.
-  if (!(options & TR_SILType) && !(options & TR_AllowUnavailable) &&
+  // Check the availability of the type.
+  if (!(options & TR_AllowUnavailable) &&
       diagnoseAvailability(result, IdType,
                            Components.back()->getIdLoc(), DC, *this,
                            AllowPotentiallyUnavailableProtocol)) {
@@ -1664,6 +1664,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_FunctionInput;
   }
 
+  if (Context.LangOpts.DisableAvailabilityChecking)
+    options |= TR_AllowUnavailable;
+
   switch (repr->getKind()) {
   case TypeReprKind::Error:
     return ErrorType::get(Context);
@@ -1768,9 +1771,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
         if (base) {
           Optional<MetatypeRepresentation> storedRepr;
-          // The instance type is not a SIL type. We still want to allow
-          // unavailable references, though.
-          auto instanceOptions = options - TR_SILType | TR_AllowUnavailable;
+          // The instance type is not a SIL type.
+          auto instanceOptions = options - TR_SILType;
           auto instanceTy = resolveType(base, instanceOptions);
           if (!instanceTy || instanceTy->is<ErrorType>())
             return instanceTy;

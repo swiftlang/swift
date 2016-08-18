@@ -1068,15 +1068,12 @@ func functionWithUnavailableInDeadBranch() {
 
     localFuncAvailableOn10_51() // no-warning
 
-    // We still want to error on references to explicitly unavailable symbols
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 
   guard #available(iOS 8.0, *) else {
     _ = globalFuncAvailableOn10_51() // no-warning
 
-    // CHECK:error: 'explicitlyUnavailable()' is unavailable
     explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 }
@@ -1624,6 +1621,5 @@ func useShortFormAvailable() {
       // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{add 'if #available' version check}}
 
-    // CHECK:error: 'unavailableWins()' is unavailable
   unavailableWins() // expected-error {{'unavailableWins()' is unavailable}}
 }
