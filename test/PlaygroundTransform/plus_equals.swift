@@ -10,4 +10,4 @@ var b = "b"
 a += b 
 // CHECK: [{{.*}}] $builtin_log[a='a']
 // CHECK-NEXT: [{{.*}}] $builtin_log[b='b']
-// CHECK-NEXT: [{{.*}}] $builtin_log[='ab']
+// CHECK-NEXT: [{{.*}}] $builtin_log[a='ab']
