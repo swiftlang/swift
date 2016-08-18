@@ -15,3 +15,9 @@ func test() {
     print(s)
    }
 }
+
+func testLValueCoerce() {
+	var lvalue = "lvalue"
+	var map: [AnyHashable : Any] = [lvalue: lvalue]
+	lvalue = map[lvalue] as! String
+}
