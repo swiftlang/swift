@@ -128,7 +128,7 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber.init(coder:)")
 NSNumberTests.test("_SwiftTypePreservingNSNumber.copy(zone:)") {
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
-  let copy = n.copy() as! AnyObject
+  let copy = n.copy() as AnyObject
   expectTrue(n === copy)
 }
 
@@ -197,7 +197,11 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType
   .forEach(in: ${Self}._interestingValues) {
   input in
   let bridgedNSNumber = input._bridgeToObjectiveC()
+%   if Self == 'Bool':
+  expectTrue(CFGetTypeID(bridgedNSNumber) == CFBooleanGetTypeID())
+%   else:
   expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
+%   end
 
   let expectedObjCType: String
 %   if Self == 'Int':
@@ -229,7 +233,9 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType
   _UnknownArchError()
 #endif
 %   elif Self == 'Bool':
-  expectedObjCType = "B"
+  // NSNumber always encodes booleans as 'signed char', even on platforms where
+  // ObjCBool is a true Bool. This is a very old compatibility concern.
+  expectedObjCType = "c"
 %   else:
   _UnknownTypeError()
 %   end
@@ -247,13 +253,20 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   input in
   // Bridged NSNumbers preserve the Swift type when put into AnyHashable.
   let bridgedNSNumber = input._bridgeToObjectiveC()
+%   if Self == 'Bool':
+  expectTrue(CFGetTypeID(bridgedNSNumber) == CFBooleanGetTypeID())
+%   else:
   expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
+%   end
   expectNotEmpty(bridgedNSNumber._toCustomAnyHashable())
 
   // Explicitly constructed NSNumbers don't have a special AnyHashable
   // representation.
 %   if Self == 'CGFloat':
   let explicitNSNumber = NSNumber(value: input.native)
+%   elif Self == 'Bool':
+  // Bool actually /is/ type-preserving for NSNumber. Use a dummy value instead.
+  let explicitNSNumber = NSNumber(value: (input ? 1 : 0) as Int8)
 %   else:
   let explicitNSNumber = NSNumber(value: input)
 %   end
