@@ -162,6 +162,20 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 @_silgen_name("_swift_bridgeAnythingNonVerbatimToObjectiveC")
 public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
 
+/// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
+///
+/// Since Objective-C APIs sometimes get their nullability annotations wrong,
+/// this includes a failsafe against nil `AnyObject`s, wrapping them up as
+/// a nil `AnyObject?`-inside-an-`Any`.
+///
+/// COMPILER_INTRINSIC
+public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
+  if let nonnullObject = possiblyNullObject {
+    return nonnullObject // AnyObject-in-Any
+  }
+  return possiblyNullObject // AnyObject?-in-Any
+}
+
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 ///
