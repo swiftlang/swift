@@ -5337,6 +5337,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // We want to check conformance on the rvalue, as that's what has
+      // the Hashable conformance
+      expr = tc.coerceToRValue(expr);
+
       // Find the conformance of the source type to Hashable.
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
       ProtocolConformance *conformance;
