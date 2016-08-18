@@ -1715,7 +1715,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
       auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result->is<FunctionType>())
+      if (result && result->is<FunctionType>())
         return adjustFunctionExtInfo(DC, result, options);
       return result;
     }
