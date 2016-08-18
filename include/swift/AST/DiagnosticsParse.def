@@ -746,6 +746,9 @@ ERROR(parameter_unnamed,none,
 ERROR(parameter_curry_syntax_removed,none,
       "curried function declaration syntax has been removed; use a single parameter list", ())
 
+ERROR(initializer_as_typed_pattern,none,
+      "unexpected initializer in pattern; did you mean to use '='?", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------

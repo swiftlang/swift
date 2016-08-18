@@ -788,15 +788,63 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
   auto result = parsePattern();
   
   // Now parse an optional type annotation.
-  if (consumeIf(tok::colon)) {
+  if (Tok.is(tok::colon)) {
+    SourceLoc pastEndOfPrevLoc = getEndOfPreviousLoc();
+    SourceLoc colonLoc = consumeToken(tok::colon);
+    SourceLoc startOfNextLoc = Tok.getLoc();
+    
     if (result.isNull())  // Recover by creating AnyPattern.
       result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
     
     ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
-    if (Ty.isNull())
+    if (!Ty.isNull()) {
+      // Attempt to diagnose initializer calls incorrectly written
+      // as typed patterns, such as "var x: [Int]()".
+      if (Tok.isFollowingLParen()) {
+        BacktrackingScope backtrack(*this);
+        
+        // Create a local context if needed so we can parse trailing closures.
+        LocalContext dummyContext;
+        Optional<ContextChange> contextChange;
+        if (!CurLocalContext) {
+          contextChange.emplace(*this, CurDeclContext, &dummyContext);
+        }
+        
+        SourceLoc lParenLoc, rParenLoc;
+        SmallVector<Expr *, 2> args;
+        SmallVector<Identifier, 2> argLabels;
+        SmallVector<SourceLoc, 2> argLabelLocs;
+        Expr *trailingClosure;
+        ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
+                                            /*isPostfix=*/true,
+                                            /*isExprBasic=*/false,
+                                            lParenLoc, args, argLabels,
+                                            argLabelLocs, rParenLoc,
+                                            trailingClosure);
+        if (status.isSuccess()) {
+          backtrack.cancelBacktrack();
+          
+          // Suggest replacing ':' with '=' (ensuring proper whitespace).
+          
+          bool needSpaceBefore = (pastEndOfPrevLoc == colonLoc);
+          bool needSpaceAfter =
+            SourceMgr.getByteDistance(colonLoc, startOfNextLoc) <= 1;
+          
+          StringRef replacement = " = ";
+          if (!needSpaceBefore) replacement = replacement.drop_front();
+          if (!needSpaceAfter)  replacement = replacement.drop_back();
+          
+          diagnose(lParenLoc, diag::initializer_as_typed_pattern)
+            .highlight({Ty.get()->getStartLoc(), rParenLoc})
+            .fixItReplace(colonLoc, replacement);
+          result.setIsParseError();
+        }
+      }
+    } else {
       Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+    }
     
     result = makeParserResult(result,
                             new (Context) TypedPattern(result.get(), Ty.get()));
