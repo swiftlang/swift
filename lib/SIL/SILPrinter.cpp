@@ -1798,7 +1798,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::SmallString<16> disambiguatedNameBuf;
   unsigned disambiguatedNameCounter = 1;
   while (params) {
-    for (ArchetypeType *param : params->getPrimaryArchetypes()) {
+    for (GenericTypeParamDecl *param : params->getParams()) {
       Identifier name = param->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
@@ -1809,7 +1809,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
       if (name != param->getName())
-        Aliases[CanType(param)] = name;
+        Aliases[CanType(param->getArchetype())] = name;
     }
     
     params = params->getOuterParameters();

@@ -801,9 +801,9 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a generic type with one argument.
   NominalTypeDecl *nominal = (ctx.*getNominal)();
   if (!nominal) return nullptr;
-  auto generics = nominal->getGenericParams();
-  if (!generics) return nullptr;
-  if (generics->size() != 1) return nullptr;
+  auto sig = nominal->getGenericSignature();
+  if (!sig) return nullptr;
+  if (sig->getGenericParams().size() != 1) return nullptr;
 
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
@@ -813,7 +813,7 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // The property must have type T.
   VarDecl *property = dyn_cast<VarDecl>(results[0]);
   if (!property) return nullptr;
-  if (!property->getType()->isEqual(generics->getPrimaryArchetypes()[0]))
+  if (!property->getInterfaceType()->isEqual(sig->getGenericParams()[0]))
     return nullptr;
 
   cache = property;

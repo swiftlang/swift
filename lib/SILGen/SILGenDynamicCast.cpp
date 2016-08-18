@@ -329,14 +329,14 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   // This will have been diagnosed by the accessors above.
   if (!fn) return SGF.emitUndefRValue(loc, destType);
 
-  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fnGenericParams = fn->getGenericSignature()->getGenericParams();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
   auto toSubsts = toCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
-  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
-  (void) fnArcheTypes;
+  (void) fnGenericParams;
 
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;

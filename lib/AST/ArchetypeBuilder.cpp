@@ -2048,14 +2048,6 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
         --skipLevels;
       }
 
-      // Return the archetype.
-      // FIXME: Use the allArchetypes vector instead of the generic param if
-      // available because of cross-module archetype serialization woes.
-      if (!myGenericParams->getAllArchetypes().empty())
-        return myGenericParams->getPrimaryArchetypes()[index];
-
-      // During type-checking, we may try to mapTypeIntoContext before
-      // AllArchetypes has been built, so fall back to the generic params.
       return myGenericParams->getParams()[index]->getArchetype();
     }
 
