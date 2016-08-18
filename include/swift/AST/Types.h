@@ -393,7 +393,7 @@ public:
   /// semantics?
   bool hasReferenceSemantics();
 
-  /// Is this an uninhabited type, such as 'Never'?
+  /// Is this 'Never'?
   bool isNever();
 
   /// Is this the 'Any' type?
