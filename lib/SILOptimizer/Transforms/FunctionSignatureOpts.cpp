@@ -416,8 +416,14 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
   std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  SILLinkage linkage = F->getLinkage();
+  if (isAvailableExternally(linkage))
+    linkage = SILLinkage::Shared;
+
+  DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  
   NewF = M.createFunction(
-      F->getLinkage(), Name,
+      linkage, Name,
       createOptimizedSILFunctionType(), nullptr, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
