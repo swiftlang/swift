@@ -9,6 +9,11 @@ func singleBlock2() -> Int {
   y += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
+enum NoCasesButNotNever {}
+
+func diagnoseNoCaseEnumMissingReturn() -> NoCasesButNotNever {
+} // expected-error {{missing return in a function expected to return 'NoCasesButNotNever'}}
+
 class MyClassWithClosure {
   var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
 }
