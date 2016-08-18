@@ -92,9 +92,7 @@ bool TypeBase::hasReferenceSemantics() {
 bool TypeBase::isNever() {
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
-        return true;
-
+      return enumDecl == getASTContext().getNeverDecl();
   return false;
 }
 
