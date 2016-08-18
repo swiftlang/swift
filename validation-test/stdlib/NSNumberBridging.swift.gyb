@@ -229,7 +229,11 @@ NSNumberTests.test("_SwiftTypePreservingNSNumber(${Self}).getValue(_:), objCType
   _UnknownArchError()
 #endif
 %   elif Self == 'Bool':
+#if ((os(iOS) || os(tvOS)) && (arch(arm64) || arch(x86_64))) || os(watchOS)
   expectedObjCType = "B"
+#else
+  expectedObjCType = "c"
+#endif
 %   else:
   _UnknownTypeError()
 %   end

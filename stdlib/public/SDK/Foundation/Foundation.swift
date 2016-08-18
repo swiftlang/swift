@@ -160,7 +160,7 @@ internal func _swift_Foundation_TypePreservingNSNumberWithCGFloat(
 
 @_silgen_name("_swift_Foundation_TypePreservingNSNumberWithBool")
 internal func _swift_Foundation_TypePreservingNSNumberWithBool(
-  _ value: Bool
+  _ value: ObjCBool
 ) -> NSNumber
 
 @_silgen_name("_swift_Foundation_TypePreservingNSNumberGetKind")
@@ -207,7 +207,7 @@ internal func _swift_Foundation_TypePreservingNSNumberGetAsCGFloat(
 @_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsBool")
 internal func _swift_Foundation_TypePreservingNSNumberGetAsBool(
   _ value: NSNumber
-) -> Bool
+) -> ObjCBool
 
 // Conversions between NSNumber and various numeric types. The
 // conversion to NSNumber is automatic (auto-boxing), while conversion
@@ -348,7 +348,7 @@ extension Bool: _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return _swift_Foundation_TypePreservingNSNumberWithBool(self)
+    return _swift_Foundation_TypePreservingNSNumberWithBool(ObjCBool(self))
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -456,7 +456,7 @@ extension NSNumber : _HasCustomAnyHashableRepresentation {
     case .CoreGraphicsCGFloat:
       return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsCGFloat(self))
     case .SwiftBool:
-      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsBool(self))
+      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsBool(self).boolValue)
     }
   }
 }

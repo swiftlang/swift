@@ -76,7 +76,7 @@ enum _SwiftTypePreservingNSNumberTag {
   case SwiftCGFloat:
     return @encode(CGFloat);
   case SwiftBool:
-    return @encode(bool);
+    return @encode(BOOL);
   }
   swift::swift_reportError(
       /* flags = */ 0,
@@ -102,7 +102,7 @@ enum _SwiftTypePreservingNSNumberTag {
     memcpy(value, self->storage, sizeof(CGFloat));
     return;
   case SwiftBool:
-    memcpy(value, self->storage, sizeof(bool));
+    memcpy(value, self->storage, sizeof(BOOL));
     return;
   }
   swift::swift_reportError(
@@ -139,7 +139,7 @@ enum _SwiftTypePreservingNSNumberTag {
       return result; \
     } \
     case SwiftBool: { \
-      bool result; \
+      BOOL result; \
       memcpy(&result, self->storage, sizeof(result)); \
       return result; \
     } \
@@ -156,6 +156,7 @@ DEFINE_ACCESSOR(long long, longLongValue)
 DEFINE_ACCESSOR(unsigned long long, unsignedLongLongValue)
 DEFINE_ACCESSOR(float, floatValue)
 DEFINE_ACCESSOR(double, doubleValue)
+DEFINE_ACCESSOR(BOOL, boolValue)
 
 #undef DEFINE_ACCESSOR
 
@@ -178,7 +179,7 @@ DEFINE_INIT(NSUInteger, UInt)
 DEFINE_INIT(float, Float)
 DEFINE_INIT(double, Double)
 DEFINE_INIT(CGFloat, CGFloat)
-DEFINE_INIT(bool, Bool)
+DEFINE_INIT(BOOL, Bool)
 
 #undef DEFINE_INIT
 
@@ -212,7 +213,7 @@ DEFINE_GETTER(NSUInteger, UInt)
 DEFINE_GETTER(float, Float)
 DEFINE_GETTER(double, Double)
 DEFINE_GETTER(CGFloat, CGFloat)
-DEFINE_GETTER(bool, Bool)
+DEFINE_GETTER(BOOL, Bool)
 
 #undef DEFINE_GETTER
 
