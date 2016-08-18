@@ -4040,6 +4040,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
   case CTP_AssignSource:
+  case CTP_Initialization:
+  case CTP_ReturnStmt:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral,
                               expr) ||

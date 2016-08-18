@@ -28,7 +28,7 @@ struct MyMask : OptionSet {
 }
 
 func supported() -> MyMask {
-  return MyMask.Bingo
+  return MyMask(rawValue: UInt(MyMask.Bingo))
 }
 
 struct MyEventMask2 : OptionSet {
