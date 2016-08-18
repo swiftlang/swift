@@ -31,7 +31,7 @@ STATISTIC(NumCapturesPropagated, "Number of constant captures propagated");
 namespace {
 /// Propagate constants through closure captures by specializing the partially
 /// applied function.
-class CapturePropagation : public SILModuleTransform
+class CapturePropagation : public SILFunctionTransform
 {
 public:
   void run() override;
@@ -237,7 +237,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   CanSILFunctionType NewFTy =
     Lowering::adjustFunctionType(PAI->getType().castTo<SILFunctionType>(),
                                  SILFunctionType::Representation::Thin);
-  SILFunction *NewF = getModule()->createFunction(
+  SILFunction *NewF = OrigF->getModule().createFunction(
       SILLinkage::Shared, Name, NewFTy,
       /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), Fragile, OrigF->isThunk(),
@@ -292,18 +292,17 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (PAI->hasSubstitutions())
     return false;
 
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
+  SILFunction *SubstF = PAI->getReferencedFunction();
+  if (!SubstF)
     return false;
 
-  assert(!FRI->getFunctionType()->isPolymorphic() &&
+  assert(!SubstF->getLoweredFunctionType()->isPolymorphic() &&
          "cannot specialize generic partial apply");
 
   for (auto Arg : PAI->getArguments()) {
     if (!isConstant(Arg))
       return false;
   }
-  SILFunction *SubstF = FRI->getReferencedFunction();
   if (SubstF->isExternalDeclaration() || !isProfitable(SubstF))
     return false;
 
@@ -312,34 +311,34 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   ++NumCapturesPropagated;
   SILFunction *NewF = specializeConstClosure(PAI, SubstF);
   rewritePartialApply(PAI, NewF);
+
+  notifyPassManagerOfFunction(NewF);
   return true;
 }
 
 void CapturePropagation::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+  auto *F = getFunction();
   bool HasChanged = false;
-  for (auto &F : *getModule()) {
 
-    // Don't optimize functions that are marked with the opt.never attribute.
-    if (!F.shouldOptimize())
+  // Don't optimize functions that are marked with the opt.never attribute.
+  if (!F->shouldOptimize())
+    return;
+
+  // Cache cold blocks per function.
+  ColdBlockInfo ColdBlocks(DA);
+  for (auto &BB : *F) {
+    if (ColdBlocks.isCold(&BB))
       continue;
 
-    // Cache cold blocks per function.
-    ColdBlockInfo ColdBlocks(DA);
-    for (auto &BB : F) {
-      if (ColdBlocks.isCold(&BB))
-        continue;
-
-      auto I = BB.begin();
-      while (I != BB.end()) {
-        SILInstruction *Inst = &*I;
-        ++I;
-        if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Inst))
-          HasChanged |= optimizePartialApply(PAI);
-      }
+    auto I = BB.begin();
+    while (I != BB.end()) {
+      SILInstruction *Inst = &*I;
+      ++I;
+      if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(Inst))
+        HasChanged |= optimizePartialApply(PAI);
     }
   }
-
   if (HasChanged) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
