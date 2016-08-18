@@ -265,7 +265,7 @@ class MismatchOptionalBase {
 
   func fixSeveralTypes(a: Int?, b: Int!) -> Int { return 0 }
 
-  func functionParam(x: (@escaping (Int) -> Int)?) {}
+  func functionParam(x: ((Int) -> Int)?) {}
   func tupleParam(x: (Int, Int)?) {}
 
   func nameAndTypeMismatch(label: Int?) {}

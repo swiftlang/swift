@@ -266,9 +266,18 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // ex
 
 // SR-824 - @noescape for Type Aliased Closures
 //
+
+// Old syntax -- @noescape is the default, and is redundant
 typealias CompletionHandlerNE = @noescape (_ success: Bool) -> () // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
+
+// Explicit @escaping is not allowed here
+typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{@escaping may only be applied to parameters of function type}}
+
+// No @escaping -- it's implicit from context
 typealias CompletionHandler = (_ success: Bool) -> ()
+
 var escape : CompletionHandlerNE
+var escapeOther : CompletionHandler
 func doThing1(_ completion: (_ success: Bool) -> ()) {
   // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
   // expected-error @+2 {{non-escaping value 'escape' may only be called}}
@@ -280,6 +289,15 @@ func doThing2(_ completion: CompletionHandlerNE) {
   // expected-error @+2 {{non-escaping value 'escape' may only be called}}
   // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
   escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+}
+func doThing3(_ completion: CompletionHandler) {
+  // expected-note@-1{{parameter 'completion' is implicitly non-escaping}}
+  // expected-error @+2 {{non-escaping value 'escape' may only be called}}
+  // expected-error @+1 {{non-escaping parameter 'completion' may only be called}}
+  escape = completion // expected-error {{declaration closing over non-escaping parameter 'escape' may allow it to escape}}
+}
+func doThing4(_ completion: @escaping CompletionHandler) {
+  escapeOther = completion
 }
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
