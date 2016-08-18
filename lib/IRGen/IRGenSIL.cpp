@@ -594,11 +594,14 @@ public:
       if (getActiveDominancePoint() == VarDominancePoint ||
           isActiveDominancePointDominatedBy(VarDominancePoint)) {
         llvm::Type *ArgTys;
-        auto *Ty = Storage->getType()->getScalarType();
-        // Pointers and Floats are expected to fit into a register.
-        if (Ty->isPointerTy() || Ty->isFloatingPointTy())
-          ArgTys = { Storage->getType() };
+        auto *Ty = Storage->getType();
+        // Vectors, Pointers and Floats are expected to fit into a register.
+        if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
+          ArgTys = { Ty };
         else {
+          // If this is not a scalar or vector type, we can't handle it.
+          if (isa<llvm::CompositeType>(Ty))
+            continue;
           // The storage is guaranteed to be no larger than the register width.
           // Extend the storage so it would fit into a register.
           llvm::Type *IntTy;
