@@ -543,3 +543,19 @@ extension GenericClass {
     return x
   }
 }
+
+// Make sure AnyHashable erasure marks Hashable conformance as used
+class AnyHashableClass : NSObject {
+  // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any16AnyHashableClass18returnsAnyHashablefT_Vs11AnyHashable
+  // CHECK: [[FN:%.*]] = function_ref @_swift_convertToAnyHashable
+  // CHECK: apply [[FN]]<GenericOption>({{.*}})
+  func returnsAnyHashable() -> AnyHashable {
+    return GenericOption.multithreaded
+  }
+}
+
+// CHECK-LABEL: sil_witness_table shared [fragile] GenericOption: Hashable module objc_generics {
+// CHECK-NEXT: base_protocol _Hashable: GenericOption: _Hashable module objc_generics
+// CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
+// CHECK-NEXT: method #Hashable.hashValue!getter.1: @_TTWVSC13GenericOptions8Hashable13objc_genericsFS0_g9hashValueSi
+// CHECK-NEXT: }
