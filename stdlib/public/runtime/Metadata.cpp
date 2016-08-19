@@ -157,7 +157,7 @@ namespace {
   struct GenericCacheEntry;
 
   // The cache entries in a generic cache are laid out like this:
-  struct GenericCacheEntryHeader : CacheEntry<GenericCacheEntry> {
+  struct GenericCacheEntryHeader {
     const Metadata *Value;
     size_t NumArguments;
   };
