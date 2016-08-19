@@ -247,10 +247,6 @@ def enable_swift_newtype :
   Flag<["-"], "enable-swift-newtype">,
   HelpText<"Enable the swift_newtype attribute">;
 
-def swift3_migration :
-  Flag<["-"], "swift3-migration">,
-  HelpText<"Enable Fix-It based migration aids for Swift 3">;
-
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,
   HelpText<"Warns when type-checking a function takes longer than <n> ms">;

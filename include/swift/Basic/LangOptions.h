@@ -164,9 +164,6 @@ namespace swift {
     /// Should 'id' in Objective-C be imported as 'Any' in Swift?
     bool EnableIdAsAny = true;
 
-    /// Enable the Swift 3 migration via Fix-Its.
-    bool Swift3Migration = false;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
