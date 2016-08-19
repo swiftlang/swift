@@ -64,6 +64,20 @@ Type Type::join(Type type1, Type type2) {
     return nullptr;
   }
 
+  // If one or both of the types are optional types, look at the underlying
+  // object type.
+  OptionalTypeKind otk1, otk2;
+  Type objectType1 = type1->getAnyOptionalObjectType(otk1);
+  Type objectType2 = type2->getAnyOptionalObjectType(otk2);
+  if (otk1 == OTK_Optional || otk2 == OTK_Optional) {
+    // Compute the join of the unwrapped type. If there is none, we're done.
+    Type unwrappedJoin = join(objectType1 ? objectType1 : type1,
+                              objectType2 ? objectType2 : type2);
+    if (!unwrappedJoin) return nullptr;
+
+    return OptionalType::get(unwrappedJoin);
+  }
+
   // The join can only be an existential.
   return nullptr;
 }

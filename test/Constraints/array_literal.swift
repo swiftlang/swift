@@ -143,3 +143,18 @@ func defaultToAny(i: Int, s: String) {
   let a4 = [B(), C()]
   let _: Int = a4 // expected-error{{value of type '[A]'}}
 }
+
+/// Check handling of 'nil'.
+func joinWithNil(s: String) {
+  let a1 = [s, nil]
+  let _: Int = a1 // expected-error{{value of type '[String?]'}}
+
+  let a2 = [nil, s]
+  let _: Int = a2 // expected-error{{value of type '[String?]'}}
+
+  let a3 = ["hello", nil]
+  let _: Int = a3 // expected-error{{value of type '[String?]'}}
+
+  let a4 = [nil, "hello"]
+  let _: Int = a4 // expected-error{{value of type '[String?]'}}
+}
