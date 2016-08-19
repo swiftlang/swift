@@ -686,6 +686,9 @@ NOTE(in_cast_expr_types,none,
       "in cast from type %0 to %1",
       (Type, Type))
 
+ERROR(types_not_convertible_use_bool_value,none,
+      "%0 is not convertible to %1; did you mean %0.boolValue", (Type, Type))
+
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
