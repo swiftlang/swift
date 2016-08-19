@@ -2419,7 +2419,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         dispatch_build_variant_arg="debug"
                     fi
                     call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
-                    echo `which autoreconf`
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
