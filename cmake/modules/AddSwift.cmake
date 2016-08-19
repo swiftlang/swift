@@ -1872,6 +1872,7 @@ function(add_swift_executable name)
       ${SWIFTEXE_EXCLUDE_FROM_ALL_FLAG}
       ${SWIFTEXE_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
       ${SWIFTEXE_DISABLE_ASLR_FLAG})
+  set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
 
 macro(add_swift_tool_subdirectory name)

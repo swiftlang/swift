@@ -811,7 +811,10 @@ if(SWIFT_INCLUDE_TOOLS)
 endif()
 
 add_subdirectory(utils)
-add_subdirectory(stdlib)
+
+
+include(AddSwiftStdlib)
+configure_swift_stdlib()
 
 if(SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_INCLUDE_TESTS)
   add_subdirectory(tools/swift-reflection-test)
