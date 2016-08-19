@@ -1388,7 +1388,8 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
       validateAccessibility(generic);
       Accessibility access = Accessibility::Internal;
       if (isa<ProtocolDecl>(generic))
-        access = std::max(access, generic->getFormalAccess());
+        access = std::max(Accessibility::FilePrivate,
+                          generic->getFormalAccess());
       D->setAccessibility(access);
       break;
     }
