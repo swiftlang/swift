@@ -7041,6 +7041,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         }
       }
     }
+    
+    // Now that all the associated types have archetypes set, we can
+    // safely try to resolve types for any typealiases.
+    proto->setIsBeingTypeChecked(false);
+    builder.addTypeAliasesToArchetype(selfArchetype);
 
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.

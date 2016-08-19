@@ -350,15 +350,17 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
   // nested types of this potential archetype.
   for (auto member : proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (!assocType)
+    auto typeAlias = dyn_cast<TypeAliasDecl>(member);
+    if (!assocType && !typeAlias)
       continue;
 
-    auto known = NestedTypes.find(assocType->getName());
+    auto name = typeAlias ? typeAlias->getName() : assocType->getName();
+    auto known = NestedTypes.find(name);
     if (known == NestedTypes.end())
       continue;
 
     // If the nested type was not already resolved, do so now.
-    if (!known->second.front()->getResolvedAssociatedType()) {
+    if (assocType && !known->second.front()->getResolvedAssociatedType()) {
       known->second.front()->resolveAssociatedType(assocType, builder);
 
       // If there's a superclass constraint that conforms to the protocol,
@@ -371,7 +373,11 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
 
     // Otherwise, create a new potential archetype for this associated type
     // and make it equivalent to the first potential archetype we encountered.
-    auto otherPA = new PotentialArchetype(this, assocType);
+    PotentialArchetype *otherPA;
+    if (assocType)
+      otherPA = new PotentialArchetype(this, assocType);
+    else
+      otherPA = new PotentialArchetype(this, typeAlias);
     auto frontRep = known->second.front()->getRepresentative();
     otherPA->Representative = frontRep;
     frontRep->EquivalenceClass.push_back(otherPA);
@@ -599,7 +605,15 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 
 ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
+  bool isAlias = getTypeAliasDecl() != nullptr;
   auto representative = getRepresentative();
+  
+  if (isAlias) {
+    if (representative == this)
+      return NestedType::forConcreteType(ErrorType::get(builder.getASTContext()));
+    auto arch = representative->getType(builder).getAsArchetype();
+    return NestedType::forArchetype(arch, /* isAlias: */ true);
+  }
 
   // Retrieve the archetype from the archetype anchor in this equivalence class.
   auto archetypeAnchor = getArchetypeAnchor();
@@ -745,16 +759,25 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
                             superclass, isRecursive());
 
   representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
-  
+
+  // Make sure any typealiases in conforming protos get added to NestedTypes
+  // so that they'll make it into the ArchetypeType as nested types. Except: if we haven't
+  // yet resolved underlying types for the proto, we can't include aliases yet or
+  // we'll recurse trying to resolve their types. In that case, addTypeAliasesToArchetype
+  // gets called afterwards.
+  for (auto protoPair : ConformsTo)
+    if (!protoPair.first->isBeingTypeChecked())
+      for (auto member : protoPair.first->getMembers())
+        if (auto alias = dyn_cast<TypeAliasDecl>(member))
+          if (alias->hasUnderlyingType())
+            getNestedType(alias->getName(), builder);
+
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
   if (!NestedTypes.empty()) {
     builder.getASTContext().registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
-      // Skip type aliases, which are just shortcuts.
-      if (Nested.second.front()->getTypeAliasDecl())
-        continue;
       bool anyNotRenamed = false;
       for (auto NestedPA : Nested.second) {
         if (!NestedPA->wasRenamed()) {
@@ -779,6 +802,51 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   return NestedType::forArchetype(arch);
 }
 
+void ArchetypeBuilder::PotentialArchetype::addTypeAliasesToArchetype(ArchetypeBuilder &builder,
+                                                                     ArchetypeType *arch) {
+  // Make sure any typealiases in conforming protos get added to NestedTypes
+  // so that they'll make it into the ArchetypeType as nested types.
+  SmallVector<std::pair<Identifier, NestedType>, 4> ArchetypeTypes;
+  
+  for (auto pair : arch->getNestedTypes()) {
+    ArchetypeTypes.push_back(pair);
+  }
+  
+  bool foundAliases = false;
+  bool unresolved = false;
+  for (auto protoPair : ConformsTo) {
+    for (auto member : protoPair.first->getMembers()) {
+      if (auto alias = dyn_cast<TypeAliasDecl>(member)) {
+        auto name = alias->getName();
+        if (!NestedTypes[name].empty())
+          continue;
+        
+        unresolved |= getNestedType(name, builder)->getTypeAliasDecl() == nullptr;
+        ArchetypeTypes.push_back({ alias->getName(), NestedType() });
+        foundAliases = true;
+      }
+    }
+  }
+  
+  if (!foundAliases || unresolved)
+    return;
+
+  builder.getASTContext().registerLazyArchetype(arch, builder, this);
+  arch->setNestedTypes(builder.getASTContext(), ArchetypeTypes);
+  arch->getNestedTypes();
+  builder.getASTContext().unregisterLazyArchetype(arch);
+}
+
+void ArchetypeBuilder::addTypeAliasesToArchetype(ArchetypeType *arch) {
+  
+  auto proto = arch->getSelfProtocol();
+  auto genericParam = proto->getProtocolSelf();
+  auto known = Impl->PotentialArchetypes.find(
+                                              GenericTypeParamKey::forDecl(genericParam));
+  auto pa = known->second;
+  pa->addTypeAliasesToArchetype(*this, arch);
+}
+
 Type ArchetypeBuilder::PotentialArchetype::getDependentType(
        ArchetypeBuilder &builder,
        bool allowUnresolved) {
@@ -790,6 +858,9 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType, builder.Context);
+    
+    // If we are an alias, our representative is a pointer to the real type.
+    //if (getTypeAliasDecl() && getRepresentative() != this) {
 
     // If typo correction renamed this type, get the renamed type.
     if (wasRenamed())
@@ -1779,6 +1850,9 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
         continue;
 
       PotentialArchetype *PA = Entry.second;
+      if (PA->getTypeAliasDecl())
+        continue;
+      
       auto Archetype = PA->getType(*this).castToArchetype();
       if (KnownArchetypes.insert(Archetype).second)
         Impl->AllArchetypes.push_back(Archetype);

@@ -253,6 +253,10 @@ public:
   bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
                            bool treatRequirementsAsExplicit = false);
 
+  /// Append any self protocol type aliases as nested types to the given
+  /// archetype type.
+  void addTypeAliasesToArchetype(ArchetypeType *arch);
+  
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
@@ -599,6 +603,11 @@ public:
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
   ArchetypeType::NestedType getType(ArchetypeBuilder &builder);
+  
+  /// Append any protocol type aliases as nested types to the given
+  /// archetype type.
+  void addTypeAliasesToArchetype(ArchetypeBuilder &builder,
+                                 ArchetypeType *arch);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.

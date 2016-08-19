@@ -2844,6 +2844,9 @@ namespace {
         } else if (auto concrete = nestedType.second.getAsConcreteType()) {
           PrintWithColorRAII(OS, TypeColor) << "concrete";
           OS << "=" << concrete.getString();
+        } else if (nestedType.second.isAlias()) {
+          PrintWithColorRAII(OS, TypeColor) << "alias";
+          OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());
         } else {
           PrintWithColorRAII(OS, TypeColor) << "archetype";
           OS << "=" << static_cast<void *>(nestedType.second.getAsArchetype());

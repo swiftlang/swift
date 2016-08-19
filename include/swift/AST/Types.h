@@ -3614,19 +3614,20 @@ public:
   /// A nested type. Either a dependent associated archetype, or a concrete
   /// type (which may be a bound archetype from an outer context).
   class NestedType {
-    llvm::PointerIntPair<TypeBase *, 1> TypeAndIsConcrete;
-    NestedType(Type type, bool isConcrete)
-      : TypeAndIsConcrete(type.getPointer(), isConcrete) {}
+    llvm::PointerIntPair<TypeBase *, 2> TypeAndIsConcrete;
+    NestedType(Type type, bool isConcrete, bool isAlias)
+      : TypeAndIsConcrete(type.getPointer(), (isAlias << 1) | isConcrete) {}
   public:
     NestedType() { assert(!*this && "empty nested type isn't false"); }
-    static NestedType forArchetype(ArchetypeType *archetype) {
-      return { archetype, false };
+    static NestedType forArchetype(ArchetypeType *archetype, bool isAlias = false) {
+      return { archetype, false, isAlias };
     }
     static NestedType forConcreteType(Type concrete) {
-      return { concrete, true };
+      return { concrete, true, false };
     }
     operator bool() const { return TypeAndIsConcrete.getOpaqueValue() != 0; }
-    bool isConcreteType() const { return TypeAndIsConcrete.getInt(); }
+    bool isConcreteType() const { return TypeAndIsConcrete.getInt() & 1; }
+    bool isAlias() const { return TypeAndIsConcrete.getInt() >> 1 & 1; }
     Type getValue() const { return TypeAndIsConcrete.getPointer(); }
 
     /// Check whether this nested type is a concrete type.

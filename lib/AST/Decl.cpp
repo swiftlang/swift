@@ -567,6 +567,8 @@ void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
                                       SmallPtrSetImpl<ArchetypeType*> &known,
                                       SmallVectorImpl<ArchetypeType*> &all) {
   for (auto nested : archetype->getNestedTypes()) {
+    if (nested.second.isAlias())
+      continue;
     auto nestedArch = nested.second.getAsArchetype();
     if (!nestedArch)
       continue;
