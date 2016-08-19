@@ -81,22 +81,26 @@ extension TextOutputStream {
 
 /// A source of text-streaming operations.
 ///
-/// Instances of types that conform to the `Streamable` protocol can write
-/// their value to instances of any type that conforms to the `TextOutputStream`
-/// protocol. The Swift standard library's text-related types, `String`,
-/// `Character`, and `UnicodeScalar`, all conform to `Streamable`.
+/// Instances of types that conform to the `TextOutputStreamable` protocol can
+/// write their value to instances of any type that conforms to the
+/// `TextOutputStream` protocol. The Swift standard library's text-related
+/// types, `String`, `Character`, and `UnicodeScalar`, all conform to
+/// `TextOutputStreamable`.
 ///
-/// Conforming to the Streamable Protocol
+/// Conforming to the TextOutputStreamable Protocol
 /// =====================================
 ///
-/// To add `Streamable` conformance to a custom type, implement the required
-/// `write(to:)` method. Call the given output stream's `write(_:)` method in
-/// your implementation.
-public protocol Streamable {
+/// To add `TextOutputStreamable` conformance to a custom type, implement the
+/// required `write(to:)` method. Call the given output stream's `write(_:)`
+/// method in your implementation.
+public protocol TextOutputStreamable {
   /// Writes a textual representation of this instance into the given output
   /// stream.
   func write<Target : TextOutputStream>(to target: inout Target)
 }
+
+// @available(*, unavailable, renamed: "TextOutputStreamable")
+public typealias Streamable = TextOutputStreamable
 
 /// A type with a customized textual representation.
 ///
@@ -346,7 +350,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
     debugPrintable.debugDescription.write(to: &target)
     return
   }
-  if case let streamableObject as Streamable = value {
+  if case let streamableObject as TextOutputStreamable = value {
     streamableObject.write(to: &target)
     return
   }
@@ -373,7 +377,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inline(never) @effects(readonly)
-func _toStringReadOnlyStreamable<T : Streamable>(_ x: T) -> String {
+func _toStringReadOnlyStreamable<T : TextOutputStreamable>(_ x: T) -> String {
   var result = ""
   x.write(to: &result)
   return result
@@ -402,7 +406,7 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
     return
   }
 
-  if let streamableObject = value as? Streamable {
+  if let streamableObject = value as? TextOutputStreamable {
     streamableObject.write(to: &target)
     return
   }
@@ -415,7 +419,8 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
 ) {
   if let displayStyle = mirror.displayStyle {
-    // Containers and tuples are always displayed in terms of their element count
+    // Containers and tuples are always displayed in terms of their element
+    // count
     switch displayStyle {
     case .tuple:
       let count = mirror.children.count
@@ -448,7 +453,7 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     return
   }
 
-  if let streamableObject = value as? Streamable {
+  if let streamableObject = value as? TextOutputStreamable {
     streamableObject.write(to: &target)
     return
   }
@@ -519,7 +524,7 @@ extension String : TextOutputStream {
 // Streamables
 //===----------------------------------------------------------------------===//
 
-extension String : Streamable {
+extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
   /// 
   /// - Parameter target: An output stream.
@@ -528,7 +533,7 @@ extension String : Streamable {
   }
 }
 
-extension Character : Streamable {
+extension Character : TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
@@ -537,7 +542,7 @@ extension Character : Streamable {
   }
 }
 
-extension UnicodeScalar : Streamable {
+extension UnicodeScalar : TextOutputStreamable {
   /// Writes the textual representation of the Unicode scalar into the given
   /// output stream.
   ///
@@ -568,7 +573,7 @@ internal struct _TeeStream<
 @available(*, unavailable, renamed: "TextOutputStream")
 public typealias OutputStreamType = TextOutputStream
 
-extension Streamable {
+extension TextOutputStreamable {
   @available(*, unavailable, renamed: "write(to:)")
   public func writeTo<Target : TextOutputStream>(_ target: inout Target) {
     Builtin.unreachable()

@@ -351,7 +351,7 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
     return "XString"
   }
 }
-class TestStream : Streamable {
+class TestStream : TextOutputStreamable {
   func write<Target : TextOutputStream>(to target: inout Target) {
     target.write("AStream")
   }
@@ -371,8 +371,8 @@ OptionalTests.test("Optional TextOutputStream") {
   let optNoString: TestNoString? = TestNoString()
   expectFalse(optNoString is CustomStringConvertible)
   expectFalse(canGenericCast(optNoString, CustomStringConvertible.self))
-  expectFalse(optNoString is Streamable)
-  expectFalse(canGenericCast(optNoString, Streamable.self))
+  expectFalse(optNoString is TextOutputStreamable)
+  expectFalse(canGenericCast(optNoString, TextOutputStreamable.self))
   expectTrue(optNoString is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optNoString, CustomDebugStringConvertible.self))
   expectEqual(String(describing: optNoString), "Optional(main.TestNoString)")
@@ -388,8 +388,8 @@ OptionalTests.test("Optional TextOutputStream") {
   expectEqual(debugPrintStr(optString), "Optional(XString)")
 
   let optStream: TestStream? = TestStream()
-  expectTrue(optStream is Streamable)
-  expectTrue(canGenericCast(optStream, Streamable.self))
+  expectTrue(optStream is TextOutputStreamable)
+  expectTrue(canGenericCast(optStream, TextOutputStreamable.self))
   expectTrue(optStream is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optStream, CustomDebugStringConvertible.self))
   expectEqual(String(describing: TestStream()), "AStream")
