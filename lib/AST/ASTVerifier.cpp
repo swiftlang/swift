@@ -78,7 +78,7 @@ struct ASTNodeBase {};
     using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
     SmallVector<ScopeLike, 4> Scopes;
 
-    /// The set of archetypes that are currently available.
+    /// The set of primary archetypes that are currently available.
     SmallPtrSet<ArchetypeType *, 4> ActiveArchetypes;
 
     /// \brief The stack of optional evaluations active at this point.
@@ -106,8 +106,8 @@ struct ASTNodeBase {};
       for (auto genericParams = dc->getGenericParamsOfContext();
            genericParams;
            genericParams = genericParams->getOuterParameters()) {
-        ActiveArchetypes.insert(genericParams->getAllArchetypes().begin(),
-                                genericParams->getAllArchetypes().end());
+        for (auto *param : genericParams->getParams())
+          ActiveArchetypes.insert(param->getArchetype());
       }
     }
 
@@ -446,8 +446,11 @@ struct ASTNodeBase {};
             return false;
           }
 
+          // Get the primary archetype.
+          auto *parent = archetype->getPrimary();
+
           // Otherwise, the archetype needs to be from this scope.
-          if (ActiveArchetypes.count(archetype) == 0) {
+          if (ActiveArchetypes.count(parent) == 0) {
             // FIXME: Make an exception for serialized extensions, which don't
             // currently have the correct archetypes.
             if (auto activeScope = Scopes.back().dyn_cast<DeclContext *>()) {
@@ -463,7 +466,7 @@ struct ASTNodeBase {};
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
-            auto knownDC = Ctx.ArchetypeContexts.find(archetype);
+            auto knownDC = Ctx.ArchetypeContexts.find(parent);
             if (knownDC != Ctx.ArchetypeContexts.end()) {
               llvm::errs() << "archetype came from:\n";
               knownDC->second->dumpContext();
@@ -534,8 +537,9 @@ struct ASTNodeBase {};
 
       // Add any archetypes from this scope into the set of active archetypes.
       if (auto genericParams = getImmediateGenericParams(scope))
-        ActiveArchetypes.insert(genericParams->getAllArchetypes().begin(),
-                                genericParams->getAllArchetypes().end());
+        for (auto *param : genericParams->getParams())
+          if (auto *archetype = param->getArchetype())
+            ActiveArchetypes.insert(archetype);
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
@@ -546,7 +550,11 @@ struct ASTNodeBase {};
       // Remove archetypes from this scope from the set of active archetypes.
       if (auto genericParams
             = getImmediateGenericParams(Scopes.back().get<DeclContext*>())) {
-        for (auto archetype : genericParams->getAllArchetypes()) {
+        for (auto *param : genericParams->getParams()) {
+          auto *archetype = param->getArchetype();
+          if (archetype == nullptr)
+            continue;
+
           if (!ActiveArchetypes.erase(archetype)) {
             llvm::errs() << "archetype " << archetype
                          << " not introduced by scope?\n";

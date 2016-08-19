@@ -2601,6 +2601,10 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
                                       llvm::raw_ostream &os,
                                       unsigned indent) const {
+  archetype = archetype->getPrimary();
+  if (!archetype)
+    return;
+
   auto knownDC = ArchetypeContexts.find(archetype);
   if (knownDC != ArchetypeContexts.end())
     knownDC->second->printContext(os, indent);
