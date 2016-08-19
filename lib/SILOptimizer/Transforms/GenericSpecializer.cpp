@@ -82,6 +82,8 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *I = Applies.pop_back_val();
       auto Apply = ApplySite::isa(I);
       assert(Apply && "Expected an apply!");
+      SILFunction *Callee = Apply.getReferencedFunction();
+      assert(Callee && "Expected to have a known callee");
 
       // We have a call that can potentially be specialized, so
       // attempt to do so.
@@ -106,7 +108,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyPassManagerOfFunction(NewF);
+        notifyPassManagerOfFunction(NewF, Callee);
       }
     }
   }

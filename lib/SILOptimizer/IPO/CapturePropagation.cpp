@@ -312,7 +312,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   SILFunction *NewF = specializeConstClosure(PAI, SubstF);
   rewritePartialApply(PAI, NewF);
 
-  notifyPassManagerOfFunction(NewF);
+  notifyPassManagerOfFunction(NewF, SubstF);
   return true;
 }
 

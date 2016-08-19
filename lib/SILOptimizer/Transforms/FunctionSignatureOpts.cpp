@@ -868,7 +868,14 @@ public:
       assert(F->isThunk() && "Old function should have been turned into a thunk");
       // Make sure the PM knows about this function. This will also help us
       // with self-recursion.
-      notifyPassManagerOfFunction(FST.getOptimizedFunction());
+      notifyPassManagerOfFunction(FST.getOptimizedFunction(), F);
+
+      // We have to restart the pipeline for this thunk in order to run the
+      // inliner (and other opts) again. This is important if the new
+      // specialized function (which is called from this thunk) is
+      // function-signature-optimized again and also becomes an
+      // always-inline-thunk.
+      restartPassPipeline();
     }
   }
 
