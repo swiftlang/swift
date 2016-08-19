@@ -5544,11 +5544,12 @@ public:
         std::min(classDecl->getFormalAccess(), overriddenAccess);
       if (requiredAccess == Accessibility::Open && decl->isFinal())
         requiredAccess = Accessibility::Public;
+      else if (requiredAccess == Accessibility::Private)
+        requiredAccess = Accessibility::FilePrivate;
 
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
-      if (requiredAccess > Accessibility::Private &&
-          !isa<ConstructorDecl>(decl)) {
+      if (!isa<ConstructorDecl>(decl)) {
         shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
 
         if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
@@ -5558,6 +5559,8 @@ public:
             const DeclContext *accessDC = nullptr;
             if (requiredAccess == Accessibility::Internal)
               accessDC = classDecl->getParentModule();
+            else if (requiredAccess == Accessibility::FilePrivate)
+              accessDC = classDecl->getDeclContext();
             shouldDiagnoseSetter = ASD->isSettable(accessDC) &&
                                    !ASD->isSetterAccessibleFrom(accessDC);
           }
@@ -6498,11 +6501,14 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getFormalAccess() <
-            std::min(nominal->getFormalAccess(), Accessibility::Public)) {
+        auto requiredAccess = std::min(nominal->getFormalAccess(),
+                                       Accessibility::Public);
+        if (requiredAccess == Accessibility::Private)
+          requiredAccess = Accessibility::FilePrivate;
+        if (CD->getFormalAccess() < requiredAccess) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
-          fixItAccessibility(diag, CD, nominal->getFormalAccess());
+          fixItAccessibility(diag, CD, requiredAccess);
         }
       }
     }
