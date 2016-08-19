@@ -159,12 +159,14 @@ public protocol SignedArithmetic : Arithmetic {
 extension SignedArithmetic {
   @_transparent
   public func negated() -> Self {
-    return Self().subtracting(self)
+    var result = self
+    result.negate()
+    return result
   }
 
   @_transparent
   public mutating func negate() {
-    self = negated()
+    self = Self().subtracting(self)
   }
 }
 
