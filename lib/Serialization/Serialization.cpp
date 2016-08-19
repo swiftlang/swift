@@ -3097,9 +3097,9 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::Optional: {
-    auto sliceTy = cast<OptionalType>(ty.getPointer());
+    auto optionalTy = cast<OptionalType>(ty.getPointer());
 
-    Type base = sliceTy->getBaseType();
+    Type base = optionalTy->getBaseType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[OptionalTypeLayout::Code];
     OptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3108,13 +3108,13 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::ImplicitlyUnwrappedOptional: {
-    auto sliceTy = cast<ImplicitlyUnwrappedOptionalType>(ty.getPointer());
+    auto optionalTy = cast<ImplicitlyUnwrappedOptionalType>(ty.getPointer());
 
-    Type base = sliceTy->getBaseType();
+    Type base = optionalTy->getBaseType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ImplicitlyUnwrappedOptionalTypeLayout::Code];
     ImplicitlyUnwrappedOptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                            addTypeRef(base));
+                                                      addTypeRef(base));
     break;
   }
 
