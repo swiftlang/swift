@@ -95,7 +95,7 @@ struct NSOptions : OptionSet {
   static var __privA: NSOptions { get }
   static var B: NSOptions { get }
 }
-class __PrivCFType {
+class __PrivCFType : _CFObject {
 }
 typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32

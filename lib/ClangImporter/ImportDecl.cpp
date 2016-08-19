@@ -1279,9 +1279,14 @@ namespace {
       addObjCAttribute(theClass, None);
       Impl.registerExternalDecl(theClass);
 
-      SmallVector<ProtocolDecl *, 4> protocols;
-      theClass->getImplicitProtocols(protocols);
-      addObjCProtocolConformances(theClass, protocols);
+      auto *cfObjectProto =
+          Impl.SwiftContext.getProtocol(KnownProtocolKind::CFObject);
+      if (cfObjectProto) {
+        populateInheritedTypes(theClass, cfObjectProto, superclass);
+        auto *attr = new (Impl.SwiftContext) SynthesizedProtocolAttr(
+            KnownProtocolKind::CFObject);
+        theClass->getAttrs().add(attr);
+      }
 
       // Look for bridging attributes on the clang record.  We can
       // just check the most recent redeclaration, which will inherit
@@ -2209,11 +2214,14 @@ namespace {
     }
 
     void populateInheritedTypes(NominalTypeDecl *nominal,
-                                ArrayRef<ProtocolDecl *> protocols) {
+                                ArrayRef<ProtocolDecl *> protocols,
+                                Type superclass = Type()) {
       SmallVector<TypeLoc, 4> inheritedTypes;
-      inheritedTypes.resize(protocols.size());
-      for_each(MutableArrayRef<TypeLoc>(inheritedTypes),
-               ArrayRef<ProtocolDecl *>(protocols),
+      inheritedTypes.resize(protocols.size() + (superclass ? 1 : 0));
+      if (superclass)
+        inheritedTypes[0] = TypeLoc::withoutLoc(superclass);
+      for_each(MutableArrayRef<TypeLoc>(inheritedTypes).slice(superclass?1:0),
+               protocols,
                [](TypeLoc &tl, ProtocolDecl *proto) {
                  tl = TypeLoc::withoutLoc(proto->getDeclaredType());
                });
@@ -4995,7 +5003,7 @@ namespace {
     /// given vector, guarded by the known set of protocols.
     void addProtocols(ProtocolDecl *protocol,
                       SmallVectorImpl<ProtocolDecl *> &protocols,
-                      llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &known) {
       if (!known.insert(protocol).second)
         return;
 
@@ -5003,6 +5011,13 @@ namespace {
       for (auto inherited : protocol->getInheritedProtocols(
                               Impl.getTypeResolver()))
         addProtocols(inherited, protocols, known);
+    }
+
+    void addProtocols(ProtocolDecl *protocol,
+                      SmallVectorImpl<ProtocolDecl *> &protocols) {
+      llvm::SmallPtrSet<ProtocolDecl *, 4> known(protocols.begin(),
+                                                 protocols.end());
+      addProtocols(protocol, protocols, known);
     }
 
     // Import the given Objective-C protocol list, along with any
@@ -5013,16 +5028,14 @@ namespace {
                              SmallVectorImpl<TypeLoc> &inheritedTypes) {
       SmallVector<ProtocolDecl *, 4> protocols;
       llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
         nominal->getImplicitProtocols(protocols);
-        knownProtocols.insert(protocols.begin(), protocols.end());
-      }
 
       for (auto cp = clangProtocols.begin(), cpEnd = clangProtocols.end();
            cp != cpEnd; ++cp) {
         if (auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp,
                                                                     false))) {
-          addProtocols(proto, protocols, knownProtocols);
+          addProtocols(proto, protocols);
           inheritedTypes.push_back(
             TypeLoc::withoutLoc(proto->getDeclaredType()));
         }

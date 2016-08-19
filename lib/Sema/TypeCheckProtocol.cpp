@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
@@ -1139,39 +1140,87 @@ bool WitnessChecker::findBestWitness(ValueDecl *requirement,
                                      unsigned &numViable,
                                      unsigned &bestIdx,
                                      bool &doNotDiagnoseMatches) {
-  auto witnesses = lookupValueWitnesses(requirement, ignoringNames);
+  enum Attempt {
+    Regular,
+    OperatorsFromOverlay,
+    Done
+  };
 
-  // Match each of the witnesses to the requirement.
-  bool anyFromUnconstrainedExtension = false;
-  numViable = 0;
-  bestIdx = 0;
+  SmallVector<ValueDecl *, 4> witnesses;
+  bool anyFromUnconstrainedExtension;
 
-  for (auto witness : witnesses) {
-    // Don't match anything in a protocol.
-    // FIXME: When default implementations come along, we can try to match
-    // these when they're default implementations coming from another
-    // (unrelated) protocol.
-    if (isa<ProtocolDecl>(witness->getDeclContext())) {
-      continue;
+  for (Attempt attempt = Regular; attempt != Done;
+       attempt = static_cast<Attempt>(attempt + 1)) {
+    switch (attempt) {
+    case Regular:
+      witnesses = lookupValueWitnesses(requirement, ignoringNames);
+      break;
+    case OperatorsFromOverlay: {
+      // If we have a Clang declaration, the matching operator might be in the
+      // overlay for that module.
+      if (!requirement->isOperator())
+        continue;
+
+      auto *clangModule =
+          dyn_cast<ClangModuleUnit>(DC->getModuleScopeContext());
+      if (!clangModule)
+        continue;
+
+      DeclContext *overlay = clangModule->getAdapterModule();
+      if (!overlay)
+        continue;
+
+      auto lookupOptions = defaultUnqualifiedLookupOptions;
+      lookupOptions |= NameLookupFlags::KnownPrivate;
+      auto lookup = TC.lookupUnqualified(overlay, requirement->getName(),
+                                         SourceLoc(), lookupOptions);
+      witnesses.clear();
+      for (auto candidate : lookup)
+        witnesses.push_back(candidate.Decl);
+      break;
+    }
+    case Done:
+      llvm_unreachable("should have exited loop");
     }
 
-    if (!witness->hasType())
-      TC.validateDecl(witness, true);
+    // Match each of the witnesses to the requirement.
+    anyFromUnconstrainedExtension = false;
+    numViable = 0;
+    bestIdx = 0;
 
-    auto match = matchWitness(TC, Proto, conformance, DC,
-                              requirement, witness);
-    if (match.isViable()) {
-      ++numViable;
-      bestIdx = matches.size();
-    } else if (match.Kind == MatchKind::WitnessInvalid) {
-      doNotDiagnoseMatches = true;
+    for (auto witness : witnesses) {
+      // Don't match anything in a protocol.
+      // FIXME: When default implementations come along, we can try to match
+      // these when they're default implementations coming from another
+      // (unrelated) protocol.
+      if (isa<ProtocolDecl>(witness->getDeclContext())) {
+        continue;
+      }
+
+      if (!witness->hasType())
+        TC.validateDecl(witness, true);
+
+      auto match = matchWitness(TC, Proto, conformance, DC,
+                                requirement, witness);
+      if (match.isViable()) {
+        ++numViable;
+        bestIdx = matches.size();
+      } else if (match.Kind == MatchKind::WitnessInvalid) {
+        doNotDiagnoseMatches = true;
+      }
+
+      if (auto *ext = dyn_cast<ExtensionDecl>(match.Witness->getDeclContext())){
+        if (!ext->isConstrainedExtension() &&
+            ext->getAsProtocolExtensionContext()) {
+          anyFromUnconstrainedExtension = true;
+        }
+      }
+
+      matches.push_back(std::move(match));
     }
 
-    if (auto *ext = dyn_cast<ExtensionDecl>(match.Witness->getDeclContext()))
-      if (!ext->isConstrainedExtension() && ext->getAsProtocolExtensionContext())
-        anyFromUnconstrainedExtension = true;
-
-    matches.push_back(std::move(match));
+    if (numViable > 0)
+      break;
   }
 
   if (numViable == 0) {
