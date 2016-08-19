@@ -112,7 +112,7 @@ public struct ${Self}<@swift3_migration(renamed="Pointee") Memory>
   /// Allocate memory for `num` objects of type `Memory`.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
-  @swift3_migration(renamed="init(allocatingCapacity:)")
+  @swift3_migration(renamed="allocate(capacity:)")
   @warn_unused_result
   public static func alloc(num: Int) -> ${Self} {
     let size = strideof(Memory.self) * num

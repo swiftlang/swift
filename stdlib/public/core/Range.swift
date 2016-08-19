@@ -138,6 +138,7 @@ public struct Range<
   /// The range's lower bound.
   ///
   /// Identical to `endIndex` in an empty range.
+  @swift3_migration(renamed="lowerBound")
   public var startIndex: Element
 
   /// The range's upper bound.
@@ -145,6 +146,7 @@ public struct Range<
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
+  @swift3_migration(renamed="upperBound")
   public var endIndex: Element
 
   /// A textual representation of `self`.
