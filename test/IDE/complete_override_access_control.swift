@@ -2,18 +2,22 @@
 // RUN: %target-swift-frontend -parse -verify -disable-objc-attr-requires-foundation-module %t_no_errors.swift
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ABC
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ABC
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ABC -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ABC
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_DE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_DE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_DE -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_DE
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_ED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_ED
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_ED -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_ED
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_FILEPRIVATE_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PRIVATE_EF
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_INTERNAL_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_INTERNAL_EF
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_PUBLIC_EF -code-completion-keywords=false | %FileCheck %s -check-prefix=TEST_PUBLIC_EF
 
@@ -85,6 +89,10 @@ public protocol ProtocolFPublic {
 private class TestPrivateABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPublic {
   #^TEST_PRIVATE_ABC^#
 }
+fileprivate class TestFilePrivateABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPublic {
+  #^TEST_FILEPRIVATE_ABC^#
+  // Same as TEST_PRIVATE_ABC.
+}
 class TestInternalABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPublic {
   #^TEST_INTERNAL_ABC^#
 }
@@ -149,6 +157,10 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 private class TestPrivateDE : ProtocolDPrivate, ProtocolEPublic {
   #^TEST_PRIVATE_DE^#
 }
+fileprivate class TestPrivateDE : ProtocolDPrivate, ProtocolEPublic {
+  #^TEST_FILEPRIVATE_DE^#
+  // Same as TEST_PRIVATE_DE.
+}
 class TestInternalDE : ProtocolDPrivate, ProtocolEPublic {
   #^TEST_INTERNAL_DE^#
 }
@@ -171,6 +183,10 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
 private class TestPrivateED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_PRIVATE_ED^#
 }
+fileprivate class TestPrivateED : ProtocolEPublic, ProtocolDPrivate {
+  #^TEST_FILEPRIVATE_ED^#
+  // Same as TEST_PRIVATE_ED.
+}
 class TestInternalED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_INTERNAL_ED^#
 }
@@ -192,6 +208,10 @@ public class TestPublicED : ProtocolEPublic, ProtocolDPrivate {
 
 private class TestPrivateEF : ProtocolEPublic, ProtocolFPublic {
   #^TEST_PRIVATE_EF^#
+}
+fileprivate class TestPrivateEF : ProtocolEPublic, ProtocolFPublic {
+  #^TEST_FILEPRIVATE_EF^#
+  // Same as TEST_PRIVATE_EF.
 }
 class TestInternalEF : ProtocolEPublic, ProtocolFPublic {
   #^TEST_INTERNAL_EF^#
