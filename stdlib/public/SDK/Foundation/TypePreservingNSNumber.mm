@@ -76,11 +76,13 @@ enum _SwiftTypePreservingNSNumberTag {
   case SwiftCGFloat:
     return @encode(CGFloat);
   case SwiftBool:
-    return @encode(bool);
+    // Bool is represented by CFBoolean.
+    break;
   }
   swift::swift_reportError(
       /* flags = */ 0,
       "_SwiftTypePreservingNSNumber.tag is corrupted.\n");
+  abort();
 }
 
 - (void)getValue:(void *)value {
@@ -102,12 +104,13 @@ enum _SwiftTypePreservingNSNumberTag {
     memcpy(value, self->storage, sizeof(CGFloat));
     return;
   case SwiftBool:
-    memcpy(value, self->storage, sizeof(bool));
-    return;
+    // Bool is represented by CFBoolean.
+    break;
   }
   swift::swift_reportError(
       /* flags = */ 0,
       "_SwiftTypePreservingNSNumber.tag is corrupted.\n");
+  abort();
 }
 
 #define DEFINE_ACCESSOR(C_TYPE, METHOD_NAME) \
@@ -139,14 +142,14 @@ enum _SwiftTypePreservingNSNumberTag {
       return result; \
     } \
     case SwiftBool: { \
-      bool result; \
-      memcpy(&result, self->storage, sizeof(result)); \
-      return result; \
+      /* Bool is represented by CFBoolean. */ \
+      break; \
     } \
     } \
     swift::swift_reportError( \
         /* flags = */ 0, \
         "_SwiftTypePreservingNSNumber.tag is corrupted.\n"); \
+    abort(); \
   }
 
 DEFINE_ACCESSOR(char, charValue)
@@ -178,7 +181,6 @@ DEFINE_INIT(NSUInteger, UInt)
 DEFINE_INIT(float, Float)
 DEFINE_INIT(double, Double)
 DEFINE_INIT(CGFloat, CGFloat)
-DEFINE_INIT(bool, Bool)
 
 #undef DEFINE_INIT
 
@@ -186,8 +188,10 @@ SWIFT_CC(swift) extern "C" uint32_t
 _swift_Foundation_TypePreservingNSNumberGetKind(
   NSNumber *NS_RELEASES_ARGUMENT _Nonnull self_) {
   uint32_t result = 0;
-  if ([self_ isKindOfClass: [_SwiftTypePreservingNSNumber class]]) {
+  if ([self_ isKindOfClass:[_SwiftTypePreservingNSNumber class]]) {
     result = ((_SwiftTypePreservingNSNumber *) self_)->tag;
+  } else if (CFGetTypeID(self_) == CFBooleanGetTypeID()) {
+    result = SwiftBool;
   }
   [self_ release];
   return result;
@@ -212,7 +216,6 @@ DEFINE_GETTER(NSUInteger, UInt)
 DEFINE_GETTER(float, Float)
 DEFINE_GETTER(double, Double)
 DEFINE_GETTER(CGFloat, CGFloat)
-DEFINE_GETTER(bool, Bool)
 
 #undef DEFINE_GETTER
 
