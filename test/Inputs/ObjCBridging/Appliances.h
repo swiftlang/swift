@@ -17,3 +17,7 @@
 @interface APPManufacturerInfo <DataType> : NSObject
 @property (nonatomic,nonnull,readonly) DataType value;
 @end
+
+@interface APPBroken : NSObject
+@property (nonatomic,nonnull,readonly) id thing;
+@end

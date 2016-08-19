@@ -47,5 +47,12 @@ if let f2 = obj as? Refrigerator {
   print("Fridge has temperature \(f2.temperature)")
 }
 
+// Check improper nullability auditing of `id` interfaces. `nil` should come
+// through as a nonnull `Any` without crashing.
+autoreleasepool {
+  let broken = APPBroken()
+  let thing = broken.thing
+}
+
 // CHECK: DONE
 print("DONE")
