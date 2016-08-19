@@ -5,8 +5,8 @@ Swift 3.0
 
 * [SE-0045](https://github.com/apple/swift-evolution/blob/master/proposals/0045-scan-takewhile-dropwhile.md)
 
-  The `Sequence` protocol now includes two new members, `take(while:)` and 
-  `drop(while:)`.  `take(while:)` is used to request the longest subsequence
+  The `Sequence` protocol now includes two new members, `prefix(while:)` and
+  `drop(while:)`.  `prefix(while:)` is used to request the longest subsequence
   satisfying a predicate.  `drop(while:)` is used to request the subsequence
   remaining after dropping the longest subsequence satisfying a predicate.
 
