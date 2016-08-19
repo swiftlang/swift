@@ -769,3 +769,14 @@ struct SR1752 {
 let sr1752: SR1752? = nil
 
 true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
+
+// <rdar://problem/27891805> QoI: FailureDiagnosis doesn't look through 'try'
+struct rdar27891805 {
+  init(contentsOf: String, encoding: String) throws {}
+  init(contentsOf: String, usedEncoding: inout String) throws {}
+  init<T>(_ t: T) {}
+}
+
+try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
+// expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
+// expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
