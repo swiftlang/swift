@@ -26,141 +26,246 @@ import StdlibUnittest
 
 var mirrors = TestSuite("Mirrors")
 
-class NativeSwiftClass : NativeClassBoundExistential {}
+class NativeSwiftClass : NativeClassBoundExistential {
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
+}
 
-protocol NativeClassBoundExistential : class {}
+protocol NativeClassBoundExistential : class {
+  var x: Int { get }
+}
 class NativeSwiftClassHasWeak {
   weak var weakProperty: AnyObject?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 class NativeSwiftClassHasNativeClassBoundExistential {
   weak var weakProperty: NativeClassBoundExistential?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 struct StructHasNativeWeakReference {
   weak var weakProperty: AnyObject?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 mirrors.test("class/NativeSwiftClassHasNativeWeakReference") {
-  let c1 = NativeSwiftClassHasWeak()
-  let c2 = NativeSwiftClass()
-  c1.weakProperty = c2
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = NativeSwiftClassHasWeak(x: 1010)
+  let child = NativeSwiftClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! NativeSwiftClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/NativeSwiftClassHasNativeClassBoundExistential") {
-  let c1 = NativeSwiftClassHasNativeClassBoundExistential()
-  let e = NativeSwiftClass() as NativeClassBoundExistential
-  c1.weakProperty = e
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = NativeSwiftClassHasNativeClassBoundExistential(x: 1010)
+  let child = NativeSwiftClass(x: 2020) as NativeClassBoundExistential
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! NativeSwiftClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("struct/StructHasNativeWeakReference") {
-  var s = StructHasNativeWeakReference()
-  let c2 = NativeSwiftClass()
-  s.weakProperty = c2
-  let structChild = _reflect(s)[0].1.value
-  print(structChild)
+  var parent = StructHasNativeWeakReference(x: 1010)
+  let child = NativeSwiftClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! NativeSwiftClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 #if _runtime(_ObjC)
 
 import Foundation
 
-@objc protocol ObjCClassBoundExistential : class {}
-
-@objc protocol ObjCProtocol : class {
+@objc protocol ObjCClassExistential : class {
   weak var weakProperty: AnyObject? { get set }
+  var x: Int { get }
+}
+
+class ObjCClass : ObjCClassExistential {
+  weak var weakProperty: AnyObject?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 class NativeSwiftClassHasObjCClassBoundExistential {
-  weak var weakProperty: NSObjectProtocol?
+  weak var weakProperty: ObjCClassExistential?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 class ObjCClassHasWeak : NSObject {
   weak var weakProperty: AnyObject?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 class ObjCClassHasNativeClassBoundExistential : NSObject {
   weak var weakProperty: NativeClassBoundExistential?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 class ObjCClassHasObjCClassBoundExistential : NSObject {
-  weak var weakProperty: NSObjectProtocol?
+  weak var weakProperty: ObjCClassExistential?
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 struct StructHasObjCWeakReference {
-  weak var weakProperty: NSObject?
+  weak var weakProperty: ObjCClass? = nil
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 struct StructHasObjCClassBoundExistential {
-  weak var weakProperty: NSObjectProtocol?
+  weak var weakProperty: ObjCClassExistential? = nil
+  let x: Int
+  init(x: Int) {
+    self.x = x
+  }
 }
 
 mirrors.test("class/NativeSwiftClassHasObjCWeakReference") {
-  let c1 = NativeSwiftClassHasWeak()
-  let nso = NSObject()
-  c1.weakProperty = nso
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = NativeSwiftClassHasWeak(x: 1010)
+  let child = ObjCClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/NativeSwiftClassHasObjCClassBoundExistential") {
-  let c1 = NativeSwiftClassHasObjCClassBoundExistential()
-  let nso = NSObject() as NSObjectProtocol
-  c1.weakProperty = nso
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = NativeSwiftClassHasObjCClassBoundExistential(x: 1010)
+  let child = ObjCClass(x: 2020) as ObjCClassExistential
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/ObjCClassHasNativeWeak") {
-  let c1 = ObjCClassHasWeak()
-  let c2 = NativeSwiftClass()
-  c1.weakProperty = c2
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = ObjCClassHasWeak(x: 1010)
+  let child = NativeSwiftClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! NativeSwiftClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/ObjcCClassHasObjCWeakReference") {
-  let c1 = ObjCClassHasWeak()
-  let nso = NSObject()
-  c1.weakProperty = nso
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = ObjCClassHasWeak(x: 1010)
+  let child = ObjCClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/ObjCClassHasNativeClassBoundExistential") {
-  let c1 = ObjCClassHasNativeClassBoundExistential()
-  let e = NativeSwiftClass() as NativeClassBoundExistential
-  c1.weakProperty = e
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = ObjCClassHasNativeClassBoundExistential(x: 1010)
+  let child = NativeSwiftClass(x: 2020) as NativeClassBoundExistential
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! NativeSwiftClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("class/ObjCClassHasObjCClassBoundExistential") {
-  let c1 = ObjCClassHasObjCClassBoundExistential()
-  let nsop = NSObject() as NSObjectProtocol
-  c1.weakProperty = nsop
-  let classChild = _reflect(c1)[0].1.value
-  print(classChild)
+  let parent = ObjCClassHasObjCClassBoundExistential(x: 1010)
+  let child = ObjCClass(x: 2020) as ObjCClassExistential
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("struct/StructHasObjCWeakReference") {
-  var s = StructHasObjCWeakReference()
-  let nso = NSObject()
-  s.weakProperty = nso
-  let structChild = _reflect(s)[0].1.value
-  print(structChild)
+  var parent = StructHasObjCWeakReference(x: 1010)
+  let child = ObjCClass(x: 2020)
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 mirrors.test("struct/StructHasObjCClassBoundExistential") {
-  var s = StructHasObjCClassBoundExistential()
-  let nsop = NSObject() as NSObjectProtocol
-  s.weakProperty = nsop
-  let structChild = _reflect(s)[0].1.value
-  print(structChild)
+  var parent = StructHasObjCClassBoundExistential(x: 1010)
+  let child = ObjCClass(x: 2020) as ObjCClassExistential
+  parent.weakProperty = child
+  let mirror = Mirror(reflecting: parent)
+  let children = Array(mirror.children)
+  let extractedChild = children[0].1 as! ObjCClass
+  expectNotEqual(parent.x, extractedChild.x)
+  expectEqual(ObjectIdentifier(child), ObjectIdentifier(extractedChild))
+  expectEqual(child.x, extractedChild.x)
+  print(extractedChild)
 }
 
 #endif
