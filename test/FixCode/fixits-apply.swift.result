@@ -271,4 +271,5 @@ class BoolFoo : Bool {
 func testBoolValue(a : BoolFoo) {
   if a.boolValue { }
   guard a.boolValue {}
+  if (a as BoolFoo).boolValue {}
 }

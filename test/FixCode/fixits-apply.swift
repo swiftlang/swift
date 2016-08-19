@@ -268,4 +268,5 @@ class BoolFoo : BooleanType {
 func testBoolValue(a : BoolFoo) {
   if a { }
   guard a {}
+  if a as BoolFoo {}
 }
