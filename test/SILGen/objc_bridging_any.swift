@@ -358,10 +358,11 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:     bb0(%0 : $AnyObject, %1 : $SwiftIdLover):
   // CHECK-NEXT:  strong_retain %0
   // CHECK-NEXT:  strong_retain %1
-  // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_ref %0
+  // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast %0
+  // CHECK-NEXT:  // function_ref
+  // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = init_existential_addr [[RESULT]]
-  // CHECK-NEXT:  store [[OPENED]] to [[RESULT_VAL]]
+  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL]])
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @_TFC17objc_bridging_any12SwiftIdLover15methodTakingAnyfT1aP__T_
   // CHECK-NEXT:  apply [[METHOD]]([[RESULT]], %1)
@@ -373,7 +374,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover23methodTakingOptionalAny
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_bridging_any12SwiftIdLover23methodTakingOptionalAny
-  // CHECK: init_existential_addr %11 : $*Any, $@opened({{.*}}) AnyObject
+  // CHECK: function_ref [[BRIDGE_TO_ANY_FUNC]]
 
   // CHECK-LABEL: sil hidden @_TFC17objc_bridging_any12SwiftIdLover26methodTakingBlockTakingAnyfFP_T_T_ : $@convention(method) (@owned @callee_owned (@in Any) -> (), @guaranteed SwiftIdLover) -> ()
 
@@ -427,10 +428,11 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [[BLOCK_STORAGE_ADDR]]
   // CHECK-NEXT:  strong_retain [[FUNCTION]]
   // CHECK-NEXT:  strong_retain %1
-  // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_ref %1
+  // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast %1
+  // CHECK-NEXT:  // function_ref
+  // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = init_existential_addr [[RESULT]] : $*Any
-  // CHECK-NEXT:  store [[OPENED]] to [[RESULT_VAL]]
+  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL]])
   // CHECK-NEXT:  apply [[FUNCTION]]([[RESULT]])
   // CHECK-NEXT:  [[VOID:%.*]] = tuple ()
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
@@ -456,10 +458,11 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__aPs9AnyObject__XFo__iP__ : $@convention(thin) (@owned @convention(block) () -> @autoreleased AnyObject) -> @out Any
   // CHECK:     bb0(%0 : $*Any, %1 : $@convention(block) () -> @autoreleased AnyObject):
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply %1()
-  // CHECK-NEXT:  [[OPENED:%.*]] = open_existential_ref [[BRIDGED]]
+  // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[BRIDGED]]
+  // CHECK-NEXT:  // function_ref
+  // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $Any
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = init_existential_addr [[RESULT]]
-  // CHECK-NEXT:  store [[OPENED]] to [[RESULT_VAL]]
+  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[RESULT]], [[OPTIONAL]])
 
   // TODO: Should elide the copy
   // CHECK-NEXT:  copy_addr [take] [[RESULT]] to [initialization] %0

@@ -704,20 +704,25 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
       gen.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
         ->getDeclaredType())
       && "Any should bridge to AnyObject");
-    
-    // Open the type of the reference and use it to build an Any.
-    auto openedTy = ArchetypeType::getOpened(loweredBridgedTy);
-    auto openedSILTy = SILType::getPrimitiveObjectType(openedTy);
+
     // TODO: Ever need to handle +0 values here?
     assert(v.hasCleanup());
-    auto opened = gen.B.createOpenExistentialRef(loc, v.forward(gen),
-                                                 openedSILTy);
-    auto result = gen.emitTemporaryAllocation(loc, nativeTy);
-    auto resultVal = gen.B.createInitExistentialAddr(loc, result,
-                                                     openedTy, openedSILTy,
-                                                     {});
-    gen.B.createStore(loc, opened, resultVal);
-    return gen.emitManagedRValueWithCleanup(result);
+
+    // Use a runtime call to bridge the AnyObject to Any. We do this instead of
+    // a simple AnyObject-to-Any upcast because the ObjC API may have returned
+    // a null object in spite of its annotation.
+    
+    // Bitcast to Optional. This provides a barrier to the optimizer to prevent
+    // it from attempting to eliminate null checks.
+    auto optionalBridgedTy = OptionalType::get(loweredBridgedTy)
+      ->getCanonicalType();
+    auto optionalV = gen.B.createUncheckedBitCast(loc, v.getValue(),
+                          SILType::getPrimitiveObjectType(optionalBridgedTy));
+    auto optionalMV = ManagedValue(optionalV, v.getCleanup());
+    return gen.emitApplyOfLibraryIntrinsic(loc,
+                           gen.getASTContext().getBridgeAnyObjectToAny(nullptr),
+                           {}, optionalMV, SGFContext())
+      .getAsSingleValue(gen, loc);
   }
 
   return v;
