@@ -212,6 +212,49 @@ _SwiftValue *swift::getAsSwiftValue(id object) {
   return nil;
 }
 
+bool
+swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+                                  const WitnessTable **tablesBuffer) {
+  Class cls = nullptr;
+
+  // Note that currently we never modify tablesBuffer because
+  // _SwiftValue doesn't conform to any protocols that need witness tables.
+
+  for (size_t i = 0, e = protocols.NumProtocols; i != e; ++i) {
+    auto protocol = protocols[i];
+
+    // _SwiftValue does conform to AnyObject.
+    switch (protocol->Flags.getSpecialProtocol()) {
+    case SpecialProtocol::AnyObject:
+      continue;
+
+    case SpecialProtocol::Error:
+      return false;
+
+    case SpecialProtocol::None:
+      break;
+    }
+
+    // Otherwise, it only conforms to ObjC protocols.  We specifically
+    // don't want to say that _SwiftValue conforms to the Swift protocols
+    // that NSObject conforms to because that would create a situation
+    // where arguably an arbitrary type would conform to those protocols
+    // by way of coercion through _SwiftValue.  Eventually we want to
+    // change _SwiftValue to not be an NSObject subclass at all.
+
+    if (protocol->Flags.getDispatchStrategy() != ProtocolDispatchStrategy::ObjC)
+      return false;
+
+    if (!cls) cls = _getSwiftValueClass();
+
+    // Check whether the class conforms to the protocol.
+    if (![cls conformsToProtocol: (Protocol*) protocol])
+      return false;
+  }
+
+  return true;
+}
+
 @implementation _SwiftValue
 
 + (instancetype)allocWithZone:(NSZone *)zone {

@@ -1049,6 +1049,26 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     MetadataKind kind =
         srcDynamicType ? srcDynamicType->getKind() : MetadataKind::Class;
 
+    // A fallback to use if we don't have a more specialized approach
+    // for a non-class type.
+    auto fallbackForNonClass = [&] {
+#if SWIFT_OBJC_INTEROP
+      // If the destination type is a set of protocols that SwiftValue
+      // implements, we're fine.
+      if (findSwiftValueConformances(targetType->Protocols,
+                                     destExistential->getWitnessTables())) {
+        bool consumeValue = dynamicFlags & DynamicCastFlags::TakeOnSuccess;
+        destExistential->Value =
+          bridgeAnythingToSwiftValueObject(srcDynamicValue, srcDynamicType,
+                                           consumeValue);
+        maybeDeallocateSource(true);
+        return true;
+      }
+#endif
+
+      return _fail(src, srcType, targetType, flags);
+    };
+
     // If the source type is a value type, it cannot possibly conform
     // to a class-bounded protocol. 
     switch (kind) {
@@ -1068,14 +1088,15 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       }
 #endif
       // Otherwise, metatypes aren't class objects.
-      return _fail(src, srcType, targetType, flags);
+      return fallbackForNonClass();
     }
     
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
     case MetadataKind::Existential:
-      // Handle these cases below.
+      // Handle the class cases below.  Note that opaque existentials
+      // shouldn't get here because we should have drilled into them above.
       break;
 
     case MetadataKind::Struct:
@@ -1105,7 +1126,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         return success;
       }
 #endif
-      break;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
@@ -1113,8 +1134,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     case MetadataKind::ErrorObject:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
-      // Will never succeed.
-      return _fail(src, srcType, targetType, flags);
+      return fallbackForNonClass();
     }
 
     // Check for protocol conformances and fill in the witness tables. If
