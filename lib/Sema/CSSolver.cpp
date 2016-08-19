@@ -676,7 +676,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::TypeMember:
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
@@ -765,7 +764,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
-    case ConstraintKind::BridgedToObjectiveC:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;

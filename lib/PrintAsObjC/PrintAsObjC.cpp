@@ -1193,7 +1193,7 @@ private:
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&
         !isSwiftNewtype(SD)) {
-      ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
+      ty = ctx.getBridgedToObjC(&M, ty);
     }
     
     assert(ty && "unknown bridged type");

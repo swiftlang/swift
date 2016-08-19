@@ -3970,10 +3970,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   if (Type objectTy = indexTy->getAnyOptionalObjectType())
     indexTy = objectTy;
 
-  if (getASTContext().getBridgedToObjC(getDeclContext(), indexTy, resolver))
-    return ObjCSubscriptKind::Keyed;
-
-  return ObjCSubscriptKind::None;
+  return ObjCSubscriptKind::Keyed;
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
