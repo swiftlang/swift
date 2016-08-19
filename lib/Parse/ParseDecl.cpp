@@ -1444,7 +1444,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   SourceLoc Loc = consumeToken();
 
   bool isAutoclosureEscaping = false;
-  SourceLoc autoclosureEscapingRightParenLoc;
+  SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
 
   // Handle @autoclosure(escaping)
@@ -1462,9 +1462,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
 
     if (isAutoclosureEscaping) {
-      consumeToken(tok::l_paren);
+      autoclosureEscapingParenRange.Start = consumeToken(tok::l_paren);
       consumeToken(tok::identifier);
-      autoclosureEscapingRightParenLoc = consumeToken(tok::r_paren);
+      autoclosureEscapingParenRange.End = consumeToken(tok::r_paren);
     }
   } else if (attr == TAK_convention) {
     SourceLoc LPLoc;
@@ -1516,9 +1516,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
+        StringRef replacement = " @escaping ";
+        if (autoclosureEscapingParenRange.End.getAdvancedLoc(1) != Tok.getLoc())
+          replacement = replacement.drop_back();
         diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
-            .fixItReplace({Loc, autoclosureEscapingRightParenLoc},
-                          "@autoclosure @escaping ");
+            .fixItReplace(autoclosureEscapingParenRange, replacement);
       }
       Attributes.setAttr(TAK_escaping, Loc);
     } else if (Attributes.has(TAK_noescape)) {
