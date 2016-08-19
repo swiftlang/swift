@@ -253,10 +253,6 @@ def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
 def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
   Alias<warn_long_function_bodies>;
 
-def warn_omit_needless_words :
-  Flag<["-"], "Womit-needless-words">,
-  HelpText<"Warn about needless words in names">;
-
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

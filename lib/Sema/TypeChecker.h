@@ -1982,19 +1982,6 @@ public:
   /// Attempt to omit needless words from the name of the given declaration.
   Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
-  /// Check for needless words in the name of the given function/constructor.
-  void checkOmitNeedlessWords(AbstractFunctionDecl *afd);
-
-  /// Check for needless words in the name of the given variable.
-  void checkOmitNeedlessWords(VarDecl *var);
-
-  /// Check for needless words in the name of the function/constructor being
-  /// called.
-  void checkOmitNeedlessWords(ApplyExpr *apply);
-
-  /// Check for needless words in the member reference.
-  void checkOmitNeedlessWords(MemberRefExpr *memberRef);
-
   /// Check for a typo correction.
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,

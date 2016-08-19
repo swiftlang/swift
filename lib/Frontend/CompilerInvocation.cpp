@@ -772,7 +772,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
   Opts.Playground |= Args.hasArg(OPT_playground);
-  Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
