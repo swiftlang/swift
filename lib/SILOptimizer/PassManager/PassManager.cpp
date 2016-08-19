@@ -559,7 +559,7 @@ void SILPassManager::addFunctionToWorklist(SILFunction *F,
   assert(F && F->isDefinition() && F->shouldOptimize() &&
          "Expected optimizable function definition!");
 
-  const unsigned MaxDeriveLevels = 10;
+  const int MaxDeriveLevels = 10;
 
   int NewLevel = 1;
   if (DerivedFrom) {
