@@ -2914,6 +2914,27 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
     return true;
   }
+
+  // Due to migration reasons, types used to conform to BooleanType, which
+  // contain a member var 'boolValue', now does not convert to Bool. This block
+  // tries to add a specific diagnosis/fixit to explicitly invoke 'boolValue'.
+  if (toType->isBool()) {
+    auto LookupResult = CS->TC.lookupMember(CS->DC, fromType,
+      DeclName(CS->TC.Context.getIdentifier("boolValue")));
+    if (!LookupResult.empty()) {
+      if (isa<VarDecl>(LookupResult.begin()->Decl)) {
+        if (anchor->canAppendCallParentheses())
+          diagnose(anchor->getLoc(), diag::types_not_convertible_use_bool_value,
+                   fromType, toType).fixItInsertAfter(anchor->getEndLoc(),
+                                                      ".boolValue");
+        else
+          diagnose(anchor->getLoc(), diag::types_not_convertible_use_bool_value,
+            fromType, toType).fixItInsert(anchor->getStartLoc(), "(").
+              fixItInsertAfter(anchor->getEndLoc(), ").boolValue");
+        return true;
+      }
+    }
+  }
   
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
@@ -4026,6 +4047,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
   case CTP_AssignSource:
+  case CTP_Initialization:
+  case CTP_ReturnStmt:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByIntegerLiteral,
                               expr) ||
