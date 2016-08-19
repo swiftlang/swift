@@ -5345,7 +5345,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
       ProtocolConformance *conformance;
       bool conforms = tc.conformsToProtocol(expr->getType(), hashable, cs.DC,
-                                            ConformanceCheckFlags::InExpression,
+                                            ConformanceCheckFlags::InExpression |
+                                            ConformanceCheckFlags::Used,
                                             &conformance);
       assert(conforms && "must conform to Hashable");
       (void)conforms;
