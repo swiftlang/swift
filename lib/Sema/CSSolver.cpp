@@ -302,16 +302,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     }
   }
 
-  if (auto functionTy = type->getAs<FunctionType>()) {
-    // FIXME: Can weaken input type, but we really don't want to get in the
-    // business of strengthening the result type.
-
-    // An @autoclosure function type can be viewed as scalar of the result
-    // type.
-    if (functionTy->isAutoClosure())
-      result.push_back(functionTy->getResult());
-  }
-
   if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
@@ -326,10 +316,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     result.push_back(lvalue->getObjectType());
   if (auto iot = type->getAs<InOutType>())
     result.push_back(iot->getObjectType());
-
-  // Try to unwrap implicitly unwrapped optional types.
-  if (auto objectType = type->getImplicitlyUnwrappedOptionalObjectType())
-    result.push_back(objectType);
 
   // FIXME: lots of other cases to consider!
   return result;
