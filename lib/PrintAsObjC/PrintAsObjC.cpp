@@ -1533,10 +1533,12 @@ public:
 class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
   friend TypeVisitor;
 
+  ModuleDecl &M;
   llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
   bool IsWithinConstrainedObjCGeneric = false;
 
-  ReferencedTypeFinder(decltype(Callback) callback) : Callback(callback) {}
+  ReferencedTypeFinder(ModuleDecl &mod, decltype(Callback) callback)
+    : M(mod), Callback(callback) {}
 
   void visitType(TypeBase *base) {
     llvm_unreachable("unhandled type");
@@ -1612,28 +1614,34 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   /// Returns true if \p archetype has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
-  static bool isConstrainedArchetype(const ArchetypeType *archetype) {
-    if (archetype->getSuperclass())
+  static bool isConstrained(ModuleDecl &mod,
+                            GenericSignature *sig,
+                            GenericTypeParamType *paramTy) {
+    if (sig->getSuperclassBound(paramTy, mod))
       return true;
 
-    if (archetype->getConformsTo().size() > 1)
+    auto conformsTo = sig->getConformsTo(paramTy, mod);
+
+    if (conformsTo.size() > 1)
       return true;
-    if (archetype->getConformsTo().size() == 0)
+    if (conformsTo.size() == 0)
       return false;
 
-    const ProtocolDecl *proto = archetype->getConformsTo().front();
+    const ProtocolDecl *proto = conformsTo.front();
     if (auto knownKind = proto->getKnownProtocolKind())
       return knownKind.getValue() != KnownProtocolKind::AnyObject;
     return true;
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
-    bool isObjCGeneric = boundGeneric->getDecl()->hasClangNode();
+    auto *decl = boundGeneric->getDecl();
+    bool isObjCGeneric = decl->hasClangNode();
+    auto *sig = decl->getGenericSignature();
 
     for_each(boundGeneric->getGenericArgs(),
-             boundGeneric->getDecl()->getGenericParams()->getPrimaryArchetypes(),
-             [&](Type argTy, const ArchetypeType *archetype) {
-      if (isObjCGeneric && isConstrainedArchetype(archetype))
+             sig->getInnermostGenericParams(),
+             [&](Type argTy, GenericTypeParamType *paramTy) {
+      if (isObjCGeneric && isConstrained(M, sig, paramTy))
         IsWithinConstrainedObjCGeneric = true;
       visit(argTy);
       IsWithinConstrainedObjCGeneric = false;
@@ -1652,8 +1660,8 @@ public:
     return IsWithinConstrainedObjCGeneric;
   }
 
-  static void walk(Type ty, decltype(Callback) callback) {
-    ReferencedTypeFinder(callback).visit(ty);
+  static void walk(ModuleDecl &mod, Type ty, decltype(Callback) callback) {
+    ReferencedTypeFinder(mod, callback).visit(ty);
   }
 };
 
@@ -1835,7 +1843,7 @@ public:
       }
 
       bool needsToBeIndividuallyDelayed = false;
-      ReferencedTypeFinder::walk(VD->getType(),
+      ReferencedTypeFinder::walk(M, VD->getType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
         if (TD == container)

@@ -4282,7 +4282,7 @@ public:
     // Substitute a context archetype if we have context generic params.
     if (Options.ContextGenericParams) {
       return visit(getGenericParamListAtDepth(T->getDepth())
-                     ->getPrimaryArchetypes()[T->getIndex()]);
+                     ->getParams()[T->getIndex()]->getArchetype());
     }
 
     auto Name = T->getName();

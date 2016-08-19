@@ -1000,14 +1000,14 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   // This will have been diagnosed by the accessors above.
   if (!fn) return SGF.emitUndefRValue(E, E->getType());
   
-  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fnGenericParams = fn->getGenericParams()->getParams();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
   auto toSubsts = toCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
-  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
-  (void) fnArcheTypes;
+  (void) fnGenericParams;
   
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
@@ -1439,10 +1439,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
                                        unsigned numElements) {
   // Reabstract the base type against the array element type.
-  AbstractionPattern baseAbstraction(
-    arrayTy->getNominalOrBoundGenericNominal()
-           ->getGenericParams()->getPrimaryArchetypes()[0]);
-  
+  auto baseAbstraction = AbstractionPattern::getOpaque();
+
   // Allocate the array.
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
                              SILType::getBuiltinWordType(gen.getASTContext()),
