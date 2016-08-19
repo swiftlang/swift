@@ -1139,13 +1139,11 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     // Is the base type bridged?
     Type normalizedBaseTy = normalizeType(baseTy);
     const DeclContext *DC = decl->getDeclContext();
-    Optional<Type> maybeBridged =
-        TC.Context.getBridgedToObjC(DC, normalizedBaseTy, &TC);
 
     // ...and just knowing that it's bridged isn't good enough if we don't
     // know what it's bridged /to/. Also, don't do this check for trivial
     // bridging---that doesn't count.
-    Type bridged = maybeBridged.getValueOr(Type());
+    Type bridged = TC.Context.getBridgedToObjC(DC, normalizedBaseTy);
     if (!bridged || bridged->isEqual(normalizedBaseTy))
       return false;
 

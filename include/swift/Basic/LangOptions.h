@@ -155,9 +155,6 @@ namespace swift {
     /// and methods.
     bool InferImportAsMember = false;
 
-    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = true;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

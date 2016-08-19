@@ -2534,8 +2534,9 @@ namespace {
 
         if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
           auto &tc = cs.getTypeChecker();
-          auto classTy = tc.getBridgedToObjC(cs.DC,
-                                             baseMetaTy->getInstanceType());
+          auto &ctx = tc.Context;
+          auto classTy = ctx.getBridgedToObjC(cs.DC,
+                                              baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
           base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 

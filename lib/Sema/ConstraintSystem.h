@@ -1949,10 +1949,6 @@ private:
   /// \brief Attempt to simplify the given class constraint.
   SolutionKind simplifyClassConstraint(const Constraint &constraint);
   
-  /// \brief Attempt to simplify the given bridge constraint.
-  SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
-                                                                &constraint);
-
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(const Constraint &c);
 

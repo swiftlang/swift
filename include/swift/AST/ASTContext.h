@@ -522,13 +522,10 @@ public:
   /// 
   /// \param dc The context in which bridging is occurring.
   /// \param type The Swift for which we are querying bridging behavior.
-  /// \param resolver The lazy resolver.
   /// \param bridgedValueType The specific value type that is bridged,
   /// which will usually by the same as \c type.
-  Optional<Type> getBridgedToObjC(const DeclContext *dc,
-                                  Type type,
-                                  LazyResolver *resolver,
-                                  Type *bridgedValueType = nullptr) const;
+  Type getBridgedToObjC(const DeclContext *dc, Type type,
+                        Type *bridgedValueType = nullptr) const;
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.

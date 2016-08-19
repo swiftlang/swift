@@ -1127,7 +1127,8 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// NSString.
 static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
                                    Type type) {
-  auto objcType = tc.getBridgedToObjC(dc, type);
+  ASTContext &ctx = tc.Context;
+  auto objcType = ctx.getBridgedToObjC(dc, type);
   if (!objcType)
     return false;
 
@@ -1708,11 +1709,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // NSError and Error.
         if (isBridgeableTargetType) {
           Type bridgedValueType;
-          if (auto bridgedToObjCClass =
-                     TC.Context.getBridgedToObjC(DC, type1, &TC,
-                                                 &bridgedValueType)) {
-            if (*bridgedToObjCClass &&
-                (kind >= TypeMatchKind::ExplicitConversion ||
+          if (TC.Context.getBridgedToObjC(DC, type1, &bridgedValueType)) {
+            if ((kind >= TypeMatchKind::ExplicitConversion ||
                  bridgedValueType->getAnyNominal() !=
                    TC.Context.getErrorDecl()))
               conversionsOrFixes.push_back(
@@ -1724,8 +1722,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Anything can be explicitly converted to AnyObject using the universal
       // bridging conversion.
       if (auto protoType2 = type2->getAs<ProtocolType>()) {
-        if (TC.Context.LangOpts.EnableIdAsAny
-            && TC.Context.LangOpts.EnableObjCInterop
+        if (TC.Context.LangOpts.EnableObjCInterop
             && protoType2->getDecl()
               == TC.Context.getProtocol(KnownProtocolKind::AnyObject)
             && !type1->mayHaveSuperclass()
@@ -2913,7 +2910,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   Type bridgedClass;
   Type bridgedType;
   if (instanceTy->getAnyNominal() == TC.Context.getStringDecl()) {
-    if (Type classType = TC.getBridgedToObjC(DC, instanceTy)) {
+    if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
       bridgedClass = classType;
       bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
     }
@@ -3300,22 +3297,6 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
-  const Constraint &constraint)
-{
-  auto baseTy = simplifyForTypePropertyConstraint(*this,
-                                                  constraint.getFirstType());
-  if (!baseTy)
-    return SolutionKind::Unsolved;
-  
-  if (TC.getBridgedToObjC(DC, baseTy)) {
-    increaseScore(SK_UserConversion);
-    return SolutionKind::Solved;
-  }
-  return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
   // Leave the constraint around if the first variable is still opaque.
   auto baseTy = simplifyForTypePropertyConstraint(*this,
@@ -3533,7 +3514,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
       
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
 
@@ -3863,7 +3843,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_CollectionUpcastConversion);
     } else {
       // Check whether this is a bridging upcast.
-      Type bridgedType1 = TC.getBridgedToObjC(DC, baseType1);
+      Type bridgedType1 = TC.Context.getBridgedToObjC(DC, baseType1);
       if (!bridgedType1) {
         // FIXME: Record error.
         return SolutionKind::Error;
@@ -3951,10 +3931,10 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_CollectionUpcastConversion);
     } else {
       // This might be a bridged upcast.
-      Type bridgedKey1 = TC.getBridgedToObjC(DC, key1);
+      Type bridgedKey1 = TC.Context.getBridgedToObjC(DC, key1);
       Type bridgedValue1;
       if (bridgedKey1) {
-        bridgedValue1 = TC.getBridgedToObjC(DC, value1);
+        bridgedValue1 = TC.Context.getBridgedToObjC(DC, value1);
       }
 
       // Both the key and value types need to be bridged.
@@ -4061,7 +4041,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_CollectionUpcastConversion);
     } else {
       // This might be a bridged upcast.
-      Type bridgedBaseType1 = TC.getBridgedToObjC(DC, baseType1);
+      Type bridgedBaseType1 = TC.Context.getBridgedToObjC(DC, baseType1);
       if (!bridgedBaseType1) {
         // FIXME: Record failure.
         return SolutionKind::Error;
@@ -4135,13 +4115,12 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // T bridges to C and C < U ===> T <c U
   case ConversionRestrictionKind::BridgeToObjC: {
-    auto objcClass = TC.getBridgedToObjC(DC, type1);
+    auto objcClass = TC.Context.getBridgedToObjC(DC, type1);
     // If the type doesn't bridge any other way, we can still go straight to
     // AnyObject by universal bridging.
     if (!objcClass) {
-      assert(TC.Context.LangOpts.EnableIdAsAny
-             && TC.Context.LangOpts.EnableObjCInterop
-             && "should only happen in id-as-any mode");
+      assert(TC.Context.LangOpts.EnableObjCInterop
+             && "should only happen in Objective-C mode");
       objcClass = TC.Context.getProtocol(KnownProtocolKind::AnyObject)
         ->getDeclaredType();
     }
@@ -4152,27 +4131,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    // TODO: Under id-as-any, container bridging is unconstrained. This check
-    // can go away.
-    if (!TC.Context.LangOpts.EnableIdAsAny) {
-      // If the bridged value type is generic, the generic arguments
-      // must be bridged to Objective-C for bridging to succeed.
-      if (auto bgt1 = type1->getAs<BoundGenericType>()) {
-        unsigned argIdx = 0;
-        for (auto arg: bgt1->getGenericArgs()) {
-          addConstraint(
-            Constraint::create(*this,
-                               ConstraintKind::BridgedToObjectiveC,
-                               arg, Type(), DeclName(),
-                               FunctionRefKind::Compound,
-                               getConstraintLocator(
-                                 locator.withPathElement(
-                                   LocatorPathElt::getGenericArgument(
-                                     argIdx++)))));
-        }
-      }
-    }
-    
     return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subFlags,
                       locator);
   }
@@ -4180,8 +4138,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // U bridges to C and T < C ===> T <c U
   case ConversionRestrictionKind::BridgeFromObjC: {
     Type bridgedValueType;
-    auto objcClass = *TC.Context.getBridgedToObjC(DC, type2, &TC,
-                                                  &bridgedValueType);
+    auto objcClass = TC.Context.getBridgedToObjC(DC, type2, &bridgedValueType);
     assert(objcClass && "type is not bridged to Objective-C?");
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
@@ -4445,9 +4402,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
   
-  case ConstraintKind::BridgedToObjectiveC:
-    return simplifyBridgedToObjectiveCConstraint(constraint);
-
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);
 

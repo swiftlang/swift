@@ -1329,18 +1329,6 @@ public:
                                        std::function<bool(Type)> convertToType,
                                        bool suppressDiagnostics);
 
-  /// Retrieves the Objective-C type to which the given value type is
-  /// bridged.
-  ///
-  /// \param dc The declaration context from which we will look for
-  /// bridging.
-  ///
-  /// \param type The value type being queried, e.g., String.
-  ///
-  /// \returns the class type to which the given type is bridged, or null if it
-  /// is not bridged.
-  Type getBridgedToObjC(const DeclContext *dc, Type type);
-
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
   ///

@@ -985,11 +985,9 @@ namespace {
 
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
-        if (Impl.SwiftContext.LangOpts.EnableIdAsAny)
-          return {proto->getDeclaredType(),
-                  ImportHint(ImportHint::ObjCBridged,
-                             Impl.SwiftContext.TheAnyType)};
-        return {proto->getDeclaredType(), ImportHint::ObjCPointer};
+        return {proto->getDeclaredType(),
+                ImportHint(ImportHint::ObjCBridged,
+                           Impl.SwiftContext.TheAnyType)};
       }
 
       // Class maps to AnyObject.Type.
