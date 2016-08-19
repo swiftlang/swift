@@ -23,6 +23,7 @@
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
+#include "swift/Runtime/Metadata.h"
 
 // _SwiftValue is an Objective-C class, but we shouldn't interface with it
 // directly as such. Keep the type opaque.
@@ -50,6 +51,12 @@ getValueFromSwiftValue(_SwiftValue *v);
 /// Return the object reference as a _SwiftValue* if it is a _SwiftValue instance,
 /// or nil if it is not.
 _SwiftValue *getAsSwiftValue(id object);
+
+/// Find conformances for SwiftValue to the given list of protocols.
+///
+/// Returns true if SwiftValue does conform to all the protocols.
+bool findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+                                const WitnessTable **tablesBuffer);
 
 } // namespace swift
 #endif
