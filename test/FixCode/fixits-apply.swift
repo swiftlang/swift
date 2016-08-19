@@ -118,7 +118,7 @@ func baz(var x: Int) {
   x += 10
 }
 func foo(let y: String, inout x: Int) {
-  
+
 }
 
 struct Test1 : OptionSet {
@@ -261,3 +261,11 @@ func disable_unnamed_param_reorder(p: Int, _: String) {}
 disable_unnamed_param_reorder(0, "") // no change.
 
 prefix operator ***** {}
+
+class BoolFoo : BooleanType {
+  var boolValue: Bool {return false}
+}
+func testBoolValue(a : BoolFoo) {
+  if a { }
+  guard a {}
+}
