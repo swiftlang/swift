@@ -465,7 +465,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
     
     auto openedExistential = gen.emitOpenExistential(loc, v, openedTy,
                                                  gen.getLoweredType(openedTy));
-    v = openedExistential.Value;
+    v = gen.manageOpaqueValue(openedExistential, loc, SGFContext());
     loweredNativeTy = openedTy;
   }
 

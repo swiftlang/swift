@@ -18,6 +18,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
                            classExistential: CP,
                            generic: U,
                            existential: P,
+                           error: Error,
                            any: Any,
                            knownUnbridged: KnownUnbridged,
                            optionalA: String?,
@@ -31,6 +32,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[CLASS_EXISTENTIAL:%.*]] : $CP
   // CHECK: [[GENERIC:%.*]] : $*U
   // CHECK: [[EXISTENTIAL:%.*]] : $*P
+  // CHECK: [[ERROR:%.*]] : $Error
   // CHECK: [[ANY:%.*]] : $*Any
   // CHECK: [[KNOWN_UNBRIDGED:%.*]] : $KnownUnbridged
   // CHECK: [[OPT_STRING:%.*]] : $Optional<String>
@@ -91,6 +93,19 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   receiver.takesId(existential)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK-NEXT: strong_retain [[ERROR]] : $Error
+  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
+  // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_TFs27_bridgeAnythingToObjectiveCurFxPs9AnyObject_
+  // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
+  // CHECK-NEXT: apply [[METHOD]]([[BRIDGED_ERROR]], [[SELF]])
+  // CHECK-NEXT: strong_release [[BRIDGED_ERROR]] : $AnyObject
+  // CHECK-NEXT: dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK-NEXT: strong_release [[ERROR]] : $Error
+  receiver.takesId(error)
+
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
   // CHECK-NEXT: copy_addr [[ANY]] to [initialization] [[COPY]]
   // CHECK-NEXT: [[OPENED_COPY:%.*]] = open_existential_addr [[COPY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
@@ -147,6 +162,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
                                    classExistential: CP,
                                    generic: U,
                                    existential: P,
+                                   error: Error,
                                    any: Any,
                                    knownUnbridged: KnownUnbridged,
                                    optString: String?,
@@ -170,6 +186,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[CLASS_EXISTENTIAL:%.*]] : $CP
   // CHECK: [[GENERIC:%.*]] : $*U
   // CHECK: [[EXISTENTIAL:%.*]] : $*P
+  // CHECK: [[ERROR:%.*]] : $Error
   // CHECK: [[ANY:%.*]] : $*Any,
   // CHECK: [[KNOWN_UNBRIDGED:%.*]] : $KnownUnbridged,
   // CHECK: [[OPT_STRING:%.*]] : $Optional<String>,
@@ -242,6 +259,20 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK-NEXT: deinit_existential_addr [[COPY]]
   // CHECK-NEXT: dealloc_stack [[COPY]]
   receiver.takesNullableId(existential)
+
+  // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK-NEXT: strong_retain [[ERROR]] : $Error
+  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[ERROR]] : $Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]]) Error
+  // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [initialization] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK: [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @_TFs27_bridgeAnythingToObjectiveCurFxPs9AnyObject_
+  // CHECK-NEXT: [[BRIDGED_ERROR:%[0-9]+]] = apply [[BRIDGE_FUNCTION]]<@opened([[ERROR_ARCHETYPE]]) Error>([[ERROR_STACK]])
+  // CHECK-NEXT: [[BRIDGED_ERROR_OPT:%[0-9]+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1, [[BRIDGED_ERROR]] : $AnyObject
+  // CHECK-NEXT: apply [[METHOD]]([[BRIDGED_ERROR_OPT]], [[SELF]])
+  // CHECK-NEXT: strong_release [[BRIDGED_ERROR]] : $AnyObject
+  // CHECK-NEXT: dealloc_stack [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]]) Error
+  // CHECK-NEXT: strong_release [[ERROR]] : $Error
+  receiver.takesNullableId(error)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Any
