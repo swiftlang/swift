@@ -81,6 +81,8 @@ PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
      "Removes redundant overflow checks")
 PASS(DCE, "dce",
      "Eliminate dead code")
+PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
+     "Create function with removed dead arguments")
 PASS(DeadFunctionElimination, "sil-deadfuncelim",
      "Remove unused functions")
 PASS(DeadObjectElimination, "deadobject-elim",
