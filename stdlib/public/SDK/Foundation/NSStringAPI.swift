@@ -869,6 +869,7 @@ extension String {
   /// Produces a string created by reading data from a given URL
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
+  @swift3_migration(renamed="init(contentsOf:encoding:)")
   public init(
     contentsOfURL url: NSURL,
     encoding enc: NSStringEncoding
@@ -885,6 +886,7 @@ extension String {
   /// Produces a string created by reading data from a given URL
   /// and returns by reference the encoding used to interpret the
   /// data.  Errors are written into the inout `error` argument.
+  @swift3_migration(renamed="init(contentsOf:usedEncoding:)")
   public init(
     contentsOfURL url: NSURL,
     usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil
