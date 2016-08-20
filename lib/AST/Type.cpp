@@ -2996,8 +2996,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType()
-                    ->castTo<GenericTypeParamType>()]
+                    ->getCanonicalType().getPointer()]
       = baseTy;
     return substitutions;
   }
@@ -3028,8 +3027,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()]
-          = args[i];
+                        .getPointer()] = args[i];
       }
 
       // Continue looking into the parent.
