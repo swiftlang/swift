@@ -843,7 +843,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller,
       // directly.
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(CSDesc, NewFName);
-        SFT->notifyPassManagerOfFunction(NewF);
+        SFT->notifyPassManagerOfFunction(NewF, CSDesc.getApplyCallee());
       }
 
       // Rewrite the call
