@@ -5021,6 +5021,7 @@ namespace {
                              const clang::ObjCProtocolList &clangProtocols,
                              SmallVectorImpl<TypeLoc> &inheritedTypes) {
       SmallVector<ProtocolDecl *, 4> protocols;
+      llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl))
         nominal->getImplicitProtocols(protocols);
 
