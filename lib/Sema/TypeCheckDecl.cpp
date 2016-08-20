@@ -6337,8 +6337,16 @@ public:
     // extensions thereof.
     if (CD->isConvenienceInit()) {
       if (auto extType = CD->getExtensionType()) {
-        if (!extType->getClassOrBoundGenericClass() &&
-            !extType->is<ErrorType>()) {
+        auto extClass = extType->getClassOrBoundGenericClass();
+
+        // Forbid convenience inits on Foreign CF types, as Swift does not yet
+        // support user-defined factory inits.
+        if (extClass &&
+            extClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+          TC.diagnose(CD->getLoc(), diag::cfclass_convenience_init);
+        }
+
+        if (!extClass && !extType->is<ErrorType>()) {
           auto ConvenienceLoc =
             CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
