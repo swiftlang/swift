@@ -99,7 +99,7 @@ public protocol TextOutputStreamable {
   func write<Target : TextOutputStream>(to target: inout Target)
 }
 
-// @available(*, unavailable, renamed: "TextOutputStreamable")
+ @available(*, unavailable, renamed: "TextOutputStreamable")
 public typealias Streamable = TextOutputStreamable
 
 /// A type with a customized textual representation.
