@@ -2895,7 +2895,8 @@ Type DependentMemberType::substBaseType(Module *module,
                               None);
 }
 
-Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
+Type Type::subst(Module *module,
+                 const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
