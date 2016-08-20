@@ -333,13 +333,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 }
 
-SubstitutionIterator
-SpecializedProtocolConformance::getGenericSubstitutionIterator() const {
-  return SubstitutionIterator(
-          GenericConformance->getDeclContext()->getGenericParamsOfContext(),
-                              GenericSubstitutions);
-}
-
 bool SpecializedProtocolConformance::hasTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {

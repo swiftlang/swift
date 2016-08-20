@@ -142,8 +142,3 @@ Substitution Substitution::subst(Module *module,
 
   return Substitution{substReplacement, substConfs};
 }
-
-SubstitutionIterator::SubstitutionIterator(GenericParamList *params,
-                                           ArrayRef<Substitution> subs)
-  : Archetypes(params->getAllArchetypes()), Subs(subs) {
-}
