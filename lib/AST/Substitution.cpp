@@ -31,23 +31,6 @@ bool Substitution::operator==(const Substitution &other) const {
     Conformance.equals(other.Conformance);
 }
 
-static void
-getSubstitutionMaps(GenericParamList *context,
-                    ArrayRef<Substitution> subs,
-                    TypeSubstitutionMap &typeMap,
-                    ArchetypeConformanceMap &conformanceMap) {
-  for (auto arch : context->getAllNestedArchetypes()) {
-    auto sub = subs.front();
-    subs = subs.slice(1);
-
-    // Save the conformances from the substitution so that we can substitute
-    // them into substitutions that map between archetypes.
-    conformanceMap[arch] = sub.getConformances();
-    typeMap[arch] = sub.getReplacement();
-  }
-  assert(subs.empty() && "did not use all substitutions?!");
-}
-
 Substitution::Substitution(Type Replacement,
                            ArrayRef<ProtocolConformanceRef> Conformance)
   : Replacement(Replacement), Conformance(Conformance)
@@ -58,12 +41,14 @@ Substitution::Substitution(Type Replacement,
 }
 
 Substitution Substitution::subst(Module *module,
+                                 GenericSignature *sig,
                                  GenericParamList *context,
                                  ArrayRef<Substitution> subs) const {
   TypeSubstitutionMap subMap;
   ArchetypeConformanceMap conformanceMap;
-  getSubstitutionMaps(context, subs,
-                      subMap, conformanceMap);
+
+  assert(sig && context);
+  context->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
   return subst(module, subs, subMap, conformanceMap);
 }
 

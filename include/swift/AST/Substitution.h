@@ -59,12 +59,17 @@ public:
   void dump() const;
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
   
-  /// Substitute the replacement and conformance types with the given
-  /// substitution vector.
+  /// Apply a substitution to this substitution's replacement type and
+  /// conformances.
+  ///
+  /// Our replacement type must be written in terms of the context
+  /// archetypes of 'context', which in turn must be derived from the
+  /// generic requirements of 'sig'.
   Substitution subst(ModuleDecl *module,
+                     GenericSignature *sig,
                      GenericParamList *context,
                      ArrayRef<Substitution> subs) const;
-  
+
 private:
   friend class ProtocolConformance;
   
