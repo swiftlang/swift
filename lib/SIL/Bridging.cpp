@@ -171,7 +171,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
   
   // `Any` can bridge to `AnyObject` (`id` in ObjC).
-  if (Context.LangOpts.EnableIdAsAny && t->isAny()) {
+  if (t->isAny()) {
     return Context.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType();
   }
   

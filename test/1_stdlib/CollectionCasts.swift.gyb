@@ -12,7 +12,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %gyb %s -o %t/CollectionCasts.swift
-// RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift -Xfrontend -enable-experimental-collection-casts %t/CollectionCasts.swift -o %t/a.out
+// RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift %t/CollectionCasts.swift -o %t/a.out
 // RUN: %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
 // REQUIRES: executable_test
 

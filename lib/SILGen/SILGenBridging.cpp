@@ -451,12 +451,9 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
 
   // Fall back to dynamic Any-to-id bridging.
   // The destination type should be AnyObject in this case.
-  //
-  // TODO: Should only get here if -enable-id-as-any is active.
-  assert(gen.getASTContext().LangOpts.EnableIdAsAny
-         && loweredBridgedTy->isEqual(
-              gen.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-                ->getDeclaredType()));
+  assert(loweredBridgedTy->isEqual(
+           gen.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
+             ->getDeclaredType()));
 
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.

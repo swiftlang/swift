@@ -446,8 +446,6 @@ enum ScoreKind {
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
   SK_NonDefaultLiteral,
-  /// An implicit bridged conversion between collection types.
-  SK_CollectionBridgedConversion,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
@@ -1949,10 +1947,6 @@ private:
   /// \brief Attempt to simplify the given class constraint.
   SolutionKind simplifyClassConstraint(const Constraint &constraint);
   
-  /// \brief Attempt to simplify the given bridge constraint.
-  SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
-                                                                &constraint);
-
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(const Constraint &c);
 

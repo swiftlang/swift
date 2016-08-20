@@ -81,13 +81,8 @@ enum class CheckedCastKind : unsigned {
   ArrayDowncast,
   // A downcast from a dictionary type to another dictionary type.
   DictionaryDowncast,
-  // A downcast from a dictionary type to another dictionary type that
-  // requires bridging.
-  DictionaryDowncastBridged,
   // A downcast from a set type to another set type.
   SetDowncast,
-  // A downcast from a set type to another set type that requires bridging.
-  SetDowncastBridged,
   /// A downcast from an object of class or Objective-C existential
   /// type to its bridged value type.
   BridgeFromObjectiveC,
@@ -392,9 +387,8 @@ class alignas(8) Expr {
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
     unsigned : NumExprBits;
-    unsigned BridgesToObjC : 1;
   };
-  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 1 };
+  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 0 };
   static_assert(NumCollectionUpcastConversionExprBits <= 32, "fits in an unsigned");
 
   class ObjCSelectorExprBitfields {
@@ -2938,19 +2932,12 @@ private:
 public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
                                  ConversionPair keyConversion,
-                                 ConversionPair valueConversion,
-                                 bool bridgesToObjC)
+                                 ConversionPair valueConversion)
     : ImplicitConversionExpr(
         ExprKind::CollectionUpcastConversion, subExpr, type),
       KeyConversion(keyConversion), ValueConversion(valueConversion) {
     assert((!KeyConversion || ValueConversion)
            && "key conversion without value conversion");
-    CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
-  }
-
-  /// Whether this upcast bridges the source elements to Objective-C.
-  bool bridgesToObjC() const {
-    return CollectionUpcastConversionExprBits.BridgesToObjC;
   }
 
   /// Returns the expression that should be used to perform a

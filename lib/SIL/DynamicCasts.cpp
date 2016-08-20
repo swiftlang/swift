@@ -30,19 +30,8 @@ static unsigned getAnyMetatypeDepth(CanType type) {
 
 static bool
 mayBridgeToObjectiveC(Module *M, CanType T) {
-  // If the target type is either an unknown dynamic type, or statically
-  // known to bridge, the cast may succeed.
-  // TODO: We could be more precise with the bridged-to type.
-  if (T->hasArchetype())
-    return true;
-  
-  if (T->isAnyExistentialType())
-    return true;
-  
-  if (M->getASTContext().getBridgedToObjC(M, T, nullptr))
-    return true;
-
-  return false;
+  // FIXME: Disable when we don't support Objective-C interoperability?
+  return true;
 }
 
 static bool
@@ -61,14 +50,7 @@ mustBridgeToSwiftValueBox(Module *M, CanType T) {
     if (M->getASTContext().isStandardLibraryTypeBridgedInFoundation(N))
       return false;
 
-  auto bridgeTy  = M->getASTContext().getBridgedToObjC(M, T, nullptr);
-  if (!bridgeTy.hasValue())
-    return false;
-
-  if (bridgeTy->isNull())
-    return true;
-
-  return false;
+  return !M->getASTContext().getBridgedToObjC(M, T);
 }
 
 static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
@@ -532,13 +514,11 @@ swift::classifyDynamicCast(Module *M,
   if (source->isBridgeableObjectType() && mayBridgeToObjectiveC(M, target)) {
     // Try to get the ObjC type which is bridged to target type.
     assert(!target.isAnyExistentialType());
-    Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
-        M, target, nullptr);
-    if (ObjCTy && ObjCTy.getValue()) {
+    if (Type ObjCTy = M->getASTContext().getBridgedToObjC(M, target)) {
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
       return classifyDynamicCast(M, source,
-          ObjCTy.getValue().getCanonicalTypeOrNull(),
+          ObjCTy.getCanonicalTypeOrNull(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }
     return DynamicCastFeasibility::MaySucceed;
@@ -547,13 +527,11 @@ swift::classifyDynamicCast(Module *M,
   if (target->isBridgeableObjectType() && mayBridgeToObjectiveC(M, source)) {
     // Try to get the ObjC type which is bridged to source type.
     assert(!source.isAnyExistentialType());
-    Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
-        M, source, nullptr);
-    if (ObjCTy && ObjCTy.getValue()) {
+    if (Type ObjCTy = M->getASTContext().getBridgedToObjC(M, source)) {
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.
       return classifyDynamicCast(M,
-          ObjCTy.getValue().getCanonicalTypeOrNull(),
+          ObjCTy.getCanonicalTypeOrNull(),
           target,
           /* isSourceTypeExact */ false, isWholeModuleOpts);
     }

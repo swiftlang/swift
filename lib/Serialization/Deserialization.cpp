@@ -2066,22 +2066,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
-      case decls_block::Swift3Migration_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t renameLength;
-        uint64_t messageLength;
-        serialization::decls_block::Swift3MigrationDeclAttrLayout::readRecord(
-          scratch, isImplicit, renameLength, messageLength);
-        StringRef renameStr = blobData.substr(0, renameLength);
-        StringRef message = blobData.substr(renameLength,
-                                            renameLength + messageLength);
-        DeclName renamed = parseDeclName(getContext(), renameStr);
-        Attr = new (ctx) Swift3MigrationAttr(SourceLoc(), SourceLoc(),
-                                             SourceLoc(), renamed,
-                                             message, SourceLoc(), isImplicit);
-        break;
-      }
-
       case decls_block::Specialize_DECL_ATTR: {
         ArrayRef<uint64_t> rawTypeIDs;
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(

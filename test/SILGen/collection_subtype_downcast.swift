@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-collection-casts -emit-silgen -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 

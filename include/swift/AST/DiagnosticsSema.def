@@ -3109,12 +3109,6 @@ WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
 
-//------------------------------------------------------------------------------
-// Naming convention diagnostics
-//------------------------------------------------------------------------------
-WARNING(omit_needless_words, none,
-        "%0 could be named %1 [-Womit-needless-words]", (DeclName, DeclName))
-
 WARNING(extraneous_default_args_in_call, none,
         "call to %0 has extraneous arguments that could use defaults", 
         (DeclName))

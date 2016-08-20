@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name TestModule -parse -verify -suppress-argument-labels-in-types %s
+// RUN: %target-swift-frontend -module-name TestModule -parse -verify %s
 
 // Function type with various forms of argument label.
 typealias Function1 = (a: Int,   // expected-error{{function types cannot have argument label 'a'; use '_' instead}}{{24-24=_ }}

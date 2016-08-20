@@ -64,9 +64,6 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
     case SK_CollectionUpcastConversion:
       log << "collection upcast conversion";
       break;
-    case SK_CollectionBridgedConversion:
-      log << "collection bridged conversion";
-      break;
         
     case SK_ValueToOptional:
       log << "value to optional";

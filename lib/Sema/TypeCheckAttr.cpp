@@ -72,7 +72,6 @@ public:
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Specialize)
-  IGNORED_ATTR(Swift3Migration)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
@@ -739,7 +738,6 @@ public:
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
@@ -1368,11 +1366,6 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     TC.computeDefaultAccessibility(extension);
     Accessibility maxAccess = extension->getMaxAccessibility();
     if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
-      if (maxAccess == Accessibility::FilePrivate &&
-          !TC.Context.LangOpts.EnableSwift3Private) {
-        maxAccess = Accessibility::Private;
-      }
-
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
