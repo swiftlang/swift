@@ -1293,7 +1293,10 @@ public:
   deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C);
+  void getForwardingSubstitutionMap(TypeSubstitutionMap &result) const;
+
+  ArrayRef<Substitution>
+  getForwardingSubstitutions(GenericSignature *sig) const;
 
   /// Collect the nested archetypes of an archetype into the given
   /// collection.

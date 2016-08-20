@@ -536,29 +536,38 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-ArrayRef<Substitution>
-GenericParamList::getForwardingSubstitutions(ASTContext &C) {
-  SmallVector<Substitution, 4> subs;
-
-  // TODO: IRGen wants substitutions for secondary archetypes.
-  // for (auto &param : params->getNestedGenericParams()) {
-  //  ArchetypeType *archetype = param.getAsTypeParam()->getArchetype();
-
-  for (auto archetype : getAllNestedArchetypes()) {
-    // "Check conformance" on each declared protocol to build a
-    // conformance map.
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-
-    for (ProtocolDecl *proto : archetype->getConformsTo()) {
-      conformances.push_back(ProtocolConformanceRef(proto));
-    }
-
-    // Build an identity mapping with the derived conformances.
-    auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({replacement, C.AllocateCopy(conformances)});
+void GenericParamList::
+getForwardingSubstitutionMap(TypeSubstitutionMap &result) const {
+  // Add forwarding substitutions from the outer context if we have
+  // a type nested inside a generic function.
+  for (auto *params = this;
+       params != nullptr;
+       params = params->getOuterParameters()) {
+    for (auto *param : params->getParams())
+      result[param->getDeclaredType()->getCanonicalType().getPointer()]
+          = param->getArchetype();
   }
+}
 
-  return C.AllocateCopy(subs);
+ArrayRef<Substitution>
+GenericParamList::getForwardingSubstitutions(GenericSignature *sig) const {
+  // This is stupid. We don't really need a module, because we
+  // should not be looking up concrete conformances when we
+  // substitute types here.
+  auto *mod = getParams()[0]->getDeclContext()->getParentModule();
+
+  TypeSubstitutionMap subs;
+  getForwardingSubstitutionMap(subs);
+
+  auto lookupConformanceFn =
+      [&](Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+    return ProtocolConformanceRef(protoType->getDecl());
+  };
+
+  SmallVector<Substitution, 4> result;
+  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
+  return sig->getASTContext().AllocateCopy(result);
 }
 
 /// \brief Add the nested archetypes of the given archetype to the set

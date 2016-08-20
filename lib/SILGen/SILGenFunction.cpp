@@ -815,8 +815,10 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   // Forward substitutions.
   ArrayRef<Substitution> subs;
-  if (auto gp = getConstantInfo(to).ContextGenericParams) {
-    subs = gp->getForwardingSubstitutions(getASTContext());
+  auto constantInfo = getConstantInfo(to);
+  if (auto gp = constantInfo.ContextGenericParams) {
+    auto sig = constantInfo.SILFnType->getGenericSignature();
+    subs = gp->getForwardingSubstitutions(sig);
   }
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,

@@ -1584,10 +1584,11 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
 static ArrayRef<Substitution>
 getNonMemberVarDeclSubstitutions(SILGenModule &SGM, VarDecl *var) {
   ArrayRef<Substitution> substitutions;
-  if (auto genericParams
-      = var->getDeclContext()->getGenericParamsOfContext())
-    substitutions =
-        genericParams->getForwardingSubstitutions(SGM.getASTContext());
+  auto *dc = var->getDeclContext();
+  if (auto genericParams = dc->getGenericParamsOfContext()) {
+    auto *genericSig = dc->getGenericSignatureOfContext();
+    substitutions = genericParams->getForwardingSubstitutions(genericSig);
+  }
   return substitutions;
 }
 
