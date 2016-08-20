@@ -12,6 +12,7 @@
 
 #include "swift/IDE/Utils.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Demangle.h"
@@ -61,14 +62,22 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
       auto *nominal_type_decl = unbound_generic_type->getDecl();
       if (!nominal_type_decl)
         break;
-      GenericParamList *generic_param_list =
-          nominal_type_decl->getGenericParams();
-      if (!generic_param_list)
+      GenericSignature *generic_sig =
+          nominal_type_decl->getGenericSignature();
+      if (!generic_sig)
         break;
-      if (arg_idx >= generic_param_list->getAllArchetypes().size())
-        break;
-      return generic_param_list->getAllArchetypes()[arg_idx];
-    } break;
+      for (auto depTy : generic_sig->getAllDependentTypes()) {
+        if (arg_idx == 0) {
+          return ArchetypeBuilder::mapTypeIntoContext(
+              nominal_type_decl, depTy)->castTo<ArchetypeType>();
+        }
+
+        arg_idx--;
+      }
+
+      // Index was out of bounds...
+      break;
+    }
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericStruct:
     case TypeKind::BoundGenericEnum: {
