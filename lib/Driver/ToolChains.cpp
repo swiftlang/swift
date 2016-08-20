@@ -963,6 +963,11 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     addPrimaryInputsOfType(Arguments, context.Inputs, types::TY_Object);
   }
 
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-v");
+  }
+
   addInputsOfType(Arguments, context.InputActions, types::TY_Object);
 
   if (context.OI.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
@@ -1285,6 +1290,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
   if (!Linker.empty()) {
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+  }
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-v");
   }
 
   std::string Target = getTargetForLinker();
