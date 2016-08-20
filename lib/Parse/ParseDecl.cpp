@@ -507,11 +507,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("public", Accessibility::Public)
       .Case("open", Accessibility::Open);
 
-    if (access == Accessibility::FilePrivate &&
-        !Context.LangOpts.EnableSwift3Private) {
-      access = Accessibility::Private;
-    }
-
     if (!consumeIf(tok::l_paren)) {
       // Normal accessibility attribute.
       AttrRange = Loc;

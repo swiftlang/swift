@@ -1397,10 +1397,6 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
       auto extension = cast<ExtensionDecl>(DC);
       computeDefaultAccessibility(extension);
       auto access = extension->getDefaultAccessibility();
-      if (access == Accessibility::FilePrivate &&
-          !Context.LangOpts.EnableSwift3Private) {
-        access = Accessibility::Private;
-      }
       D->setAccessibility(access);
     }
     }

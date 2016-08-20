@@ -1896,16 +1896,13 @@ const DeclContext *
 ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
   const DeclContext *result = getDeclContext();
   Accessibility access = getFormalAccess(useDC);
-  bool swift3PrivateChecked = false;
 
   while (!result->isModuleScopeContext()) {
     if (result->isLocalContext())
       return result;
 
-    if (access == Accessibility::Private && !swift3PrivateChecked) {
-      if (result->getASTContext().LangOpts.EnableSwift3Private)
-        return result;
-      swift3PrivateChecked = true;
+    if (access == Accessibility::Private) {
+      return result;
     }
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {

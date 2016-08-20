@@ -1366,11 +1366,6 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
     TC.computeDefaultAccessibility(extension);
     Accessibility maxAccess = extension->getMaxAccessibility();
     if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
-      if (maxAccess == Accessibility::FilePrivate &&
-          !TC.Context.LangOpts.EnableSwift3Private) {
-        maxAccess = Accessibility::Private;
-      }
-
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =

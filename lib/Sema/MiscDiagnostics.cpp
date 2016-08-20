@@ -3630,8 +3630,7 @@ swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
     return Accessibility::Public;
   if (isa<ModuleDecl>(accessScope))
     return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext() &&
-      accessScope->getASTContext().LangOpts.EnableSwift3Private) {
+  if (accessScope->isModuleScopeContext()) {
     return Accessibility::FilePrivate;
   }
   return Accessibility::Private;
