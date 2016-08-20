@@ -536,47 +536,6 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-/// \brief Add the nested archetypes of the given archetype to the set
-/// of all archetypes.
-void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
-                                      SmallPtrSetImpl<ArchetypeType*> &known,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  for (auto nested : archetype->getNestedTypes()) {
-    auto nestedArch = nested.second.getAsArchetype();
-    if (!nestedArch)
-      continue;
-    if (known.insert(nestedArch).second) {
-      assert(!nestedArch->isPrimary() && "Unexpected primary archetype");
-      all.push_back(nestedArch);
-      addNestedArchetypes(nestedArch, known, all);
-    }
-  }
-}
-
-ArrayRef<ArchetypeType*>
-GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  // This should be kept in sync with ArchetypeBuilder::getAllArchetypes().
-
-  assert(all.empty());
-  llvm::SmallPtrSet<ArchetypeType*, 8> known;
-
-  // Collect all the primary archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    if (known.insert(archetype).second)
-      all.push_back(archetype);
-  }
-
-  // Collect all the nested archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    addNestedArchetypes(archetype, known, all);
-  }
-
-  return all;
-}
-
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)

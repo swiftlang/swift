@@ -440,7 +440,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
   genericParam->setArchetype(archetype);
-  return { archetype, genericParam };
+  return std::make_pair(archetype, genericParam);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
@@ -449,7 +449,7 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
                        SmallVectorImpl<ArchetypeType*> &archetypes,
                        SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
-  assert(archetypes.empty() && genericParams.empty());
+  assert(genericParams.empty());
 
   for (unsigned i = 0; i != numParameters; ++i) {
     auto archetypeAndParam = createGenericParam(ctx, GenericParamNames[i], i);
@@ -459,7 +459,6 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
-  paramList->setAllArchetypes(ctx.AllocateCopy(archetypes));
   return paramList;
 }
 

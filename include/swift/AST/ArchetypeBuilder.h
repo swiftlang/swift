@@ -323,11 +323,6 @@ public:
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
-  /// \brief Retrieve the array of all of the archetypes produced during
-  /// archetype assignment. The 'primary' archetypes will occur first in this
-  /// list.
-  ArrayRef<ArchetypeType *> getAllArchetypes();
-  
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);
 

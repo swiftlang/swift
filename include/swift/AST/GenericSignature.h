@@ -184,10 +184,6 @@ public:
   /// Return a range that iterates through first all of the generic parameters
   /// of the signature, followed by all of their recursive member types exposed
   /// through protocol requirements.
-  ///
-  /// The member types are presented in the
-  /// same order as GenericParamList::getAllArchetypes would present for an
-  /// equivalent GenericParamList.
   GenericSignatureWitnessIterator getAllDependentTypes() const {
     return GenericSignatureWitnessIterator(getRequirements());
   }
@@ -204,8 +200,10 @@ public:
   /// for mangling purposes.
   ///
   /// TODO: This is what getCanonicalSignature() ought to do, but currently
-  /// cannot due to implementation dependencies on 'getAllDependentTypes'
-  /// order matching 'getAllArchetypes' order of a generic param list.
+  /// does not due to former implementation dependencies on
+  /// 'getAllDependentTypes' order matching 'getAllArchetypes' order of a
+  /// generic param list. Now that 'getAllArchetypes' is gone, we might
+  /// be able to move forward here.
   CanGenericSignature getCanonicalManglingSignature(ModuleDecl &M) const;
 
   /// Uniquing for the ASTContext.

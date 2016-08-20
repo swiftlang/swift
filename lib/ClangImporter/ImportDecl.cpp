@@ -5180,8 +5180,6 @@ namespace {
         auto *archetype = builder.getArchetype(param);
         param->setArchetype(archetype);
       }
-      genericParams->setAllArchetypes(
-          Impl.SwiftContext.AllocateCopy(builder.getAllArchetypes()));
 
       auto *sig = builder.getGenericSignature(genericParamTypes);
       auto *env = builder.getGenericEnvironment(genericParamTypes);
@@ -5689,12 +5687,6 @@ namespace {
                                                  Type(result->getDeclaredType()),
                                                  Type(), false);
       selfDecl->setArchetype(selfArchetype);
-
-      // Set AllArchetypes of the protocol. ObjC protocols don't have associated
-      // types so only the Self archetype is present.
-      
-      result->getGenericParams()->setAllArchetypes(
-             Impl.SwiftContext.AllocateCopy(llvm::makeArrayRef(selfArchetype)));
       
       // Set the generic parameters and requirements.
       auto genericParam = selfDecl->getDeclaredType()
@@ -6998,8 +6990,6 @@ ClangImporter::Implementation::importDeclContextOf(
         conformsTo, protoArchetype->getSuperclass(),
         protoArchetype->getIsRecursive());
     extSelf->setArchetype(extSelfArchetype);
-    ext->getGenericParams()->setAllArchetypes(
-        SwiftContext.AllocateCopy(llvm::makeArrayRef(extSelfArchetype)));
 
     auto genericParam =
         extSelf->getDeclaredType()->castTo<GenericTypeParamType>();

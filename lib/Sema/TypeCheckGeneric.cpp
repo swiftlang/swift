@@ -500,9 +500,6 @@ TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
   for (auto GP : *genericParams)
     GP->setArchetype(builder.getArchetype(GP));
 
-  genericParams->setAllArchetypes(
-      Context.AllocateCopy(builder.getAllArchetypes()));
-
   return genericEnv;
 }
 
@@ -821,8 +818,6 @@ TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
     if (!GP->hasAccessibility())
       GP->setAccessibility(access);
   }
-  genericParams->setAllArchetypes(
-    Context.AllocateCopy(builder.getAllArchetypes()));
 
 #ifndef NDEBUG
   // Record archetype contexts.
