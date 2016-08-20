@@ -539,7 +539,7 @@ ${'#endif' if 'ObjC' in prefix else ''}
 #if _runtime(_ObjC)
 // There is no public way to define new CF types, so we are using
 // CFBitVector and CFMutableBitVector.
-extension CFBitVector {
+extension CFBitVector : Hashable {
   static func makeImmutable(from values: Array<UInt8>) -> CFBitVector {
     return CFBitVectorCreate(/*allocator:*/ nil, values, values.count * 8)
   }
@@ -550,6 +550,13 @@ extension CFBitVector {
       CFRange(location: 0, length: result.count * 8),
       &result)
     return result
+  }
+  public var hashValue: Int {
+    // This is a bad hash function, but acceptable for tests.
+    return 0
+  }
+  public static func == (lhs: CFBitVector, rhs: CFBitVector) -> Bool {
+    return lhs.asArray == rhs.asArray
   }
 }
 
