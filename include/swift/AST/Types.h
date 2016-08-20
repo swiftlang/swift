@@ -394,7 +394,7 @@ public:
   bool hasReferenceSemantics();
 
   /// Is this an uninhabited type, such as 'Never'?
-  bool isNever();
+  bool isUninhabited();
 
   /// Is this the 'Any' type?
   bool isAny();
