@@ -97,12 +97,11 @@ def main_preset():
         args.preset_substitutions, args.preset_file_names, args.preset)
 
     build_script_args = [ sys.argv[0] ]
-    build_script_args += preset_args
     if args.distcc:
         build_script_args += [ "--distcc" ]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
-
+    build_script_args += preset_args
     print_with_argv0(
         "using preset '" + args.preset + "', which expands to " +
         quote_shell_command(build_script_args))
