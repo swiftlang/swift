@@ -107,6 +107,9 @@ struct ArgumentDescriptor {
     // See if the projection tree consists of potentially multiple levels of
     // structs containing one field. In such a case, there is no point in
     // exploding the argument.
+    //
+    // Also, in case of a type can not be exploded, e.g an enum, we treat it
+    // as a singleton.
     if (ProjTree.isSingleton())
       return false;
 
