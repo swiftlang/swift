@@ -134,6 +134,7 @@ using TargetFarRelativeIndirectablePointer
   = typename Runtime::template FarRelativeIndirectablePointer<Pointee,Nullable>;
 
 struct HeapObject;
+struct WeakReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -2327,8 +2328,9 @@ using OpaqueExistentialContainer
   = TargetOpaqueExistentialContainer<InProcess>;
 
 /// The basic layout of a class-bounded existential type.
-struct ClassExistentialContainer {
-  void *Value;
+template <typename ContainedValue>
+struct ClassExistentialContainerImpl {
+  ContainedValue Value;
 
   const WitnessTable **getWitnessTables() {
     return reinterpret_cast<const WitnessTable**>(this + 1);
@@ -2337,11 +2339,15 @@ struct ClassExistentialContainer {
     return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
-  void copyTypeInto(ClassExistentialContainer *dest, unsigned numTables) const {
+  void copyTypeInto(ClassExistentialContainerImpl *dest,
+                    unsigned numTables) const {
     for (unsigned i = 0; i != numTables; ++i)
       dest->getWitnessTables()[i] = getWitnessTables()[i];
   }
 };
+using ClassExistentialContainer = ClassExistentialContainerImpl<void *>;
+using WeakClassExistentialContainer =
+  ClassExistentialContainerImpl<WeakReference>;
 
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
