@@ -520,20 +520,23 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     assert(inherited->getType()->isEqual(spec->getGenericConformance()->getType())
            && "inherited conformance doesn't match type?!");
     
+    // Fill in the substitution and conformance maps.
     TypeSubstitutionMap subMap;
     ArchetypeConformanceMap conformanceMap;
-    
-    // Fill in the substitution and conformance maps.
-    for (auto archAndSub : spec->getGenericSubstitutionIterator()) {
-      auto arch = archAndSub.first;
-      auto sub = archAndSub.second;
-      conformanceMap[arch] = sub.getConformances();
-      if (arch->isPrimary())
-        subMap[arch] = sub.getReplacement();
-    }
-    auto r = inherited->subst(getDeclContext()->getParentModule(),
-                            getType(), spec->getGenericSubstitutions(),
-                            subMap, conformanceMap);
+
+    auto subs = spec->getGenericSubstitutions();
+
+    auto *conformingDC = spec->getDeclContext();
+    auto *conformingModule = conformingDC->getParentModule();
+
+    auto *sig = conformingDC->getGenericSignatureOfContext();
+    auto *params = conformingDC->getGenericParamsOfContext();
+
+    params->getSubstitutionMap(conformingModule, sig, subs,
+                               subMap, conformanceMap);
+
+    auto r = inherited->subst(conformingModule, getType(), subs,
+                              subMap, conformanceMap);
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;
