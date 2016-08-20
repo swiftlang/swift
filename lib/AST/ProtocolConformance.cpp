@@ -358,16 +358,33 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  TypeSubstitutionMap substitutionMap = GenericConformance->getGenericParams()
-    ->getSubstitutionMap(GenericSubstitutions);
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
+
+  auto *genericParams = GenericConformance->getGenericParams();
+  auto *genericSig = GenericConformance->getGenericSignature();
+
+  TypeSubstitutionMap substitutionMap;
+
+  // FIXME: We could have a new version of Type::subst() that
+  // takes a conformanceMap in addition to a substitutionMap,
+  // but for now this is ignored below
+  ArchetypeConformanceMap conformanceMap;
+
+  // Compute a context type substitution map from the
+  // substitution array stored in this conformance
+  genericParams->getSubstitutionMap(conformingModule, genericSig,
+                                    GenericSubstitutions,
+                                    substitutionMap,
+                                    conformanceMap);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
 
   auto &genericWitness = genericWitnessAndDecl.first;
   auto *typeDecl = genericWitnessAndDecl.second;
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
+
+  // Apply the substitution we computed above
   auto specializedType
     = genericWitness.getReplacement().subst(conformingModule, substitutionMap,
                                             None);

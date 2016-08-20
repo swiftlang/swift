@@ -1283,9 +1283,15 @@ public:
     return depth;
   }
 
-  /// Derive a type substitution map for this generic parameter list from a
-  /// matching substitution vector.
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
+  /// Derive a contextual type substitution map from a substitution array.
+  /// This is just like GenericSignature::getSubstitutionMap(), except
+  /// with contextual types instead of interface types.
+  void
+  getSubstitutionMap(ModuleDecl *mod,
+                     GenericSignature *sig,
+                     ArrayRef<Substitution> subs,
+                     TypeSubstitutionMap &subsMap,
+                     ArchetypeConformanceMap &conformanceMap) const;
 
   /// Derive the all-archetypes list for the given list of generic
   /// parameters.

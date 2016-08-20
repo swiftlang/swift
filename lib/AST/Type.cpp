@@ -2767,19 +2767,32 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-TypeSubstitutionMap
-GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
+void GenericParamList::
+getSubstitutionMap(ModuleDecl *mod,
+                   GenericSignature *sig,
+                   ArrayRef<Substitution> subs,
+                   TypeSubstitutionMap &subsMap,
+                   ArchetypeConformanceMap &conformanceMap) const {
+
+  // Map from interface types to archetypes
   TypeSubstitutionMap map;
-  
-  for (auto arch : getAllNestedArchetypes()) {
-    auto sub = Subs.front();
-    Subs = Subs.slice(1);
-    
-    map.insert({arch, sub.getReplacement()});
+  getForwardingSubstitutionMap(map);
+
+  for (auto depTy : sig->getAllDependentTypes()) {
+
+    // Map the interface type to a context type.
+    auto contextTy = depTy.subst(mod, map, SubstOptions());
+    auto *archetype = contextTy->castTo<ArchetypeType>();
+
+    auto sub = subs.front();
+    subs = subs.slice(1);
+
+    // Record the replacement type and its conformances.
+    subsMap[archetype] = sub.getReplacement();
+    conformanceMap[archetype] = sub.getConformances();
   }
   
-  assert(Subs.empty() && "did not use all substitutions?!");
-  return map;
+  assert(subs.empty() && "did not use all substitutions?!");
 }
 
 FunctionType *
