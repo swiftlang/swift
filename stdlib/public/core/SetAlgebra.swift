@@ -124,8 +124,8 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///
   /// In the following example, the `bothNeighborsAndEmployees` set is made up
   /// of the elements that are in *both* the `employees` and `neighbors` sets.
-  /// Elements that are in only one or the other are left out of the result of
-  /// the intersection.
+  /// Elements that are in either one or the other, but not both, are left out
+  /// of the result of the intersection.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
