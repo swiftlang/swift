@@ -294,11 +294,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-Swift3Migration("swift3-migration",
-                   llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
-                   llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::desc("Infer when a global could be imported as a member"),
                    llvm::cl::init(false));
@@ -2791,7 +2786,6 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=

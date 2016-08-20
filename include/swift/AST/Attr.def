@@ -102,10 +102,7 @@ SIMPLE_DECL_ATTR(required, Required,
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
-DECL_ATTR(swift3_migration, Swift3Migration,
-          OnEnum | OnStruct | OnClass | OnProtocol | OnTypeAlias |
-          OnVar | OnSubscript | OnConstructor | OnFunc | OnEnumElement |
-          OnGenericTypeParam | OnAssociatedType | LongAttribute, 6)
+/// NOTE: 6 is unused
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 

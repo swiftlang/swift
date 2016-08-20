@@ -171,7 +171,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // a bridged value type, this will be the Objective-C class to
     // which it is bridged.
     Type lookupType;
-    if (auto bridgedClass = getBridgedToObjC(dc, currentType))
+    if (auto bridgedClass = Context.getBridgedToObjC(dc, currentType))
       lookupType = bridgedClass;
     else
       lookupType = currentType;

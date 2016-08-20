@@ -165,12 +165,6 @@ Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
                                   dc);
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
-  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
-    return *bridged;
-  return nullptr;
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
@@ -184,7 +178,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, valueType);
+  return Context.getBridgedToObjC(dc, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -2933,13 +2927,12 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
 
   // Determine whether this type is bridged to Objective-C.
   ASTContext &ctx = type->getASTContext();
-  Optional<Type> bridged = ctx.getBridgedToObjC(dc, type,
-                                                ctx.getLazyResolver());
+  Type bridged = ctx.getBridgedToObjC(dc, type);
   if (!bridged)
     return false;
 
   // Check whether we're bridging to a class.
-  auto classDecl = (*bridged)->getClassOrBoundGenericClass();
+  auto classDecl = bridged->getClassOrBoundGenericClass();
   if (!classDecl)
     return false;
 

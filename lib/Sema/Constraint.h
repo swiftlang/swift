@@ -117,8 +117,6 @@ enum class ConstraintKind : char {
   /// \brief The first type is a class or an archetype of a class-bound
   /// protocol.
   Class,
-  /// \brief The first type implements the _BridgedToObjectiveC protocol.
-  BridgedToObjectiveC,
   /// \brief The first type can be defaulted to the second (which currently
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
@@ -489,7 +487,6 @@ public:
 
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
-    case ConstraintKind::BridgedToObjectiveC:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;

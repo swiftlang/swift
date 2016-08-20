@@ -2067,12 +2067,10 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
   
   // Any can be bridged to id.
-  if (type->getASTContext().LangOpts.EnableIdAsAny) {
-    if (type->isAny()) {
-      return ForeignRepresentableKind::Bridged;
-    }
+  if (type->isAny()) {
+    return ForeignRepresentableKind::Bridged;
   }
-  
+
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
     if (auto clas = tyContext->getAsClassOrClassExtensionContext())

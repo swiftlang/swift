@@ -1259,16 +1259,6 @@ ERROR(effects_attribute_expect_option,none,
 ERROR(effects_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
 
-// swift3_migration
-ERROR(attr_swift3_migration_label,none,
-      "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-WARNING(warn_attr_swift3_migration_unknown_label,none,
-        "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-ERROR(attr_swift3_migration_expected_rparen,none,
-      "expected ')' after name for 'swift3_migration' attribute", ())
-ERROR(attr_bad_swift_name,none,
-      "ill-formed Swift name '%0'", (StringRef))
-
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
       "expected 'safe' or 'unsafe'", ())

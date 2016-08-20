@@ -1375,11 +1375,7 @@ static bool isBridgingCast(CanType SourceType, CanType TargetType) {
 /// return the ObjC type it bridges to.
 /// If target is an ObjC type, return this type.
 static Type getCastFromObjC(SILModule &M, CanType source, CanType target) {
-  Optional<Type> BridgedTy = M.getASTContext().getBridgedToObjC(
-      M.getSwiftModule(), target, nullptr);
-  if (!BridgedTy.hasValue() || !BridgedTy.getValue())
-    return Type();
-  return BridgedTy.getValue();
+  return M.getASTContext().getBridgedToObjC(M.getSwiftModule(), target);
 }
 
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or

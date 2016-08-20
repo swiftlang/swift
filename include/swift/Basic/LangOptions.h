@@ -44,9 +44,6 @@ namespace swift {
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
     
-    /// Whether to warn about "needless" words in declarations.
-    bool WarnOmitNeedlessWords = false;
-
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -94,9 +91,6 @@ namespace swift {
     /// If true, <code>@testable import Foo</code> produces an error if \c Foo
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
-
-    /// Whether to implement SE-0111, the removal of argument labels in types.
-    bool SuppressArgumentLabelsInTypes = false;
 
     ///
     /// Flags for developers
@@ -160,12 +154,6 @@ namespace swift {
     /// member of some type instead. This includes inits, computed properties,
     /// and methods.
     bool InferImportAsMember = false;
-
-    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = true;
-
-    /// Enable the Swift 3 migration via Fix-Its.
-    bool Swift3Migration = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

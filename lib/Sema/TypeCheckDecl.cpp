@@ -3496,7 +3496,6 @@ public:
     }
 
     TC.checkDeclAttributes(VD);
-    TC.checkOmitNeedlessWords(VD);
   }
 
 
@@ -4630,7 +4629,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, FD);
-      TC.checkOmitNeedlessWords(FD);
       return;
     }
 
@@ -5840,19 +5838,6 @@ public:
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
     }
-
-    void visitSwift3MigrationAttr(Swift3MigrationAttr *attr) {
-      if (!Override->getAttrs().hasAttribute<Swift3MigrationAttr>()) {
-        // Inherit swift3_migration attribute.
-        Override->getAttrs().add(new (TC.Context) Swift3MigrationAttr(
-                                                    SourceLoc(), SourceLoc(),
-                                                    SourceLoc(),
-                                                    attr->getRenamed(),
-                                                    attr->getMessage(),
-                                                    SourceLoc(),
-                                                    /*implicit=*/true));
-      }
-    }
   };
 
   /// Determine whether overriding the given declaration requires a keyword.
@@ -6317,7 +6302,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, CD);
-      TC.checkOmitNeedlessWords(CD);
       return;
     }
     if (CD->hasType())
