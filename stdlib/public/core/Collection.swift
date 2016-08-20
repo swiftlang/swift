@@ -528,7 +528,7 @@ public struct IndexingIterator<
 /// able to calculate its `count` property in O(1) time. Conversely, because a
 /// forward or bidirectional collection must traverse the entire collection to
 /// count the number of contained elements, accessing its `count` property is
-/// an O(N) operation.
+/// an O(*n*) operation.
 public protocol Collection : Indexable, Sequence {
   /// A type that can represent the number of steps between a pair of
   /// indices.
@@ -751,7 +751,7 @@ public protocol Collection : Indexable, Sequence {
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 
   /// The first element of the collection.
@@ -1209,7 +1209,7 @@ extension Collection {
   /// Customization point for `Collection.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
-  /// O(N) by exploiting collection-specific knowledge.
+  /// O(*n*) by exploiting collection-specific knowledge.
   ///
   /// - Returns: `nil` if a linear search should be attempted instead,
   ///   `Optional(nil)` if the element was not found, or

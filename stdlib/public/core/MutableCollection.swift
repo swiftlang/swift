@@ -303,7 +303,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(n)
+  /// - Complexity: O(*n*)
   mutating func partition(
     by belongsInSecondPartition: (Iterator.Element) throws -> Bool
   ) rethrows -> Index

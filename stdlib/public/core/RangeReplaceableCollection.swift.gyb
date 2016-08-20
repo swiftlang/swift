@@ -99,10 +99,9 @@ public protocol RangeReplaceableIndexable : Indexable {
 
   /// Inserts a new element into the collection at the specified position.
   ///
-  /// The new element is inserted before the element currently at the
-  /// specified index. If you pass the collection's `endIndex` property as
-  /// the `index` parameter, the new element is appended to the
-  /// collection.
+  /// The new element is inserted before the element currently at the specified
+  /// index. If you pass the collection's `endIndex` property as the `i`
+  /// parameter, the new element is appended to the collection.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers.insert(100, at: 3)
@@ -114,9 +113,10 @@ public protocol RangeReplaceableIndexable : Indexable {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter newElement: The new element to insert into the collection.
-  /// - Parameter i: The position at which to insert the new element.
-  ///   `index` must be a valid index into the collection.
+  /// - Parameters:
+  ///   - newElement: The new element to insert into the collection.
+  ///   - i: The position at which to insert the new element. `i` must be a
+  ///     valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func insert(_ newElement: _Element, at i: Index)
@@ -126,7 +126,7 @@ public protocol RangeReplaceableIndexable : Indexable {
   ///
   /// The new elements are inserted before the element currently at the
   /// specified index. If you pass the collection's `endIndex` property as the
-  /// `index` parameter, the new elements are appended to the collection.
+  /// `i` parameter, the new elements are appended to the collection.
   ///
   /// Here's an example of inserting a range of integers into an array of the
   /// same type:
@@ -139,9 +139,10 @@ public protocol RangeReplaceableIndexable : Indexable {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter newElements: The new elements to insert into the collection.
-  /// - Parameter i: The position at which to insert the new elements. `index`
-  ///   must be a valid index of the collection.
+  /// - Parameters:
+  ///   - newElements: The new elements to insert into the collection.
+  ///   - i: The position at which to insert the new elements. `i` must be a
+  ///     valid index of the collection.
   ///
   /// - Complexity: O(*m*), where *m* is the combined length of the collection
   ///   and `newElements`. If `i` is equal to the collection's `endIndex`
@@ -165,9 +166,9 @@ public protocol RangeReplaceableIndexable : Indexable {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter i: The position of the element to remove. `index` must be
-  ///   a valid index of the collection that is not equal to the collection's
-  ///   end index.
+  /// - Parameter i: The position of the element to remove. `i` must be a valid
+  ///   index of the collection that is not equal to the collection's end
+  ///   index.
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
@@ -373,11 +374,10 @@ public protocol RangeReplaceableCollection
     where S.Iterator.Element == Iterator.Element
   */
 
-  /// Adds the elements of a sequence to the end of the collection.
+  /// Adds the elements of a sequence to the end of this collection.
   ///
-  /// Use this method to append the elements of a sequence or collection to the
-  /// end of this collection. The collection being appended to allocates any
-  /// additional necessary storage to hold the new elements.
+  /// The collection being appended to allocates any additional necessary
+  /// storage to hold the new elements.
   ///
   /// The following example appends the elements of a `Range<Int>` instance to
   /// an array of integers:
@@ -396,10 +396,9 @@ public protocol RangeReplaceableCollection
 
   /// Inserts a new element into the collection at the specified position.
   ///
-  /// The new element is inserted before the element currently at the
-  /// specified index. If you pass the collection's `endIndex` property as
-  /// the `index` parameter, the new element is appended to the
-  /// collection.
+  /// The new element is inserted before the element currently at the specified
+  /// index. If you pass the collection's `endIndex` property as the `i`
+  /// parameter, the new element is appended to the collection.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers.insert(100, at: 3)
@@ -412,8 +411,8 @@ public protocol RangeReplaceableCollection
   /// collection.
   ///
   /// - Parameter newElement: The new element to insert into the collection.
-  /// - Parameter i: The position at which to insert the new element.
-  ///   `index` must be a valid index into the collection.
+  /// - Parameter i: The position at which to insert the new element. `i` must
+  ///   be a valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func insert(_ newElement: Iterator.Element, at i: Index)
@@ -423,7 +422,7 @@ public protocol RangeReplaceableCollection
   ///
   /// The new elements are inserted before the element currently at the
   /// specified index. If you pass the collection's `endIndex` property as the
-  /// `index` parameter, the new elements are appended to the collection.
+  /// `i` parameter, the new elements are appended to the collection.
   ///
   /// Here's an example of inserting a range of integers into an array of the
   /// same type:
@@ -437,8 +436,8 @@ public protocol RangeReplaceableCollection
   /// collection.
   ///
   /// - Parameter newElements: The new elements to insert into the collection.
-  /// - Parameter i: The position at which to insert the new elements. `index`
-  ///   must be a valid index of the collection.
+  /// - Parameter i: The position at which to insert the new elements. `i` must
+  ///   be a valid index of the collection.
   ///
   /// - Complexity: O(*m*), where *m* is the combined length of the collection
   ///   and `newElements`. If `i` is equal to the collection's `endIndex`
@@ -461,9 +460,9 @@ public protocol RangeReplaceableCollection
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter i: The position of the element to remove. `index` must be
-  ///   a valid index of the collection that is not equal to the collection's
-  ///   end index.
+  /// - Parameter i: The position of the element to remove. `i` must be a valid
+  ///   index of the collection that is not equal to the collection's end
+  ///   index.
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
@@ -590,11 +589,10 @@ extension RangeReplaceableCollection {
     insert(newElement, at: endIndex)
   }
 
-  /// Adds the elements of a sequence to the end of the collection.
+  /// Adds the elements of a sequence to the end of this collection.
   ///
-  /// Use this method to append the elements of a sequence or collection to the
-  /// end of this collection. The collection being appended to allocates any
-  /// additional necessary storage to hold the new elements.
+  /// The collection being appended to allocates any additional necessary
+  /// storage to hold the new elements.
   ///
   /// The following example appends the elements of a `Range<Int>` instance to
   /// an array of integers:
@@ -621,10 +619,9 @@ extension RangeReplaceableCollection {
 
   /// Inserts a new element into the collection at the specified position.
   ///
-  /// The new element is inserted before the element currently at the
-  /// specified index. If you pass the collection's `endIndex` property as
-  /// the `index` parameter, the new element is appended to the
-  /// collection.
+  /// The new element is inserted before the element currently at the specified
+  /// index. If you pass the collection's `endIndex` property as the `i`
+  /// parameter, the new element is appended to the collection.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers.insert(100, at: 3)
@@ -637,8 +634,8 @@ extension RangeReplaceableCollection {
   /// collection.
   ///
   /// - Parameter newElement: The new element to insert into the collection.
-  /// - Parameter i: The position at which to insert the new element.
-  ///   `index` must be a valid index into the collection.
+  /// - Parameter i: The position at which to insert the new element. `i` must
+  ///   be a valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   public mutating func insert(
@@ -652,7 +649,7 @@ extension RangeReplaceableCollection {
   ///
   /// The new elements are inserted before the element currently at the
   /// specified index. If you pass the collection's `endIndex` property as the
-  /// `index` parameter, the new elements are appended to the collection.
+  /// `i` parameter, the new elements are appended to the collection.
   ///
   /// Here's an example of inserting a range of integers into an array of the
   /// same type:
@@ -666,8 +663,8 @@ extension RangeReplaceableCollection {
   /// collection.
   ///
   /// - Parameter newElements: The new elements to insert into the collection.
-  /// - Parameter i: The position at which to insert the new elements. `index`
-  ///   must be a valid index of the collection.
+  /// - Parameter i: The position at which to insert the new elements. `i` must
+  ///   be a valid index of the collection.
   ///
   /// - Complexity: O(*m*), where *m* is the combined length of the collection
   ///   and `newElements`. If `i` is equal to the collection's `endIndex`

@@ -112,7 +112,7 @@ extension _ArrayBuffer {
 
   /// Convert to an NSArray.
   ///
-  /// O(1) if the element type is bridged verbatim, O(N) otherwise.
+  /// O(1) if the element type is bridged verbatim, O(*n*) otherwise.
   public func _asCocoaArray() -> _NSArrayCore {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }

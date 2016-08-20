@@ -553,7 +553,7 @@ public struct _StringCore {
   /// Returns `true` iff the contents of this string can be
   /// represented as pure ASCII.
   ///
-  /// - Complexity: O(N) in the worst case.
+  /// - Complexity: O(*n*) in the worst case.
   func isRepresentableAsASCII() -> Bool {
     if _slowPath(!hasContiguousStorage) {
       return false
@@ -589,7 +589,7 @@ extension _StringCore : RangeReplaceableCollection {
   /// Replace the elements within `bounds` with `newElements`.
   ///
   /// - Complexity: O(`bounds.count`) if `bounds.upperBound
-  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(*n*) otherwise.
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Int>,
     with newElements: C

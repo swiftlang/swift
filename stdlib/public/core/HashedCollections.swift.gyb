@@ -421,7 +421,7 @@ internal struct _UnmanagedAnyObjectArray {
 /// set's `Element` type is neither a class nor an `@objc` protocol, any
 /// required bridging of elements occurs at the first access of each element,
 /// so the first operation that uses the contents of the set (for example, a
-/// membership test) can take O(N).
+/// membership test) can take O(*n*).
 ///
 /// Bridging from `NSSet` to `Set` first calls the `copy(with:)` method
 /// (`- copyWithZone:` in Objective-C) on the set to get an immutable copy and
@@ -996,8 +996,8 @@ public struct Set<Element : Hashable> :
   ///
   /// In the following example, the `bothNeighborsAndEmployees` set is made up
   /// of the elements that are in *both* the `employees` and `neighbors` sets.
-  /// Elements that are only in one or the other are left out of the result of
-  /// the intersection.
+  /// Elements that are in either one or the other, but not both, are left out
+  /// of the result of the intersection.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors = ["Bethany", "Eric", "Forlani", "Greta"]
@@ -1739,7 +1739,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///   the dictionary; otherwise, `nil`.
   @inline(__always)
   public func index(forKey key: Key) -> Index? {
-    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
+    // Complexity: amortized O(1) for native storage, O(*n*) when wrapping an
     // NSDictionary.
     return _variantStorage.index(forKey: key)
   }
@@ -5217,8 +5217,8 @@ extension Set {
   ///
   /// In the following example, the `bothNeighborsAndEmployees` set is made up
   /// of the elements that are in *both* the `employees` and `neighbors` sets.
-  /// Elements that are only in one or the other are left out of the result of
-  /// the intersection.
+  /// Elements that are in either one or the other, but not both, are left out
+  /// of the result of the intersection.
   ///
   ///     let employees: Set = ["Alicia", "Bethany", "Chris", "Diana", "Eric"]
   ///     let neighbors: Set = ["Bethany", "Eric", "Forlani", "Greta"]
