@@ -956,13 +956,8 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
   if (!genericParams)
     return true;
 
-  SmallVector<TypeID, 8> archetypeIDs;
-  for (auto archetype : genericParams->getAllArchetypes())
-    archetypeIDs.push_back(addTypeRef(archetype));
-
   unsigned abbrCode = abbrCodes[GenericParamListLayout::Code];
-  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     archetypeIDs);
+  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode);
 
   abbrCode = abbrCodes[GenericParamLayout::Code];
   for (auto next : genericParams->getParams()) {
