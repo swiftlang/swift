@@ -3008,9 +3008,7 @@ namespace {
         break;
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
@@ -3035,9 +3033,7 @@ namespace {
       if (fromOptionals.size() != toOptionals.size() ||
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncastBridged ||
-          castKind == CheckedCastKind::SetDowncast ||
-          castKind == CheckedCastKind::SetDowncastBridged) {
+          castKind == CheckedCastKind::SetDowncast) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
@@ -3282,9 +3278,7 @@ namespace {
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
@@ -3351,9 +3345,7 @@ namespace {
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
@@ -5150,16 +5142,13 @@ buildElementConversion(ExprRewriter &rewriter,
                        ConstraintLocatorBuilder locator,
                        unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
-  auto &ctx = rewriter.cs.getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalCollectionCasts)
-    return {};
-
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
                                   ->getGenericArgs()[typeArgIndex];
   Type destType = destCollectionType->castTo<BoundGenericType>()
                                     ->getGenericArgs()[typeArgIndex];
 
   // Build the conversion.
+  ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
   auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
@@ -5324,11 +5313,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         buildElementConversion(*this, expr->getType(), toType, locator, 0);
 
       // Form the upcast.
-      bool isBridged = !cs.getBaseTypeForArrayType(fromType.getPointer())
-                          ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             {}, conv,
-                                                             isBridged);
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::HashableToAnyHashable: {
@@ -5375,11 +5361,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       Type sourceKey, sourceValue;
       std::tie(sourceKey, sourceValue) = *cs.isDictionaryType(expr->getType());
 
-      bool isBridged = !sourceKey->isBridgeableObjectType() ||
-                       !sourceValue->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             keyConv, valueConv,
-                                                             isBridged);
+                                                             keyConv,
+                                                             valueConv);
     }
 
     case ConversionRestrictionKind::SetUpcast: {
@@ -5393,11 +5377,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto conv =
         buildElementConversion(*this, expr->getType(), toType, locator, 0);
 
-      bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
-                          ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             {}, conv,
-                                                             isBridged);
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
@@ -6700,9 +6681,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
