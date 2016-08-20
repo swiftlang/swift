@@ -101,35 +101,6 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
   return nullptr;
 }
 
-enum class MemberType : uint32_t { Invalid, BaseClass, Field };
-
-struct MemberInfo {
-  Type clang_type;
-  const std::string name;
-  uint64_t byte_size;
-  uint32_t byte_offset;
-  MemberType member_type;
-  bool is_fragile;
-
-  MemberInfo(MemberType member_type)
-      : clang_type(), name(), byte_size(0), byte_offset(0),
-        member_type(member_type), is_fragile(false) {}
-};
-
-struct EnumElementInfo {
-  Type clang_type;
-  ConstString name;
-  uint64_t byte_size;
-  uint32_t value;       // The value for this enumeration element
-  uint32_t extra_value; // If not UINT32_MAX, then this value is an extra value
-  // that appears at offset 0 to tell one or more empty
-  // enums apart. This value will only be filled in if there
-  // are one or more enum elements that have a non-zero byte size
-
-  EnumElementInfo()
-      : clang_type(), name(), byte_size(0), extra_value(UINT32_MAX) {}
-};
-
 class DeclsLookupSource {
 public:
   typedef SmallVectorImpl<ValueDecl *> ValueDecls;
