@@ -3151,58 +3151,10 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     auto generic = cast<BoundGenericType>(ty.getPointer());
-
-    // We don't want two copies of Archetype being serialized, one by
-    // serializing genericArgs, the other by serializing the Decl. The reason
-    // is that it is likely the Decl's Archetype can be serialized in
-    // a different module, causing two copies being constructed at
-    // deserialization, one in the other module, one in this module as
-    // genericArgs. The fix is to check if genericArgs exist in the Decl's
-    // Archetypes, if they all exist, we use indices to the Decl's
-    // Archetypes..
-    bool allGenericArgsInDecl = true;
-#ifndef NDEBUG
-    bool someGenericArgsInDecl = false;
-#endif
     SmallVector<TypeID, 8> genericArgIDs;
-    // Push in a special number to say that IDs are indices to the Archetypes.
-    if (!generic->getGenericArgs().empty())
-      genericArgIDs.push_back(INT32_MAX);
-    for (auto next : generic->getGenericArgs()) {
-      bool found = false;
-      if (auto arche = dyn_cast<ArchetypeType>(next.getPointer())) {
-        auto genericParams = generic->getDecl()->getGenericParams();
-        unsigned idx = 0;
-        // Check if next exists in the Decl.
-        for (auto archetype : genericParams->getAllArchetypes()) {
-          if (archetype == arche) {
-            found = true;
-            genericArgIDs.push_back(idx);
-#ifndef NDEBUG
-            someGenericArgsInDecl = true;
-#endif
-            break;
-          }
-          idx++;
-        }
-      }
 
-      if (!found) {
-        allGenericArgsInDecl = false;
-        break;
-      }
-    }
-
-    if (!allGenericArgsInDecl) {
-#ifndef NDEBUG
-      if (someGenericArgsInDecl && isDeclXRef(generic->getDecl()))
-        // Emit warning message. 
-        llvm::errs() << "Serialization: we may have two copied of Archetype\n";
-#endif
-      genericArgIDs.clear();
-      for (auto next : generic->getGenericArgs())
-        genericArgIDs.push_back(addTypeRef(next));
-    }
+    for (auto next : generic->getGenericArgs())
+      genericArgIDs.push_back(addTypeRef(next));
 
     unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
     BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
