@@ -647,10 +647,7 @@ TypeBase::gatherAllSubstitutions(Module *module,
   unsigned index = 0;
   for (auto archetype : allArchetypes) {
     // Substitute into the type.
-    SubstOptions options;
-    if (hasTypeVariables)
-      options |= SubstFlags::IgnoreMissing;
-    auto type = Type(archetype).subst(module, substitutions, options);
+    auto type = Type(archetype).subst(module, substitutions, SubstOptions());
     if (!type)
       type = ErrorType::get(module->getASTContext());
 
