@@ -24,6 +24,12 @@ GlibcTestSuite.test("errno") {
   expectEqual(EBADF, errno)
 }
 
+GlibcTestSuite.test("sendfile") {
+  // Check that `sendfile` is available.  Don't actually call it, because doing that is non-trivial.
+  var sendfile_ = sendfile
+  expectEqual(((Int32, Int32, off_t, size_t) -> ssize_t).self, &sendfile_)
+}
+
 var GlibcIoctlConstants = TestSuite("GlibcIoctlConstants")
 
 GlibcIoctlConstants.test("tty ioctl constants availability") {
