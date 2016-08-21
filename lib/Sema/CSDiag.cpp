@@ -5043,6 +5043,10 @@ static bool isCastToTypedPointer(ASTContext &Ctx, const Expr *Fn,
   if (InitType.isNull() || ArgType.isNull())
     return false;
 
+  // unwrap one level of Optional
+  if (auto ArgOptType = ArgType->getOptionalObjectType())
+    ArgType = ArgOptType;
+
   auto *InitNom = InitType->getAnyNominal();
   if (!InitNom)
     return false;
