@@ -609,6 +609,11 @@ extension ${Self} {
     Builtin.unreachable()
   }
 
+  @available(*, unavailable, renamed: "initialize(from:)")
+  public func initializeFrom<C : Collection>(_ source: C) {
+    Builtin.unreachable()
+  }
+
   @available(*, unavailable, renamed: "initialize(from:count:)")
   public func initializeFrom(_ source: UnsafePointer<Pointee>, count: Int) {
     Builtin.unreachable()
