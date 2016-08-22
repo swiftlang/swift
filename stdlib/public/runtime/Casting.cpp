@@ -2632,6 +2632,11 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass: {
+      // Casts to AnyHashable.
+      if (isAnyHashableType(targetType)) {
+        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
+      }
+
 #if SWIFT_OBJC_INTEROP
       // If the target type is bridged to Objective-C, try to bridge.
       if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
@@ -2648,10 +2653,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       }
 #endif
 
-      // Casts to AnyHashable.
-      if (isAnyHashableType(targetType)) {
-        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
-      }
       break;
     }
 
@@ -2665,10 +2666,16 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       }
       break;
 
+    case MetadataKind::Optional:
+    case MetadataKind::Enum:
+      // Casts to AnyHashable.
+      if (isAnyHashableType(targetType)) {
+        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
+      }
+      break;
+
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
