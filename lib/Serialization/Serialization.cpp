@@ -1758,30 +1758,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
-  case DAK_Swift3Migration: {
-    auto *theAttr = cast<Swift3MigrationAttr>(DA);
-
-    llvm::SmallString<32> blob;
-
-    unsigned renameLength = 0;
-    if (auto newName = theAttr->getRenamed()) {
-      llvm::raw_svector_ostream os(blob);
-      newName.print(os);
-      renameLength = os.str().size();
-    }
-
-    blob.append(theAttr->getMessage());
-
-    auto abbrCode = DeclTypeAbbrCodes[Swift3MigrationDeclAttrLayout::Code];
-    Swift3MigrationDeclAttrLayout::emitRecord(
-                                        Out, ScratchRecord, abbrCode,
-                                        theAttr->isImplicit(),
-                                        renameLength,
-                                        theAttr->getMessage().size(),
-                                        blob);
-    return;
-  }
-
   case DAK_Specialize: {
     auto abbrCode = DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
     SmallVector<TypeID, 8> typeIDs;

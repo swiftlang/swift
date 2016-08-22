@@ -2987,27 +2987,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ArrayDowncast;
   }
 
-  if (auto toDict = cs.isDictionaryType(toType)) {
-    if (auto fromDict = cs.isDictionaryType(fromType)) {
-      if (toDict->first->isBridgeableObjectType() &&
-          toDict->second->isBridgeableObjectType() &&
-          fromDict->first->isBridgeableObjectType() &&
-          fromDict->second->isBridgeableObjectType())
-        return CheckedCastKind::DictionaryDowncast;
-      
-      return CheckedCastKind::DictionaryDowncastBridged;
-    }
-  }
+  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType))
+    return CheckedCastKind::DictionaryDowncast;
 
-  if (cs.isSetType(toType) && cs.isSetType(fromType)) {
-    auto toBaseType = cs.getBaseTypeForSetType(toType.getPointer());
-    auto fromBaseType = cs.getBaseTypeForSetType(fromType.getPointer());
-    if (toBaseType->isBridgeableObjectType() &&
-        fromBaseType->isBridgeableObjectType()) {
-      return CheckedCastKind::SetDowncast;
-    }
-    return CheckedCastKind::SetDowncastBridged;
-  }
+  if (cs.isSetType(toType) && cs.isSetType(fromType))
+    return CheckedCastKind::SetDowncast;
 
   if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;

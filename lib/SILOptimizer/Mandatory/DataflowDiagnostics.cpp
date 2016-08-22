@@ -46,16 +46,13 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     llvm_unreachable("unhandled case in MissingReturn");
   }
 
-  // No action required if the function returns 'Void' or that the
-  // function is marked 'noreturn'.
-  if (ResTy->isVoid() || F->isNoReturnFunction())
-    return;
-
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
+  auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
+                                        : diag::missing_return;
   diagnose(Context,
            L.getEndSourceLoc(),
-           diag::missing_return, ResTy,
+           diagID, ResTy,
            FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
 }
 

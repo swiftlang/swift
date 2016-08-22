@@ -1037,6 +1037,19 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   return addErrorDomain(swiftDecl, clangNamedDecl, importer);
 }
 
+/// Determine whether this is the declaration of Objective-C's 'id' type.
+static bool isObjCId(ASTContext &ctx, const clang::Decl *decl) {
+  if (!ctx.LangOpts.EnableObjCInterop) return false;
+
+  auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
+  if (!typedefDecl) return false;
+
+  if (!typedefDecl->getDeclContext()->getRedeclContext()->isTranslationUnit())
+    return false;
+
+  return typedefDecl->getName() == "id";
+}
+
 namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
@@ -1532,36 +1545,6 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
-        // Ignore the 'id' typedef. We want to bridge the underlying
-        // ObjCId type.
-        //
-        // When we remove the EnableIdAsAny staging flag, the 'id' entry
-        // should be removed from MappedTypes.def, and this conditional should
-        // become unnecessary.
-        if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
-              MappedTypeNameKind::DoNothing;
-
-          auto DC = Impl.importDeclContextOf(Decl, importedName.EffectiveContext);
-          if (!DC) return nullptr;
-
-          auto loc = Impl.importSourceLoc(Decl->getLocStart());
-          
-          // Leave behind a typealias for 'id' marked unavailable, to instruct
-          // people to use Any instead.
-          auto unavailableAlias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                          Decl, Accessibility::Public, loc, Name, loc,
-                          TypeLoc::withoutLoc(Impl.SwiftContext.TheAnyType),
-                          /*genericparams*/nullptr, DC);
-
-          auto attr = AvailableAttr::createUnconditional(
-                        Impl.SwiftContext, "'id' is not available in Swift; use 'Any'",
-                        "", UnconditionalAvailabilityKind::UnavailableInSwift);
-
-          unavailableAlias->getAttrs().add(attr);
-          return nullptr;
-        }
-      
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
@@ -1714,6 +1697,17 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
       Result->computeType();
+
+      // Make Objective-C's 'id' unavailable.
+      ASTContext &ctx = DC->getASTContext();
+      if (isObjCId(ctx, Decl)) {
+        auto attr = AvailableAttr::createUnconditional(
+                      ctx,
+                      "'id' is not available in Swift; use 'Any'", "",
+                      UnconditionalAvailabilityKind::UnavailableInSwift);
+        Result->getAttrs().add(attr);
+      }
+
       return Result;
     }
 
@@ -6495,6 +6489,9 @@ void ClangImporter::Implementation::importAttributes(
 
 bool ClangImporter::Implementation::isUnavailableInSwift(
     const clang::Decl *decl) {
+  // 'id' is always unavailable in Swift.
+  if (isObjCId(SwiftContext, decl)) return true;
+
   // FIXME: Somewhat duplicated from importAttributes(), but this is a
   // more direct path.
   if (decl->getAvailability() == clang::AR_Unavailable) return true;

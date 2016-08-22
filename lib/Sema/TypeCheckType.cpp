@@ -165,12 +165,6 @@ Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
                                   dc);
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
-  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
-    return *bridged;
-  return nullptr;
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
@@ -184,7 +178,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, valueType);
+  return Context.getBridgedToObjC(dc, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -1410,9 +1404,9 @@ static bool isDefaultNoEscapeContext(const DeclContext *DC) {
 }
 
 // Hack to apply context-specific @escaping to an AST function type.
-static Type adjustFunctionExtInfo(DeclContext *DC,
-                                  Type ty,
-                                  TypeResolutionOptions options) {
+static Type applyNonEscapingFromContext(DeclContext *DC,
+                                        Type ty,
+                                        TypeResolutionOptions options) {
   // Remember whether this is a function parameter.
   bool isFunctionParam =
     options.contains(TR_FunctionInput) ||
@@ -1426,7 +1420,11 @@ static Type adjustFunctionExtInfo(DeclContext *DC,
   if (defaultNoEscape && !extInfo.isNoEscape()) {
     extInfo = extInfo.withNoEscape();
 
-    // We lost the sugar to flip the isNoEscape bit
+    // We lost the sugar to flip the isNoEscape bit.
+    //
+    // FIXME: It would be better to add a new AttributedType sugared type,
+    // which would wrap the NameAliasType or ParenType, and apply the
+    // isNoEscape bit when de-sugaring.
     return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
   }
 
@@ -1467,7 +1465,7 @@ Type TypeChecker::resolveIdentifierType(
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
-    result = adjustFunctionExtInfo(DC, result, options);
+    result = applyNonEscapingFromContext(DC, result, options);
 
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
@@ -1716,7 +1714,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       // Default non-escaping for closure parameters
       auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
       if (result && result->is<FunctionType>())
-        return adjustFunctionExtInfo(DC, result, options);
+        return applyNonEscapingFromContext(DC, result, options);
       return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
@@ -1987,10 +1985,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
-    if (attrs.has(TAK_noescape)) {
-      // FIXME: diagnostic to tell user this is redundant and drop it
-    }
-
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
@@ -2030,7 +2024,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_escaping);
     } else {
       // No attribute; set the isNoEscape bit if we're in parameter context.
-      ty = adjustFunctionExtInfo(DC, ty, options);
+      ty = applyNonEscapingFromContext(DC, ty, options);
     }
   }
 
@@ -2048,6 +2042,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
   } else if (hasFunctionAttr && fnRepr) {
+    // Remove the function attributes from the set so that we don't diagnose.
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
     attrs.convention = None;
@@ -2504,6 +2499,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   
   // If this is the top level of a function input list, peel off the
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
+  //
+  // If we have a single ParenType though, don't clear these bits; we
+  // still want to parse the type contained therein as if it were in
+  // parameter position, meaning function types are not @escaping by
+  // default.
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = withoutContext(elementOptions);
@@ -2927,13 +2927,12 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
 
   // Determine whether this type is bridged to Objective-C.
   ASTContext &ctx = type->getASTContext();
-  Optional<Type> bridged = ctx.getBridgedToObjC(dc, type,
-                                                ctx.getLazyResolver());
+  Type bridged = ctx.getBridgedToObjC(dc, type);
   if (!bridged)
     return false;
 
   // Check whether we're bridging to a class.
-  auto classDecl = (*bridged)->getClassOrBoundGenericClass();
+  auto classDecl = bridged->getClassOrBoundGenericClass();
   if (!classDecl)
     return false;
 

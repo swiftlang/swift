@@ -394,7 +394,7 @@ public:
   bool hasReferenceSemantics();
 
   /// Is this an uninhabited type, such as 'Never'?
-  bool isNever();
+  bool isUninhabited();
 
   /// Is this the 'Any' type?
   bool isAny();
@@ -3748,12 +3748,10 @@ public:
   /// True if this is the 'Self' parameter of a protocol or an associated type
   /// of 'Self'.
   bool isSelfDerived() {
-    ArchetypeType *t = this;
+    ArchetypeType *t = getPrimary();
 
-    do {
-      if (t->getSelfProtocol())
-        return true;
-    } while ((t = t->getParent()));
+    if (t && t->getSelfProtocol())
+      return true;
 
     return false;
   }
@@ -3808,6 +3806,16 @@ public:
   /// archetype, e.g., 
   bool isPrimary() const { 
     return ParentOrOpened.isNull();
+  }
+
+  /// getPrimary - Return the primary archetype parent of this archetype.
+  ArchetypeType *getPrimary() const {
+    assert(!getOpenedExistentialType() && "Check for opened existential first");
+
+    auto *archetype = this;
+    while (auto *parent = archetype->getParent())
+      archetype = parent;
+    return const_cast<ArchetypeType *>(archetype);
   }
 
   /// Retrieve the ID number of this opened existential.

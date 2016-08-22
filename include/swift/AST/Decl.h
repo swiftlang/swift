@@ -1213,18 +1213,6 @@ public:
   ///
   /// This does not include archetypes from the outer generic parameter list(s).
   ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
-
-  /// \brief Return the number of primary archetypes.
-  unsigned getNumPrimaryArchetypes() const {
-    return size();
-  }
-  
-  /// \brief Retrieves the list containing only the primary archetypes described
-  /// by this generic parameter clause. This excludes archetypes for associated
-  /// types of the primary archetypes.
-  ArrayRef<ArchetypeType *> getPrimaryArchetypes() const {
-    return getAllArchetypes().slice(0, getNumPrimaryArchetypes());
-  }
   
   /// \brief Sets all archetypes *without* copying the source array.
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
@@ -1236,19 +1224,11 @@ public:
   using NestedArchetypeIterator
     = NestedGenericParamListIterator<ArchetypeType*,
                                      &GenericParamList::getAllArchetypes>;
-  using NestedGenericParamIterator
-    = NestedGenericParamListIterator<GenericTypeParamDecl*,
-                                     &GenericParamList::getParams>;
   
   /// \brief Retrieves a list containing all archetypes from this generic
   /// parameter clause and all outer generic parameter clauses in outer-to-
   /// inner order.
   iterator_range<NestedArchetypeIterator> getAllNestedArchetypes() const;
-  
-  /// \brief Retrieves a list containing all generic parameter records from
-  /// this generic parameter clause and all outer generic parameter clauses in
-  /// outer-to-inner order.
-  iterator_range<NestedGenericParamIterator> getNestedGenericParams() const;
   
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
@@ -1395,16 +1375,10 @@ public:
 };
   
 using NestedArchetypeIterator = GenericParamList::NestedArchetypeIterator;
-using NestedGenericParamIterator = GenericParamList::NestedGenericParamIterator;
 
 inline iterator_range<NestedArchetypeIterator>
 GenericParamList::getAllNestedArchetypes() const {
   return {NestedArchetypeIterator(this), NestedArchetypeIterator()};
-}
-  
-inline iterator_range<NestedGenericParamIterator>
-GenericParamList::getNestedGenericParams() const {
-  return {NestedGenericParamIterator(this), NestedGenericParamIterator()};
 }
 
 /// A trailing where clause.

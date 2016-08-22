@@ -262,9 +262,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
-
-        // Check whether there are needless words that could be omitted.
-        TC.checkOmitNeedlessWords(MRE);
       }
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
@@ -340,9 +337,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, Call);
         }
-
-        // Check whether there are needless words that could be omitted.
-        TC.checkOmitNeedlessWords(Call);
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
@@ -1145,13 +1139,11 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     // Is the base type bridged?
     Type normalizedBaseTy = normalizeType(baseTy);
     const DeclContext *DC = decl->getDeclContext();
-    Optional<Type> maybeBridged =
-        TC.Context.getBridgedToObjC(DC, normalizedBaseTy, &TC);
 
     // ...and just knowing that it's bridged isn't good enough if we don't
     // know what it's bridged /to/. Also, don't do this check for trivial
     // bridging---that doesn't count.
-    Type bridged = maybeBridged.getValueOr(Type());
+    Type bridged = TC.Context.getBridgedToObjC(DC, normalizedBaseTy);
     if (!bridged || bridged->isEqual(normalizedBaseTy))
       return false;
 
@@ -3638,8 +3630,7 @@ swift::accessibilityFromScopeForDiagnostics(const DeclContext *accessScope) {
     return Accessibility::Public;
   if (isa<ModuleDecl>(accessScope))
     return Accessibility::Internal;
-  if (accessScope->isModuleScopeContext() &&
-      accessScope->getASTContext().LangOpts.EnableSwift3Private) {
+  if (accessScope->isModuleScopeContext()) {
     return Accessibility::FilePrivate;
   }
   return Accessibility::Private;
@@ -3962,308 +3953,4 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
-}
-
-void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
-
-  auto newName = omitNeedlessWords(afd);
-  if (!newName)
-    return;
-
-  auto name = afd->getFullName();
-  InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
-                                     name, *newName);
-  fixDeclarationName(diag, afd, *newName);
-}
-
-void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
-
-  auto newName = omitNeedlessWords(var);
-  if (!newName)
-    return;
-
-  auto name = var->getName();
-  diagnose(var->getLoc(), diag::omit_needless_words, name, *newName)
-    .fixItReplace(var->getLoc(), newName->str());
-}
-
-/// Find the source ranges of extraneous default arguments within a
-/// call to the given function.
-static bool hasExtraneousDefaultArguments(AbstractFunctionDecl *afd,
-                                          Expr *arg, DeclName name,
-                                          SmallVectorImpl<SourceRange> &ranges,
-                                      SmallVectorImpl<unsigned> &removedArgs) {
-  if (!afd->getClangDecl())
-    return false;
-
-  if (afd->isInvalid())
-    return false;
-
-  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
-    arg = shuffle->getSubExpr();
-    
-  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
-  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
-  
-  ASTContext &ctx = afd->getASTContext();
-  // Skip over the implicit 'self'.
-  auto *bodyParams = afd->getParameterList(afd->getImplicitSelfDecl()?1:0);
-
-  Optional<unsigned> firstRemoved;
-  Optional<unsigned> lastRemoved;
-  unsigned numElementsInParens;
-  if (argTuple) {
-    numElementsInParens = (argTuple->getNumElements() -
-                           argTuple->hasTrailingClosure());
-  } else if (argParen) {
-    numElementsInParens = 1 - argParen->hasTrailingClosure();
-  } else {
-    numElementsInParens = 0;
-  }
-
-  for (unsigned i = 0; i != numElementsInParens; ++i) {
-    auto param = bodyParams->get(i);
-    if (!param->isDefaultArgument())
-      continue;
-
-    auto defaultArg = param->getDefaultArgumentKind();
-
-    // Never consider removing the first argument for a "set" method
-    // with an unnamed first argument.
-    if (i == 0 &&
-        !name.getBaseName().empty() &&
-        camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
-        name.getArgumentNames().size() > 0 &&
-        name.getArgumentNames()[0].empty())
-      continue;
-
-    SourceRange removalRange;
-    if (argTuple && i < argTuple->getNumElements()) {
-      // Check whether the supplied argument is the same as the
-      // default argument.
-      if (defaultArg != inferDefaultArgumentKind(argTuple->getElement(i)))
-        continue;
-
-      // Figure out where to start removing this argument.
-      if (i == 0) {
-        // Start removing right after the opening parenthesis.
-        removalRange.Start = argTuple->getLParenLoc();
-      } else {
-        // Start removing right after the preceding argument, so we
-        // consume the comma as well.
-        removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
-      }
-
-      // Adjust to the end of the starting token.
-      removalRange.Start
-        = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
-
-      // Figure out where to finish removing this element.
-      if (i == 0 && i < numElementsInParens - 1) {
-        // We're the first of several arguments; consume the
-        // following comma as well.
-        removalRange.End = argTuple->getElementNameLoc(i+1);
-        if (removalRange.End.isInvalid())
-          removalRange.End = argTuple->getElement(i+1)->getStartLoc();
-      } else if (i < numElementsInParens - 1) {
-        // We're in the middle; consume through the end of this
-        // element.
-        removalRange.End
-          = Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                       argTuple->getElement(i)->getEndLoc());
-      } else {
-        // We're at the end; consume up to the closing parentheses.
-        removalRange.End = argTuple->getRParenLoc();
-      }
-    } else if (argParen) {
-      // Check whether we have a default argument.
-      if (defaultArg != inferDefaultArgumentKind(argParen->getSubExpr()))
-        continue;
-
-      removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
-                                 argParen->getRParenLoc());
-    } else {
-      continue;
-    }
-
-    if (removalRange.isInvalid())
-      continue;
-
-    // Note that we're removing this argument.
-    removedArgs.push_back(i);
-
-    // If we hadn't removed anything before, this is the first
-    // removal.
-    if (!firstRemoved) {
-      ranges.push_back(removalRange);
-      firstRemoved = i;
-      lastRemoved = i;
-      continue;
-    }
-
-    // If the previous removal range was the previous argument,
-    // combine the ranges.
-    if (*lastRemoved == i - 1) {
-      ranges.back().End = removalRange.End;
-      lastRemoved = i;
-      continue;
-    }
-
-    // Otherwise, add this new removal range.
-    ranges.push_back(removalRange);
-    lastRemoved = i;
-  }
-
-  // If there is a single removal range that covers everything but
-  // the trailing closure at the end, also zap the parentheses.
-  if (ranges.size() == 1 &&
-      *firstRemoved == 0 && *lastRemoved == bodyParams->size() - 2 &&
-      argTuple && argTuple->hasTrailingClosure()) {
-    ranges.front().Start = argTuple->getLParenLoc();
-    ranges.front().End
-      = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
-  }
-
-  return !ranges.empty();
-}
-
-void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
-
-  // Find the callee.
-  ApplyExpr *innermostApply = apply;
-  unsigned numApplications = 0;
-  while (auto fnApply = dyn_cast<ApplyExpr>(
-                          innermostApply->getFn()->getValueProvidingExpr())) {
-    innermostApply = fnApply;
-    ++numApplications;
-  }
-  if (numApplications != 1)
-    return;
-
-  DeclRefExpr *fnRef
-    = dyn_cast<DeclRefExpr>(innermostApply->getFn()->getValueProvidingExpr());
-  if (!fnRef)
-    return;
-
-  auto *afd = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl());
-  if (!afd)
-    return;
-
-  // Determine whether the callee has any needless words in it.
-  auto newName = omitNeedlessWords(afd);
-
-  bool renamed;
-  if (!newName) {
-    newName = afd->getFullName();
-    renamed = false;
-  } else {
-    renamed = true;
-  }
-
-  // Determine whether there are any extraneous default arguments to be zapped.
-  SmallVector<SourceRange, 2> removedDefaultArgRanges;
-  SmallVector<unsigned, 2> removedArgs;
-  bool anyExtraneousDefaultArgs
-    = hasExtraneousDefaultArguments(afd, apply->getArg(), *newName,
-                                    removedDefaultArgRanges,
-                                    removedArgs);
-
-  if (!renamed && !anyExtraneousDefaultArgs)
-    return;
-
-  // Make sure to apply the fix at the right application level.
-  auto name = afd->getFullName();
-
-  // Dig out the argument tuple.
-  Expr *arg = apply->getArg();
-  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
-    arg = shuffle->getSubExpr();
-  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
-  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
-
-  if (argParen && !argTuple)
-    arg = argParen->getSubExpr();
-
-  InFlightDiagnostic diag
-    = renamed ? diagnose(fnRef->getLoc(), diag::omit_needless_words,
-                         name, *newName)
-              : diagnose(fnRef->getLoc(), diag::extraneous_default_args_in_call,
-                         name);
-
-  // Fix the base name.
-  if (newName->getBaseName() != name.getBaseName()) {
-    diag.fixItReplace(fnRef->getLoc(), newName->getBaseName().str());
-  }
-
-  // Fix the argument names.
-  auto oldArgNames = name.getArgumentNames();
-  auto newArgNames = newName->getArgumentNames();
-  unsigned currentRemovedArg = 0;
-  if (argTuple) {
-    for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
-      // If this argument was completely removed, don't emit any
-      // Fix-Its for it.
-      if (currentRemovedArg < removedArgs.size() &&
-          removedArgs[currentRemovedArg] == i) {
-        ++currentRemovedArg;
-        continue;
-      }
-
-      // Check whether the name changed.
-      auto newArgName = newArgNames[i];
-      if (oldArgNames[i] == newArgName) continue;
-
-      if (i >= argTuple->getNumElements()) break;
-      if (argTuple->getElementName(i) != oldArgNames[i]) continue;
-
-      auto nameLoc = argTuple->getElementNameLoc(i);
-      if (nameLoc.isInvalid()) {
-        // Add the argument label.
-        diag.fixItInsert(argTuple->getElement(i)->getStartLoc(),
-                         (newArgName.str() + ": ").str());
-      } else if (newArgName.empty()) {
-        // Delete the argument label.
-        diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
-      } else {
-        // Fix the argument label.
-        diag.fixItReplace(nameLoc, newArgName.str());
-      }
-    }
-  } else if (newArgNames.size() > 0 && !newArgNames[0].empty() &&
-             (!argParen || !argParen->hasTrailingClosure()) &&
-             removedArgs.empty()) {
-    // Add the argument label.
-    auto newArgName = newArgNames[0];
-    diag.fixItInsert(arg->getStartLoc(), (newArgName.str() + ": ").str());
-  }
-
-  // Remove all of the defaulted arguments.
-  for (auto extraneous : removedDefaultArgRanges) {
-    diag.fixItRemoveChars(extraneous.Start, extraneous.End);
-  }
-}
-
-void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
-  if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
-
-  auto var = dyn_cast<VarDecl>(memberRef->getMember().getDecl());
-  if (!var)
-    return;
-
-  // Check whether any needless words were omitted.
-  auto newName = omitNeedlessWords(var);
-  if (!newName)
-    return;
-
-  // Fix the name.
-  auto name = var->getName();
-  diagnose(memberRef->getNameLoc(), diag::omit_needless_words, name, *newName)
-    .fixItReplace(memberRef->getNameLoc().getSourceRange(), newName->str());
 }

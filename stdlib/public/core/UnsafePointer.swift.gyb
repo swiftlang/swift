@@ -157,8 +157,9 @@ public struct ${Self}<Pointee>
 
   /// Accesses the `Pointee` instance referenced by `self`.
   ///
-  /// - Precondition: the pointee has been initialized with an instance of
-  ///   type `Pointee`.
+  /// - Precondition: Either the pointee has been initialized with an
+  ///   instance of type `Pointee`, or `pointee` is being assigned to
+  ///   and `Pointee` is a trivial type.
   public var pointee: Pointee {
 %  if mutable:
     @_transparent unsafeAddress {
@@ -212,8 +213,11 @@ public struct ${Self}<Pointee>
   ///
   /// - Precondition: `count >= 0`
   ///
-  /// - Precondition: The `Pointee`s at `self..<self + count` and
-  ///   `source..<source + count` are initialized.
+  /// - Precondition: The `Pointee`s at `source..<source + count` are
+  ///   initialized.
+  ///
+  /// - Precondition: Either the `Pointee`s at `self..<self + count`
+  ///   are initialized, or `Pointee` is a trivial type.
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assign with negative count")
@@ -380,7 +384,9 @@ public struct ${Self}<Pointee>
 
   /// Accesses the pointee at `self + i`.
   ///
-  /// - Precondition: the pointee at `self + i` is initialized.
+  /// - Precondition: Either the pointee at `self + i` is initialized, or the
+  ///   subscript is the left side of an assignment and `Pointee` is a trivial
+  ///   type.
   public subscript(i: Int) -> Pointee {
 %  if mutable:
     @_transparent
@@ -600,6 +606,11 @@ extension ${Self} {
 
   @available(*, unavailable, renamed: "deinitialize(count:)")
   public func destroy(_ count: Int) {
+    Builtin.unreachable()
+  }
+
+  @available(*, unavailable, renamed: "initialize(from:)")
+  public func initializeFrom<C : Collection>(_ source: C) {
     Builtin.unreachable()
   }
 

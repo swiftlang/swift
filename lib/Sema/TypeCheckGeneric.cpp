@@ -815,7 +815,8 @@ void TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
 
 #ifndef NDEBUG
   // Record archetype contexts.
-  for (auto archetype : genericParams->getAllArchetypes()) {
+  for (auto *param : genericParams->getParams()) {
+    auto *archetype = param->getArchetype();
     if (Context.ArchetypeContexts.count(archetype) == 0)
       Context.ArchetypeContexts[archetype] = dc;
   }

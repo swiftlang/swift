@@ -1038,13 +1038,6 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.createReleaseValue(Call->getLoc(), OnX, Atomicity::Atomic);
 }
 
-static bool isCastTypeKnownToSucceed(SILType Type, SILModule &Mod) {
-  auto *M = Mod.getSwiftModule();
-  return M->getASTContext()
-      .getBridgedToObjC(M, Type.getSwiftRValueType(), nullptr)
-      .hasValue();
-}
-
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
 bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
                                               StringRef FInverseName,
@@ -1055,12 +1048,6 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
 
   // We need to know how to replace the call by reference counting instructions.
   if (!knowHowToEmitReferenceCountInsts(FInverse))
-    return false;
-
-  // We need to know that the cast will succeed.
-  if (!isCastTypeKnownToSucceed(FInverse->getArgument(0)->getType(),
-                                FInverse->getModule()) ||
-      !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
     return false;
 
   // Need to have a matching 'f'.

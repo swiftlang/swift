@@ -49,27 +49,27 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
-/// Returns true if A is an opened existential type, Self, or is equal to an
-/// archetype in F's nested archetype list.
-///
-/// FIXME: Once Self has been removed in favor of opened existential types
-/// everywhere, remove support for self.
+/// Returns true if A is an opened existential type or is equal to an
+/// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
-  // The only two cases where an archetype is always legal in a function is if
-  // it is self or if it is from an opened existential type. Currently, Self is
-  // being migrated away from in favor of opened existential types, so we should
-  // remove the special case here for Self when that process is completed.
-  //
-  // *NOTE* Associated types of self are not valid here.
-  if (!A->getOpenedExistentialType().isNull() || A->getSelfProtocol())
+  if (!A->getOpenedExistentialType().isNull())
     return true;
 
-  // Ok, we have an archetype, make sure it is in the nested archetypes of our
-  // caller.
-  for (auto Iter : F->getContextGenericParams()->getAllNestedArchetypes())
-    if (A->isEqual(&*Iter))
-      return true;
-  return A->getIsRecursive();
+  // Find the primary archetype.
+  A = A->getPrimary();
+
+  // Ok, we have a primary archetype, make sure it is in the nested generic
+  // parameters of our caller.
+  for (auto *params = F->getContextGenericParams();
+       params != nullptr;
+       params = params->getOuterParameters()) {
+
+    for (auto param : params->getParams())
+      if (param->getArchetype()->isEqual(A))
+        return true;
+  }
+
+  return false;
 }
 
 namespace {

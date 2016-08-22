@@ -234,6 +234,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Treat warnings as errors">;
 
+def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Continue building, even after errors are encountered">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

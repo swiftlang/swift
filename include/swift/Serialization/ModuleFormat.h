@@ -1357,14 +1357,6 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
-  using Swift3MigrationDeclAttrLayout = BCRecordLayout<
-    Swift3Migration_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCVBR<5>,   // number of bytes in rename string
-    BCVBR<5>,   // number of bytes in message string
-    BCBlob      // rename, followed by message
-  >;
-
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
     BCArray<TypeIDField> // concrete types

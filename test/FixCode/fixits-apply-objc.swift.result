@@ -21,3 +21,11 @@ func foo(an : Any) {
   let a3 : AnyObject!
   a3 = an as AnyObject!
 }
+
+func foo1(_ an : Any) {
+  let obj: AnyObject = an as AnyObject
+}
+
+func foo2(_ messageData: Any?) -> AnyObject? {
+  return messageData as AnyObject?
+}

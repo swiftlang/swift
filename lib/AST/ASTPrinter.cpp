@@ -4282,7 +4282,7 @@ public:
     // Substitute a context archetype if we have context generic params.
     if (Options.ContextGenericParams) {
       return visit(getGenericParamListAtDepth(T->getDepth())
-                     ->getPrimaryArchetypes()[T->getIndex()]);
+                     ->getParams()[T->getIndex()]->getArchetype());
     }
 
     auto Name = T->getName();
@@ -4398,12 +4398,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "array_downcast";
   case CheckedCastKind::DictionaryDowncast:
     return "dictionary_downcast";
-  case CheckedCastKind::DictionaryDowncastBridged:
-    return "dictionary_downcast_bridged";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::SetDowncastBridged:
-    return "set_downcast_bridged";
   case CheckedCastKind::BridgeFromObjectiveC:
     return "bridge_from_objc";
   }

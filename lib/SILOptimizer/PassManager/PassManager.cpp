@@ -373,6 +373,8 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       FunctionWorklist.push_back(*I);
   }
 
+  DerivationLevels.clear();
+
   // The maximum number of times the pass pipeline can be restarted for a
   // function. This is used to ensure we are not going into an infinite loop in
   // cases where (for example) we have recursive type-based specialization
@@ -550,6 +552,33 @@ SILPassManager::~SILPassManager() {
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
   }
+}
+
+void SILPassManager::addFunctionToWorklist(SILFunction *F,
+                                           SILFunction *DerivedFrom) {
+  assert(F && F->isDefinition() && F->shouldOptimize() &&
+         "Expected optimizable function definition!");
+
+  const int MaxDeriveLevels = 10;
+
+  int NewLevel = 1;
+  if (DerivedFrom) {
+    NewLevel = DerivationLevels[DerivedFrom] + 1;
+    // Limit the number of derivations, i.e. don't allow that a pass specializes
+    // a specialized function which is itself a specialized function, and so on.
+    if (NewLevel >= MaxDeriveLevels)
+      return;
+  }
+  int &StoredLevel = DerivationLevels[F];
+
+  // Only allow a function to be pushed on the worklist a single time
+  // (not counting the initial population of the worklist with the bottom-up
+  // function order).
+  if (StoredLevel > 0)
+    return;
+
+  StoredLevel = NewLevel;
+  FunctionWorklist.push_back(F);
 }
 
 void SILPassManager::restartWithCurrentFunction(SILTransform *T) {

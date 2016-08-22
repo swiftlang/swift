@@ -801,9 +801,9 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a generic type with one argument.
   NominalTypeDecl *nominal = (ctx.*getNominal)();
   if (!nominal) return nullptr;
-  auto generics = nominal->getGenericParams();
-  if (!generics) return nullptr;
-  if (generics->size() != 1) return nullptr;
+  auto sig = nominal->getGenericSignature();
+  if (!sig) return nullptr;
+  if (sig->getGenericParams().size() != 1) return nullptr;
 
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
@@ -813,7 +813,7 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // The property must have type T.
   VarDecl *property = dyn_cast<VarDecl>(results[0]);
   if (!property) return nullptr;
-  if (!property->getType()->isEqual(generics->getPrimaryArchetypes()[0]))
+  if (!property->getInterfaceType()->isEqual(sig->getGenericParams()[0]))
     return nullptr;
 
   cache = property;
@@ -2598,6 +2598,10 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
                                       llvm::raw_ostream &os,
                                       unsigned indent) const {
+  archetype = archetype->getPrimary();
+  if (!archetype)
+    return;
+
   auto knownDC = ArchetypeContexts.find(archetype);
   if (knownDC != ArchetypeContexts.end())
     knownDC->second->printContext(os, indent);
@@ -3995,44 +3999,12 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal->getName() == Id_CGFloat);
 }
 
-Optional<Type>
-ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
-                             LazyResolver *resolver,
-                             Type *bridgedValueType) const {
+Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
+                                  Type *bridgedValueType) const {
   if (type->isBridgeableObjectType()) {
     if (bridgedValueType) *bridgedValueType = type;
 
     return type;
-  }
-
-  // Whitelist certain types even if Foundation is not imported, to ensure
-  // that casts from AnyObject to one of these types are not optimized away.
-  //
-  // Outside of these standard library types to which Foundation
-  // bridges, an _ObjectiveCBridgeable conformance can only be added
-  // in the same module where the Swift type itself is defined, so the
-  // optimizer will be guaranteed to see the conformance if it exists.
-  bool knownBridgedToObjC = false;
-  if (auto ntd = type->getAnyNominal())
-    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
-
-  // TODO: Under id-as-any, container bridging is unconstrained. This check can
-  // go away.
-  if (!LangOpts.EnableIdAsAny) {
-    // If the type is generic, check whether its generic arguments are also
-    // bridged to Objective-C.
-    if (auto bgt = type->getAs<BoundGenericType>()) {
-      for (auto arg : bgt->getGenericArgs()) {
-        if (arg->hasTypeVariable())
-          continue;
-
-        if (!getBridgedToObjC(dc, arg, resolver))
-          return None;
-      }
-    }
-  } else {
-    // Under id-as-any, anything is bridged to objective c.
-    knownBridgedToObjC = true;
   }
 
   if (auto metaTy = type->getAs<MetatypeType>())
@@ -4062,7 +4034,8 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       auto proto = getProtocol(known);
       if (!proto) return None;
 
-      return dc->getParentModule()->lookupConformance(type, proto, resolver);
+      return dc->getParentModule()->lookupConformance(type, proto,
+                                                      getLazyResolver());
     };
 
   // Do we conform to _ObjectiveCBridgeable?
@@ -4076,7 +4049,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (conformance->isConcrete()) {
       return ProtocolConformance::getTypeWitnessByName(
                type, conformance->getConcrete(), Id_ObjectiveCType,
-               resolver);
+               getLazyResolver());
     } else {
       return type->castTo<ArchetypeType>()->getNestedType(Id_ObjectiveCType)
         .getValue();
@@ -4094,12 +4067,8 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       return nsErrorDecl->getDeclaredInterfaceType();
   }
 
-
-  // If we haven't imported Foundation but this is a whitelisted type,
-  // behave as above.
-  if (knownBridgedToObjC)
-    return Type();
-  return None;
+  // No special bridging to Objective-C, but this can become an 'Any'.
+  return Type();
 }
 
 std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>

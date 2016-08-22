@@ -54,6 +54,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     
     __ https://developer.apple.com/swift/blog/?id=28
 
+  dup
+    From "duplicate". As a noun, refers to another filed issue that describes
+    the same bug ("I have a dup of this"); as a verb, the act of marking a bug
+    *as* a duplicate ("Please dup this to the underlying issue"). Sometimes
+    written "dupe". Pronounced the same way as the first syllable of
+    "duplicate", which for most American English speakers is "doop".
+
   existential
     A value whose type is a protocol composition (including a single protocol
     and *zero* protocols; the latter is the ``Any`` type).

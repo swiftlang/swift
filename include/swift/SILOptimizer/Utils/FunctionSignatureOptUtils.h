@@ -104,6 +104,15 @@ struct ArgumentDescriptor {
     if (!canOptimizeLiveArg())
       return false;
 
+    // See if the projection tree consists of potentially multiple levels of
+    // structs containing one field. In such a case, there is no point in
+    // exploding the argument.
+    //
+    // Also, in case of a type can not be exploded, e.g an enum, we treat it
+    // as a singleton.
+    if (ProjTree.isSingleton())
+      return false;
+
     // If this argument is @owned and we can not find all the releases for it
     // try to explode it, maybe we can find some of the releases and O2G some
     // of its components.
@@ -113,12 +122,6 @@ struct ArgumentDescriptor {
     if (hasConvention(SILArgumentConvention::Direct_Owned) && 
         ERM.hasSomeReleasesForArgument(Arg))
       return true;
-
-    // See if the projection tree consists of potentially multiple levels of
-    // structs containing one field. In such a case, there is no point in
-    // exploding the argument.
-    if (ProjTree.isSingleton())
-      return false;
 
     size_t explosionSize = ProjTree.liveLeafCount();
     return explosionSize >= 1 && explosionSize <= 3;

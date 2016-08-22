@@ -1005,7 +1005,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 
 static bool isDiscardableType(Type type) {
   return (type->is<ErrorType>() ||
-          type->isNever() ||
+          type->isUninhabited() ||
           type->lookThroughAllAnyOptionalTypes()->isVoid());
 }
 

@@ -1388,7 +1388,8 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
       validateAccessibility(generic);
       Accessibility access = Accessibility::Internal;
       if (isa<ProtocolDecl>(generic))
-        access = std::max(access, generic->getFormalAccess());
+        access = std::max(Accessibility::FilePrivate,
+                          generic->getFormalAccess());
       D->setAccessibility(access);
       break;
     }
@@ -1396,10 +1397,6 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
       auto extension = cast<ExtensionDecl>(DC);
       computeDefaultAccessibility(extension);
       auto access = extension->getDefaultAccessibility();
-      if (access == Accessibility::FilePrivate &&
-          !Context.LangOpts.EnableSwift3Private) {
-        access = Accessibility::Private;
-      }
       D->setAccessibility(access);
     }
     }
@@ -3495,7 +3492,6 @@ public:
     }
 
     TC.checkDeclAttributes(VD);
-    TC.checkOmitNeedlessWords(VD);
   }
 
 
@@ -4629,7 +4625,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, FD);
-      TC.checkOmitNeedlessWords(FD);
       return;
     }
 
@@ -5548,11 +5543,12 @@ public:
         std::min(classDecl->getFormalAccess(), overriddenAccess);
       if (requiredAccess == Accessibility::Open && decl->isFinal())
         requiredAccess = Accessibility::Public;
+      else if (requiredAccess == Accessibility::Private)
+        requiredAccess = Accessibility::FilePrivate;
 
       bool shouldDiagnose = false;
       bool shouldDiagnoseSetter = false;
-      if (requiredAccess > Accessibility::Private &&
-          !isa<ConstructorDecl>(decl)) {
+      if (!isa<ConstructorDecl>(decl)) {
         shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
 
         if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
@@ -5562,6 +5558,8 @@ public:
             const DeclContext *accessDC = nullptr;
             if (requiredAccess == Accessibility::Internal)
               accessDC = classDecl->getParentModule();
+            else if (requiredAccess == Accessibility::FilePrivate)
+              accessDC = classDecl->getDeclContext();
             shouldDiagnoseSetter = ASD->isSettable(accessDC) &&
                                    !ASD->isSetterAccessibleFrom(accessDC);
           }
@@ -5835,19 +5833,6 @@ public:
         // Dynamic is inherited.
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
-    }
-
-    void visitSwift3MigrationAttr(Swift3MigrationAttr *attr) {
-      if (!Override->getAttrs().hasAttribute<Swift3MigrationAttr>()) {
-        // Inherit swift3_migration attribute.
-        Override->getAttrs().add(new (TC.Context) Swift3MigrationAttr(
-                                                    SourceLoc(), SourceLoc(),
-                                                    SourceLoc(),
-                                                    attr->getRenamed(),
-                                                    attr->getMessage(),
-                                                    SourceLoc(),
-                                                    /*implicit=*/true));
-      }
     }
   };
 
@@ -6313,7 +6298,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, CD);
-      TC.checkOmitNeedlessWords(CD);
       return;
     }
     if (CD->hasType())
@@ -6494,11 +6478,14 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getFormalAccess() <
-            std::min(nominal->getFormalAccess(), Accessibility::Public)) {
+        auto requiredAccess = std::min(nominal->getFormalAccess(),
+                                       Accessibility::Public);
+        if (requiredAccess == Accessibility::Private)
+          requiredAccess = Accessibility::FilePrivate;
+        if (CD->getFormalAccess() < requiredAccess) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
-          fixItAccessibility(diag, CD, nominal->getFormalAccess());
+          fixItAccessibility(diag, CD, requiredAccess);
         }
       }
     }

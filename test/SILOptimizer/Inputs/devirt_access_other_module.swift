@@ -14,5 +14,5 @@ public func getExternalClass() -> ExternalClass {
 }
 
 private class PrivateSubclass : ExternalClass {
-  override private func foo() {}
+  override fileprivate func foo() {}
 }

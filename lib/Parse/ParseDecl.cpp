@@ -507,11 +507,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .Case("public", Accessibility::Public)
       .Case("open", Accessibility::Open);
 
-    if (access == Accessibility::FilePrivate &&
-        !Context.LangOpts.EnableSwift3Private) {
-      access = Accessibility::Private;
-    }
-
     if (!consumeIf(tok::l_paren)) {
       // Normal accessibility attribute.
       AttrRange = Loc;
@@ -1061,107 +1056,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Swift3Migration: {
-    if (Tok.isNot(tok::l_paren)) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    SourceLoc lParenLoc = consumeToken(tok::l_paren);
-
-    DeclName renamed;
-    StringRef message;
-    bool invalid = false;
-    do {
-      // If we see a closing parenthesis, we're done.
-      if (Tok.is(tok::r_paren))
-        break;
-
-      if (Tok.isNot(tok::identifier)) {
-        diagnose(Tok, diag::attr_swift3_migration_label);
-        if (Tok.isNot(tok::r_paren))
-          skipUntil(tok::r_paren);
-        consumeIf(tok::r_paren);
-        invalid = true;
-        break;
-      }
-
-      // Consume the identifier.
-      StringRef name = Tok.getText();
-      SourceLoc nameLoc = consumeToken();
-
-      // If we don't have the '=', complain.
-      SourceLoc equalLoc;
-      if (findAttrValueDelimiter()) {
-        consumeToken();
-      } else {
-        diagnose(Tok, diag::attr_expected_colon_separator, name, AttrName);
-        invalid = true;
-        continue;
-      }
-
-      // If we don't have a string, complain.
-      if (Tok.isNot(tok::string_literal)) {
-        diagnose(Tok, diag::attr_expected_string_literal_arg, name, AttrName);
-        invalid = true;
-        break;
-      }
-
-      // Dig out the string.
-      auto paramString = getStringLiteralIfNotInterpolated(*this, nameLoc, Tok,
-                                                            name.str());
-      SourceLoc paramLoc = consumeToken(tok::string_literal);
-      if (!paramString) {
-        invalid = true;
-        continue;
-      }
-
-      if (name == "message") {
-        if (!message.empty())
-          diagnose(nameLoc, diag::attr_duplicate_argument, name);
-
-        message = *paramString;
-        continue;
-      }
-
-      if (name == "renamed") {
-        if (renamed)
-          diagnose(nameLoc, diag::attr_duplicate_argument, name);
-
-        // Parse the name.
-        DeclName newName = parseDeclName(Context, *paramString);
-        if (!newName) {
-          diagnose(paramLoc, diag::attr_bad_swift_name, *paramString);
-          continue;
-        }
-
-        renamed = newName;
-        continue;
-      }
-
-      diagnose(nameLoc, diag::warn_attr_swift3_migration_unknown_label);
-    } while (consumeIf(tok::comma));
-
-    // Parse the closing ')'.
-    SourceLoc rParenLoc;
-    if (invalid && !Tok.is(tok::r_paren)) {
-      skipUntil(tok::r_paren);
-      if (Tok.is(tok::r_paren)) {
-        rParenLoc = consumeToken();
-      } else
-        rParenLoc = Tok.getLoc();
-    } else {
-      parseMatchingToken(tok::r_paren, rParenLoc,
-                         diag::attr_swift3_migration_expected_rparen,
-                         lParenLoc);
-    }
-
-    Attributes.add(new (Context) Swift3MigrationAttr(AtLoc, Loc, lParenLoc,
-                                                     renamed, message,
-                                                     rParenLoc, false));
-    break;
-    }
   case DAK_Specialize: {
     if (Tok.isNot(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -1444,7 +1338,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   SourceLoc Loc = consumeToken();
 
   bool isAutoclosureEscaping = false;
-  SourceLoc autoclosureEscapingRightParenLoc;
+  SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
 
   // Handle @autoclosure(escaping)
@@ -1462,9 +1356,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     }
 
     if (isAutoclosureEscaping) {
-      consumeToken(tok::l_paren);
+      autoclosureEscapingParenRange.Start = consumeToken(tok::l_paren);
       consumeToken(tok::identifier);
-      autoclosureEscapingRightParenLoc = consumeToken(tok::r_paren);
+      autoclosureEscapingParenRange.End = consumeToken(tok::r_paren);
     }
   } else if (attr == TAK_convention) {
     SourceLoc LPLoc;
@@ -1516,9 +1410,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
+        StringRef replacement = " @escaping ";
+        if (autoclosureEscapingParenRange.End.getAdvancedLoc(1) != Tok.getLoc())
+          replacement = replacement.drop_back();
         diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
-            .fixItReplace({Loc, autoclosureEscapingRightParenLoc},
-                          "@autoclosure @escaping ");
+            .fixItReplace(autoclosureEscapingParenRange, replacement);
       }
       Attributes.setAttr(TAK_escaping, Loc);
     } else if (Attributes.has(TAK_noescape)) {

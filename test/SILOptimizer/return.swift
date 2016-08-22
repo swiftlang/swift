@@ -9,6 +9,32 @@ func singleBlock2() -> Int {
   y += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
+enum NoCasesButNotNever {}
+
+func diagnoseNoCaseEnumMissingReturn() -> NoCasesButNotNever {
+} // expected-error {{function with uninhabited return type 'NoCasesButNotNever' is missing call to another never-returning function on all paths}} 
+
+func diagnoseNeverMissingBody() -> Never {
+} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}} 
+
+_ = { () -> Never in
+}() // expected-error {{closure with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}-
+
+func diagnoseNeverWithBody(i : Int) -> Never {
+  if (i == -1) {
+    print("Oh no!")
+  } else {
+    switch i {
+    case 0:
+      exit()
+    case 1:
+      fatalError()
+    default:
+      repeat { } while true 
+    } 
+  }
+} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
+
 class MyClassWithClosure {
   var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
 }

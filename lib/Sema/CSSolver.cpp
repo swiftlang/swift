@@ -47,7 +47,8 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 ///
 /// \returns the type to bind to, if the binding is okay.
 static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs, 
-                                         TypeVariableType *typeVar, Type type) {
+                                         TypeVariableType *typeVar, Type type,
+                                         bool *isNilLiteral = nullptr) {
   if (!type)
     return None;
 
@@ -63,8 +64,15 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   // If the type is a type variable itself, don't permit the binding.
   // FIXME: This is a hack. We need to be smarter about whether there's enough
   // structure in the type to produce an interesting binding, or not.
-  if (type->getRValueType()->is<TypeVariableType>())
+  if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
+    if (isNilLiteral &&
+        bindingTypeVar->getImpl().literalConformanceProto &&
+        bindingTypeVar->getImpl().literalConformanceProto->isSpecificProtocol(
+          KnownProtocolKind::ExpressibleByNilLiteral))
+      *isNilLiteral = true;
+    
     return None;
+  }
 
   // Okay, allow the binding (with the simplified type).
   return type;
@@ -294,16 +302,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     }
   }
 
-  if (auto functionTy = type->getAs<FunctionType>()) {
-    // FIXME: Can weaken input type, but we really don't want to get in the
-    // business of strengthening the result type.
-
-    // An @autoclosure function type can be viewed as scalar of the result
-    // type.
-    if (functionTy->isAutoClosure())
-      result.push_back(functionTy->getResult());
-  }
-
   if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
@@ -318,10 +316,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     result.push_back(lvalue->getObjectType());
   if (auto iot = type->getAs<InOutType>())
     result.push_back(iot->getObjectType());
-
-  // Try to unwrap implicitly unwrapped optional types.
-  if (auto objectType = type->getImplicitlyUnwrappedOptionalObjectType())
-    result.push_back(objectType);
 
   // FIXME: lots of other cases to consider!
   return result;
@@ -682,7 +676,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::TypeMember:
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
@@ -709,20 +702,22 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
   // Local function to add a potential binding to the list of bindings,
   // coalescing supertype bounds when we are able to compute the meet.
-  auto addPotentialBinding = [&](PotentialBinding binding) {
+  auto addPotentialBinding = [&](PotentialBinding binding,
+                                 bool allowJoinMeet = true) {
     // If this is a non-defaulted supertype binding, check whether we can
-    // combine it with another supertype binding by computing the 'meet' of the
+    // combine it with another supertype binding by computing the 'join' of the
     // types.
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         !binding.BindingType->hasTypeVariable() &&
         !binding.DefaultedProtocol &&
-        !binding.IsDefaultableBinding) {
+        !binding.IsDefaultableBinding &&
+        allowJoinMeet) {
       if (lastSupertypeIndex) {
-        // Can we compute a meet?
+        // Can we compute a join?
         auto &lastBinding = result.Bindings[*lastSupertypeIndex];
         if (auto meet =
-                Type::meet(lastBinding.BindingType, binding.BindingType)) {
-          // Replace the last supertype binding with the meet. We're done.
+                Type::join(lastBinding.BindingType, binding.BindingType)) {
+          // Replace the last supertype binding with the join. We're done.
           lastBinding.BindingType = meet;
           return;
         }
@@ -739,6 +734,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
   SmallVector<Constraint *, 2> defaultableConstraints;
+  bool addOptionalSupertypeBindings = false;
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
@@ -768,7 +764,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
-    case ConstraintKind::BridgedToObjectiveC:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;
@@ -917,11 +912,18 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     // Check whether we can perform this binding.
     // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-    if (auto boundType = checkTypeOfBinding(cs, typeVar, type)) {
+    bool isNilLiteral = false;
+    if (auto boundType = checkTypeOfBinding(cs, typeVar, type, &isNilLiteral)) {
       type = *boundType;
       if (type->hasTypeVariable())
         result.InvolvesTypeVariables = true;
     } else {
+      // If the bound is a 'nil' literal type, add optional supertype bindings.
+      if (isNilLiteral && kind == AllowedBindingKind::Supertypes) {
+        addOptionalSupertypeBindings = true;
+        continue;
+      }
+
       result.InvolvesTypeVariables = true;
       continue;
     }
@@ -980,7 +982,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       addPotentialBinding({type, kind, None});
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      addPotentialBinding({alternateType, kind, None});
+      addPotentialBinding({alternateType, kind, None}, /*allowJoinMeet=*/false);
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -1070,6 +1072,30 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
                   return binding.BindingType->isExistentialType() &&
                          binding.Kind == AllowedBindingKind::Subtypes;
                 });
+
+  // If we're supposed to add optional supertype bindings, do so now.
+  if (addOptionalSupertypeBindings) {
+    for (unsigned i : indices(result.Bindings)) {
+      // Only interested in supertype bindings.
+      auto &binding = result.Bindings[i];
+      if (binding.Kind != AllowedBindingKind::Supertypes) continue;
+
+      // If the type doesn't conform to ExpressibleByNilLiteral,
+      // produce an optional of that type as a potential binding. We
+      // overwrite the binding in place because the non-optional type
+      // will fail to type-check against the nil-literal conformance.
+      auto nominalBindingDecl = binding.BindingType->getAnyNominal();
+      if (!nominalBindingDecl) continue;
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (!nominalBindingDecl->lookupConformance(
+            cs.DC->getParentModule(),
+            cs.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral),
+            conformances)) {
+        binding.BindingType = OptionalType::get(binding.BindingType);
+      }
+    }
+  }
 
   return result;
 }

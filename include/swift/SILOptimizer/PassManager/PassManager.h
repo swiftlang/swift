@@ -75,6 +75,13 @@ class SILPassManager {
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
+  /// Stores for each function the number of levels of specializations it is
+  /// derived from an original function. E.g. if a function is a signature
+  /// optimized specialization of a generic specialiation, it has level 2.
+  /// This is used to avoid an infinite amount of functions pushed on the
+  /// worklist (e.g. caused by a bug in a specializing optimization).
+  llvm::DenseMap<SILFunction *, int> DerivationLevels;
+
   /// Set to true when a pass invalidates an analysis.
   bool CurrentPassHasInvalidated = false;
 
@@ -109,13 +116,6 @@ public:
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
 
-  /// \brief Add a function to the function pass worklist.
-  void addFunctionToWorklist(SILFunction *F) {
-    assert(F && F->isDefinition() && F->shouldOptimize() &&
-           "Expected optimizable function definition!");
-    FunctionWorklist.push_back(F);
-  }
-
   /// \brief Restart the function pass pipeline on the same function
   /// that is currently being processed.
   void restartWithCurrentFunction(SILTransform *T);
@@ -137,11 +137,12 @@ public:
     CompletedPassesMap.clear();
   }
 
-  /// \brief Add the function to the function pass worklist.
-  void notifyTransformationOfFunction(SILFunction *F) {
-    addFunctionToWorklist(F);
-  }
-
+  /// \brief Add the function \p F to the function pass worklist.
+  /// If not null, the function \p DerivedFrom is the function from which \p F
+  /// is derived. This is used to avoid an infinite amount of functions pushed
+  /// on the worklist (e.g. caused by a bug in a specializing optimization).
+  void addFunctionToWorklist(SILFunction *F, SILFunction *DerivedFrom);
+  
   /// \brief Iterate over all analysis and notify them of the function.
   /// This function does not necessarily have to be newly created function. It
   /// is the job of the analysis to make sure no extra work is done if the
