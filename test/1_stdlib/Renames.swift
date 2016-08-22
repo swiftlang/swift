@@ -606,6 +606,10 @@ func _UnsafePointer<T>(x: UnsafeMutablePointer<T>, e: T) {
   ptr2.deallocate(capacity: 1)
 }
 
+func _UnsafePointer<T, C : Collection>(x: UnsafeMutablePointer<T>, c: C) where C.Iterator.Element == T {
+  x.initializeFrom(c) // expected-error {{'initializeFrom' has been renamed to 'initialize(from:)'}}
+}
+
 func _VarArgs() {
   func fn1(_: CVarArgType) {} // expected-error {{'CVarArgType' has been renamed to 'CVarArg'}} {{15-26=CVarArg}}{{none}}
   func fn2(_: VaListBuilder) {} // expected-error {{'VaListBuilder' is unavailable}} {{none}}
