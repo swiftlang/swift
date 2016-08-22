@@ -64,6 +64,6 @@ var colorRaw: Color.RawValue = 7.5
 
 // Mismatched case types
 
-enum BadPlain : UInt { // expected-error {{type 'BadPlain' does not conform to protocol 'RawRepresentable'}}
+enum BadPlain : UInt { // expected-error {{'BadPlain' declares raw type 'UInt', but does not conform to RawRepresentable and conformance could not be synthesized}}
     case a = "hello"   // expected-error {{cannot convert value of type 'String' to raw type 'UInt'}}
 }

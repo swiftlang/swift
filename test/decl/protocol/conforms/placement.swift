@@ -127,9 +127,9 @@ class SynthesizedSubClass3 : SynthesizedClass1, AnyObjectRefinement { }
 class SynthesizedSubClass4 : SynthesizedClass2 { }
 extension SynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 } // expected-error{{redundant conformance of 'SynthesizedEnum1' to protocol 'RawRepresentable'}} expected-note{{'SynthesizedEnum1' declares conformance to protocol 'RawRepresentable' here}}
+enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 } // expected-error{{redundant conformance of 'SynthesizedEnum1' to protocol 'RawRepresentable'}} expected-note{{'SynthesizedEnum1' declares raw type 'Int', which implies RawRepresentable}}
 
-enum SynthesizedEnum2 : Int { case none = 0 } // expected-note {{'SynthesizedEnum2' declares conformance to protocol 'RawRepresentable' here}}
+enum SynthesizedEnum2 : Int { case none = 0 } // expected-note {{'SynthesizedEnum2' declares raw type 'Int', which implies RawRepresentable}}
 extension SynthesizedEnum2 : RawRepresentable { } // expected-error{{redundant conformance of 'SynthesizedEnum2' to protocol 'RawRepresentable'}}
 
 
