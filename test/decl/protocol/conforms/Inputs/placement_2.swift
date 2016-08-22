@@ -39,6 +39,6 @@ class MFSynthesizedSubClass3 : MFSynthesizedClass1 { }
 
 extension MFSynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum MFSynthesizedEnum1 : Int { case a }
+enum MFSynthesizedEnum1 : Int { case a } // expected-note {{'MFSynthesizedEnum1' declares conformance to protocol 'RawRepresentable' here}}
 extension MFSynthesizedEnum2 : RawRepresentable { }
 

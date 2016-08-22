@@ -60,16 +60,23 @@ enum SE<T> : T { case X } // expected-error{{raw type 'T' is not expressible by 
 // expected-error@-1{{type 'SE<T>' does not conform to protocol 'RawRepresentable'}}
 
 // Also need Equatable for init?(RawValue)
-enum SE2<T : ExpressibleByIntegerLiteral> 
+enum SE2<T : ExpressibleByIntegerLiteral> // expected-error {{type 'SE2<T>' does not conform to protocol 'RawRepresentable'}}
   : T // expected-error{{RawRepresentable 'init' cannot be synthesized because raw type 'T' is not Equatable}}
 { case X }
 
-// ... but not if init?(RawValue) is directly implemented some other way.
-enum SE3<T : ExpressibleByIntegerLiteral> : T { 
+// ... but not if init?(RawValue) and `rawValue` are directly implemented some other way.
+protocol InstanceGettable {
+  static var someInstance : Self { get }
+}
+enum SE3<T : ExpressibleByIntegerLiteral> : T where T: InstanceGettable {
   case X 
 
   init?(rawValue: T) {
     self = SE3.X
+  }
+
+  var rawValue : T {
+    return T.someInstance
   }
 }
 

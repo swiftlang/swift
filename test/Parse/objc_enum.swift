@@ -31,7 +31,7 @@ class Bar {
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info
-@objc enum r23681566 : Int {  // expected-note {{declared raw type 'Int' here}}
+@objc enum r23681566 : Int {  // expected-error {{type 'r23681566' does not conform to protocol 'RawRepresentable'}} expected-note {{declared raw type 'Int' here}}
   case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 

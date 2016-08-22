@@ -127,10 +127,11 @@ class SynthesizedSubClass3 : SynthesizedClass1, AnyObjectRefinement { }
 class SynthesizedSubClass4 : SynthesizedClass2 { }
 extension SynthesizedSubClass4 : AnyObjectRefinement { }
 
-enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 }
+enum SynthesizedEnum1 : Int, RawRepresentable { case none = 0 } // expected-error{{redundant conformance of 'SynthesizedEnum1' to protocol 'RawRepresentable'}} expected-note{{'SynthesizedEnum1' declares conformance to protocol 'RawRepresentable' here}}
 
-enum SynthesizedEnum2 : Int { case none = 0 }
-extension SynthesizedEnum2 : RawRepresentable { }
+enum SynthesizedEnum2 : Int { case none = 0 } // expected-note {{'SynthesizedEnum2' declares conformance to protocol 'RawRepresentable' here}}
+extension SynthesizedEnum2 : RawRepresentable { } // expected-error{{redundant conformance of 'SynthesizedEnum2' to protocol 'RawRepresentable'}}
+
 
 // ===========================================================================
 // Tests across different source files
@@ -142,6 +143,7 @@ extension SynthesizedEnum2 : RawRepresentable { }
 struct MFExplicit1 : P1 { }
 
 extension MFExplicit2 : P1 { } // expected-error{{redundant conformance of 'MFExplicit2' to protocol 'P1'}}
+
 
 // ---------------------------------------------------------------------------
 // Multiple implicit conformances, with no ambiguities
@@ -180,7 +182,7 @@ extension MFSynthesizedSubClass3 : AnyObjectRefinement { }
 
 class MFSynthesizedSubClass4 : MFSynthesizedClass2 { }
 
-extension MFSynthesizedEnum1 : RawRepresentable { }
+extension MFSynthesizedEnum1 : RawRepresentable { } // expected-error{{redundant conformance of 'MFSynthesizedEnum1' to protocol 'RawRepresentable'}}
 
 enum MFSynthesizedEnum2 : Int { case none = 0 }
 

@@ -167,7 +167,7 @@ enum RawTypeCircularityB : RawTypeCircularityA, ExpressibleByIntegerLiteral { //
 struct ExpressibleByFloatLiteralOnly : ExpressibleByFloatLiteral {
     init(floatLiteral: Double) {}
 }
-enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
+enum ExpressibleByRawTypeNotIntegerLiteral : ExpressibleByFloatLiteralOnly { // expected-error {{type 'ExpressibleByRawTypeNotIntegerLiteral' does not conform to protocol 'RawRepresentable'}} expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'ExpressibleByFloatLiteralOnly' is not Equatable}}
   case Everett // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Flanders
 }
@@ -181,23 +181,23 @@ enum RawTypeWithNegativeValues : Int {
   case AutoIncAcrossZero = -1, Zero, One
 }
 
-enum RawTypeWithUnicodeScalarValues : UnicodeScalar {
+enum RawTypeWithUnicodeScalarValues : UnicodeScalar { // expected-error {{type 'RawTypeWithUnicodeScalarValues' does not conform to protocol 'RawRepresentable'}}
   case Kearney = "K"
   case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Marshall = "M"
 }
 
-enum RawTypeWithCharacterValues : Character {
+enum RawTypeWithCharacterValues : Character { // expected-error {{type 'RawTypeWithCharacterValues' does not conform to protocol 'RawRepresentable'}}
   case First = "い"
   case Second // expected-error {{enum cases require explicit raw values when the raw type is not expressible by integer or string literal}}
   case Third = "は"
 }
 
-enum RawTypeWithCharacterValues_Error1 : Character {
+enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{type 'RawTypeWithCharacterValues_Error1' does not conform to protocol 'RawRepresentable'}}
   case First = "abc" // expected-error {{cannot convert value of type 'String' to raw type 'Character'}}
 }
 
-enum RawTypeWithFloatValues : Float {
+enum RawTypeWithFloatValues : Float { // expected-error {{type 'RawTypeWithFloatValues' does not conform to protocol 'RawRepresentable'}}
   case Northrup = 1.5
   case Overton // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
   case Pettygrove = 2.25
@@ -308,12 +308,12 @@ enum NonliteralRawValue : Int {
   case Yeon = 100 + 20 + 3 // expected-error {{raw value for enum case must be a literal}}
 }
 
-enum RawTypeWithPayload : Int { // expected-note {{declared raw type 'Int' here}} expected-note {{declared raw type 'Int' here}}
+enum RawTypeWithPayload : Int { // expected-error {{type 'RawTypeWithPayload' does not conform to protocol 'RawRepresentable'}} expected-note {{declared raw type 'Int' here}} expected-note {{declared raw type 'Int' here}}
   case Powell(Int) // expected-error {{enum with raw type cannot have cases with arguments}}
   case Terwilliger(Int) = 17 // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 
-enum RawTypeMismatch : Int {
+enum RawTypeMismatch : Int { // expected-error {{type 'RawTypeMismatch' does not conform to protocol 'RawRepresentable'}}
   case Barbur = "foo" // expected-error {{}}
 }
 
@@ -333,12 +333,12 @@ enum DuplicateMembers3 {
   case Foo(Int) // expected-error {{duplicate definition of enum element}}
 }
 
-enum DuplicateMembers4 : Int {
+enum DuplicateMembers4 : Int { // expected-error {{type 'DuplicateMembers4' does not conform to protocol 'RawRepresentable'}}
   case Foo = 1 // expected-note {{previous definition of 'Foo' is here}}
   case Foo = 2 // expected-error {{duplicate definition of enum element}}
 }
 
-enum DuplicateMembers5 : Int {
+enum DuplicateMembers5 : Int { // expected-error {{type 'DuplicateMembers5' does not conform to protocol 'RawRepresentable'}}
   case Foo = 1 // expected-note {{previous definition of 'Foo' is here}}
   case Foo = 1 + 1 // expected-error {{duplicate definition of enum element}} expected-error {{raw value for enum case must be a literal}}
 }
@@ -349,7 +349,7 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{duplicate definition of enum element}}
 }
 
-enum DuplicateMembers7 : String {
+enum DuplicateMembers7 : String { // expected-error {{type 'DuplicateMembers7' does not conform to protocol 'RawRepresentable'}}
   case Foo // expected-note {{previous definition of 'Foo' is here}}
   case Foo = "Bar" // expected-error {{duplicate definition of enum element}}
 }
@@ -401,7 +401,7 @@ enum ManyLiteralA : ManyLiteralable {
   case B = 0 // expected-error {{raw value for enum case is not unique}}
 }
 
-enum ManyLiteralB : ManyLiteralable {
+enum ManyLiteralB : ManyLiteralable { // expected-error {{type 'ManyLiteralB' does not conform to protocol 'RawRepresentable'}}
   case A = "abc"
   case B // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
 }
@@ -430,7 +430,7 @@ enum RawValueBTest: Double, RawValueB {
   case A, B
 }
 
-enum foo : String {
+enum foo : String { // expected-error {{type 'foo' does not conform to protocol 'RawRepresentable'}}
   case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
 }
 

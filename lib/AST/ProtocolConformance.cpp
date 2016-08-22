@@ -606,10 +606,14 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      if (auto rawRepresentable = getASTContext().getProtocol(
-                                    KnownProtocolKind::RawRepresentable)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis,
-                                                    rawRepresentable);
+      if (auto rawRepresentable = ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
+
+        // The presence of a raw type is an explicit declaration that
+        // the compiler should derive a RawRepresentable conformance.
+        auto conformance = ctx.getConformance(mutableThis->getDeclaredTypeInContext(), rawRepresentable,
+                                              mutableThis->getNameLoc(), mutableThis->getInnermostDeclContext(),
+                                              ProtocolConformanceState::Incomplete);
+        ConformanceTable->registerProtocolConformance(conformance);
       }
     }
   }

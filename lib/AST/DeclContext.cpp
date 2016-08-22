@@ -213,6 +213,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     }
     llvm_unreachable("bad DeclContextKind");
   }
+  llvm_unreachable("unknown parent");
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
