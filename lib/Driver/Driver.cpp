@@ -367,6 +367,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     !ArgList->hasArg(options::OPT_embed_bitcode);
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
+  bool ContinueBuildingAfterErrors =
+    ArgList->hasArg(options::OPT_continue_building_after_errors);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -506,10 +508,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
   // For updating code we need to go through all the files and pick up changes,
-  // even if they have compiler errors.
-  // Also for getting bulk fixits.
+  // even if they have compiler errors. Also for getting bulk fixits, or for when
+  // users explicitly request to continue building despite errors.
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
-      OI.ShouldGenerateFixitEdits)
+      OI.ShouldGenerateFixitEdits ||
+      ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions)
