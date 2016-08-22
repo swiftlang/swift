@@ -2436,7 +2436,7 @@ SetTestSuite.test("SetUpcastEntryPoint") {
       s.insert(TestObjCKeyTy(i))
   }
 
-  var sAsAnyObject: Set<NSObject> = _setUpCast(s)
+  var sAsAnyObject: Set<NSObject> = s
 
   expectEqual(3, sAsAnyObject.count)
   expectTrue(sAsAnyObject.contains(TestObjCKeyTy(1010)))
@@ -2465,7 +2465,7 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
   }
 
   do {
-    var s: Set<NSObject> = _setBridgeToObjectiveC(s)
+    var s: Set<NSObject> = s as Set<AnyHashable> as! Set<NSObject>
 
     expectTrue(s.contains(TestBridgedKeyTy(1010) as NSObject))
     expectTrue(s.contains(TestBridgedKeyTy(2020) as NSObject))
@@ -2473,7 +2473,7 @@ SetTestSuite.test("SetUpcastBridgedEntryPoint") {
   }
 
   do {
-    var s: Set<TestObjCKeyTy> = _setBridgeToObjectiveC(s)
+    var s: Set<TestObjCKeyTy> = s as Set<AnyHashable> as! Set<TestObjCKeyTy>
 
     expectEqual(3, s.count)
     expectTrue(s.contains(TestBridgedKeyTy(1010) as TestObjCKeyTy))
@@ -2518,7 +2518,7 @@ SetTestSuite.test("SetDowncastEntryPoint") {
   }
 
   // Successful downcast.
-  let sCC: Set<TestObjCKeyTy> = _setDownCast(s)
+  let sCC: Set<TestObjCKeyTy> = s as! Set<TestObjCKeyTy>
   expectEqual(3, sCC.count)
   expectTrue(sCC.contains(TestObjCKeyTy(1010)))
   expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2550,7 +2550,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sCC  = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
+  if let sCC  = s as? Set<TestObjCKeyTy> {
     expectEqual(3, sCC.count)
     expectTrue(sCC.contains(TestObjCKeyTy(1010)))
     expectTrue(sCC.contains(TestObjCKeyTy(2020)))
@@ -2561,7 +2561,7 @@ SetTestSuite.test("SetDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   s.insert("Hello, world" as NSString)
-  if let sCC = _setDownCastConditional(s) as Set<TestObjCKeyTy>? {
+  if let sCC = s as? Set<TestObjCKeyTy> {
     expectTrue(false)
   }
 }
@@ -2596,7 +2596,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCEntryPoint") {
   }
 
   // Successful downcast.
-  let sCV: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)
+  let sCV: Set<TestBridgedKeyTy> = s as! Set<TestBridgedKeyTy>
   do {
     expectEqual(3, sCV.count)
     expectTrue(sCV.contains(TestBridgedKeyTy(1010)))
@@ -2639,7 +2639,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = s as? Set<TestBridgedKeyTy> {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2650,7 +2650,7 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
 
   // Unsuccessful downcasts
   s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb" as NSString)
-  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = s as? Set<TestBridgedKeyTy> {
     expectTrue(false)
   }
 }
