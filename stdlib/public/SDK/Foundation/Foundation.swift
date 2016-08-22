@@ -638,13 +638,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     result: inout Dictionary?
   ) -> Bool {
     let anyDict = x as [NSObject : AnyObject]
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = Swift._dictionaryDownCastConditional(anyDict)
-      return result != nil
-    }
-
-    result = Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
+    result = Swift._dictionaryDownCastConditional(anyDict)
     return result != nil
   }
 
@@ -888,12 +882,7 @@ extension Set : _ObjectiveCBridgeable {
     _ x: NSSet, result: inout Set?
   ) -> Bool {
     let anySet = x as Set<NSObject>
-    if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Swift._setDownCastConditional(anySet)
-      return result != nil
-    }
-
-    result = Swift._setBridgeFromObjectiveCConditional(anySet)
+    result = Swift._setDownCastConditional(anySet)
     return result != nil
   }
 
