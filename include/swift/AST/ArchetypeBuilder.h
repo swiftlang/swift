@@ -216,9 +216,7 @@ private:
 
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamDecl *GenericParam);
+  void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -227,9 +225,7 @@ public:
   bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
 
   /// \brief Add a new generic parameter for which there may be requirements.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamType *GenericParam);
+  void addGenericParameter(GenericTypeParamType *GenericParam);
   
   /// \brief Add a new requirement.
   ///
@@ -248,9 +244,7 @@ public:
   /// FIXME: Requirements from the generic signature are treated as coming from
   /// an outer scope in order to avoid disturbing the AllDependentTypes.
   /// Setting \c treatRequirementsAsExplicit to true disables this behavior.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
+  void addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
                            bool treatRequirementsAsExplicit = false);
 
   /// \brief Get a generic signature based on the provided complete list

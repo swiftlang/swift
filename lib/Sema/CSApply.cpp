@@ -60,6 +60,9 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
 }
 
 /// Determine whether the given type is an opened AnyObject.
+///
+/// This comes up in computeSubstitutions() when accessing
+/// members via dynamic lookup.
 static bool isOpenedAnyObject(Type type) {
   auto archetype = type->getAs<ArchetypeType>();
   if (!archetype)
@@ -79,122 +82,65 @@ Type Solution::computeSubstitutions(
        Type origType, DeclContext *dc,
        Type openedType,
        ConstraintLocator *locator,
-       SmallVectorImpl<Substitution> &substitutions) const {
+       SmallVectorImpl<Substitution> &result) const {
   auto &tc = getConstraintSystem().getTypeChecker();
-  auto &ctx = tc.Context;
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
   assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
-  TypeSubstitutionMap typeSubstitutions;
+  TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
-    typeSubstitutions[opened.first.getPointer()] = getFixedType(opened.second);
+    subs[opened.first.getPointer()] = getFixedType(opened.second);
   }
 
   // Produce the concrete form of the opened type.
   auto type = openedType.transform([&](Type type) -> Type {
-                if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-                  auto archetype = tv->getImpl().getArchetype();
-                  auto simplified = getFixedType(tv);
-                  return SubstitutedType::get(archetype, simplified,
-                                              tc.Context);
-                }
+    if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+      auto archetype = tv->getImpl().getArchetype();
+      auto simplified = getFixedType(tv);
+      return SubstitutedType::get(archetype, simplified,
+                                  tc.Context);
+    }
 
-                return type;
-              });
+    return type;
+  });
 
-  auto currentModule = getConstraintSystem().DC->getParentModule();
-  ArchetypeType *currentArchetype = nullptr;
-  Type currentReplacement;
-  SmallVector<ProtocolConformanceRef, 4> currentConformances;
-
-  ArrayRef<Requirement> requirements;
+  auto mod = getConstraintSystem().DC->getParentModule();
+  GenericSignature *sig;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
-    requirements = genericFn->getRequirements();
+    sig = genericFn->getGenericSignature();
   } else {
-    requirements = dc->getGenericSignatureOfContext()->getRequirements();
+    sig = dc->getGenericSignatureOfContext();
   }
 
-  for (const auto &req : requirements) {
-    // Drop requirements for parameters that have been constrained away to
-    // concrete types.
-    auto firstArchetype
-      = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType(), &tc)
-        ->getAs<ArchetypeType>();
-    if (!firstArchetype)
-      continue;
-    
-    switch (req.getKind()) {
-    case RequirementKind::Conformance: {
-      // Get the conformance and record it.
-      auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      assert(firstArchetype == currentArchetype
-             && "Archetype out-of-sync");
-      ProtocolConformance *conformance = nullptr;
-      Type replacement = currentReplacement;
-      bool conforms = tc.conformsToProtocol(
-                        replacement,
-                        protoType->getDecl(),
-                        getConstraintSystem().DC,
-                        (ConformanceCheckFlags::InExpression|
-                         ConformanceCheckFlags::Used),
-                        &conformance);
-      (void)isOpenedAnyObject;
-      assert((conforms ||
-              replacement->is<ErrorType>() ||
-              firstArchetype->getIsRecursive() ||
-              isOpenedAnyObject(replacement) ||
-              replacement->is<GenericTypeParamType>()) &&
-             "Constraint system missed a conformance?");
-      (void)conforms;
+  auto lookupConformanceFn =
+      [&](Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+    ProtocolConformance *conformance = nullptr;
 
-      assert(conformance ||
-             replacement->is<ErrorType>() ||
-             replacement->hasDependentProtocolConformances());
-      currentConformances.push_back(
-                  ProtocolConformanceRef(protoType->getDecl(), conformance));
-      break;
-    }
+    bool conforms = tc.conformsToProtocol(
+                      replacement,
+                      protoType->getDecl(),
+                      getConstraintSystem().DC,
+                      (ConformanceCheckFlags::InExpression|
+                       ConformanceCheckFlags::Used),
+                      &conformance);
+    (void)isOpenedAnyObject;
+    assert((conforms ||
+            replacement->is<ErrorType>() ||
+            isOpenedAnyObject(replacement) ||
+            replacement->is<GenericTypeParamType>()) &&
+           "Constraint system missed a conformance?");
+    (void)conforms;
 
-    case RequirementKind::Superclass:
-      // Superclass requirements aren't recorded in substitutions.
-      break;
+    assert(conformance ||
+           replacement->is<ErrorType>() ||
+           replacement->hasDependentProtocolConformances());
 
-    case RequirementKind::SameType:
-      // Same-type requirements aren't recorded in substitutions.
-      break;
+    return ProtocolConformanceRef(protoType->getDecl(), conformance);
+  };
 
-    case RequirementKind::WitnessMarker:
-      // Flush the current conformances.
-      if (currentArchetype) {
-        substitutions.push_back({
-          currentReplacement,
-          ctx.AllocateCopy(currentConformances)
-        });
-        currentConformances.clear();
-      }
-
-      // Each witness marker starts a new substitution.
-      currentArchetype = firstArchetype;
-      currentReplacement = req.getFirstType().subst(currentModule,
-                                                    typeSubstitutions,
-                                                    None);
-      if (!currentReplacement)
-        currentReplacement = tc.Context.TheErrorType;
-
-      break;
-    }
-  }
-  
-  // Flush the final conformances.
-  if (currentArchetype) {
-    substitutions.push_back({
-      currentReplacement,
-      ctx.AllocateCopy(currentConformances),
-    });
-    currentConformances.clear();
-  }
-
+  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
   return type;
 }
 

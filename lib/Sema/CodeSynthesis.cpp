@@ -1271,9 +1271,9 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   
   // Add the witnesses to the conformance.
   ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
+  if (auto *sig = DC->getGenericSignatureOfContext()) {
     MemberSubs = DC->getGenericParamsOfContext()
-                   ->getForwardingSubstitutions(Context);
+                   ->getForwardingSubstitutions(sig);
   }
   
   BehaviorConformance->setWitness(BehaviorStorage,
@@ -1440,9 +1440,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   // Add the witnesses to the conformance.
   ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
+  if (auto *sig = DC->getGenericSignatureOfContext()) {
     MemberSubs = DC->getGenericParamsOfContext()
-    ->getForwardingSubstitutions(Context);
+    ->getForwardingSubstitutions(sig);
   }
 
   BehaviorConformance->setWitness(BehaviorParameter,

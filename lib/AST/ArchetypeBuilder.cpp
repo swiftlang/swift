@@ -909,19 +909,16 @@ auto ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   return PA;
 }
 
-bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
+void ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   ProtocolDecl *RootProtocol = dyn_cast<ProtocolDecl>(GenericParam->getDeclContext());
   if (!RootProtocol) {
     if (auto Ext = dyn_cast<ExtensionDecl>(GenericParam->getDeclContext()))
       RootProtocol = dyn_cast_or_null<ProtocolDecl>(Ext->getExtendedType()->getAnyNominal());
   }
-  PotentialArchetype *PA
-    = addGenericParameter(
+  addGenericParameter(
         GenericParam->getDeclaredType()->castTo<GenericTypeParamType>(),
         RootProtocol,
         GenericParam->getName());
-
-  return (!PA);
 }
 
 bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *GenericParam) {
@@ -935,17 +932,14 @@ bool ArchetypeBuilder::addGenericParameterRequirements(GenericTypeParamDecl *Gen
                                           visited);
 }
 
-bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
+void ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
   auto name = GenericParam->getName();
   // Trim '$' so that archetypes are more readily discernible from abstract
   // parameters.
   if (name.str().startswith("$"))
     name = Context.getIdentifier(name.str().slice(1, name.str().size()));
   
-  PotentialArchetype *PA = addGenericParameter(GenericParam,
-                                               nullptr,
-                                               name);
-  return !PA;
+  addGenericParameter(GenericParam, nullptr, name);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
@@ -2096,18 +2090,17 @@ Type ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
   return type;
 }
 
-bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
+void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
                                            bool adoptArchetypes,
                                            bool treatRequirementsAsExplicit) {
-  if (!sig) return false;
+  if (!sig) return;
   
   RequirementSource::Kind sourceKind = treatRequirementsAsExplicit
     ? RequirementSource::Explicit
     : RequirementSource::OuterScope;
   
   for (auto param : sig->getGenericParams()) {
-    if (addGenericParameter(param))
-      return true;
+    addGenericParameter(param);
 
     if (adoptArchetypes) {
       // If this generic parameter has an archetype, use it as the concrete
@@ -2125,7 +2118,6 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
           pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
         }
       }
-
     }
   }
 
@@ -2133,7 +2125,6 @@ bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
   for (auto &reqt : sig->getRequirements()) {
     addRequirement(reqt, source);
   }
-  return false;
 }
 
 Type ArchetypeBuilder::substDependentType(Type type) {

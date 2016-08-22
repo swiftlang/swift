@@ -26,6 +26,7 @@
 namespace swift {
 
 class ArchetypeBuilder;
+class ProtocolType;
 
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
@@ -163,13 +164,23 @@ public:
     assert(Mem);
     return Mem;
   }
-  
-  /// Build a substitution map from a vector of Substitutions that correspond to
-  /// the generic parameters in this generic signature. The order of primary
-  /// archetypes in the substitution vector must match the order of generic
-  /// parameters in getGenericParams().
+
+  /// Build an interface type substitution map from a vector of Substitutions
+  /// that correspond to the generic parameters in this generic signature.
+  /// The order of primary archetypes in the substitution vector must match
+  /// the order of generic parameters in getGenericParams().
   TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
-  
+
+  using LookupConformanceFn =
+      llvm::function_ref<ProtocolConformanceRef(Type, ProtocolType *)>;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(ModuleDecl &mod,
+                        const TypeSubstitutionMap &subs,
+                        LookupConformanceFn lookupConformance,
+                        SmallVectorImpl<Substitution> &result);
+
   /// Return a range that iterates through first all of the generic parameters
   /// of the signature, followed by all of their recursive member types exposed
   /// through protocol requirements.
@@ -181,7 +192,7 @@ public:
     return GenericSignatureWitnessIterator(getRequirements());
   }
 
-  /// Determines whether this ASTContext is canonical.
+  /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
   
   ASTContext &getASTContext() const;

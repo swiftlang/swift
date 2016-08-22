@@ -29,7 +29,6 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -1049,9 +1048,6 @@ public:
   void printAsWritten(raw_ostream &OS) const;
 };
   
-template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
-class NestedGenericParamListIterator;
-  
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
@@ -1221,15 +1217,6 @@ public:
     AllArchetypes = AA;
   }
 
-  using NestedArchetypeIterator
-    = NestedGenericParamListIterator<ArchetypeType*,
-                                     &GenericParamList::getAllArchetypes>;
-  
-  /// \brief Retrieves a list containing all archetypes from this generic
-  /// parameter clause and all outer generic parameter clauses in outer-to-
-  /// inner order.
-  iterator_range<NestedArchetypeIterator> getAllNestedArchetypes() const;
-  
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
   /// exists.
@@ -1283,9 +1270,15 @@ public:
     return depth;
   }
 
-  /// Derive a type substitution map for this generic parameter list from a
-  /// matching substitution vector.
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
+  /// Derive a contextual type substitution map from a substitution array.
+  /// This is just like GenericSignature::getSubstitutionMap(), except
+  /// with contextual types instead of interface types.
+  void
+  getSubstitutionMap(ModuleDecl *mod,
+                     GenericSignature *sig,
+                     ArrayRef<Substitution> subs,
+                     TypeSubstitutionMap &subsMap,
+                     ArchetypeConformanceMap &conformanceMap) const;
 
   /// Derive the all-archetypes list for the given list of generic
   /// parameters.
@@ -1293,7 +1286,10 @@ public:
   deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
 
-  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C);
+  void getForwardingSubstitutionMap(TypeSubstitutionMap &result) const;
+
+  ArrayRef<Substitution>
+  getForwardingSubstitutions(GenericSignature *sig) const;
 
   /// Collect the nested archetypes of an archetype into the given
   /// collection.
@@ -1308,79 +1304,6 @@ public:
   void dump();
 };
   
-/// An iterator template for lazily walking a nested generic parameter list.
-template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
-class NestedGenericParamListIterator {
-  SmallVector<const GenericParamList*, 2> stack;
-  ArrayRef<T> elements;
-
-  void refreshElements() {
-    while (elements.empty()) {
-      stack.pop_back();
-      if (stack.empty()) break;
-      elements = (stack.back()->*accessor)();
-    }
-  }
-public:
-  // Create a 'begin' iterator for a generic param list.
-  NestedGenericParamListIterator(const GenericParamList *params) {
-    // Walk up to the outermost list to create a stack of lists to walk.
-    while (params) {
-      stack.push_back(params);
-      params = params->getOuterParameters();
-    }
-    // If the stack is empty, be like the 'end' iterator.
-    if (stack.empty())
-      return;
-
-    elements = (stack.back()->*accessor)();
-    refreshElements();
-  }
-  
-  // Create an 'end' iterator.
-  NestedGenericParamListIterator() {}
-  
-  // Iterator dereference.
-  const T &operator*() const {
-    return elements[0];
-  }
-  const T *operator->() const {
-    return &elements[0];
-  }
-  
-  // Iterator advancement.
-  NestedGenericParamListIterator &operator++() {
-    elements = elements.slice(1);
-    refreshElements();
-    return *this;
-  }
-  NestedGenericParamListIterator operator++(int) {
-    auto copy = *this;
-    ++(*this);
-    return copy;
-  }
-  
-  // Ghetto comparison. Only true if end() == end().
-  bool operator==(const NestedGenericParamListIterator &o) const {
-    return stack.empty() && o.stack.empty();
-  }
-  bool operator!=(const NestedGenericParamListIterator &o) const {
-    return !stack.empty() || !o.stack.empty();
-  }
-  
-  // An empty range of nested archetypes.
-  static iterator_range<NestedGenericParamListIterator> emptyRange() {
-    return {{}, {}};
-  }
-};
-  
-using NestedArchetypeIterator = GenericParamList::NestedArchetypeIterator;
-
-inline iterator_range<NestedArchetypeIterator>
-GenericParamList::getAllNestedArchetypes() const {
-  return {NestedArchetypeIterator(this), NestedArchetypeIterator()};
-}
-
 /// A trailing where clause.
 class alignas(RequirementRepr) TrailingWhereClause final :
     private llvm::TrailingObjects<TrailingWhereClause, RequirementRepr> {

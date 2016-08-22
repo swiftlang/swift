@@ -94,6 +94,9 @@ private:
   /// The context archetypes of the function.
   GenericParamList *ContextGenericParams;
 
+  /// The forwarding substitutions, lazily computed.
+  Optional<ArrayRef<Substitution>> ForwardingSubs;
+
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
   BlockListType BlockList;

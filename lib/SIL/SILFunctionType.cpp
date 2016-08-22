@@ -2105,13 +2105,13 @@ namespace {
       public CanTypeVisitor<SILTypeSubstituter, CanType> {
     SILModule &TheSILModule;
     Module *TheASTModule;
-    TypeSubstitutionMap &Subs;
+    const TypeSubstitutionMap &Subs;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs)
+                       const TypeSubstitutionMap &subs)
       : TheSILModule(silModule), TheASTModule(astModule), Subs(subs)
     {}
 
@@ -2219,19 +2219,19 @@ namespace {
 }
 
 SILType SILType::substType(SILModule &silModule, Module *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy) {
+                           const TypeSubstitutionMap &subs, SILType SrcTy) {
   return SrcTy.subst(silModule, astModule, subs);
 }
 
 SILType SILType::subst(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs) const {
+                       const TypeSubstitutionMap &subs) const {
   SILTypeSubstituter STST(silModule, astModule, subs);
   return STST.subst(*this);
 }
 
 CanSILFunctionType SILType::substFuncType(SILModule &silModule,
                                           Module *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics) {
   SILTypeSubstituter STST(silModule, astModule, subs);

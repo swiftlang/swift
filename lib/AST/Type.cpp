@@ -2767,19 +2767,32 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-TypeSubstitutionMap
-GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
+void GenericParamList::
+getSubstitutionMap(ModuleDecl *mod,
+                   GenericSignature *sig,
+                   ArrayRef<Substitution> subs,
+                   TypeSubstitutionMap &subsMap,
+                   ArchetypeConformanceMap &conformanceMap) const {
+
+  // Map from interface types to archetypes
   TypeSubstitutionMap map;
-  
-  for (auto arch : getAllNestedArchetypes()) {
-    auto sub = Subs.front();
-    Subs = Subs.slice(1);
-    
-    map.insert({arch, sub.getReplacement()});
+  getForwardingSubstitutionMap(map);
+
+  for (auto depTy : sig->getAllDependentTypes()) {
+
+    // Map the interface type to a context type.
+    auto contextTy = depTy.subst(mod, map, SubstOptions());
+    auto *archetype = contextTy->castTo<ArchetypeType>();
+
+    auto sub = subs.front();
+    subs = subs.slice(1);
+
+    // Record the replacement type and its conformances.
+    subsMap[archetype] = sub.getReplacement();
+    conformanceMap[archetype] = sub.getConformances();
   }
   
-  assert(Subs.empty() && "did not use all substitutions?!");
-  return map;
+  assert(subs.empty() && "did not use all substitutions?!");
 }
 
 FunctionType *
@@ -2895,7 +2908,8 @@ Type DependentMemberType::substBaseType(Module *module,
                               None);
 }
 
-Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
+Type Type::subst(Module *module,
+                 const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
@@ -2995,8 +3009,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType()
-                    ->castTo<GenericTypeParamType>()]
+                    ->getCanonicalType().getPointer()]
       = baseTy;
     return substitutions;
   }
@@ -3027,8 +3040,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()]
-          = args[i];
+                        .getPointer()] = args[i];
       }
 
       // Continue looking into the parent.

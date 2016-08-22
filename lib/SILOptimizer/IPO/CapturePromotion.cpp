@@ -862,6 +862,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   // Create the substitution maps.
   TypeSubstitutionMap InterfaceSubs;
   TypeSubstitutionMap ContextSubs;
+  ArchetypeConformanceMap ConformanceMap;
 
   ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
   auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
@@ -869,7 +870,9 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   if (!ApplySubs.empty()) {
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-    ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
+    genericParams->getSubstitutionMap(F->getModule().getSwiftModule(),
+                                      genericSig, ApplySubs,
+                                      ContextSubs, ConformanceMap);
   } else {
     assert(!genericSig && "Function type has Unexpected generic signature!");
     assert(!genericParams &&

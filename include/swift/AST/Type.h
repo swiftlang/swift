@@ -167,7 +167,8 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module, TypeSubstitutionMap &substitutions,
+  Type subst(ModuleDecl *module,
+             const TypeSubstitutionMap &substitutions,
              SubstOptions options) const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;

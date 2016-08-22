@@ -491,9 +491,10 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArrayRef<Substitution> subs;
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
-  if (auto *genericParamList = ctor->getGenericParamsOfContext())
-    forwardingSubs =
-        genericParamList->getForwardingSubstitutions(getASTContext());
+  if (auto *genericParamList = ctor->getGenericParamsOfContext()) {
+    auto *genericSig = ctor->getGenericSignatureOfContext();
+    forwardingSubs = genericParamList->getForwardingSubstitutions(genericSig);
+  }
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
@@ -871,8 +872,10 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // Get the substitutions for the constructor context.
         ArrayRef<Substitution> subs;
         auto *genericParams = dc->getGenericParamsOfContext();
-        if (genericParams)
-          subs = genericParams->getForwardingSubstitutions(getASTContext());
+        if (genericParams) {
+          auto *genericSig = dc->getGenericSignatureOfContext();
+          subs = genericParams->getForwardingSubstitutions(genericSig);
+        }
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.
