@@ -1764,6 +1764,9 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // Okay, now do layout.
   for (unsigned i = 0; i != numFields; ++i) {
+    // Skip empty fields.
+    if (fieldOffsets[i] == 0 && fieldLayouts[i].Size == 0)
+      continue;
     auto offset = roundUpToAlignMask(size, fieldLayouts[i].AlignMask);
     fieldOffsets[i] = offset;
     size = offset + fieldLayouts[i].Size;
