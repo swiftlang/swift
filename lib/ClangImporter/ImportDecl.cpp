@@ -5148,11 +5148,8 @@ namespace {
     GenericSignature *calculateGenericSignature(GenericParamList *genericParams,
                                                 DeclContext *dc) {
       ArchetypeBuilder builder(*dc->getParentModule(), Impl.SwiftContext.Diags);
-      for (auto param : *genericParams) {
-        if (builder.addGenericParameter(param)) {
-          return nullptr;
-        }
-      }
+      for (auto param : *genericParams)
+        builder.addGenericParameter(param);
       for (auto param : *genericParams) {
         if (builder.addGenericParameterRequirements(param)) {
           return nullptr;

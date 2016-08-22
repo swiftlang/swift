@@ -388,6 +388,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         I = ApplyBlock->end();
 
       TypeSubstitutionMap ContextSubs;
+      ArchetypeConformanceMap ConformanceMap;
+
       std::vector<Substitution> ApplySubs(InnerAI.getSubstitutions());
 
       if (PAI) {
@@ -395,8 +397,13 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
       }
 
-      ContextSubs.copyFrom(CalleeFunction->getContextGenericParams()
-                                         ->getSubstitutionMap(ApplySubs));
+      if (auto *params = CalleeFunction->getContextGenericParams()) {
+        auto sig = CalleeFunction->getLoweredFunctionType()
+            ->getGenericSignature();
+        params->getSubstitutionMap(F->getModule().getSwiftModule(),
+                                   sig, ApplySubs,
+                                   ContextSubs, ConformanceMap);
+      }
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*F);
       F->getModule().registerDeleteNotificationHandler(

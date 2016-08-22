@@ -555,8 +555,15 @@ void SILFunction::convertToDeclaration() {
 }
 
 ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
+  if (ForwardingSubs)
+    return *ForwardingSubs;
+
   auto *params = getContextGenericParams();
   if (!params)
     return {};
-  return params->getForwardingSubstitutions(getASTContext());
+
+  auto sig = getLoweredFunctionType()->getGenericSignature();
+  ForwardingSubs = params->getForwardingSubstitutions(sig);
+
+  return *ForwardingSubs;
 }

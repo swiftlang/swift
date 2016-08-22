@@ -414,6 +414,63 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   return subs;
 }
 
+void GenericSignature::
+getSubstitutions(ModuleDecl &mod,
+                 const TypeSubstitutionMap &subs,
+                 GenericSignature::LookupConformanceFn lookupConformance,
+                 SmallVectorImpl<Substitution> &result) {
+  auto &ctx = getASTContext();
+
+  Type currentReplacement;
+  SmallVector<ProtocolConformanceRef, 4> currentConformances;
+
+  for (const auto &req : getRequirements()) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      // Get the conformance and record it.
+      auto protoType = req.getSecondType()->castTo<ProtocolType>();
+      currentConformances.push_back(
+          lookupConformance(currentReplacement, protoType));
+      break;
+    }
+
+    case RequirementKind::Superclass:
+      // Superclass requirements aren't recorded in substitutions.
+      break;
+
+    case RequirementKind::SameType:
+      // Same-type requirements aren't recorded in substitutions.
+      break;
+
+    case RequirementKind::WitnessMarker:
+      // Flush the current conformances.
+      if (currentReplacement) {
+        result.push_back({
+          currentReplacement,
+          ctx.AllocateCopy(currentConformances)
+        });
+        currentConformances.clear();
+      }
+
+      // Each witness marker starts a new substitution.
+      currentReplacement = req.getFirstType().subst(&mod, subs, SubstOptions());
+      if (!currentReplacement)
+        currentReplacement = ErrorType::get(ctx);
+
+      break;
+    }
+  }
+
+  // Flush the final conformances.
+  if (currentReplacement) {
+    result.push_back({
+      currentReplacement,
+      ctx.AllocateCopy(currentConformances),
+    });
+    currentConformances.clear();
+  }
+}
+
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return false;
 

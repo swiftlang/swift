@@ -1757,9 +1757,11 @@ public:
     auto methodTy = constantInfo.SILFnType;
 
     // Map interface types to archetypes.
-    if (auto *params = constantInfo.ContextGenericParams)
-      methodTy = methodTy->substGenericArgs(F.getModule(), M,
-                                            params->getForwardingSubstitutions(C));
+    if (auto *params = constantInfo.ContextGenericParams) {
+      auto sig = constantInfo.SILFnType->getGenericSignature();
+      auto subs = params->getForwardingSubstitutions(sig);
+      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+    }
     assert(!methodTy->isPolymorphic());
 
     // Replace Self parameter with type of 'self' at the call site.

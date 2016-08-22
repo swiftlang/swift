@@ -187,9 +187,14 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
-  if (GenericFunc->getContextGenericParams())
-    ContextSubs = GenericFunc->getContextGenericParams()
-      ->getSubstitutionMap(ParamSubs);
+  if (auto *params = GenericFunc->getContextGenericParams()) {
+    auto sig = GenericFunc->getLoweredFunctionType()->getGenericSignature();
+
+    ArchetypeConformanceMap conformanceMap;
+    params->getSubstitutionMap(M.getSwiftModule(), sig,
+                               ParamSubs, ContextSubs,
+                               conformanceMap);
+  }
 
   Mangle::Mangler Mangler;
   GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,

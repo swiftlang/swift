@@ -333,13 +333,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 }
 
-SubstitutionIterator
-SpecializedProtocolConformance::getGenericSubstitutionIterator() const {
-  return SubstitutionIterator(
-          GenericConformance->getDeclContext()->getGenericParamsOfContext(),
-                              GenericSubstitutions);
-}
-
 bool SpecializedProtocolConformance::hasTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
@@ -358,16 +351,33 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  TypeSubstitutionMap substitutionMap = GenericConformance->getGenericParams()
-    ->getSubstitutionMap(GenericSubstitutions);
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
+
+  auto *genericParams = GenericConformance->getGenericParams();
+  auto *genericSig = GenericConformance->getGenericSignature();
+
+  TypeSubstitutionMap substitutionMap;
+
+  // FIXME: We could have a new version of Type::subst() that
+  // takes a conformanceMap in addition to a substitutionMap,
+  // but for now this is ignored below
+  ArchetypeConformanceMap conformanceMap;
+
+  // Compute a context type substitution map from the
+  // substitution array stored in this conformance
+  genericParams->getSubstitutionMap(conformingModule, genericSig,
+                                    GenericSubstitutions,
+                                    substitutionMap,
+                                    conformanceMap);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
 
   auto &genericWitness = genericWitnessAndDecl.first;
   auto *typeDecl = genericWitnessAndDecl.second;
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
+
+  // Apply the substitution we computed above
   auto specializedType
     = genericWitness.getReplacement().subst(conformingModule, substitutionMap,
                                             None);
@@ -503,20 +513,23 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     assert(inherited->getType()->isEqual(spec->getGenericConformance()->getType())
            && "inherited conformance doesn't match type?!");
     
+    // Fill in the substitution and conformance maps.
     TypeSubstitutionMap subMap;
     ArchetypeConformanceMap conformanceMap;
-    
-    // Fill in the substitution and conformance maps.
-    for (auto archAndSub : spec->getGenericSubstitutionIterator()) {
-      auto arch = archAndSub.first;
-      auto sub = archAndSub.second;
-      conformanceMap[arch] = sub.getConformances();
-      if (arch->isPrimary())
-        subMap[arch] = sub.getReplacement();
-    }
-    auto r = inherited->subst(getDeclContext()->getParentModule(),
-                            getType(), spec->getGenericSubstitutions(),
-                            subMap, conformanceMap);
+
+    auto subs = spec->getGenericSubstitutions();
+
+    auto *conformingDC = spec->getDeclContext();
+    auto *conformingModule = conformingDC->getParentModule();
+
+    auto *sig = conformingDC->getGenericSignatureOfContext();
+    auto *params = conformingDC->getGenericParamsOfContext();
+
+    params->getSubstitutionMap(conformingModule, sig, subs,
+                               subMap, conformanceMap);
+
+    auto r = inherited->subst(conformingModule, getType(), subs,
+                              subMap, conformanceMap);
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;

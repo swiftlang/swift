@@ -66,7 +66,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
           gen.SGM.SwiftModule, nullptr);
 
   if (!substitutions.empty()) {
-    // Substitute into the witness function tye.
+    // Substitute into the witness function type.
     witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
   }
 

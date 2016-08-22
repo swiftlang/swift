@@ -59,12 +59,17 @@ public:
   void dump() const;
   void dump(llvm::raw_ostream &os, unsigned indent = 0) const;
   
-  /// Substitute the replacement and conformance types with the given
-  /// substitution vector.
+  /// Apply a substitution to this substitution's replacement type and
+  /// conformances.
+  ///
+  /// Our replacement type must be written in terms of the context
+  /// archetypes of 'context', which in turn must be derived from the
+  /// generic requirements of 'sig'.
   Substitution subst(ModuleDecl *module,
+                     GenericSignature *sig,
                      GenericParamList *context,
                      ArrayRef<Substitution> subs) const;
-  
+
 private:
   friend class ProtocolConformance;
   
@@ -72,60 +77,6 @@ private:
                      ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,
                      ArchetypeConformanceMap &conformanceMap) const;
-};
-
-/// An iterator over a list of archetypes and the substitutions
-/// applied to them.
-class SubstitutionIterator {
-  // TODO: this should use dependent types when getConformsTo() becomes
-  // efficient there.
-  ArrayRef<ArchetypeType*> Archetypes;
-  ArrayRef<Substitution> Subs;
-
-public:
-  SubstitutionIterator() = default;
-  explicit SubstitutionIterator(GenericParamList *params,
-                                ArrayRef<Substitution> subs);
-
-  struct iterator {
-    ArchetypeType * const *NextArch = nullptr;
-    const Substitution *NextSub = nullptr;
-
-    iterator() = default;
-    iterator(ArchetypeType * const *nextArch, const Substitution *nextSub)
-      : NextArch(nextArch), NextSub(nextSub) {}
-
-    iterator &operator++() {
-      ++NextArch;
-      ++NextSub;
-      return *this;
-    }
-
-    iterator operator++(int) {
-      iterator copy = *this;
-      ++*this;
-      return copy;
-    }
-
-    std::pair<ArchetypeType*,Substitution> operator*() const {
-      return { *NextArch, *NextSub };
-    }
-
-    bool operator==(const iterator &other) const {
-      assert((NextSub == other.NextSub) == (NextArch == other.NextArch));
-      return NextSub == other.NextSub;
-    }
-    bool operator!=(const iterator &other) const {
-      return !(*this == other);
-    }
-  };
-
-  ArrayRef<Substitution> getSubstitutions() const { return Subs; }
-
-  bool empty() const { return Archetypes.empty(); }
-
-  iterator begin() const { return { Archetypes.begin(), Subs.begin() }; }
-  iterator end() const { return { Archetypes.end(), Subs.end() }; }
 };
 
 void dump(const ArrayRef<Substitution> &subs);

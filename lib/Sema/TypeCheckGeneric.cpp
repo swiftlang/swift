@@ -271,10 +271,8 @@ bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   for (auto param : *genericParams) {
     param->setDepth(depth);
 
-    if (builder) {
-      if (builder->addGenericParameter(param))
-        invalid = true;
-    }
+    if (builder)
+      builder->addGenericParameter(param);
   }
 
   // Now, check the inheritance clauses of each parameter.
