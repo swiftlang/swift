@@ -545,8 +545,10 @@ static DtorKind analyzeDestructor(Value *P) {
 
   // We have to have a known heap metadata value, reject dynamically computed
   // ones, or places
+  // Also, make sure we have a definitive initializer for the global.
   GlobalVariable *GV = dyn_cast<GlobalVariable>(P->stripPointerCasts());
-  if (GV == 0 || GV->mayBeOverridden()) return DtorKind::Unknown;
+  if (GV == 0 || !GV->hasDefinitiveInitializer())
+    return DtorKind::Unknown;
 
   ConstantStruct *CS = dyn_cast_or_null<ConstantStruct>(GV->getInitializer());
   if (CS == 0 || CS->getNumOperands() == 0) return DtorKind::Unknown;
