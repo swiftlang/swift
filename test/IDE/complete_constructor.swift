@@ -25,6 +25,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_1 | %FileCheck %s -check-prefix=HAVE_RPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_2 | %FileCheck %s -check-prefix=HAVE_RPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_COMMA_1 | %FileCheck %s -check-prefix=HAVE_COMMA_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_ALIAS_1 | %FileCheck %s -check-prefix=WITH_ALIAS_1
 
 func freeFunc() {}
 
@@ -237,3 +238,13 @@ func testHaveComma1() {
   ExplicitConstructors1(#^HAVE_COMMA_1^#,
 // HAVE_COMMA_1-NOT: Decl[Constructor]
 }
+
+class WithAlias1 {
+  init(busted: B) {}
+  init(working: Int) {}
+}
+typealias Alias1 = WithAlias1
+func testWithAlias1() {
+  Alias1#^WITH_ALIAS_1^#
+}
+// WITH_ALIAS_1: Decl[Constructor]/CurrNominal:      ({#working: Int#})[#Alias1#];
