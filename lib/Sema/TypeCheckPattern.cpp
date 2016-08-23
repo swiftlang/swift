@@ -1455,8 +1455,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
   case PatternKind::OptionalSome: {
     auto *OP = cast<OptionalSomePattern>(P);
-    auto *enumDecl = type->getEnumOrBoundGenericEnum();
-    if (!enumDecl) {
+    OptionalTypeKind optionalKind;
+    Type elementType = type->getAnyOptionalObjectType(optionalKind);
+
+    if (elementType.isNull()) {
       auto diagID = diag::optional_element_pattern_not_valid_type;
       SourceLoc loc = OP->getQuestionLoc();
       // Produce tailored diagnostic for if/let and other conditions.
@@ -1469,35 +1471,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       return true;
     }
 
-    // If the element decl was not resolved (because it was spelled without a
-    // type as `.Foo`), resolve it now that we have a type.
-    if (!OP->getElementDecl()) {
-      auto *element = lookupEnumMemberElement(*this, dc, type, Context.Id_some,
-                                              OP->getLoc());
-      if (!element) {
-        diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
-                 "Some", type);
-        return true;
-      }
-      OP->setElementDecl(element);
-    }
+    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
+    assert(elementDecl && "missing optional some decl?!");
+    OP->setElementDecl(elementDecl);
 
-    EnumElementDecl *elt = OP->getElementDecl();
-    // Is the enum element actually part of the enum type we're matching?
-    if (elt->getParentEnum() != enumDecl) {
-      diagnose(OP->getLoc(), diag::enum_element_pattern_not_member_of_enum,
-               "Some", type);
-      return true;
-    }
-
-    // Check the subpattern & push the enum element type down onto it.
-    Type elementType;
-    if (elt->hasArgumentType())
-      elementType = type->getTypeOfMember(elt->getModuleContext(),
-                                          elt, this,
-                                          elt->getArgumentInterfaceType());
-    else
-      elementType = TupleType::getEmpty(Context);
     Pattern *sub = OP->getSubPattern();
     if (coercePatternToType(sub, dc, elementType,
                             subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
