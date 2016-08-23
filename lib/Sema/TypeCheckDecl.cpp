@@ -4357,6 +4357,8 @@ public:
                         dc->getDeclaredInterfaceType())
               .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                            "static ");
+
+            FD->setStatic();
           } else {
             TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
                         operatorName, dc->getDeclaredInterfaceType())
@@ -4372,6 +4374,7 @@ public:
                     dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "static ");
+        FD->setStatic();
       }
     } else if (!dc->isModuleScopeContext()) {
       TC.diagnose(FD, diag::operator_in_local_scope);
