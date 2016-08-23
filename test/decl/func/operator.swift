@@ -345,3 +345,11 @@ class C5 {
     _ = x == x
   }
 }
+
+class C6 {
+  static func == (lhs: C6, rhs: C6) -> Bool { return false }
+
+  func test1(x: C6) {
+    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+  }
+}
