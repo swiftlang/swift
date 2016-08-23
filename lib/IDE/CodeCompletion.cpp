@@ -1578,11 +1578,15 @@ static bool isTopLevelContext(const DeclContext *DC) {
 
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (auto FT = FD->getType()->getAs<FunctionType>()) {
-      return FT->getResult();
+    if (FD->hasType()) {
+      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+        return FT->getResult();
+      }
     }
   } else if (auto CE = dyn_cast<AbstractClosureExpr>(DC)) {
-    return CE->getResultType();
+    if (CE->getType()) {
+      return CE->getResultType();
+    }
   }
   return Type();
 }
