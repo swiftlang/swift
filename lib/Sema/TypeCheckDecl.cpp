@@ -2079,6 +2079,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     return ObjCReason::WitnessToObjC;
   else if (VD->isInvalid())
     return None;
+  else if (VD->isOperator())
+    return None;
   // Implicitly generated declarations are not @objc, except for constructors.
   else if (!allowImplicit && VD->isImplicit())
     return None;
@@ -8136,12 +8138,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         error = diag::objc_enum_case_req_objc_enum;
       else if (objcAttr->hasName() && EED->getParentCase()->getElements().size() > 1)
         error = diag::objc_enum_case_multi;
-    } else if (isa<FuncDecl>(D)) {
-      auto func = cast<FuncDecl>(D);
+    } else if (auto *func = dyn_cast<FuncDecl>(D)) {
       if (!checkObjCDeclContext(D))
         error = diag::invalid_objc_decl_context;
       else if (func->isOperator())
-        error = diag::invalid_objc_decl;
+        error = diag::objc_operator;
       else if (func->isAccessor() && !func->isGetterOrSetter())
         error = diag::objc_observing_accessor;
     } else if (isa<ConstructorDecl>(D) ||
