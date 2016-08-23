@@ -169,6 +169,9 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
 
 def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
   HelpText<"Save intermediate compilation results">;
+def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Prints the total time it took to execute all compilation tasks">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
