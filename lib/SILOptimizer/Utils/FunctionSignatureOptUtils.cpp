@@ -75,13 +75,6 @@ bool swift::canSpecializeFunction(SILFunction *F) {
   if (F->getLoweredFunctionType()->hasIndirectResults())
     return false;
 
-  // Do not specialize functions that are available externally. If an external
-  // function was able to be specialized, it would have been specialized in its
-  // own module. We will inline the original function as a thunk. The thunk will
-  // call the specialized function.
-  if (F->isAvailableExternally())
-    return false;
-
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.

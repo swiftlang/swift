@@ -31,6 +31,8 @@ STATISTIC(NumCapturesPropagated, "Number of constant captures propagated");
 namespace {
 /// Propagate constants through closure captures by specializing the partially
 /// applied function.
+/// Also optimize away partial_apply instructions where all partially applied
+/// arguments are dead.
 class CapturePropagation : public SILFunctionTransform
 {
 public:
@@ -258,15 +260,11 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
                                              SILFunction *SpecialF) {
   SILBuilderWithScope Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
-  auto NewPAI = Builder.createPartialApply(OrigPAI->getLoc(),
-                                           FuncRef,
-                                           SpecialF->getLoweredType(),
-                                           ArrayRef<Substitution>(),
-                                           ArrayRef<SILValue>(),
-                                           OrigPAI->getType());
-  OrigPAI->replaceAllUsesWith(NewPAI);
+  auto *T2TF = Builder.createThinToThickFunction(OrigPAI->getLoc(),
+                                                 FuncRef, OrigPAI->getType());
+  OrigPAI->replaceAllUsesWith(T2TF);
   recursivelyDeleteTriviallyDeadInstructions(OrigPAI, true);
-  DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *NewPAI);
+  DEBUG(llvm::dbgs() << "  Rewrote caller:\n" << *T2TF);
 }
 
 /// For now, we conservative only specialize if doing so can eliminate dynamic
@@ -286,6 +284,92 @@ static bool isProfitable(SILFunction *Callee) {
   return false;
 }
 
+/// Returns true if block \p BB only contains a return or throw of the first
+/// block argument and side-effect-free instructions.
+static bool isArgReturnOrThrow(SILBasicBlock *BB) {
+  for (SILInstruction &I : *BB) {
+    if (isa<ReturnInst>(&I) || isa<ThrowInst>(&I)) {
+      SILValue RetVal = I.getOperand(0);
+      if (BB->getNumBBArg() == 1 && RetVal == BB->getBBArg(0))
+        return true;
+      return false;
+    }
+    if (I.mayHaveSideEffects() || isa<TermInst>(&I))
+      return false;
+  }
+  llvm_unreachable("should have seen a terminator instruction");
+}
+
+/// Checks if \p Orig is a thunk which calls another function but without
+/// passing the trailing \p numDeadParams dead parameters.
+static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
+                                                 int numDeadParams) {
+  SILBasicBlock &EntryBB = *Orig->begin();
+  unsigned NumArgs = EntryBB.getNumBBArg();
+  SILModule &M = Orig->getModule();
+  
+  // Check if all dead parameters have trivial types. We don't support non-
+  // trivial types because it's very hard to find places where we can release
+  // those parameters (as a replacement for the removed partial_apply).
+  // TODO: maybe we can skip this restrication when we have semantic ARC.
+  for (unsigned Idx = NumArgs - numDeadParams; Idx < NumArgs; ++Idx) {
+    SILType ArgTy = EntryBB.getBBArg(Idx)->getType();
+    if (!ArgTy.isTrivial(M))
+      return nullptr;
+  }
+  SILFunction *Specialized = nullptr;
+  SILValue RetValue;
+  
+  // Check all instruction of the entry block.
+  for (SILInstruction &I : EntryBB) {
+    if (auto FAS = FullApplySite::isa(&I)) {
+      
+      // Check if this is the call of the specialized function.
+      // As the original function is not generic, also the specialized function
+      // must be not generic.
+      if (FAS.hasSubstitutions())
+        return nullptr;
+      // Is it the only call?
+      if (Specialized)
+        return nullptr;
+      
+      Specialized = FAS.getReferencedFunction();
+      if (!Specialized)
+        return nullptr;
+
+      // Check if parameters are passes 1-to-1
+      unsigned NumArgs = FAS.getNumArguments();
+      if (EntryBB.getNumBBArg() - numDeadParams != NumArgs)
+        return nullptr;
+
+      for (unsigned Idx = 0; Idx < NumArgs; ++Idx) {
+        if (FAS.getArgument(Idx) != (ValueBase *)EntryBB.getBBArg(Idx))
+          return nullptr;
+      }
+
+      if (TryApplyInst *TAI = dyn_cast<TryApplyInst>(&I)) {
+        // Check the normal and throw blocks of the try_apply.
+        if (isArgReturnOrThrow(TAI->getNormalBB()) &&
+            isArgReturnOrThrow(TAI->getErrorBB()))
+          return Specialized;
+        return nullptr;
+      }
+      assert(isa<ApplyInst>(&I) && "unknown FullApplySite instruction");
+      RetValue = &I;
+      continue;
+    }
+    if (auto *RI = dyn_cast<ReturnInst>(&I)) {
+      // Check if we return the result of the apply.
+      if (RI->getOperand() != RetValue)
+        return nullptr;
+      continue;
+    }
+    if (I.mayHaveSideEffects() || isa<TermInst>(&I))
+      return nullptr;
+  }
+  return Specialized;
+}
+
 bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // Check if the partial_apply has generic substitutions.
   // FIXME: We could handle generic thunks if it's worthwhile.
@@ -295,15 +379,26 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   SILFunction *SubstF = PAI->getReferencedFunction();
   if (!SubstF)
     return false;
+  if (SubstF->isExternalDeclaration())
+    return false;
 
   assert(!SubstF->getLoweredFunctionType()->isPolymorphic() &&
          "cannot specialize generic partial apply");
 
+  // First possibility: Is it a partial_apply where all partially applied
+  // arguments are dead?
+  if (SILFunction *NewFunc = getSpecializedWithDeadParams(SubstF,
+                                                    PAI->getNumArguments())) {
+    rewritePartialApply(PAI, NewFunc);
+    return true;
+  }
+
+  // Second possibility: Are all partially applied arguments constant?
   for (auto Arg : PAI->getArguments()) {
     if (!isConstant(Arg))
       return false;
   }
-  if (SubstF->isExternalDeclaration() || !isProfitable(SubstF))
+  if (!isProfitable(SubstF))
     return false;
 
   DEBUG(llvm::dbgs() << "Specializing closure for constant arguments:\n"

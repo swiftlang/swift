@@ -97,9 +97,6 @@ class FunctionSignatureTransform {
   /// The newly created function.
   SILFunction *NewF;
 
-  /// The pass manager we are using.
-  SILPassManager *PM;
-
   /// The alias analysis we are using.
   AliasAnalysis *AA;
 
@@ -122,9 +119,6 @@ class FunctionSignatureTransform {
   /// Keep a "view" of precompiled information on the direct results that we
   /// will use during our optimization.
   llvm::SmallVector<ResultDescriptor, 4> &ResultDescList;
-
-  /// Does this function have a caller inside current module
-  bool hasCaller;
 
   /// Return a function name based on ArgumentDescList and ResultDescList.
   std::string createOptimizedSILFunctionName();
@@ -224,26 +218,32 @@ private:
 
 public:
   /// Constructor.
-  FunctionSignatureTransform(SILFunction *F, bool hasCaller, SILPassManager *PM,
+  FunctionSignatureTransform(SILFunction *F,
                              AliasAnalysis *AA, RCIdentityAnalysis *RCIA,
                              FunctionSignatureSpecializationMangler &FM,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), PM(PM), AA(AA), RCIA(RCIA), FM(FM),
+    : F(F), NewF(nullptr), AA(AA), RCIA(RCIA), FM(FM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
-      ResultDescList(RDL),
-      hasCaller(hasCaller) {}
+      ResultDescList(RDL) {}
 
   /// Return the optimized function.
   SILFunction *getOptimizedFunction() { return NewF; }
 
   /// Run the optimization.
-  bool run() {
+  bool run(bool hasCaller) {
     bool Changed = false;
+
+    if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+      DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+      return false;
+    }
+
     // Run OwnedToGuaranteed optimization.
     if (OwnedToGuaranteedAnalyze()) {
       Changed = true;
+      DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
       OwnedToGuaranteedTransform();
     }
 
@@ -252,6 +252,7 @@ public:
     // already created a thunk.
     if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
       Changed = true;
+      DEBUG(llvm::dbgs() << "  remove dead arguments\n");
       DeadArgumentTransformFunction();
     }
 
@@ -274,9 +275,45 @@ public:
     // Create the specialized function and invalidate the old function.
     if (Changed) {
       createFunctionSignatureOptimizedFunction();
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
     }
     return Changed;
+  }
+
+  /// Run dead argument elimination of partially applied functions.
+  /// After this optimization CapturePropagation can replace the partial_apply
+  /// by a direct reference to the specialized function.
+  bool removeDeadArgs(int minPartialAppliedArgs) {
+    if (minPartialAppliedArgs < 1)
+      return false;
+
+    if (!DeadArgumentAnalyzeParameters())
+      return false;
+
+    // Check if at least the minimum number of partially applied arguments
+    // are dead. Otherwise no partial_apply can be removed anyway.
+    for (unsigned Idx = 0, Num = ArgumentDescList.size(); Idx < Num; ++Idx) {
+      if (Idx < Num - minPartialAppliedArgs) {
+        // Don't remove arguments other than the partial applied ones, even if
+        // they are dead.
+        ArgumentDescList[Idx].IsEntirelyDead = false;
+      } else {
+        // Is the partially applied argument dead?
+        if (!ArgumentDescList[Idx].IsEntirelyDead)
+          return false;
+        
+        // Currently we require that all dead parameters have trivial types.
+        // The reason is that it's very hard to find places where we can release
+        // those parameters (as a replacement for the removed partial_apply).
+        // TODO: maybe we can skip this restrication when we have semantic ARC.
+        if (!ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+          return false;
+      }
+    }
+
+    DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
+    DeadArgumentTransformFunction();
+    createFunctionSignatureOptimizedFunction();
+    return true;
   }
 };
 
@@ -416,8 +453,14 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
   std::string Name = getUniqueName(createOptimizedSILFunctionName(), M);
+  SILLinkage linkage = F->getLinkage();
+  if (isAvailableExternally(linkage))
+    linkage = SILLinkage::Shared;
+
+  DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
+  
   NewF = M.createFunction(
-      F->getLinkage(), Name,
+      linkage, Name,
       createOptimizedSILFunctionType(), nullptr, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isFragile(), F->isThunk(), F->getClassVisibility(),
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
@@ -806,32 +849,39 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
 //===----------------------------------------------------------------------===//
 namespace {
 class FunctionSignatureOpts : public SILFunctionTransform {
+  
+  /// If true, perform a special kind of dead argument elimination to enable
+  /// removal of partial_apply instructions where all partially applied
+  /// arguments are dead.
+  bool OptForPartialApply;
+
 public:
+
+  FunctionSignatureOpts(bool OptForPartialApply) :
+     OptForPartialApply(OptForPartialApply) { }
+
   void run() override {
     auto *F = getFunction();
-    // This is the function to optimize.
-    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Don't optimize callees that should not be optimized.
     if (!F->shouldOptimize())
       return;
 
-    // Does this function have a caller inside this module.
-    bool hasCaller = PM->getAnalysis<CallerAnalysis>()->hasCaller(F);
-
-    // If this function does not have a direct caller in the current module
-    // and maybe called indirectly, e.g. from virtual table do not function
-    // signature specialize it, as this will introduce a thunk.
-    if (!hasCaller && canBeCalledIndirectly(F->getRepresentation()))
-      return; 
+    // This is the function to optimize.
+    DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
-    if (!canSpecializeFunction(F))
+    if (!canSpecializeFunction(F)) {
+      DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
+    }
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
+    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
 
     // As we optimize the function more and more, the name of the function is
     // going to change, make sure the mangler is aware of all the changes done
@@ -860,22 +910,34 @@ public:
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, hasCaller, PM, AA, RCIA, FM, AIM,
+    FunctionSignatureTransform FST(F, AA, RCIA, FM, AIM,
                                    ArgumentDescList, ResultDescList);
-    if (FST.run()) {
+
+    bool Changed = false;
+    if (OptForPartialApply) {
+      Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
+    } else {
+      Changed = FST.run(FuncInfo.hasCaller());
+    }
+    if (Changed) {
       ++ NumFunctionSignaturesOptimized;
       // The old function must be a thunk now.
       assert(F->isThunk() && "Old function should have been turned into a thunk");
+
+      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+
       // Make sure the PM knows about this function. This will also help us
       // with self-recursion.
       notifyPassManagerOfFunction(FST.getOptimizedFunction(), F);
 
-      // We have to restart the pipeline for this thunk in order to run the
-      // inliner (and other opts) again. This is important if the new
-      // specialized function (which is called from this thunk) is
-      // function-signature-optimized again and also becomes an
-      // always-inline-thunk.
-      restartPassPipeline();
+      if (!OptForPartialApply) {
+        // We have to restart the pipeline for this thunk in order to run the
+        // inliner (and other opts) again. This is important if the new
+        // specialized function (which is called from this thunk) is
+        // function-signature-optimized again and also becomes an
+        // always-inline-thunk.
+        restartPassPipeline();
+      }
     }
   }
 
@@ -885,5 +947,9 @@ public:
 } // end anonymous namespace
 
 SILTransform *swift::createFunctionSignatureOpts() {
-  return new FunctionSignatureOpts();
+  return new FunctionSignatureOpts(/* OptForPartialApply */ false);
+}
+
+SILTransform *swift::createDeadArgSignatureOpt() {
+  return new FunctionSignatureOpts(/* OptForPartialApply */ true);
 }
