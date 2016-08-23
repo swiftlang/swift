@@ -311,6 +311,13 @@ class BuildScriptInvocation(object):
                 platform.system() != "Darwin"):
             args.build_foundation = True
 
+        # Foundation has a dependency on libdispatch.
+        # On OS X, libdispatch is provided by the OS.
+        # On Linux, we must ensure that it is built manually.
+        if (args.build_foundation and
+                platform.system() != "Darwin"):
+            args.build_libdispatch = True
+
         # Propagate global --skip-build
         if args.skip_build:
             args.skip_build_linux = True
