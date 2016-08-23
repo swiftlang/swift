@@ -15,6 +15,37 @@ protocol Implemented {}
 protocol Unimplemented {}
 extension Int : Implemented {}
 
+struct HashableStruct : Hashable {
+  var value : Int
+  static func ==(lhs: HashableStruct, rhs: HashableStruct) -> Bool {
+    return lhs.value == rhs.value
+  }
+  var hashValue : Int { return value }
+}
+
+class HashableClass : Hashable {
+  var value : Int
+  init(value v: Int) { self.value = v }
+  static func ==(lhs: HashableClass, rhs: HashableClass) -> Bool {
+    return lhs.value == rhs.value
+  }
+  var hashValue : Int { return value }
+}
+
+enum HashableEnum : Hashable {
+  case value(Int)
+  static func ==(lhs: HashableEnum, rhs: HashableEnum) -> Bool {
+    switch (lhs, rhs) {
+    case (.value(let l), .value(let r)): return l == r
+    }
+  }
+  var hashValue : Int {
+    switch self {
+    case .value(let v): return v
+    }
+  }
+}
+
 func opaqueCast<T, U>(_ lhs: T, _ rhs: U.Type) -> U? {
   return lhs as? U
 }
@@ -39,7 +70,13 @@ testCases = [
   ("5", "AnyHashable", "Unimplemented", False),
   ("5", "Int", "AnyHashable", "5"),
   ("5", "Any", "AnyHashable", "5"),
-  ("AnyHashable(5)", "Any", "Int", "5")
+  ("AnyHashable(5)", "Any", "Int", "5"),
+  ("HashableStruct(value: 5)", "HashableStruct", "AnyHashable",
+   "AnyHashable(HashableStruct(value: 5))"),
+  ("HashableClass(value: 5)", "HashableClass", "AnyHashable",
+   "AnyHashable(HashableClass(value: 5))"),
+  ("HashableEnum.value(5)", "HashableEnum", "AnyHashable",
+   "AnyHashable(HashableEnum.value(5))"),
 ]
 }%
 
