@@ -2961,6 +2961,13 @@ bool TypeChecker::isRepresentableInObjC(
   if (checkObjCInExtensionContext(*this, AFD, Diagnose))
     return false;
 
+  if (AFD->isOperator()) {
+    assert(isa<ProtocolDecl>(AFD->getDeclContext()) &&
+           "all other cases should be caught earlier");
+    diagnose(AFD, diag::objc_operator_proto);
+    return false;
+  }
+
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {
       // Accessors can only be @objc if the storage declaration is.
