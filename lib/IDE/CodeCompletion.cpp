@@ -2869,7 +2869,8 @@ public:
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
-            if (AT->getKind() == TypeKind::NameAlias &&
+            if (!CD->getType()->is<ErrorType>() &&
+                AT->getKind() == TypeKind::NameAlias &&
                 AT->getDesugaredType() == CD->getResultType().getPointer())
               Result = AT;
           }
