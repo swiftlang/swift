@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -24,6 +25,11 @@
 
 #include <cstdlib>
 #include <string>
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#include <unistd.h>
+#else
+#include <io.h>
+#endif
 
 static llvm::cl::opt<bool>
 ExpandMode("expand",
@@ -52,6 +58,16 @@ Simplified("simplified",
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
                llvm::cl::ZeroOrMore);
+
+static llvm::StringRef substrBefore(llvm::StringRef whole,
+                                    llvm::StringRef part) {
+  return whole.slice(0, part.data() - whole.data());
+}
+
+static llvm::StringRef substrAfter(llvm::StringRef whole,
+                                   llvm::StringRef part) {
+  return whole.substr((part.data() - whole.data()) + part.size());
+}
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
                      const swift::Demangle::DemangleOptions &options) {
@@ -86,14 +102,34 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
 }
 
-static llvm::StringRef substrBefore(llvm::StringRef whole,
-                                    llvm::StringRef part) {
-  return whole.slice(0, part.data() - whole.data());
-}
+static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
+  // This doesn't handle Unicode symbols, but maybe that's okay.
+  llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
 
-static llvm::StringRef substrAfter(llvm::StringRef whole,
-                                   llvm::StringRef part) {
-  return whole.substr((part.data() - whole.data()) + part.size());
+  while (true) {
+    char *inputLine = NULL;
+    size_t size;
+    if (getline(&inputLine, &size, stdin) == -1 || size <= 0) {
+      if (errno == 0) {
+        break;
+      }
+
+      return EXIT_FAILURE;
+    }
+
+    llvm::StringRef inputContents(inputLine);
+    llvm::SmallVector<llvm::StringRef, 1> matches;
+    while (maybeSymbol.match(inputContents, &matches)) {
+      llvm::outs() << substrBefore(inputContents, matches.front());
+      demangle(llvm::outs(), matches.front(), options);
+      inputContents = substrAfter(inputContents, matches.front());
+    }
+
+    llvm::outs() << inputContents;
+    free(inputLine);
+  }
+
+  return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
@@ -101,7 +137,7 @@ int main(int argc, char **argv) {
   // Cygwin clang 3.5.2 with '-O3' generates CRASHING BINARY,
   // if main()'s first function call is passing argv[0].
   std::rand();
-#endif  
+#endif
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   swift::Demangle::DemangleOptions options;
@@ -111,29 +147,13 @@ int main(int argc, char **argv) {
 
   if (InputNames.empty()) {
     CompactMode = true;
-    auto input = llvm::MemoryBuffer::getSTDIN();
-    if (!input) {
-      llvm::errs() << input.getError().message() << '\n';
-      return EXIT_FAILURE;
-    }
-    llvm::StringRef inputContents = input.get()->getBuffer();
-
-    // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
-    llvm::SmallVector<llvm::StringRef, 1> matches;
-    while (maybeSymbol.match(inputContents, &matches)) {
-      llvm::outs() << substrBefore(inputContents, matches.front());
-      demangle(llvm::outs(), matches.front(), options);
-      inputContents = substrAfter(inputContents, matches.front());
-    }
-    llvm::outs() << inputContents;
-
+    return demangleSTDIN(options);
   } else {
     for (llvm::StringRef name : InputNames) {
       demangle(llvm::outs(), name, options);
       llvm::outs() << '\n';
     }
-  }
 
-  return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
+  }
 }
