@@ -250,10 +250,18 @@ public:
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
-  /// \returns a generic signature build based on the provided list of
+  /// \returns a generic signature built from the provided list of
   ///          generic parameter types.
   GenericSignature *
   getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+
+  /// \brief Get a generic context based on the complete list of generic
+  /// parameter types.
+  ///
+  /// \returns a generic context built from the provided list of
+  ///          generic parameter types.
+  GenericEnvironment *getGenericEnvironment(
+      ArrayRef<GenericTypeParamType *> genericParamsTypes);
 
   /// Infer requirements from the given type, recursively.
   ///

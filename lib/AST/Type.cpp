@@ -3489,8 +3489,6 @@ case TypeKind::Id:
         anyChanges = true;
     }
     
-    auto sig = GenericSignature::get(genericParams, requirements);
-
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
@@ -3508,11 +3506,12 @@ case TypeKind::Id:
       return *this;
 
     // If no generic parameters remain, this is a non-generic function type.
-    if (genericParams.empty())
+    if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
+    }
 
     // Produce the new generic function type.
-    
+    auto sig = GenericSignature::get(genericParams, requirements);
     return GenericFunctionType::get(sig, inputTy, resultTy,
                                     function->getExtInfo());
   }

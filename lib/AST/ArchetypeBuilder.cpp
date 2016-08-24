@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -2301,5 +2302,27 @@ GenericSignature *ArchetypeBuilder::getGenericSignature(
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;
+}
+
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+    ArrayRef<GenericTypeParamType *> genericParamTypes) {
+  TypeSubstitutionMap interfaceToArchetypeMap;
+
+  for (auto paramTy : genericParamTypes) {
+    auto known = Impl->PotentialArchetypes.find(
+                   GenericTypeParamKey::forType(paramTy));
+    assert(known != Impl->PotentialArchetypes.end());
+
+    auto archetypeTy = known->second->getType(*this).getAsArchetype();
+    auto concreteTy = known->second->getType(*this).getAsConcreteType();
+    if (archetypeTy)
+      interfaceToArchetypeMap[paramTy] = archetypeTy;
+    else if (concreteTy)
+      interfaceToArchetypeMap[paramTy] = concreteTy;
+    else
+      llvm_unreachable("broken generic parameter");
+  }
+
+  return GenericEnvironment::get(Context, interfaceToArchetypeMap);
 }
 

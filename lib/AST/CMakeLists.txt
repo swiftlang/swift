@@ -21,6 +21,7 @@ add_swift_library(swiftAST STATIC
   DiagnosticList.cpp
   DocComment.cpp
   Expr.cpp
+  GenericEnvironment.cpp
   GenericSignature.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp

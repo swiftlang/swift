@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -1957,7 +1958,44 @@ struct ASTNodeBase {};
         }
       }
     }
-    
+
+    void verifyGenericEnvironment(Decl *D,
+                                  GenericSignature *sig,
+                                  GenericEnvironment *env) {
+      if (!sig && !env)
+        return;
+
+      if (sig && env) {
+        auto &map = env->getInterfaceToArchetypeMap();
+        if (sig->getGenericParams().size() != map.size()) {
+          Out << "Mismatch between signature and environment parameter count\n";
+          abort();
+        }
+
+        for (auto *paramTy : sig->getGenericParams()) {
+          auto found = map.find(paramTy->getCanonicalType().getPointer());
+          if (found == map.end()) {
+            Out << "Generic parameter present in signature but not "
+                   "in environment\n";
+            paramTy->dump();
+            abort();
+          }
+        }
+
+        return;
+      }
+
+      Out << "Decl must have both signature and environment, or neither\n";
+      D->dump(Out);
+      abort();
+    }
+
+    void verifyChecked(GenericTypeDecl *generic) {
+      verifyGenericEnvironment(generic,
+                               generic->getGenericSignature(),
+                               generic->getGenericEnvironment());
+    }
+
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(nominal, nominal->getLocalProtocols());
@@ -2325,6 +2363,10 @@ struct ASTNodeBase {};
         AFD->dump(Out);
         abort();
       }
+
+      verifyGenericEnvironment(AFD,
+                               AFD->getGenericSignature(),
+                               AFD->getGenericEnvironment());
 
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.

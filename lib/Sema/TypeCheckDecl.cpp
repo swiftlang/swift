@@ -377,7 +377,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Retrieve the interface type for this inherited type.
-    if (inheritedTy->hasArchetype())
+    //
+    // If we have a generic parameter, mapTypeOutOfContext() might not
+    // work yet, if we're calling this while building the generic
+    // signature. However, we're also not storing inheritedTy back
+    // anywhere, so it's OK to leave it as an archetype.
+    //
+    // FIXME: Ideally, we wouldn't have code paths that take a mix
+    // of archetypes and interface types. Other than generic parameters,
+    // the only time we get an interface type here is with invalid
+    // circular cases. That should be diagnosed elsewhere.
+    if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
       inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
 
     // Check whether we inherited from the same type twice.
@@ -724,7 +734,7 @@ GenericSignature *TypeChecker::handleSILGenericParams(
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
     checkGenericParamList(&builder, genericParams, parentSig);
-    finalizeGenericParamList(builder, genericParams, DC);
+    finalizeGenericParamList(builder, genericParams, genericSig, DC);
 
     parentSig = genericSig;
   }
@@ -4698,7 +4708,8 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
-        TC.markInvalidGenericSignature(FD);
+        auto *env = TC.markInvalidGenericSignature(FD);
+        FD->setGenericEnvironment(env);
       } else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
@@ -4721,14 +4732,18 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        TC.finalizeGenericParamList(builder, gp, FD);
+        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, FD);
+        FD->setGenericEnvironment(env);
       }
     } else if (FD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
-        TC.markInvalidGenericSignature(FD);
+        auto *env = TC.markInvalidGenericSignature(FD);
+        FD->setGenericEnvironment(env);
       } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
+        FD->setGenericEnvironment(
+            FD->getDeclContext()->getGenericEnvironmentOfContext());
       } else {
         // Recursively satisfied.
         // FIXME: This is an awful hack.
@@ -6384,7 +6399,8 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
-        TC.markInvalidGenericSignature(CD);
+        auto *env = TC.markInvalidGenericSignature(CD);
+        CD->setGenericEnvironment(env);
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
@@ -6399,14 +6415,19 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        TC.finalizeGenericParamList(builder, gp, CD);
+        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, CD);
+        CD->setGenericEnvironment(env);
       }
     } else if (CD->getDeclContext()->isGenericContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
-        TC.markInvalidGenericSignature(CD);
+        auto *env = TC.markInvalidGenericSignature(CD);
+        CD->setGenericEnvironment(env);
       } else {
         // Revert all of the types within the signature of the constructor.
         TC.revertGenericFuncSignature(CD);
+
+        CD->setGenericEnvironment(
+            CD->getDeclContext()->getGenericEnvironmentOfContext());
       }
     }
 
@@ -6554,8 +6575,11 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericContext())
+    if (DD->getDeclContext()->isGenericContext()) {
       TC.validateGenericFuncSignature(DD);
+      DD->setGenericEnvironment(
+          DD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
 
     if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
@@ -7328,8 +7352,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 /// the parameter lists within the extension.
 static Type checkExtensionGenericParams(
               TypeChecker &tc, ExtensionDecl *ext,
-              Type type, GenericParamList *genericParams,
-              GenericSignature *&sig) {
+              Type type, GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7352,8 +7375,7 @@ static Type checkExtensionGenericParams(
                       tc, ext, parentType,
                       nominal->getGenericParams()
                         ? genericParams->getOuterParameters()
-                        : genericParams,
-                      sig);
+                        : genericParams);
     if (!newParentType)
       return Type();
   }
@@ -7396,9 +7418,14 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
-  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(),
-                                    nullptr, inferExtendedTypeReqs, invalid);
+  GenericSignature *sig = tc.validateGenericSignature(
+      genericParams, ext->getDeclContext(),
+      nullptr, inferExtendedTypeReqs, invalid);
+  ext->setGenericSignature(sig);
+
   if (invalid) {
+    auto *env = tc.markInvalidGenericSignature(ext);
+    ext->setGenericEnvironment(env);
     return nullptr;
   }
 
@@ -7408,7 +7435,9 @@ static Type checkExtensionGenericParams(
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
-  tc.finalizeGenericParamList(builder, genericParams, ext);
+
+  auto *env = tc.finalizeGenericParamList(builder, genericParams, nullptr, ext);
+  ext->setGenericEnvironment(env);
 
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.
@@ -7475,24 +7504,28 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
     return;
   }
 
   // If we're extending a protocol, check the generic parameters.
-  if (auto proto = extendedType->getAs<ProtocolType>()) {
+  //
+  // Canonicalize the type to work around the fact that getAs<> cannot
+  // "look through" protocol<X, Y> where X and Y both desugar to the same
+  // thing.
+  //
+  // FIXME: Probably the above comes up elsewhere, perhaps getAs<>()
+  // should be fixed.
+  if (auto proto = extendedType->getCanonicalType()->getAs<ProtocolType>()) {
     if (!isa<ProtocolType>(extendedType.getPointer()) &&
         proto->getDecl()->getParentModule() == ext->getParentModule()) {
       // Protocols in the same module cannot be extended via a typealias;
@@ -7505,18 +7538,14 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    GenericSignature *sig = nullptr;
-    extendedType = checkExtensionGenericParams(*this, ext,
-                                               ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+    extendedType = checkExtensionGenericParams(*this, ext, proto,
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
 
     // Speculatively ban extension of AnyObject; it won't be a
@@ -7529,6 +7558,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     }
     return;
   }
+
+  assert(extendedType->is<NominalType>());
 }
 
 ArrayRef<ProtocolDecl *>

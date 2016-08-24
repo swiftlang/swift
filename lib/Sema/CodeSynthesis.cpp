@@ -1303,6 +1303,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     ->getResult();
 
   GenericSignature *genericSig = nullptr;
+  GenericEnvironment *genericEnv = nullptr;
 
   TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
@@ -1321,6 +1322,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->isTypeContext()) {
     if (DC->isGenericContext()) {
       genericSig = DC->getGenericSignatureOfContext();
+      genericEnv = DC->getGenericEnvironmentOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
@@ -1398,6 +1400,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   Parameter->setGenericSignature(genericSig);
+  Parameter->setGenericEnvironment(genericEnv);
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
@@ -2132,6 +2135,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
+  ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
   tc.configureInterfaceType(ctor);
 
   // Set the contextual type of the initializer. This will go away one day.

@@ -432,6 +432,24 @@ private:
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
 
+  /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  ///
+  /// Also returns the set of generic parameters read, in order, to help with
+  /// forming a GenericSignature.
+  GenericEnvironment *readGenericEnvironment(
+      SmallVectorImpl<GenericTypeParamType *> &paramTypes,
+      llvm::BitstreamCursor &Cursor);
+
+  /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
+  ///
+  /// Returns the GenericEnvironment and the signature formed from the
+  /// generic parameters of the environment, together with the
+  /// read requirements.
+  ///
+  /// Returns nullptr if there's no generic signature here.
+  std::pair<GenericSignature *, GenericEnvironment *>
+  maybeReadGenericSignature();
+
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
   /// Returns true if there is an error.

@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 261; // Last change: remove AllArchetypes indexing
+const uint16_t VERSION_MINOR = 262; // Last change: serialize GenericEnvironment
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1090,6 +1090,24 @@ namespace decls_block {
   using GenericParamLayout = BCRecordLayout<
     GENERIC_PARAM,
     DeclIDField // Typealias
+  >;
+
+  // Subtlety here: GENERIC_ENVIRONMENT is serialized for both Decls and
+  // SILFunctions.
+  //
+  // For Decls, the interface type is non-canonical, so it points back
+  // to the GenericParamListDecl. This allows us to use the serialized
+  // GENERIC_ENVIRONMENT records to form the GenericSignature, as well.
+  // The type is canonicalized when forming the actual GenericEnvironment
+  // instance.
+  //
+  // For SILFunctions, the interface type below is always canonical,
+  // since SILFunctions never point back to any original
+  // GenericTypeParamDecls.
+  using GenericEnvironmentLayout = BCRecordLayout<
+    GENERIC_ENVIRONMENT,
+    TypeIDField,                 // interface type
+    TypeIDField                  // contextual type
   >;
 
   using GenericRequirementLayout = BCRecordLayout<

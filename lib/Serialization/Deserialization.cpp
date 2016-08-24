@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Parser.h"
@@ -847,8 +848,7 @@ void ModuleFile::readGenericRequirements(
       break;
 
     scratch.clear();
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
-                                                  &blobData);
+    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     switch (recordID) {
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
@@ -904,6 +904,78 @@ void ModuleFile::readGenericRequirements(
     if (!shouldContinue)
       break;
   }
+}
+
+GenericEnvironment *ModuleFile::readGenericEnvironment(
+    SmallVectorImpl<GenericTypeParamType *> &paramTypes,
+    llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  TypeSubstitutionMap interfaceToArchetypeMap;
+
+  while (true) {
+    lastRecordOffset.reset();
+    bool shouldContinue = true;
+
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = Cursor.readRecord(entry.ID, scratch, &blobData);
+    switch (recordID) {
+    case GENERIC_ENVIRONMENT: {
+      uint64_t rawTypeIDs[2];
+      GenericEnvironmentLayout::readRecord(scratch,
+                                           rawTypeIDs[0], rawTypeIDs[1]);
+
+      auto paramTy = getType(rawTypeIDs[0])->castTo<GenericTypeParamType>();
+      auto contextTy = getType(rawTypeIDs[1]);
+
+      auto result = interfaceToArchetypeMap.insert(
+          std::make_pair(paramTy, contextTy));
+
+      assert(result.second);
+      paramTypes.push_back(paramTy);
+      break;
+    }
+    default:
+      // This record is not part of the GenericEnvironment.
+      shouldContinue = false;
+      break;
+    }
+
+    if (!shouldContinue)
+      break;
+  }
+
+  if (interfaceToArchetypeMap.empty())
+    return nullptr;
+
+  return GenericEnvironment::get(getContext(), interfaceToArchetypeMap);
+}
+
+std::pair<GenericSignature *, GenericEnvironment *>
+ModuleFile::maybeReadGenericSignature() {
+  SmallVector<GenericTypeParamType *, 4> paramTypes;
+
+  // Read the generic environment.
+  auto env = readGenericEnvironment(paramTypes, DeclTypeCursor);
+
+  if (env == nullptr)
+    return std::make_pair(nullptr, nullptr);
+
+  // Read the generic requirements.
+  SmallVector<Requirement, 4> requirements;
+  readGenericRequirements(requirements);
+
+  auto sig = GenericSignature::get(paramTypes, requirements);
+
+  return std::make_pair(sig, env);
 }
 
 bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
@@ -2160,18 +2232,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     declOrOffset = alias;
 
     if (genericParams) {
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *genericParams) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-      }
+      GenericSignature *sig;
+      GenericEnvironment *env;
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+      std::tie(sig, env) = maybeReadGenericSignature();
 
-      auto sig = GenericSignature::get(paramTypes, requirements);
+      assert(sig && "generic typealias without signature");
       alias->setGenericSignature(sig);
+      alias->setGenericEnvironment(env);
     }
 
     alias->computeType();
@@ -2312,20 +2380,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       theStruct->setImplicit();
-    if (genericParams) {
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theStruct->getGenericParams()) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-      }
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+    GenericSignature *sig;
+    GenericEnvironment *env;
 
-      auto sig = GenericSignature::get(paramTypes, requirements);
-      theStruct->setGenericSignature(sig);
-    }
+    std::tie(sig, env) = maybeReadGenericSignature();
+
+    theStruct->setGenericSignature(sig);
+    theStruct->setGenericEnvironment(env);
 
     theStruct->computeType();
 
@@ -2362,9 +2424,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto genericParams = maybeReadGenericParams(parent, DeclTypeCursor);
+    auto *genericParams = maybeReadGenericParams(parent, DeclTypeCursor);
     if (declOrOffset.isComplete())
       return declOrOffset;
+
+    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+    auto *genericEnv = readGenericEnvironment(genericParamTypes, DeclTypeCursor);
 
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -2407,6 +2472,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         ctor->setGenericSignature(genericFnType->getGenericSignature());
       ctor->setInterfaceType(interfaceType);
     }
+
+    ctor->setGenericEnvironment(genericEnv);
 
     // Set the initializer interface type of the constructor.
     auto allocType = ctor->getInterfaceType();
@@ -2573,6 +2640,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
+    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+    auto *genericEnv = readGenericEnvironment(genericParamTypes, DeclTypeCursor);
+
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.hasValue()) {
       error();
@@ -2639,6 +2709,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         fn->setGenericSignature(genericFnType->getGenericSignature());
       fn->setInterfaceType(interfaceType);
     }
+
+    fn->setGenericEnvironment(genericEnv);
 
     SmallVector<ParameterList*, 2> paramLists;
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
@@ -2752,21 +2824,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
-    if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
+    if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor))
       proto->setGenericParams(genericParams);
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *proto->getGenericParams()) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-      }
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+    GenericSignature *sig;
+    GenericEnvironment *env;
 
-      auto sig = GenericSignature::get(paramTypes, requirements);
-      proto->setGenericSignature(sig);
-    }
+    std::tie(sig, env) = maybeReadGenericSignature();
+
+    proto->setGenericSignature(sig);
+    proto->setGenericEnvironment(env);
 
     if (isImplicit)
       proto->setImplicit();
@@ -2940,20 +3007,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
-    if (genericParams) {
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theClass->getGenericParams()) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-      }
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+    GenericSignature *sig;
+    GenericEnvironment *env;
 
-      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
-      theClass->setGenericSignature(sig);
-    }
+    std::tie(sig, env) = maybeReadGenericSignature();
+
+    theClass->setGenericSignature(sig);
+    theClass->setGenericEnvironment(env);
+
     theClass->computeType();
 
     handleInherited(theClass, rawInheritedIDs);
@@ -3006,20 +3068,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setRawType(getType(rawTypeID));
-    if (genericParams) {
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theEnum->getGenericParams()) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-      }
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+    GenericSignature *sig;
+    GenericEnvironment *env;
 
-      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
-      theEnum->setGenericSignature(sig);
-    }
+    std::tie(sig, env) = maybeReadGenericSignature();
+
+    theEnum->setGenericSignature(sig);
+    theEnum->setGenericEnvironment(env);
 
     theEnum->computeType();
 
@@ -3202,24 +3258,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                              DeclTypeCursor);
     extension->setGenericParams(genericParams);
 
-    // Conjure up a generic signature from the generic parameters and
-    // requirements.
-    if (genericParams) {
-      SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *genericParams) {
-        paramTypes.push_back(genericParam->getDeclaredType()
-                             ->castTo<GenericTypeParamType>());
-      }
+    GenericSignature *sig;
+    GenericEnvironment *env;
 
-      // Read the generic requirements.
-      SmallVector<Requirement, 4> requirements;
-      readGenericRequirements(requirements);
+    std::tie(sig, env) = maybeReadGenericSignature();
 
-      if (!paramTypes.empty()) {
-        GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
-        extension->setGenericSignature(sig);
-      }
-    }
+    extension->setGenericSignature(sig);
+    extension->setGenericEnvironment(env);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
@@ -3265,6 +3310,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
       dtor->setGenericSignature(genericFnType->getGenericSignature());
     dtor->setInterfaceType(interfaceType);
+
+    dtor->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
 
     if (isImplicit)
       dtor->setImplicit();

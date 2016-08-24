@@ -23,6 +23,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -1365,12 +1367,14 @@ namespace {
       // Handle generic types.
       GenericParamList *genericParams = nullptr;
       GenericSignature *genericSig = nullptr;
+      GenericEnvironment *genericEnv = nullptr;
       auto underlyingType = typeDecl->getDeclaredInterfaceType();
 
       if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
         if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
           genericParams = generic->getGenericParams();
           genericSig = generic->getGenericSignature();
+          genericEnv = generic->getGenericEnvironment();
 
           underlyingType = ArchetypeBuilder::mapTypeIntoContext(
               generic, underlyingType);
@@ -1395,6 +1399,7 @@ namespace {
                      genericParams, dc);
       alias->computeType();
       alias->setGenericSignature(genericSig);
+      alias->setGenericEnvironment(genericEnv);
 
       // Record that this is the Swift 2 version of this declaration.
       Impl.ImportedDecls[{decl->getCanonicalDecl(), true}] = alias;
@@ -3133,6 +3138,7 @@ namespace {
       result->setType(fnType);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setBodyResultType(swiftResultTy);
       result->setAccessibility(Accessibility::Public);
@@ -3912,6 +3918,7 @@ namespace {
       result->setType(type);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4386,6 +4393,7 @@ namespace {
       result->setInitializerInterfaceType(interfaceInitType);
       result->setInterfaceType(interfaceAllocType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setType(allocType);
 
@@ -4523,6 +4531,8 @@ namespace {
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
       thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
@@ -4594,6 +4604,8 @@ namespace {
       thunk->setBodyResultType(TupleType::getEmpty(C));
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
       thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
@@ -5143,22 +5155,24 @@ namespace {
             Impl.importSourceLoc(typeParamList->getRAngleLoc()));
     }
 
-    // Calculate the generic signature for the given imported generic param
-    // list. If there are any errors in doing so, return 'nullptr'.
-    GenericSignature *calculateGenericSignature(GenericParamList *genericParams,
-                                                DeclContext *dc) {
+    // Calculate the generic signature and interface type to archetype mapping
+    // from an imported generic param list.
+    std::pair<GenericSignature *, GenericEnvironment *>
+    calculateGenericSignature(GenericParamList *genericParams,
+                              DeclContext *dc) {
       ArchetypeBuilder builder(*dc->getParentModule(), Impl.SwiftContext.Diags);
       for (auto param : *genericParams)
         builder.addGenericParameter(param);
       for (auto param : *genericParams) {
-        if (builder.addGenericParameterRequirements(param)) {
-          return nullptr;
-        }
+        bool result = builder.addGenericParameterRequirements(param);
+        assert(!result);
+        (void) result;
       }
       // TODO: any need to infer requirements?
-      if (builder.finalize(genericParams->getSourceRange().Start)) {
-        return nullptr;
-      }
+      bool result = builder.finalize(genericParams->getSourceRange().Start);
+      assert(!result);
+      (void) result;
+
       SmallVector<GenericTypeParamType *, 4> genericParamTypes;
       for (auto param : *genericParams) {
         genericParamTypes.push_back(
@@ -5169,7 +5183,10 @@ namespace {
       genericParams->setAllArchetypes(
           Impl.SwiftContext.AllocateCopy(builder.getAllArchetypes()));
 
-      return builder.getGenericSignature(genericParamTypes);
+      auto *sig = builder.getGenericSignature(genericParamTypes);
+      auto *env = builder.getGenericEnvironment(genericParamTypes);
+
+      return std::make_pair(sig, env);
     }
 
     /// Import members of the given Objective-C container and add them to the
@@ -5507,11 +5524,14 @@ namespace {
         auto genericParams = GenericParamList::create(Impl.SwiftContext,
             SourceLoc(), toGenericParams, SourceLoc());
         result->setGenericParams(genericParams);
-        if (auto sig = calculateGenericSignature(genericParams, result)) {
-          result->setGenericSignature(sig);
-        } else {
-          return nullptr;
-        }
+
+        GenericSignature *sig;
+        GenericEnvironment *env;
+        std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+        result->setGenericSignature(sig);
+        result->setGenericEnvironment(env);
+
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
         for (auto gp : *genericParams) {
@@ -5687,6 +5707,15 @@ namespace {
       auto sig = GenericSignature::get(genericParam, genericRequirements);
       result->setGenericSignature(sig);
 
+      TypeSubstitutionMap interfaceToArchetypeMap;
+
+      auto paramTy = selfDecl->getDeclaredType()->getCanonicalType();
+      interfaceToArchetypeMap[paramTy.getPointer()] = selfArchetype;
+
+      auto *env =
+          GenericEnvironment::get(Impl.SwiftContext, interfaceToArchetypeMap);
+      result->setGenericEnvironment(env);
+
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
@@ -5818,11 +5847,13 @@ namespace {
         auto genericParams = *gpImportResult;
         if (genericParams) {
           result->setGenericParams(genericParams);
-          if (auto sig = calculateGenericSignature(genericParams, result)) {
-            result->setGenericSignature(sig);
-          } else {
-            return nullptr;
-          }
+
+          GenericSignature *sig;
+          GenericEnvironment *env;
+          std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+          result->setGenericSignature(sig);
+          result->setGenericEnvironment(env);
         }
       } else {
         return nullptr;
@@ -6976,8 +7007,17 @@ ClangImporter::Implementation::importDeclContextOf(
         Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
         Requirement(RequirementKind::Conformance, genericParam,
                     protoDecl->getDeclaredType())};
-    auto sig = GenericSignature::get(genericParam, genericRequirements);
+    auto *sig = GenericSignature::get(genericParam, genericRequirements);
     ext->setGenericSignature(sig);
+
+    TypeSubstitutionMap interfaceToArchetypeMap;
+
+    auto paramTy = extSelf->getDeclaredType()->getCanonicalType();
+    interfaceToArchetypeMap[paramTy.getPointer()] = extSelfArchetype;
+
+    auto *env =
+        GenericEnvironment::get(SwiftContext, interfaceToArchetypeMap);
+    ext->setGenericEnvironment(env);
   }
 
   // Add the extension to the nominal type.

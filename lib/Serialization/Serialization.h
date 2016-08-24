@@ -242,7 +242,12 @@ private:
   void writePattern(const Pattern *pattern);
 
   /// Writes a set of generic requirements.
-  void writeRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements);
+
+  /// Writes generic environment.
+  void writeGenericEnvironment(GenericSignature *sig,
+                               GenericEnvironment *env,
+                         const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,

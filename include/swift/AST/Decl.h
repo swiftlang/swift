@@ -35,6 +35,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
+  class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -1472,6 +1473,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this extension.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this extension.
+  GenericEnvironment *GenericEnv = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// The trailing where clause.
@@ -1555,7 +1562,19 @@ public:
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
+
+  /// Retrieve the generic context for this extension.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this extension.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!GenericEnv && "Already have generic context");
+    GenericEnv = env;
+  }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -2306,6 +2325,12 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this type.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this type.
+  GenericEnvironment *GenericEnv = nullptr;
+
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
@@ -2324,7 +2349,10 @@ public:
   void setGenericParams(GenericParamList *params);
 
   /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
 
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
@@ -2353,6 +2381,15 @@ public:
   
   bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
+  }
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this type.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = env;
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -4573,6 +4610,7 @@ protected:
 
   GenericParamList *GenericParams;
   GenericSignature *GenericSig;
+  GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
 
@@ -4589,7 +4627,7 @@ protected:
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4614,6 +4652,15 @@ public:
   
   GenericSignature *getGenericSignature() const {
     return GenericSig;
+  }
+
+  /// Retrieve the generic context for this function.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this function.
+  void setGenericEnvironment(GenericEnvironment *GenericEnv) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = GenericEnv;
   }
 
   // Expose our import as member status

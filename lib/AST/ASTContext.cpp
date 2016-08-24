@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
@@ -3754,8 +3755,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         bool isKnownCanonical) {
-  if (params.empty() && requirements.empty())
-    return nullptr;
+  assert(!params.empty());
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
@@ -3779,6 +3779,12 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                            isKnownCanonical);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
+}
+
+GenericEnvironment *
+GenericEnvironment::get(ASTContext &ctx,
+                        TypeSubstitutionMap interfaceToArchetypeMap) {
+  return new (ctx) GenericEnvironment(interfaceToArchetypeMap);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
