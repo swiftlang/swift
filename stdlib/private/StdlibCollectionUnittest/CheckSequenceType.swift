@@ -136,6 +136,50 @@ public struct FindTest {
   }
 }
 
+public struct CollectionBinaryOperationTest {
+  public let expected: [MinimalEquatableValue]
+  public let lhs: [MinimalEquatableValue]
+  public let rhs: [MinimalEquatableValue]
+  public let loc: SourceLoc
+
+  public init(
+    expected: [Int], lhs: [Int], rhs: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.lhs = lhs.map {
+      return MinimalEquatableValue($0, identity: $0) 
+    }
+    self.rhs = rhs.map {
+      return MinimalEquatableValue($0, identity: $0) 
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct CollectionPredicateTest {
+  public let expected: Bool
+  public let lhs: [MinimalEquatableValue]
+  public let rhs: [MinimalEquatableValue]
+  public let loc: SourceLoc
+
+  public init(
+    expected: Bool, lhs: [Int], rhs: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.lhs = lhs.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.rhs = rhs.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0) 
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 public struct FlatMapTest {
   public let expected: [Int32]
   public let sequence: [Int]
@@ -487,6 +531,32 @@ public let findTests = [
     element: 2020,
     sequence: [ 1010, 2020, 3030, 2020, 4040 ],
     expectedLeftoverSequence: [ 3030, 2020, 4040 ]),
+]
+
+public let unionTests = [
+  CollectionBinaryOperationTest(expected: [1, 2, 3, 4, 5], lhs: [1, 3, 5], rhs: [2, 4]),
+  CollectionBinaryOperationTest(expected: [3, 5], lhs: [3], rhs: [5])
+]
+
+public let intersectionTests = [
+  CollectionBinaryOperationTest(expected: [1, 5], lhs: [1, 3, 5], rhs: [1, 2, 5])
+]
+
+public let symmetricDifferenceTests = [
+  CollectionBinaryOperationTest(expected: [1, 3, 5], lhs: [1, 2, 3, 4], rhs: [2, 4, 5])
+]
+
+public let subtractTests = [
+  CollectionBinaryOperationTest(expected: [1, 3], lhs: [1, 2, 3, 4], rhs: [2, 4, 5])
+]
+
+public let subtractingTests = [
+  CollectionBinaryOperationTest(expected: [1, 3, 4], lhs: [1, 2, 3, 4, 5], rhs: [2, 5, 6, 7])
+]
+
+public let strictSupersetTests = [
+  CollectionPredicateTest(expected: true, lhs: [1, 2, 3, 4, 5, 6], rhs: [1, 2, 3, 4]),
+  CollectionPredicateTest(expected: false, lhs: [1, 2], rhs: [1, 2, 4])
 ]
 
 /// For a number of form `NNN_MMM`, returns an array of `NNN` numbers that all
