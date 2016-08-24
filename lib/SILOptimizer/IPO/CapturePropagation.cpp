@@ -286,7 +286,7 @@ static bool isProfitable(SILFunction *Callee) {
 
 /// Returns true if block \p BB only contains a return or throw of the first
 /// block argument and side-effect-free instructions.
-static bool isArgReturnOrThrow(SILBasicBlock *BB) {
+static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
   for (SILInstruction &I : *BB) {
     if (isa<ReturnInst>(&I) || isa<ThrowInst>(&I)) {
       SILValue RetVal = I.getOperand(0);
@@ -349,8 +349,8 @@ static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
 
       if (TryApplyInst *TAI = dyn_cast<TryApplyInst>(&I)) {
         // Check the normal and throw blocks of the try_apply.
-        if (isArgReturnOrThrow(TAI->getNormalBB()) &&
-            isArgReturnOrThrow(TAI->getErrorBB()))
+        if (onlyContainsReturnOrThrowOfArg(TAI->getNormalBB()) &&
+            onlyContainsReturnOrThrowOfArg(TAI->getErrorBB()))
           return Specialized;
         return nullptr;
       }

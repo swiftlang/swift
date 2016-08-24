@@ -53,6 +53,7 @@ public:
     llvm::SmallSet<SILFunction *, 4> Callers;
 
     /// The number of partial applied arguments of this function.
+    ///
     /// Specifically, it stores the minimum number of partial applied arguments
     /// of each function which contain one or multiple partial_applys of this
     /// function.
@@ -67,6 +68,7 @@ public:
     }
 
     /// Returns non zero if this function is partially applied anywhere.
+    ///
     /// The return value is the minimum number of partially applied arguments.
     /// Usually all partial applies of a function partially apply the same
     /// number of arguments anyway.
