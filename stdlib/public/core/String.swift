@@ -708,6 +708,9 @@ extension String {
     if lhs.isEmpty {
       return rhs
     }
+    if rhs.isEmpty {
+      return lhs
+    }
     lhs._core.append(rhs._core)
     return lhs
   }
