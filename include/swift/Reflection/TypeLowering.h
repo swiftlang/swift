@@ -19,6 +19,7 @@
 #define SWIFT_REFLECTION_TYPELOWERING_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 
 #include <iostream>
@@ -206,6 +207,7 @@ class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
   llvm::DenseMap<const TypeRef *, const TypeInfo *> Cache;
+  llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
 
