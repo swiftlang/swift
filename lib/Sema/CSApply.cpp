@@ -2460,8 +2460,6 @@ namespace {
         // in an ambiguity tolerant mode used for diagnostic generation.  Just
         // leave this as whatever type of member reference it already is.
         Type resultTy = simplifyType(expr->getType());
-        assert(resultTy->hasUnresolvedType() &&
-               "Should have a selected member if we got a type");
         expr->setType(resultTy);
         return expr;
       }

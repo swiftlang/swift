@@ -53,6 +53,15 @@ Foo.b()
 Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 _ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
+
+// <rdar://problem/27982012> QoI: Poor diagnostic for inaccessible initializer
+struct rdar27982012 {
+  var x: Int
+  private init(_ x: Int) { self.x = x }
+}
+
+_ = { rdar27982012($0.0) }((1, 2)) // expected-error {{type of expression is ambiguous without more context}}
+
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
