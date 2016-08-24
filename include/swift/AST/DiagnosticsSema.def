@@ -1702,6 +1702,11 @@ ERROR(raw_type_not_literal_convertible,none,
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
+ERROR(enum_raw_type_nonconforming_and_nonsynthable,none,
+      "%0 declares raw type %1, but does not conform to RawRepresentable "
+      "and conformance could not be synthesized", (Type, Type))
+NOTE(enum_declares_rawrep_with_raw_type,none,
+      "%0 declares raw type %1, which implies RawRepresentable", (Type, Type))
 ERROR(enum_raw_type_access,none,
       "enum %select{must be declared "
       "%select{private|fileprivate|internal|PUBLIC}2"
