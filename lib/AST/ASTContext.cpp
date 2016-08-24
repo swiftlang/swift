@@ -3755,8 +3755,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         bool isKnownCanonical) {
-  if (params.empty() && requirements.empty())
-    return nullptr;
+  assert(!params.empty());
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;

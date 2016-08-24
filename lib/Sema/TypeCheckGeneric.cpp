@@ -548,7 +548,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   auto sig = builder.getGenericSignature(allGenericParams);
 
   // Debugging of the archetype builder and generic signature generation.
-  if (sig && Context.LangOpts.DebugGenericSignatures) {
+  if (Context.LangOpts.DebugGenericSignatures) {
     func->dumpRef(llvm::errs());
     llvm::errs() << "\n";
     builder.dump(llvm::errs());
