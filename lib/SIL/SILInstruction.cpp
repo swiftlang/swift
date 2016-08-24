@@ -49,46 +49,42 @@ void SILInstruction::setDebugScope(SILBuilder &B, const SILDebugScope *DS) {
          "scope belongs to different function");
 
   Location = SILDebugLocation(getLoc(), DS);
+
 }
 
 //===----------------------------------------------------------------------===//
-// ilist_traits<SILInstruction> Implementation
+// SILInstruction ilist_node_traits Implementation
 //===----------------------------------------------------------------------===//
 
-// The trait object is embedded into a basic block.  Use dirty hacks to
-// reconstruct the BB from the 'self' pointer of the trait.
-SILBasicBlock *llvm::ilist_traits<SILInstruction>::getContainingBlock() {
-  size_t Offset(
-      size_t(&((SILBasicBlock *)0->*SILBasicBlock::getSublistAccess())));
-  iplist<SILInstruction> *Anchor(static_cast<iplist<SILInstruction> *>(this));
-  return reinterpret_cast<SILBasicBlock *>(reinterpret_cast<char *>(Anchor) -
-                                           Offset);
+SILBasicBlock *getContainingBlock(llvm::ilist_node_traits<SILInstruction> *T) {
+  auto Offset = size_t(&(static_cast<swift::SILBasicBlock *>(nullptr)
+                             ->*SILBasicBlock::getSublistAccess()));
+  char *Anchor =
+      reinterpret_cast<char *>(static_cast<llvm::iplist<SILInstruction> *>(T));
+  return reinterpret_cast<SILBasicBlock *>(Anchor - Offset);
 }
 
-
-void llvm::ilist_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
-  assert(I->ParentBB == 0 && "Already in a list!");
-  I->ParentBB = getContainingBlock();
+void llvm::ilist_node_traits<SILInstruction>::addNodeToList(SILInstruction *I) {
+  assert(I->Parent == nullptr && "already in a list");
+  I->Parent = getContainingBlock(this);
 }
 
-void llvm::ilist_traits<SILInstruction>::removeNodeFromList(SILInstruction *I) {
-  // When an instruction is removed from a BB, clear the parent pointer.
-  assert(I->ParentBB && "Not in a list!");
-  I->ParentBB = 0;
+void llvm::ilist_node_traits<SILInstruction>::removeNodeFromList(
+    SILInstruction *I) {
+  assert(I->Parent && "not in a list");
+  I->Parent = nullptr;
 }
 
-void llvm::ilist_traits<SILInstruction>::
-transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
-                      llvm::ilist_iterator<SILInstruction> first,
-                      llvm::ilist_iterator<SILInstruction> last) {
-  // If transferring instructions within the same basic block, no reason to
-  // update their parent pointers.
-  SILBasicBlock *ThisParent = getContainingBlock();
-  if (ThisParent == L2.getContainingBlock()) return;
+void llvm::ilist_node_traits<SILInstruction>::
+transferNodesFromList(ilist_node_traits &FromList,
+                      ilist_iterator<SILInstruction> First,
+                      ilist_iterator<SILInstruction> Last) {
+  SILBasicBlock *Parent = getContainingBlock(this);
+  if (Parent == getContainingBlock(&FromList))
+    return;
 
-  // Update the parent fields in the instructions.
-  for (; first != last; ++first)
-    first->ParentBB = ThisParent;
+  for (; First != Last; ++First)
+    First->Parent = Parent;
 }
 
 //===----------------------------------------------------------------------===//

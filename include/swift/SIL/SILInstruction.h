@@ -57,19 +57,19 @@ template <typename ImplClass> class SILClonerWithScopes;
 
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
-class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
-  friend struct llvm::ilist_traits<SILInstruction>;
-  friend struct llvm::ilist_traits<SILBasicBlock>;
+class SILInstruction
+    : public ValueBase,
+      public llvm::ilist_node_with_parent<SILInstruction, SILBasicBlock> {
+  friend struct llvm::ilist_node_traits<SILBasicBlock>;
+  friend struct llvm::ilist_node_traits<SILInstruction>;
 
-  /// A backreference to the containing basic block.  This is maintained by
-  /// ilist_traits<SILInstruction>.
-  SILBasicBlock *ParentBB;
+  /// A backreference to the containing basic block.
+  SILBasicBlock *Parent;
 
   /// This instruction's containing lexical scope and source location
   /// used for debug info and diagnostics.
   SILDebugLocation Location;
 
-  friend struct llvm::ilist_sentinel_traits<SILInstruction>;
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -86,7 +86,7 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
 protected:
   SILInstruction(ValueKind Kind, SILDebugLocation DebugLoc,
                  SILType Ty = SILType())
-      : ValueBase(Kind, Ty), ParentBB(0), Location(DebugLoc) {}
+      : ValueBase(Kind, Ty), Parent(nullptr), Location(DebugLoc) {}
 
 public:
   /// Instructions should be allocated using a dedicated instruction allocation
@@ -120,8 +120,8 @@ public:
     MayRelease,
   };
 
-  const SILBasicBlock *getParent() const { return ParentBB; }
-  SILBasicBlock *getParent() { return ParentBB; }
+  const SILBasicBlock *getParent() const { return Parent; }
+  SILBasicBlock *getParent() { return Parent; }
 
   SILFunction *getFunction();
   const SILFunction *getFunction() const;
@@ -5209,43 +5209,24 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 
 } // end swift namespace
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILInstruction
-//===----------------------------------------------------------------------===//
 
 namespace llvm {
 
-template <>
-struct ilist_traits<::swift::SILInstruction> :
-  public ilist_default_traits<::swift::SILInstruction> {
-  using SILInstruction = ::swift::SILInstruction;
+//===----------------------------------------------------------------------===//
+// ilist_node_traits for SILInstruction
+//===----------------------------------------------------------------------===//
 
-private:
-  mutable ilist_half_node<SILInstruction> Sentinel;
-
-  swift::SILBasicBlock *getContainingBlock();
-
-public:
-  SILInstruction *createSentinel() const {
-    return static_cast<SILInstruction*>(&Sentinel);
-  }
-  void destroySentinel(SILInstruction *) const {}
-
-  SILInstruction *provideInitialHead() const { return createSentinel(); }
-  SILInstruction *ensureHead(SILInstruction*) const { return createSentinel(); }
-  static void noteHead(SILInstruction*, SILInstruction*) {}
-  static void deleteNode(SILInstruction *V) {
-    SILInstruction::destroy(V);
+template <> struct ilist_node_traits<swift::SILInstruction> {
+  static swift::SILInstruction *createNode(const swift::SILInstruction &V);
+  static void deleteNode(swift::SILInstruction *I) {
+    swift::SILInstruction::destroy(I);
   }
 
-  void addNodeToList(SILInstruction *I);
-  void removeNodeFromList(SILInstruction *I);
-  void transferNodesFromList(ilist_traits<SILInstruction> &L2,
-                             ilist_iterator<SILInstruction> first,
-                             ilist_iterator<SILInstruction> last);
-
-private:
-  void createNode(const SILInstruction &);
+  void addNodeToList(swift::SILInstruction *I);
+  void removeNodeFromList(swift::SILInstruction *I);
+  void transferNodesFromList(ilist_node_traits &,
+                             ilist_iterator<swift::SILInstruction>,
+                             ilist_iterator<swift::SILInstruction>);
 };
 
 // An ApplySite casts like a SILInstruction*.

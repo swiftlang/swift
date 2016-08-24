@@ -33,10 +33,8 @@ class SILModule;
 class VarDecl;
   
 /// A global variable that has been referenced in SIL.
-class SILGlobalVariable
-  : public llvm::ilist_node<SILGlobalVariable>,
-    public SILAllocated<SILGlobalVariable>
-{
+class SILGlobalVariable : public llvm::ilist_node<SILGlobalVariable>,
+                          public SILAllocated<SILGlobalVariable> {
 private:
   friend class SILBasicBlock;
   friend class SILModule;
@@ -190,37 +188,17 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
 } // end swift namespace
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILGLobalVariable
-//===----------------------------------------------------------------------===//
-
 namespace llvm {
+template <> struct ilist_node_traits<swift::SILGlobalVariable> {
+  static swift::SILGlobalVariable *createNode(const swift::SILGlobalVariable &);
+  static void deleteNode(swift::SILGlobalVariable *) {}
 
-template <>
-struct ilist_traits<::swift::SILGlobalVariable> :
-public ilist_default_traits<::swift::SILGlobalVariable> {
-  typedef ::swift::SILGlobalVariable SILGlobalVariable;
-
-private:
-  mutable ilist_half_node<SILGlobalVariable> Sentinel;
-
-public:
-  SILGlobalVariable *createSentinel() const {
-    return static_cast<SILGlobalVariable*>(&Sentinel);
-  }
-  void destroySentinel(SILGlobalVariable *) const {}
-
-  SILGlobalVariable *provideInitialHead() const { return createSentinel(); }
-  SILGlobalVariable *ensureHead(SILGlobalVariable*) const {
-    return createSentinel();
-  }
-  static void noteHead(SILGlobalVariable*, SILGlobalVariable*) {}
-  static void deleteNode(SILGlobalVariable *V) {}
-  
-private:
-  void createNode(const SILGlobalVariable &);
+  void addNodeToList(swift::SILGlobalVariable *) {}
+  void removeNodeFromList(swift::SILGlobalVariable *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILGlobalVariable> &,
+                             ilist_iterator<swift::SILGlobalVariable>,
+                             ilist_iterator<swift::SILGlobalVariable>) {}
 };
-
-} // end llvm namespace
+}
 
 #endif
