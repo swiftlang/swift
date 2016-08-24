@@ -133,6 +133,10 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
+def tools_directory : Separate<["-"], "tools-directory">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Look for external executables (ld, clang, binutils) in <directory>">, MetaVarName<"<directory>">;
+
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
