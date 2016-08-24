@@ -1477,6 +1477,10 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
   case RequirementKind::Conformance: {
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     assert(pa && "Re-introducing invalid requirement");
+    // FIXME: defensively return if assertions are disabled until we figure out
+    // how this sitatuaion can occur and fix it properly.
+    if (!pa)
+      return;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
     bool existential = req.getSecondType()->isExistentialType(conformsTo);
