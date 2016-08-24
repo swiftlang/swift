@@ -216,7 +216,6 @@ clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
     if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
       if (isa<clang::TagDecl>(decl) ||
           isa<clang::ObjCInterfaceDecl>(decl) ||
-          isa<clang::ObjCProtocolDecl>(decl) ||
           isa<clang::TypedefNameDecl>(decl))
         return decl;
     }
