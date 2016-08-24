@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ArchetypeMapping.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -2301,5 +2302,27 @@ GenericSignature *ArchetypeBuilder::getGenericSignature(
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;
+}
+
+ArchetypeMapping *ArchetypeBuilder::getArchetypeMapping() {
+  TypeSubstitutionMap interfaceToArchetypeMap;
+
+  for (auto param : Impl->PotentialArchetypes) {
+    auto paramTy = GenericTypeParamType::get(
+        param.first.Depth,
+        param.first.Index,
+        Context);
+
+    auto archetypeTy = param.second->getType(*this).getAsArchetype();
+    auto concreteTy = param.second->getType(*this).getAsConcreteType();
+    if (archetypeTy)
+      interfaceToArchetypeMap[paramTy] = archetypeTy;
+    else if (concreteTy)
+      interfaceToArchetypeMap[paramTy] = concreteTy;
+    else
+      llvm_unreachable("broken generic parameter");
+  }
+
+  return ArchetypeMapping::get(Context, interfaceToArchetypeMap);
 }
 

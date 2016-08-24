@@ -13,11 +13,13 @@
 // This file implements the GenericSignature class.
 //
 //===----------------------------------------------------------------------===//
+
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+
 using namespace swift;
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,

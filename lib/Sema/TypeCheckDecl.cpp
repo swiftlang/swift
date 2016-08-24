@@ -4729,6 +4729,7 @@ public:
       } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
+        FD->setArchetypes(FD->getDeclContext()->getArchetypesOfContext());
       } else {
         // Recursively satisfied.
         // FIXME: This is an awful hack.
@@ -6382,6 +6383,8 @@ public:
       } else {
         // Revert all of the types within the signature of the constructor.
         TC.revertGenericFuncSignature(CD);
+
+        CD->setArchetypes(CD->getDeclContext()->getArchetypesOfContext());
       }
     }
 
@@ -6529,8 +6532,10 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericContext())
+    if (DD->getDeclContext()->isGenericContext()) {
       TC.validateGenericFuncSignature(DD);
+      DD->setArchetypes(DD->getDeclContext()->getArchetypesOfContext());
+    }
 
     if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
@@ -7303,8 +7308,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 /// the parameter lists within the extension.
 static Type checkExtensionGenericParams(
               TypeChecker &tc, ExtensionDecl *ext,
-              Type type, GenericParamList *genericParams,
-              GenericSignature *&sig) {
+              Type type, GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -7327,8 +7331,7 @@ static Type checkExtensionGenericParams(
                       tc, ext, parentType,
                       nominal->getGenericParams()
                         ? genericParams->getOuterParameters()
-                        : genericParams,
-                      sig);
+                        : genericParams);
     if (!newParentType)
       return Type();
   }
@@ -7371,8 +7374,9 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
-  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(),
-                                    nullptr, inferExtendedTypeReqs, invalid);
+  GenericSignature *sig = tc.validateGenericSignature(
+      genericParams, ext->getDeclContext(),
+      nullptr, inferExtendedTypeReqs, invalid);
   if (invalid) {
     return nullptr;
   }
@@ -7383,6 +7387,8 @@ static Type checkExtensionGenericParams(
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
+
+  ext->setGenericSignature(sig);
   tc.finalizeGenericParamList(builder, genericParams, ext);
 
   if (isa<ProtocolDecl>(nominal)) {
@@ -7450,18 +7456,15 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
     return;
   }
@@ -7480,18 +7483,15 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
 
     // Speculatively ban extension of AnyObject; it won't be a

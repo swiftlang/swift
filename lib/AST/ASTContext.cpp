@@ -18,6 +18,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ArchetypeMapping.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -3779,6 +3780,12 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                            isKnownCanonical);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
+}
+
+ArchetypeMapping *
+ArchetypeMapping::get(ASTContext &ctx,
+                      TypeSubstitutionMap interfaceToArchetypeMap) {
+  return new (ctx) ArchetypeMapping(interfaceToArchetypeMap);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

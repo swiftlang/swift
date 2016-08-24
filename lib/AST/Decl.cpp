@@ -818,11 +818,6 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
-void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
-}
-
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
@@ -2218,11 +2213,6 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
   if (params)
     for (auto Param : *params)
       Param->setDeclContext(this);
-}
-
-void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
 }
 
 
