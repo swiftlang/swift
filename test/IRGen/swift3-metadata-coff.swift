@@ -19,8 +19,10 @@ public struct S : P {
   public typealias T = Optional<S>
 }
 
+var gg = S()
+
 public func f(s : S) -> (() -> ()) {
-  return { _ = s }
+  return { gg = s }
 }
 
 // CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant {{.*}}, section ".sw3cptr"

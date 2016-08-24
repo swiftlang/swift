@@ -336,3 +336,20 @@ extension P3 {
   // Okay: refers to P3
   static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
 }
+
+// rdar://problem/27940842 - recovery with a non-static '=='.
+class C5 {
+  func == (lhs: C5, rhs: C5) -> Bool { return false } // expected-error{{operator '==' declared in type 'C5' must be 'static'}}
+
+  func test1(x: C5) {
+    _ = x == x
+  }
+}
+
+class C6 {
+  static func == (lhs: C6, rhs: C6) -> Bool { return false }
+
+  func test1(x: C6) {
+    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+  }
+}

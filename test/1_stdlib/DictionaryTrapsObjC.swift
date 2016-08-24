@@ -144,7 +144,7 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
 DictionaryTraps.test("Downcast1") {
   let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]
-  let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
+  let d2: Dictionary<TestObjCKeyTy, NSObject> = d as! Dictionary<TestObjCKeyTy, NSObject>
   expectCrashLater()
   let v1 = d2[TestObjCKeyTy(10)]
   let v2 = d2[TestObjCKeyTy(20)]
@@ -163,7 +163,7 @@ DictionaryTraps.test("Downcast2")
 
   expectCrashLater()
   let d2: Dictionary<TestBridgedKeyTy, NSObject>
-    = _dictionaryBridgeFromObjectiveC(d)
+    = d as! Dictionary<TestBridgedKeyTy, NSObject>
   let v1 = d2[TestBridgedKeyTy(10)]
 }
 

@@ -47,5 +47,3 @@ enum Phantom<T> : Int64 {
   case Up
   case Down
 }
-
-extension Phantom : RawRepresentable {}

@@ -2101,3 +2101,19 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
 func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   return true
 }
+
+// CHECK-LABEL: @objc class OperatorInClass
+@objc class OperatorInClass {
+  // CHECK: {{^}} static func ==(lhs: OperatorInClass, rhs: OperatorInClass) -> Bool
+  static func ==(lhs: OperatorInClass, rhs: OperatorInClass) -> Bool {
+    return true
+  }
+  // CHECK: {{^}} @objc static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass
+  @objc static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared @objc}}
+    return lhs
+  }
+} // CHECK: {{^}$}}
+
+@objc protocol OperatorInProtocol {
+  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
+}

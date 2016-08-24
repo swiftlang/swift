@@ -1702,6 +1702,11 @@ ERROR(raw_type_not_literal_convertible,none,
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable 'init' cannot be synthesized because raw type %0 is not "
       "Equatable", (Type))
+ERROR(enum_raw_type_nonconforming_and_nonsynthable,none,
+      "%0 declares raw type %1, but does not conform to RawRepresentable "
+      "and conformance could not be synthesized", (Type, Type))
+NOTE(enum_declares_rawrep_with_raw_type,none,
+      "%0 declares raw type %1, which implies RawRepresentable", (Type, Type))
 ERROR(enum_raw_type_access,none,
       "enum %select{must be declared "
       "%select{private|fileprivate|internal|PUBLIC}2"
@@ -2732,6 +2737,10 @@ ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
       "@objc is not supported within extensions of generic classes", ())
+ERROR(objc_operator, none,
+      "operator methods cannot be declared @objc", ())
+ERROR(objc_operator_proto, none,
+      "@objc protocols may not have operator requirements", ())
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "

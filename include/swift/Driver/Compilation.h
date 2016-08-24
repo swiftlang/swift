@@ -128,6 +128,10 @@ private:
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
+  /// When true, dumps information on how long each compilation task took to
+  /// execute.
+  bool ShowDriverTimeCompilation;
+
   /// When true, dumps information about why files are being scheduled to be
   /// rebuilt.
   bool ShowIncrementalBuildDecisions = false;
@@ -145,7 +149,8 @@ public:
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
-              bool SaveTemps = false);
+              bool SaveTemps = false,
+              bool ShowDriverTimeCompilation = false);
   ~Compilation();
 
   ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
