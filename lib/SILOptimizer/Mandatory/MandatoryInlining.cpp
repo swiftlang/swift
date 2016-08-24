@@ -37,6 +37,44 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+namespace {
+
+/// A helper class to update an instruction iterator if
+/// removal of instructions would invalidate it.
+class DeleteInstructionsHandler : public DeleteNotificationHandler {
+  SILBasicBlock::iterator &CurrentI;
+  SILModule &Module;
+
+public:
+  DeleteInstructionsHandler(SILBasicBlock::iterator &I)
+      : CurrentI(I), Module(I->getModule()) {
+    Module.registerDeleteNotificationHandler(this);
+  }
+
+  ~DeleteInstructionsHandler() {
+     // Unregister the handler.
+    Module.removeDeleteNotificationHandler(this);
+  }
+
+  // Handling of instruction removal notifications.
+  bool needsNotifications() { return true; }
+
+  // Handle notifications about removals of instructions.
+  void handleDeleteNotification(swift::ValueBase *Value) {
+    if (auto DeletedI = dyn_cast<SILInstruction>(Value)) {
+      if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
+        if (CurrentI != CurrentI->getParent()->begin()) {
+          --CurrentI;
+        } else {
+          ++CurrentI;
+        }
+      }
+    }
+  }
+};
+
+} // end of namespace
+
 /// \brief Fixup reference counts after inlining a function call (which is a
 /// no-op unless the function is a thick function). Note that this function
 /// makes assumptions about the release/retain convention of thick function
@@ -426,8 +464,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // Reestablish our iterator if it wrapped.
       if (I == ApplyBlock->end())
         I = ApplyBlock->begin();
-      else
-        ++I;
+
+      // Update the iterator when instructions are removed.
+      DeleteInstructionsHandler DeletionHandler(I);
 
       // If the inlined apply was a thick function, then we need to balance the
       // reference counts for correctness.
@@ -440,8 +479,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // Reposition iterators possibly invalidated by mutation.
       FI = SILFunction::iterator(ApplyBlock);
-      I = ApplyBlock->begin();
       E = ApplyBlock->end();
+      assert(FI == SILFunction::iterator(I->getParent()) &&
+             "Mismatch between the instruction and basic block");
       ++NumMandatoryInlines;
     }
   }
