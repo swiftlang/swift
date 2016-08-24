@@ -1326,6 +1326,27 @@ bb0(%0 : $Optional<(foo, foo)>):
 }
 
 
+// Check if externally available functions are optimized.
+
+sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_externally_available
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSf4d__externally_available_with_dead_arg : $@convention(thin) () -> ()
+// CHECK: apply [[F]]()
+// CHECK: return
+sil @call_externally_available : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %f = function_ref @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed foo) -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+
 // We should remove the array semantic from specialized calls.
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
