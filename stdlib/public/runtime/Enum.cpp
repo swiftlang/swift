@@ -348,17 +348,25 @@ static void storeMultiPayloadValue(OpaqueValue *value,
 #if defined(__BIG_ENDIAN__)
   unsigned numPayloadValueBytes =
       std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(bytes,
+  memcpy(bytes + sizeof(OpaqueValue *) - numPayloadValueBytes,
          reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
          numPayloadValueBytes);
+  if (layout.payloadSize > sizeof(payloadValue) &&
+      layout.payloadSize > sizeof(OpaqueValue *)) {
+    memset(bytes, 0,
+           sizeof(OpaqueValue *) - numPayloadValueBytes);
+    memset(bytes + sizeof(OpaqueValue *), 0,
+           layout.payloadSize - sizeof(OpaqueValue *));
+  }
 #else
   memcpy(bytes, &payloadValue,
          std::min(layout.payloadSize, sizeof(payloadValue)));
-#endif
+
   // If the payload is larger than the value, zero out the rest.
   if (layout.payloadSize > sizeof(payloadValue))
     memset(bytes + sizeof(payloadValue), 0,
            layout.payloadSize - sizeof(payloadValue));
+#endif
 }
 
 static unsigned loadMultiPayloadTag(const OpaqueValue *value,
@@ -384,7 +392,7 @@ static unsigned loadMultiPayloadValue(const OpaqueValue *value,
   unsigned numPayloadValueBytes =
       std::min(layout.payloadSize, sizeof(payloadValue));
   memcpy(reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         bytes, numPayloadValueBytes);
+         bytes + sizeof(OpaqueValue *) - numPayloadValueBytes, numPayloadValueBytes);
 #else
   memcpy(&payloadValue, bytes,
          std::min(layout.payloadSize, sizeof(payloadValue)));
