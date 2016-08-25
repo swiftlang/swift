@@ -1023,6 +1023,13 @@ static void filterValues(Type expectedTy, Module *expectedModule,
           ->getCanonicalSignature() != expectedGenericSig)
       return true;
 
+    // If we don't expect a specific generic signature, ignore anything from a
+    // constrained extension.
+    if (!expectedGenericSig &&
+        isa<ExtensionDecl>(value->getDeclContext()) &&
+        cast<ExtensionDecl>(value->getDeclContext())->isConstrainedExtension())
+      return true;
+
     // If we're looking at members of a protocol or protocol extension,
     // filter by whether we expect to find something in a protocol extension or
     // not. This lets us distinguish between a protocol member and a protocol
