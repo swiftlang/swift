@@ -1282,8 +1282,9 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     auto fnType = fn->getType().castTo<SILFunctionType>();
     fnType = fnType->substGenericArgs(SGM.M, SGM.SwiftModule, subs);
 
-    CanType substResultTy{
-        ArchetypeBuilder::mapTypeIntoContext(fd, nativeFormalResultTy)};
+    auto substResultTy =
+        ArchetypeBuilder::mapTypeIntoContext(fd, nativeFormalResultTy)
+            ->getCanonicalType();
 
     auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn),
                        subs, args, fnType,
