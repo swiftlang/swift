@@ -621,9 +621,9 @@ public:
                   Elements.insert(Elements.begin() + (EI + 1), *Log);
                   ++EI;
                 }
-                Handled = true;
               }
             }
+            Handled = true; // Never log ()
           }
           if (!Handled) {
             // do the same as for all other expressions
