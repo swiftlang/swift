@@ -160,6 +160,7 @@ extension LazyFilterIndex : Comparable {
 // FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be
 // collapsed into one `LazyFilterCollection` using conditional conformances.
 // Maybe even combined with `LazyFilterSequence`.
+// rdar://problem/17144340
 
 % for Traversal in ['Forward', 'Bidirectional']:
 %   Self = "LazyFilter" + collectionForTraversal(Traversal)

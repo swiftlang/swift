@@ -535,6 +535,7 @@ extension ${Self} : Equatable {
 % ]:
 // FIXME(ABI)(compiler limitation): replace this extension with a conditional
 // conformance.
+// rdar://problem/17144340
 /// Ranges whose `Bound` is `Strideable` with `Integer` `Stride` have all
 /// the capabilities of `RandomAccessCollection`s, just like
 /// `CountableRange` and `CountableClosedRange`.
