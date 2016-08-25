@@ -731,12 +731,13 @@ namespace llvm {
   template <> struct GraphTraits<CGForDotView::Node *> {
     typedef CGForDotView::Node NodeType;
     typedef CGForDotView::child_iterator ChildIteratorType;
+    typedef CGForDotView::Node *NodeRef;
 
-    static NodeType *getEntryNode(NodeType *N) { return N; }
-    static inline ChildIteratorType child_begin(NodeType *N) {
+    static NodeRef getEntryNode(NodeRef N) { return N; }
+    static inline ChildIteratorType child_begin(NodeRef N) {
       return N->Children.begin();
     }
-    static inline ChildIteratorType child_end(NodeType *N) {
+    static inline ChildIteratorType child_end(NodeRef N) {
       return N->Children.end();
     }
   };
@@ -744,8 +745,9 @@ namespace llvm {
   template <> struct GraphTraits<CGForDotView *>
   : public GraphTraits<CGForDotView::Node *> {
     typedef CGForDotView *GraphType;
+    typedef CGForDotView::Node *NodeRef;
 
-    static NodeType *getEntryNode(GraphType F) { return nullptr; }
+    static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
     typedef CGForDotView::iterator nodes_iterator;
     static nodes_iterator nodes_begin(GraphType OCG) {
