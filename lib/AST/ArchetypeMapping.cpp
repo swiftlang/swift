@@ -37,17 +37,13 @@ void *ArchetypeMapping::operator new(size_t bytes, const ASTContext &ctx) {
 }
 
 Type ArchetypeMapping::mapTypeOutOfContext(ModuleDecl *M, Type type) {
-  auto type = type.subst(M, ArchetypeToInterfaceMap,
-                         SubstFlags::AllowLoweredTypes);
-
+  type = type.subst(M, ArchetypeToInterfaceMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasArchetype() && "not fully substituted");
   return type;
 }
 
 Type ArchetypeMapping::mapTypeIntoContext(ModuleDecl *M, Type type) {
-  auto type = type.subst(M, InterfaceToArchetypeMap,
-                         SubstFlags::AllowLoweredTypes);
-
+  type = type.subst(M, InterfaceToArchetypeMap, SubstFlags::AllowLoweredTypes);
   assert(!type->hasTypeParameter() && "not fully substituted");
   return type;
 }
