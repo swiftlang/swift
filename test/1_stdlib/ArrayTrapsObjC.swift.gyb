@@ -117,16 +117,4 @@ class ViolateInoutSafetyNeedElementTypeCheck {
   }
 }
 
-ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
-  .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
-  .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: inout rules were violated: the array was overwritten" : "")
-  .code {
-  let v = ViolateInoutSafetyNeedElementTypeCheck()
-  expectCrashLater()
-  v.inoutViolation()
-}
-
 runAllTests()
