@@ -1,5 +1,6 @@
 add_swift_library(swiftCoreData ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  CoreData.swift
+  CocoaError.swift
+  NSManagedObjectContext.swift
   CoreData.mm
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"

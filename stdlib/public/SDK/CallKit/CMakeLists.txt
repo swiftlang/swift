@@ -1,5 +1,4 @@
 add_swift_library(swiftCallKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  CallKit.swift
   CXProviderConfiguration.swift
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
