@@ -184,14 +184,21 @@ public func _errorInMain(_ error: Error) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
 }
 
+/// Runtime function to determine the default code for an Error-conforming type.
+@_silgen_name("swift_getDefaultErrorCode")
+public func _swift_getDefaultErrorCode<T : Error>(_ x: T) -> Int
+
 @available(*, unavailable, renamed: "Error")
 public typealias ErrorType = Error
 
 @available(*, unavailable, renamed: "Error")
 public typealias ErrorProtocol = Error
 
-
 extension Error {
+  public var _code: Int {
+    return _swift_getDefaultErrorCode(self)
+  }
+
   public var _domain: String {
     return String(reflecting: type(of: self))
   }
@@ -202,5 +209,19 @@ extension Error {
 #else
     return nil
 #endif
+  }
+}
+
+extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var _code: Int {
+    return numericCast(self.rawValue)
+  }
+}
+
+extension Error where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var _code: Int {
+    return numericCast(self.rawValue)
   }
 }
