@@ -23,9 +23,13 @@ ArchetypeMapping::ArchetypeMapping(TypeSubstitutionMap interfaceToArchetypeMap)
   : InterfaceToArchetypeMap(interfaceToArchetypeMap) {
 
   // Compute reverse mapping.
-  for (auto entry : interfaceToArchetypeMap)
+  for (auto entry : interfaceToArchetypeMap) {
+    // We're going to pass the map to Type::subst(), which expects the keys
+    // to be canonical, otherwise it won't be able to find them.
+    assert(entry.first->isCanonical());
     if (auto *archetypeTy = entry.second->getAs<ArchetypeType>())
       ArchetypeToInterfaceMap[archetypeTy] = entry.first;
+  }
 }
 
 void *ArchetypeMapping::operator new(size_t bytes, const ASTContext &ctx) {
