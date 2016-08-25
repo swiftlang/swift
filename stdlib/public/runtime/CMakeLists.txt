@@ -40,6 +40,7 @@ set(swift_runtime_sources
     Enum.cpp
     ErrorObjectNative.cpp
     Errors.cpp
+    ErrorDefaultImpls.cpp
     Heap.cpp
     HeapObject.cpp
     KnownMetadata.cpp
