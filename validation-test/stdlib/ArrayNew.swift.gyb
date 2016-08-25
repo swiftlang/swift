@@ -248,13 +248,13 @@ func getAsImmutableNSArray(_ a: Array<Int>) -> NSArray {
   return NSArray(objects: &elements, count: elements.count)
 }
 
-func getAsNSArray(_ a: Array<Int>) -> NSArray {
+func copyToNewNSArray(_ a: Array<Int>) -> NSArray {
   // Return an `NSMutableArray` to make sure that it has a unique
   // pointer identity.
-  return getAsNSMutableArray(a)
+  return copyToNewNSMutableArray(a)
 }
 
-func getAsNSMutableArray(_ a: Array<Int>) -> NSMutableArray {
+func copyToNewNSMutableArray(_ a: Array<Int>) -> NSMutableArray {
   let result = NSMutableArray()
   for element in a {
     result.add(TestObjCValueTy(element))
@@ -327,7 +327,7 @@ class CustomImmutableNSArray : NSArray {
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
   do {
     let source = [ 10, 20, 30 ]
-    let nsa = getAsNSArray(source)
+    let nsa = copyToNewNSArray(source)
     var result = nsa as Array
     expectFalse(isCocoaArray(result))
     expectType(Array<AnyObject>.self, &result)
@@ -337,7 +337,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
   }
   do {
     let source = [ 10, 20, 30 ]
-    let nsa = getAsNSArray(source)
+    let nsa = copyToNewNSArray(source)
     var result = nsa as! Array<TestObjCValueTy>
     expectFalse(isCocoaArray(result))
     expectType(Array<TestObjCValueTy>.self, &result)
@@ -349,7 +349,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.BridgeUsingAs") {
   let source = [ 10, 20, 30 ]
-  let nsa = getAsNSArray(source)
+  let nsa = copyToNewNSArray(source)
   var result = nsa as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
   expectType(Array<TestBridgedValueTy>.self, &result)
@@ -361,7 +361,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.BridgeUsingAs") {
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
-  let nsa = getAsNSMutableArray(source)
+  let nsa = copyToNewNSMutableArray(source)
   let result = nsa as Array<AnyObject>
   expectFalse(isCocoaArray(result))
 
@@ -376,7 +376,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
   let source = [ 10, 20, 30 ]
-  let nsa = getAsNSMutableArray(source)
+  let nsa = copyToNewNSMutableArray(source)
   var result = nsa as AnyObject as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
 
@@ -391,7 +391,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
 
 
 ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
-  let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
+  let nsa = NSArray(array: copyToNewNSArray([ 10, 20, 30 ]))
   var a: Array<AnyObject> = convertNSArrayToArray(nsa)
   var bridgedBack: NSArray = convertArrayToNSArray(a)
 
@@ -405,7 +405,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
 }
 
 ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
-  let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
+  let nsa = NSArray(array: copyToNewNSArray([ 10, 20, 30 ]))
   var a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
   var bridgedBack: NSArray = convertArrayToNSArray(a)
 
