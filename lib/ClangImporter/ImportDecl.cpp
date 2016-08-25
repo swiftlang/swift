@@ -5170,7 +5170,7 @@ namespace {
       }
       // TODO: any need to infer requirements?
       bool result = builder.finalize(genericParams->getSourceRange().Start);
-      assert(result);
+      assert(!result);
       (void) result;
 
       SmallVector<GenericTypeParamType *, 4> genericParamTypes;
