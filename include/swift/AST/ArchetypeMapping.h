@@ -35,13 +35,19 @@ public:
   static ArchetypeMapping *get(ASTContext &ctx,
                                TypeSubstitutionMap interfaceToArchetypeMap);
 
-  // Make vanilla new/delete illegal.
+  /// Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
 
-  // Only allow allocation of ArchetypeMappings using the allocator
-  // in ASTContext.
+  /// Only allow allocation of ArchetypeMappings using the allocator
+  /// in ASTContext.
   void *operator new(size_t bytes, const ASTContext &ctx);
+
+  /// Map a contextual type to an interface type.
+  Type mapTypeOutOfContext(ModuleDecl *M, Type type);
+
+  /// Map an interface type to a contextual type.
+  Type mapTypeIntoContext(ModuleDecl *M, Type type);
 };
   
 } // end namespace swift
