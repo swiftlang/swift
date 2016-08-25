@@ -1347,27 +1347,54 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    ExprTypeCheckListener *listener, ConstraintSystem &cs,
                    SmallVectorImpl<Solution> &viable,
                    TypeCheckExprOptions options) {
+
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (preCheckExpression(*this, expr, dc))
     return true;
 
-  // Attempt to solve the constraint system.
-  auto solution = cs.solve(expr,
-                           convertType,
-                           listener,
-                           viable,
-                           allowFreeTypeVariables);
-
-  // The constraint system has failed
-  if (solution == ConstraintSystem::SolutionKind::Error)
+  if (auto generatedExpr = cs.generateConstraints(expr))
+    expr = generatedExpr;
+  else {
     return true;
+  }
 
-  // If the system is unsolved or there are multiple solutions present but
-  // type checker options do not allow unresolved types, let's try to salvage
-  if (solution == ConstraintSystem::SolutionKind::Unsolved
-      || (viable.size() != 1 &&
-          !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
+  // If there is a type that we're expected to convert to, add the conversion
+  // constraint.
+  if (convertType) {
+    auto constraintKind = ConstraintKind::Conversion;
+    if (cs.getContextualTypePurpose() == CTP_CallArgument)
+      constraintKind = ConstraintKind::ArgumentConversion;
+      
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+      convertType = convertType.transform([&](Type type) -> Type {
+        if (type->is<UnresolvedType>())
+          return cs.createTypeVariable(cs.getConstraintLocator(expr), 0);
+        return type;
+      });
+    }
+    
+    cs.addConstraint(constraintKind, expr->getType(), convertType,
+                     cs.getConstraintLocator(expr), /*isFavored*/ true);
+  }
+
+  // Notify the listener that we've built the constraint system.
+  if (listener && listener->builtConstraints(cs, expr)) {
+    return true;
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Initial constraints for the given expression---\n";
+    expr->print(log);
+    log << "\n";
+    cs.print(log);
+  }
+
+  // Attempt to solve the constraint system.
+  if (cs.solve(viable, allowFreeTypeVariables) ||
+      (viable.size() != 1 &&
+       !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
     if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
       return true;
 

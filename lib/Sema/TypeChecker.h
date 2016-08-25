@@ -44,7 +44,6 @@ class TypeChecker;
 
 namespace constraints {
   enum class ConstraintKind : char;
-  enum class SolutionKind : char;
   class ConstraintSystem;
   class Solution;
 }
