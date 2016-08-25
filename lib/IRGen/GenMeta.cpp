@@ -236,7 +236,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type, nullptr)
+    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type)
              ->getCanonicalType();
   };
 
@@ -2767,7 +2767,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     auto declCtxt = type;
     if (auto generics = declCtxt->getGenericSignatureOfContext()) {
       auto getInContext = [&](CanType type) -> CanType {
-        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type, nullptr)
+        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type)
             ->getCanonicalType();
       };
       bindArchetypeAccessPaths(IGF, generics, getInContext);
