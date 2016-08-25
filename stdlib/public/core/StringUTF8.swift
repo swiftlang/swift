@@ -469,7 +469,7 @@ extension String.UTF8View.Index : Comparable {
     // Match up bytes in the buffer
     var buffer = (lhs._buffer, rhs._buffer)
     var isContinuation: Bool
-    repeat {
+    while true {
       let unit = (
         UTF8.CodeUnit(truncatingBitPattern: buffer.0),
         UTF8.CodeUnit(truncatingBitPattern: buffer.1))
@@ -490,7 +490,6 @@ extension String.UTF8View.Index : Comparable {
         String.UTF8Index._nextBuffer(after: buffer.0),
         String.UTF8Index._nextBuffer(after: buffer.1))
     }
-    while true
   }
 
   public static func < (
