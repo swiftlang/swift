@@ -599,7 +599,11 @@ function(_add_swift_library_single target name)
   endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
-  string(REPLACE swift "" module_name "${name}")
+  if(SWIFTLIB_IS_STDLIB_CORE)
+    set(module_name "Swift")
+  else()
+    string(REPLACE swift "" module_name "${name}")
+  endif()
   list(FIND SWIFT_API_NOTES_INPUTS "${module_name}" overlay_index)
   if(NOT ${overlay_index} EQUAL -1)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
@@ -641,6 +645,7 @@ function(_add_swift_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
+      MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
@@ -1675,6 +1680,7 @@ function(_add_swift_executable_single name)
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}
         ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS}
+      MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
       IS_MAIN)
