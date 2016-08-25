@@ -48,7 +48,7 @@ func testEquality() {
   let x4 : (_ : P2) -> ()
   x3 = x4
   _ = x3
-  
+
   // Empty protocol-conformance types are empty.
   let x5 : (_ : Any) -> ()
   let x6 : (_ : Any2) -> ()
@@ -123,7 +123,7 @@ func testConversion() {
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=P5}}
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=(P5)=}}
 
 typealias A = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{15-25=Any}}
 typealias B1 = protocol<P1,P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-31=P1 & P2}}
