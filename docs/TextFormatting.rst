@@ -133,14 +133,14 @@ need to declare conformance: simply give the type a ``debugFormat()``::
 
   /// \brief A thing that can be printed in the REPL and the Debugger
   protocol CustomDebugStringConvertible {
-    typealias DebugRepresentation : Streamable = String
+    typealias DebugRepresentation : TextOutputStreamable = String
 
     /// \brief Produce a textual representation for the REPL and
     /// Debugger.
     func debugFormat() -> DebugRepresentation
   }
 
-Because ``String`` is a ``Streamable``, your implementation of
+Because ``String`` is a ``TextOutputStreamable``, your implementation of
 ``debugFormat`` can just return a ``String``. If want to write
 directly to the ``TextOutputStream`` for efficiency reasons,
 (e.g. if your representation is huge), you can return a custom
@@ -171,12 +171,12 @@ implement::
 
   /// \brief A thing that can be print()ed and toString()ed.
   protocol CustomStringConvertible : CustomDebugStringConvertible {
-    typealias PrintRepresentation: Streamable = DebugRepresentation
+    typealias PrintRepresentation : TextOutputStreamable = DebugRepresentation
 
     /// \brief produce a "pretty" textual representation.
     ///
     /// In general you can return a String here, but if you need more
-    /// control, return a custom Streamable type
+    /// control, return a custom TextOutputStreamable type
     func format() -> PrintRepresentation {
       return debugFormat()
     }
@@ -191,16 +191,16 @@ implement::
     }
   }
 
-``Streamable``
-...............
+``TextOutputStreamable``
+........................
 
 Because it's not always efficient to construct a ``String``
 representation before writing an object to a stream, we provide a
-``Streamable`` protocol, for types that can write themselves into an
-``TextOutputStream``. Every ``Streamable`` is also a ``CustomStringConvertible``,
-naturally::
+``TextOutputStreamable`` protocol, for types that can write themselves into an
+``TextOutputStream``. Every ``TextOutputStreamable`` is also a
+``CustomStringConvertible``, naturally::
 
-  protocol Streamable : CustomStringConvertible {
+  protocol TextOutputStreamable : CustomStringConvertible {
     func writeTo<T: TextOutputStream>(_ target: [inout] T)
 
     // You'll never want to reimplement this
@@ -212,7 +212,7 @@ naturally::
 How ``String`` Fits In
 ......................
 
-``String``\ 's ``debugFormat()`` yields a ``Streamable`` that
+``String``\ 's ``debugFormat()`` yields a ``TextOutputStreamable`` that
 adds surrounding quotes and escapes special characters::
 
   extension String : CustomDebugStringConvertible {
@@ -221,7 +221,7 @@ adds surrounding quotes and escapes special characters::
     }
   }
 
-  struct EscapedStringRepresentation : Streamable {
+  struct EscapedStringRepresentation : TextOutputStreamable {
     var _value: String
 
     func writeTo<T: TextOutputStream>(_ target: [inout] T) {
@@ -234,9 +234,9 @@ adds surrounding quotes and escapes special characters::
   }
 
 Besides modeling ``TextOutputStream``, ``String`` also conforms to
-``Streamable``::
+``TextOutputStreamable``::
 
-  extension String : Streamable {
+  extension String : TextOutputStreamable {
     func writeTo<T: TextOutputStream>(_ target: [inout] T) {
       target.append(self) // Append yourself to the stream
     }
@@ -272,7 +272,7 @@ complicated ``format(…)`` might be written::
     }
   }
 
-  struct RadixFormat<T: CustomStringConvertibleInteger> : Streamable {
+  struct RadixFormat<T: CustomStringConvertibleInteger> : TextOutputStreamable {
     var value: T, radix = 10, fill = " ", width = 0
 
     func writeTo<S: TextOutputStream>(_ target: [inout] S) {
@@ -363,13 +363,13 @@ processed and written to the underlying stream:
 This makes general ``TextOutputStream`` adapters more complicated to write
 and use than ordinary ``TextOutputStream``\ s.
 
-``Streamable`` Adapters
-.......................
+``TextOutputStreamable`` Adapters
+.................................
 
 For every conceivable ``TextOutputStream`` adaptor there's a corresponding
-``Streamable`` adaptor. For example::
+``TextOutputStreamable`` adaptor. For example::
 
-  struct UpperStreamable<UnderlyingStreamable:Streamable> {
+  struct UpperStreamable<UnderlyingStreamable : TextOutputStreamable> {
     var base: UnderlyingStreamable
 
     func writeTo<T: TextOutputStream>(_ target: [inout] T) {
@@ -379,10 +379,10 @@ For every conceivable ``TextOutputStream`` adaptor there's a corresponding
     }
   }
 
-Then, we could extend ``Streamable`` as follows::
+Then, we could extend ``TextOutputStreamable`` as follows::
 
-  extension Streamable {
-    typealias Upcased : Streamable = UpperStreamable<This>
+  extension TextOutputStreamable {
+    typealias Upcased : TextOutputStreamable = UpperStreamable<This>
     func toUpper() -> UpperStreamable<This> {
       return Upcased(self)
     }
@@ -409,8 +409,8 @@ Possible Simplifications
 
 One obvious simplification might be to fearlessly use ``String`` as
 the universal textual representation type, rather than having a
-separate ``Streamable`` protocol that doesn't necessarily create a
-fully-stored representation. This approach would trade some
+separate ``TextOutputStreamable`` protocol that doesn't necessarily
+create a fully-stored representation. This approach would trade some
 efficiency for considerable design simplicity. It is reasonable to
 ask whether the efficiency cost would be significant in real cases,
 and the truth is that we don't have enough information to know. At
@@ -429,7 +429,7 @@ the underlying stream, which can then be "written back":
 
 .. parsed-literal::
 
-  struct AdaptedStreamable<T:Streamable> {
+  struct AdaptedStreamable<T : TextOutputStreamable> {
     ...
     func writeTo<Target: TextOutputStream>(_ target: [inout] Target) {
       // create the stream that transforms the representation
