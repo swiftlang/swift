@@ -90,6 +90,7 @@ def get_slice_doc_comment(Self):
 // that has conditional conformances to `BidirectionalCollection`,
 // `RandomAccessCollection`, `RangeReplaceableCollection`, and
 // `MutableCollection`.
+// rdar://problem/17144340
 
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
