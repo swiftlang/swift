@@ -1421,7 +1421,11 @@ protected:
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
-  
+
+  void setDecls(ArrayRef<ValueDecl *> domain) {
+    Decls = domain;
+  }
+
   /// getBaseType - Determine the type of the base object provided for the
   /// given overload set, which is only non-null when dealing with an overloaded
   /// member reference.
