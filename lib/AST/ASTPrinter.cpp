@@ -3791,13 +3791,11 @@ public:
       return;
 
     if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
-      Printer.printSimpleAttr("@autoclosure");
-      Printer << " ";
+      Printer.printSimpleAttr("@autoclosure") << " ";
     }
     if (inParameterPrinting && !info.isNoEscape() &&
         !Options.excludeAttrKind(TAK_escaping)) {
-      Printer.printSimpleAttr("@escaping");
-      Printer << " ";
+      Printer.printSimpleAttr("@escaping") << " ";
     }
 
     if (Options.PrintFunctionRepresentationAttrs &&
@@ -3874,8 +3872,7 @@ public:
     }
 
     if (info.isPseudogeneric()) {
-      Printer.printSimpleAttr("@pseudogeneric");
-      Printer << " ";
+      Printer.printSimpleAttr("@pseudogeneric") << " ";
     }
   }
 
