@@ -741,6 +741,7 @@ Globals
   global ::= 'Mm' type                   // class metaclass
   global ::= 'Mn' nominal-type           // nominal type descriptor
   global ::= 'Mp' protocol               // protocol descriptor
+  global ::= 'MR' remote-reflection-record // metadata for remote mirrors
   global ::= 'PA' .*                     // partial application forwarder
   global ::= 'PAo' .*                    // ObjC partial application forwarder
   global ::= 'w' value-witness-kind type // value witness
@@ -821,6 +822,10 @@ Globals
   addressor-kind ::= 'O'                 // owning addressor (non-native owner)
   addressor-kind ::= 'o'                 // owning addressor (native owner)
   addressor-kind ::= 'p'                 // pinning addressor (native owner)
+
+  remote-reflection-record ::= 'f' type                  // field descriptor
+  remote-reflection-record ::= 'a' protocol-conformance  // associated type descriptor
+  remote-reflection-record ::= 'b' type                  // builtin type descriptor
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[Ss]``) of a nominal type, or an ``entity-kind``
