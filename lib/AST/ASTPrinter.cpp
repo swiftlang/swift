@@ -924,10 +924,6 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
-// FIXME: We need to undef 'defer' when including Tokens.def. It is restored
-// below.
-#undef defer
-
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   StringRef name;
   switch (keyword) {
