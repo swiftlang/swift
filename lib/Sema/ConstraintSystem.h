@@ -1024,19 +1024,18 @@ private:
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
+    bool IsPrimary;
+
+    ConstraintSystem &CS;
     TypeChecker &TC;
     DeclContext *DC;
-    TypeLoc CT;
-    ContextualTypePurpose CTP;
 
   public:
-    Candidate(ConstraintSystem &cs, Expr *expr)
-    : E(expr),
-      TC(cs.TC),
-      DC(cs.DC),
-      CT(cs.getContextualTypeLoc()),
-      CTP(cs.getContextualTypePurpose())
-    {}
+    Candidate(ConstraintSystem &cs, Expr *expr, bool primaryExpr)
+        : E(expr), IsPrimary(primaryExpr), CS(cs), TC(cs.TC), DC(cs.DC) {}
+
+    /// \brief Return underlaying expression.
+    Expr *getExpr() const { return E; }
 
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
