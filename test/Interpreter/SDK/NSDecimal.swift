@@ -117,3 +117,10 @@ twenty = Decimal(20)
 ten = Decimal(10)
 twenty.divide(by: ten)
 print(twenty) // CHECK: 2
+
+twenty = Decimal(20)
+print(twenty.significand) // CHECK: 2
+print(twenty.exponent) // CHECK: 1
+print(twenty.ulp) // CHECK: 10
+
+print(Decimal(sign: .plus, exponent: -2, significand: 100)) // CHECK: 1
