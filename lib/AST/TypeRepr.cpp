@@ -303,8 +303,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
-    Printer << "(" << Attrs.convention.getValue() << ") ";
+    Printer << "(" << Attrs.convention.getValue() << ")";
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    Printer << " ";
   }
 }
 
