@@ -199,22 +199,6 @@ GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   }
 }
 
-GenericParamList *ProtocolConformance::getGenericParams() const {
-  switch (getKind()) {
-  case ProtocolConformanceKind::Inherited:
-  case ProtocolConformanceKind::Normal:
-    // If we have a normal or inherited protocol conformance, look for its
-    // generic parameters.
-    return getDeclContext()->getGenericParamsOfContext();
-
-  case ProtocolConformanceKind::Specialized:
-    // If we have a specialized protocol conformance, since we do not support
-    // currently partial specialization, we know that it cannot have any open
-    // type variables.
-    return nullptr;
-  }
-}
-
 GenericSignature *ProtocolConformance::getGenericSignature() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:

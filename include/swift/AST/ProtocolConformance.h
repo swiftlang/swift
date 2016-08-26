@@ -239,10 +239,6 @@ public:
  
   /// Get the generic parameters open on the conforming type.
   GenericEnvironment *getGenericEnvironment() const;
-  
-  /// Get the generic parameters open on the conforming type.
-  /// FIXME: Retire in favor of getGenericSignature().
-  GenericParamList *getGenericParams() const;
 
   /// Get the generic signature containing the parameters open on the conforming
   /// interface type.
