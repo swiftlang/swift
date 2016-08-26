@@ -22,6 +22,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -59,15 +60,10 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
   A = A->getPrimary();
 
   // Ok, we have a primary archetype, make sure it is in the nested generic
-  // parameters of our caller.
-  for (auto *params = F->getContextGenericParams();
-       params != nullptr;
-       params = params->getOuterParameters()) {
-
-    for (auto param : params->getParams())
-      if (param->getArchetype()->isEqual(A))
-        return true;
-  }
+  // environment of our caller.
+  if (auto *genericEnv = F->getGenericEnvironment())
+    if (genericEnv->getArchetypeToInterfaceMap().count(A))
+      return true;
 
   return false;
 }
@@ -1757,9 +1753,9 @@ public:
     auto methodTy = constantInfo.SILFnType;
 
     // Map interface types to archetypes.
-    if (auto *params = constantInfo.ContextGenericParams) {
+    if (auto *env = constantInfo.GenericEnv) {
       auto sig = constantInfo.SILFnType->getGenericSignature();
-      auto subs = params->getForwardingSubstitutions(sig);
+      auto subs = env->getForwardingSubstitutions(M, sig);
       methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
     }
     assert(!methodTy->isPolymorphic());
@@ -3308,13 +3304,13 @@ public:
 
     // Make sure that our SILFunction only has context generic params if our
     // SILFunctionType is non-polymorphic.
-    if (F->getContextGenericParams()) {
+    if (F->getGenericEnvironment()) {
       require(FTy->isPolymorphic(),
-              "non-generic function definitions cannot have context "
-              "archetypes");
+              "non-generic function definitions cannot have a "
+              "generic environment");
     } else {
       require(!FTy->isPolymorphic(),
-              "generic function definition must have context archetypes");
+              "generic function definition must have a generic environment");
     }
 
     // Otherwise, verify the body of the function.

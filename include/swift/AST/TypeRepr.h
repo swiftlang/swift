@@ -378,7 +378,9 @@ public:
   FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
-      GenericParams(genericParams), GenericSig(nullptr),
+      GenericParams(genericParams),
+      GenericEnv(nullptr),
+      GenericSig(nullptr),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }

@@ -64,3 +64,42 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
   assert(!type->hasTypeParameter() && "not fully substituted");
   return type;
 }
+
+ArrayRef<Substitution>
+GenericEnvironment::getForwardingSubstitutions(
+    ModuleDecl *M, GenericSignature *sig) const {
+  auto lookupConformanceFn =
+      [&](Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+    return ProtocolConformanceRef(protoType->getDecl());
+  };
+
+  SmallVector<Substitution, 4> result;
+  sig->getSubstitutions(*M, InterfaceToArchetypeMap,
+                        lookupConformanceFn, result);
+  return sig->getASTContext().AllocateCopy(result);
+}
+
+void GenericEnvironment::
+getSubstitutionMap(ModuleDecl *mod,
+                   GenericSignature *sig,
+                   ArrayRef<Substitution> subs,
+                   TypeSubstitutionMap &subsMap,
+                   ArchetypeConformanceMap &conformanceMap) const {
+
+  for (auto depTy : sig->getAllDependentTypes()) {
+
+    // Map the interface type to a context type.
+    auto contextTy = depTy.subst(mod, InterfaceToArchetypeMap, SubstOptions());
+    auto *archetype = contextTy->castTo<ArchetypeType>();
+
+    auto sub = subs.front();
+    subs = subs.slice(1);
+
+    // Record the replacement type and its conformances.
+    subsMap[archetype] = sub.getReplacement();
+    conformanceMap[archetype] = sub.getConformances();
+  }
+  
+  assert(subs.empty() && "did not use all substitutions?!");
+}

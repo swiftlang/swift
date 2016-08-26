@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -1134,6 +1135,17 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   return Get;
 }
 
+static ArrayRef<Substitution>
+getForwardingSubstitutions(DeclContext *DC) {
+  if (auto *env = DC->getGenericEnvironmentOfContext()) {
+    auto *sig = DC->getGenericSignatureOfContext();
+    return env->getForwardingSubstitutions(
+        DC->getParentModule(), sig);
+  }
+
+  return { };
+}
+
 void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
                                FuncDecl *DefaultInitStorage,
@@ -1270,12 +1282,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   addTrivialAccessorsToStorage(Storage, *this);
   
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (auto *sig = DC->getGenericSignatureOfContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-                   ->getForwardingSubstitutions(sig);
-  }
-  
+  auto MemberSubs = getForwardingSubstitutions(DC);
   BehaviorConformance->setWitness(BehaviorStorage,
                                  ConcreteDeclRef(Context, Storage, MemberSubs));
   BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
@@ -1442,12 +1449,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (auto *sig = DC->getGenericSignatureOfContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-    ->getForwardingSubstitutions(sig);
-  }
-
+  auto MemberSubs = getForwardingSubstitutions(DC);
   BehaviorConformance->setWitness(BehaviorParameter,
                                ConcreteDeclRef(Context, Parameter, MemberSubs));
 }

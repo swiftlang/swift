@@ -56,6 +56,19 @@ public:
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+
+  /// Derive a contextual type substitution map from a substitution array.
+  /// This is just like GenericSignature::getSubstitutionMap(), except
+  /// with contextual types instead of interface types.
+  void
+  getSubstitutionMap(ModuleDecl *mod,
+                     GenericSignature *sig,
+                     ArrayRef<Substitution> subs,
+                     TypeSubstitutionMap &subsMap,
+                     ArchetypeConformanceMap &conformanceMap) const;
+
+  ArrayRef<Substitution>
+  getForwardingSubstitutions(ModuleDecl *M, GenericSignature *sig) const;
 };
   
 } // end namespace swift

@@ -475,7 +475,7 @@ GenericEnvironment *
 TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
   // If there aren't any generic parameters at this level, we're done.
   if (!DC->isInnermostContextGeneric())
-    return;
+    return nullptr;
 
   GenericParamList *genericParams = DC->getGenericParamsOfContext();
   GenericSignature *genericSig = DC->getGenericSignatureOfContext();

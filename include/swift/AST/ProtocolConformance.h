@@ -236,6 +236,9 @@ public:
   /// Retrieve the complete set of protocol conformances for directly inherited
   /// protocols.
   const InheritedConformanceMap &getInheritedConformances() const;
+ 
+  /// Get the generic parameters open on the conforming type.
+  GenericEnvironment *getGenericEnvironment() const;
   
   /// Get the generic parameters open on the conforming type.
   /// FIXME: Retire in favor of getGenericSignature().

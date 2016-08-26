@@ -20,7 +20,7 @@
 #include <vector>
 
 namespace swift {
-class GenericParamList;
+class GenericEnvironment;
 class CanType;
 class Decl;
 class ValueDecl;
@@ -336,9 +336,8 @@ struct PrintOptions {
   /// formatting.
   bool PrintOriginalSourceText = false;
 
-  /// \brief Print dependent types as references into this generic parameter
-  /// list.
-  GenericParamList *ContextGenericParams = nullptr;
+  /// \brief Print dependent types as references into this generic environment.
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;

@@ -244,11 +244,6 @@ private:
   /// Writes a set of generic requirements.
   void writeGenericRequirements(ArrayRef<Requirement> requirements);
 
-  /// Writes generic environment.
-  void writeGenericEnvironment(GenericSignature *sig,
-                               GenericEnvironment *env,
-                         const std::array<unsigned, 256> &abbrCodes);
-
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
@@ -419,6 +414,11 @@ public:
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams,
                           const std::array<unsigned, 256> &abbrCodes);
+
+  /// Writes a generic environment.
+  void writeGenericEnvironment(GenericSignature *sig,
+                               GenericEnvironment *env,
+                         const std::array<unsigned, 256> &abbrCodes);
 
 };
 } // end namespace serialization

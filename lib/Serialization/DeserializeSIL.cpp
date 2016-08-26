@@ -490,34 +490,18 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->addSpecializeAttr(SILSpecializeAttr::create(SILMod, Substitutions));
   }
 
-  GenericParamList *contextParams = nullptr;
+  GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly) {
-    // We need to construct a linked list of GenericParamList. The outermost
-    // list appears first in the module file. Force the declaration's context to
-    // be the current module, not the original module associated with this
-    // module file. A generic param decl at module scope cannot refer to another
-    // module because we would have no way lookup the original module when
-    // serializing a copy of the function. This comes up with generic
-    // reabstraction thunks which have shared linkage.
-    DeclContext *outerParamContext = SILMod.getSwiftModule();
-    while (true) {
-      // Params' OuterParameters will point to contextParams.
-      auto *Params = MF->maybeReadGenericParams(outerParamContext,
-                                                SILCursor, contextParams);
-      if (!Params)
-        break;
-      // contextParams will point to the last deserialized list, which is the
-      // innermost one.
-      contextParams = Params;
-    }
+    SmallVector<GenericTypeParamType *, 4> genericParamTypes;
+    genericEnv = MF->readGenericEnvironment(genericParamTypes, SILCursor);
   }
 
   // If the next entry is the end of the block, then this function has
   // no contents.
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
-  assert((!isEmptyFunction || !contextParams) &&
-         "context params without body?!");
+  assert((!isEmptyFunction || !genericEnv) &&
+         "generic environment without body?!");
 
   // Remember this in our cache in case it's a recursive function.
   // Increase the reference count to keep it alive.
@@ -536,10 +520,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   NumDeserializedFunc++;
 
-  assert(!(fn->getContextGenericParams() && !fn->empty())
+  assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
-  if (contextParams)
-    fn->setContextGenericParams(contextParams);
+  if (genericEnv)
+    fn->setGenericEnvironment(genericEnv);
 
   scratch.clear();
   kind = SILCursor.readRecord(entry.ID, scratch);

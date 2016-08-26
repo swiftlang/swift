@@ -23,6 +23,7 @@
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -1768,33 +1769,35 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     nameBuffer = mangler.finalize();
   }
 
-  // Collect the context generic parameters for the witness.
-  //
-  // FIXME: SILFunction::ContextGenericParams needs to be a GenericSignature
-  // instead.
-  GenericParamList *witnessContextParams = nullptr;
+  // Collect the generic environment for the witness.
+  TypeSubstitutionMap witnessContextParams;
 
   // Concrete witness thunks use the context archetypes of the conformance.
   if (conformance) {
-    witnessContextParams = conformance->getGenericParams();
+    if (auto *genericEnv = conformance->getGenericEnvironment())
+      witnessContextParams = genericEnv->getInterfaceToArchetypeMap();
 
     // If the requirement is generic, reparent the requirement parameters to
     // the conformance parameters.
-    if (auto reqtParams = requirementInfo.InnerGenericParams) {
-      // Preserve the depth of generic arguments by adding an empty outer generic
-      // param list if the conformance is concrete.
-      if (!witnessContextParams)
-        witnessContextParams = GenericParamList::getEmpty(getASTContext());
+    for (auto pair : requirementInfo.GenericEnv->getInterfaceToArchetypeMap()) {
+      // Skip the 'Self' parameter.
+      if (auto *archetypeTy = pair.second->getAs<ArchetypeType>())
+        if (archetypeTy->getSelfProtocol() != nullptr)
+          continue;
 
-      witnessContextParams
-        = reqtParams->cloneWithOuterParameters(getASTContext(),
-                                               witnessContextParams);
+      auto result = witnessContextParams.insert(pair);
+      assert(result.second);
     }
 
   // Default witness thunks use the context archetypes of the requirement.
   } else {
-    witnessContextParams = requirementInfo.ContextGenericParams;
+    witnessContextParams = requirementInfo.GenericEnv
+        ->getInterfaceToArchetypeMap();
   }
+
+  GenericEnvironment *witnessEnv = nullptr;
+  if (!witnessContextParams.empty())
+    witnessEnv = GenericEnvironment::get(getASTContext(), witnessContextParams);
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
@@ -1814,7 +1817,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
   auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
-      witnessContextParams, SILLocation(witness.getDecl()),
+      witnessEnv, SILLocation(witness.getDecl()),
       IsNotBare, IsTransparent, isFragile, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);
 
@@ -1959,7 +1962,7 @@ void SILGenModule::emitDefaultWitnessTable(ProtocolDecl *protocol) {
 }
 
 SILFunction *SILGenModule::
-getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
+getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
                               CanSILFunctionType thunkType,
                               CanSILFunctionType fromType,
                               CanSILFunctionType toType,
@@ -1981,11 +1984,11 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
     // Substitute context parameters out of the "from" and "to" types.
     auto fromInterfaceType
         = ArchetypeBuilder::mapTypeOutOfContext(
-            M.getSwiftModule(), thunkContextParams, fromType)
+            M.getSwiftModule(), genericEnv, fromType)
                 ->getCanonicalType();
     auto toInterfaceType
         = ArchetypeBuilder::mapTypeOutOfContext(
-            M.getSwiftModule(), thunkContextParams, toType)
+            M.getSwiftModule(), genericEnv, toType)
                 ->getCanonicalType();
 
     mangler.mangleType(fromInterfaceType, /*uncurry*/ 0);

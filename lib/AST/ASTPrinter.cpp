@@ -21,6 +21,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -4274,25 +4275,14 @@ public:
     }
   }
 
-  GenericParamList *getGenericParamListAtDepth(unsigned depth) {
-    assert(Options.ContextGenericParams);
-    if (!UnwrappedGenericParams) {
-      std::vector<GenericParamList *> paramLists;
-      for (auto *params = Options.ContextGenericParams;
-           params;
-           params = params->getOuterParameters()) {
-        paramLists.push_back(params);
-      }
-      UnwrappedGenericParams = std::move(paramLists);
-    }
-    return UnwrappedGenericParams->rbegin()[depth];
-  }
-
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     // Substitute a context archetype if we have context generic params.
-    if (Options.ContextGenericParams) {
-      return visit(getGenericParamListAtDepth(T->getDepth())
-                     ->getParams()[T->getIndex()]->getArchetype());
+    if (Options.GenericEnv) {
+      auto *paramTy = T->getCanonicalType().getPointer();
+      auto &map = Options.GenericEnv->getInterfaceToArchetypeMap();
+      auto found = map.find(paramTy);
+      if (found != map.end())
+        return visit(found->second);
     }
 
     auto Name = T->getName();

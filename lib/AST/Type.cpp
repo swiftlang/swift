@@ -2767,34 +2767,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-void GenericParamList::
-getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
-                   ArrayRef<Substitution> subs,
-                   TypeSubstitutionMap &subsMap,
-                   ArchetypeConformanceMap &conformanceMap) const {
-
-  // Map from interface types to archetypes
-  TypeSubstitutionMap map;
-  getForwardingSubstitutionMap(map);
-
-  for (auto depTy : sig->getAllDependentTypes()) {
-
-    // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, map, SubstOptions());
-    auto *archetype = contextTy->castTo<ArchetypeType>();
-
-    auto sub = subs.front();
-    subs = subs.slice(1);
-
-    // Record the replacement type and its conformances.
-    subsMap[archetype] = sub.getReplacement();
-    conformanceMap[archetype] = sub.getConformances();
-  }
-  
-  assert(subs.empty() && "did not use all substitutions?!");
-}
-
 FunctionType *
 GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   auto params = getGenericParams();

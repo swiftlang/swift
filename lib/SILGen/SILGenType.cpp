@@ -93,7 +93,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto thunk =
       M.createFunction(SILLinkage::Private,
                        name, overrideInfo.SILFnType,
-                       derivedDecl->getGenericParams(), loc, IsBare,
+                       derivedDecl->getGenericEnvironment(), loc, IsBare,
                        IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 

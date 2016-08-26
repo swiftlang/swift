@@ -26,6 +26,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
+  class GenericEnvironment;
   class ProtocolConformanceRef;
   
 /// DenseMap type used internally by Substitution::subst to track conformances
@@ -63,11 +64,11 @@ public:
   /// conformances.
   ///
   /// Our replacement type must be written in terms of the context
-  /// archetypes of 'context', which in turn must be derived from the
+  /// archetypes of 'env', which in turn must be derived from the
   /// generic requirements of 'sig'.
   Substitution subst(ModuleDecl *module,
                      GenericSignature *sig,
-                     GenericParamList *context,
+                     GenericEnvironment *env,
                      ArrayRef<Substitution> subs) const;
 
 private:

@@ -1110,28 +1110,6 @@ public:
                                   MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
-  /// Create a new generic parameter list with the same parameters and
-  /// requirements as this one, but parented to a different outer parameter
-  /// list.
-  GenericParamList *cloneWithOuterParameters(const ASTContext &Context,
-                                             GenericParamList *Outer) {
-    auto clone = create(Context,
-                        SourceLoc(),
-                        getParams(),
-                        SourceLoc(),
-                        getRequirements(),
-                        SourceLoc());
-    clone->setAllArchetypes(getAllArchetypes());
-    clone->setOuterParameters(Outer);
-    return clone;
-  }
-  
-  /// Create an empty generic parameter list.
-  static GenericParamList *getEmpty(ASTContext &Context) {
-    // TODO: Could probably unique this in the AST context.
-    return create(Context, SourceLoc(), {}, SourceLoc(), {}, SourceLoc());
-  }
-  
   MutableArrayRef<GenericTypeParamDecl *> getParams() {
     return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
   }
@@ -1149,12 +1127,6 @@ public:
   const_iterator begin() const { return getParams().begin(); }
   const_iterator end() const { return getParams().end(); }
 
-  /// Get the total number of parameters, including those from parent generic
-  /// parameter lists.
-  unsigned totalSize() const {
-    return NumParams + (OuterParameters ? OuterParameters->totalSize() : 0);
-  }
-  
   /// \brief Retrieve the location of the 'where' keyword, or an invalid
   /// location if 'where' was not present.
   SourceLoc getWhereLoc() const { return WhereLoc; }
@@ -1271,26 +1243,11 @@ public:
     return depth;
   }
 
-  /// Derive a contextual type substitution map from a substitution array.
-  /// This is just like GenericSignature::getSubstitutionMap(), except
-  /// with contextual types instead of interface types.
-  void
-  getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
-                     ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subsMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
-
   /// Derive the all-archetypes list for the given list of generic
   /// parameters.
   static ArrayRef<ArchetypeType*>
   deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
-
-  void getForwardingSubstitutionMap(TypeSubstitutionMap &result) const;
-
-  ArrayRef<Substitution>
-  getForwardingSubstitutions(GenericSignature *sig) const;
 
   /// Collect the nested archetypes of an archetype into the given
   /// collection.

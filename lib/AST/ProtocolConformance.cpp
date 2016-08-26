@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Substitution.h"
@@ -178,6 +179,24 @@ ProtocolConformance::getInheritedConformances() const {
 bool ProtocolConformance::
 usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
+}
+
+GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
+  switch (getKind()) {
+  case ProtocolConformanceKind::Inherited:
+  case ProtocolConformanceKind::Normal:
+    // If we have a normal or inherited protocol conformance, look for its
+    // generic parameters.
+    return getDeclContext()->getGenericEnvironmentOfContext();
+
+  case ProtocolConformanceKind::Specialized:
+    // If we have a specialized protocol conformance, since we do not support
+    // currently partial specialization, we know that it cannot have any open
+    // type variables.
+    //
+    // FIXME: We could return a meaningful GenericEnvironment here
+    return nullptr;
+  }
 }
 
 GenericParamList *ProtocolConformance::getGenericParams() const {
@@ -354,7 +373,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto conformingDC = getDeclContext();
   auto conformingModule = conformingDC->getParentModule();
 
-  auto *genericParams = GenericConformance->getGenericParams();
+  auto *genericEnv = GenericConformance->getGenericEnvironment();
   auto *genericSig = GenericConformance->getGenericSignature();
 
   TypeSubstitutionMap substitutionMap;
@@ -366,10 +385,10 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Compute a context type substitution map from the
   // substitution array stored in this conformance
-  genericParams->getSubstitutionMap(conformingModule, genericSig,
-                                    GenericSubstitutions,
-                                    substitutionMap,
-                                    conformanceMap);
+  genericEnv->getSubstitutionMap(conformingModule, genericSig,
+                                 GenericSubstitutions,
+                                 substitutionMap,
+                                 conformanceMap);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -523,10 +542,10 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto *conformingModule = conformingDC->getParentModule();
 
     auto *sig = conformingDC->getGenericSignatureOfContext();
-    auto *params = conformingDC->getGenericParamsOfContext();
+    auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    params->getSubstitutionMap(conformingModule, sig, subs,
-                               subMap, conformanceMap);
+    env->getSubstitutionMap(conformingModule, sig, subs,
+                            subMap, conformanceMap);
 
     auto r = inherited->subst(conformingModule, getType(), subs,
                               subMap, conformanceMap);

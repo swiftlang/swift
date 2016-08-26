@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -816,9 +817,9 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Forward substitutions.
   ArrayRef<Substitution> subs;
   auto constantInfo = getConstantInfo(to);
-  if (auto gp = constantInfo.ContextGenericParams) {
+  if (auto *env = constantInfo.GenericEnv) {
     auto sig = constantInfo.SILFnType->getGenericSignature();
-    subs = gp->getForwardingSubstitutions(sig);
+    subs = env->getForwardingSubstitutions(SGM.SwiftModule, sig);
   }
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,

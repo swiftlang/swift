@@ -536,40 +536,6 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-void GenericParamList::
-getForwardingSubstitutionMap(TypeSubstitutionMap &result) const {
-  // Add forwarding substitutions from the outer context if we have
-  // a type nested inside a generic function.
-  for (auto *params = this;
-       params != nullptr;
-       params = params->getOuterParameters()) {
-    for (auto *param : params->getParams())
-      result[param->getDeclaredType()->getCanonicalType().getPointer()]
-          = param->getArchetype();
-  }
-}
-
-ArrayRef<Substitution>
-GenericParamList::getForwardingSubstitutions(GenericSignature *sig) const {
-  // This is stupid. We don't really need a module, because we
-  // should not be looking up concrete conformances when we
-  // substitute types here.
-  auto *mod = getParams()[0]->getDeclContext()->getParentModule();
-
-  TypeSubstitutionMap subs;
-  getForwardingSubstitutionMap(subs);
-
-  auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return ProtocolConformanceRef(protoType->getDecl());
-  };
-
-  SmallVector<Substitution, 4> result;
-  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
-  return sig->getASTContext().AllocateCopy(result);
-}
-
 /// \brief Add the nested archetypes of the given archetype to the set
 /// of all archetypes.
 void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
