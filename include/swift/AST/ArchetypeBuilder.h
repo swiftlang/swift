@@ -344,16 +344,6 @@ public:
                                   GenericEnvironment *genericEnv,
                                   Type type);
 
-  /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericParamList *genericParams,
-                                 Type type);
-
-  /// Map a contextual type to an interface type.
-  static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericParamList *genericParams,
-                                  Type type);
-
   using SameTypeRequirement
     = std::pair<PotentialArchetype *,
                 PointerUnion<Type, PotentialArchetype*>>;

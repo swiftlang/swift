@@ -876,6 +876,7 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
       std::tie(GenericSig, GenericEnv) =
           handleSILGenericParams(P.Context, generics, &P.SF);
       fnType->setGenericSignature(GenericSig);
+      fnType->setGenericEnvironment(GenericEnv);
     }
   }
   
@@ -2942,6 +2943,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         std::tie(genericSig, genericEnv) =
             handleSILGenericParams(P.Context, generics, &P.SF);
         fnType->setGenericSignature(genericSig);
+        fnType->setGenericEnvironment(genericEnv);
       }
     }
 

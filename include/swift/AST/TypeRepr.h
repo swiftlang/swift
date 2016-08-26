@@ -364,9 +364,10 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   Foo -> Bar
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // These two are only used in SIL mode, which is the only time
+  // These three are only used in SIL mode, which is the only time
   // we can have polymorphic function values.
   GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv;
   GenericSignature *GenericSig;
 
   TypeRepr *ArgsTy;
@@ -386,11 +387,17 @@ public:
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   void setGenericSignature(GenericSignature *genericSig) {
     assert(GenericSig == nullptr);
     GenericSig = genericSig;
+  }
+
+  void setGenericEnvironment(GenericEnvironment *genericEnv) {
+    assert(GenericEnv == nullptr);
+    GenericEnv = genericEnv;
   }
 
   TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
