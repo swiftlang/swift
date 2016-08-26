@@ -284,25 +284,27 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   };
 
   if (hasAttr(TAK_autoclosure)) {
-    Printer.printAttrName("@autoclosure");
+    Printer.printSimpleAttr("@autoclosure");
     Printer << " ";
   }
   if (hasAttr(TAK_escaping)) {
-    Printer.printAttrName("@escaping");
+    Printer.printSimpleAttr("@escaping");
     Printer << " ";
   }
 
   if (hasAttr(TAK_thin)) {
-    Printer.printAttrName("@thin");
+    Printer.printSimpleAttr("@thin");
     Printer << " ";
   }
   if (hasAttr(TAK_thick)) {
-    Printer.printAttrName("@thick");
+    Printer.printSimpleAttr("@thick");
     Printer << " ";
   }
   if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
     Printer << "(" << Attrs.convention.getValue() << ") ";
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
   }
 }
 
