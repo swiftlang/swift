@@ -175,18 +175,24 @@ public:
 
   ASTPrinter &operator<<(DeclName name);
 
-  void printKeyword(StringRef Name) {
+  void printKeyword(StringRef name) {
     callPrintNamePre(PrintNameContext::Keyword);
-    *this << Name;
+    *this << name;
     printNamePost(PrintNameContext::Keyword);
   }
 
-  void printAttrName(StringRef Name, bool needAt = false) {
+  void printAttrName(StringRef name, bool needAt = false) {
     callPrintNamePre(PrintNameContext::Attribute);
     if (needAt)
       *this << "@";
-    *this << Name;
+    *this << name;
     printNamePost(PrintNameContext::Attribute);
+  }
+
+  void printSimpleAttr(StringRef name, bool needAt = false) {
+    callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+    printAttrName(name, needAt);
+    printStructurePost(PrintStructureKind::BuiltinAttribute);
   }
 
   void printName(Identifier Name,
