@@ -38,7 +38,7 @@ protocol MyArrayProtocol
   : RandomAccessCollection,
     RangeReplaceableCollection,
     MutableCollection,
-    ArrayLiteralConvertible {
+    ExpressibleByArrayLiteral {
 
   associatedtype Iterator : IteratorProtocol
 
@@ -46,11 +46,8 @@ protocol MyArrayProtocol
 
   var capacity: Int { get }
 
-  func += <
-    S : Sequence
-    where
-    S.Iterator.Element == Iterator.Element
-  >(lhs: inout Self, rhs: S)
+  static func += <S : Sequence>(lhs: inout Self, rhs: S)
+    where S.Iterator.Element == Iterator.Element
 }
 extension MyArrayProtocol {
   var _bufferID: _BufferID {
@@ -72,26 +69,27 @@ func checkReallocation<T : MyArrayProtocol>(
   return currentBuffer
 }
 
-func checkEqual<
-  S1 : Sequence, S2 : Sequence
+func checkEqual<S1 : Sequence, S2 : Sequence>(
+  _ a1: S1, _ a2: S2, _ expected: Bool
+)
   where
   S1.Iterator.Element == S2.Iterator.Element,
-  S1.Iterator.Element : Equatable
->(_ a1: S1, _ a2: S2, _ expected: Bool) {
+  S1.Iterator.Element : Equatable {
+
+  
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
     print("unexpectedly \(un)equal sequences!")
   }
 }
 
-func test<
-  T : MyArrayProtocol
-  where
+func test<T : MyArrayProtocol>(_: T.Type, _ label: String)
+where
   T.Iterator.Element == LifetimeTracked,
   T.Iterator.Element == T.Element,
   T.Index == Int,
-  T.IndexDistance == Int
->(_: T.Type, _ label: String) {
+  T.IndexDistance == Int {
+  
   print("test: \(label)...", terminator: "")
 
   var x: T = [
