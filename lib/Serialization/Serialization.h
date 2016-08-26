@@ -241,6 +241,9 @@ private:
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
 
+  /// Writes a generic parameter list.
+  bool writeGenericParams(const GenericParamList *genericParams);
+
   /// Writes a set of generic requirements.
   void writeGenericRequirements(ArrayRef<Requirement> requirements);
 
@@ -410,10 +413,6 @@ public:
   /// Writes a protocol conformance.
   void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes);
-
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams,
-                          const std::array<unsigned, 256> &abbrCodes);
 
   /// Writes a generic environment.
   void writeGenericEnvironment(GenericSignature *sig,

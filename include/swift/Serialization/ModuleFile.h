@@ -426,8 +426,14 @@ private:
   ParameterList *readParameterList();
   
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
-                                                DeclContext *DC,
-                                                llvm::BitstreamCursor &Cursor);
+                                                DeclContext *DC);
+
+  /// Reads a generic param list from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a generic param list, returns null
+  /// without moving the cursor.
+  GenericParamList *maybeReadGenericParams(DeclContext *DC,
+                                     GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
@@ -708,14 +714,6 @@ public:
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *
   readNormalConformance(serialization::NormalConformanceID id);
-
-  /// Reads a generic param list from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a generic param list, returns null
-  /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                     llvm::BitstreamCursor &Cursor,
-                                     GenericParamList *outerParams = nullptr);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
