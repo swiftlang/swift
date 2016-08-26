@@ -121,12 +121,55 @@ public protocol CustomNSError : Error {
   var errorUserInfo: [String : Any] { get }
 }
 
+public extension CustomNSError {
+  /// Default domain of the error.
+  static var errorDomain: String {
+    return String(reflecting: type(of: self))
+  }
+
+  /// The error code within the given domain.
+  var errorCode: Int {
+    return _swift_getDefaultErrorCode(self)
+  }
+
+  /// The default user-info dictionary.
+  var errorUserInfo: [String : Any] {
+    return [:]
+  }
+}
+
+extension CustomNSError where Self: RawRepresentable, Self.RawValue: SignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var errorCode: Int {
+    return numericCast(self.rawValue)
+  }
+}
+
+extension CustomNSError where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+  // The error code of Error with integral raw values is the raw value.
+  public var errorCode: Int {
+    return numericCast(self.rawValue)
+  }
+}
+
 public extension Error where Self : CustomNSError {
   /// Default implementation for customized NSErrors.
   var _domain: String { return Self.errorDomain }
 
   /// Default implementation for customized NSErrors.
   var _code: Int { return self.errorCode }
+}
+
+public extension Error where Self: CustomNSError, Self: RawRepresentable,
+    Self.RawValue: SignedInteger {
+  /// Default implementation for customized NSErrors.
+  var _code: Int { return self.errorCode }  
+}
+
+public extension Error where Self: CustomNSError, Self: RawRepresentable,
+    Self.RawValue: UnsignedInteger {
+  /// Default implementation for customized NSErrors.
+  var _code: Int { return self.errorCode }  
 }
 
 public extension Error {
