@@ -758,12 +758,13 @@ namespace llvm {
   template <> struct GraphTraits<CallGraph::Node *> {
     typedef CallGraph::Node NodeType;
     typedef CallGraph::child_iterator ChildIteratorType;
+    typedef CallGraph::Node *NodeRef;
 
-    static NodeType *getEntryNode(NodeType *N) { return N; }
-    static inline ChildIteratorType child_begin(NodeType *N) {
+    static NodeRef getEntryNode(NodeRef N) { return N; }
+    static inline ChildIteratorType child_begin(NodeRef N) {
       return N->Children.begin();
     }
-    static inline ChildIteratorType child_end(NodeType *N) {
+    static inline ChildIteratorType child_end(NodeRef N) {
       return N->Children.end();
     }
   };
@@ -771,8 +772,9 @@ namespace llvm {
   template <> struct GraphTraits<CallGraph *>
   : public GraphTraits<CallGraph::Node *> {
     typedef CallGraph *GraphType;
+    typedef CallGraph::Node *NodeRef;
 
-    static NodeType *getEntryNode(GraphType F) { return nullptr; }
+    static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
     typedef CallGraph::iterator nodes_iterator;
     static nodes_iterator nodes_begin(GraphType CG) {

@@ -10,6 +10,9 @@ add_swift_executable(swift-llvm-opt
   # Clang libraries included to appease the linker on linux.
   clangBasic
   clangCodeGen
+
+  LLVM_COMPONENT_DEPENDS
+    DebugInfoCodeView
 )
 
 swift_install_in_component(tools

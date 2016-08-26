@@ -38,6 +38,7 @@ extension MutableCollection where Self : BidirectionalCollection {
 // `ReversedCollection`, that has conditional conformances to
 // `RandomAccessCollection`, and possibly `MutableCollection` and
 // `RangeReplaceableCollection`.
+// rdar://problem/17144340
 
 // FIXME: swift-3-indexing-model - should gyb ReversedXxx & ReversedRandomAccessXxx
 

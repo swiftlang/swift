@@ -125,9 +125,9 @@ static constexpr const size_t SwiftValueMinAlignMask
 /* TODO: If we're able to become a SwiftObject subclass in the future,
  * change to this:
 static constexpr const size_t SwiftValueHeaderOffset
-  = sizeof(SwiftObject_s);
+  = sizeof(HeapObject);
 static constexpr const size_t SwiftValueMinAlignMask
-  = alignof(SwiftObject_s) - 1;
+  = alignof(HeapObject) - 1;
  */
 
 static Class _getSwiftValueClass() {

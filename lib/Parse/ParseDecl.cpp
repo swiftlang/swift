@@ -1792,6 +1792,22 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 /// \endverbatim
 ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
                                llvm::function_ref<void(Decl*)> Handler) {
+  if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line))
+    return parseLineDirective(Tok.is(tok::pound_line));
+
+  if (Tok.is(tok::pound_if)) {
+    auto IfConfigResult = parseDeclIfConfig(Flags);
+    if (auto ICD = IfConfigResult.getPtrOrNull()) {
+      // The IfConfigDecl is ahead of its members in source order.
+      Handler(ICD);
+      // Copy the active members into the entries list.
+      for (auto activeMember : ICD->getActiveMembers()) {
+        Handler(activeMember);
+      }
+    }
+    return IfConfigResult;
+  }
+
   Decl* LastDecl = nullptr;
   auto InternalHandler  = [&](Decl *D) {
     LastDecl = D;
@@ -1942,6 +1958,13 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 
+    case tok::pound_if:
+    case tok::pound_sourceLocation:
+    case tok::pound_line:
+      // We see some attributes right before these pounds.
+      // TODO: Emit dedicated errors for them.
+      SWIFT_FALLTHROUGH;
+
     // Obvious nonsense.
     default:
       if (FoundCCTokenInAttr) {
@@ -2034,26 +2057,6 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_protocol:
       DeclResult = parseDeclProtocol(Flags, Attributes);
       Status = DeclResult;
-      break;
-    case tok::pound_if: {
-      auto IfConfigResult = parseDeclIfConfig(Flags);
-      Status = IfConfigResult;
-
-      if (auto ICD = IfConfigResult.getPtrOrNull()) {
-        // The IfConfigDecl is ahead of its members in source order.
-        InternalHandler(ICD);
-        // Copy the active members into the entries list.
-        for (auto activeMember : ICD->getActiveMembers()) {
-          InternalHandler(activeMember);
-        }
-      }
-      break;
-    }
-    case tok::pound_sourceLocation:
-      Status = parseLineDirective(false);
-      break;
-    case tok::pound_line:
-      Status = parseLineDirective(true);
       break;
 
     case tok::kw_func:
