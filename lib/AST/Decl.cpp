@@ -2025,10 +2025,6 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   if (!knownProtocol)
     return false;
 
-  // All nominal types can derive their Error conformance.
-  if (*knownProtocol == KnownProtocolKind::Error)
-    return true;
-
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
     switch (*knownProtocol) {
     // The presence of a raw type is an explicit declaration that
