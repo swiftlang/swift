@@ -2019,6 +2019,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
     case tok::kw_typealias:
       DeclResult = parseDeclTypeAlias(Flags, Attributes);
       Status = DeclResult;
+      MayNeedOverrideCompletion = true;
       break;
     case tok::kw_associatedtype:
       DeclResult = parseDeclAssociatedType(Flags, Attributes);
@@ -2098,6 +2099,7 @@ ParserStatus Parser::parseDecl(ParseDeclOptions Flags,
         case tok::kw_func:
         case tok::kw_subscript:
         case tok::kw_var:
+        case tok::kw_typealias:
           Keywords.push_back(OrigTok.getText());
           break;
         default:
