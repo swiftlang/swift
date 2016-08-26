@@ -109,6 +109,6 @@ swift::_swift_stdlib_CFStringFindWithOptions(
 }
 
 _swift_shims_CFStringRef
-swift::_swift_stdlib_objcDebugDescription(id __nonnull nsObject) {
+swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
   return [nsObject debugDescription];
 }
