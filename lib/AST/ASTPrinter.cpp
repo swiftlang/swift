@@ -3766,12 +3766,12 @@ public:
       return;
 
     if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
-      Printer.printAttrName("@autoclosure");
+      Printer.printSimpleAttr("@autoclosure");
       Printer << " ";
     }
     if (inParameterPrinting && !info.isNoEscape() &&
         !Options.excludeAttrKind(TAK_escaping)) {
-      Printer.printAttrName("@escaping");
+      Printer.printSimpleAttr("@escaping");
       Printer << " ";
     }
 
