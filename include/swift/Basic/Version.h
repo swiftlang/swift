@@ -65,13 +65,15 @@ public:
 
   /// Return a string to be used as an internal preprocessor define.
   ///
-  /// Assuming the project version is at most X.Y.Z.a.b, the integral constant
-  /// representing the version is:
+  /// The components of the version are multiplied element-wise by
+  /// \p componentWeights, then added together (a dot product operation).
+  /// If either array is longer than the other, the missing elements are
+  /// treated as zero.
   ///
-  /// X*1000*1000*1000 + Z*1000*1000 + a*1000 + b
-  ///
-  /// The second version component is not used.
-  std::string preprocessorDefinition() const;
+  /// The resulting string will have the form "-DMACRO_NAME=XYYZZ".
+  /// The combined value must fit in a uint64_t.
+  std::string preprocessorDefinition(StringRef macroName,
+                                     ArrayRef<uint64_t> componentWeights) const;
 
   /// Return the ith version component.
   unsigned operator[](size_t i) const {

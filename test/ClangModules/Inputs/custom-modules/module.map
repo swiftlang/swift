@@ -103,6 +103,11 @@ module ObjCSubscripts {
   export *
 }
 
+module PredefinedMacros {
+  header "PredefinedMacros.h"
+  export *
+}
+
 module ProtoWithInitializer {
   header "ProtoWithInitializer.h"
   export *
