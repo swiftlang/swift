@@ -127,11 +127,7 @@ public struct UnicodeScalar :
   ///       // Do something else
   ///     }
   public init?(_ v: UInt16) {
-    if let us = UnicodeScalar(UInt32(v)) {
-      self = us
-    } else {
-      return nil
-    }
+    self.init(UInt32(v))
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
