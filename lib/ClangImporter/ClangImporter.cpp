@@ -315,6 +315,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
+  auto languageVersion = swift::version::Version::getCurrentLanguageVersion();
+
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
   invocationArgStrs.insert(
@@ -332,8 +334,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           // Don't emit LLVM IR.
           "-fsyntax-only",
 
-          // enable block support
+          // Enable block support.
           "-fblocks",
+
+          languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
 
           "-fretain-comments-from-system-headers",
 
@@ -396,7 +400,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {
-        V.preprocessorDefinition(),
+        V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
+                                 {1000000000, /*ignored*/0, 1000000, 1000, 1}),
       });
     }
   } else {
