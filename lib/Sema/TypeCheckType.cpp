@@ -292,19 +292,12 @@ Type TypeChecker::resolveTypeInContext(
     // extension MyProtocol where Self : YourProtocol { ... }
     if (parentDC->getAsProtocolExtensionContext()) {
       auto ED = cast<ExtensionDecl>(parentDC);
-      if (auto genericParams = ED->getGenericParams()) {
-        for (auto req : genericParams->getTrailingRequirements()) {
-          // We might be resolving 'req.getSubject()' itself.
-          // This whole case feels like a hack -- there should be a
-          // more principled way to represent extensions of protocol
-          // compositions.
-          if (req.getKind() == RequirementReprKind::TypeConstraint) {
-            if (!req.getSubject() ||
-                !req.getSubject()->is<ArchetypeType>() ||
-                !req.getSubject()->castTo<ArchetypeType>()->getSelfProtocol())
-              continue;
-
-            stack.push_back(req.getConstraint());
+      if (auto genericSig = ED->getGenericSignature()) {
+        for (auto req : genericSig->getRequirements()) {
+          if (req.getKind() == RequirementKind::Conformance ||
+              req.getKind() == RequirementKind::Superclass) {
+            if (req.getFirstType()->isEqual(ED->getSelfInterfaceType()))
+              stack.push_back(req.getSecondType());
           }
         }
       }
