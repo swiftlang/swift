@@ -169,11 +169,6 @@ struct ArchetypeBuilder::Implementation {
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
 
-  /// A vector containing all of the archetypes, expanded out.
-  /// FIXME: This notion should go away, because it's impossible to expand
-  /// out "all" archetypes
-  SmallVector<ArchetypeType *, 4> AllArchetypes;
-
   /// A vector containing the same-type requirements introduced into the
   /// system.
   SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
@@ -1763,41 +1758,6 @@ ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
     return nullptr;
 
   return known->second->getType(*this).getAsArchetype();
-}
-
-ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
-  // This should be kept in sync with GenericParamList::deriveAllArchetypes().
-  if (Impl->AllArchetypes.empty()) {
-    // Collect the primary archetypes first.
-    unsigned depth = Impl->PotentialArchetypes.back().first.Depth;
-    llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
-    for (const auto &Entry : Impl->PotentialArchetypes) {
-      // Skip outer potential archetypes.
-      if (Entry.first.Depth < depth)
-        continue;
-
-      PotentialArchetype *PA = Entry.second;
-      auto Archetype = PA->getType(*this).castToArchetype();
-      if (KnownArchetypes.insert(Archetype).second)
-        Impl->AllArchetypes.push_back(Archetype);
-    }
-
-    // Collect all of the remaining archetypes.
-    for (const auto &Entry : Impl->PotentialArchetypes) {
-      // Skip outer potential archetypes.
-      if (Entry.first.Depth < depth)
-        continue;
-
-      PotentialArchetype *PA = Entry.second;
-      if (!PA->isConcreteType() && !PA->getTypeAliasDecl()) {
-        auto Archetype = PA->getType(*this).castToArchetype();
-        GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
-                                              Impl->AllArchetypes);
-      }
-    }
-  }
-
-  return Impl->AllArchetypes;
 }
 
 ArrayRef<ArchetypeBuilder::SameTypeRequirement>

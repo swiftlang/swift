@@ -1059,7 +1059,6 @@ class GenericParamList final :
   unsigned NumParams;
   SourceLoc WhereLoc;
   MutableArrayRef<RequirementRepr> Requirements;
-  ArrayRef<ArchetypeType *> AllArchetypes;
 
   GenericParamList *OuterParameters;
 
@@ -1120,7 +1119,6 @@ public:
                         SourceLoc(),
                         getRequirements(),
                         SourceLoc());
-    clone->setAllArchetypes(getAllArchetypes());
     clone->setOuterParameters(Outer);
     return clone;
   }
@@ -1199,24 +1197,7 @@ public:
   /// main part of a declaration's signature.
   void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
-
-  /// \brief Retrieves the list containing all archetypes described by this
-  /// generic parameter clause.
-  ///
-  /// In this list of archetypes, the primary archetypes come first followed by
-  /// any non-primary archetypes (i.e., those archetypes that encode associated
-  /// types of another archetype).
-  ///
-  /// This does not include archetypes from the outer generic parameter list(s).
-  ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
   
-  /// \brief Sets all archetypes *without* copying the source array.
-  void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
-    assert(AA.size() >= size()
-           && "allArchetypes is smaller than number of generic params?!");
-    AllArchetypes = AA;
-  }
-
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
   /// exists.
@@ -1280,26 +1261,11 @@ public:
                      TypeSubstitutionMap &subsMap,
                      ArchetypeConformanceMap &conformanceMap) const;
 
-  /// Derive the all-archetypes list for the given list of generic
-  /// parameters.
-  static ArrayRef<ArchetypeType*>
-  deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
-                      SmallVectorImpl<ArchetypeType*> &archetypes);
-
   void getForwardingSubstitutionMap(TypeSubstitutionMap &result) const;
 
   ArrayRef<Substitution>
   getForwardingSubstitutions(GenericSignature *sig) const;
 
-  /// Collect the nested archetypes of an archetype into the given
-  /// collection.
-  ///
-  /// \param known - the set of archetypes already present in `all`
-  /// \param all - the output list of archetypes
-  static void addNestedArchetypes(ArchetypeType *archetype,
-                                  SmallPtrSetImpl<ArchetypeType*> &known,
-                                  SmallVectorImpl<ArchetypeType*> &all);
-  
   void print(raw_ostream &OS);
   void dump();
 };

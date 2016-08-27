@@ -423,7 +423,7 @@ static const char * const GenericParamNames[] = {
   "U",
 };
 
-static std::pair<ArchetypeType*, GenericTypeParamDecl*>
+GenericTypeParamDecl *
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   Module *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
@@ -435,26 +435,23 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
   genericParam->setArchetype(archetype);
-  return { archetype, genericParam };
+  return genericParam;
 }
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
-                       SmallVectorImpl<ArchetypeType*> &archetypes,
                        SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
-  assert(archetypes.empty() && genericParams.empty());
+  assert(genericParams.empty());
 
   for (unsigned i = 0; i != numParameters; ++i) {
-    auto archetypeAndParam = createGenericParam(ctx, GenericParamNames[i], i);
-    archetypes.push_back(archetypeAndParam.first);
-    genericParams.push_back(archetypeAndParam.second);
+    auto genericParam = createGenericParam(ctx, GenericParamNames[i], i);
+    genericParams.push_back(genericParam);
   }
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
-  paramList->setAllArchetypes(ctx.AllocateCopy(archetypes));
   return paramList;
 }
 
@@ -467,7 +464,6 @@ namespace {
     GenericParamList *TheGenericParamList;
 
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    SmallVector<ArchetypeType*, 2> Archetypes;
 
     SmallVector<TupleTypeElt, 4> InterfaceParams;
     SmallVector<Type, 4> BodyParams;
@@ -479,7 +475,7 @@ namespace {
     GenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
-                                             Archetypes, GenericTypeParams);
+                                             GenericTypeParams);
     }
 
     template <class G>
@@ -512,7 +508,7 @@ namespace {
     struct ParameterGenerator {
       unsigned Index;
       Type build(GenericSignatureBuilder &builder, bool forBody) const {
-        return (forBody ? builder.Archetypes[Index]
+        return (forBody ? builder.GenericTypeParams[Index]->getArchetype()
                         : builder.GenericTypeParams[Index]->getDeclaredType());
       }
     };
