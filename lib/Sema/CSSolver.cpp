@@ -1346,8 +1346,10 @@ bool ConstraintSystem::Candidate::solve() {
 
   // Set contextual type if present. This is done before constraint generation
   // to give a "hint" to that operation about possible optimizations.
+  auto CT = IsPrimary ? CS.getContextualType() : CS.getContextualType(E);
   if (!CT.isNull())
-    cs.setContextualType(E, CT, CTP);
+    cs.setContextualType(E, CS.getContextualTypeLoc(),
+                         CS.getContextualTypePurpose());
 
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
@@ -1362,10 +1364,10 @@ bool ConstraintSystem::Candidate::solve() {
   // constraint to the system.
   if (!CT.isNull()) {
     auto constraintKind = ConstraintKind::Conversion;
-    if (CTP == CTP_CallArgument)
+    if (CS.getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
-    cs.addConstraint(constraintKind, E->getType(), CT.getType(),
+    cs.addConstraint(constraintKind, E->getType(), CT,
                      cs.getConstraintLocator(E), /*isFavored=*/true);
   }
 
@@ -1452,6 +1454,8 @@ void ConstraintSystem::shrink(Expr *expr) {
   DomainMap domains;
 
   struct ExprCollector : public ASTWalker {
+    Expr *PrimaryExpr;
+
     // The primary constraint system.
     ConstraintSystem &CS;
 
@@ -1469,15 +1473,15 @@ void ConstraintSystem::shrink(Expr *expr) {
     // so they can be restored in case of failure.
     DomainMap &Domains;
 
-    ExprCollector(ConstraintSystem &cs,
-                  std::queue<Candidate> &container,
-                  DomainMap &domains)
-      : CS(cs), SubExprs(container), Domains(domains) { }
+    ExprCollector(Expr *expr, ConstraintSystem &cs,
+                  std::queue<Candidate> &container, DomainMap &domains)
+        : PrimaryExpr(expr), CS(cs), SubExprs(container), Domains(domains) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // A dictionary expression is just a set of tuples; try to solve ones
       // that have overload sets.
       if (auto dictionaryExpr = dyn_cast<DictionaryExpr>(expr)) {
+        bool isPrimaryExpr = expr == PrimaryExpr;
         for (auto element : dictionaryExpr->getElements()) {
           unsigned numOverlaods = 0;
           element->walk(OverloadSetCounter(numOverlaods));
@@ -1496,11 +1500,18 @@ void ConstraintSystem::shrink(Expr *expr) {
 
           // Make each of the dictionary elements an independent dictionary,
           // such makes it easy to type-check everything separately.
-          SubExprs.push(Candidate(CS, dict));
+          SubExprs.push(Candidate(CS, dict, isPrimaryExpr));
         }
 
         // Don't try to walk into the dictionary.
         return { false, expr };
+      }
+
+      // Consider all of the collections to be candidates,
+      // FIXME: try to split collections into parts for simplified solving.
+      if (isa<CollectionExpr>(expr)) {
+        SubExprs.push(Candidate(CS, expr, false));
+        return {false, expr};
       }
 
       // Let's not attempt to type-check closures or default values,
@@ -1532,6 +1543,16 @@ void ConstraintSystem::shrink(Expr *expr) {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
+      // If there are sub-expressions to consider and
+      // contextual type is involved, let's add top-most expression
+      // to the queue just to make sure that we didn't miss any solutions.
+      if (expr == PrimaryExpr && !SubExprs.empty()) {
+        if (!CS.getContextualType().isNull()) {
+          SubExprs.push(Candidate(CS, expr, true));
+          return expr;
+        }
+      }
+
       if (!isa<ApplyExpr>(expr))
         return expr;
 
@@ -1557,14 +1578,14 @@ void ConstraintSystem::shrink(Expr *expr) {
       // there is no point of solving this expression,
       // because we won't be able to reduce it's domain.
       if (numOverloadSets > 1)
-        SubExprs.push(Candidate(CS, expr));
+        SubExprs.push(Candidate(CS, expr, expr == PrimaryExpr));
 
       return expr;
     }
   };
 
   std::queue<Candidate> expressions;
-  ExprCollector collector(*this, expressions, domains);
+  ExprCollector collector(expr, *this, expressions, domains);
 
   // Collect all of the binary/unary and call sub-expressions
   // so we can start solving them separately.
@@ -1577,13 +1598,20 @@ void ConstraintSystem::shrink(Expr *expr) {
     // system so far. This actually is ok, because some of the expressions
     // might require manual salvaging.
     if (candidate.solve()) {
-      // Let's restore all of the original OSR domains.
-      for (auto &domain : domains) {
-        if (auto OSR = dyn_cast<OverloadSetRefExpr>(domain.getFirst())) {
-          OSR->setDecls(domain.getSecond());
+      // Let's restore all of the original OSR domains for this sub-expression,
+      // this means that we can still make forward progress with solving of the
+      // top sub-expressions.
+      candidate.getExpr()->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        if (auto OSR = dyn_cast<OverloadSetRefExpr>(childExpr)) {
+          auto domain = domains.find(OSR);
+          if (domain == domains.end())
+            return childExpr;
+
+          OSR->setDecls(domain->getSecond());
         }
-      }
-      break;
+
+        return childExpr;
+      });
     }
 
     expressions.pop();
