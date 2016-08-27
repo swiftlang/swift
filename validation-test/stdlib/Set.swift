@@ -130,8 +130,6 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantStorage {
   case .native:
     return true
-  case .cocoa:
-    return false
   }
 }
 

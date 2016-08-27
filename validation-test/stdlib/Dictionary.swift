@@ -1400,7 +1400,7 @@ class CustomImmutableNSDictionary : NSDictionary {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.DictionaryIsCopied") {
   var (d, nsd) = getBridgedVerbatimDictionaryAndNSMutableDictionary()
   var identity1 = d._rawIdentifier()
-  assert(isCocoaDictionary(d))
+  assert(!isCocoaDictionary(d))
 
   // Find an existing key.
   do {
@@ -1458,7 +1458,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
 
   var bridgedBack: NSDictionary = convertDictionaryToNSDictionary(d)
 
-  expectEqual(
+  expectNotEqual(
     unsafeBitCast(nsd, to: Int.self),
     unsafeBitCast(bridgedBack, to: Int.self))
 
