@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ArchetypeMapping.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -2010,17 +2011,34 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type,
-                                          LazyResolver *resolver) {
-  auto genericParams = dc->getGenericParamsOfContext();
-  return mapTypeIntoContext(dc->getParentModule(), genericParams, type,
-                            resolver);
+Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type) {
+  auto canType = type->getCanonicalType();
+  assert(!canType->hasArchetype() && "already have a contextual type");
+  if (!canType->hasTypeParameter())
+    return type;
+
+  auto *archetypes = dc->getArchetypesOfContext();
+  assert(archetypes && "dependent type in non-generic context");
+
+  return archetypes->mapTypeIntoContext(dc->getParentModule(), type);
+}
+
+Type
+ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
+  auto canType = type->getCanonicalType();
+  assert(!canType->hasTypeParameter() && "already have an interface type");
+  if (!canType->hasArchetype())
+    return type;
+
+  auto *archetypes = dc->getArchetypesOfContext();
+  assert(archetypes && "dependent type in non-generic context");
+
+  return archetypes->mapTypeOutOfContext(dc->getParentModule(), type);
 }
 
 Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
                                           GenericParamList *genericParams,
-                                          Type type,
-                                          LazyResolver *resolver) {
+                                          Type type) {
   auto canType = type->getCanonicalType();
   assert(!canType->hasArchetype() && "already have a contextual type");
   if (!canType->hasTypeParameter())
@@ -2052,8 +2070,8 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
     // Map a dependent member to the corresponding nested archetype.
     if (auto dependentMember = type->getAs<DependentMemberType>()) {
       auto base = mapTypeIntoContext(M, genericParams,
-                                     dependentMember->getBase(), resolver);
-      return dependentMember->substBaseType(M, base, resolver);
+                                     dependentMember->getBase());
+      return dependentMember->substBaseType(M, base);
     }
 
     return type;
@@ -2061,12 +2079,6 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 
   assert(!type->hasTypeParameter() && "not fully substituted");
   return type;
-}
-
-Type
-ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
-  GenericParamList *genericParams = dc->getGenericParamsOfContext();
-  return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
 }
 
 Type ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
@@ -2301,5 +2313,27 @@ GenericSignature *ArchetypeBuilder::getGenericSignature(
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;
+}
+
+ArchetypeMapping *ArchetypeBuilder::getArchetypeMapping() {
+  TypeSubstitutionMap interfaceToArchetypeMap;
+
+  for (auto param : Impl->PotentialArchetypes) {
+    auto paramTy = GenericTypeParamType::get(
+        param.first.Depth,
+        param.first.Index,
+        Context);
+
+    auto archetypeTy = param.second->getType(*this).getAsArchetype();
+    auto concreteTy = param.second->getType(*this).getAsConcreteType();
+    if (archetypeTy)
+      interfaceToArchetypeMap[paramTy] = archetypeTy;
+    else if (concreteTy)
+      interfaceToArchetypeMap[paramTy] = concreteTy;
+    else
+      llvm_unreachable("broken generic parameter");
+  }
+
+  return ArchetypeMapping::get(Context, interfaceToArchetypeMap);
 }
 

@@ -485,14 +485,22 @@ void TypeChecker::markInvalidGenericSignature(ValueDecl *VD) {
   DeclContext *DC = VD->getDeclContext();
   ArchetypeBuilder builder = createArchetypeBuilder(DC->getParentModule());
 
-  if (auto sig = DC->getGenericSignatureOfContext())
-    builder.addGenericSignature(sig, true);
+  auto parentSig = DC->getGenericSignatureOfContext();
+
+  if (parentSig != nullptr)
+    builder.addGenericSignature(parentSig, true);
 
   // Visit each of the generic parameters.
   for (auto param : *genericParams)
     builder.addGenericParameter(param);
 
   // Wire up the archetypes.
+  auto archetypes = builder.getArchetypeMapping();
+  if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
+    GTD->setArchetypes(archetypes);
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+    AFD->setArchetypes(archetypes);
+
   for (auto GP : *genericParams)
     GP->setArchetype(builder.getArchetype(GP));
 
@@ -540,7 +548,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   auto sig = builder.getGenericSignature(allGenericParams);
 
   // Debugging of the archetype builder and generic signature generation.
-  if (sig && Context.LangOpts.DebugGenericSignatures) {
+  if (Context.LangOpts.DebugGenericSignatures) {
     func->dumpRef(llvm::errs());
     llvm::errs() << "\n";
     builder.dump(llvm::errs());
@@ -802,6 +810,14 @@ void TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
   access = std::max(access, Accessibility::Internal);
 
   // Wire up the archetypes.
+  auto archetypes = builder.getArchetypeMapping();
+  if (auto *GTD = dyn_cast<GenericTypeDecl>(dc))
+    GTD->setArchetypes(archetypes);
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc))
+    AFD->setArchetypes(archetypes);
+  if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+    ED->setArchetypes(archetypes);
+
   for (auto GP : *genericParams) {
     GP->setArchetype(builder.getArchetype(GP));
     checkInheritanceClause(GP);

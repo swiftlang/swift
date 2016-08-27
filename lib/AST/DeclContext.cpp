@@ -257,6 +257,47 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   }
 }
 
+ArchetypeMapping *DeclContext::getArchetypesOfContext() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return nullptr;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SubscriptDecl:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
+
+    case DeclContextKind::AbstractFunctionDecl: {
+      auto *AFD = cast<AbstractFunctionDecl>(dc);
+      if (auto genericCtx = AFD->getArchetypes())
+        return genericCtx;
+      continue;
+    }
+
+    case DeclContextKind::GenericTypeDecl: {
+      auto GTD = cast<GenericTypeDecl>(dc);
+      if (auto genericCtx = GTD->getArchetypes())
+        return genericCtx;
+      continue;
+    }
+
+    case DeclContextKind::ExtensionDecl: {
+      auto ED = cast<ExtensionDecl>(dc);
+      if (auto genericCtx = ED->getArchetypes())
+        return genericCtx;
+      continue;
+    }
+    }
+    llvm_unreachable("bad DeclContextKind");
+  }
+}
+
 DeclContext *DeclContext::getLocalContext() {
   if (isLocalContext())
     return this;

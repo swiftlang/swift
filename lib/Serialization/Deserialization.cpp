@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/AST/ArchetypeMapping.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -2161,7 +2162,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *genericParams) {
+      for (auto *genericParam : *genericParams) {
         paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -2172,6 +2173,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       auto sig = GenericSignature::get(paramTypes, requirements);
       alias->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      alias->setArchetypes(archetypes);
     }
 
     alias->computeType();
@@ -2314,7 +2329,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       theStruct->setImplicit();
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theStruct->getGenericParams()) {
+      for (auto *genericParam : *theStruct->getGenericParams()) {
         paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -2325,6 +2340,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       auto sig = GenericSignature::get(paramTypes, requirements);
       theStruct->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      theStruct->setArchetypes(archetypes);
     }
 
     theStruct->computeType();
@@ -2406,6 +2435,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
         ctor->setGenericSignature(genericFnType->getGenericSignature());
       ctor->setInterfaceType(interfaceType);
+    }
+
+    if (auto *genericParams = ctor->getGenericParamsOfContext()) {
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      ctor->setArchetypes(archetypes);
     }
 
     // Set the initializer interface type of the constructor.
@@ -2640,6 +2685,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       fn->setInterfaceType(interfaceType);
     }
 
+    // FIXME: Temporary hack
+    if (auto *genericParams = fn->getGenericParamsOfContext()) {
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      fn->setArchetypes(archetypes);
+    }
+
     SmallVector<ParameterList*, 2> paramLists;
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i)
       paramLists.push_back(readParameterList());
@@ -2755,7 +2816,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
       proto->setGenericParams(genericParams);
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *proto->getGenericParams()) {
+      for (auto *genericParam : *proto->getGenericParams()) {
         paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -2766,6 +2827,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       auto sig = GenericSignature::get(paramTypes, requirements);
       proto->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      proto->setArchetypes(archetypes);
     }
 
     if (isImplicit)
@@ -2942,7 +3017,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       theClass->setRequiresStoredPropertyInits(true);
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theClass->getGenericParams()) {
+      for (auto *genericParam : *theClass->getGenericParams()) {
         paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -2953,6 +3028,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
       theClass->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      theClass->setArchetypes(archetypes);
     }
     theClass->computeType();
 
@@ -3008,7 +3097,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theEnum->setRawType(getType(rawTypeID));
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *theEnum->getGenericParams()) {
+      for (auto *genericParam : *theEnum->getGenericParams()) {
         paramTypes.push_back(genericParam->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -3019,6 +3108,20 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
       theEnum->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
+      }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      theEnum->setArchetypes(archetypes);
     }
 
     theEnum->computeType();
@@ -3206,7 +3309,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // requirements.
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
-      for (auto &genericParam : *genericParams) {
+      for (auto *genericParam : *genericParams) {
         paramTypes.push_back(genericParam->getDeclaredType()
                              ->castTo<GenericTypeParamType>());
       }
@@ -3215,10 +3318,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements);
 
-      if (!paramTypes.empty()) {
-        GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
-        extension->setGenericSignature(sig);
+      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
+      extension->setGenericSignature(sig);
+
+      // FIXME: Temporary hack
+      TypeSubstitutionMap interfaceToArchetypeMap;
+      for (auto *outerParams = genericParams;
+           outerParams != nullptr;
+           outerParams = outerParams->getOuterParameters()) {
+        for (auto *genericParam : *outerParams) {
+          auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+          interfaceToArchetypeMap[paramTy.getPointer()]
+              = genericParam->getArchetype();
+        }
       }
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      extension->setArchetypes(archetypes);
     }
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
@@ -3265,6 +3380,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto genericFnType = interfaceType->getAs<GenericFunctionType>())
       dtor->setGenericSignature(genericFnType->getGenericSignature());
     dtor->setInterfaceType(interfaceType);
+
+    // FIXME: Temporary hack
+    TypeSubstitutionMap interfaceToArchetypeMap;
+    for (auto *outerParams = dtor->getGenericParamsOfContext();
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters()) {
+      for (auto *genericParam : *outerParams) {
+        auto paramTy = genericParam->getDeclaredType()->getCanonicalType();
+        interfaceToArchetypeMap[paramTy.getPointer()]
+            = genericParam->getArchetype();
+      }
+    }
+    if (!interfaceToArchetypeMap.empty()) {
+      auto archetypes = ArchetypeMapping::get(ctx, interfaceToArchetypeMap);
+      dtor->setArchetypes(archetypes);
+    }
 
     if (isImplicit)
       dtor->setImplicit();

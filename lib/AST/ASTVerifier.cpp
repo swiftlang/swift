@@ -1957,7 +1957,18 @@ struct ASTNodeBase {};
         }
       }
     }
-    
+
+    void verifyChecked(GenericTypeDecl *generic) {
+      // If the type has a generic signature, it should also have an
+      // archetype mapping.
+      if ((generic->getArchetypes() != nullptr) !=
+          (generic->getGenericSignature() != nullptr)) {
+        Out << "Missing generic context for generic type\n";
+        generic->dump(Out);
+        abort();
+      }
+    }
+
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(nominal, nominal->getLocalProtocols());
@@ -2322,6 +2333,15 @@ struct ASTNodeBase {};
       if (AFD->getInterfaceType()->is<GenericFunctionType>() !=
           (AFD->getGenericSignature() != nullptr)) {
         Out << "Missing generic signature for generic function\n";
+        AFD->dump(Out);
+        abort();
+      }
+
+      // If the function has a generic signature, it should also have an
+      // archetype mapping.
+      if ((AFD->getArchetypes() != nullptr) !=
+          (AFD->getGenericSignature() != nullptr)) {
+        Out << "Missing generic context for generic function\n";
         AFD->dump(Out);
         abort();
       }

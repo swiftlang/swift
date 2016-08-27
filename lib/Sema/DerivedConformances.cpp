@@ -148,6 +148,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericSignature(sig);
+    getterDecl->setArchetypes(parentDC->getArchetypesOfContext());
     interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                              interfaceType,
                                              FunctionType::ExtInfo());

@@ -35,6 +35,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
+  class ArchetypeMapping;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -1472,6 +1473,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this extension.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this extension.
+  ArchetypeMapping *Archetypes = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// The trailing where clause.
@@ -1555,7 +1562,20 @@ public:
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
+
+
+  /// Retrieve the generic context for this extension.
+  ArchetypeMapping *getArchetypes() const { return Archetypes; }
+
+  /// Set the generic context of this extension.
+  void setArchetypes(ArchetypeMapping *archetypes) {
+    assert(!Archetypes && "Already have generic context");
+    Archetypes = archetypes;
+  }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -2306,6 +2326,12 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this type.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this type.
+  ArchetypeMapping *Archetypes = nullptr;
+
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
@@ -2324,7 +2350,10 @@ public:
   void setGenericParams(GenericParamList *params);
 
   /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
 
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
@@ -2353,6 +2382,15 @@ public:
   
   bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
+  }
+
+  /// Retrieve the generic context for this type.
+  ArchetypeMapping *getArchetypes() const { return Archetypes; }
+
+  /// Set the generic context of this type.
+  void setArchetypes(ArchetypeMapping *archetypes) {
+    assert(!this->Archetypes && "already have generic context?");
+    this->Archetypes = archetypes;
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -4573,6 +4611,7 @@ protected:
 
   GenericParamList *GenericParams;
   GenericSignature *GenericSig;
+  ArchetypeMapping *Archetypes;
 
   CaptureInfo Captures;
 
@@ -4589,7 +4628,7 @@ protected:
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        Archetypes(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4614,6 +4653,15 @@ public:
   
   GenericSignature *getGenericSignature() const {
     return GenericSig;
+  }
+
+  /// Retrieve the generic context for this function.
+  ArchetypeMapping *getArchetypes() const { return Archetypes; }
+
+  /// Set the generic context of this function.
+  void setArchetypes(ArchetypeMapping *Archetypes) {
+    assert(!this->Archetypes && "already have generic context?");
+    this->Archetypes = Archetypes;
   }
 
   // Expose our import as member status
