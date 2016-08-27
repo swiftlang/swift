@@ -4739,7 +4739,7 @@ public:
         auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, FD);
         FD->setGenericEnvironment(env);
       }
-    } else if (FD->getDeclContext()->isGenericContext()) {
+    } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
         auto *env = TC.markInvalidGenericSignature(FD);
         FD->setGenericEnvironment(env);
@@ -4760,7 +4760,7 @@ public:
     if (semaFuncDecl(FD, &resolver))
       return;
 
-    if (!FD->isGenericContext())
+    if (!FD->getGenericSignatureOfContext())
       TC.configureInterfaceType(FD);
 
     if (FD->isInvalid())
@@ -6146,7 +6146,7 @@ public:
   /// Compute the interface type of the given enum element.
   void computeEnumElementInterfaceType(EnumElementDecl *elt) {
     auto enumDecl = cast<EnumDecl>(elt->getDeclContext());
-    assert(enumDecl->isGenericContext() && "Not a generic enum");
+    assert(enumDecl->getGenericSignatureOfContext() && "Not a generic enum");
 
     // Build the generic function type.
     auto funcTy = elt->getType()->castTo<AnyFunctionType>();
@@ -6242,7 +6242,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (EED->getDeclContext()->isGenericContext())
+    if (EED->getDeclContext()->getGenericSignatureOfContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -6422,7 +6422,7 @@ public:
         auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, CD);
         CD->setGenericEnvironment(env);
       }
-    } else if (CD->getDeclContext()->isGenericContext()) {
+    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
         auto *env = TC.markInvalidGenericSignature(CD);
         CD->setGenericEnvironment(env);
@@ -6444,7 +6444,7 @@ public:
       configureConstructorType(CD, SelfTy,
                                CD->getParameterList(1)->getType(TC.Context));
 
-      if (!CD->isGenericContext())
+      if (!CD->getGenericSignatureOfContext())
         TC.configureInterfaceType(CD);
     }
 
@@ -6579,7 +6579,7 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericContext()) {
+    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
       TC.validateGenericFuncSignature(DD);
       DD->setGenericEnvironment(
           DD->getDeclContext()->getGenericEnvironmentOfContext());
@@ -6591,7 +6591,7 @@ public:
       DD->setInvalid();
     }
 
-    if (!DD->isGenericContext())
+    if (!DD->getGenericSignatureOfContext())
       TC.configureInterfaceType(DD);
 
     if (!DD->hasType()) {
