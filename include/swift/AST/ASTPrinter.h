@@ -189,10 +189,11 @@ public:
     printNamePost(PrintNameContext::Attribute);
   }
 
-  void printSimpleAttr(StringRef name, bool needAt = false) {
+  ASTPrinter &printSimpleAttr(StringRef name, bool needAt = false) {
     callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     printAttrName(name, needAt);
     printStructurePost(PrintStructureKind::BuiltinAttribute);
+    return *this;
   }
 
   void printName(Identifier Name,

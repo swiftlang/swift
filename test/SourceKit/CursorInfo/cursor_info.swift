@@ -198,6 +198,14 @@ typealias MyVoid = ()
 
 func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 
+func convention1(_: @convention(thick) ()->()) {}
+func convention2(_: @convention(thin) ()->()) {}
+func convention3(_: @convention(block) ()->()) {}
+func convention4(_: @convention(c) ()->()) {}
+func convention5(_: @convention(method) ()->()) {}
+func convention6(_: @convention(objc_method) ()->()) {}
+func convention7(_: @convention(witness_method) ()->()) {}
+
 // RUN: rm -rf %t.tmp
 // RUN: mkdir %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -686,3 +694,12 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK85-NOT: @rethrows
 // CHECK85: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>rethrowingFunction1</decl.name>({{.*}}) <syntaxtype.keyword>rethrows</syntaxtype.keyword></decl.function.free>
 // CHECK85-NOT: @rethrows
+
+// RUN: %sourcekitd-test -req=cursor -pos=201:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=202:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=203:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=204:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=205:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=206:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=207:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// CHECK86: <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@convention</syntaxtype.attribute.name>({{[a-z_]*}})</syntaxtype.attribute.builtin>
