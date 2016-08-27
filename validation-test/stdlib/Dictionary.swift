@@ -62,7 +62,8 @@ DictionaryTestSuite.test("AssociatedTypes") {
   typealias Collection = Dictionary<MinimalHashableValue, OpaqueValue<Int>>
   expectCollectionAssociatedTypes(
     collectionType: Collection.self,
-    iteratorType: DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
+    iteratorType:
+      DictionaryIterator<MinimalHashableValue, OpaqueValue<Int>>.self,
     subSequenceType: Slice<Collection>.self,
     indexType: DictionaryIndex<MinimalHashableValue, OpaqueValue<Int>>.self,
     indexDistanceType: Int.self,
@@ -413,7 +414,8 @@ DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
     assert(d1[TestKeyTy(40)]!.value == 2040)
 
     // Overwrite a value in existing binding.
-    assert(d1.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))!.value == 1010)
+    assert(
+      d1.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))!.value == 1010)
     assert(identity1 == d1._rawIdentifier())
     assert(d1.count == 4)
     assert(d1[TestKeyTy(10)]!.value == 2010)
@@ -1170,7 +1172,7 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
 // NSDictionary -> Dictionary bridging tests.
 //===---
 
-func getAsNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
+func makeNSDictionary(thatBridgesTo d: Dictionary<Int, Int>) -> NSDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCValueTy($0) })
 
@@ -1179,7 +1181,9 @@ func getAsNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
-func getAsEquatableNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
+func makeEquatableNSDictionary(
+  thatBridgesTo d: Dictionary<Int, Int>
+) -> NSDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCEquatableValueTy($0) })
 
@@ -1188,7 +1192,9 @@ func getAsEquatableNSDictionary(_ d: Dictionary<Int, Int>) -> NSDictionary {
   return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
-func getAsNSMutableDictionary(_ d: Dictionary<Int, Int>) -> NSMutableDictionary {
+func makeNSMutableDictionary(
+  thatBridgesTo d: Dictionary<Int, Int>
+) -> NSMutableDictionary {
   let keys = Array(d.keys.map { TestObjCKeyTy($0) })
   let values = Array(d.values.map { TestObjCValueTy($0) })
 
@@ -1196,44 +1202,55 @@ func getAsNSMutableDictionary(_ d: Dictionary<Int, Int>) -> NSMutableDictionary 
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  let nsd = getAsNSDictionary([10: 1010, 20: 1020, 30: 1030])
+  let nsd = makeNSDictionary(thatBridgesTo: [10: 1010, 20: 1020, 30: 1030])
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getBridgedVerbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
-  let nsd = getAsNSDictionary(d)
+func getBridgedVerbatimDictionary(
+  _ d: Dictionary<Int, Int>
+) -> Dictionary<NSObject, AnyObject> {
+  let nsd = makeNSDictionary(thatBridgesTo: d)
   return convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedVerbatimDictionaryAndNSMutableDictionary()
-    -> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
-  let nsd = getAsNSMutableDictionary([10: 1010, 20: 1020, 30: 1030])
+-> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
+  let nsd = makeNSMutableDictionary(
+    thatBridgesTo: [10: 1010, 20: 1020, 30: 1030])
   return (convertNSDictionaryToDictionary(nsd), nsd)
 }
 
-func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  let nsd = getAsNSDictionary([10: 1010, 20: 1020, 30: 1030 ])
+func getBridgedNonverbatimDictionary()
+-> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  let nsd = makeNSDictionary(thatBridgesTo: [10: 1010, 20: 1020, 30: 1030 ])
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
-func getBridgedNonverbatimDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  let nsd = getAsNSDictionary(d)
+func getBridgedNonverbatimDictionary(
+  _ d: Dictionary<Int, Int>
+) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  let nsd = makeNSDictionary(thatBridgesTo: d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
 func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<TestBridgedKeyTy, TestBridgedValueTy>, NSMutableDictionary) {
-  let nsd = getAsNSMutableDictionary([10: 1010, 20: 1020, 30: 1030])
+  let nsd = makeNSMutableDictionary(
+    thatBridgesTo: [10: 1010, 20: 1020, 30: 1030])
   return (Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self), nsd)
 }
 
-func getBridgedVerbatimEquatableDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
-  let nsd = getAsEquatableNSDictionary(d)
+func getBridgedVerbatimEquatableDictionary(
+  _ d: Dictionary<Int, Int>
+) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
+  let nsd = makeEquatableNSDictionary(thatBridgesTo: d)
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getBridgedNonverbatimEquatableDictionary(_ d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
-  let nsd = getAsEquatableNSDictionary(d)
+func getBridgedNonverbatimEquatableDictionary(
+  _ d: Dictionary<Int, Int>
+) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
+  let nsd = makeEquatableNSDictionary(thatBridgesTo: d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
@@ -1249,7 +1266,8 @@ func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+func getHugeBridgedNonverbatimDictionary()
+-> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   let nsd = getHugeBridgedVerbatimDictionaryHelper()
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
@@ -1297,7 +1315,8 @@ class ParallelArrayDictionary : NSDictionary {
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(keys._baseAddressIfContiguous)
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(
+        keys._baseAddressIfContiguous)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       state.pointee = theState
       return 4
@@ -1314,12 +1333,14 @@ class ParallelArrayDictionary : NSDictionary {
   }
 }
 
-func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
+func getParallelArrayBridgedVerbatimDictionary()
+-> Dictionary<NSObject, AnyObject> {
   let nsd: NSDictionary = ParallelArrayDictionary()
   return convertNSDictionaryToDictionary(nsd)
 }
 
-func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+func getParallelArrayBridgedNonverbatimDictionary()
+-> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
   let nsd: NSDictionary = ParallelArrayDictionary()
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
@@ -1355,12 +1376,14 @@ class CustomImmutableNSDictionary : NSDictionary {
 
   override func object(forKey aKey: Any) -> Any? {
     CustomImmutableNSDictionary.timesObjectForKeyWasCalled += 1
-    return getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]).object(forKey: aKey)
+    return makeNSDictionary(
+      thatBridgesTo: [10: 1010, 20: 1020, 30: 1030]).object(forKey: aKey)
   }
 
   override func keyEnumerator() -> NSEnumerator {
     CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled += 1
-    return getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]).keyEnumerator()
+    return makeNSDictionary(
+      thatBridgesTo: [10: 1010, 20: 1020, 30: 1030]).keyEnumerator()
   }
 
   override var count: Int {
@@ -1428,7 +1451,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.DictionaryIsCopied") {
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
   var nsd: NSDictionary = autoreleasepool {
     NSDictionary(dictionary:
-      getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+      makeNSDictionary(thatBridgesTo: [10: 1010, 20: 1020, 30: 1030]))
   }
 
   var d: [NSObject : AnyObject] = convertNSDictionaryToDictionary(nsd)
@@ -1447,7 +1470,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.NSDictionaryIsRetained") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
   var nsd: NSDictionary = autoreleasepool {
     NSDictionary(dictionary:
-      getAsNSDictionary([10: 1010, 20: 1020, 30: 1030]))
+      makeNSDictionary(thatBridgesTo: [10: 1010, 20: 1020, 30: 1030]))
   }
 
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
@@ -1465,7 +1488,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.NSDictionaryIsCopied") {
 }
 
 
-DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained") {
+DictionaryTestSuite.test(
+  "BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained") {
   var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
@@ -1488,7 +1512,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ImmutableDictionaryIsRetained
   _fixLifetime(bridgedBack)
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
+DictionaryTestSuite.test(
+  "BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopied") {
   var nsd: NSDictionary = CustomImmutableNSDictionary(_privateInit: ())
 
   CustomImmutableNSDictionary.timesCopyWithZoneWasCalled = 0
@@ -1640,7 +1665,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.SubscriptWithIndex_Empty") {
   _fixLifetime(endIndex)
 }
 
-DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
+DictionaryTestSuite.test(
+  "BridgedFromObjC.Nonverbatim.SubscriptWithIndex_Empty") {
   var d = getBridgedNonverbatimDictionary([:])
   var identity1 = d._rawIdentifier()
   assert(isNativeDictionary(d))
@@ -2244,8 +2270,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   assert(isCocoaDictionary(d))
 
   var iter = d.makeIterator()
-  // Cannot write code below because of
-  // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
+  // Cannot write code below because of <rdar://problem/16811736>
+  // Optional tuples are broken as optionals regarding == comparison
   // assert(iter.next() == .none)
   assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
@@ -2262,8 +2288,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   assert(isNativeDictionary(d))
 
   var iter = d.makeIterator()
-  // Cannot write code below because of
-  // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
+  // Cannot write code below because of <rdar://problem/16811736> 
+  // Optional tuples are broken as optionals regarding == comparison
   // assert(iter.next() == .none)
   assert(iter.next() == nil)
   // The following is not required by the IteratorProtocol protocol, but
@@ -2428,7 +2454,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
-  func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
+  func helper(
+    _ nd1: Dictionary<Int, Int>,
+    _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
     let d1 = getBridgedVerbatimEquatableDictionary(nd1)
     let identity1 = d1._rawIdentifier()
     assert(isCocoaDictionary(d1))
@@ -2520,7 +2548,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
+      makeNSDictionary(
+        thatBridgesTo: [10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
@@ -2529,7 +2558,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
     var iter = d.makeIterator()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = iter.next() {
-      let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
+      let kv = (
+        (key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
       pairs.append(kv)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
@@ -2541,10 +2571,13 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSDictionary([10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
+      makeNSDictionary(
+        thatBridgesTo: [10: 1010 + i, 20: 1020 + i, 30: 1030 + i]))
   }
 
-  var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
+  var a = nsa as [AnyObject] as! [
+    Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
+  
   for i in 0..<3 {
     var d = a[i]
     var iter = d.makeIterator()
@@ -2574,7 +2607,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.Count") {
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
-  var v: AnyObject? = d.object(forKey: TestObjCKeyTy(10)).map { $0 as AnyObject }
+  var v: AnyObject? = d.object(
+    forKey: TestObjCKeyTy(10)).map { $0 as AnyObject }
   expectEqual(1010, (v as! TestObjCValueTy).value)
   let idValue10 = unsafeBitCast(v, to: UInt.self)
 
@@ -2594,14 +2628,23 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   expectNil(d.object(forKey: TestObjCInvalidKeyTy()))
 
   for i in 0..<3 {
-    expectEqual(idValue10, unsafeBitCast(
-      d.object(forKey: TestObjCKeyTy(10)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue10,
+      unsafeBitCast(
+        d.object(forKey: TestObjCKeyTy(10)).map { $0 as AnyObject },
+        to: UInt.self))
 
-    expectEqual(idValue20, unsafeBitCast(
-      d.object(forKey: TestObjCKeyTy(20)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue20,
+      unsafeBitCast(
+        d.object(forKey: TestObjCKeyTy(20)).map { $0 as AnyObject },
+        to: UInt.self))
 
-    expectEqual(idValue30, unsafeBitCast(
-      d.object(forKey: TestObjCKeyTy(30)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue30,
+      unsafeBitCast(
+        d.object(forKey: TestObjCKeyTy(30)).map { $0 as AnyObject },
+        to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -2647,7 +2690,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty") {
   let d = getBridgedEmptyNSDictionary()
   let enumerator = d.keyEnumerator()
 
@@ -2656,7 +2700,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject_Empty"
   assert(enumerator.nextObject() == nil)
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromSwift") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   checkDictionaryFastEnumerationFromSwift(
@@ -2668,7 +2713,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromObjC") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   checkDictionaryFastEnumerationFromObjC(
@@ -2680,7 +2726,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration.U
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_Empty") {
   let d = getBridgedEmptyNSDictionary()
 
   checkDictionaryFastEnumerationFromSwift(
@@ -2694,7 +2741,8 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.FastEnumeration_E
     { ($0 as! TestObjCValueTy).value })
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
 
   checkDictionaryFastEnumerationFromSwift(
@@ -2753,7 +2801,8 @@ DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
   checkDictionaryFastEnumerationFromSwift(
@@ -2765,7 +2814,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift.Partial") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromSwift.Partial") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
     numElements: 9)
 
@@ -2779,7 +2829,8 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.Use
   expectAutoreleasedKeysAndValues(unopt: (9, 9))
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromObjC") {
+DictionaryTestSuite.test(
+  "BridgedToObjC.Custom.KeyEnumerator.FastEnumeration.UseFromObjC") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
 
   checkDictionaryFastEnumerationFromObjC(
@@ -3155,8 +3206,8 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   // Successful downcast.
-  if let dCC
-       = _dictionaryDownCastConditional(d) as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
+  if let dCC = _dictionaryDownCastConditional(d)
+  as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
     assert(dCC.count == 3)
     var v = dCC[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3172,8 +3223,8 @@ DictionaryTestSuite.test("DictionaryDowncastConditionalEntryPoint") {
 
   // Unsuccessful downcast
   d["hello" as NSString] = 17 as NSNumber
-  if let dCC
-       = _dictionaryDownCastConditional(d) as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
+  if let dCC = _dictionaryDownCastConditional(d)
+  as Dictionary<TestObjCKeyTy, TestObjCValueTy>? {
     assert(false)
   }
 }
@@ -3307,7 +3358,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveC") {
   }
 }
 
-DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") {
+DictionaryTestSuite.test(
+  "DictionaryBridgeFromObjectiveCConditionalEntryPoint") {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3331,8 +3383,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   }
 
   // Successful downcast.
-  if let dVC
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>? {
+  if let dVC = _dictionaryBridgeFromObjectiveCConditional(d)
+  as Dictionary<TestBridgedKeyTy, TestObjCValueTy>? {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3348,7 +3400,8 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
 
   // Successful downcast.
   if let dVV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>? {
+  = _dictionaryBridgeFromObjectiveCConditional(d)
+  as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>? {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3365,15 +3418,18 @@ DictionaryTestSuite.test("DictionaryBridgeFromObjectiveCConditionalEntryPoint") 
   // Unsuccessful downcasts
   d["hello" as NSString] = 17 as NSNumber
   if let dCV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestObjCKeyTy, TestBridgedValueTy>?{
+  = _dictionaryBridgeFromObjectiveCConditional(d)
+  as Dictionary<TestObjCKeyTy, TestBridgedValueTy>?{
     assert(false)
   }
   if let dVC
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestObjCValueTy>?{
+  = _dictionaryBridgeFromObjectiveCConditional(d)
+  as Dictionary<TestBridgedKeyTy, TestObjCValueTy>?{
     assert(false)
   }
   if let dVV
-       = _dictionaryBridgeFromObjectiveCConditional(d) as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>?{
+  = _dictionaryBridgeFromObjectiveCConditional(d)
+  as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>?{
     assert(false)
   }
 }
@@ -3756,7 +3812,8 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
     Array(IteratorSequence(iter)))
 }
 
-DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") {
+DictionaryTestSuite.test(
+  "mutationDoesNotAffectIterator/removeValueForKey,all") {
   var dict = getDerivedAPIsDictionary()
   var iter = dict.makeIterator()
   expectOptionalEqual(1010, dict.removeValue(forKey: 10))
