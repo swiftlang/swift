@@ -490,8 +490,13 @@ public struct Set<Element : Hashable> :
   public init(_immutableCocoaSet: _NSSet) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
-    _variantStorage = _VariantSetStorage.cocoa(
-      _CocoaSetStorage(cocoaSet: _immutableCocoaSet))
+    self.init(minimumCapacity: _immutableCocoaSet.count)
+    _immutableCocoaSet._forEachBatch { b in 
+      for e in b {
+        // FIXME: Use an unsafeDowncast as an optimization?
+        self.insert(e as! Element)
+      }
+    }
   }
 #endif
 
@@ -763,8 +768,6 @@ public struct Set<Element : Hashable> :
       switch s._variantStorage {
         case .native(let owner):
           _variantStorage = .native(owner)
-        case .cocoa(let owner):
-          _variantStorage = .cocoa(owner)
       }
     } else {
       for item in sequence {
@@ -1185,50 +1188,6 @@ extension Set {
         }
       }
       return true
-
-    case (_VariantSetStorage.cocoa(let lhsCocoa),
-        _VariantSetStorage.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
-      return _stdlib_NSObject_isEqual(lhsCocoa.cocoaSet, rhsCocoa.cocoaSet)
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
-
-    case (_VariantSetStorage.native(let lhsNativeOwner),
-      _VariantSetStorage.cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
-      let lhsNative = lhsNativeOwner.nativeStorage
-
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
-
-      let endIndex = lhsNative.endIndex
-      var i = lhsNative.startIndex
-      while i != endIndex {
-        let key = lhsNative.assertingGet(i)
-        let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-        let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
-        if let rhsValue = optRhsValue {
-          if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
-            i = i.successor()
-            continue
-          }
-        }
-        i = i.successor()
-        return false
-      }
-      return true
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
-
-    case (_VariantSetStorage.cocoa, _VariantSetStorage.native):
-  #if _runtime(_ObjC)
-      return rhs == lhs
-  #else
-        _sanityCheckFailure("internal error: unexpected cocoa set")
-  #endif
     }
   }
 }
@@ -1350,11 +1309,6 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
       return Set(
         _immutableCocoaSet:
         unsafeBitCast(nativeOwner, to: _NSSet.self))
-
-    case _VariantSetStorage.cocoa(let cocoaStorage):
-      return Set(
-        _immutableCocoaSet:
-        unsafeBitCast(cocoaStorage, to: _NSSet.self))
     }
   }
 #endif
@@ -1676,18 +1630,21 @@ public struct Dictionary<Key : Hashable, Value> :
 #if _runtime(_ObjC)
   /// Private initializer used for bridging.
   ///
-  /// Only use this initializer when both conditions are true:
-  ///
-  /// * it is statically known that the given `NSDictionary` is immutable;
-  /// * `Key` and `Value` are bridged verbatim to Objective-C (i.e.,
-  ///   are reference types).
-  public init(_immutableCocoaDictionary: _NSDictionary) {
+  /// - Precondition: * `Key` and `Value` are bridged verbatim to Objective-C
+  ///   (i.e., are reference types).
+  public init(_ source: _NSDictionary) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
-      "Dictionary can be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
-    _variantStorage = .cocoa(
-      _CocoaDictionaryStorage(cocoaDictionary: _immutableCocoaDictionary))
+      "Expecting both key and value to be bridged verbatim to Objective-C")
+    self.init(minimumCapacity: source.count)
+    source._forEachBatch { b in
+      for k in b {
+        // FIXME: Use objectsForKeys as an optimization
+        // FIXME: Use unsafeDowncasts as an optimization?
+        self[k as! Key] = (source.objectFor(k)! as! Value)
+      }
+    }
   }
 #endif
 
@@ -2099,49 +2056,6 @@ extension Dictionary where Key : Equatable, Value : Equatable {
         }
       }
       return true
-
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
-      return _stdlib_NSObject_isEqual(
-        lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
-
-    case (.native(let lhsNativeOwner), .cocoa(let rhsCocoa)):
-  #if _runtime(_ObjC)
-      let lhsNative = lhsNativeOwner.nativeStorage
-
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
-
-      let endIndex = lhsNative.endIndex
-      var index = lhsNative.startIndex
-      while index != endIndex {
-        let (key, value) = lhsNative.assertingGet(index)
-        let optRhsValue: AnyObject? =
-          rhsCocoa.maybeGet(_bridgeAnythingToObjectiveC(key))
-        // TODO: swift-3-indexing-model: change 'if' into 'guard'.
-        if let rhsValue = optRhsValue {
-          if value == _forceBridgeFromObjectiveC(rhsValue, Value.self) {
-            lhsNative.formIndex(after: &index)
-            continue
-          }
-        }
-        return false
-      }
-      return true
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
-
-    case (.cocoa, .native):
-  #if _runtime(_ObjC)
-      return rhs == lhs
-  #else
-      _sanityCheckFailure("internal error: unexpected cocoa dictionary")
-  #endif
     }
   }
 
@@ -2315,13 +2229,7 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
       // Note: it is safe to treat the storage as immutable here because
       // Dictionary will not mutate storage with reference count greater than 1.
       return Dictionary(
-        _immutableCocoaDictionary:
-        unsafeBitCast(nativeOwner, to: _NSDictionary.self))
-
-    case .cocoa(let cocoaStorage):
-      return Dictionary(
-        _immutableCocoaDictionary:
-        unsafeBitCast(cocoaStorage, to: _NSDictionary.self))
+        _unsafeReferenceCast(nativeOwner, to: _NSDictionary.self))
     }
   }
 #endif
@@ -3740,7 +3648,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
 %end
 
   case native(NativeStorageOwner)
-  case cocoa(CocoaStorage)
 
   @_versioned
   @_transparent
@@ -3756,10 +3663,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return _isUnique_native(&self)
-    case .cocoa:
-      // Don't consider Cocoa storage mutable, even if it is mutable and is
-      // uniquely referenced.
-      return false
     }
   }
 
@@ -3768,21 +3671,8 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native(let owner):
       return owner.nativeStorage
-    case .cocoa:
-      _sanityCheckFailure("internal error: not backed by native storage")
     }
   }
-
-#if _runtime(_ObjC)
-  internal var asCocoa: CocoaStorage {
-    switch self {
-    case .native:
-      _sanityCheckFailure("internal error: not backed by NS${Self}")
-    case .cocoa(let cocoaStorage):
-      return cocoaStorage
-    }
-  }
-#endif
 
   /// Ensure this we hold a unique reference to a native storage
   /// having at least `minimumCapacity` elements.
@@ -3797,8 +3687,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
         switch self {
         case .native(let owner):
           owner.deinitializeHeapBufferBridged()
-        case .cocoa:
-          _sanityCheckFailure("internal error: not backed by native storage")
         }
 #endif
         return (reallocated: false, capacityChanged: false)
@@ -3835,35 +3723,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
       self = .native(newNativeOwner)
       return (reallocated: true,
               capacityChanged: oldCapacity != newNativeStorage.capacity)
-
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      let cocoa${Self} = cocoaStorage.cocoa${Self}
-      let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
-      var newNativeStorage = newNativeOwner.nativeStorage
-      let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
-%if Self == 'Set':
-      while let key = oldCocoaIterator.next() {
-        newNativeStorage.unsafeAddNew(
-            key: _forceBridgeFromObjectiveC(key, Value.self))
-      }
-
-%elif Self == 'Dictionary':
-
-      while let (key, value) = oldCocoaIterator.next() {
-        newNativeStorage.unsafeAddNew(
-          key: _forceBridgeFromObjectiveC(key, Key.self),
-          value: _forceBridgeFromObjectiveC(value, Value.self))
-      }
-
-%end
-      newNativeStorage.count = cocoa${Self}.count
-
-      self = .native(newNativeOwner)
-      return (reallocated: true, capacityChanged: true)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -3894,12 +3753,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return ._native(asNative.startIndex)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return ._cocoa(cocoaStorage.startIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -3911,12 +3764,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return ._native(asNative.endIndex)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return ._cocoa(cocoaStorage.endIndex)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -3929,12 +3776,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return ._native(asNative.index(after: i._nativeIndex))
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return ._cocoa(cocoaStorage.index(after: i._cocoaIndex))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -3959,16 +3800,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
         return ._native(nativeIndex)
       }
       return nil
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      if let cocoaIndex = cocoaStorage.index(forKey: anyObjectKey) {
-        return ._cocoa(cocoaIndex)
-      }
-      return nil
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -3980,22 +3811,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return asNative.assertingGet(i._nativeIndex)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-%if Self == 'Set':
-      let anyObjectValue: AnyObject = cocoaStorage.assertingGet(i._cocoaIndex)
-      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-      return nativeValue
-%elif Self == 'Dictionary':
-      let (anyObjectKey, anyObjectValue) =
-          cocoaStorage.assertingGet(i._cocoaIndex)
-      let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
-      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-      return (nativeKey, nativeValue)
-%end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4007,15 +3822,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return asNative.assertingGet(key)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      // FIXME: This assumes that Key and Value are bridged verbatim.
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
-      return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4043,12 +3849,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return asNative.maybeGet(key)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return SelfType.maybeGetFromCocoaStorage(cocoaStorage, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4101,13 +3901,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return nativeUpdateValue(value, forKey: key)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      migrateDataToNativeStorage(cocoaStorage)
-      return nativeUpdateValue(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4156,13 +3949,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return nativeInsert(value, forKey: key)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      migrateDataToNativeStorage(cocoaStorage)
-      return nativeInsert(value, forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4294,29 +4080,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return nativeRemove(at: index._nativeIndex)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      // We have to migrate the data first.  But after we do so, the Cocoa
-      // index becomes useless, so get the key first.
-      //
-      // FIXME(performance): fuse data migration and element deletion into one
-      // operation.
-      let cocoaIndex = index._cocoaIndex
-      let anyObjectKey: AnyObject =
-        cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
-      migrateDataToNativeStorage(cocoaStorage)
-      let key = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
-      let value = nativeRemoveObject(forKey: key)
-
-%if Self == 'Set':
-      _sanityCheck(key == value, "bridging did not preserve equality")
-      return key
-%elif Self == 'Dictionary':
-      return (key, value._unsafelyUnwrappedUnchecked)
-%end
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4329,17 +4092,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return nativeRemoveObject(forKey: key)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      if cocoaStorage.maybeGet(anyObjectKey) == nil {
-        return nil
-      }
-      migrateDataToNativeStorage(cocoaStorage)
-      return nativeRemoveObject(forKey: key)
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4384,12 +4136,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       nativeRemoveAll()
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      self = .native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4401,12 +4147,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     switch self {
     case .native:
       return asNative.count
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return cocoaStorage.count
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -4420,12 +4160,6 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorage {
     case .native(let owner):
       return ._native(
         start: asNative.startIndex, end: asNative.endIndex, owner: owner)
-    case .cocoa(let cocoaStorage):
-#if _runtime(_ObjC)
-      return ._cocoa(_Cocoa${Self}Iterator(cocoaStorage.cocoa${Self}))
-#else
-      _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
-#endif
     }
   }
 
@@ -5047,9 +4781,6 @@ extension ${Self} {
     switch _variantStorage {
     case _Variant${Self}Storage.native(let nativeOwner):
       return nativeOwner as _Native${Self}StorageOwner<${TypeParameters}>
-
-    case _Variant${Self}Storage.cocoa(let cocoaStorage):
-      return cocoaStorage.cocoa${Self}
     }
   }
 

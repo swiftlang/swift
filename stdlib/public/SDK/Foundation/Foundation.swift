@@ -580,9 +580,7 @@ extension Dictionary {
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
     self = Dictionary(
-      _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(with: nil) as AnyObject,
-                      to: _NSDictionary.self))
+        _unsafeReferenceCast(_cocoaDictionary, to: _NSDictionary.self))
   }
 }
 
