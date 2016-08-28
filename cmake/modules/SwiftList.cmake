@@ -81,14 +81,16 @@ function(precondition_list_is_set l)
     MESSAGE "List ${l} has duplicate elements and thus is not a set. Contents: ${${l}}")
 endfunction()
 
-function(precondition_list_is_disjoint)
-  set(TOP)
-  foreach(l ${ARGN})
-    # First do a precondition check that TOP and l are disjoint.
-    list_intersect(TOP l TOP_L_INTERSECTION)
-    list(LENGTH TOP_L_INTERSECTION TOP_L_INTERSECTION_LENGTH)
-    precondition_binary_op(EQUAL ${TOP_L_INTERSECTION_LENGTH} 0)
-    # Then union l into TOP so that we can check the next list.
-    list_union(TOP l TOP)
+function(precondition_list_is_disjoint first)
+  set(RESULT "${${first}}")
+  set(REST ${ARGN})
+  foreach(l ${REST})
+    # First do a precondition check that RESULT and l are disjoint.
+    list_intersect("${RESULT}" "${${l}}" TMP_INTERSECTION)
+    list(LENGTH TMP_INTERSECTION TMP_INTERSECTION_LENGTH)
+    precondition_binary_op(EQUAL ${TMP_INTERSECTION_LENGTH} 0
+      MESSAGE "Found non-empty set intersection.")
+    # Then union l into RESULT so that we can check the next list.
+    list_union(RESULT "${${l}}" "${RESULT}")
   endforeach()
 endfunction()
