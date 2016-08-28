@@ -2130,6 +2130,10 @@ addNestedRequirements(
       auto nestedType =
         rep->getDependentType(builder, /*allowUnresolved*/ false);
 
+      // Skip unresolved nested types.
+      if (nestedType->is<ErrorType>())
+        continue;
+
       addRequirements(builder, nestedType, rep, knownPAs, requirements);
       addNestedRequirements(builder, rep, knownPAs, requirements);
     }
