@@ -2553,7 +2553,7 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   // saved iterator if it's still valid.  This should only be called
   // while the lock is held.
   decltype(foreignTypes.Types.begin()) savedIterator;
-  size_t savedSize;
+  size_t savedSize = 0;
   auto getCurrentEntry = [&]() -> const ForeignTypeMetadata *& {
     // The iterator may have been invalidated if the size of the map
     // has changed since the last lookup.
