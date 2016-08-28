@@ -931,7 +931,7 @@ protected:
     // This is ABI.
     static constexpr auto OffsetToName =
     roundUpToAlignment(size_t(12), sizeof(StoredPointer))
-    + sizeof(StoredPointer);;
+      + sizeof(StoredPointer);
 
     // Read the name pointer.
     StoredPointer namePtr;
@@ -963,15 +963,19 @@ protected:
         return _readMetadata<TargetEnumMetadata>(address);
       case MetadataKind::Existential: {
         StoredPointer numProtocolsAddress = address +
-        TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
+          TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
         StoredPointer numProtocols;
         if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
                                  &numProtocols))
           return nullptr;
 
+        // Make sure the number of protocols is reasonable
+        if (numProtocols >= 256)
+          return nullptr;
+
         auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
-        + numProtocols *
-        sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+          + numProtocols *
+          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
 
         return _readMetadata(address, totalSize);
       }
@@ -997,13 +1001,18 @@ protected:
         return _readMetadata<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
-        TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
+          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
         StoredSize numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>)
-        + numElements * sizeof(StoredPointer);
+          + numElements * sizeof(StoredPointer);
+
+        // Make sure the number of elements is reasonable
+        if (numElements >= 256)
+          return nullptr;
+
         return _readMetadata(address, totalSize);
       }
     }

@@ -19,6 +19,8 @@
 #include <stdio.h>
 #endif
 
+namespace swift {
+
 /// This is a node in a concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
   ConcurrentListNode(ElemTy Elem) : Payload(Elem), Next(nullptr) {}
@@ -123,6 +125,29 @@ template <class ElemTy> struct ConcurrentList {
   std::atomic<ConcurrentListNode<ElemTy> *> First;
 };
 
+template <class T, bool Delete> class AtomicMaybeOwningPointer;
+
+template <class T>
+class AtomicMaybeOwningPointer<T, false> {
+public:
+  std::atomic<T*> Value;
+  constexpr AtomicMaybeOwningPointer(T *value) : Value(value) {}
+};
+
+template <class T>
+class AtomicMaybeOwningPointer<T, true> {
+public:
+  std::atomic<T*> Value;
+  constexpr AtomicMaybeOwningPointer(T *value) : Value(value) {}
+
+  ~AtomicMaybeOwningPointer() {
+    // This can use relaxed memory order because the client has to ensure
+    // that all accesses are safely completed and their effects fully
+    // visible before destruction occurs anyway.
+    ::delete Value.load(std::memory_order_relaxed);
+  }
+};
+
 /// A concurrent map that is implemented using a binary tree. It supports
 /// concurrent insertions but does not support removals or rebalancing of
 /// the tree.
@@ -140,7 +165,8 @@ template <class ElemTy> struct ConcurrentList {
 ///   /// where KeyTy is the type of the first argument to getOrInsert and
 ///   /// ArgTys is the type of the remaining arguments.
 ///   static size_t getExtraAllocationSize(KeyTy key, ArgTys...)
-template <class EntryTy> class ConcurrentMap {
+template <class EntryTy, bool ProvideDestructor = true>
+class ConcurrentMap {
   struct Node {
     std::atomic<Node*> Left;
     std::atomic<Node*> Right;
@@ -182,7 +208,7 @@ template <class EntryTy> class ConcurrentMap {
   };
 
   /// The root of the tree.
-  std::atomic<Node*> Root;
+  AtomicMaybeOwningPointer<Node, ProvideDestructor> Root;
 
   /// This member stores the address of the last node that was found by the
   /// search procedure. We cache the last search to accelerate code that
@@ -195,13 +221,14 @@ public:
   ConcurrentMap(const ConcurrentMap &) = delete;
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
 
-  ~ConcurrentMap() {
-    ::delete Root.load(std::memory_order_relaxed);
-  }
+  // ConcurrentMap<T, false> must have a trivial destructor.
+  ~ConcurrentMap() = default;
+
+public:
 
 #ifndef NDEBUG
   void dump() const {
-    auto R = Root.load(std::memory_order_acquire);
+    auto R = Root.Value.load(std::memory_order_acquire);
     printf("digraph g {\n"
            "graph [ rankdir = \"TB\"];\n"
            "node  [ fontsize = \"16\" ];\n"
@@ -225,7 +252,7 @@ public:
     }
 
     // Search the tree, starting from the root.
-    Node *node = Root.load(std::memory_order_acquire);
+    Node *node = Root.Value.load(std::memory_order_acquire);
     while (node) {
       int comparisonResult = node->Payload.compareWithKey(key);
       if (comparisonResult == 0) {
@@ -258,7 +285,7 @@ public:
     Node *newNode = nullptr;
 
     // Start from the root.
-    auto edge = &Root;
+    auto edge = &Root.Value;
 
     while (true) {
       // Load the edge.
@@ -312,5 +339,7 @@ public:
     }
   }
 };
+
+} // end namespace swift
 
 #endif // SWIFT_RUNTIME_CONCURRENTUTILS_H

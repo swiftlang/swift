@@ -924,10 +924,6 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
-// FIXME: We need to undef 'defer' when including Tokens.def. It is restored
-// below.
-#undef defer
-
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   StringRef name;
   switch (keyword) {
@@ -3791,40 +3787,45 @@ public:
       return;
 
     if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
-      Printer.printAttrName("@autoclosure");
-      Printer << " ";
+      Printer.printSimpleAttr("@autoclosure") << " ";
     }
     if (inParameterPrinting && !info.isNoEscape() &&
         !Options.excludeAttrKind(TAK_escaping)) {
-      Printer.printAttrName("@escaping");
-      Printer << " ";
+      Printer.printSimpleAttr("@escaping") << " ";
     }
 
     if (Options.PrintFunctionRepresentationAttrs &&
-        !Options.excludeAttrKind(TAK_convention)) {
+        !Options.excludeAttrKind(TAK_convention) &&
+        info.getSILRepresentation() != SILFunctionType::Representation::Thick) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@convention");
+      Printer << "(";
       // TODO: coalesce into a single convention attribute.
       switch (info.getSILRepresentation()) {
       case SILFunctionType::Representation::Thick:
-        break;
+        llvm_unreachable("thick is not printed");
       case SILFunctionType::Representation::Thin:
-        Printer << "@convention(thin) ";
+        Printer << "thin";
         break;
       case SILFunctionType::Representation::Block:
-        Printer << "@convention(block) ";
+        Printer << "block";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        Printer << "@convention(c) ";
+        Printer << "c";
         break;
       case SILFunctionType::Representation::Method:
-        Printer << "@convention(method) ";
+        Printer << "method";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        Printer << "@convention(objc_method) ";
+        Printer << "objc_method";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        Printer << "@convention(witness_method) ";
+        Printer << "witness_method";
         break;
       }
+      Printer << ")";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
     }
   }
 
@@ -3832,34 +3833,43 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (Options.PrintFunctionRepresentationAttrs) {
+    if (Options.PrintFunctionRepresentationAttrs &&
+        !Options.excludeAttrKind(TAK_convention) &&
+        info.getRepresentation() != SILFunctionType::Representation::Thick) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@convention");
+      Printer << "(";
       // TODO: coalesce into a single convention attribute.
       switch (info.getRepresentation()) {
       case SILFunctionType::Representation::Thick:
-        break;
+        llvm_unreachable("thick is not printed");
       case SILFunctionType::Representation::Thin:
-        Printer << "@convention(thin) ";
+        Printer << "thin";
         break;
       case SILFunctionType::Representation::Block:
-        Printer << "@convention(block) ";
+        Printer << "block";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        Printer << "@convention(c) ";
+        Printer << "c";
         break;
       case SILFunctionType::Representation::Method:
-        Printer << "@convention(method) ";
+        Printer << "method";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        Printer << "@convention(objc_method) ";
+        Printer << "objc_method";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        Printer << "@convention(witness_method) ";
+        Printer << "witness_method";
         break;
       }
+      Printer << ")";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
     }
 
-    if (info.isPseudogeneric())
-      Printer << "@pseudogeneric ";
+    if (info.isPseudogeneric()) {
+      Printer.printSimpleAttr("@pseudogeneric") << " ";
+    }
   }
 
   void visitFunctionType(FunctionType *T) {

@@ -101,13 +101,13 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 }
 
 // TEST_PRIVATE_ABC: Begin completions, 15 items
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolB: TagPB) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
-// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolC: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA
@@ -119,13 +119,13 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_PRIVATE_ABC: End completions
 
 // TEST_INTERNAL_ABC: Begin completions, 15 items
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolB: TagPB) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
-// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolC: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA
@@ -137,13 +137,13 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_INTERNAL_ABC: End completions
 
 // TEST_PUBLIC_ABC: Begin completions, 15 items
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolB: TagPB) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    required init(fromProtocolB: TagPB) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFunc(x: TagPB) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: func protoBFuncOptional(x: TagPB) {|}{{; name=.+$}}
-// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolC: TagPC) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    public required init(fromProtocolC: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: TagPA

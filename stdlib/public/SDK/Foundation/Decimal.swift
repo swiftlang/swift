@@ -31,12 +31,12 @@ extension Decimal {
 
     public var significand: Decimal { 
         get {
-            return Decimal(_exponent: 1, _length: _length, _isNegative: _isNegative, _isCompact: _isCompact, _reserved: 0, _mantissa: _mantissa)
+            return Decimal(_exponent: 0, _length: _length, _isNegative: _isNegative, _isCompact: _isCompact, _reserved: 0, _mantissa: _mantissa)
         }
     }
 
     public init(sign: FloatingPointSign, exponent: Int, significand: Decimal) {
-        self.init(_exponent: Int32(exponent), _length: significand._length, _isNegative: sign == .plus ? 1 : 0, _isCompact: significand._isCompact, _reserved: 0, _mantissa: significand._mantissa)
+        self.init(_exponent: Int32(exponent) + significand._exponent, _length: significand._length, _isNegative: sign == .plus ? 0 : 1, _isCompact: significand._isCompact, _reserved: 0, _mantissa: significand._mantissa)
     }
 
     public init(signOf: Decimal, magnitudeOf magnitude: Decimal) {
@@ -50,7 +50,8 @@ extension Decimal {
     public static var radix: Int { return 10 }
 
     public var ulp: Decimal {
-        return Decimal(_exponent: 1, _length: _length, _isNegative: _isNegative, _isCompact: _isCompact, _reserved: 0, _mantissa: _mantissa)
+        if !self.isFinite { return Decimal.nan }
+        return Decimal(_exponent: _exponent, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
     }
 
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
