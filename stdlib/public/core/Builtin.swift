@@ -193,12 +193,12 @@ internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 /// not much you can do with this other than use it to identify the
 /// object.
 @available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddress(of object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddress(of object: AnyObject) -> UnsafeRawPointer {
   Builtin.unreachable()
 }
 
 @available(*, unavailable, message: "Removed in Swift 3. Use Unmanaged.passUnretained(x).toOpaque() instead.")
-public func unsafeAddressOf(_ object: AnyObject) -> UnsafePointer<Void> {
+public func unsafeAddressOf(_ object: AnyObject) -> UnsafeRawPointer {
   Builtin.unreachable()
 }
 
