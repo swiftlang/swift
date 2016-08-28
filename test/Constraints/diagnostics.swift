@@ -428,13 +428,13 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
-let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
+let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
-let _ : Color = .rainbow  // expected-error {{contextual member 'rainbow' expects argument of type '()'}}
+let _ : Color = .rainbow  // expected-error {{member 'rainbow' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
