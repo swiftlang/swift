@@ -67,9 +67,13 @@ A smoke test on Linux does the following:
         Platform     | Comment
         ------------ | -------------
         All supported platforms     | @swift-ci Please test
+        All supported platforms     | @swift-ci Please clean test
         All supported platforms     | @swift-ci Please test and merge
         OS X platform               | @swift-ci Please test OS X platform
+        OS X platform               | @swift-ci Please clean test OS X platform
+        OS X platform               | @swift-ci Please benchmark
         Linux platform              | @swift-ci Please test Linux platform
+        Linux platform              | @swift-ci Please clean test Linux platform
 
 The core principles of validation testing is that:
 
