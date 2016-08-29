@@ -4,6 +4,7 @@ add_swift_library(swiftAST STATIC
   ASTDumper.cpp
   ASTNode.cpp
   ASTPrinter.cpp
+  ASTScope.cpp
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp

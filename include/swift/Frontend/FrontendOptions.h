@@ -142,6 +142,9 @@ public:
     DumpAST, ///< Parse, type-check, and dump AST
     PrintAST, ///< Parse, type-check, and pretty-print AST
 
+    /// Parse and dump scope map.
+    DumpScopeMaps,
+
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 

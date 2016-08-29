@@ -253,6 +253,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpParse;
     } else if (Opt.matches(OPT_dump_ast)) {
       Action = FrontendOptions::DumpAST;
+    } else if (Opt.matches(OPT_dump_scope_maps)) {
+      Action = FrontendOptions::DumpScopeMaps;
     } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
       Action = FrontendOptions::DumpTypeRefinementContexts;
     } else if (Opt.matches(OPT_dump_interface_hash)) {
@@ -433,6 +435,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
       // Textual modes.
       Opts.setSingleOutputFilename("-");
@@ -622,6 +625,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
@@ -648,6 +652,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
@@ -676,6 +681,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:

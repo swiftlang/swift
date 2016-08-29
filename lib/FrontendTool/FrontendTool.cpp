@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
@@ -780,6 +781,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
       Action == FrontendOptions::PrintAST ||
+      Action == FrontendOptions::DumpScopeMaps ||
       Action == FrontendOptions::DumpTypeRefinementContexts ||
       Action == FrontendOptions::DumpInterfaceHash) {
     SourceFile *SF = PrimarySourceFile;
@@ -789,7 +791,11 @@ static bool performCompile(CompilerInstance &Instance,
     }
     if (Action == FrontendOptions::PrintAST)
       SF->print(llvm::outs(), PrintOptions::printEverything());
-    else if (Action == FrontendOptions::DumpTypeRefinementContexts)
+    else if (Action == FrontendOptions::DumpScopeMaps) {
+      ASTScope &scope = SF->getScope();
+      scope.expandAll();
+      scope.print(llvm::errs());
+    } else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());
