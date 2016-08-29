@@ -232,18 +232,13 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
     // Filter out redundant requirements.
     switch (source.getKind()) {
     case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
       // The requirement was explicit and required, keep it.
       break;
       
     case RequirementSource::Protocol:
-      // Keep witness markers.
-      if (kind == RequirementKind::WitnessMarker)
-        break;
-      return;
-    
     case RequirementSource::Redundant:
-    case RequirementSource::Inferred:
-      // The requirement was inferred or redundant, drop it.
+      // The requirement was redundant, drop it.
       return;
       
     case RequirementSource::OuterScope:

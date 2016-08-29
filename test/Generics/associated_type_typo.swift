@@ -43,6 +43,8 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc witness marker
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2.Assoc == T[.P2].AssocP2[.P1].Assoc [redundant]
+// CHECK-GENERIC-NEXT:   T.AssocP2 == T[.P2].AssocP2 [redundant]
 // CHECK-GENERIC-NEXT: Generic signature
 
 
