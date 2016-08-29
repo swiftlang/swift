@@ -2949,10 +2949,11 @@ partial_apply
 `````````````
 ::
 
-  sil-instruction ::= 'partial_apply' sil-value
+  sil-instruction ::= 'partial_apply' callee-ownership-attr? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
+  callee-ownership-attr ::= '[callee_guaranteed]'
 
   %c = partial_apply %0(%1, %2, ...) : $(Z..., A, B, ...) -> R
   // Note that the type of the callee '%0' is specified *after* the arguments
@@ -2988,6 +2989,11 @@ TODO: The instruction, when applied to a generic function,
 currently implicitly performs abstraction difference transformations enabled
 by the given substitutions, such as promoting address-only arguments and returns
 to register arguments. This should be fixed.
+
+By default, ``partial_apply`` creates a closure whose invocation takes ownership
+of the context, meaning that a call implicitly releases the closure. The
+``[callee_guaranteed]`` change this to a caller-guaranteed model, where the
+caller promises not to release the closure while the function is being called.
 
 This instruction is used to implement both curry thunks and closures. A
 curried function in Swift::

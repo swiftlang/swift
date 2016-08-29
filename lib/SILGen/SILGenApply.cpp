@@ -4405,7 +4405,8 @@ namespace {
             constantInfo.getSILType(),
             1,
             gen.B.getModule(),
-            subs);
+            subs,
+            ParameterConvention::Direct_Owned);
 
           auto &module = gen.getFunction().getModule();
 
@@ -5417,9 +5418,10 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                                         SILValue self,
                                         CanFunctionType methodTy) {
   auto partialApplyTy = SILBuilder::getPartialApplyResultType(method->getType(),
-                                                              /*argCount*/1,
-                                                              gen.SGM.M,
-                                                              /*subs*/{});
+                                            /*argCount*/1,
+                                            gen.SGM.M,
+                                            /*subs*/{},
+                                            ParameterConvention::Direct_Owned);
 
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.

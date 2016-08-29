@@ -1292,7 +1292,7 @@ class PartialApplyInst
                                   SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Return the ast level function type of this partial apply.
+  /// Return the result function type of this partial apply.
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
