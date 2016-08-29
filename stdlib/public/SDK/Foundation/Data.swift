@@ -735,10 +735,10 @@ extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomRe
 
 extension Data {
     @available(*, unavailable, renamed: "copyBytes(to:count:)")
-    public func getBytes(_ buffer: UnsafeMutablePointer<Swift.Void>, length: Int) { }
+  public func getBytes<UnsafeMutablePointerVoid: _Pointer>(_ buffer: UnsafeMutablePointerVoid, length: Int) { }
 
     @available(*, unavailable, renamed: "copyBytes(to:from:)")
-    public func getBytes(_ buffer: UnsafeMutablePointer<Swift.Void>, range: NSRange) { }
+    public func getBytes<UnsafeMutablePointerVoid: _Pointer>(_ buffer: UnsafeMutablePointerVoid, range: NSRange) { }
 }
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.

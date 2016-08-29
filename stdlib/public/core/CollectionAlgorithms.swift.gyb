@@ -469,7 +469,7 @@ ${orderingExplanation}
   }
 }
 
-% for Self in 'Indexable', 'MutableIndexable':
+% for Self in '_Indexable', '_MutableIndexable':
 %{
 
 subscriptCommentPre = """\

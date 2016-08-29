@@ -2211,7 +2211,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
 
   for (k, v) in source {
-    result[k as! BaseKey] = v as! BaseValue
+    result[k as! BaseKey] = (v as! BaseValue)
   }
   return result
 }
