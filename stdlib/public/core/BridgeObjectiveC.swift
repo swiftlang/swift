@@ -11,12 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #if _runtime(_ObjC)
-/// A Swift Array or Dictionary of types conforming to
-/// `_ObjectiveCBridgeable` can be passed to Objective-C as an NSArray or
-/// NSDictionary, respectively.  The elements of the resulting NSArray
-/// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
-/// on each element of the source container.
+/// A protocol for value types with custom bridging behavior.
 public protocol _ObjectiveCBridgeable {
+  
+  /// An Objective-C type to which `Self` can be losslessly round-trip
+  /// converted.
   associatedtype _ObjectiveCType : AnyObject
 
   /// Convert `self` to Objective-C.
@@ -37,50 +36,158 @@ public protocol _ObjectiveCBridgeable {
     result: inout Self?
   )
 
-  /// Try to bridge from an Objective-C object of the bridged class
-  /// type to a value of the Self type.
-  ///
-  /// This conditional bridging operation is used for conditional
-  /// downcasting (e.g., via as?) and therefore must perform a
-  /// complete conversion to the value type; it cannot defer checking
-  /// to a later time.
-  ///
-  /// - parameter result: The location where the result is written.
-  ///
+  /// Implement `x as? Self` where x is of type `_ObjectiveCType`.
+  /// 
   /// - Returns: `true` if bridging succeeded, `false` otherwise. This redundant
-  ///   information is provided for the convenience of the runtime's `dynamic_cast`
-  ///   implementation, so that it need not look into the optional representation
-  ///   to determine success.
+  ///   information is provided for the convenience of the runtime's
+  ///   `dynamic_cast` implementation, so that it need not look into the
+  ///   optional representation to determine success.
+  ///
+  /// - Parameter result: a container for the new instance of `Self`.
+  /// - Postcondition: If ``true` is returned, `result` is non-`nil`.
   @discardableResult
   static func _conditionallyBridgeFromObjectiveC(
     _ source: _ObjectiveCType,
     result: inout Self?
   ) -> Bool
 
+  /// Convert an instance of `_ObjectiveCType?` to an instance of `Self` at an
+  /// imported Objective-C method boundary.
+  ///
+  /// This operation is used where an Objective-C method signature claims the
+  /// dynamic type of an instance is `_ObjectiveCType` with the correct
+  /// substructure.  For example:
+  ///
+  ///     @objc class ImportedClass {
+  ///       func foo() -> [String]  // -(NSArray<NSString>* _NonNull)foo
+  ///       func bar(_ x: [String]) // -(void)bar:(NSArray<NSString>* _NonNull)
+  ///     } 
+  ///
+  /// The Objective-C signatures claim the `NSArray*`s returned from `foo` and
+  /// passed to overrides of `bar` will only contain `NSString`s.  We take that
+  /// claim on faith and do not (necessarily) check its validity. If the
+  /// imported signatures lie about parameter or return types, it may lead to
+  /// undefined behavior.
+  ///
+  /// The signatures also claim the `NSArray*`s will be non-null, but
+  /// nullability is commonly mis-annotated in Objective-C.  As a resilience
+  /// measure against mis-annotation, this method accepts `source` as an
+  /// `Optional`, so implementations can return an appropriate default value
+  /// (e.g. an empty `Array`) when `source` is `nil`.
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self
+}
+
+public protocol _BridgePolicy {
+  static func bridge<Target>(
+    _ source: AnyObject, to target: Target.Type) -> Target?
+}
+
+struct _ForceCasting : _BridgePolicy {
+  static func bridge<Target>(
+    _ source: AnyObject, to target: Target.Type) -> Target? {
+    return (source as! Target)
+  }
+}
+
+struct _ConditionalCasting : _BridgePolicy {
+  static func bridge<Target>(
+    _ source: AnyObject, to target: Target.Type) -> Target? {
+    return source as? Target
+  }
+}
+
+public protocol _CustomObjectiveCBridgeable : _ObjectiveCBridgeable {
+  static func _bridged<Policy: _BridgePolicy>(
+    from objc: _ObjectiveCType, by policy: Policy.Type) -> Self?
+
+  static func _bridgedFromNil(_: _ObjectiveCType?) -> Self
+}
+
+extension _ObjectiveCBridgeable {
+  public static func _bridgedFromNil(_: _ObjectiveCType?) -> Self {
+    fatalError(
+      "Objective-C nil of type \(String(reflecting: _ObjectiveCType.self)) "
+      + "does not bridge to \(String(reflecting: Self.self))")
+  }
+}
+
+
+extension _ObjectiveCBridgeable where Self : _CustomObjectiveCBridgeable {
   /// Bridge from an Objective-C object of the bridged class type to a
   /// value of the Self type.
   ///
-  /// This bridging operation is used for unconditional bridging when
-  /// interoperating with Objective-C code, either in the body of an
-  /// Objective-C thunk or when calling Objective-C code, and may
-  /// defer complete checking until later. For example, when bridging
-  /// from `NSArray` to `Array<Element>`, we can defer the checking
-  /// for the individual elements of the array.
+  /// This bridging operation is used for forced downcasting (e.g.,
+  /// via as), and may defer complete checking until later. For
+  /// example, when bridging from `NSArray` to `Array<Element>`, we can defer
+  /// the checking for the individual elements of the array.
   ///
-  /// \param source The Objective-C object from which we are
-  /// bridging. This optional value will only be `nil` in cases where
-  /// an Objective-C method has returned a `nil` despite being marked
-  /// as `_Nonnull`/`nonnull`. In most such cases, bridging will
-  /// generally force the value immediately. However, this gives
-  /// bridging the flexibility to substitute a default value to cope
-  /// with historical decisions, e.g., an existing Objective-C method
-  /// that returns `nil` to for "empty result" rather than (say) an
-  /// empty array. In such cases, when `nil` does occur, the
-  /// implementation of `Swift.Array`'s conformance to
-  /// `_ObjectiveCBridgeable` will produce an empty array rather than
-  /// dynamically failing.
-  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
-      -> Self
+  /// - parameter result: The location where the result is written. The optional
+  ///   will always contain a value.
+  public static func _forceBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout Self?
+  ) {
+    result = Self._bridged(
+      from: source, by: _ForceCasting.self).unsafelyUnwrapped
+  }
+
+  /// Implement `x as? Self` where x is of type `_ObjectiveCType`.
+  /// 
+  /// - Returns: `true` if bridging succeeded, `false` otherwise. This redundant
+  ///   information is provided for the convenience of the runtime's
+  ///   `dynamic_cast` implementation, so that it need not look into the
+  ///   optional representation to determine success.
+  ///
+  /// - Parameter result: a container for the new instance of `Self`.
+  /// - Postcondition: If ``true` is returned, `result` is non-`nil`.
+  @discardableResult
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: _ObjectiveCType,
+    result: inout Self?
+  ) -> Bool {
+    result = Self._bridged(from: source, by: _ConditionalCasting.self)
+    return result != nil
+  }
+
+  /// Convert an instance of `_ObjectiveCType?` to an instance of `Self` at an
+  /// imported Objective-C method boundary.
+  ///
+  /// This operation is used where an Objective-C method signature claims the
+  /// dynamic type of an instance is `_ObjectiveCType` with the correct
+  /// substructure.  For example:
+  ///
+  ///     @objc class ImportedClass {
+  ///       func foo() -> [String]  // -(NSArray<NSString>* _NonNull)foo
+  ///       func bar(_ x: [String]) // -(void)bar:(NSArray<NSString>* _NonNull)
+  ///     } 
+  ///
+  /// The Objective-C signatures claim the `NSArray*`s returned from `foo` and
+  /// passed to overrides of `bar` will only contain `NSString`s.  We take that
+  /// claim on faith and do not (necessarily) check its validity. If the
+  /// imported signatures lie about parameter or return types, it may lead to
+  /// undefined behavior.
+  ///
+  /// The signatures also claim the `NSArray*`s will be non-null, but
+  /// nullability is commonly mis-annotated in Objective-C.  As a resilience
+  /// measure against mis-annotation, this method accepts `source` as an
+  /// `Optional`, so implementations can return an appropriate default value
+  /// (e.g. an empty `Array`) when `source` is `nil`.
+  static func _unconditionallyBridgeFromObjectiveC(
+    _ source: _ObjectiveCType?
+  ) -> Self {
+    if _slowPath(source == nil) {
+      return self._bridgedFromNil(source)
+    }
+    if let result = Self._bridged(from: source!, by: _ForceCasting.self) {
+      return result
+    }
+    fatalError(
+      "Bridging from Objective-C type "
+      + "\(String(reflecting: _ObjectiveCType.self)) to Swift type "
+      + "\(String(reflecting: Self.self)) failed with actual value "
+      + "\(String(reflecting: source))")
+  }
 }
 
 //===--- Bridging for metatypes -------------------------------------------===//
