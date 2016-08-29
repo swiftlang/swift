@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -168,11 +169,6 @@ struct ArchetypeBuilder::Implementation {
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
-
-  /// A vector containing all of the archetypes, expanded out.
-  /// FIXME: This notion should go away, because it's impossible to expand
-  /// out "all" archetypes
-  SmallVector<ArchetypeType *, 4> AllArchetypes;
 
   /// A vector containing the same-type requirements introduced into the
   /// system.
@@ -1765,41 +1761,6 @@ ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
   return known->second->getType(*this).getAsArchetype();
 }
 
-ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
-  // This should be kept in sync with GenericParamList::deriveAllArchetypes().
-  if (Impl->AllArchetypes.empty()) {
-    // Collect the primary archetypes first.
-    unsigned depth = Impl->PotentialArchetypes.back().first.Depth;
-    llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
-    for (const auto &Entry : Impl->PotentialArchetypes) {
-      // Skip outer potential archetypes.
-      if (Entry.first.Depth < depth)
-        continue;
-
-      PotentialArchetype *PA = Entry.second;
-      auto Archetype = PA->getType(*this).castToArchetype();
-      if (KnownArchetypes.insert(Archetype).second)
-        Impl->AllArchetypes.push_back(Archetype);
-    }
-
-    // Collect all of the remaining archetypes.
-    for (const auto &Entry : Impl->PotentialArchetypes) {
-      // Skip outer potential archetypes.
-      if (Entry.first.Depth < depth)
-        continue;
-
-      PotentialArchetype *PA = Entry.second;
-      if (!PA->isConcreteType() && !PA->getTypeAliasDecl()) {
-        auto Archetype = PA->getType(*this).castToArchetype();
-        GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
-                                              Impl->AllArchetypes);
-      }
-    }
-  }
-
-  return Impl->AllArchetypes;
-}
-
 ArrayRef<ArchetypeBuilder::SameTypeRequirement>
 ArchetypeBuilder::getSameTypeRequirements() const {
   return Impl->SameTypeRequirements;
@@ -2010,88 +1971,44 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type,
-                                          LazyResolver *resolver) {
-  auto genericParams = dc->getGenericParamsOfContext();
-  return mapTypeIntoContext(dc->getParentModule(), genericParams, type,
-                            resolver);
+Type ArchetypeBuilder::mapTypeIntoContext(const DeclContext *dc, Type type) {
+  return mapTypeIntoContext(dc->getParentModule(),
+                            dc->getGenericEnvironmentOfContext(),
+                            type);
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
-                                          GenericParamList *genericParams,
-                                          Type type,
-                                          LazyResolver *resolver) {
+Type ArchetypeBuilder::mapTypeIntoContext(ModuleDecl *M,
+                                          GenericEnvironment *env,
+                                          Type type) {
   auto canType = type->getCanonicalType();
   assert(!canType->hasArchetype() && "already have a contextual type");
   if (!canType->hasTypeParameter())
     return type;
 
-  assert(genericParams && "dependent type in non-generic context");
+  assert(env && "dependent type in non-generic context");
 
-  unsigned genericParamsDepth = genericParams->getDepth();
-  type = type.transform([&](Type type) -> Type {
-    // Map a generic parameter type to its archetype.
-    if (auto gpType = type->getAs<GenericTypeParamType>()) {
-      auto index = gpType->getIndex();
-      unsigned depth = gpType->getDepth();
-
-      // Skip down to the generic parameter list that houses the corresponding
-      // generic parameter.
-      auto myGenericParams = genericParams;
-      assert(genericParamsDepth >= depth);
-      unsigned skipLevels = genericParamsDepth - depth;
-      while (skipLevels > 0) {
-        myGenericParams = myGenericParams->getOuterParameters();
-        assert(myGenericParams && "Wrong number of levels?");
-        --skipLevels;
-      }
-
-      return myGenericParams->getParams()[index]->getArchetype();
-    }
-
-    // Map a dependent member to the corresponding nested archetype.
-    if (auto dependentMember = type->getAs<DependentMemberType>()) {
-      auto base = mapTypeIntoContext(M, genericParams,
-                                     dependentMember->getBase(), resolver);
-      return dependentMember->substBaseType(M, base, resolver);
-    }
-
-    return type;
-  });
-
-  assert(!type->hasTypeParameter() && "not fully substituted");
-  return type;
+  return env->mapTypeIntoContext(M, type);
 }
 
 Type
 ArchetypeBuilder::mapTypeOutOfContext(const DeclContext *dc, Type type) {
-  GenericParamList *genericParams = dc->getGenericParamsOfContext();
-  return mapTypeOutOfContext(dc->getParentModule(), genericParams, type);
+  return mapTypeOutOfContext(dc->getParentModule(),
+                             dc->getGenericEnvironmentOfContext(),
+                             type);
 }
 
-Type ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
-                                           GenericParamList *genericParams,
-                                           Type type) {
+Type
+ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
+                                      GenericEnvironment *env,
+                                      Type type) {
   auto canType = type->getCanonicalType();
   assert(!canType->hasTypeParameter() && "already have an interface type");
   if (!canType->hasArchetype())
     return type;
 
-  assert(genericParams && "dependent type in non-generic context");
+  assert(env && "dependent type in non-generic context");
 
-  // Capture the archetype -> interface type mapping.
-  TypeSubstitutionMap subs;
-  for (auto params = genericParams; params != nullptr;
-       params = params->getOuterParameters()) {
-    for (auto param : *params) {
-      subs[param->getArchetype()] = param->getDeclaredType();
-    }
-  }
-
-  type = type.subst(M, subs, SubstFlags::AllowLoweredTypes);
-
-  assert(!type->hasArchetype() && "not fully substituted");
-  return type;
+  return env->mapTypeOutOfContext(M, type);
 }
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
@@ -2213,6 +2130,10 @@ addNestedRequirements(
       auto nestedType =
         rep->getDependentType(builder, /*allowUnresolved*/ false);
 
+      // Skip unresolved nested types.
+      if (nestedType->is<ErrorType>())
+        continue;
+
       addRequirements(builder, nestedType, rep, knownPAs, requirements);
       addNestedRequirements(builder, rep, knownPAs, requirements);
     }
@@ -2301,5 +2222,27 @@ GenericSignature *ArchetypeBuilder::getGenericSignature(
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;
+}
+
+GenericEnvironment *ArchetypeBuilder::getGenericEnvironment(
+    ArrayRef<GenericTypeParamType *> genericParamTypes) {
+  TypeSubstitutionMap interfaceToArchetypeMap;
+
+  for (auto paramTy : genericParamTypes) {
+    auto known = Impl->PotentialArchetypes.find(
+                   GenericTypeParamKey::forType(paramTy));
+    assert(known != Impl->PotentialArchetypes.end());
+
+    auto archetypeTy = known->second->getType(*this).getAsArchetype();
+    auto concreteTy = known->second->getType(*this).getAsConcreteType();
+    if (archetypeTy)
+      interfaceToArchetypeMap[paramTy] = archetypeTy;
+    else if (concreteTy)
+      interfaceToArchetypeMap[paramTy] = concreteTy;
+    else
+      llvm_unreachable("broken generic parameter");
+  }
+
+  return GenericEnvironment::get(Context, interfaceToArchetypeMap);
 }
 

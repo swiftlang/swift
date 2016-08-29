@@ -46,6 +46,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -444,7 +445,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *Fn = M.createFunction(
-      Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
+      Orig->getLinkage(), ClonedName, SubstTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
@@ -866,7 +867,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
   auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
-  auto *genericParams = F->getContextGenericParams();
+  auto *genericParams = F->getGenericEnvironment();
 
   if (!ApplySubs.empty()) {
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);

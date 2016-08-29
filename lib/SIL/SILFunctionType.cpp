@@ -1682,9 +1682,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
   auto formalInterfaceType = makeConstantInterfaceType(constant);
-  GenericParamList *contextGenerics, *innerGenerics;
-  std::tie(contextGenerics, innerGenerics)
-    = getConstantContextGenericParams(constant);
+  auto *genericEnv = getConstantGenericEnvironment(constant);
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
@@ -1714,8 +1712,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
     formalInterfaceType,
     loweredInterfaceType,
     silFnType,
-    contextGenerics,
-    innerGenerics,
+    genericEnv
   };
   ConstantTypes[constant] = result;
   return result;
@@ -2091,8 +2088,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   SILConstantInfo overrideInfo;
   overrideInfo.LoweredInterfaceType = overrideLoweredInterfaceTy;
   overrideInfo.SILFnType = fnTy;
-  overrideInfo.ContextGenericParams = derivedInfo.ContextGenericParams;
-  overrideInfo.InnerGenericParams = derivedInfo.InnerGenericParams;
+  overrideInfo.GenericEnv = derivedInfo.GenericEnv;
   ConstantOverrideTypes[{derived, base}] = overrideInfo;
 
   return overrideInfo;

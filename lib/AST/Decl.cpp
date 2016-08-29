@@ -536,81 +536,6 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-void GenericParamList::
-getForwardingSubstitutionMap(TypeSubstitutionMap &result) const {
-  // Add forwarding substitutions from the outer context if we have
-  // a type nested inside a generic function.
-  for (auto *params = this;
-       params != nullptr;
-       params = params->getOuterParameters()) {
-    for (auto *param : params->getParams())
-      result[param->getDeclaredType()->getCanonicalType().getPointer()]
-          = param->getArchetype();
-  }
-}
-
-ArrayRef<Substitution>
-GenericParamList::getForwardingSubstitutions(GenericSignature *sig) const {
-  // This is stupid. We don't really need a module, because we
-  // should not be looking up concrete conformances when we
-  // substitute types here.
-  auto *mod = getParams()[0]->getDeclContext()->getParentModule();
-
-  TypeSubstitutionMap subs;
-  getForwardingSubstitutionMap(subs);
-
-  auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
-          -> ProtocolConformanceRef {
-    return ProtocolConformanceRef(protoType->getDecl());
-  };
-
-  SmallVector<Substitution, 4> result;
-  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
-  return sig->getASTContext().AllocateCopy(result);
-}
-
-/// \brief Add the nested archetypes of the given archetype to the set
-/// of all archetypes.
-void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
-                                      SmallPtrSetImpl<ArchetypeType*> &known,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  for (auto nested : archetype->getNestedTypes()) {
-    auto nestedArch = nested.second.getAsArchetype();
-    if (!nestedArch)
-      continue;
-    if (known.insert(nestedArch).second) {
-      assert(!nestedArch->isPrimary() && "Unexpected primary archetype");
-      all.push_back(nestedArch);
-      addNestedArchetypes(nestedArch, known, all);
-    }
-  }
-}
-
-ArrayRef<ArchetypeType*>
-GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  // This should be kept in sync with ArchetypeBuilder::getAllArchetypes().
-
-  assert(all.empty());
-  llvm::SmallPtrSet<ArchetypeType*, 8> known;
-
-  // Collect all the primary archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    if (known.insert(archetype).second)
-      all.push_back(archetype);
-  }
-
-  // Collect all the nested archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    addNestedArchetypes(archetype, known, all);
-  }
-
-  return all;
-}
-
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)
@@ -816,11 +741,6 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
     for (auto param : *GenericParams)
       param->setDeclContext(this);
   }
-}
-
-void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
 }
 
 DeclRange ExtensionDecl::getMembers() const {
@@ -2214,11 +2134,6 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
   if (params)
     for (auto Param : *params)
       Param->setDeclContext(this);
-}
-
-void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
 }
 
 

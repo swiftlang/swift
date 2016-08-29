@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
 
@@ -187,13 +188,13 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
-  if (auto *params = GenericFunc->getContextGenericParams()) {
+  if (auto *env = GenericFunc->getGenericEnvironment()) {
     auto sig = GenericFunc->getLoweredFunctionType()->getGenericSignature();
 
     ArchetypeConformanceMap conformanceMap;
-    params->getSubstitutionMap(M.getSwiftModule(), sig,
-                               ParamSubs, ContextSubs,
-                               conformanceMap);
+    env->getSubstitutionMap(M.getSwiftModule(), sig,
+                            ParamSubs, ContextSubs,
+                            conformanceMap);
   }
 
   Mangle::Mangler Mangler;

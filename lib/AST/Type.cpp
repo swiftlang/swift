@@ -2767,34 +2767,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-void GenericParamList::
-getSubstitutionMap(ModuleDecl *mod,
-                   GenericSignature *sig,
-                   ArrayRef<Substitution> subs,
-                   TypeSubstitutionMap &subsMap,
-                   ArchetypeConformanceMap &conformanceMap) const {
-
-  // Map from interface types to archetypes
-  TypeSubstitutionMap map;
-  getForwardingSubstitutionMap(map);
-
-  for (auto depTy : sig->getAllDependentTypes()) {
-
-    // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, map, SubstOptions());
-    auto *archetype = contextTy->castTo<ArchetypeType>();
-
-    auto sub = subs.front();
-    subs = subs.slice(1);
-
-    // Record the replacement type and its conformances.
-    subsMap[archetype] = sub.getReplacement();
-    conformanceMap[archetype] = sub.getConformances();
-  }
-  
-  assert(subs.empty() && "did not use all substitutions?!");
-}
-
 FunctionType *
 GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   auto params = getGenericParams();
@@ -3489,8 +3461,6 @@ case TypeKind::Id:
         anyChanges = true;
     }
     
-    auto sig = GenericSignature::get(genericParams, requirements);
-
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
@@ -3508,11 +3478,12 @@ case TypeKind::Id:
       return *this;
 
     // If no generic parameters remain, this is a non-generic function type.
-    if (genericParams.empty())
+    if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
+    }
 
     // Produce the new generic function type.
-    
+    auto sig = GenericSignature::get(genericParams, requirements);
     return GenericFunctionType::get(sig, inputTy, resultTy,
                                     function->getExtInfo());
   }

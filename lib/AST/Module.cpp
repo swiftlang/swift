@@ -19,6 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -587,16 +588,15 @@ TypeBase::gatherAllSubstitutions(Module *module,
   auto *parentDC = gpContext;
   while (parent) {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
-      auto genericParams = parentDC->getGenericParamsOfContext();
+      auto genericSig = parentDC->getGenericSignatureOfContext();
       unsigned index = 0;
 
       assert(boundGeneric->getGenericArgs().size() ==
-             genericParams->getParams().size());
+             genericSig->getInnermostGenericParams().size());
 
       for (Type arg : boundGeneric->getGenericArgs()) {
-        auto gp = genericParams->getParams()[index++];
-        substitutions[gp->getDeclaredType()->getCanonicalType()
-                        .getPointer()] = arg;
+        auto paramTy = genericSig->getInnermostGenericParams()[index++];
+        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
       }
 
       parent = CanType(boundGeneric->getParent());
@@ -615,8 +615,11 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
-  if (auto *outerParams = parentDC->getGenericParamsOfContext())
-    outerParams->getForwardingSubstitutionMap(substitutions);
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
+    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
+      auto result = substitutions.insert(pair);
+      assert(result.second);
+    }
 
   auto lookupConformanceFn =
       [&](Type replacement, ProtocolType *protoType)

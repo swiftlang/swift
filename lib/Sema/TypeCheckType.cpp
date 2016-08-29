@@ -292,19 +292,12 @@ Type TypeChecker::resolveTypeInContext(
     // extension MyProtocol where Self : YourProtocol { ... }
     if (parentDC->getAsProtocolExtensionContext()) {
       auto ED = cast<ExtensionDecl>(parentDC);
-      if (auto genericParams = ED->getGenericParams()) {
-        for (auto req : genericParams->getTrailingRequirements()) {
-          // We might be resolving 'req.getSubject()' itself.
-          // This whole case feels like a hack -- there should be a
-          // more principled way to represent extensions of protocol
-          // compositions.
-          if (req.getKind() == RequirementReprKind::TypeConstraint) {
-            if (!req.getSubject() ||
-                !req.getSubject()->is<ArchetypeType>() ||
-                !req.getSubject()->castTo<ArchetypeType>()->getSelfProtocol())
-              continue;
-
-            stack.push_back(req.getConstraint());
+      if (auto genericSig = ED->getGenericSignature()) {
+        for (auto req : genericSig->getRequirements()) {
+          if (req.getKind() == RequirementKind::Conformance ||
+              req.getKind() == RequirementKind::Superclass) {
+            if (req.getFirstType()->isEqual(ED->getSelfInterfaceType()))
+              stack.push_back(req.getSecondType());
           }
         }
       }
@@ -2131,11 +2124,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   }
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
-  if (auto genericParams = repr->getGenericParams()) {
+  if (auto genericEnv = repr->getGenericEnvironment()) {
     auto *genericSig = repr->getGenericSignature();
     assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
-    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, inputTy);
-    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, outputTy);
+    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, inputTy);
+    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, outputTy);
     return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
   }
 
@@ -2224,24 +2217,24 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILParameterInfo, 4> interfaceParams;
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
-  if (auto *genericParams = repr->getGenericParams()) {
+  if (auto *genericEnv = repr->getGenericEnvironment()) {
     genericSig = repr->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
       auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, param.getType())->getCanonicalType();
+          M, genericEnv, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &result : results) {
       auto transResultType =
         ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, result.getType())->getCanonicalType();
+          M, genericEnv, result.getType())->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
       auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, errorResult->getType())->getCanonicalType();
+          M, genericEnv, errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }

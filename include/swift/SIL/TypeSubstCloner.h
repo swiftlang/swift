@@ -90,9 +90,9 @@ protected:
 
   Substitution remapSubstitution(Substitution sub) {
     if (!ApplySubs.empty()) {
-      auto *params = Original.getContextGenericParams();
       auto sig = Original.getLoweredFunctionType()->getGenericSignature();
-      sub = sub.subst(SwiftMod, sig, params, ApplySubs);
+      auto *env = Original.getGenericEnvironment();
+      sub = sub.subst(SwiftMod, sig, env, ApplySubs);
     }
     // Remap opened archetypes into the cloned context.
     return Substitution(getASTTypeInClonedContext(sub.getReplacement()
@@ -209,9 +209,9 @@ protected:
     auto sub = Inst->getSelfSubstitution();
     if (!ApplySubs.empty()) {
       auto sig = Original.getLoweredFunctionType()->getGenericSignature();
-      auto *params = Original.getContextGenericParams();
+      auto *env = Original.getGenericEnvironment();
       sub = sub.subst(Inst->getModule().getSwiftModule(),
-                      sig, params, ApplySubs);
+                      sig, env, ApplySubs);
     }
 
     assert(sub.getConformances().size() == 1 &&

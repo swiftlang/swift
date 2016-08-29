@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
@@ -1957,7 +1958,44 @@ struct ASTNodeBase {};
         }
       }
     }
-    
+
+    void verifyGenericEnvironment(Decl *D,
+                                  GenericSignature *sig,
+                                  GenericEnvironment *env) {
+      if (!sig && !env)
+        return;
+
+      if (sig && env) {
+        auto &map = env->getInterfaceToArchetypeMap();
+        if (sig->getGenericParams().size() != map.size()) {
+          Out << "Mismatch between signature and environment parameter count\n";
+          abort();
+        }
+
+        for (auto *paramTy : sig->getGenericParams()) {
+          auto found = map.find(paramTy->getCanonicalType().getPointer());
+          if (found == map.end()) {
+            Out << "Generic parameter present in signature but not "
+                   "in environment\n";
+            paramTy->dump();
+            abort();
+          }
+        }
+
+        return;
+      }
+
+      Out << "Decl must have both signature and environment, or neither\n";
+      D->dump(Out);
+      abort();
+    }
+
+    void verifyChecked(GenericTypeDecl *generic) {
+      verifyGenericEnvironment(generic,
+                               generic->getGenericSignature(),
+                               generic->getGenericEnvironment());
+    }
+
     void verifyChecked(NominalTypeDecl *nominal) {
       // Make sure that the protocol list is fully expanded.
       verifyProtocolList(nominal, nominal->getLocalProtocols());
@@ -2084,195 +2122,6 @@ struct ASTNodeBase {};
       verifyParsedBase(DD);
     }
 
-    bool checkAllArchetypes(const GenericParamList *generics) {
-      ArrayRef<ArchetypeType*> storedArchetypes = generics->getAllArchetypes();
-
-      SmallVector<ArchetypeType*, 16> derivedBuffer;
-      ArrayRef<ArchetypeType*> derivedArchetypes =
-        GenericParamList::deriveAllArchetypes(generics->getParams(),
-                                              derivedBuffer);
-
-      return (storedArchetypes == derivedArchetypes);
-    }
-
-    /// Check that the generic requirements line up with the archetypes.
-    void checkGenericRequirements(Decl *decl,
-                                  DeclContext *dc,
-                                  GenericFunctionType *genericTy) {
-
-      PrettyStackTraceDecl debugStack("verifying generic requirements", decl);
-
-      // We need to have generic parameters here.
-      auto genericParams = dc->getGenericParamsOfContext();
-      if (!genericParams) {
-        Out << "Missing generic parameters\n";
-        decl->dump(Out);
-        abort();
-      }
-
-      // Verify that the list of all archetypes matches what we would
-      // derive from the generic params.
-      if (!checkAllArchetypes(genericParams)) {
-        Out << "Archetypes list in generic parameter list doesn't "
-               "match what would have been derived\n";
-        decl->dump(Out);
-        abort();
-      }
-
-      // Step through the list of requirements in the generic type.
-      auto requirements = genericTy->getRequirements();
-
-      // Skip over same-type requirements.
-      auto skipUnrepresentedRequirements = [&]() {
-        for (; !requirements.empty(); requirements = requirements.slice(1)) {
-          bool done = false;
-          switch (requirements.front().getKind()) {
-          case RequirementKind::Conformance:
-            // If the second type is a protocol type, we're done.
-            done = true;
-            break;
-
-          case RequirementKind::Superclass:
-            break;
-
-          case RequirementKind::SameType:
-            // Skip the next same-type constraint.
-            continue;
-
-          case RequirementKind::WitnessMarker:
-            done = true;
-            break;
-          }
-
-          if (done)
-            break;
-        }
-      };
-      skipUnrepresentedRequirements();
-
-      // Collect all of the generic parameter lists.
-      SmallVector<GenericParamList *, 4> allGenericParamLists;
-      for (auto gpList = genericParams; gpList;
-           gpList = gpList->getOuterParameters()) {
-        allGenericParamLists.push_back(gpList);
-      }
-      std::reverse(allGenericParamLists.begin(), allGenericParamLists.end());
-
-      // Helpers that diagnose failures when generic requirements mismatch.
-      bool failed = false;
-      auto noteFailure =[&]() {
-        if (failed)
-          return;
-
-        Out << "Generic requirements don't match all archetypes\n";
-        decl->dump(Out);
-
-        Out << "\nGeneric type: " << genericTy->getString() << "\n";
-        Out << "Expected requirements: ";
-        bool first = true;
-        for (auto gpList : allGenericParamLists) {
-          for (auto archetype : gpList->getAllArchetypes()) {
-            for (auto proto : archetype->getConformsTo()) {
-              if (first)
-                first = false;
-              else
-                Out << ", ";
-
-              Out << archetype->getString() << " : "
-                  << proto->getDeclaredType()->getString();
-            }
-          }
-        }
-        Out << "\n";
-
-        failed = true;
-      };
-
-      // Walk through all of the archetypes in the generic parameter lists,
-      // matching up their conformance requirements with those in the
-      for (auto gpList : allGenericParamLists) {
-        for (auto archetype : gpList->getAllArchetypes()) {
-          // Make sure we have the value witness marker.
-          if (requirements.empty()) {
-            noteFailure();
-            Out << "Ran out of requirements before we ran out of archetypes\n";
-            break;
-          }
-
-          if (requirements.front().getKind()
-                == RequirementKind::WitnessMarker) {
-            auto type = ArchetypeBuilder::mapTypeIntoContext(
-                          dc,
-                          requirements.front().getFirstType());
-            if (type->isEqual(archetype)) {
-              requirements = requirements.slice(1);
-              skipUnrepresentedRequirements();
-            } else {
-              noteFailure();
-              Out << "Value witness marker for " << type->getString()
-                  << " does not match expected " << archetype->getString()
-                  << "\n";
-            }
-          } else {
-            noteFailure();
-            Out << "Missing value witness marker for "
-                << archetype->getString() << "\n";
-          }
-
-          for (auto proto : archetype->getConformsTo()) {
-            // If there are no requirements left, we're missing requirements.
-            if (requirements.empty()) {
-              noteFailure();
-              Out << "No requirement for " << archetype->getString()
-                  << " : " << proto->getDeclaredType()->getString() << "\n";
-              continue;
-            }
-
-            auto firstReqType = ArchetypeBuilder::mapTypeIntoContext(
-                                  dc,
-                                  requirements.front().getFirstType());
-            auto secondReqType = ArchetypeBuilder::mapTypeIntoContext(
-                                  dc,
-                                  requirements.front().getSecondType());
-
-            // If the requirements match up, move on to the next requirement.
-            if (firstReqType->isEqual(archetype) &&
-                secondReqType->isEqual(proto->getDeclaredType())) {
-              requirements = requirements.slice(1);
-              skipUnrepresentedRequirements();
-              continue;
-            }
-
-            noteFailure();
-
-            // If the requirements don't match up, complain.
-            if (!firstReqType->isEqual(archetype)) {
-              Out << "Mapped archetype " << firstReqType->getString()
-                  << " does not match expected " << archetype->getString()
-                  << "\n";
-              continue;
-            }
-
-            Out << "Mapped conformance " << secondReqType->getString()
-                << " does not match expected "
-                << proto->getDeclaredType()->getString() << "\n";
-          }
-        }
-      }
-
-      if (!requirements.empty()) {
-        noteFailure();
-        Out << "Extra requirement "
-            << requirements.front().getFirstType()->getString()
-            << " : "
-            << requirements.front().getSecondType()->getString()
-            << "\n";
-      }
-
-      if (failed)
-        abort();
-    }
-
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
@@ -2326,6 +2175,10 @@ struct ASTNodeBase {};
         abort();
       }
 
+      verifyGenericEnvironment(AFD,
+                               AFD->getGenericSignature(),
+                               AFD->getGenericEnvironment());
+
       // If there is an interface type, it shouldn't have any unresolved
       // dependent member types.
       // FIXME: This is a general property of the type system.
@@ -2345,12 +2198,6 @@ struct ASTNodeBase {};
         Out << "Unresolved dependent member type ";
         unresolvedDependentTy->print(Out);
         abort();
-      }
-
-      // If the interface type is generic, make sure its requirements
-      // line up with the archetypes.
-      if (auto genericTy = interfaceTy->getAs<GenericFunctionType>()) {
-        checkGenericRequirements(AFD, AFD, genericTy);
       }
 
       // Throwing @objc methods must have a foreign error convention.
