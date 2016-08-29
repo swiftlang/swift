@@ -98,22 +98,20 @@ struct _ConditionalCasting : _BridgePolicy {
 }
 
 public protocol _CustomObjectiveCBridgeable : _ObjectiveCBridgeable {
+  /// An Objective-C type to which `Self` can be losslessly round-trip
+  /// converted.
+  associatedtype _ObjectiveCType : AnyObject
+
+  /// Convert `self` to Objective-C.
+  func _bridgeToObjectiveC() -> _ObjectiveCType
+  
   static func _bridged<Policy: _BridgePolicy>(
     from objc: _ObjectiveCType, by policy: Policy.Type) -> Self?
 
   static func _bridgedFromNil(_: _ObjectiveCType?) -> Self
 }
 
-extension _ObjectiveCBridgeable {
-  public static func _bridgedFromNil(_: _ObjectiveCType?) -> Self {
-    fatalError(
-      "Objective-C nil of type \(String(reflecting: _ObjectiveCType.self)) "
-      + "does not bridge to \(String(reflecting: Self.self))")
-  }
-}
-
-
-extension _ObjectiveCBridgeable where Self : _CustomObjectiveCBridgeable {
+extension _CustomObjectiveCBridgeable {
   /// Bridge from an Objective-C object of the bridged class type to a
   /// value of the Self type.
   ///
@@ -173,7 +171,7 @@ extension _ObjectiveCBridgeable where Self : _CustomObjectiveCBridgeable {
   /// measure against mis-annotation, this method accepts `source` as an
   /// `Optional`, so implementations can return an appropriate default value
   /// (e.g. an empty `Array`) when `source` is `nil`.
-  static func _unconditionallyBridgeFromObjectiveC(
+  public static func _unconditionallyBridgeFromObjectiveC(
     _ source: _ObjectiveCType?
   ) -> Self {
     if _slowPath(source == nil) {
@@ -187,6 +185,12 @@ extension _ObjectiveCBridgeable where Self : _CustomObjectiveCBridgeable {
       + "\(String(reflecting: _ObjectiveCType.self)) to Swift type "
       + "\(String(reflecting: Self.self)) failed with actual value "
       + "\(String(reflecting: source))")
+  }
+
+  public static func _bridgedFromNil(_: _ObjectiveCType?) -> Self {
+    fatalError(
+      "Objective-C nil of type \(String(reflecting: _ObjectiveCType.self)) "
+      + "does not bridge to \(String(reflecting: Self.self))")
   }
 }
 
