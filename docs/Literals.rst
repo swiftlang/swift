@@ -138,6 +138,6 @@ literal type is always Dictionary.
 
 String interpolations are a bit different: they try to individually convert
 each element of the interpolation to the type that adopts
-ExpressibleByStringInterpolation, then calls the variadic
+_ExpressibleByStringInterpolation, then calls the variadic
 ``convertFromStringInterpolation`` to put them all together. The default type
 for an interpolated literal without context is also ``StringLiteralType``.

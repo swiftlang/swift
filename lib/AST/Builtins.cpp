@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Builtins.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
@@ -182,7 +183,7 @@ getBuiltinGenericFunction(Identifier Id,
                           Type ResType,
                           Type ResBodyType,
                           GenericParamList *GenericParams,
-                          FunctionType::ExtInfo Info = FunctionType::ExtInfo()){
+                          TypeSubstitutionMap InterfaceToArchetypeMap) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -200,11 +201,13 @@ getBuiltinGenericFunction(Identifier Id,
     requirements.push_back(Requirement(RequirementKind::WitnessMarker,
                                        param, Type()));
   }
-  GenericSignature *Sig = GenericSignature::get(GenericParamTypes,requirements);
-  
-  Type InterfaceType = GenericFunctionType::get(Sig,
-                                                ArgParamType, ResType,
-                                                Info);
+  GenericSignature *Sig =
+      GenericSignature::get(GenericParamTypes, requirements);
+  GenericEnvironment *Env =
+      GenericEnvironment::get(Context, InterfaceToArchetypeMap);
+
+  Type InterfaceType = GenericFunctionType::get(Sig, ArgParamType, ResType,
+                                                AnyFunctionType::ExtInfo());
 
   Module *M = Context.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
@@ -223,7 +226,8 @@ getBuiltinGenericFunction(Identifier Id,
   
   // Compute the function type.
   Type FnType = PolymorphicFunctionType::get(paramList->getType(Context),
-                                             ResBodyType, GenericParams, Info);
+                                             ResBodyType, GenericParams,
+                                             AnyFunctionType::ExtInfo());
   
   DeclName Name(Context, Id, paramList);
   auto func = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(),
@@ -237,6 +241,7 @@ getBuiltinGenericFunction(Identifier Id,
     
   func->setInterfaceType(InterfaceType);
   func->setGenericSignature(Sig);
+  func->setGenericEnvironment(Env);
   func->setImplicit();
   func->setAccessibility(Accessibility::Public);
 
@@ -435,7 +440,7 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
   genericParam->setArchetype(archetype);
-  return { archetype, genericParam };
+  return std::make_pair(archetype, genericParam);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
@@ -444,7 +449,7 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
                        SmallVectorImpl<ArchetypeType*> &archetypes,
                        SmallVectorImpl<GenericTypeParamDecl*> &genericParams) {
   assert(numParameters <= llvm::array_lengthof(GenericParamNames));
-  assert(archetypes.empty() && genericParams.empty());
+  assert(genericParams.empty());
 
   for (unsigned i = 0; i != numParameters; ++i) {
     auto archetypeAndParam = createGenericParam(ctx, GenericParamNames[i], i);
@@ -454,7 +459,6 @@ static GenericParamList *getGenericParams(ASTContext &ctx,
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
-  paramList->setAllArchetypes(ctx.AllocateCopy(archetypes));
   return paramList;
 }
 
@@ -469,6 +473,8 @@ namespace {
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
     SmallVector<ArchetypeType*, 2> Archetypes;
 
+    TypeSubstitutionMap InterfaceToArchetypeMap;
+
     SmallVector<TupleTypeElt, 4> InterfaceParams;
     SmallVector<Type, 4> BodyParams;
 
@@ -480,6 +486,12 @@ namespace {
         : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              Archetypes, GenericTypeParams);
+
+      for (unsigned i = 0, e = GenericTypeParams.size(); i < e; i++) {
+        auto paramTy = GenericTypeParams[i]->getDeclaredType()
+            ->getCanonicalType().getPointer();
+        InterfaceToArchetypeMap[paramTy] = Archetypes[i];
+      }
     }
 
     template <class G>
@@ -497,7 +509,8 @@ namespace {
     ValueDecl *build(Identifier name) {
       return getBuiltinGenericFunction(name, InterfaceParams, BodyParams,
                                        InterfaceResult, BodyResult,
-                                       TheGenericParamList);
+                                       TheGenericParamList,
+                                       InterfaceToArchetypeMap);
     }
 
     // Don't use these generator classes directly; call the make{...}

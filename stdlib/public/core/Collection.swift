@@ -16,7 +16,8 @@
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public protocol IndexableBase {
+public typealias IndexableBase = _IndexableBase
+public protocol _IndexableBase {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
@@ -159,7 +160,8 @@ public protocol IndexableBase {
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public protocol Indexable : IndexableBase {
+public typealias Indexable = _Indexable
+public protocol _Indexable : _IndexableBase {
   /// A type used to represent the number of steps between two indices, where
   /// one value is reachable from the other.
   ///
@@ -354,7 +356,7 @@ public protocol Indexable : IndexableBase {
 ///     // Prints "15.0"
 ///     // Prints "20.0"
 public struct IndexingIterator<
-  Elements : IndexableBase
+  Elements : _IndexableBase
   // FIXME(compiler limitation):
   // Elements : Collection
 > : IteratorProtocol, Sequence {
@@ -530,7 +532,7 @@ public struct IndexingIterator<
 /// forward or bidirectional collection must traverse the entire collection to
 /// count the number of contained elements, accessing its `count` property is
 /// an O(*n*) operation.
-public protocol Collection : Indexable, Sequence {
+public protocol Collection : _Indexable, Sequence {
   /// A type that can represent the number of steps between a pair of
   /// indices.
   associatedtype IndexDistance : SignedInteger = Int
@@ -555,7 +557,7 @@ public protocol Collection : Indexable, Sequence {
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence : IndexableBase, Sequence = Slice<Self>
+  associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : Collection
   //   where
@@ -614,7 +616,7 @@ public protocol Collection : Indexable, Sequence {
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : IndexableBase, Sequence = DefaultIndices<Self>
+  associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
   // FIXME(compiler limitation):
   // associatedtype Indices : Collection
@@ -859,7 +861,7 @@ public protocol Collection : Indexable, Sequence {
 }
 
 /// Default implementation for forward collections.
-extension Indexable {
+extension _Indexable {
   /// Replaces the given index with its successor.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
@@ -1702,7 +1704,7 @@ extension Collection {
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")
-public struct IndexingGenerator<Elements : IndexableBase> {}
+public struct IndexingGenerator<Elements : _IndexableBase> {}
 
 @available(*, unavailable, renamed: "Collection")
 public typealias CollectionType = Collection

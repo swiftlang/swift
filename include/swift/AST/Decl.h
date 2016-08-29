@@ -35,6 +35,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
+  class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -1059,7 +1060,6 @@ class GenericParamList final :
   unsigned NumParams;
   SourceLoc WhereLoc;
   MutableArrayRef<RequirementRepr> Requirements;
-  ArrayRef<ArchetypeType *> AllArchetypes;
 
   GenericParamList *OuterParameters;
 
@@ -1109,28 +1109,6 @@ public:
                                   MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
-  /// Create a new generic parameter list with the same parameters and
-  /// requirements as this one, but parented to a different outer parameter
-  /// list.
-  GenericParamList *cloneWithOuterParameters(const ASTContext &Context,
-                                             GenericParamList *Outer) {
-    auto clone = create(Context,
-                        SourceLoc(),
-                        getParams(),
-                        SourceLoc(),
-                        getRequirements(),
-                        SourceLoc());
-    clone->setAllArchetypes(getAllArchetypes());
-    clone->setOuterParameters(Outer);
-    return clone;
-  }
-  
-  /// Create an empty generic parameter list.
-  static GenericParamList *getEmpty(ASTContext &Context) {
-    // TODO: Could probably unique this in the AST context.
-    return create(Context, SourceLoc(), {}, SourceLoc(), {}, SourceLoc());
-  }
-  
   MutableArrayRef<GenericTypeParamDecl *> getParams() {
     return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
   }
@@ -1148,12 +1126,6 @@ public:
   const_iterator begin() const { return getParams().begin(); }
   const_iterator end() const { return getParams().end(); }
 
-  /// Get the total number of parameters, including those from parent generic
-  /// parameter lists.
-  unsigned totalSize() const {
-    return NumParams + (OuterParameters ? OuterParameters->totalSize() : 0);
-  }
-  
   /// \brief Retrieve the location of the 'where' keyword, or an invalid
   /// location if 'where' was not present.
   SourceLoc getWhereLoc() const { return WhereLoc; }
@@ -1199,24 +1171,7 @@ public:
   /// main part of a declaration's signature.
   void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
-
-  /// \brief Retrieves the list containing all archetypes described by this
-  /// generic parameter clause.
-  ///
-  /// In this list of archetypes, the primary archetypes come first followed by
-  /// any non-primary archetypes (i.e., those archetypes that encode associated
-  /// types of another archetype).
-  ///
-  /// This does not include archetypes from the outer generic parameter list(s).
-  ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
   
-  /// \brief Sets all archetypes *without* copying the source array.
-  void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
-    assert(AA.size() >= size()
-           && "allArchetypes is smaller than number of generic params?!");
-    AllArchetypes = AA;
-  }
-
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
   /// exists.
@@ -1270,36 +1225,6 @@ public:
     return depth;
   }
 
-  /// Derive a contextual type substitution map from a substitution array.
-  /// This is just like GenericSignature::getSubstitutionMap(), except
-  /// with contextual types instead of interface types.
-  void
-  getSubstitutionMap(ModuleDecl *mod,
-                     GenericSignature *sig,
-                     ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subsMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
-
-  /// Derive the all-archetypes list for the given list of generic
-  /// parameters.
-  static ArrayRef<ArchetypeType*>
-  deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
-                      SmallVectorImpl<ArchetypeType*> &archetypes);
-
-  void getForwardingSubstitutionMap(TypeSubstitutionMap &result) const;
-
-  ArrayRef<Substitution>
-  getForwardingSubstitutions(GenericSignature *sig) const;
-
-  /// Collect the nested archetypes of an archetype into the given
-  /// collection.
-  ///
-  /// \param known - the set of archetypes already present in `all`
-  /// \param all - the output list of archetypes
-  static void addNestedArchetypes(ArchetypeType *archetype,
-                                  SmallPtrSetImpl<ArchetypeType*> &known,
-                                  SmallVectorImpl<ArchetypeType*> &all);
-  
   void print(raw_ostream &OS);
   void dump();
 };
@@ -1472,6 +1397,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this extension.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this extension.
+  GenericEnvironment *GenericEnv = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// The trailing where clause.
@@ -1555,7 +1486,19 @@ public:
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
+
+  /// Retrieve the generic context for this extension.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this extension.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!GenericEnv && "Already have generic context");
+    GenericEnv = env;
+  }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -2306,6 +2249,12 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this type.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this type.
+  GenericEnvironment *GenericEnv = nullptr;
+
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
@@ -2324,7 +2273,10 @@ public:
   void setGenericParams(GenericParamList *params);
 
   /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
 
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
@@ -2353,6 +2305,15 @@ public:
   
   bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
+  }
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this type.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = env;
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -4573,6 +4534,7 @@ protected:
 
   GenericParamList *GenericParams;
   GenericSignature *GenericSig;
+  GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
 
@@ -4589,7 +4551,7 @@ protected:
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4614,6 +4576,15 @@ public:
   
   GenericSignature *getGenericSignature() const {
     return GenericSig;
+  }
+
+  /// Retrieve the generic context for this function.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this function.
+  void setGenericEnvironment(GenericEnvironment *GenericEnv) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = GenericEnv;
   }
 
   // Expose our import as member status

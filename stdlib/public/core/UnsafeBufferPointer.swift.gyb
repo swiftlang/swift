@@ -37,7 +37,7 @@ public struct UnsafeBufferPointerIterator<Element>
 ///
 /// The pointer should be aligned to `MemoryLayout<Element>.alignment`.
 public struct Unsafe${Mutable}BufferPointer<Element>
-  : ${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
+  : _${Mutable}Indexable, ${Mutable}Collection, RandomAccessCollection {
 
   public typealias Index = Int
   public typealias IndexDistance = Int

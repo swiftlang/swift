@@ -30,7 +30,7 @@ from gyb_stdlib_support import (
 
 /// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
-  Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
+  Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)(compiler limitation):
   // Elements : Collection
   // rdar://problem/20531108

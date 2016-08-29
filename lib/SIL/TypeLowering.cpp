@@ -1658,7 +1658,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
     sig = genTy->getGenericSignature()->getCanonicalSignature();
     resultTy = ArchetypeBuilder::mapTypeOutOfContext(
         TC.M.getSwiftModule(),
-        funcInfo.ContextGenericParams,
+        funcInfo.GenericEnv,
         resultTy)->getCanonicalType();
   }
   
@@ -1748,16 +1748,16 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   return CanFunctionType::get(classType, resultType, extInfo);
 }
 
-GenericParamList *
-TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
-                                         CaptureInfo captureInfo) {
+GenericEnvironment *
+TypeConverter::getEffectiveGenericEnvironment(AnyFunctionRef fn,
+                                              CaptureInfo captureInfo) {
   auto dc = fn.getAsDeclContext();
 
   if (dc->getParent()->isLocalContext() &&
       !captureInfo.hasGenericParamCaptures())
     return nullptr;
 
-  return dc->getGenericParamsOfContext();
+  return dc->getGenericEnvironmentOfContext();
 }
 
 CanGenericSignature
@@ -1904,9 +1904,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   }
 }
 
-/// Get the context generic parameters for an entity.
-std::pair<GenericParamList *, GenericParamList *>
-TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
+/// Get the generic environment for an entity.
+GenericEnvironment *
+TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
   
   /// Get the function generic params, including outer params.
@@ -1915,48 +1915,37 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
     if (auto *ACE = c.getAbstractClosureExpr()) {
       auto captureInfo = getLoweredLocalCaptures(ACE);
 
-      // Closures are currently never natively generic.
-      return {getEffectiveGenericParams(ACE, captureInfo), nullptr};
+      return getEffectiveGenericEnvironment(ACE, captureInfo);
     }
     FuncDecl *func = cast<FuncDecl>(vd);
     auto captureInfo = getLoweredLocalCaptures(func);
 
-    return {getEffectiveGenericParams(func, captureInfo),
-            func->getGenericParams()};
+    return getEffectiveGenericEnvironment(func, captureInfo);
   }
   case SILDeclRef::Kind::EnumElement: {
     auto eltDecl = cast<EnumElementDecl>(vd);
-    return {
-      eltDecl->getDeclContext()->getGenericParamsOfContext(),
-      nullptr
-    };
+    return eltDecl->getDeclContext()->getGenericEnvironmentOfContext();
   }
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator: {
     auto *afd = cast<AbstractFunctionDecl>(vd);
-    return {afd->getGenericParamsOfContext(), afd->getGenericParams()};
+    return afd->getGenericEnvironmentOfContext();
   }
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::GlobalGetter: {
-    return {
-      cast<VarDecl>(vd)->getDeclContext()->getGenericParamsOfContext(),
-      nullptr,
-    };
+    return vd->getDeclContext()->getGenericEnvironmentOfContext();
   }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    return {cast<ClassDecl>(vd)->getGenericParamsOfContext(), nullptr};
+    return cast<ClassDecl>(vd)->getGenericEnvironmentOfContext();
   case SILDeclRef::Kind::DefaultArgGenerator:
-    // Use the context generic parameters of the original declaration.
-    return getConstantContextGenericParams(SILDeclRef(c.getDecl()));
+    // Use the generic environment of the original function.
+    return getConstantGenericEnvironment(SILDeclRef(c.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    // Use the context generic parameters of the containing type.
-    return {
-      c.getDecl()->getDeclContext()->getGenericParamsOfContext(),
-      nullptr,
-    };
+    // Use the generic environment of the containing type.
+    return c.getDecl()->getDeclContext()->getGenericEnvironmentOfContext();
   }
 }
 

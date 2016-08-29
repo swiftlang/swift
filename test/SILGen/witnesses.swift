@@ -426,14 +426,14 @@ protocol GenericParameterNameCollisionProtocol {
 struct GenericParameterNameCollision<T: HasAssoc> :
     GenericParameterNameCollisionProtocol {
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
-  // CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
-  // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@in T1, @in_guaranteed GenericParameterNameCollision<T>) -> () {
+  // CHECK:       bb0(%0 : $*T1, %1 : $*GenericParameterNameCollision<T>):
+  // CHECK:         apply {{%.*}}<T, T.Assoc, T1>
   func foo<U>(_ x: U) {}
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@in T) -> @out T1.Assoc, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
-  // CHECK:       bb0(%0 : $@callee_owned (@in T) -> @out T1.Assoc, %1 : $*GenericParameterNameCollision<T1>):
-  // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@owned @callee_owned (@in T1) -> @out T.Assoc, @in_guaranteed GenericParameterNameCollision<T>) -> () {
+  // CHECK:       bb0(%0 : $@callee_owned (@in T1) -> @out T.Assoc, %1 : $*GenericParameterNameCollision<T>):
+  // CHECK:         apply {{%.*}}<T, T.Assoc, T1>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 

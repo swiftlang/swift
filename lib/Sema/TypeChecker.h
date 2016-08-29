@@ -731,8 +731,9 @@ public:
   void checkUnsupportedProtocolType(Stmt *stmt);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericSignature *handleSILGenericParams(GenericParamList *genericParams,
-                                           DeclContext *DC);
+  std::pair<GenericSignature *, GenericEnvironment *>
+  handleSILGenericParams(GenericParamList *genericParams,
+                         DeclContext *DC);
 
   /// \brief Resolves a TypeRepr to a type.
   ///
@@ -996,7 +997,7 @@ public:
   bool isProtocolExtensionUsable(DeclContext *dc, Type type,
                                  ExtensionDecl *protocolExtension) override;
 
-  void markInvalidGenericSignature(ValueDecl *VD);
+  GenericEnvironment *markInvalidGenericSignature(DeclContext *dc);
 
   /// Configure the interface type of a function declaration.
   void configureInterfaceType(AbstractFunctionDecl *func);
@@ -1044,9 +1045,10 @@ public:
 
   /// Finalize the given generic parameter list, assigning archetypes to
   /// the generic parameters.
-  void finalizeGenericParamList(ArchetypeBuilder &builder,
-                                GenericParamList *genericParams,
-                                DeclContext *dc);
+  GenericEnvironment *finalizeGenericParamList(ArchetypeBuilder &builder,
+                                               GenericParamList *genericParams,
+                                               GenericSignature *genericSig,
+                                               DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///

@@ -799,6 +799,9 @@ protocol _AnyCollectionProtocol : Collection {
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
 
+//  public typealias Indices
+//    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+  
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
   }

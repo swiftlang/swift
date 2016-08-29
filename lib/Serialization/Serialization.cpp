@@ -16,6 +16,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/RawComment.h"
@@ -527,6 +528,8 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::LAST_GENERIC_REQUIREMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::GENERIC_ENVIRONMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -931,7 +934,7 @@ static uint8_t getRawStableRequirementKind(RequirementKind kind) {
 #undef CASE
 }
 
-void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
+void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements) {
   using namespace decls_block;
 
   if (requirements.empty())
@@ -948,29 +951,23 @@ void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
   }
 }
 
-bool Serializer::writeGenericParams(const GenericParamList *genericParams,
-                                  const std::array<unsigned, 256> &abbrCodes) {
+bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   using namespace decls_block;
 
   // Don't write anything if there are no generic params.
   if (!genericParams)
     return true;
 
-  SmallVector<TypeID, 8> archetypeIDs;
-  for (auto archetype : genericParams->getAllArchetypes())
-    archetypeIDs.push_back(addTypeRef(archetype));
+  unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
+  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode);
 
-  unsigned abbrCode = abbrCodes[GenericParamListLayout::Code];
-  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     archetypeIDs);
-
-  abbrCode = abbrCodes[GenericParamLayout::Code];
+  abbrCode = DeclTypeAbbrCodes[GenericParamLayout::Code];
   for (auto next : genericParams->getParams()) {
     GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addDeclRef(next));
   }
 
-  abbrCode = abbrCodes[GenericRequirementLayout::Code];
+  abbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
   SmallString<64> ReqStr;
   for (auto next : genericParams->getRequirements()) {
     ReqStr.clear();
@@ -996,10 +993,35 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
     }
   }
 
-  abbrCode = abbrCodes[LastGenericRequirementLayout::Code];
+  abbrCode = DeclTypeAbbrCodes[LastGenericRequirementLayout::Code];
   uint8_t dummy = 0;
   LastGenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode, dummy);
   return true;
+}
+
+void Serializer::writeGenericEnvironment(GenericSignature *sig,
+                                         GenericEnvironment *env,
+                                  const std::array<unsigned, 256> &abbrCodes) {
+  using namespace decls_block;
+
+  if (env == nullptr)
+    return;
+
+  auto &map = env->getInterfaceToArchetypeMap();
+
+  auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
+
+  // Iterate over the signature's generic parameters, for stable
+  // iteration order.
+  for (auto *paramTy : sig->getGenericParams()) {
+    auto found = map.find(paramTy->getCanonicalType().getPointer());
+    assert(found != map.end() && "missing generic parameter");
+    auto contextTy = found->second;
+    GenericEnvironmentLayout::emitRecord(
+      Out, ScratchRecord, envAbbrCode,
+      addTypeRef(paramTy),
+      addTypeRef(contextTy));
+  }
 }
 
 void Serializer::writeNormalConformance(
@@ -1363,7 +1385,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
         genericParams);
 
     if (genericSig) {
-      writeRequirements(genericSig->getRequirements());
+      writeGenericRequirements(genericSig->getRequirements());
     }
     break;
   }
@@ -2063,8 +2085,11 @@ void Serializer::writeDecl(const Decl *D) {
                          isa<ProtocolDecl>(baseNominal);
     }
 
-    writeGenericParams(extension->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(extension->getGenericRequirements());
+    writeGenericParams(extension->getGenericParams());
+    writeGenericEnvironment(extension->getGenericSignature(),
+                            extension->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
     writeConformances(conformances, DeclTypeAbbrCodes);
 
@@ -2184,8 +2209,11 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(typeAlias->getInterfaceType()),
                                 typeAlias->isImplicit(),
                                 rawAccessLevel);
-    writeGenericParams(typeAlias->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(typeAlias->getGenericRequirements());
+    writeGenericParams(typeAlias->getGenericParams());
+    writeGenericEnvironment(typeAlias->getGenericSignature(),
+                            typeAlias->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(typeAlias->getGenericRequirements());
     break;
   }
 
@@ -2260,8 +2288,11 @@ void Serializer::writeDecl(const Decl *D) {
                              inheritedTypes);
 
 
-    writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(theStruct->getGenericRequirements());
+    writeGenericParams(theStruct->getGenericParams());
+    writeGenericEnvironment(theStruct->getGenericSignature(),
+                            theStruct->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(theStruct->getGenericRequirements());
     writeMembers(theStruct->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2294,8 +2325,11 @@ void Serializer::writeDecl(const Decl *D) {
                             conformances.size(),
                             inheritedTypes);
 
-    writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(theEnum->getGenericRequirements());
+    writeGenericParams(theEnum->getGenericParams());
+    writeGenericEnvironment(theEnum->getGenericSignature(),
+                            theEnum->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(theEnum->getGenericRequirements());
     writeMembers(theEnum->getMembers(), false);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2331,8 +2365,11 @@ void Serializer::writeDecl(const Decl *D) {
                             conformances.size(),
                             inheritedTypes);
 
-    writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(theClass->getGenericRequirements());
+    writeGenericParams(theClass->getGenericParams());
+    writeGenericEnvironment(theClass->getGenericSignature(),
+                            theClass->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(theClass->getGenericRequirements());
     writeMembers(theClass->getMembers(), true);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;
@@ -2367,8 +2404,11 @@ void Serializer::writeDecl(const Decl *D) {
                                numProtocols,
                                protocolsAndInherited);
 
-    writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
-    writeRequirements(proto->getGenericRequirements());
+    writeGenericParams(proto->getGenericParams());
+    writeGenericEnvironment(proto->getGenericSignature(),
+                            proto->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+    writeGenericRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
     writeDefaultWitnessTable(proto, DeclTypeAbbrCodes);
     break;
@@ -2468,7 +2508,10 @@ void Serializer::writeDecl(const Decl *D) {
                            rawAccessLevel,
                            nameComponents);
 
-    writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
+    writeGenericParams(fn->getGenericParams());
+    writeGenericEnvironment(fn->getGenericSignature(),
+                            fn->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
 
     // Write the body parameters.
     for (auto pattern : fn->getParameterLists())
@@ -2585,7 +2628,11 @@ void Serializer::writeDecl(const Decl *D) {
                                   rawAccessLevel,
                                   nameComponents);
 
-    writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
+    writeGenericParams(ctor->getGenericParams());
+    writeGenericEnvironment(ctor->getGenericSignature(),
+                            ctor->getGenericEnvironment(),
+                            DeclTypeAbbrCodes);
+
     assert(ctor->getParameterLists().size() == 2);
     // Why is this writing out the param list for self?
     for (auto paramList : ctor->getParameterLists())
@@ -2961,7 +3008,7 @@ void Serializer::writeType(Type ty) {
             getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
             fnTy->throws());
     if (!genericContext)
-      writeGenericParams(&fnTy->getGenericParams(), DeclTypeAbbrCodes);
+      writeGenericParams(&fnTy->getGenericParams());
     break;
   }
 
@@ -2979,7 +3026,7 @@ void Serializer::writeType(Type ty) {
             genericParams);
 
     // Write requirements.
-    writeRequirements(fnTy->getRequirements());
+    writeGenericRequirements(fnTy->getRequirements());
     break;
   }
       
@@ -3045,9 +3092,7 @@ void Serializer::writeType(Type ty) {
           fnTy->getNumAllResults(),
           variableData);
     if (sig)
-      writeRequirements(sig->getRequirements());
-    else
-      writeRequirements({});
+      writeGenericRequirements(sig->getRequirements());
     break;
   }
       
@@ -3243,6 +3288,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<LastGenericRequirementLayout>();
+  registerDeclTypeAbbr<GenericEnvironmentLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<DeclContextLayout>();

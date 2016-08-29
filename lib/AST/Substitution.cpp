@@ -17,6 +17,7 @@
 #include "swift/AST/Substitution.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
@@ -42,13 +43,13 @@ Substitution::Substitution(Type Replacement,
 
 Substitution Substitution::subst(Module *module,
                                  GenericSignature *sig,
-                                 GenericParamList *context,
+                                 GenericEnvironment *env,
                                  ArrayRef<Substitution> subs) const {
   TypeSubstitutionMap subMap;
   ArchetypeConformanceMap conformanceMap;
 
-  assert(sig && context);
-  context->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
+  assert(sig && env);
+  env->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
   return subst(module, subs, subMap, conformanceMap);
 }
 

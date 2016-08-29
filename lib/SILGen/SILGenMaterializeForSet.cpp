@@ -98,7 +98,7 @@ struct MaterializeForSetEmitter {
   ArrayRef<Substitution> WitnessSubs;
 
   CanGenericSignature GenericSig;
-  GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv;
 
   // Assume that we don't need to reabstract 'self'.  Right now,
   // that's always true; if we ever reabstract Optional (or other
@@ -128,7 +128,7 @@ private:
       WitnessStorage(witness->getAccessorStorageDecl()),
       WitnessStoragePattern(AbstractionPattern::getInvalid()),
       WitnessSubs(subs),
-      GenericParams(nullptr),
+      GenericEnv(nullptr),
       SelfInterfaceType(selfInterfaceType->getCanonicalType()),
       SubstSelfType(selfType->getCanonicalType()),
       TheAccessSemantics(AccessSemantics::Ordinary),
@@ -178,11 +178,11 @@ public:
     if (conformance) {
       if (auto signature = conformance->getGenericSignature())
         emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericParams = conformance->getGenericParams();
+      emitter.GenericEnv = conformance->getGenericEnvironment();
     } else {
       auto signature = requirement->getGenericSignatureOfContext();
       emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericParams = requirement->getGenericParamsOfContext();
+      emitter.GenericEnv = requirement->getGenericEnvironmentOfContext();
     }
 
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
@@ -218,7 +218,7 @@ public:
 
     if (auto signature = witness->getGenericSignatureOfContext())
       emitter.GenericSig = signature->getCanonicalSignature();
-    emitter.GenericParams = constantInfo.ContextGenericParams;
+    emitter.GenericEnv = constantInfo.GenericEnv;
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -552,7 +552,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
                                 F.isTransparent(),
                                 F.isFragile());
 
-  callback->setContextGenericParams(GenericParams);
+  callback->setGenericEnvironment(GenericEnv);
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);

@@ -366,16 +366,9 @@ struct SILConstantInfo {
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
   
-  /// The context generic parameters used by the constant.
-  /// This will be the innermost generic parameter list that applies to the
-  /// constant, which may be the generic parameter list of an enclosing context.
-  GenericParamList *ContextGenericParams;
+  /// The generic environment used by the constant.
+  GenericEnvironment *GenericEnv;
   
-  /// The generic parameter list of the function.
-  /// If the function does not have any generic parameters of its own, this
-  /// will be null.
-  GenericParamList *InnerGenericParams;
-
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
@@ -384,8 +377,7 @@ struct SILConstantInfo {
     return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType &&
-           lhs.ContextGenericParams == rhs.ContextGenericParams &&
-           lhs.InnerGenericParams == rhs.InnerGenericParams;
+           lhs.GenericEnv == rhs.GenericEnv;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -521,11 +513,8 @@ class TypeConverter {
   
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the context parameters for a constant. Returns a pair of the innermost
-  /// generic parameter list and the generic param list that directly applies
-  /// to the constant, if any.
-  std::pair<GenericParamList *, GenericParamList*>
-  getConstantContextGenericParams(SILDeclRef constant);
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
@@ -746,8 +735,8 @@ public:
                                     Type lvalueType);
 
   /// Retrieve the set of archetypes closed over by the given function.
-  GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,
-                                              CaptureInfo captureInfo);
+  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
+                                                     CaptureInfo captureInfo);
 
   /// Retrieve the set of generic parameters closed over by the given function.
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,

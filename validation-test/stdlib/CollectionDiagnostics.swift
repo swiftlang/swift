@@ -8,7 +8,7 @@ import StdlibCollectionUnittest
 //
 
 // expected-error@+3 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
-// expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'IndexableBase'}}
+// expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol '_IndexableBase'}}
 // expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Sequence'}}
 struct CollectionWithBadSubSequence : Collection {
   var startIndex: MinimalIndex {
@@ -23,7 +23,7 @@ struct CollectionWithBadSubSequence : Collection {
     fatalError("unreachable")
   }
 
-  // expected-note@+3 {{possibly intended match 'CollectionWithBadSubSequence.SubSequence' (aka 'OpaqueValue<Int8>') does not conform to 'IndexableBase'}}
+  // expected-note@+3 {{possibly intended match 'CollectionWithBadSubSequence.SubSequence' (aka 'OpaqueValue<Int8>') does not conform to 'Sequence'}}
   // expected-note@+2 {{possibly intended match}}
   // expected-note@+1 {{possibly intended match}}
   typealias SubSequence = OpaqueValue<Int8>
@@ -66,7 +66,7 @@ struct GoodIndexable : Indexable {
 
 
 // expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol 'IndexableBase'}}
+// expected-error@+1 {{type 'BadIndexable1' does not conform to protocol '_IndexableBase'}}
 struct BadIndexable1 : Indexable {
   func index(after i: Int) -> Int { return i + 1 }
   var startIndex: Int { return 0 }
@@ -78,7 +78,7 @@ struct BadIndexable1 : Indexable {
 }
 
 // expected-warning@+2 {{'Indexable' is deprecated: it will be removed in Swift 4.0.  Please use 'Collection' instead}}
-// expected-error@+1 {{type 'BadIndexable2' does not conform to protocol 'IndexableBase'}}
+// expected-error@+1 {{type 'BadIndexable2' does not conform to protocol '_IndexableBase'}}
 struct BadIndexable2 : Indexable {
   var startIndex: Int { return 0 }
   var endIndex: Int { return 0 }
@@ -112,6 +112,6 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
   // This is a poor error message; it would be better to get a message
   // that index(before:) was missing.
   //
-  // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol 'BidirectionalIndexable' ('index(before:)'}}
+  // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol '_BidirectionalIndexable' ('index(before:)'}}
   func index(after i: Int) -> Int { return 0 }
 }

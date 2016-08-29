@@ -250,10 +250,18 @@ public:
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
-  /// \returns a generic signature build based on the provided list of
+  /// \returns a generic signature built from the provided list of
   ///          generic parameter types.
   GenericSignature *
   getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+
+  /// \brief Get a generic context based on the complete list of generic
+  /// parameter types.
+  ///
+  /// \returns a generic context built from the provided list of
+  ///          generic parameter types.
+  GenericEnvironment *getGenericEnvironment(
+      ArrayRef<GenericTypeParamType *> genericParamsTypes);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -315,27 +323,20 @@ public:
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
-  /// \brief Retrieve the array of all of the archetypes produced during
-  /// archetype assignment. The 'primary' archetypes will occur first in this
-  /// list.
-  ArrayRef<ArchetypeType *> getAllArchetypes();
-  
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(const DeclContext *dc, Type type,
-                                 LazyResolver *resolver = nullptr);
+  static Type mapTypeIntoContext(const DeclContext *dc, Type type);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericParamList *genericParams,
-                                 Type type,
-                                 LazyResolver *resolver = nullptr);
+                                 GenericEnvironment *genericEnv,
+                                 Type type);
 
   /// Map a contextual type to an interface type.
   static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
 
   /// Map a contextual type to an interface type.
   static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericParamList *genericParams,
+                                  GenericEnvironment *genericEnv,
                                   Type type);
 
   using SameTypeRequirement
