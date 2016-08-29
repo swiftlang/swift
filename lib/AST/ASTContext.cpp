@@ -3709,6 +3709,11 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         bool isKnownCanonical) {
   assert(!params.empty());
 
+#ifndef NDEBUG
+  for (auto req : requirements)
+    assert(req.getFirstType()->isTypeParameter());
+#endif
+
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
   GenericSignature::Profile(ID, params, requirements);
