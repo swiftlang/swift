@@ -910,10 +910,26 @@ public:
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
-  
-  
+
   void visitPartialApplyInst(PartialApplyInst *CI) {
     *this << "partial_apply ";
+    switch (CI->getFunctionType()->getCalleeConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // Default; do nothing.
+      break;
+    case ParameterConvention::Direct_Guaranteed:
+      *this << "[callee_guaranteed] ";
+      break;
+    
+    // Should not apply to callees.
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("unexpected callee convention!");
+    }
     *this << getID(CI->getCallee());
     printSubstitutions(CI->getSubstitutions());
     *this << '(';
