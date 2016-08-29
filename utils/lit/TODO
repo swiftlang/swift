@@ -1,0 +1,174 @@
+================
+ lit TODO Items
+================
+
+Infrastructure
+==============
+
+1. Change to always load suites, then resolve command line arguments?
+
+  Currently we expect each input argument to be a path on disk; we do a
+  recursive search to find the test suite for each item, but then we only do a
+  local search based at the input path to find tests. Additionally, for any path
+  that matches a file on disk we explicitly construct a test instance (bypassing
+  the formats on discovery implementation).
+
+  This has a couple problems:
+
+  * The test format doesn't have control over the test instances that result
+    from file paths.
+
+  * It isn't possible to specify virtual tests as inputs. For example, it is not
+    possible to specify an individual subtest to run with the googletest format.
+
+  * The test format doesn't have full control over the discovery of tests in
+    subdirectories.
+
+  Instead, we should move to a model whereby first all of the input specifiers
+  are resolved to test suites, and then the resolution of the input specifier is
+  delegated to each test suite. This could take a couple forms:
+
+  * We could resolve to test suites, then fully load each test suite, then have
+    a fixed process to map input specifiers to tests in the test suite
+    (presumably based on path-in-suite derivations). This has the benefit of
+    being consistent across all test formats, but the downside of requiring
+    loading the entire test suite.
+
+  * We could delegate all of the resolution of specifiers to the test
+    suite. This would allow formats that anticipate large test suites to manage
+    their own resolution for better performance. We could provide a default
+    resolution strategy that was similar to what we do now (start at subpaths
+    for directories, but allow the test format control over what happens for
+    individual tests).
+
+2. Consider move to identifying all tests by path-to-test-suite and then path to
+   subtest, and don't use test suite names.
+
+  Currently the test suite name is presented as part of test names, but it has
+  no other useful function, and it is something that has to be skipped over to
+  cut-and-paste a name to subsequently use to rerun a test. If we just
+  represented each test suite by the path to its suite, then it would allow more
+  easy cut-and-paste of the test output lines. This has the downside that the
+  lines might get rather long.
+
+3. Allow 'lit' driver to cooperate with test formats and suites to add options
+   (or at least sanitize accepted params).
+
+  We have started to use the --params method more and more extensively, and it is
+  cumbersome and error prone. Additionally, there are currently various options
+  ``lit`` honors that should more correctly be specified as belonging to the
+  ShTest test format.
+  
+  It would be really nice if we could allow test formats and test suites to add
+  their own options to be parsed. The difficulty here, of course, is that we
+  don't know what test formats or test suites are in use until we have parsed the
+  input specifiers. For test formats we could ostensibly require all the possible
+  formats to be registered in order to have options, but for test suites we would
+  certainly have to load the suite before we can query it for what options it
+  understands.
+
+  That leaves us with the following options:
+
+  * Currently we could almost get away with parsing the input specifiers without
+    having done option parsing first (the exception is ``--config-prefix``) but
+    that isn't a very extensible design.
+
+  * We could make a distinction in the command line syntax for test format and
+    test suite options. For example, we could require something like::
+
+      lit -j 1 -sv input-specifier -- --some-format-option
+
+    which would be relatively easy to implement with optparser (I think).
+
+  * We could allow fully interspersed arguments by first extracting the options
+    lit knows about and parsing them, then dispatching the remainder to the
+    formats. This seems the most convenient for users, who are unlikely to care
+    about (or even be aware of) the distinction between the generic lit
+    infrastructure and format or suite specific options.
+
+4. Eliminate duplicate execution models for ShTest tests.
+
+  Currently, the ShTest format uses tests written with shell-script like syntax,
+  and executes them in one of two ways. The first way is by converting them into
+  a bash script and literally executing externally them using bash. The second
+  way is through the use of an internal shell parser and shell execution code
+  (built on the subprocess module). The external execution mode is used on most
+  Unix systems that have bash, the internal execution mode is used on Windows.
+
+  Having two ways to do the same thing is error prone and leads to unnecessary
+  complexity in the testing environment. Additionally, because the mode that
+  converts scripts to bash doesn't try and validate the syntax, it is possible
+  to write tests that use bash shell features unsupported by the internal
+  shell. Such tests won't work on Windows but this may not be obvious to the
+  developer writing the test.
+
+  Another limitation is that when executing the scripts externally, the ShTest
+  format has no idea which commands fail, or what output comes from which
+  commands, so this limits how convenient the output of ShTest failures can be
+  and limits other features (for example, knowing what temporary files were
+  written).
+
+  We should eliminate having two ways of executing the same tests to reduce
+  platform differences and make it easier to develop new features in the ShTest
+  module. This is currently blocked on:
+
+  * The external execution mode is faster in some situations, because it avoids
+    being bottlenecked on the GIL. This can hopefully be obviated simply by
+    using --use-processes.
+
+  * Some tests in LLVM/Clang are explicitly disabled with the internal shell
+    (because they use features specific to bash). We would need to rewrite these
+    tests, or add additional features to the internal shell handling to allow
+    them to pass.
+
+5. Consider changing core to support setup vs. execute distinction.
+
+  Many of the existing test formats are cleanly divided into two phases, once
+  parses the test format and extracts XFAIL and REQUIRES information, etc., and
+  the other code actually executes the test.
+
+  We could make this distinction part of the core infrastructure and that would
+  enable a couple things:
+
+  * The REQUIREs handling could be lifted to the core, which is nice.
+
+  * This would provide a clear place to insert subtest support, because the
+    setup phase could be responsible for providing subtests back to the
+    core. That would provide part of the infrastructure to parallelize them, for
+    example, and would probably interact well with other possible features like
+    parameterized tests.
+
+  * This affords a clean implementation of --no-execute.
+
+  * One possible downside could be for test formats that cannot determine their
+    subtests without having executed the test. Supporting such formats would
+    either force the test to actually be executed in the setup stage (which
+    might be ok, as long as the API was explicitly phrased to support that), or
+    would mean we are forced into supporting subtests as return values from the
+    execute phase.
+
+  Any format can just keep all of its code in execute, presumably, so the only
+  cost of implementing this is its impact on the API and futures changes.
+
+
+Miscellaneous
+=============
+
+* Move temp directory name into local test config.
+
+* Support valgrind in all configs, and LLVM style valgrind.
+
+* Support ulimit.
+
+* Create an explicit test suite object (instead of using the top-level
+  TestingConfig object).
+
+* Introduce a wrapper class that has a ``subprocess.Popen`` like interface
+  but also supports killing the process and all its children and use this for
+  running tests.  This would allow us to implement platform specific methods
+  for killing a process's children which is needed for a per test timeout. On
+  POSIX platforms we can use process groups and on Windows we can probably use
+  job objects. This would not only allow us to remove the dependency on the
+  ``psutil`` module but would also be more reliable as the
+  ``lit.util.killProcessAndChildren()`` function which is currently used is
+  potentially racey (e.g. it might not kill a fork bomb completely).
