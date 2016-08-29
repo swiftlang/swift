@@ -2246,74 +2246,64 @@ bool AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D,
   return false;
 }
 
-/// If this is a call to an unavailable sizeof family functions, diagnose it
+/// If this is a call to an unavailable sizeof family function, diagnose it
 /// with a fixit hint and return true. If not, or if we fail, return false.
 bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
-                                               SourceRange R,
-                                               const AvailableAttr *Attr,
-                                               const ApplyExpr *call) {
+                                                       SourceRange R,
+                                                       const AvailableAttr *Attr,
+                                                       const ApplyExpr *call) {
 
   if (!D->getModuleContext()->isStdlibModule())
     return false;
 
-  std::pair<StringRef, bool> KindValue
-    = llvm::StringSwitch<std::pair<StringRef, bool>>(D->getNameStr())
-      .Case("sizeof", {"size", false})
-      .Case("alignof", {"alignment", false})
-      .Case("strideof", {"stride", false})
-      .Default({});
-
-  if (KindValue.first.empty())
+  StringRef Property = llvm::StringSwitch<StringRef>(D->getNameStr())
+    .Case("sizeof", "size")
+    .Case("alignof", "alignment")
+    .Case("strideof", "stride")
+    .Default(StringRef());
+  if (Property.empty())
     return false;
-
-  auto Kind = KindValue.first;
-  auto isValue = KindValue.second;
 
   auto args = dyn_cast<ParenExpr>(call->getArg());
   if (!args)
     return false;
-
-  auto subject = args->getSubExpr();
-  if (!isValue) {
-    // sizeof(type(of: x)) is equivalent to sizeofValue(x)
-    if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
-      subject = DTE->getBase();
-      isValue = true;
-    }
-  }
 
   EncodedDiagnosticMessage EncodedMessage(Attr->Message);
   auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
                           D->getFullName(), EncodedMessage.Message);
   diag.highlight(R);
 
+  auto subject = args->getSubExpr();
+
   StringRef Prefix = "MemoryLayout<";
   StringRef Suffix = ">.";
-  if (isValue) {
-    auto valueType = subject->getType()->getRValueType();
+
+  if (auto DTE = dyn_cast<DynamicTypeExpr>(subject)) {
+    // Replace `sizeof(type(of: x))` with `MemoryLayout<X>.size`, where `X` is
+    // the static type of `x`. The previous spelling misleadingly hinted that
+    // `sizeof(_:)` might return the size of the *dynamic* type of `x`, when
+    // it is not the case.
+    auto valueType = DTE->getBase()->getType()->getRValueType();
     if (!valueType || valueType->hasError()) {
-      // If we don't have a suitable argument, we cannot emit a fix-it.
+      // If we don't have a suitable argument, we can't emit a fixit.
       return true;
     }
-
-    // NOTE: We are destructively replacing the source text here.
-    // `sizeof(type(of: doSomething()))` => `MemoryLayout<T>.size`, where T is
-    // the return type of `doSomething()`. If that function has any side
-    // effects, this replacement will break the source.
+    // Note that in rare circumstances we may be destructively replacing the
+    // source text. For example, we'd replace `sizeof(type(of: doSomething()))`
+    // with `MemoryLayout<T>.size`, if T is the return type of `doSomething()`.
     diag.fixItReplace(call->getSourceRange(),
-      (Prefix + valueType->getString() + Suffix + Kind).str());
+                   (Prefix + valueType->getString() + Suffix + Property).str());
   } else {
     SourceRange PrefixRange(call->getStartLoc(), args->getLParenLoc());
     SourceRange SuffixRange(args->getRParenLoc());
 
-    // We must truncate `.self`.
-    // E.g. sizeof(T.self) => MemoryLayout<T>.size
+    // We must remove `.self`.
     if (auto *DSE = dyn_cast<DotSelfExpr>(subject))
       SuffixRange.Start = DSE->getDotLoc();
 
     diag
       .fixItReplace(PrefixRange, Prefix)
-      .fixItReplace(SuffixRange, (Suffix + Kind).str());
+      .fixItReplace(SuffixRange, (Suffix + Property).str());
   }
 
   return true;
