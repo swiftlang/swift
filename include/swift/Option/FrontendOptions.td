@@ -163,6 +163,9 @@ def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
 def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-contexts">,
   HelpText<"Use @guaranteed convention for closure context">;
 
+def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
+  HelpText<"Disable use of partial_apply in SIL generation">;
+
 def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
   HelpText<"Remove runtime asserts.">;
 
