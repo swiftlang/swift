@@ -242,9 +242,10 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// FIXME: Requirements from the generic signature are treated as coming from
-  /// an outer scope in order to avoid disturbing the AllDependentTypes.
-  /// Setting \c treatRequirementsAsExplicit to true disables this behavior.
-  void addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
+  /// an outer scope. Setting \c treatRequirementsAsExplicit to true disables
+  /// this behavior.
+  void addGenericSignature(GenericSignature *sig,
+                           GenericEnvironment *genericEnv,
                            bool treatRequirementsAsExplicit = false);
 
   /// \brief Get a generic signature based on the provided complete list

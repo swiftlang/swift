@@ -238,14 +238,14 @@ Type CompleteGenericTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
                                         GenericParamList *genericParams,
                                         GenericSignature *parentSig,
-                                        bool adoptArchetypes,
+                                        GenericEnvironment *parentEnv,
                                         GenericTypeResolver *resolver) {
   bool invalid = false;
 
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder)
-    builder->addGenericSignature(parentSig, adoptArchetypes);
+    builder->addGenericSignature(parentSig, parentEnv);
 
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -389,7 +389,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
   tc.checkGenericParamList(builder, genericParams,
                            func->getDeclContext()->getGenericSignatureOfContext(),
-                           false, &resolver);
+                           nullptr,
+                           &resolver);
 
   // Check the parameter patterns.
   for (auto params : func->getParameterLists()) {
@@ -485,9 +486,10 @@ TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
   auto builder = createArchetypeBuilder(parentDC->getParentModule());
 
   auto parentSig = parentDC->getGenericSignatureOfContext();
+  auto parentEnv = parentDC->getGenericEnvironmentOfContext();
 
   if (parentSig != nullptr)
-    builder.addGenericSignature(parentSig, true);
+    builder.addGenericSignature(parentSig, parentEnv);
 
   // Visit each of the generic parameters.
   for (auto param : *genericParams)
@@ -711,7 +713,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
 GenericSignature *TypeChecker::validateGenericSignature(
                     GenericParamList *genericParams,
                     DeclContext *dc,
-                    GenericSignature *outerSignature,
+                    GenericSignature *parentSig,
                     std::function<bool(ArchetypeBuilder &)> inferRequirements,
                     bool &invalid) {
   assert(genericParams && "Missing generic parameters?");
@@ -719,15 +721,12 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // Create the archetype builder.
   Module *module = dc->getParentModule();
   ArchetypeBuilder builder = createArchetypeBuilder(module);
-  auto *parentSig = (outerSignature
-                     ? outerSignature
-                     : dc->getGenericSignatureOfContext());
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
   DependentGenericTypeResolver dependentResolver(builder);  
   if (checkGenericParamList(&builder, genericParams, parentSig,
-                            false, &dependentResolver)) {
+                            nullptr, &dependentResolver)) {
     invalid = true;
   }
 
@@ -744,8 +743,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // and type-check it again, completely.
   revertGenericParamList(genericParams);
   CompleteGenericTypeResolver completeResolver(*this, builder);
-  if (checkGenericParamList(nullptr, genericParams, parentSig,
-                            false, &completeResolver)) {
+  if (checkGenericParamList(nullptr, genericParams, nullptr,
+                            nullptr, &completeResolver)) {
     invalid = true;
   }
 
@@ -807,8 +806,6 @@ TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
   access = std::max(access, Accessibility::Internal);
 
   // Wire up the archetypes.
-  if (genericSig == nullptr)
-    genericSig = dc->getGenericSignatureOfContext();
   auto genericEnv = builder.getGenericEnvironment(
       genericSig->getGenericParams());
 
@@ -913,7 +910,8 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
 
-  auto *sig = validateGenericSignature(gp, dc, nullptr, nullptr, invalid);
+  auto *sig = validateGenericSignature(gp, dc, dc->getGenericSignatureOfContext(),
+                                       nullptr, invalid);
   assert(sig->getInnermostGenericParams().size()
            == typeDecl->getGenericParams()->size());
   typeDecl->setGenericSignature(sig);
@@ -929,9 +927,10 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   ArchetypeBuilder builder =
     createArchetypeBuilder(typeDecl->getModuleContext());
   auto *parentSig = dc->getGenericSignatureOfContext();
-  checkGenericParamList(&builder, gp, parentSig);
+  auto *parentEnv = dc->getGenericEnvironmentOfContext();
+  checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-  auto *env = finalizeGenericParamList(builder, gp, nullptr, typeDecl);
+  auto *env = finalizeGenericParamList(builder, gp, sig, typeDecl);
   typeDecl->setGenericEnvironment(env);
 
   return invalid;

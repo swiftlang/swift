@@ -1062,8 +1062,8 @@ public:
   bool checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
-                             bool adoptArchetypes = true,
-                             GenericTypeResolver *resolver = nullptr);
+                             GenericEnvironment *parentEnv,
+                             GenericTypeResolver *resolver);
 
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.

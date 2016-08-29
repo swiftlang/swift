@@ -2012,7 +2012,7 @@ ArchetypeBuilder::mapTypeOutOfContext(ModuleDecl *M,
 }
 
 void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
-                                           bool adoptArchetypes,
+                                           GenericEnvironment *env,
                                            bool treatRequirementsAsExplicit) {
   if (!sig) return;
   
@@ -2023,21 +2023,17 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
   for (auto param : sig->getGenericParams()) {
     addGenericParameter(param);
 
-    if (adoptArchetypes) {
+    if (env) {
       // If this generic parameter has an archetype, use it as the concrete
       // type.
-      // FIXME: This forces us to re-use archetypes from outer scopes as
-      // concrete types, which is currently important for the layout of the "all
-      // archetypes" list.
-      if (auto gpDecl = param->getDecl()) {
-        if (auto archetype = gpDecl->getArchetype()) {
-          auto key = GenericTypeParamKey::forDecl(gpDecl);
-          assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
-          auto *pa = Impl->PotentialArchetypes[key];
-          assert(pa == pa->getRepresentative() && "Not the representative");
-          pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
-          pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
-        }
+      auto contextTy = env->mapTypeIntoContext(&Mod, param);
+      if (auto archetype = contextTy->getAs<ArchetypeType>()) {
+        auto key = GenericTypeParamKey::forType(param);
+        assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
+        auto *pa = Impl->PotentialArchetypes[key];
+        assert(pa == pa->getRepresentative() && "Not the representative");
+        pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
+        pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
       }
     }
   }
