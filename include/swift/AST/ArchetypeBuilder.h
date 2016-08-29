@@ -63,15 +63,21 @@ public:
     /// The requirement was explicitly stated in the generic parameter
     /// clause.
     Explicit,
-    /// The requirement was explicitly stated in the generic parameter clause
-    /// but is redundant with some other requirement.
-    Redundant,
-    /// The requirement was part of a protocol requirement, e.g., an
-    /// inherited protocol or a requirement on an associated type.
-    Protocol,
-    /// 
-    /// The requirement was inferred from part of the signature.
+    /// The requirement was inferred from the function's parameter or
+    /// result types.
     Inferred,
+
+    /// The requirement was part of a protocol requirement on an
+    /// associated type.
+    ///
+    /// These are dropped by getCanonicalManglingSignature().
+    Protocol,
+
+    /// The requirement is redundant with some other requirement.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Redundant,
+
     /// The requirement came from an outer scope.
     /// FIXME: eliminate this in favor of keeping requirement sources in 
     /// GenericSignatures, at least non-canonical ones?

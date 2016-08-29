@@ -67,7 +67,7 @@ extension P2 where Self.T : C {
 // CHECK-NEXT: T witness marker
 // CHECK-NEXT: T : C [explicit @
 // CHECK-NEXT: T : P3 [redundant @
-// CHECK-NEXT: T[.P3].T == C.T [protocol]
+// CHECK-NEXT: T[.P3].T == C.T [redundant]
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T) where T : C, T : P3 {}
 
@@ -76,7 +76,7 @@ func superclassConformance1<T>(t: T) where T : C, T : P3 {}
 // CHECK-NEXT: T witness marker
 // CHECK-NEXT: T : C [explicit @
 // CHECK-NEXT: T : P3 [redundant @
-// CHECK-NEXT: T[.P3].T == C.T [protocol]
+// CHECK-NEXT: T[.P3].T == C.T [redundant]
 // CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T) where T : C, T : P3 {}
 
