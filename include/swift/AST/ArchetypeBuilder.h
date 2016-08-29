@@ -618,15 +618,15 @@ public:
   }
 
   void setIsRecursive() { IsRecursive = true; }
-  bool isRecursive() { return IsRecursive; }
+  bool isRecursive() const { return IsRecursive; }
 
-  bool isInvalid() { return Invalid; }
+  bool isInvalid() const { return Invalid; }
 
   void setInvalid() { Invalid = true; }
 
   /// Determine whether this archetype was renamed due to typo
   /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() { return Renamed; }
+  bool wasRenamed() const { return Renamed; }
 
   /// Note that this potential archetype was renamed (due to typo
   /// correction), providing the new name.
@@ -637,7 +637,7 @@ public:
 
   /// Whether this potential archetype makes a better archetype anchor than
   /// the given archetype anchor.
-  bool isBetterArchetypeAnchor(PotentialArchetype *other);
+  bool isBetterArchetypeAnchor(PotentialArchetype *other) const;
 
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);

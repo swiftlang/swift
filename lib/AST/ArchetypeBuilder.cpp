@@ -413,7 +413,7 @@ bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
 }
 
 bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
-       PotentialArchetype *other) {
+       PotentialArchetype *other) const {
   auto concrete = hasConcreteTypeInPath();
   auto otherConcrete = other->hasConcreteTypeInPath();
   if (concrete != otherConcrete)
@@ -430,14 +430,15 @@ bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
 
 auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
        -> PotentialArchetype * {
-   // Default to the representative, unless we find something better.
-   PotentialArchetype *best = getRepresentative();
-   for (auto pa : getEquivalenceClass()) {
-     if (pa->isBetterArchetypeAnchor(best))
-       best = pa;
-   }
 
-   return best;
+  // Default to the representative, unless we find something better.
+  PotentialArchetype *best = getRepresentative();
+  for (auto pa : best->getEquivalenceClass()) {
+    if (pa->isBetterArchetypeAnchor(best))
+      best = pa;
+  }
+
+  return best;
 }
 
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
@@ -595,9 +596,12 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 
 ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
+
   auto representative = getRepresentative();
 
   // Retrieve the archetype from the archetype anchor in this equivalence class.
+  // The anchor must not have any concrete parents (otherwise we would just
+  // use the representative).
   auto archetypeAnchor = getArchetypeAnchor();
   if (archetypeAnchor != this)
     return archetypeAnchor->getType(builder);
@@ -1936,7 +1940,7 @@ void ArchetypeBuilder::dump() {
 
 void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
   out << "Requirements:";
-  enumerateRequirements([&](RequirementKind kind, 
+  enumerateRequirements([&](RequirementKind kind,
                             PotentialArchetype *archetype,
                             llvm::PointerUnion<Type, PotentialArchetype *> type,
                             RequirementSource source) {
