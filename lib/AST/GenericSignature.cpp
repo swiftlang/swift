@@ -487,5 +487,7 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type, ModuleDecl &mod) 
     }
   });
 
-  return type->getCanonicalType();
+  auto result = type->getCanonicalType();
+  assert(isCanonicalTypeInContext(result, mod));
+  return result;
 }
