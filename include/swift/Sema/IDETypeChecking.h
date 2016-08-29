@@ -77,23 +77,17 @@ namespace swift {
   /// \returns True on applied, false on not applied.
   bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
 
-/// The kind of type checking to perform for code completion.
-  enum class CompletionTypeCheckKind {
-    /// Type check the expression as normal.
-    Normal,
-
-    /// Type check the argument to an Objective-C #keyPath.
-    ObjCKeyPath,
-  };
-
   /// \brief Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
                    DeclContext *DC,
-                   CompletionTypeCheckKind kind,
                    Expr *&parsedExpr,
                    ConcreteDeclRef &referencedDecl);
+
+  /// \brief Return the type of an ObjCKeyPath expression parsed during code
+  /// completion, or None on error.
+  Optional<Type> getTypeOfObjCKeyPath(DeclContext *DC, ObjCKeyPathExpr *E);
 
   /// Typecheck the sequence expression \p parsedExpr for code completion.
   ///
@@ -121,11 +115,29 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
+  /// An interface between code completion and the expression type-checker.
+  class CodeCompletionTypeCheckingCallbacks {
+  public:
+    virtual ~CodeCompletionTypeCheckingCallbacks();
+    /// Whether we're intereseted in resolving the given expression.
+    ///
+    /// \param opaque whether to treat \p E as opaque for constraint generation
+    ///               and just introduce a free type variable.
+    virtual bool isInterestingExpr(Expr *E, bool &opaque) = 0;
+
+    /// Report the type and optionally the corresponding declaration of an
+    /// interesting expression.
+    virtual void resolvedInterestingExpr(Expr *E, Type T,
+                                         ConcreteDeclRef D) = 0;
+  };
+
   /// A unique_ptr for LazyResolver that can perform additional cleanup.
   using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;
 
   /// Creates a lazy type resolver for use in lookups.
-  OwnedResolver createLazyResolver(ASTContext &Ctx);
+  OwnedResolver createLazyResolver(
+      ASTContext &Ctx,
+      CodeCompletionTypeCheckingCallbacks *ccCallbacks = nullptr);
 }
 
 #endif

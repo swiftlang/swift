@@ -36,6 +36,7 @@
 namespace swift {
 
 class ArchetypeBuilder;
+class CodeCompletionTypeCheckingCallbacks;
 class GenericTypeResolver;
 class NominalTypeDecl;
 class NormalProtocolConformance;
@@ -535,6 +536,10 @@ public:
   /// as C function pointers when the function's captures have not yet been
   /// computed.
   llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
+
+  /// Code completion callbacks if we are currently performing code completion;
+  /// otherwise nullptr.
+  CodeCompletionTypeCheckingCallbacks *CodeCompletion = nullptr;
 
 private:
   /// Return statements with functions as return values.

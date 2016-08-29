@@ -904,6 +904,8 @@ public:
   /// The original CS if this CS was created as a simplification of another CS
   ConstraintSystem *baseCS = nullptr;
 
+  llvm::SmallDenseMap<Expr *, TypeVariableType *, 4> InterestingExprs;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1741,7 +1743,7 @@ public:
   /// \brief Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E);
+  Expr *generateConstraints(Expr *E, bool forCodeCompletion=false);
 
   /// \brief Generate constraints for the given top-level expression,
   /// assuming that its children are already type-checked.
@@ -2057,7 +2059,8 @@ private:
                      ExprTypeCheckListener *listener,
                      SmallVectorImpl<Solution> &solutions,
                      FreeTypeVariableBinding allowFreeTypeVariables
-                       = FreeTypeVariableBinding::Disallow);
+                       = FreeTypeVariableBinding::Disallow,
+                     bool forCodeCompletion = false);
 
   /// \brief Solve the system of constraints.
   ///

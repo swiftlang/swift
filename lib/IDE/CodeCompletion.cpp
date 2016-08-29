@@ -1239,14 +1239,45 @@ void CodeCompletionContext::sortCompletionResults(
 }
 
 namespace {
+class CodeCompletionTypechecking : public CodeCompletionTypeCheckingCallbacks {
+  llvm::SmallDenseMap<Expr *, SmallVector<std::pair<Type, ConcreteDeclRef>, 2>>
+      typeMap;
+  typedef llvm::PointerIntPair<Expr *, 1, bool> ExprAndUseFreeTypeVar;
+  llvm::SmallVector<ExprAndUseFreeTypeVar, 3> interestingExprs;
+
+  bool isInterestingExpr(Expr *E, bool &overrrideCSGen) override {
+    for (auto exprAndUseFreeTypeVar : interestingExprs) {
+      if (exprAndUseFreeTypeVar.getPointer() == E) {
+        overrrideCSGen = exprAndUseFreeTypeVar.getInt();
+        return true;
+      }
+    }
+    return false;
+  }
+  void resolvedInterestingExpr(Expr *E, Type T, ConcreteDeclRef D) override {
+    typeMap[E].push_back(std::make_pair(T, D));
+  }
+
+public:
+  void addInterestingExpr(Expr *E, bool useFreeTypeVar) {
+    interestingExprs.emplace_back(E, useFreeTypeVar);
+  }
+  ArrayRef<std::pair<Type, ConcreteDeclRef>> getViableTypes(Expr *E) {
+    return typeMap[E];
+  }
+};
+} // end anonymous namespace
+
+namespace {
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
+  CodeCompletionTypechecking CCTypeChecking;
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
-  AssignExpr *AssignmentExpr;
-  CallExpr *FuncCallExpr;
-  UnresolvedMemberExpr *UnresolvedExpr;
+  AssignExpr *AssignmentExpr = nullptr;
+  CallExpr *FuncCallExpr = nullptr;
+  UnresolvedMemberExpr *UnresolvedExpr = nullptr;
   bool UnresolvedExprInReturn;
   std::vector<std::string> TokensBeforeUnresolvedExpr;
   CompletionKind Kind = CompletionKind::None;
@@ -1352,33 +1383,41 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
-    // Figure out the kind of type-check we'll be performing.
-    auto CheckKind = CompletionTypeCheckKind::Normal;
     if (Kind == CompletionKind::KeyPathExpr ||
-        Kind == CompletionKind::KeyPathExprDot)
-      CheckKind = CompletionTypeCheckKind::ObjCKeyPath;
+        Kind == CompletionKind::KeyPathExprDot) {
+      auto keyPath = cast<ObjCKeyPathExpr>(ParsedExpr);
+      if (auto T = getTypeOfObjCKeyPath(CurDeclContext, keyPath))
+        return std::make_pair(*T, ConcreteDeclRef());
+      return None;
+    }
+
+    auto typeAndDecls = CCTypeChecking.getViableTypes(ParsedExpr);
+    if (!typeAndDecls.empty())
+      return typeAndDecls[0];
 
     // If we've already successfully type-checked the expression for some
     // reason, just return the type.
     // FIXME: if it's ErrorType but we've already typechecked we shouldn't
     // typecheck again. rdar://21466394
-    if (CheckKind == CompletionTypeCheckKind::Normal &&
-        ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
+    if (ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
       return std::make_pair(ParsedExpr->getType(),
                             ParsedExpr->getReferencedDecl());
 
-    eraseErrorTypes(ParsedExpr);
+    if (ParsedExpr->getType())
+      eraseErrorTypes(ParsedExpr);
 
     ConcreteDeclRef ReferencedDecl = nullptr;
     Expr *ModifiedExpr = ParsedExpr;
-    if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
-                                                CheckKind, ModifiedExpr,
-                                                ReferencedDecl)) {
+    auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
+                                            ModifiedExpr, ReferencedDecl);
+    typeAndDecls = CCTypeChecking.getViableTypes(ParsedExpr);
+    if (!typeAndDecls.empty()) {
+      return typeAndDecls[0];
+    } else if (T) {
       // FIXME: even though we don't apply the solution, the type checker may
       // modify the original expression. We should understand what effect that
       // may have on code completion.
       ParsedExpr = ModifiedExpr;
-
       return std::make_pair(*T, ReferencedDecl);
     }
     return None;
@@ -1776,13 +1815,13 @@ public:
   Optional<RequestedResultsTy> RequestedCachedResults;
 
 public:
-  CompletionLookup(CodeCompletionResultSink &Sink,
-                   ASTContext &Ctx,
+  CompletionLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
+                   OwnedResolver &&TypeResolver,
                    const DeclContext *CurrDeclContext)
-      : Sink(Sink), Ctx(Ctx),
-        TypeResolver(createLazyResolver(Ctx)), CurrDeclContext(CurrDeclContext),
-        Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
-          getClangModuleLoader())) {
+      : Sink(Sink), Ctx(Ctx), TypeResolver(std::move(TypeResolver)),
+        CurrDeclContext(CurrDeclContext),
+        Importer(static_cast<ClangImporter *>(
+            CurrDeclContext->getASTContext().getClangModuleLoader())) {
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -3271,7 +3310,6 @@ public:
     if (auto T = getTypeOfCompletionContextExpr(
             CurrDeclContext->getASTContext(),
             const_cast<DeclContext *>(CurrDeclContext),
-            CompletionTypeCheckKind::Normal,
             tempExpr,
             referencedDecl))
       addPostfixOperatorCompletion(op, *T);
@@ -3398,20 +3436,24 @@ public:
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    auto LHS = sequence.back();
     eraseErrorTypes(expr);
     // Take advantage of the fact the type-checker leaves the types on the AST.
-    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
-                             expr)) {
-      if (auto binexpr = dyn_cast<BinaryExpr>(expr)) {
-        // Rebuild the sequence from the type-checked version.
-        sequence.clear();
-        flattenBinaryExpr(binexpr, sequence);
-        return;
+    typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr);
+    if (auto binexpr = dyn_cast<BinaryExpr>(expr)) {
+      // Rebuild the sequence from the type-checked version.
+      sequence.clear();
+      flattenBinaryExpr(binexpr, sequence);
+      // Check that each non-operator is typed.
+      for (unsigned i = 0; i < sequence.size(); i += 2) {
+        if (!sequence[i]->getType() || sequence[i]->getType()->is<ErrorType>())
+          goto fallback;
       }
+      return;
     }
 
+  fallback:
     // Fall back to just using the immediate LHS.
-    auto LHS = sequence.back();
     sequence.clear();
     sequence.push_back(LHS);
   }
@@ -5061,6 +5103,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   // Add keywords even if type checking fails completely.
   addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
+  if (ParsedExpr)
+    CCTypeChecking.addInterestingExpr(ParsedExpr, false);
+  if (UnresolvedExpr)
+    CCTypeChecking.addInterestingExpr(UnresolvedExpr, true);
+  if (CodeCompleteTokenExpr)
+    CCTypeChecking.addInterestingExpr(CodeCompleteTokenExpr, true);
+
+  OwnedResolver TypeResolver = createLazyResolver(P.Context, &CCTypeChecking);
+
   if (!typecheckContext())
     return;
 
@@ -5090,7 +5141,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     return;
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
-                          CurDeclContext);
+                          std::move(TypeResolver), CurDeclContext);
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
@@ -5480,7 +5531,9 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     CodeCompletionResultSink &targetSink, const Module *module,
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
-  CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
+  CompletionLookup Lookup(targetSink, module->getASTContext(),
+                          createLazyResolver(module->getASTContext()),
+                          currDeclContext);
   Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
 }
 
@@ -5557,3 +5610,5 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
 
   handleResults(context.takeResults());
 }
+
+CodeCompletionTypeCheckingCallbacks::~CodeCompletionTypeCheckingCallbacks() {}

@@ -213,7 +213,7 @@ func testArchetypeReplacement6() {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_10: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): P1 & P2#})[#Void#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): T#})[#Void#]{{; name=.+}}
 
 // rdar://problem/22334700
 struct Test1000 : Sequence {
