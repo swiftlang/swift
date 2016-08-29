@@ -1,0 +1,11 @@
+# .coveragerc to control coverage.py
+[run]
+branch = False
+parallel = True
+source = lit
+
+[html]
+directory = coverage_html_report
+
+[report]
+omit = Inputs
