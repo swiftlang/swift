@@ -1937,7 +1937,10 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   B.setCurrentDebugScope(TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
-  auto *ControlVariableBox = B.createAllocStack(Loc, IVType);
+  // Use an empty location for the alloc_stack. If Loc is variable declaration
+  // the alloc_stack would look like the storage of that variable.
+  auto *ControlVariableBox =
+      B.createAllocStack(RegularLocation(SourceLoc()), IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
