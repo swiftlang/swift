@@ -125,7 +125,13 @@ public:
 };
 
 template <class Impl>
-struct CacheEntryHeader {};
+struct CacheEntryHeader {
+  /// LLDB walks this list.
+  /// FIXME: when LLDB stops walking this list, there will stop being
+  /// any reason to store argument data in cache entries, and a *ton*
+  /// of weird stuff here will go away.
+  const Impl *Next;
+};
 
 /// A CRTP class for defining entries in a metadata cache.
 template <class Impl, class Header = CacheEntryHeader<Impl> >
@@ -266,6 +272,11 @@ template <class ValueTy> class MetadataCache {
   static_assert(sizeof(Map) == 2 * sizeof(void*),
                 "offset of Head is not at proper offset");
 
+  /// The head of a linked list connecting all the metadata cache entries.
+  /// TODO: Remove this when LLDB is able to understand the final data
+  /// structure for the metadata cache.
+  const ValueTy *Head;
+
   struct ConcurrencyControl {
     Mutex Lock;
     ConditionVariable Queue;
@@ -350,6 +361,10 @@ public:
     // Otherwise, we created the entry and are responsible for
     // creating the metadata.
     auto value = builder();
+
+    // Update the linked list.
+    value->Next = Head;
+    Head = value;
 
 #if SWIFT_DEBUG_RUNTIME
         printf("%s(%p): created %p\n",
