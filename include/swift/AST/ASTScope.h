@@ -22,6 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 
@@ -60,8 +61,8 @@ enum class ASTScopeKind : uint8_t {
   AfterPatternBinding,
   /// The scope introduced by a brace statement.
   BraceStmt,
-  /// The scope introduced by an element in a brace statement.
-  BraceStmtElement,
+  /// The scope introduced by a local declaration.
+  LocalDeclaration,
   /*
   BraceStmt,
   IfThenBranch,
@@ -136,33 +137,41 @@ class ASTScope {
     } patternBinding;
 
     /// For \c kind == ASTScopeKind::BraceStmt.
-    BraceStmt *braceStmt;
-
-    /// For \c kind == ASTScopeKind::BraceStmtElement.
     struct {
-      BraceStmt *braceStmt;
-      mutable unsigned element;
-    } braceStmtElement;
-};
+      BraceStmt *stmt;
+
+      /// The next element in the brace statement that should be expanded.
+      mutable unsigned nextElement;
+    } braceStmt;
+
+    /// The declatation introduced within a local scope.
+    ///
+    /// For \c kind == ASTScopeKind::LocalDeclaration.
+    Decl *localDeclaration;
+  };
 
   /// Child scopes, sorted by source range.
   mutable SmallVector<ASTScope *, 4> storedChildren;
 
+  /// Constructor that only initializes the kind and parent, leaving the
+  /// pieces to be initialized by the caller.
+  ASTScope(ASTScopeKind kind, const ASTScope *parent)
+      : kind(kind), parentAndExpanded(parent, false) { }
+
   ASTScope(SourceFile *sourceFile, unsigned nextElement)
-      : kind(ASTScopeKind::SourceFile), parentAndExpanded(nullptr, false) {
+      : ASTScope(ASTScopeKind::SourceFile, nullptr) {
     this->sourceFile.file = sourceFile;
     this->sourceFile.nextElement = nextElement;
   }
 
   ASTScope(const ASTScope *parent, IterableDeclContext *idc)
-      : kind(ASTScopeKind::TypeOrExtensionBody),
-        parentAndExpanded(parent, false) {
+      : ASTScope(ASTScopeKind::TypeOrExtensionBody, parent) {
     this->iterableDeclContext = idc;
   }
 
   ASTScope(const ASTScope *parent, GenericParamList *genericParams,
            Decl *decl, unsigned index)
-      : kind(ASTScopeKind::GenericParams), parentAndExpanded(parent, false) {
+      : ASTScope(ASTScopeKind::GenericParams, parent) {
     this->genericParams.params = genericParams;
     this->genericParams.decl = decl;
     this->genericParams.index = index;
@@ -170,29 +179,22 @@ class ASTScope {
 
   ASTScope(const ASTScope *parent, AbstractFunctionDecl *abstractFunction,
            unsigned listIndex, unsigned paramIndex)
-      : kind(ASTScopeKind::AbstractFunctionParams),
-        parentAndExpanded(parent, false) {
+      : ASTScope(ASTScopeKind::AbstractFunctionParams, parent) {
     this->abstractFunctionParams.decl = abstractFunction;
     this->abstractFunctionParams.listIndex = listIndex;
     this->abstractFunctionParams.paramIndex = paramIndex;
   }
 
   ASTScope(const ASTScope *parent, PatternBindingDecl *decl, unsigned entry)
-      : kind(ASTScopeKind::AfterPatternBinding),
-        parentAndExpanded(parent, false) {
+      : ASTScope(ASTScopeKind::AfterPatternBinding, parent) {
     this->patternBinding.decl = decl;
     this->patternBinding.entry = entry;
   }
   
   ASTScope(const ASTScope *parent, BraceStmt *braceStmt)
-      : kind(ASTScopeKind::BraceStmt), parentAndExpanded(parent, false) {
-    this->braceStmt = braceStmt;
-  }
-
-  ASTScope(const ASTScope *parent, BraceStmt *braceStmt, unsigned element)
-      : kind(ASTScopeKind::BraceStmtElement), parentAndExpanded(parent, false) {
-    this->braceStmtElement.braceStmt = braceStmt;
-    this->braceStmtElement.element = element;
+      : ASTScope(ASTScopeKind::BraceStmt, parent) {
+    this->braceStmt.stmt = braceStmt;
+    this->braceStmt.nextElement = 0;
   }
 
   ~ASTScope();
@@ -232,14 +234,18 @@ class ASTScope {
   /// introduced by this AST node.
   static ASTScope *createIfNeeded(const ASTScope *parent, ASTNode node);
 
-  /// Create a new AST scope that describes the continuation within the same
-  /// parent scope.
+  /// Determine whether this is a scope from which we can perform a
+  /// continuation.
+  bool isContinuationScope() const;
+
+  /// Enumerate the continuation scopes for the given parent,
   ///
   /// Statements, such as 'guard' and local declarations, introduce scopes
   /// that extend to the end of an enclosing brace-stmt. This
-  /// operation finds the "continuation" in the nearest enclosing brace
-  /// statement, which is the next statement following.
-  static ASTScope *createContinuationScope(const ASTScope *parent);
+  /// operation finds each of the "continuation" scopes in the nearest
+  /// enclosing brace statement.
+  void enumerateContinuationScopes(
+         llvm::function_ref<void(ASTScope *)> fn) const;
 
   /// Retrieve the ASTContext in which this scope exists.
   ASTContext &getASTContext() const;
@@ -266,6 +272,13 @@ public:
 
   /// Determine the source range covered by this scope.
   SourceRange getSourceRange() const;
+
+  /// Retrieve the local declatation when
+  /// \c getKind() == ASTScopeKind::LocalDeclaration.
+  Decl *getLocalDeclaration() const {
+    assert(getKind() == ASTScopeKind::LocalDeclaration);
+    return localDeclaration;
+  }
 
   /// Expand the entire scope map.
   ///

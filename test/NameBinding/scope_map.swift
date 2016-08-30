@@ -38,9 +38,65 @@ struct i386ArchStruct { }
 struct OtherArchStruct { }
 #endif
 
-func functionBodies(a: Int, b: Int?) {
-  let (x, y) = (a, b),
-      (z1, z2) = (b, a)
+func functionBodies1(a: Int, b: Int?) {
+  let (x1, x2) = (a, b),
+      (y1, y2) = (b, a)
+  let (z1, z2) = (a, a)
+  do {
+    let a1 = a
+    let a2 = a
+    do {
+      let b1 = b
+      let b2 = b
+    }
+  }
+  do {
+    let b1 = b
+    let b2 = b
+  }
+  func f(_ i: Int) -> Int { return i }
+  let f2 = f(_:)
+  struct S7 { }
+  typealias S7Alias = S7
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 // RUN: %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
@@ -69,14 +125,29 @@ func functionBodies(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT:       -AbstractFunctionParams {{.*}} init(t:u:) param 1:0 [26:17 - 27:3] expanded
 // CHECK-EXPANDED-NEXT:         -AbstractFunctionParams {{.*}} init(t:u:) param 1:1 [26:23 - 27:3] expanded
 // CHECK-EXPANDED-NEXT:           -BraceStmt {{.*}} [26:26 - 27:3] expanded
-// CHECK-EXPANDED-NEXT:             -BraceStmtElement {{.*}} element 0 [27:3 - 27:3] expanded
 // CHECK-EXPANDED-NEXT:   -AbstractFunctionParams {{.*}} deinit param 0:0 [29:3 - 30:3] expanded
 // CHECK-EXPANDED-NEXT:     -BraceStmt {{.*}} [29:10 - 30:3] expanded
 // CHECK-EXPANDED-NEXT: -GenericParams {{.*}} param 0 [33:25 - 33:32] expanded
 // CHECK-EXPANDED-NEXT: {{^[|`]}}-TypeOrExtensionBody {{.*}} '{{.*}}ArchStruct' [{{.*}}] expanded
-// CHECK-EXPANDED-NEXT: -AbstractFunctionParams {{.*}} functionBodies(a:b:) param 0:0 [41:24 - 44:1] expanded
-// CHECK-EXPANDED-NEXT:   `-AbstractFunctionParams {{.*}} functionBodies(a:b:) param 0:1 [41:35 - 44:1] expanded
-// CHECK-EXPANDED-NEXT:     `-BraceStmt {{.*}} [41:38 - 44:1] expanded
-// CHECK-EXPANDED-NEXT:       `-BraceStmtElement {{.*}} element 0 [42:3 - 44:1] expanded
-// CHECK-EXPANDED-NEXT:         `-AfterPatternBinding {{.*}} entry 0 [42:21 - 44:1] expanded
-// CHECK-EXPANDED-NEXT:           `-AfterPatternBinding {{.*}} entry 1 [43:23 - 44:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}`-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:1 [41:36 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [41:39 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 0 [42:23 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 1 [43:23 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-AfterPatternBinding {{.*}} entry 0 [44:23 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [45:6 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [46:14 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [47:14 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                  `-BraceStmt {{.*}} [48:8 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                    `-AfterPatternBinding {{.*}} entry 0 [49:16 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      `-AfterPatternBinding {{.*}} entry 0 [50:16 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [53:6 - 56:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [54:14 - 56:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [55:14 - 56:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            `-LocalDeclaration {{.*}} [57:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              |-AbstractFunctionParams {{.*}} f(_:) param 0:0 [57:15 - 57:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-BraceStmt {{.*}} [57:27 - 57:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [58:16 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-LocalDeclaration {{.*}} [59:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                  |-TypeOrExtensionBody {{.*}} 'S7' [59:13 - 59:15] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                  `-LocalDeclaration {{.*}} [60:3 - 100:1] expanded
