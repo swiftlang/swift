@@ -76,9 +76,9 @@ func functionBodies1(a: Int, b: Int?) {
 
   repeat { } while true;
 
+  for (x, y) in [(1, "hello"), (2, "world")] where x % 2 == 0 {
 
-
-
+  }
 
 
 
@@ -165,7 +165,10 @@ func functionBodies1(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ConditionalClause {{.*}} index 1 [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                          `-RepeatWhileStmt {{.*}} [77:3 - 77:20] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          |-RepeatWhileStmt {{.*}} [77:3 - 77:20] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [77:10 - 77:12] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ForEachStmt {{.*}} [79:3 - 81:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-ForEachPattern {{.*}} [79:52 - 81:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [79:63 - 81:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded

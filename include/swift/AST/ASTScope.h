@@ -72,8 +72,10 @@ enum class ASTScopeKind : uint8_t {
   GuardStmt,
   /// Node describing a repeat...while statement.
   RepeatWhileStmt,
-  /// Note describing a for-each statement.
+  /// Node describing a for-each statement.
   ForEachStmt,
+  /// Describes the scope of the pattern of the for-each statement.
+  ForEachPattern,
   /*
   DoCatchStmt,
   ForEachBody,
@@ -173,7 +175,8 @@ class ASTScope {
     RepeatWhileStmt *repeatWhile;
 
     /// The for-each statement, for
-    /// \c kind == ASTScopeKind::ForEachStmt.
+    /// \c kind == ASTScopeKind::ForEachStmt or
+    /// \c kind == ASTScopeKind::ForEachPattern.
     ForEachStmt *forEach;
 };
 
@@ -246,8 +249,10 @@ class ASTScope {
     this->repeatWhile = repeatWhile;
   }
 
-  ASTScope(const ASTScope *parent, ForEachStmt *forEach)
-      : ASTScope(ASTScopeKind::ForEachStmt, parent) {
+  ASTScope(ASTScopeKind kind, const ASTScope *parent, ForEachStmt *forEach)
+      : ASTScope(kind, parent) {
+    assert(kind == ASTScopeKind::ForEachStmt ||
+           kind == ASTScopeKind::ForEachPattern);
     this->forEach = forEach;
   }
 

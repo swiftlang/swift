@@ -240,6 +240,26 @@ void ASTScope::expand() const {
       addChild(conditionChild);
 
     break;
+
+  case ASTScopeKind::ForEachStmt:
+    // Add a child for the sequence.
+    if (auto seqChild = createIfNeeded(this, forEach->getSequence()))
+      addChild(seqChild);
+
+    // Add a child describing the scope of the pattern.
+    addChild(new (ctx) ASTScope(ASTScopeKind::ForEachPattern, this, forEach));
+    break;
+
+  case ASTScopeKind::ForEachPattern:
+    // Add a child for the 'where' clause.
+    if (auto whereChild = createIfNeeded(this, forEach->getWhere()))
+      addChild(whereChild);
+
+    // Add a child for the body.
+    if (auto bodyChild = createIfNeeded(this, forEach->getBody()))
+      addChild(bodyChild);
+
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -329,6 +349,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::GuardStmt:
     case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
       // Not a direct descendant.
       return false;
     }
@@ -517,7 +539,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return new (ctx) ASTScope(parent, cast<RepeatWhileStmt>(stmt));
 
   case StmtKind::ForEach:
-    return new (ctx) ASTScope(parent, cast<ForEachStmt>(stmt));
+    return new (ctx) ASTScope(ASTScopeKind::ForEachStmt, parent,
+                              cast<ForEachStmt>(stmt));
 
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
@@ -559,6 +582,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
+  case ASTScopeKind::ForEachStmt:
+  case ASTScopeKind::ForEachPattern:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -591,6 +616,8 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -657,6 +684,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::ConditionalClause:
   case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
+  case ASTScopeKind::ForEachStmt:
+  case ASTScopeKind::ForEachPattern:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -787,6 +816,19 @@ SourceRange ASTScope::getSourceRange() const {
 
   case ASTScopeKind::RepeatWhileStmt:
     return repeatWhile->getSourceRange();
+
+  case ASTScopeKind::ForEachStmt:
+    return forEach->getSourceRange();
+
+  case ASTScopeKind::ForEachPattern:
+    // The scope of the pattern extends from the 'where expression (if present)
+    // until the end of the body.
+    if (forEach->getWhere())
+      return SourceRange(forEach->getWhere()->getStartLoc(),
+                         forEach->getBody()->getEndLoc());
+
+    // Otherwise, scope of the pattern covers the body.
+    return forEach->getBody()->getSourceRange();
   }
 }
 
@@ -916,6 +958,18 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::RepeatWhileStmt:
     printScopeKind("RepeatWhileStmt");
     printAddress(repeatWhile);
+    printRange();
+    break;
+
+  case ASTScopeKind::ForEachStmt:
+    printScopeKind("ForEachStmt");
+    printAddress(forEach);
+    printRange();
+    break;
+
+  case ASTScopeKind::ForEachPattern:
+    printScopeKind("ForEachPattern");
+    printAddress(forEach);
     printRange();
     break;
   }
