@@ -136,61 +136,6 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
-/// Canonical ordering for dependent types in generic signatures.
-static int compareDependentTypes(const CanType *pa, const CanType *pb) {
-  auto a = *pa, b = *pb;
-  
-  // Fast-path check for equality.
-  if (a == b)
-    return 0;
-
-  // Ordering is as follows:
-  // - Generic params
-  if (auto gpa = dyn_cast<GenericTypeParamType>(a)) {
-    if (auto gpb = dyn_cast<GenericTypeParamType>(b)) {
-      // - by depth, so t_0_n < t_1_m
-      if (int compareDepth = gpa->getDepth() - gpb->getDepth())
-        return compareDepth;
-      // - by index, so t_n_0 < t_n_1
-      return gpa->getIndex() - gpb->getIndex();
-    }
-    return -1;
-  }
-  
-  // - Dependent members
-  if (auto dma = dyn_cast<DependentMemberType>(a)) {
-    if (isa<GenericTypeParamType>(b))
-      return +1;
-    if (auto dmb = dyn_cast<DependentMemberType>(b)) {
-      // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
-      auto abase = dma.getBase();
-      auto bbase = dmb.getBase();
-      if (int compareBases = compareDependentTypes(&abase, &bbase))
-        return compareBases;
-      
-      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
-      auto protoa = dma->getAssocType()->getProtocol();
-      auto protob = dmb->getAssocType()->getProtocol();
-      if (int compareProtocols
-            = ProtocolType::compareProtocols(&protoa, &protob))
-        return compareProtocols;
-      
-      // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
-      return dma->getAssocType()->getName().str().compare(
-                                          dmb->getAssocType()->getName().str());
-    }
-    return -1;
-  }
-  
-  // - Other types.
-  //
-  // There should only ever be one of these in a set of constraints related to
-  // a dependent type, so the ordering among other types does not matter.
-  if (isa<GenericTypeParamType>(b) || isa<DependentMemberType>(b))
-    return +1;
-  return 0;
-}
-
 CanGenericSignature
 GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   // Start from the elementwise-canonical signature.
@@ -211,24 +156,14 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   
   builder->addGenericSignature(canonical, /*adoptArchetypes*/ false,
                                /*treatRequirementsAsExplicit*/ true);
-  
-  // Sort out the requirements.
-  struct DependentConstraints {
-    CanType baseClass;
-    SmallVector<CanType, 2> protocols;
-  };
-  
-  SmallVector<CanType, 2> depTypes;
-  llvm::DenseMap<CanType, DependentConstraints> constraints;
-  llvm::DenseMap<CanType, SmallVector<CanType, 2>> sameTypes;
-  
+
+  // Build a new set of minimized requirements.
+  SmallVector<Requirement, 4> requirements;
+
   builder->enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
           RequirementSource source) {
-    CanType depTy
-      = archetype->getDependentType(*builder, false)->getCanonicalType();
-    
     // Filter out redundant requirements.
     switch (source.getKind()) {
     case RequirementSource::Explicit:
@@ -240,130 +175,36 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
     case RequirementSource::Redundant:
       // The requirement was redundant, drop it.
       return;
-      
+
     case RequirementSource::OuterScope:
       llvm_unreachable("shouldn't have an outer scope!");
     }
-    
-    switch (kind) {
-    case RequirementKind::WitnessMarker: {
-      // Introduce the dependent type into the constraint set, to ensure we
-      // have a record for every dependent type.
-      depTypes.push_back(depTy);
+
+    auto depTy = archetype->getDependentType(*builder, false);
+
+    if (kind == RequirementKind::WitnessMarker) {
+      requirements.push_back(Requirement(kind, depTy, Type()));
       return;
     }
 
-    case RequirementKind::Superclass: {
-      assert(std::find(depTypes.begin(), depTypes.end(),
-                       depTy) != depTypes.end()
-             && "didn't see witness marker first?");
-      // Organize conformance constraints, sifting out the base class
-      // requirement.
-      auto &depConstraints = constraints[depTy];
+    Type repTy;
+    if (auto concreteTy = type.dyn_cast<Type>()) {
+      // Maybe we were equated to a concrete type...
+      repTy = concreteTy;
+    } else {
+      // ...or to a dependent type.
+      repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
+          ->getDependentType(*builder, false);
+    }
 
-      auto constraintType = type.get<Type>()->getCanonicalType();
-      assert(depConstraints.baseClass.isNull()
-              && "multiple base class constraints?!");
-      depConstraints.baseClass = constraintType;
-      return;
-    }
-      
-    case RequirementKind::Conformance: {
-      assert(std::find(depTypes.begin(), depTypes.end(),
-                       depTy) != depTypes.end()
-             && "didn't see witness marker first?");
-      // Organize conformance constraints, sifting out the base class
-      // requirement.
-      auto &depConstraints = constraints[depTy];
-      
-      auto constraintType = type.get<Type>()->getCanonicalType();
-      assert(constraintType->isExistentialType());
-      depConstraints.protocols.push_back(constraintType);
-      return;
-    }
-    
-    case RequirementKind::SameType:
-      // Collect the same-type constraints by their representative.
-      CanType repTy;
-      if (auto concreteTy = type.dyn_cast<Type>()) {
-        // Maybe we were equated to a concrete type...
-        repTy = concreteTy->getCanonicalType();
-      } else {
-        // ...or to a representative dependent type that was in turn equated
-        // to a concrete type.
-        auto representative
-          = type.get<ArchetypeBuilder::PotentialArchetype *>();
-        
-        if (representative->isConcreteType())
-          repTy = representative->getConcreteType()->getCanonicalType();
-        else
-          repTy = representative->getDependentType(*builder, false)
-            ->getCanonicalType();
-      }
-      
-      sameTypes[repTy].push_back(depTy);
-      return;
-    }
+    depTy = depTy->getCanonicalType();
+    repTy = repTy->getCanonicalType();
+    requirements.push_back(Requirement(kind, depTy, repTy));
   });
-  
-  // Order the dependent types canonically.
-  llvm::array_pod_sort(depTypes.begin(), depTypes.end(), compareDependentTypes);
-  
-  // Build a new set of minimized requirements.
-  // Emit the conformance constraints.
-  SmallVector<Requirement, 4> minimalRequirements;
-  for (auto depTy : depTypes) {
-    minimalRequirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                              depTy, Type()));
-    
-    auto foundConstraints = constraints.find(depTy);
-    if (foundConstraints != constraints.end()) {
-      const auto &depConstraints = foundConstraints->second;
-      
-      if (depConstraints.baseClass)
-        minimalRequirements.push_back(Requirement(RequirementKind::Superclass,
-                                                  depTy,
-                                                  depConstraints.baseClass));
-      
-      for (auto protocol : depConstraints.protocols)
-        minimalRequirements.push_back(Requirement(RequirementKind::Conformance,
-                                                  depTy, protocol));
-    }
-  }
-  
-  // Collect the same type constraints.
-  unsigned sameTypeBegin = minimalRequirements.size();
-  
-  for (auto &group : sameTypes) {
-    // Sort the types in the set.
-    auto types = std::move(group.second);
-    types.push_back(group.first);
-    llvm::array_pod_sort(types.begin(), types.end(), compareDependentTypes);
-
-    // Form constraints with the greater type on the right (which will be the
-    // concrete type, if one).
-    auto rhsType = types.pop_back_val();
-    for (auto lhsType : types)
-      minimalRequirements.push_back(Requirement(RequirementKind::SameType,
-                                                lhsType, rhsType));
-  }
-  
-  // Sort the same-types by LHS, then by RHS.
-  std::sort(minimalRequirements.begin() + sameTypeBegin, minimalRequirements.end(),
-    [](const Requirement &a, const Requirement &b) -> bool {
-      assert(a.getKind() == b.getKind()
-             && a.getKind() == RequirementKind::SameType
-             && "not same type constraints");
-      CanType aLHS(a.getFirstType()), bLHS(b.getFirstType());
-      if (int compareLHS = compareDependentTypes(&aLHS, &bLHS))
-        return compareLHS < 0;
-      CanType aRHS(a.getSecondType()), bRHS(b.getSecondType());
-      return compareDependentTypes(&aRHS, &bRHS);
-    });
   
   // Build the minimized signature.
   auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
-                                           minimalRequirements,
+                                           requirements,
                                            /*isKnownCanonical=*/true);
   
   CanGenericSignature canSig(manglingSig);

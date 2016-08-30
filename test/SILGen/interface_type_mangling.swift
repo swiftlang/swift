@@ -43,15 +43,15 @@ func h1<T where T: Base, T: P>(_ x: T) {}
 // CHECK:       interface_type_mangling.h2 [[H_SIGNATURE]]
 func h2<T where T: P, T: Base>(_ x: T) {}
 // FIXME: Q and AnyObject constraints should be implied by base class constraint. rdar://problem/20829810
-// FIXME:       interface_type_mangling.h3 [[H_SIGNATURE]]
+// CHECK:       interface_type_mangling.h3 [[H_SIGNATURE]]
 func h3<T where T: P, T: Base, T: AnyObject>(_ x: T) {}
-// FIXME:       interface_type_mangling.h4 [[H_SIGNATURE]]
+// CHECK:       interface_type_mangling.h4 [[H_SIGNATURE]]
 func h4<T where T: P, T: Base, T: Q>(_ x: T) {}
-// FIXME:       interface_type_mangling.h5 [[H_SIGNATURE]]
+// CHECK:       interface_type_mangling.h5 [[H_SIGNATURE]]
 func h5<T where T: P, T: Base, T: Q /* TODO: same type constraints , T.Assoc0 == Base*/>(_ x: T) {}
 
 // CHECK-LABEL: interface_type_mangling.i1
-// CHECK:                                    [[I_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc1: interface_type_mangling.P, A.Assoc0: interface_type_mangling.Q> \(A\) -> \(\)]]
+// CHECK:                                    [[I_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc0: interface_type_mangling.Q, A.Assoc1: interface_type_mangling.P> \(A\) -> \(\)]]
 func i1<T where T: P, T: Q, T.Assoc1: P, T.Assoc0: Q>(_ x: T) {}
 // CHECK:       interface_type_mangling.i2 [[I_SIGNATURE]]
 func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(_ x: T) {}
@@ -59,7 +59,7 @@ func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(_ x: T) {}
 /* FIXME: ArchetypeBuilder introduces extra associated type equivalence
  * classes without filtering them out as redundant. */
 // CHECK-LABEL: interface_type_mangling.j01
-// CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc1 == A.Assoc0, A.Assoc2 == A.Assoc0> \(A\) -> \(\)]]
+// CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc0 == A.Assoc1, A.Assoc0 == A.Assoc2> \(A\) -> \(\)]]
 func j01<T where T: P, T: Q, T.Assoc0 == T.Assoc1, T.Assoc1 == T.Assoc2>(_ x: T) {}
 // FIXME:       interface_type_mangling.j02 [[J_SIGNATURE]]
 func j02<T where T: P, T: Q, T.Assoc0 == T.Assoc2, T.Assoc1 == T.Assoc2>(_ x: T) {}
