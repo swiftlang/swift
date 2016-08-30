@@ -158,7 +158,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Deallocates uninitialized memory allocated for `bytes` number of bytes
   /// with `alignedTo` alignment.
   ///
-  /// - Precondition: The memory is not initialized.
+  /// - Precondition: The memory is uninitialized or initialized to a
+  ///   trivial type.
   /// - Postcondition: The memory has been deallocated.
   public func deallocate(bytes: Int, alignedTo: Int) {
     Builtin.deallocRaw(
@@ -168,7 +169,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Binds the allocated memory to type `T` and returns an
   /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
   ///
-  /// - Precondition: The memory is uninitialized.
+  /// - Precondition: The memory is uninitialized or initialized to a type
+  ///   that is layout compatible with `T`.
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
   ///   through `self` + `count` * `MemoryLayout<T>.stride`
   /// - Warning: Binding memory to a type is potentially undefined if the
@@ -203,7 +205,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Precondition: The memory at
   ///  `self + index * strideof(T)..<self + (index + count) * strideof(T)`
-  ///  is uninitialized.
+  ///  is uninitialized or initialized to a trivial type.
   ///
   /// - Precondition: The underlying pointer is properly aligned for
   ///                 accessing `T`.
@@ -243,8 +245,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory regions `source..<source + count` and
   ///   `self..<self + count * MemoryLayout<T>.stride` do not overlap.
   /// - Precondition: The memory at
-  ///   `self..<self + count * MemoryLayout<T>.stride` is uninitialized, and
-  ///   the `T` values at `source..<source + count` are initialized.
+  ///   `self..<self + count * MemoryLayout<T>.stride` is uninitialized or
+  ///   initialized to a trivial type, and the `T` values at
+  ///   `source..<source + count` are initialized.
   /// - Precondition: The underlying pointer is properly aligned for accessing
   ///   `T`.
   /// - Postcondition: The memory at
@@ -281,7 +284,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// Returns an `UnsafeMutablePointer<T>` this memory.
   ///
   /// - Precondition: The memory at `self..<self + source.count *
-  ///   MemoryLayout<T>.stride` is uninitialized.
+  ///   MemoryLayout<T>.stride` is uninitialized or initialized to a
+  ///   trivial type.
   ///
   /// - Postcondition: The memory at `self..<self + source.count *
   ///   MemoryLayout<T>.stride` is bound to type `T`.
@@ -310,7 +314,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: `count >= 0`
   ///
   /// - Precondition: The memory at `self..<self + count *
-  ///   MemoryLayout<T>.stride` is uninitialized and the `T` values at
+  ///   MemoryLayout<T>.stride` is uninitialized or initialized to a
+  ///   trivial type and the `T` values at
   ///   `source..<source + count` are initialized.
   ///
   /// - Postcondition: The memory at `self..<self + count *
