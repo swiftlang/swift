@@ -77,6 +77,11 @@ struct ProfilerRAII {
 };
 
 } // end namespace Lowering
+
+namespace ProfileCounter {
+  Optional<uint64_t> subtract(Optional<uint64_t> L, Optional<uint64_t> R);
+} // end namespace ProfileCounter
+
 } // end namespace swift
 
 #endif // SWIFT_SILGEN_PROFILING
