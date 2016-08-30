@@ -82,7 +82,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(_ generic: inou
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T, var, name "generic"
+// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $@box T, var, name "generic"
 // CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[GUARANTEEDSTACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr [[PB]] to [initialization]
@@ -100,7 +100,7 @@ func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(_ generic: inou
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
+// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $@box T
 // CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
 // CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[PB]])
@@ -195,7 +195,7 @@ func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(_ generic: 
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
 // CHECK: bb0(%0 : $*T, %1 : $Int):
-// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
+// CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $@box T
 // CHECK: [[PB:%.*]] = project_box [[INOUTBOX]]
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
 // CHECK-NEXT: apply [[METH]]<T>(%1, [[PB]])
@@ -383,7 +383,7 @@ func testExistentialPropertyRead<T: ExistentialProperty>(_ t: inout T) {
     let b = t.p.b
 }
 // CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyRead
-// CHECK:      [[T:%.*]] = alloc_box $T
+// CHECK:      [[T:%.*]] = alloc_box $@box T
 // CHECK:      [[PB:%.*]] = project_box [[T]]
 // CHECK:      copy_addr %0 to [initialization] [[PB]] : $*T
 // CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter
@@ -410,7 +410,7 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
   modify(&x.b)
 }
 // CHECK-LABEL: sil hidden @_TF9protocols14modifyPropertyuRxS_24PropertyWithGetterSetterrFRxT_
-// CHECK:      [[SELF_BOX:%.*]] = alloc_box $T
+// CHECK:      [[SELF_BOX:%.*]] = alloc_box $@box T
 // CHECK:      [[SELF:%.*]] = project_box %1 : $@box T
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @_TF9protocols6modifyFRSiT_
 // CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!materializeForSet.1

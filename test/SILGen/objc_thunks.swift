@@ -258,7 +258,7 @@ class Hoozit : Gizmo {
 
   // Constructor.
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozitc{{.*}} : $@convention(method) (Int, @owned Hoozit) -> @owned Hoozit {
-  // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
+  // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $@box Hoozit
   // CHECK: [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
@@ -354,10 +354,10 @@ extension Hoozit {
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks6Hoozitc{{.*}} : $@convention(method) (Double, @owned Hoozit) -> @owned Hoozit
   convenience init(double d: Double) { 
-    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
+    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $@box Hoozit
     // CHECK: [[PB:%.*]] = project_box [[SELF_BOX]]
     // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [delegatingself] [[PB]]
-    // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $X
+    // CHECK: [[X_BOX:%[0-9]+]] = alloc_box $@box X
     var x = X()
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : (Hoozit.Type) -> (Int) -> Hoozit , $@convention(objc_method) (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]

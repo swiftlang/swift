@@ -291,7 +291,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
-  llvm::DenseMap<CanType, SILBoxType *> SILBoxTypes;
+  llvm::DenseMap<llvm::PointerIntPair<CanType, 1, bool>, SILBoxType *> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -3133,17 +3133,17 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   return CanSILBlockStorageType(storageTy);
 }
 
-CanSILBoxType SILBoxType::get(CanType boxType) {
+CanSILBoxType SILBoxType::get(CanType boxType, bool immutable) {
   ASTContext &ctx = boxType->getASTContext();
-  auto found = ctx.Impl.SILBoxTypes.find(boxType);
+  auto found = ctx.Impl.SILBoxTypes.find({boxType, immutable});
   if (found != ctx.Impl.SILBoxTypes.end())
     return CanSILBoxType(found->second);
   
   void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
                            alignof(SILBlockStorageType));
   
-  auto storageTy = new (mem) SILBoxType(boxType);
-  ctx.Impl.SILBoxTypes.insert({boxType, storageTy});
+  auto storageTy = new (mem) SILBoxType(boxType, immutable);
+  ctx.Impl.SILBoxTypes.insert({{boxType, immutable}, storageTy});
   return CanSILBoxType(storageTy);
 }
 

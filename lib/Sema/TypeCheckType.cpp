@@ -2106,12 +2106,15 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_block_storage);
   }
   
-  // In SIL *only*, allow @box to specify a box type.
+  // In SIL *only*, allow @box or @immutable_box to specify a box type.
   if ((options & TR_SILType) && attrs.has(TAK_box)) {
-    ty = SILBoxType::get(ty->getCanonicalType());
+    ty = SILBoxType::get(ty->getCanonicalType(), /*immutable*/ false);
     attrs.clearAttribute(TAK_box);
   }
-
+  if ((options & TR_SILType) && attrs.has(TAK_immutable_box)) {
+    ty = SILBoxType::get(ty->getCanonicalType(), /*immutable*/ true);
+    attrs.clearAttribute(TAK_immutable_box);
+  }
   // In SIL *only*, allow @dynamic_self to specify a dynamic Self type.
   if ((options & TR_SILMode) && attrs.has(TAK_dynamic_self)) {
     ty = rebuildWithDynamicSelf(TC.Context, ty);

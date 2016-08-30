@@ -363,8 +363,8 @@ public:
     return WeakStorageType::get(base, Ctx);
   }
 
-  Type createSILBoxType(Type base) {
-    return SILBoxType::get(base->getCanonicalType());
+  Type createSILBoxType(Type base, bool immutable) {
+    return SILBoxType::get(base->getCanonicalType(), immutable);
   }
 
   Type createObjCClassType(StringRef name) {

@@ -400,7 +400,7 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     // the captured value.
     SILType ty = gen.getLoweredType(type).getAddressType();
     SILType boxTy = SILType::getPrimitiveObjectType(
-      SILBoxType::get(ty.getSwiftRValueType()));
+      SILBoxType::get(ty.getSwiftRValueType(), /*immutable*/ false));
     SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
     SILValue addr = gen.B.createProjectBox(VD, box);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);

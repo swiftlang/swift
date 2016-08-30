@@ -794,7 +794,8 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       case CaptureKind::Box: {
         // Lvalues are captured as a box that owns the captured value.
         SILType ty = loweredTy.getAddressType();
-        CanType boxTy = SILBoxType::get(ty.getSwiftRValueType());
+        CanType boxTy = SILBoxType::get(ty.getSwiftRValueType(),
+                                        /*immutable*/ false);
         auto convention = M.getOptions().EnableGuaranteedClosureContexts
           ? ParameterConvention::Direct_Guaranteed
           : ParameterConvention::Direct_Owned;
@@ -2191,7 +2192,7 @@ namespace {
     }
     CanType visitSILBoxType(CanSILBoxType origType) {
       auto substBoxedType = visit(origType->getBoxedType());
-      return SILBoxType::get(substBoxedType);
+      return SILBoxType::get(substBoxedType, origType->isImmutable());
     }
 
     /// Optionals need to have their object types substituted by these rules.

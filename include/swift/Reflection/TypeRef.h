@@ -19,6 +19,7 @@
 #define SWIFT_REFLECTION_TYPEREF_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Casting.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -733,25 +734,32 @@ public:
 };
 
 class SILBoxTypeRef final : public TypeRef {
-  const TypeRef *BoxedType;
+  llvm::PointerIntPair<const TypeRef *, 1, bool> BoxedTypeAndIsImmutable;
 
-  static TypeRefID Profile(const TypeRef *BoxedType) {
+  static TypeRefID Profile(const TypeRef *BoxedType, bool immutable) {
     TypeRefID ID;
     ID.addPointer(BoxedType);
+    ID.addInteger((uint32_t)immutable);
     return ID;
   }
 public:
-  SILBoxTypeRef(const TypeRef *BoxedType)
-    : TypeRef(TypeRefKind::SILBox), BoxedType(BoxedType) {}
+  SILBoxTypeRef(const TypeRef *BoxedType, bool immutable)
+    : TypeRef(TypeRefKind::SILBox),
+      BoxedTypeAndIsImmutable{BoxedType, immutable} {}
 
   template <typename Allocator>
   static const SILBoxTypeRef *create(Allocator &A,
-                                     const TypeRef *BoxedType) {
-    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeRef, BoxedType);
+                                     const TypeRef *BoxedType,
+                                     bool immutable) {
+    FIND_OR_CREATE_TYPEREF(A, SILBoxTypeRef, BoxedType, immutable);
   }
 
   const TypeRef *getBoxedType() const {
-    return BoxedType;
+    return BoxedTypeAndIsImmutable.getPointer();
+  }
+  
+  bool isImmutable() const {
+    return BoxedTypeAndIsImmutable.getInt();
   }
 
   static bool classof(const TypeRef *TR) {

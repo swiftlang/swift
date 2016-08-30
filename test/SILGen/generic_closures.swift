@@ -131,7 +131,7 @@ func nested_closure_in_generic<T>(_ x:T) -> T {
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures16local_properties
 func local_properties<T>(_ t: inout T) {
-  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $T
+  // CHECK: [[TBOX:%[0-9]+]] = alloc_box $@box T
   var prop: T {
     get {
       return t

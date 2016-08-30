@@ -176,7 +176,7 @@ struct D : Subscriptable {
 // SILGEN: bb0([[VALUE:%.*]] : $Int32, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   debug_value [[VALUE]] : $Int32
 // SILGEN:   debug_value [[I]] : $Int32
-// SILGEN:   [[BOX:%.*]] = alloc_box $D
+// SILGEN:   [[BOX:%.*]] = alloc_box $@box D
 // SILGEN:   [[PB:%.*]] = project_box [[BOX]]
 // SILGEN:   copy_addr [[SELF]] to [initialization] [[PB]] : $*D
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_{{.*}}

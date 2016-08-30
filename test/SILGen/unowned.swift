@@ -41,12 +41,12 @@ func test0(c c: C) {
 // CHECK:    bb0(%0 : $C):
 
   var a: A
-// CHECK:      [[A1:%.*]] = alloc_box $A
+// CHECK:      [[A1:%.*]] = alloc_box $@box A
 // CHECK:      [[PBA:%.*]] = project_box [[A1]]
 // CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
 
   unowned var x = c
-// CHECK:      [[X:%.*]] = alloc_box $@sil_unowned C
+// CHECK:      [[X:%.*]] = alloc_box $@box @sil_unowned C
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
 // CHECK-NEXT: [[T2:%.*]] = ref_to_unowned %0 : $C  to $@sil_unowned C
 // CHECK-NEXT: unowned_retain [[T2]] : $@sil_unowned C
@@ -74,7 +74,7 @@ func unowned_local() -> C {
   // CHECK: [[c:%.*]] = apply
   let c = C()
 
-  // CHECK: [[uc:%.*]] = alloc_box $@sil_unowned C, let, name "uc"
+  // CHECK: [[uc:%.*]] = alloc_box $@box @sil_unowned C, let, name "uc"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[uc]]
   // CHECK-NEXT: [[tmp1:%.*]] = ref_to_unowned [[c]] : $C to $@sil_unowned C
   // CHECK-NEXT: unowned_retain [[tmp1]]

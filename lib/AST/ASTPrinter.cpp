@@ -3917,7 +3917,7 @@ public:
   }
 
   void visitSILBoxType(SILBoxType *T) {
-    Printer << "@box ";
+    Printer << (T->isImmutable() ? "@immutable_box " : "@box ");
     printWithParensIfNotSimple(T->getBoxedType());
   }
 

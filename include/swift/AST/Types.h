@@ -3300,20 +3300,24 @@ typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 /// The SIL-only type @box T, which represents a reference to a (non-class)
 /// refcounted heap allocation containing a value of type T.
 class SILBoxType : public TypeBase {
-  CanType BoxedType;
+  llvm::PointerIntPair<CanType, 1, bool> BoxedTypeAndIsImmutable;
 
-  SILBoxType(CanType BoxedType)
+  SILBoxType(CanType BoxedType, bool Immutable)
     : TypeBase(TypeKind::SILBox,
                &BoxedType->getASTContext(),
                BoxedType->getRecursiveProperties()),
-      BoxedType(BoxedType) {}
+      BoxedTypeAndIsImmutable(BoxedType, Immutable) {}
 
 public:
-  static CanSILBoxType get(CanType BoxedType);
+  static CanSILBoxType get(CanType BoxedType, bool Immutable);
 
-  CanType getBoxedType() const { return BoxedType; }
+  CanType getBoxedType() const { return BoxedTypeAndIsImmutable.getPointer(); }
   // In SILType.h
   SILType getBoxedAddressType() const;
+  
+  bool isImmutable() const {
+    return BoxedTypeAndIsImmutable.getInt();
+  }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBox;

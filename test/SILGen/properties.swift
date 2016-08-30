@@ -10,7 +10,7 @@ func getInt() -> Int { return zero }
 // CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
-  // CHECK: [[BOX:%[0-9]+]] = alloc_box $(Int, Int)
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box $@box (Int, Int)
   // CHECK: [[XADDR1:%.*]] = project_box [[BOX]]
   // CHECK: [[XADDR:%[0-9]+]] = mark_uninitialized [var] [[XADDR1]]
   x.1 = c
@@ -32,9 +32,9 @@ func physical_tuple_rvalue() -> Int {
 // CHECK-LABEL: sil hidden  @_TF10properties16tuple_assignment
 func tuple_assignment(_ a: inout Int, b: inout Int) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int):
-  // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[A_LOCAL:%.*]] = alloc_box $@box Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
-  // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[B_LOCAL:%.*]] = alloc_box $@box Int
   // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
   // CHECK: [[B:%[0-9]+]] = load [[PBB]]
   // CHECK: [[A:%[0-9]+]] = load [[PBA]]
@@ -46,9 +46,9 @@ func tuple_assignment(_ a: inout Int, b: inout Int) {
 // CHECK-LABEL: sil hidden  @_TF10properties18tuple_assignment_2
 func tuple_assignment_2(_ a: inout Int, b: inout Int, xy: (Int, Int)) {
   // CHECK: bb0([[A_ADDR:%[0-9]+]] : $*Int, [[B_ADDR:%[0-9]+]] : $*Int, [[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int):
-  // CHECK: [[A_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[A_LOCAL:%.*]] = alloc_box $@box Int
   // CHECK: [[PBA:%.*]] = project_box [[A_LOCAL]]
-  // CHECK: [[B_LOCAL:%.*]] = alloc_box $Int
+  // CHECK: [[B_LOCAL:%.*]] = alloc_box $@box Int
   // CHECK: [[PBB:%.*]] = project_box [[B_LOCAL]]
   (a, b) = xy
   // CHECK: [[XY2:%[0-9]+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
@@ -98,7 +98,7 @@ struct Val {
 // CHECK-LABEL: sil hidden  @_TF10properties22physical_struct_lvalue
 func physical_struct_lvalue(_ c: Int) {
   var v : Val
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
   v.y = c
   // CHECK: assign %0 to [[X_1]]
 }
@@ -167,7 +167,7 @@ func logical_struct_get() -> Int {
 func logical_struct_set(_ value: inout Val, z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z:%[0-9]+]] : $Int):
   value.z = z
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
   // CHECK: apply [[Z_SET_METHOD]]([[Z]], [[PB]])
@@ -178,7 +178,7 @@ func logical_struct_set(_ value: inout Val, z: Int) {
 func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*(Int, Val), [[Z:%[0-9]+]] : $Int):
   value.1.z = z
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $(Int, Val)
+  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $@box (Int, Val)
   // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[VAL_1:%[0-9]+]] = tuple_element_addr [[PB]] : {{.*}}, 1
   // CHECK: [[Z_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals1z
@@ -190,7 +190,7 @@ func logical_struct_in_tuple_set(_ value: inout (Int, Val), z: Int) {
 func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.ref.val_prop.z_tuple.1 = z1
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // -- val.ref
   // CHECK: [[VAL_REF_ADDR:%[0-9]+]] = struct_element_addr [[PB]] : $*Val, #Val.ref
@@ -253,7 +253,7 @@ func reftype_rvalue_set(_ value: Val) {
 func tuple_in_logical_struct_set(_ value: inout Val, z1: Int) {
   // CHECK: bb0([[VAL:%[0-9]+]] : $*Val, [[Z1:%[0-9]+]] : $Int):
   value.z_tuple.1 = z1
-  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VAL_LOCAL:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PB:%.*]] = project_box [[VAL_LOCAL]]
   // CHECK: [[Z_TUPLE_MATERIALIZED:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[VAL1:%[0-9]+]] = load [[PB]]
@@ -338,7 +338,7 @@ func inout_arg(_ x: inout Int) {}
 // CHECK-LABEL: sil hidden  @_TF10properties14physical_inout
 func physical_inout(_ x: Int) {
   var x = x
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $@box Int
   // CHECK: [[PB:%.*]] = project_box [[XADDR]]
   inout_arg(&x)
   // CHECK: [[INOUT_ARG:%[0-9]+]] = function_ref @_TF10properties9inout_arg
@@ -363,7 +363,7 @@ func val_subscript_get(_ v: Val, i: Int) -> Float {
 func val_subscript_set(_ v: Val, i: Int, x: Float) {
   var v = v
   v[i] = x
-  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $Val
+  // CHECK: [[VADDR:%[0-9]+]] = alloc_box $@box Val
   // CHECK: [[PB:%.*]] = project_box [[VADDR]]
   // CHECK: [[SUBSCRIPT_SET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Vals9subscript
   // CHECK: apply [[SUBSCRIPT_SET_METHOD]]([[X]], [[I]], [[PB]])
@@ -476,7 +476,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsw1a
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
-      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
+      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $@box DidSetWillSetTests
       // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
       // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
@@ -501,7 +501,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsW1a
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
-      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
+      // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $@box DidSetWillSetTests
       // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
       // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
@@ -545,7 +545,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
   // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
-  // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
+  // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $@box DidSetWillSetTests
   // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFBOX]]
   // CHECK-NEXT: copy_addr %1 to [initialization] [[PB]] : $*DidSetWillSetTests
 
@@ -629,7 +629,7 @@ func local_observing_property(_ arg: Int) {
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
 // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
-// CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
+// CHECK: [[BOX:%[0-9]+]] = alloc_box $@box Int
 // CHECK: [[PB:%.*]] = project_box [[BOX]]
 // CHECK: store [[ARG]] to [[PB]]
 
@@ -1007,7 +1007,7 @@ struct AddressOnlyReadOnlySubscript {
 }
 
 // CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBase
-// CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
+// CHECK:         [[BASE:%.*]] = alloc_box $@box AddressOnlyReadOnlySubscript
 // CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscript
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
@@ -1025,7 +1025,7 @@ struct MutatingGetterStruct {
   }
 
   // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
-  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct, var, name "x"
+  // CHECK: [[X:%.*]] = alloc_box $@box MutatingGetterStruct, var, name "x"
   // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
   // CHECK: store {{.*}} to [[PB]] : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[PB]]) : $@convention(method) (@inout MutatingGetterStruct) -> Int

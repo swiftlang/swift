@@ -3910,9 +3910,11 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     TypeID boxID;
+    bool immutable = false;
 
-    decls_block::SILBoxTypeLayout::readRecord(scratch, boxID);
-    typeOrOffset = SILBoxType::get(getType(boxID)->getCanonicalType());
+    decls_block::SILBoxTypeLayout::readRecord(scratch, boxID, immutable);
+    typeOrOffset = SILBoxType::get(getType(boxID)->getCanonicalType(),
+                                   immutable);
     break;
   }
       

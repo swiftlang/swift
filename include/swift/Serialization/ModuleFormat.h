@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 272; // Last change: partial_apply ownership control
+const uint16_t VERSION_MINOR = 273; // Last change: sil_box mutability
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -724,7 +724,8 @@ namespace decls_block {
 
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    TypeIDField            // capture type
+    TypeIDField,           // capture type
+    BCFixed<1>             // immutable
   >;
 
   template <unsigned Code>

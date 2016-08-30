@@ -3028,7 +3028,8 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                 addTypeRef(boxTy->getBoxedType()));
+                                 addTypeRef(boxTy->getBoxedType()),
+                                 boxTy->isImmutable());
     break;
   }
       

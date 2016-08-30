@@ -258,8 +258,8 @@ public:
     return WeakStorageTypeRef::create(*this, base);
   }
 
-  const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
-    return SILBoxTypeRef::create(*this, base);
+  const SILBoxTypeRef *createSILBoxType(const TypeRef *base, bool immutable) {
+    return SILBoxTypeRef::create(*this, base, immutable);
   }
 
   const ObjCClassTypeRef *

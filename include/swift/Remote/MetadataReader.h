@@ -311,7 +311,7 @@ class TypeDecoder {
       auto base = decodeMangledType(Node->getChild(0));
       if (!base)
         return BuiltType();
-      return Builder.createSILBoxType(base);
+      return Builder.createSILBoxType(base, /*immutable*/ false);
     }
     default:
       return BuiltType();

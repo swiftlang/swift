@@ -3150,7 +3150,7 @@ case TypeKind::Id:
       return Type();
     CanType canTransBoxed = transBoxed->getCanonicalType();
     if (canTransBoxed != storageTy->getBoxedType())
-      return SILBoxType::get(canTransBoxed);
+      return SILBoxType::get(canTransBoxed, storageTy->isImmutable());
     return storageTy;
   }
 

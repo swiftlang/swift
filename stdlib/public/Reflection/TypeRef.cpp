@@ -530,7 +530,8 @@ public:
   }
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()),
+                                 SB->isImmutable());
   }
 
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
@@ -707,7 +708,8 @@ public:
   }
 
   const TypeRef *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
-    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()));
+    return SILBoxTypeRef::create(Builder, visit(SB->getBoxedType()),
+                                 SB->isImmutable());
   }
 
   const TypeRef *visitOpaqueTypeRef(const OpaqueTypeRef *O) {

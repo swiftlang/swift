@@ -324,7 +324,8 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect())
     loweredTy = SILType::getPrimitiveObjectType(
-      SILBoxType::get(loweredTy.getSwiftRValueType()));
+      SILBoxType::get(loweredTy.getSwiftRValueType(),
+                      /*immutable*/ false));
 
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
