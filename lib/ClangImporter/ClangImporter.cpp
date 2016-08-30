@@ -2013,22 +2013,6 @@ void ClangImporter::Implementation::printSwiftName(ImportedName name,
   os << ")";
 }
 
-namespace llvm {
-  // An Identifier is "pointer like".
-  template<typename T> class PointerLikeTypeTraits;
-  template<>
-  class PointerLikeTypeTraits<swift::DeclName> {
-  public:
-    static inline void *getAsVoidPointer(swift::DeclName name) {
-      return name.getOpaqueValue();
-    }
-    static inline swift::DeclName getFromVoidPointer(void *ptr) {
-      return swift::DeclName::getFromOpaqueValue(ptr);
-    }
-    enum { NumLowBitsAvailable = 0 };
-  };
-}
-
 /// Retrieve the name of the given Clang declaration context for
 /// printing.
 static StringRef getClangDeclContextName(const clang::DeclContext *dc) {

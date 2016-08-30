@@ -542,6 +542,32 @@ namespace llvm {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
   };
+
+  // A DeclName is "pointer like".
+  template<>
+  class PointerLikeTypeTraits<swift::DeclName> {
+  public:
+    static inline void *getAsVoidPointer(swift::DeclName Val) {
+      return Val.getOpaqueValue();
+    }
+    static inline swift::DeclName getFromVoidPointer(void *P) {
+      return swift::DeclName::getFromOpaqueValue(P);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
+
+  // An ObjCSelector is "pointer like".
+  template<>
+  class PointerLikeTypeTraits<swift::ObjCSelector> {
+  public:
+    static inline void *getAsVoidPointer(swift::ObjCSelector Val) {
+      return Val.getOpaqueValue();
+    }
+    static inline swift::ObjCSelector getFromVoidPointer(void *P) {
+      return swift::ObjCSelector::getFromOpaqueValue(P);
+    }
+    enum { NumLowBitsAvailable = 0 };
+  };
 } // end namespace llvm
 
 #endif
