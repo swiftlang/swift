@@ -198,6 +198,7 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
   assert(!NameOrAssociatedType.is<AssociatedTypeDecl *>() &&
          "associated type is already resolved");
   NameOrAssociatedType = assocType;
+  assert(assocType->getName() == getName());
   assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
          "Mismatch in number of unresolved nested types");
   --builder.Impl->NumUnresolvedNestedTypes;
@@ -1056,6 +1057,75 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   return false;
 }
 
+/// Canonical ordering for dependent types in generic signatures.
+static int compareDependentTypes(ArchetypeBuilder::PotentialArchetype * const* pa,
+                                 ArchetypeBuilder::PotentialArchetype * const* pb) {
+  auto a = *pa, b = *pb;
+
+  // Fast-path check for equality.
+  if (a == b)
+    return 0;
+
+  // Ordering is as follows:
+  // - Generic params
+  if (auto gpa = a->getGenericParam()) {
+    if (auto gpb = b->getGenericParam()) {
+      // - by depth, so t_0_n < t_1_m
+      if (int compareDepth = gpa->getDepth() - gpb->getDepth())
+        return compareDepth;
+      // - by index, so t_n_0 < t_n_1
+      if (int compareIndex = gpa->getIndex() - gpb->getIndex())
+        return compareIndex;
+      llvm_unreachable("total order failure among generic parameters");
+    }
+
+    // A generic param is always ordered before a nested type.
+    return -1;
+  }
+
+  if (b->getGenericParam())
+    return +1;
+
+  // - Dependent members
+  auto ppa = a->getParent();
+  auto ppb = b->getParent();
+
+  // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
+  if (int compareBases = compareDependentTypes(&ppa, &ppb))
+    return compareBases;
+
+  // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
+  if (int compareNames = a->getName().str().compare(b->getName().str()))
+    return compareNames;
+
+  if (auto *aa = a->getResolvedAssociatedType()) {
+    if (auto *ab = b->getResolvedAssociatedType()) {
+      // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
+      auto protoa = aa->getProtocol();
+      auto protob = ab->getProtocol();
+      if (int compareProtocols
+            = ProtocolType::compareProtocols(&protoa, &protob))
+        return compareProtocols;
+
+      // - if one is the representative, put it first.
+      if ((a->getRepresentative() == a) !=
+          (b->getRepresentative() == b))
+        return a->getRepresentative() ? -1 : 1;
+
+      // FIXME: Would be nice if this was a total order.
+      return 0;
+    }
+
+    // A resolved archetype is always ordered before an unresolved one.
+    return -1;
+  }
+
+  if (b->getResolvedAssociatedType())
+    return +1;
+
+  llvm_unreachable("potential archetype total order failure");
+}
+
 bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *T1,
        PotentialArchetype *T2,
@@ -1075,15 +1145,20 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // We necessarily prefer potential archetypes rooted at parameters that come
   // from outer generic parameter lists, since those generic parameters will
   // have archetypes bound in the outer context.
-  // FIXME: This isn't a total ordering
+  //
+  // FIXME: The above comment is mostly obsolete, so why can't we just use
+  // compareDependentTypes() here?
   auto T1Param = T1->getRootParam();
   auto T2Param = T2->getRootParam();
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (std::make_tuple(T2->wasRenamed(), T2Param->getDepth(),
-                      T2Param->getIndex(), T2Depth)
-        < std::make_tuple(T1->wasRenamed(), T1Param->getDepth(),
-                          T1Param->getIndex(), T1Depth))
+  auto T1Key = std::make_tuple(T1->wasRenamed(), T1Param->getDepth(),
+                               T1Param->getIndex(), T1Depth);
+  auto T2Key = std::make_tuple(T2->wasRenamed(), T2Param->getDepth(),
+                               T2Param->getIndex(), T2Depth);
+  if (T2Key < T1Key ||
+      (T2Key == T1Key &&
+       compareDependentTypes(&T2, &T1) < 0))
     std::swap(T1, T2);
 
   // Don't allow two generic parameters to be equivalent, because then we
@@ -1794,28 +1869,44 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
                            PotentialArchetype *archetype,
                            llvm::PointerUnion<Type, PotentialArchetype *> type,
                            RequirementSource source)> f) {
-  // Local function to visit a potential archetype, enumerating its
-  // requirements.
-  auto visitPA = [&](PotentialArchetype *archetype) {
+  // First, collect all archetypes, and sort them.
+  SmallVector<PotentialArchetype *, 8> archetypes;
+  visitPotentialArchetypes([&](PotentialArchetype *archetype) {
+    archetypes.push_back(archetype);
+  });
+
+  llvm::array_pod_sort(archetypes.begin(), archetypes.end(),
+                       compareDependentTypes);
+
+  for (auto *archetype : archetypes) {
     // Invalid archetypes are never representatives in well-formed or corrected
     // signature, so we don't need to visit them.
     if (archetype->isInvalid())
-      return;
+      continue;
 
-    // If this is not the representative, produce a same-type
-    // constraint to the representative.
-    if (archetype->getRepresentative() != archetype) {
-      f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
-        archetype->getSameTypeSource());
-      return;
-    }
+    // If this type is not the representative, or if it was made concrete,
+    // we emit a same-type constraint.
+    if (archetype->getRepresentative() != archetype ||
+        archetype->isConcreteType()) {
+      auto *first = archetype;
+      auto *second = archetype->getRepresentative();
 
-    // If we have a concrete type, produce a same-type requirement.
-    if (archetype->isConcreteType()) {
-      Type concreteType = archetype->getConcreteType();
-      f(RequirementKind::SameType, archetype, concreteType,
+      if (second->isConcreteType()) {
+        Type concreteType = second->getConcreteType();
+        f(RequirementKind::SameType, first, concreteType,
+          first->getSameTypeSource());
+        continue;
+      }
+
+      assert(!first->isConcreteType());
+
+      // Neither one is concrete. Put the shorter type first.
+      if (compareDependentTypes(&first, &second) > 0)
+        std::swap(first, second);
+
+      f(RequirementKind::SameType, first, second,
         archetype->getSameTypeSource());
-      return;
+      continue;
     }
 
     // Add the witness marker.
@@ -1850,51 +1941,6 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
         protocolSources.find(proto)->second);
     }
   };
-
-  // Local function to visit the nested potential archetypes of the
-  // given potential archetype.
-  std::function<void(PotentialArchetype *archetype)> visitNested 
-    = [&](PotentialArchetype *archetype) {
-    // Collect the nested types, sorted by name.
-    SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
-    for (const auto &nested : archetype->getNestedTypes()) {
-      for (auto nestedPA : nested.second)
-        nestedTypes.push_back(std::make_pair(nested.first, nestedPA));
-    }
-    std::stable_sort(nestedTypes.begin(), nestedTypes.end(),
-                     OrderPotentialArchetypeByName());
-    
-    // Add requirements for the nested types.
-    for (const auto &nested : nestedTypes) {
-      visitPA(nested.second);
-      visitNested(nested.second);
-    }
-  };
-
-  auto primaryIter = Impl->PotentialArchetypes.begin(), 
-    primaryIterEnd = Impl->PotentialArchetypes.end();
-  while (primaryIter != primaryIterEnd) {
-    unsigned depth = primaryIter->first.Depth;
-
-    // For each of the primary potential archetypes, add the requirements.
-    // Stop when we hit a parameter at a different depth.
-    // FIXME: This algorithm falls out from the way the "all archetypes" lists
-    // are structured. Once those lists no longer exist or are no longer
-    // "the truth", we can simplify this algorithm considerably.
-    auto nextPrimaryIter = primaryIter;
-    for (/*none*/; 
-         (nextPrimaryIter != primaryIterEnd && 
-          nextPrimaryIter->first.Depth == depth);
-         ++nextPrimaryIter) {
-      visitPA(nextPrimaryIter->second);
-    }
-
-    // For each of the primary potential archetypes, add the nested
-    // requirements.
-    for (; primaryIter != nextPrimaryIter; ++primaryIter) {
-      visitNested(primaryIter->second);
-    }
-  }
 }
 
 void ArchetypeBuilder::dump() {
