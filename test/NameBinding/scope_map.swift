@@ -59,20 +59,20 @@ func functionBodies1(a: Int, b: Int?) {
   struct S7 { }
   typealias S7Alias = S7
   
+  if let b1 = b, let b2 = b {
+    let c1 = b
+  } else {
+    let c2 = b
+  }
 
+  guard let b1 = b, let b2 = b else {
+    let c = 5
+    return
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-
+  while let b3 = b, let b4 = b {
+    let c = 5
+  }
 
 
 
@@ -151,3 +151,19 @@ func functionBodies1(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT: {{^}}                `-LocalDeclaration {{.*}} [59:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  |-TypeOrExtensionBody {{.*}} 'S7' [59:13 - 59:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  `-LocalDeclaration {{.*}} [60:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                    |-IfStmt {{.*}} [62:3 - 66:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [62:18 - 64:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [62:29 - 64:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-BraceStmt {{.*}} [62:29 - 64:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-AfterPatternBinding {{.*}} entry 0 [63:14 - 64:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [64:10 - 66:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [65:14 - 66:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                    `-GuardStmt {{.*}} [68:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [68:21 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [71:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 0 [73:21 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-ConditionalClause {{.*}} index 1 [73:32 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [73:32 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded

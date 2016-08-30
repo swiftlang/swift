@@ -35,7 +35,6 @@ static bool shouldSkipBraceStmtElement(ASTNode element) {
 
 /// Determines whether the given AST node introduces a continuation.
 static bool introducesContinuation(ASTNode element) {
-  // Pattern
   if (auto decl = element.dyn_cast<Decl *>()) {
     // Declarations in local contexts introduce continuations.
     return decl->getDeclContext()->isLocalContext();
@@ -180,6 +179,56 @@ void ASTScope::expand() const {
     if (auto child = createIfNeeded(this, localDeclaration))
       addChild(child);
     break;
+
+  case ASTScopeKind::IfStmt:
+    // The first conditional clause or, failing that, the 'then' clause.
+    if (!ifStmt->getCond().empty()) {
+      addChild(new (ctx) ASTScope(this, ifStmt, 0));
+    } else {
+      if (auto thenChild = createIfNeeded(this, ifStmt->getThenStmt()))
+        addChild(thenChild);
+    }
+
+    // Add the 'else' branch, if needed.
+    if (auto elseChild = createIfNeeded(this, ifStmt->getElseStmt()))
+      addChild(elseChild);
+
+    break;
+
+  case ASTScopeKind::ConditionalClause: {
+    // If there's another conditional clause, add it as the child.
+    unsigned nextIndex = conditionalClause.index + 1;
+    if (nextIndex < conditionalClause.stmt->getCond().size()) {
+      addChild(new (ctx) ASTScope(this, conditionalClause.stmt, nextIndex));
+      break;
+    }
+
+    // There aren't any additional conditional clauses. Add the appropriate
+    // nested scope based on the kind of statement.
+    if (auto ifStmt = dyn_cast<IfStmt>(conditionalClause.stmt)) {
+      if (auto child = createIfNeeded(this, ifStmt->getThenStmt()))
+        addChild(child);
+    } else if (auto whileStmt = dyn_cast<WhileStmt>(conditionalClause.stmt)) {
+      if (auto child = createIfNeeded(this, whileStmt->getBody()))
+        addChild(child);
+    } else {
+      // Note: guard statements have the continuation nested under the last
+      // condition.
+      assert(isa<GuardStmt>(conditionalClause.stmt) &&
+             "unknown labeled conditional statement");
+    }
+    break;
+  }
+
+  case ASTScopeKind::GuardStmt:
+    // Add a child to describe the guard condition.
+    addChild(new (ctx) ASTScope(this, guard, 0));
+
+    // Add a child for the 'guard' body, which always exits.
+    if (auto bodyChild = createIfNeeded(this, guard->getBody()))
+      addChild(bodyChild);
+
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -262,9 +311,12 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::LocalDeclaration:
       return (parent->getLocalDeclaration() == decl);
 
+    case ASTScopeKind::SourceFile:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::BraceStmt:
-    case ASTScopeKind::SourceFile:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::IfStmt:
+    case ASTScopeKind::GuardStmt:
       // Not a direct descendant.
       return false;
     }
@@ -423,8 +475,43 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Brace:
     return new (ctx) ASTScope(parent, cast<BraceStmt>(stmt));
 
+  case StmtKind::Return: {
+    auto returnStmt = cast<ReturnStmt>(stmt);
+    if (!returnStmt->hasResult()) return nullptr;
+
+    return createIfNeeded(parent, returnStmt->getResult());
+  }
+
+  case StmtKind::Defer:
+    return createIfNeeded(parent, cast<DeferStmt>(stmt)->getTempDecl());
+
+  case StmtKind::If:
+    return new (ctx) ASTScope(parent, cast<IfStmt>(stmt));
+
+  case StmtKind::Guard:
+    return new (ctx) ASTScope(parent, cast<GuardStmt>(stmt));
+
+  case StmtKind::While: {
+    // If there are no conditions, just create the body.
+    auto whileStmt = cast<WhileStmt>(stmt);
+    if (whileStmt->getCond().empty())
+      return createIfNeeded(parent, whileStmt->getBody());
+
+    // Create a node for the first conditional clause.
+    return new (ctx) ASTScope(parent, whileStmt, 0);
+  }
+
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
+
+  case StmtKind::Break:
+  case StmtKind::Continue:
+  case StmtKind::Fallthrough:
+  case StmtKind::IfConfig:
+  case StmtKind::Fail:
+  case StmtKind::Throw:
+    // Nothing to do for these statements.
+    return nullptr;
   }
 
   // FIXME: Handle remaining cases.
@@ -451,6 +538,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::BraceStmt:
+  case ASTScopeKind::IfStmt:
+  case ASTScopeKind::GuardStmt:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -462,6 +551,12 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::LocalDeclaration:
     // Local declarations can always have a continuation.
     return true;
+
+  case ASTScopeKind::ConditionalClause:
+    // The last conditional clause of a 'guard' statement can have a
+    // continuation.
+    return isa<GuardStmt>(conditionalClause.stmt) &&
+      conditionalClause.index + 1 == conditionalClause.stmt->getCond().size();
   }
 }
 
@@ -475,6 +570,7 @@ void ASTScope::enumerateContinuationScopes(
   while (true) {
     switch (continuation->getKind()) {
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::IfStmt:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -484,6 +580,8 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::GenericParams:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::GuardStmt:
       // Continue looking for the continuation parent.
       continuation = continuation->getParent();
       continue;
@@ -535,6 +633,9 @@ ASTContext &ASTScope::getASTContext() const {
     return patternBinding.decl->getASTContext();
 
   case ASTScopeKind::BraceStmt:
+  case ASTScopeKind::IfStmt:
+  case ASTScopeKind::ConditionalClause:
+  case ASTScopeKind::GuardStmt:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -615,6 +716,53 @@ SourceRange ASTScope::getSourceRange() const {
   case ASTScopeKind::LocalDeclaration:
     return SourceRange(localDeclaration->getStartLoc(),
                        getParent()->getSourceRange().End);
+
+  case ASTScopeKind::IfStmt:
+    return ifStmt->getSourceRange();
+
+  case ASTScopeKind::ConditionalClause: {
+    // Determine the start location, which is either the beginning of the next
+    // conditional or something statement-specific.
+    auto conditionals = conditionalClause.stmt->getCond();
+    unsigned nextIndex = conditionalClause.index + 1;
+    SourceLoc startLoc;
+    if (nextIndex < conditionals.size())
+      startLoc = conditionals[nextIndex].getStartLoc();
+
+    SourceLoc endLoc;
+
+    // For 'guard' statements, the conditional clause covers the continuation.
+    if (auto guard = dyn_cast<GuardStmt>(conditionalClause.stmt)) {
+      // If we didn't have a condition clause to start the new scope, use the
+      // end of the guard statement itself.
+      if (startLoc.isInvalid())
+        startLoc = guard->getEndLoc();
+
+      return SourceRange(startLoc, getParent()->getSourceRange().End);
+    }
+
+    // For 'if' statements, the conditional clause covers the 'then' branch.
+    if (auto ifStmt = dyn_cast<IfStmt>(conditionalClause.stmt)) {
+      // If we didn't have a conditional clause to start the new scope, use
+      // the beginning of the 'then' clause.
+      if (startLoc.isInvalid())
+        startLoc = ifStmt->getThenStmt()->getStartLoc();
+
+      return SourceRange(startLoc, ifStmt->getThenStmt()->getEndLoc());
+    }
+
+    // For 'while' statements, the conditional clause covers the body.
+    auto whileStmt = cast<WhileStmt>(conditionalClause.stmt);
+    // If we didn't have a conditional clause to start the new scope, use
+    // the beginning of the body.
+    if (startLoc.isInvalid())
+      startLoc = whileStmt->getBody()->getStartLoc();
+
+    return SourceRange(startLoc, whileStmt->getBody()->getEndLoc());
+  }
+
+  case ASTScopeKind::GuardStmt:
+    return SourceRange(guard->getStartLoc(), getParent()->getSourceRange().End);
   }
 }
 
@@ -719,6 +867,25 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::LocalDeclaration:
     printScopeKind("LocalDeclaration");
     printAddress(localDeclaration);
+    printRange();
+    break;
+
+  case ASTScopeKind::IfStmt:
+    printScopeKind("IfStmt");
+    printAddress(ifStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::ConditionalClause:
+    printScopeKind("ConditionalClause");
+    printAddress(conditionalClause.stmt);
+    out << " index " << conditionalClause.index;
+    printRange();
+    break;
+
+  case ASTScopeKind::GuardStmt:
+    printScopeKind("GuardStmt");
+    printAddress(guard);
     printRange();
     break;
   }

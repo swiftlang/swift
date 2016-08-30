@@ -30,21 +30,22 @@ class AbstractFunctionDecl;
 class ASTContext;
 class BraceStmt;
 class Decl;
+class DoCatchStmt;
 class Expr;
 class GenericParamList;
 class BraceStmt;
-class IfStmt;
-class IterableDeclContext;
 class GenericParamList;
 class GuardStmt;
-class WhileStmt;
-class DoCatchStmt;
+class IfStmt;
+class IterableDeclContext;
+class LabeledConditionalStmt;
 class ForStmt;
 class ForEachStmt;
 class PatternBindingDecl;
 class SourceFile;
 class Stmt;
 class StmtConditionElement;
+class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
 enum class ASTScopeKind : uint8_t {
@@ -63,16 +64,16 @@ enum class ASTScopeKind : uint8_t {
   BraceStmt,
   /// The scope introduced by a local declaration.
   LocalDeclaration,
+  /// Node describing an "if" statement.
+  IfStmt,
+  /// The scope introduced by a conditional clause in an if/guard/while
+  /// statement.
+  ConditionalClause,
+  /// Node describing a "guard" statement.
+  GuardStmt,
   /*
-  BraceStmt,
-  IfThenBranch,
-  IfElseBranch,
-  GuardElseBranch,
-  GuardFollowingScope,
-  WhileBody,
   DoCatchStmt,
   ForEachBody,
-  FollowingStmtConditionElement,
    */
 };
 
@@ -144,10 +145,25 @@ class ASTScope {
       mutable unsigned nextElement;
     } braceStmt;
 
-    /// The declatation introduced within a local scope.
+    /// The declaration introduced within a local scope.
     ///
     /// For \c kind == ASTScopeKind::LocalDeclaration.
     Decl *localDeclaration;
+
+    /// The 'if' statement, for \c kind == ASTScopeKind::IfStmt.
+    IfStmt *ifStmt;
+
+    /// For \c kind == ASTScopeKind::ConditionalClause.
+    struct {
+      /// The statement that contains the conditional clause.
+      LabeledConditionalStmt *stmt;
+
+      /// The index of the conditional clause.
+      unsigned index;
+    } conditionalClause;
+
+    /// The 'guard' statement, for \c lind == ASTScopeKind::GuardStmt.
+    GuardStmt *guard;
   };
 
   /// Child scopes, sorted by source range.
@@ -195,6 +211,23 @@ class ASTScope {
       : ASTScope(ASTScopeKind::BraceStmt, parent) {
     this->braceStmt.stmt = braceStmt;
     this->braceStmt.nextElement = 0;
+  }
+
+  ASTScope(const ASTScope *parent, IfStmt *ifStmt)
+      : ASTScope(ASTScopeKind::IfStmt, parent) {
+    this->ifStmt = ifStmt;
+  }
+
+  ASTScope(const ASTScope *parent, LabeledConditionalStmt *stmt,
+           unsigned index)
+      : ASTScope(ASTScopeKind::ConditionalClause, parent) {
+    this->conditionalClause.stmt = stmt;
+    this->conditionalClause.index = index;
+  }
+
+  ASTScope(const ASTScope *parent, GuardStmt *guard)
+      : ASTScope(ASTScopeKind::GuardStmt, parent) {
+    this->guard = guard;
   }
 
   ~ASTScope();
