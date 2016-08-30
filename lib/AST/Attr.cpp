@@ -319,9 +319,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName());
     } else {
-      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-      Printer.printAttrName(getAttrName(), /*needAt=*/true);
-      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
