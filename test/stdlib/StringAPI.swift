@@ -229,7 +229,6 @@ for test in comparisonTests {
 func checkHasPrefixHasSuffix(
   _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
-#if _runtime(_ObjC)
   if rhs == "" {
     expectTrue(lhs.hasPrefix(rhs), stackTrace: stackTrace)
     expectTrue(lhs.hasSuffix(rhs), stackTrace: stackTrace)
@@ -241,6 +240,12 @@ func checkHasPrefixHasSuffix(
     return
   }
 
+  // To determine the expected results, compare grapheme clusters, one by one.
+  let expectHasPrefix = Array(lhs).starts(with: Array(rhs), by: (==))
+  let expectHasSuffix = Array(lhs).reversed().starts(
+    with: Array(rhs).reversed(), by: (==))
+
+#if _runtime(_ObjC)
   // To determine the expected results, compare grapheme clusters,
   // scalar-to-scalar, of the NFD form of the strings.
   let lhsNFDGraphemeClusters =
@@ -251,15 +256,17 @@ func checkHasPrefixHasSuffix(
     rhs.decomposedStringWithCanonicalMapping.map {
       Array(String($0).unicodeScalars)
     }
-  let expectHasPrefix = lhsNFDGraphemeClusters.starts(
+  let expectHasPrefixNFD = lhsNFDGraphemeClusters.starts(
     with: rhsNFDGraphemeClusters, by: (==))
+  let expectHasSuffixNFD = lhsNFDGraphemeClusters.lazy.reversed().starts(
+    with: rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
 
-  let expectHasSuffix = lhsNFDGraphemeClusters.lazy.reversed()
-    .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
+  expectEqual(expectHasPrefixNFD, expectHasPrefix)
+  expectEqual(expectHasSuffixNFD, expectHasSuffix)
+#endif
 
   expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
-#endif
 }
 
 StringTests.test("LosslessStringConvertible") {
@@ -284,8 +291,6 @@ let substringTests = tests.map {
 
 for test in substringTests {
   StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
-    .skip(.nativeRuntime(
-        "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
     .xfail(test.xfail)
     .code {
     checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
