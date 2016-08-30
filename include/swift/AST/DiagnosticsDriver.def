@@ -133,6 +133,9 @@ WARNING(warn_ignore_embed_bitcode, none,
 WARNING(verify_debug_info_requires_debug_option,none,
         "ignoring '-verify-debug-info'; no debug info is being generated", ())
 
+ERROR(error_profile_missing,none,
+      "no profdata file exists at '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -1458,6 +1458,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
@@ -1639,6 +1642,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);
+  Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
+
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
