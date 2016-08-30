@@ -74,7 +74,7 @@ func functionBodies1(a: Int, b: Int?) {
     let c = 5
   }
 
-
+  repeat { } while true;
 
 
 
@@ -161,9 +161,11 @@ func functionBodies1(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT: {{^}}                    `-GuardStmt {{.*}} [68:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [68:21 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [71:3 - 100:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 0 [73:21 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          |-ConditionalClause {{.*}} index 0 [73:21 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ConditionalClause {{.*}} index 1 [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-RepeatWhileStmt {{.*}} [77:3 - 77:20] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [77:10 - 77:12] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded

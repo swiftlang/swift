@@ -229,6 +229,17 @@ void ASTScope::expand() const {
       addChild(bodyChild);
 
     break;
+
+  case ASTScopeKind::RepeatWhileStmt:
+    // Add a child for the loop body.
+    if (auto bodyChild = createIfNeeded(this, repeatWhile->getBody()))
+      addChild(bodyChild);
+
+    // Add a child for the loop condition.
+    if (auto conditionChild = createIfNeeded(this, repeatWhile->getCond()))
+      addChild(conditionChild);
+
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -317,6 +328,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::ConditionalClause:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::GuardStmt:
+    case ASTScopeKind::RepeatWhileStmt:
       // Not a direct descendant.
       return false;
     }
@@ -501,6 +513,12 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return new (ctx) ASTScope(parent, whileStmt, 0);
   }
 
+  case StmtKind::RepeatWhile:
+    return new (ctx) ASTScope(parent, cast<RepeatWhileStmt>(stmt));
+
+  case StmtKind::ForEach:
+    return new (ctx) ASTScope(parent, cast<ForEachStmt>(stmt));
+
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
 
@@ -540,6 +558,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
+  case ASTScopeKind::RepeatWhileStmt:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -571,6 +590,7 @@ void ASTScope::enumerateContinuationScopes(
     switch (continuation->getKind()) {
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::IfStmt:
+    case ASTScopeKind::RepeatWhileStmt:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -636,6 +656,7 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::ConditionalClause:
   case ASTScopeKind::GuardStmt:
+  case ASTScopeKind::RepeatWhileStmt:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -763,6 +784,9 @@ SourceRange ASTScope::getSourceRange() const {
 
   case ASTScopeKind::GuardStmt:
     return SourceRange(guard->getStartLoc(), getParent()->getSourceRange().End);
+
+  case ASTScopeKind::RepeatWhileStmt:
+    return repeatWhile->getSourceRange();
   }
 }
 
@@ -886,6 +910,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::GuardStmt:
     printScopeKind("GuardStmt");
     printAddress(guard);
+    printRange();
+    break;
+
+  case ASTScopeKind::RepeatWhileStmt:
+    printScopeKind("RepeatWhileStmt");
+    printAddress(repeatWhile);
     printRange();
     break;
   }

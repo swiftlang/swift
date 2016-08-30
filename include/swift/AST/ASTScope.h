@@ -32,16 +32,15 @@ class BraceStmt;
 class Decl;
 class DoCatchStmt;
 class Expr;
-class GenericParamList;
-class BraceStmt;
+class ForStmt;
+class ForEachStmt;
 class GenericParamList;
 class GuardStmt;
 class IfStmt;
 class IterableDeclContext;
 class LabeledConditionalStmt;
-class ForStmt;
-class ForEachStmt;
 class PatternBindingDecl;
+class RepeatWhileStmt;
 class SourceFile;
 class Stmt;
 class StmtConditionElement;
@@ -71,6 +70,10 @@ enum class ASTScopeKind : uint8_t {
   ConditionalClause,
   /// Node describing a "guard" statement.
   GuardStmt,
+  /// Node describing a repeat...while statement.
+  RepeatWhileStmt,
+  /// Note describing a for-each statement.
+  ForEachStmt,
   /*
   DoCatchStmt,
   ForEachBody,
@@ -162,9 +165,17 @@ class ASTScope {
       unsigned index;
     } conditionalClause;
 
-    /// The 'guard' statement, for \c lind == ASTScopeKind::GuardStmt.
+    /// The 'guard' statement, for \c kind == ASTScopeKind::GuardStmt.
     GuardStmt *guard;
-  };
+
+    /// The repeat...while statement, for
+    /// \c kind == ASTScopeKind::RepeatWhileStmt.
+    RepeatWhileStmt *repeatWhile;
+
+    /// The for-each statement, for
+    /// \c kind == ASTScopeKind::ForEachStmt.
+    ForEachStmt *forEach;
+};
 
   /// Child scopes, sorted by source range.
   mutable SmallVector<ASTScope *, 4> storedChildren;
@@ -228,6 +239,16 @@ class ASTScope {
   ASTScope(const ASTScope *parent, GuardStmt *guard)
       : ASTScope(ASTScopeKind::GuardStmt, parent) {
     this->guard = guard;
+  }
+
+  ASTScope(const ASTScope *parent, RepeatWhileStmt *repeatWhile)
+      : ASTScope(ASTScopeKind::RepeatWhileStmt, parent) {
+    this->repeatWhile = repeatWhile;
+  }
+
+  ASTScope(const ASTScope *parent, ForEachStmt *forEach)
+      : ASTScope(ASTScopeKind::ForEachStmt, parent) {
+    this->forEach = forEach;
   }
 
   ~ASTScope();
