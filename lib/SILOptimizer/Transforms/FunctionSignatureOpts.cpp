@@ -62,6 +62,15 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //                           Utilities
 //===----------------------------------------------------------------------===//
 
+/// Return the single return value of the function.
+static SILValue findReturnValue(SILFunction *F) {
+  auto RBB = F->findReturnBB();
+  if (RBB == F->end())
+    return SILValue();
+  auto Term = dyn_cast<ReturnInst>(RBB->getTerminator());
+  return Term->getOperand();
+}
+
 /// Return the single apply found in this function.
 static SILInstruction *findOnlyApply(SILFunction *F) {
   SILInstruction *OnlyApply = nullptr;
@@ -102,6 +111,9 @@ class FunctionSignatureTransform {
 
   /// The RC identity analysis we are using.
   RCIdentityAnalysis *RCIA;
+
+  /// Post order analysis we are using.
+  PostOrderAnalysis *PO;
 
   // The function signature mangler we are using.
   FunctionSignatureSpecializationMangler &FM;
@@ -220,11 +232,12 @@ public:
   /// Constructor.
   FunctionSignatureTransform(SILFunction *F,
                              AliasAnalysis *AA, RCIdentityAnalysis *RCIA,
+                             PostOrderAnalysis *PO,
                              FunctionSignatureSpecializationMangler &FM,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), AA(AA), RCIA(RCIA), FM(FM),
+    : F(F), NewF(nullptr), AA(AA), RCIA(RCIA), PO(PO), FM(FM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
       ResultDescList(RDL) {}
 
@@ -646,10 +659,14 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
 
   bool SignatureOptimize = false;
   if (ResultDescList[0].hasConvention(ResultConvention::Owned)) {
+    auto RV = findReturnValue(F);
+    if (!RV)
+      return false;
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
-    ConsumedResultToEpilogueRetainMatcher ReturnRetainMap(RCIA->get(F), AA, F);
-    auto Retains = ReturnRetainMap.getEpilogueRetains();
+    auto Retains = 
+     computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
+          RV, F, PO->get(F), AA, RCIA->get(F));
     // We do not need to worry about the throw block, as the return value is only
     // going to be used in the return block/normal block of the try_apply
     // instruction.
@@ -880,6 +897,7 @@ public:
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    auto *PO = PM->getAnalysis<PostOrderAnalysis>();
 
     const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
 
@@ -910,7 +928,7 @@ public:
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, AA, RCIA, FM, AIM,
+    FunctionSignatureTransform FST(F, AA, RCIA, PO, FM, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;

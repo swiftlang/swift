@@ -243,18 +243,18 @@ static NSString *_getClassDescription(Class cls) {
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {
-  for (auto isa = _swift_getClassOfAllocated(self); isa != nullptr;
-       isa = _swift_getSuperclass(isa))
-    if (isa == (const ClassMetadata*) someClass)
+  for (auto cls = _swift_getClassOfAllocated(self); cls != nullptr;
+       cls = _swift_getSuperclass(cls))
+    if (cls == (const ClassMetadata*) someClass)
       return YES;
 
   return NO;
 }
 
 + (BOOL)isSubclassOfClass:(Class)someClass {
-  for (auto isa = (const ClassMetadata*) self; isa != nullptr;
-       isa = _swift_getSuperclass(isa))
-    if (isa == (const ClassMetadata*) someClass)
+  for (auto cls = (const ClassMetadata*) self; cls != nullptr;
+       cls = _swift_getSuperclass(cls))
+    if (cls == (const ClassMetadata*) someClass)
       return YES;
 
   return NO;
