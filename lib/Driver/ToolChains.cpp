@@ -1233,6 +1233,7 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
   case llvm::Triple::x86_64:
   case llvm::Triple::ppc64:
   case llvm::Triple::ppc64le:
+  case llvm::Triple::systemz:
     // BFD linker has issues wrt relocations against protected symbols.
     return "gold";
   default:
