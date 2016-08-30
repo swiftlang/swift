@@ -80,6 +80,11 @@ func functionBodies1(a: Int, b: Int?) {
 
   }
 
+  do {
+    try throwing()
+  } catch let mine as MyError where mine.value == 17 {
+  } catch {
+  }
 
 
 
@@ -92,11 +97,12 @@ func functionBodies1(a: Int, b: Int?) {
 
 
 
+}
 
+func throwing() throws { }
 
-
-
-
+struct MyError : Error {
+  var value: Int
 }
 
 // RUN: %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
@@ -129,7 +135,7 @@ func functionBodies1(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT:     -BraceStmt {{.*}} [29:10 - 30:3] expanded
 // CHECK-EXPANDED-NEXT: -GenericParams {{.*}} param 0 [33:25 - 33:32] expanded
 // CHECK-EXPANDED-NEXT: {{^[|`]}}-TypeOrExtensionBody {{.*}} '{{.*}}ArchStruct' [{{.*}}] expanded
-// CHECK-EXPANDED-NEXT: {{^}}`-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}|-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:1 [41:36 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [41:39 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 0 [42:23 - 100:1] expanded
@@ -167,8 +173,14 @@ func functionBodies1(a: Int, b: Int?) {
 // CHECK-EXPANDED-NEXT: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          |-RepeatWhileStmt {{.*}} [77:3 - 77:20] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [77:10 - 77:12] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                          `-ForEachStmt {{.*}} [79:3 - 81:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          |-ForEachStmt {{.*}} [79:3 - 81:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ForEachPattern {{.*}} [79:52 - 81:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [79:63 - 81:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-DoCatchStmt {{.*}} [83:3 - 87:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            |-BraceStmt {{.*}} [83:6 - 85:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            |-CatchStmt {{.*}} [85:31 - 86:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [85:54 - 86:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-CatchStmt {{.*}} [86:11 - 87:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [86:11 - 87:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded

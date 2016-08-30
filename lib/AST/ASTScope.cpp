@@ -260,6 +260,29 @@ void ASTScope::expand() const {
       addChild(bodyChild);
 
     break;
+
+  case ASTScopeKind::DoCatchStmt:
+    // Add a child for the body.
+    if (auto bodyChild = createIfNeeded(this, doCatch->getBody()))
+      addChild(bodyChild);
+
+    // Add children for each of the 'catch' clauses.
+    for (auto catchClause : doCatch->getCatches()) {
+      if (auto catchChild = createIfNeeded(this, catchClause))
+        addChild(catchChild);
+    }
+    break;
+
+  case ASTScopeKind::CatchStmt:
+    // Add a child for the guard expression, if there is one.
+    if (auto guardChild = createIfNeeded(this, catchStmt->getGuardExpr()))
+      addChild(guardChild);
+
+    // Add a child for the catch body.
+    if (auto bodyChild = createIfNeeded(this, catchStmt->getBody()))
+      addChild(bodyChild);
+
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -351,6 +374,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::RepeatWhileStmt:
     case ASTScopeKind::ForEachStmt:
     case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
       // Not a direct descendant.
       return false;
     }
@@ -545,6 +570,12 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
 
+  case StmtKind::DoCatch:
+    return new (ctx) ASTScope(parent, cast<DoCatchStmt>(stmt));
+
+  case StmtKind::Catch:
+    return new (ctx) ASTScope(parent, cast<CatchStmt>(stmt));
+
   case StmtKind::Break:
   case StmtKind::Continue:
   case StmtKind::Fallthrough:
@@ -584,6 +615,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::RepeatWhileStmt:
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::ForEachPattern:
+  case ASTScopeKind::DoCatchStmt:
+  case ASTScopeKind::CatchStmt:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -618,6 +651,8 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::RepeatWhileStmt:
     case ASTScopeKind::ForEachStmt:
     case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -686,6 +721,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::RepeatWhileStmt:
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::ForEachPattern:
+  case ASTScopeKind::DoCatchStmt:
+  case ASTScopeKind::CatchStmt:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -821,7 +858,7 @@ SourceRange ASTScope::getSourceRange() const {
     return forEach->getSourceRange();
 
   case ASTScopeKind::ForEachPattern:
-    // The scope of the pattern extends from the 'where expression (if present)
+    // The scope of the pattern extends from the 'where' expression (if present)
     // until the end of the body.
     if (forEach->getWhere())
       return SourceRange(forEach->getWhere()->getStartLoc(),
@@ -829,6 +866,19 @@ SourceRange ASTScope::getSourceRange() const {
 
     // Otherwise, scope of the pattern covers the body.
     return forEach->getBody()->getSourceRange();
+
+  case ASTScopeKind::DoCatchStmt:
+    return doCatch->getSourceRange();
+
+  case ASTScopeKind::CatchStmt:
+    // The scope of the pattern extends from the 'where' (if present)
+    // to the end of the body.
+    if (catchStmt->getGuardExpr())
+      return SourceRange(catchStmt->getWhereLoc(),
+                         catchStmt->getBody()->getEndLoc());
+
+    // Otherwise, the scope of the pattern encompasses the body.
+    return catchStmt->getBody()->getSourceRange();
   }
 }
 
@@ -970,6 +1020,18 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::ForEachPattern:
     printScopeKind("ForEachPattern");
     printAddress(forEach);
+    printRange();
+    break;
+
+  case ASTScopeKind::DoCatchStmt:
+    printScopeKind("DoCatchStmt");
+    printAddress(doCatch);
+    printRange();
+    break;
+
+  case ASTScopeKind::CatchStmt:
+    printScopeKind("CatchStmt");
+    printAddress(catchStmt);
     printRange();
     break;
   }

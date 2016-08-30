@@ -29,6 +29,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class BraceStmt;
+class CatchStmt;
 class Decl;
 class DoCatchStmt;
 class Expr;
@@ -76,10 +77,10 @@ enum class ASTScopeKind : uint8_t {
   ForEachStmt,
   /// Describes the scope of the pattern of the for-each statement.
   ForEachPattern,
-  /*
+  /// Describes a do-catch statement.
   DoCatchStmt,
-  ForEachBody,
-   */
+  /// Describes the a catch statement.
+  CatchStmt,
 };
 
 class ASTScope {
@@ -178,6 +179,12 @@ class ASTScope {
     /// \c kind == ASTScopeKind::ForEachStmt or
     /// \c kind == ASTScopeKind::ForEachPattern.
     ForEachStmt *forEach;
+
+    /// A do-catch statement, for \c kind == ASTScopeKind::DoCatchStmt.
+    DoCatchStmt *doCatch;
+
+    /// A catch statement, for \c kind == ASTScopeKind::CatchStmt.
+    CatchStmt *catchStmt;
 };
 
   /// Child scopes, sorted by source range.
@@ -254,6 +261,16 @@ class ASTScope {
     assert(kind == ASTScopeKind::ForEachStmt ||
            kind == ASTScopeKind::ForEachPattern);
     this->forEach = forEach;
+  }
+
+  ASTScope(const ASTScope *parent, DoCatchStmt *doCatch)
+      : ASTScope(ASTScopeKind::DoCatchStmt, parent) {
+    this->doCatch = doCatch;
+  }
+
+  ASTScope(const ASTScope *parent, CatchStmt *catchStmt)
+      : ASTScope(ASTScopeKind::CatchStmt, parent) {
+    this->catchStmt = catchStmt;
   }
 
   ~ASTScope();
