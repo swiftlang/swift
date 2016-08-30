@@ -1173,7 +1173,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
 void EpilogueARCContext::initializeDataflow() {
   for (auto &B : *F) {
     // Find the exit blocks.
-    if (B.getTerminator()->isFunctionExiting()) {
+    if (isInterestedFunctionExitingBlock(&B)) {
       ExitBlocks.insert(&B);
     }
     // Allocate the storage.
@@ -1186,11 +1186,13 @@ void EpilogueARCContext::initializeDataflow() {
   llvm::DenseSet<SILValue> Processed;
   ToProcess.push_back(Arg);
   while (!ToProcess.empty()) {
-    SILValue Arg = ToProcess.pop_back_val();
-    if (Processed.find(Arg) != Processed.end())
+    SILValue CArg = ToProcess.pop_back_val();
+    if (!CArg)
+      continue;
+    if (Processed.find(CArg) != Processed.end())
        continue;
-    Processed.insert(Arg);
-    SILArgument *A = dyn_cast<SILArgument>(Arg);
+    Processed.insert(CArg);
+    SILArgument *A = dyn_cast<SILArgument>(CArg);
     if (A && !A->isFunctionArg()) {
       // Find predecessor and break the SILArgument to predecessors.
       for (auto X : A->getParent()->getPreds()) {
@@ -1204,7 +1206,7 @@ void EpilogueARCContext::initializeDataflow() {
   }
 }
 
-void EpilogueARCContext::convergeDataflow() {
+bool EpilogueARCContext::convergeDataflow() {
   // Keep iterating until Changed is false.
   bool Changed = false;
   do {
@@ -1238,9 +1240,10 @@ void EpilogueARCContext::convergeDataflow() {
             break;
           }
           // This is a transition from 1 to 0 due to a blocking instruction.
+          // at this point, its OK to abort the data flow as we have one path
+          // which we did not find an epilogue retain before getting blocked.
           if (mayBlockEpilogueARC(&*I, RCFI->getRCIdentityRoot(Arg))) {
-            BBSetOut = false;
-            break;
+            return false;
           }
         }
       }
@@ -1250,6 +1253,7 @@ void EpilogueARCContext::convergeDataflow() {
       BS->BBSetIn = BBSetOut;
     }
   } while(Changed);
+  return true;
 }
 
 bool EpilogueARCContext::computeEpilogueARC() {

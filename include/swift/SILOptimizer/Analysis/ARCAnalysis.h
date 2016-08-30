@@ -455,6 +455,16 @@ private:
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
 
+  /// Return true if this is a function exitting block this epilogue ARC
+  /// matcher is interested in. 
+  bool isInterestedFunctionExitingBlock(SILBasicBlock *BB) {
+    if (EpilogueARCKind::Release == Kind)  
+      return BB->getTerminator()->isFunctionExiting();
+
+    return BB->getTerminator()->isFunctionExiting() &&
+           BB->getTerminator()->getTermKind() != TermKind::ThrowInst;
+  }
+
   /// Return true if this is a function exit block.
   bool isExitBlock(SILBasicBlock *BB) {
     return ExitBlocks.count(BB);
@@ -489,7 +499,8 @@ public:
     // Initialize the epilogue arc data flow context.
     initializeDataflow();
     // Converge the data flow.
-    convergeDataflow();
+    if (!convergeDataflow())
+      return false;
     // Lastly, find the epilogue ARC instructions.
     return computeEpilogueARC();
   }
@@ -504,7 +515,7 @@ public:
   void initializeDataflow();
 
   /// Keep iterating until the data flow is converged.
-  void convergeDataflow();
+  bool convergeDataflow();
 
   /// Find the epilogue ARC instructions.
   bool computeEpilogueARC();
