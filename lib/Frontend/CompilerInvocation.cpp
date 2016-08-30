@@ -1110,6 +1110,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ExternalPassPipelineFilename = A->getValue();
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
+  if (const Arg *A = Args.getLastArg(OPT_profile_use))
+    Opts.ProfdataFilename = A->getValue();
+
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);

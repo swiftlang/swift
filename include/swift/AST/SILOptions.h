@@ -98,6 +98,9 @@ public:
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
+  /// Path to the profdata file to be used for PGO, or the empty string.
+  std::string ProfdataFilename = "";
+
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
 
@@ -110,6 +113,9 @@ public:
 
   /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
   std::string SILOutputFileNameForDebugging;
+
+  /// Should profile data be used?
+  bool shouldUseProfileData() const { return !ProfdataFilename.empty(); }
 };
 
 } // end namespace swift

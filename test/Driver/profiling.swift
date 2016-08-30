@@ -46,3 +46,13 @@
 // LINUX: clang++{{"? }}
 // LINUX: lib/swift/clang/lib/linux/libclang_rt.profile-x86_64.a
 // LINUX: -u__llvm_profile_runtime
+
+// RUN: not %swiftc_driver -driver-print-jobs -profile-generate -profile-use=/dev/null %s 2>&1 | %FileCheck -check-prefix=MIX_GEN_USE %s
+// MIX_GEN_USE: conflicting options '-profile-generate' and '-profile-use'
+
+// RUN: not %swiftc_driver -driver-print-jobs -profile-use=%t.does_not_exist %s 2>&1 | %FileCheck -check-prefix=USE_MISSING_FILE %s
+// USE_MISSING_FILE: no profdata file exists at '{{[^']+}}.does_not_exist'
+
+// RUN: %swiftc_driver -driver-print-jobs -profile-use=/dev/null %s | %FileCheck -check-prefix=USE_DEVNULL %s
+// USE_DEVNULL: swift
+// USE_DEVNULL: -profile-use=/dev/null
