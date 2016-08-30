@@ -321,11 +321,7 @@ extension String {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
-    if let stringBuffer = stringBufferOptional {
-      return String(_storage: stringBuffer)
-    } else {
-      return nil
-    }
+    return stringBufferOptional.map { String(_storage: $0) }
   }
 
   public // @testable
