@@ -43,8 +43,16 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
                        echo=True)
-            shell.call(['git', 'reset', '--hard', 'HEAD'],
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'clean', '-fdx'],
                        echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
+            status = shell.call(['git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
+            if status:
+                print("Please, commit your changes.")
+                print(status)
+                exit(1)
 
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
