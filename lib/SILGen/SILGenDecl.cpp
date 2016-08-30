@@ -1185,7 +1185,9 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// condition has matched and any bound variables are in scope.
 ///
 void SILGenFunction::emitStmtCondition(StmtCondition Cond,
-                                       JumpDest FailDest, SILLocation loc) {
+                                       JumpDest FailDest, SILLocation loc,
+                                       Optional<uint64_t> NumTrueTaken,
+                                       Optional<uint64_t> NumFalseTaken) {
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -1240,8 +1242,9 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
     // on success we fall through to a new block.
     SILBasicBlock *ContBB = createBasicBlock();
     auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
-    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB);
-    
+    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
+                       NumTrueTaken, NumFalseTaken);
+
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
     B.emitBlock(ContBB);
