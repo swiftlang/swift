@@ -235,13 +235,13 @@ void (*SWIFT_CC(RegisterPreservingCC) _swift_nonatomic_retain_n)(HeapObject *obj
 
 static inline void _swift_retain_inlined(HeapObject *object) {
   if (object) {
-    object->refCount.increment();
+    object->refCounts.increment();
   }
 }
 
 static inline void _swift_nonatomic_retain_inlined(HeapObject *object) {
   if (object) {
-    object->refCount.incrementNonAtomic();
+    object->refCounts.incrementNonAtomic();
   }
 }
 

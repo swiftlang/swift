@@ -1345,8 +1345,8 @@ bool swift::swift_isUniquelyReferenced_nonNull_native(
   const HeapObject* object
 ) SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
-  assert(!object->refCount.isDeallocating());
-  return object->refCount.isUniquelyReferenced();
+  assert(!object->refCounts.isDeiniting());
+  return object->refCounts.isUniquelyReferenced();
 }
 
 bool swift::swift_isUniquelyReferenced_native(const HeapObject* object) {
@@ -1455,8 +1455,8 @@ bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
                                                     const HeapObject* object)
   SWIFT_CC(RegisterPreservingCC_IMPL) {
   assert(object != nullptr);
-  assert(!object->refCount.isDeallocating());
-  return object->refCount.isUniquelyReferencedOrPinned();
+  assert(!object->refCounts.isDeiniting());
+  return object->refCounts.isUniquelyReferencedOrPinned();
 }
 
 using ClassExtents = TwoWordPair<size_t, size_t>;
