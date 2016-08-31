@@ -1,6 +1,5 @@
 #!/bin/bash
 
-LOG_FILE=/var/log/build-toolchain-daily.$(date "+%u")
 echo ========== Setup ===========
 SWIFT_PATH=/home/amr/swift
 PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
