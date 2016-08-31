@@ -123,10 +123,6 @@ struct ArchetypeBuilder::Implementation {
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
 
-  /// A vector containing the same-type requirements introduced into the
-  /// system.
-  SmallVector<SameTypeRequirement, 4> SameTypeRequirements;
-
   /// The number of nested types that haven't yet been resolved to archetypes.
   /// Once all requirements have been added, this will be zero in well-formed
   /// code.
@@ -1131,8 +1127,6 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
        PotentialArchetype *T2,
        RequirementSource Source) 
 {
-  auto OrigT1 = T1, OrigT2 = T2;
-
   // Operate on the representatives
   T1 = T1->getRepresentative();
   T2 = T2->getRepresentative();
@@ -1199,11 +1193,6 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   for (auto equiv : T2->EquivalenceClass)
     T1->EquivalenceClass.push_back(equiv);
 
-  if (!T1->wasRenamed() && !T2->wasRenamed()) {
-    // Record this same-type requirement.
-    Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
-  }
-
   // FIXME: superclass requirements!
 
   // Add all of the protocol conformance requirements of T2 to T1.
@@ -1229,7 +1218,6 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
        Type Concrete,
        RequirementSource Source) {
   // Operate on the representative.
-  auto OrigT = T;
   T = T->getRepresentative();
   
   assert(!T->ArchetypeOrConcreteType.getAsArchetype()
@@ -1279,8 +1267,6 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   T->ArchetypeOrConcreteType = NestedType::forConcreteType(Concrete);
   T->SameTypeSource = Source;
 
-  Impl->SameTypeRequirements.push_back({OrigT, Concrete});
-  
   // Recursively resolve the associated types to their concrete types.
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
@@ -1804,11 +1790,6 @@ ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
   return known->second->getType(*this).getAsArchetype();
 }
 
-ArrayRef<ArchetypeBuilder::SameTypeRequirement>
-ArchetypeBuilder::getSameTypeRequirements() const {
-  return Impl->SameTypeRequirements;
-}
-
 template<typename F>
 void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
@@ -1836,32 +1817,6 @@ void ArchetypeBuilder::visitPotentialArchetypes(F f) {
       }
     }
   }
-}
-
-namespace {
-  /// \brief Function object that orders potential archetypes by name.
-  struct OrderPotentialArchetypeByName {
-    using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
-
-    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
-                    std::pair<Identifier, PotentialArchetype *> Y) const {
-      return X.first.str() < Y.second->getName().str();
-    }
-
-    bool operator()(std::pair<Identifier, PotentialArchetype *> X,
-                    Identifier Y) const {
-      return X.first.str() < Y.str();
-    }
-
-    bool operator()(Identifier X,
-                    std::pair<Identifier, PotentialArchetype *> Y) const {
-      return X.str() < Y.first.str();
-    }
-
-    bool operator()(Identifier X, Identifier Y) const {
-      return X.str() < Y.str();
-    }
-  };
 }
 
 void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
@@ -2061,173 +2016,78 @@ Type ArchetypeBuilder::substDependentType(Type type) {
   return substConcreteTypesForDependentTypes(*this, type);
 }
 
-/// Add the requirements for the given potential archetype and its nested
-/// potential archetypes to the set of requirements.
-static void
-addRequirements(
-    ArchetypeBuilder &builder, Type type,
-    ArchetypeBuilder::PotentialArchetype *pa,
-    llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
-    SmallVectorImpl<Requirement> &requirements) {
-
-  auto &ctx = builder.getASTContext();
-
-  // If the potential archetype has been bound away to a concrete type,
-  // it needs no requirements.
-  if (pa->isConcreteType())
-    return;
-
-  // Add a value witness marker.
-  requirements.push_back(Requirement(RequirementKind::WitnessMarker,
-                                     type, Type()));
-
-  // Add superclass requirement, if needed.
-  if (auto superclass = pa->getSuperclass()) {
-    // FIXME: What if the superclass type involves a type parameter?
-    requirements.push_back(Requirement(RequirementKind::Superclass,
-                                       type, superclass));
-  }
-
-  // Add conformance requirements.
-  SmallVector<ProtocolDecl *, 4> protocols;
-  for (const auto &conforms : pa->getConformsTo()) {
-    protocols.push_back(conforms.first);
-  }
-
-  ProtocolType::canonicalizeProtocols(protocols);
-  for (auto proto : protocols) {
-    requirements.push_back(Requirement(RequirementKind::Conformance, type,
-                                       ProtocolType::get(proto, ctx)));
-  }
-}
-
-static void
-addNestedRequirements(
-    ArchetypeBuilder &builder,
-    ArchetypeBuilder::PotentialArchetype *pa,
-    llvm::SmallPtrSet<ArchetypeBuilder::PotentialArchetype *, 16> &knownPAs,
-    SmallVectorImpl<Requirement> &requirements) {
-  using PotentialArchetype = ArchetypeBuilder::PotentialArchetype;
-
-  // Collect the nested types, sorted by name.
-  // FIXME: Could collect these from the conformance requirements, above.
-  SmallVector<std::pair<Identifier, PotentialArchetype*>, 16> nestedTypes;
-  for (const auto &nested : pa->getNestedTypes()) {
-    // FIXME: Dropping requirements among different associated types of the
-    // same name.
-    // Skip type aliases, which are just shortcuts down the tree.
-    if (nested.second.front()->getTypeAliasDecl())
-      continue;
-    nestedTypes.push_back(std::make_pair(nested.first, nested.second.front()));
-  }
-  std::sort(nestedTypes.begin(), nestedTypes.end(),
-            OrderPotentialArchetypeByName());
-
-  // Add requirements for associated types.
-  for (const auto &nested : nestedTypes) {
-    auto rep = nested.second->getRepresentative();
-    if (knownPAs.insert(rep).second) {
-      // Form the dependent type that refers to this archetype.
-      auto assocType = nested.second->getResolvedAssociatedType();
-      if (!assocType)
-        continue; // FIXME: If we do this late enough, there will be no failure.
-
-      // Skip nested types bound to concrete types.
-      if (rep->isConcreteType())
-        continue;
-
-      auto nestedType =
-        rep->getDependentType(builder, /*allowUnresolved*/ false);
-
-      // Skip unresolved nested types.
-      if (nestedType->is<ErrorType>())
-        continue;
-
-      addRequirements(builder, nestedType, rep, knownPAs, requirements);
-      addNestedRequirements(builder, rep, knownPAs, requirements);
-    }
-  }
-}
-
-
 /// Collect the set of requirements placed on the given generic parameters and
 /// their associated types.
 static void collectRequirements(ArchetypeBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
-                                SmallVectorImpl<Requirement> &requirements) {
-  typedef ArchetypeBuilder::PotentialArchetype PotentialArchetype;
+                                SmallVectorImpl<Requirement> &requirements,
+                                bool buildingCanonicalManglingSignature) {
+  builder.enumerateRequirements([&](RequirementKind kind,
+          ArchetypeBuilder::PotentialArchetype *archetype,
+          llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
+          RequirementSource source) {
+    // Filter out redundant requirements.
+    switch (source.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+      // The requirement was explicit and required, keep it.
+      break;
 
-  // Find the "primary" potential archetypes, from which we'll collect all
-  // of the requirements.
-  llvm::SmallPtrSet<PotentialArchetype *, 16> knownPAs;
-  llvm::SmallVector<GenericTypeParamType *, 8> primary;
-  for (auto param : params) {
-    auto pa = builder.resolveArchetype(param);
-    assert(pa && "Missing potential archetype for generic parameter");
+    case RequirementSource::Protocol:
+      // We drop these requirements in canonical mangling signatures.
+      if (buildingCanonicalManglingSignature)
+        return;
+      break;
 
-    // We only care about the representative.
-    pa = pa->getRepresentative();
+    case RequirementSource::Redundant:
+      // The requirement was redundant, drop it.
+      return;
 
-    if (knownPAs.insert(pa).second)
-      primary.push_back(param);
-  }
-
-  // Add all of the conformance and superclass requirements placed on the given
-  // generic parameters and their associated types.
-  unsigned primaryIdx = 0, numPrimary = primary.size();
-  while (primaryIdx < numPrimary) {
-    unsigned depth = primary[primaryIdx]->getDepth();
-
-    // For each of the primary potential archetypes, add the requirements.
-    // Stop when we hit a parameter at a different depth.
-    // FIXME: This algorithm falls out from the way the "all archetypes" lists
-    // are structured. Once those lists no longer exist or are no longer
-    // "the truth", we can simplify this algorithm considerably.
-    unsigned lastPrimaryIdx = primaryIdx;
-    for (unsigned idx = primaryIdx;
-         idx < numPrimary && primary[idx]->getDepth() == depth;
-         ++idx, ++lastPrimaryIdx) {
-      auto param = primary[idx];
-      auto pa = builder.resolveArchetype(param)->getRepresentative();
-
-      // Add other requirements.
-      addRequirements(builder, param, pa, knownPAs, requirements);
+    case RequirementSource::OuterScope:
+      assert(!buildingCanonicalManglingSignature &&
+             "mangling signature shouldn't have an outer scope");
+      break;
     }
 
-    // For each of the primary potential archetypes, add the nested requirements.
-    for (unsigned idx = primaryIdx; idx < lastPrimaryIdx; ++idx) {
-      auto param = primary[idx];
-      auto pa = builder.resolveArchetype(param)->getRepresentative();
-      addNestedRequirements(builder, pa, knownPAs, requirements);
+    auto depTy = archetype->getDependentType(builder, false);
+
+    if (depTy->is<ErrorType>())
+      return;
+
+    if (kind == RequirementKind::WitnessMarker) {
+      requirements.push_back(Requirement(kind, depTy, Type()));
+      return;
     }
 
-    primaryIdx = lastPrimaryIdx;
-  }
+    Type repTy;
+    if (auto concreteTy = type.dyn_cast<Type>()) {
+      // Maybe we were equated to a concrete type...
+      repTy = concreteTy;
+    } else {
+      // ...or to a dependent type.
+      repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
+          ->getDependentType(builder, false);
+    }
 
+    if (repTy->is<ErrorType>())
+      return;
 
-  // Add all of the same-type requirements.
-  for (auto req : builder.getSameTypeRequirements()) {
-    auto firstType = req.first->getDependentType(builder, false);
-    Type secondType;
-    if (auto concrete = req.second.dyn_cast<Type>())
-      secondType = concrete;
-    else if (auto secondPA = req.second.dyn_cast<PotentialArchetype*>())
-      secondType = secondPA->getDependentType(builder, false);
+    if (buildingCanonicalManglingSignature) {
+      depTy = depTy->getCanonicalType();
+      repTy = repTy->getCanonicalType();
+    }
 
-    if (firstType->is<ErrorType>() || secondType->is<ErrorType>() ||
-        firstType->isEqual(secondType))
-      continue;
-
-    requirements.push_back(Requirement(RequirementKind::SameType,
-                                       firstType, secondType));
-  }
+    requirements.push_back(Requirement(kind, depTy, repTy));
+  });
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature(
-    ArrayRef<GenericTypeParamType *> genericParamTypes) {
+    ArrayRef<GenericTypeParamType *> genericParamTypes,
+    bool buildingCanonicalManglingSignature) {
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
-  collectRequirements(*this, genericParamTypes, requirements);
+  collectRequirements(*this, genericParamTypes, requirements,
+                      buildingCanonicalManglingSignature);
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;

@@ -428,12 +428,12 @@ struct GenericParameterNameCollision<T: HasAssoc> :
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@in T1, @in_guaranteed GenericParameterNameCollision<T>) -> () {
   // CHECK:       bb0(%0 : $*T1, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T.Assoc, T1>
+  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
   func foo<U>(_ x: U) {}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@owned @callee_owned (@in T1) -> @out T.Assoc, @in_guaranteed GenericParameterNameCollision<T>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T1) -> @out T.Assoc, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T.Assoc, T1>
+  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 
