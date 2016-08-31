@@ -111,6 +111,49 @@ enum MyEnum {
   case third
 }
 
+struct StructContainsAbstractStorageDecls {
+  subscript (i: Int, j: Int) -> Int {
+    set {
+    }
+    get {
+      return i + j
+    }
+  }
+
+  var computed: Int {
+    get {
+      return 0
+    }
+    set {
+    }
+  }
+}
+
+class ClassWithComputedProperties {
+  var willSetProperty: Int = 0 {
+    willSet { }
+  } 
+
+  var didSetProperty: Int = 0 {
+    didSet { }
+  } 
+}
+
+func funcWithComputedProperties(i: Int) {
+  var computed: Int {
+    set {
+    }
+    get {
+      return 0
+    }
+  }, var (stored1, stored2) = (1, 2),
+  var alsoComputed: Int {
+    return 17
+  }
+    
+  do { }
+}
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
@@ -200,3 +243,47 @@ enum MyEnum {
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [99:36 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
+
+// CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'StructContainsAbstractStorageDecls' [114:43 - 130:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.subscript@{{.*}}scope_map.swift:115:3 [115:37 - 121:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    |-AbstractFunctionParams {{.*}} _ param 0:0 [116:5 - 117:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [116:5 - 117:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 1:1 [116:5 - 117:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-AbstractFunctionParams {{.*}} _ param 1:2 [116:5 - 117:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [116:9 - 117:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [118:5 - 120:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [118:5 - 120:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 1:1 [118:5 - 120:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [118:9 - 120:5] expanded
+
+// CHECK-EXPANDED: {{^}}  `-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.computed@{{.*}}scope_map.swift:123:7 [123:21 - 129:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    |-AbstractFunctionParams {{.*}} _ param 0:0 [124:5 - 126:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [124:9 - 126:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [127:5 - 128:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [127:5 - 128:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [127:9 - 128:5] expanded
+
+// CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'ClassWithComputedProperties' [132:35 - 140:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.willSetProperty@{{.*}}scope_map.swift:133:7 [133:32 - 135:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [134:5 - 134:15] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [134:5 - 134:15] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [134:13 - 134:15] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.didSetProperty@{{.*}}scope_map.swift:137:7 [137:31 - 139:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [138:5 - 138:14] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [138:5 - 138:14] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [138:12 - 138:14] expanded
+
+// CHECK-EXPANDED: {{^}}`-AbstractFunctionParams {{.*}} funcWithComputedProperties(i:) param 0:0 [142:36 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [142:41 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [143:17 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        |-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        |-BraceStmt {{.*}} [146:9 - 148:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-LocalDeclaration {{.*}} [150:25 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [150:25 - 152:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [154:6 - 154:8] expanded

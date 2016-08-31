@@ -21,6 +21,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 using namespace swift;
 
@@ -50,6 +51,24 @@ static bool introducesContinuation(ASTNode element) {
   return false;
 }
 
+/// Determine whether the given abstract storage declaration has accessors.
+static bool hasAccessors(AbstractStorageDecl *asd) {
+  switch (asd->getStorageKind()) {
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithObservers:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::StoredWithObservers:
+    return true;
+
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    return false;
+  }
+}
+
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
@@ -76,7 +95,7 @@ void ASTScope::expand() const {
       out << "***Child node***\n";
       child->print(out);
       out << "***Parent node***\n";
-      getParent()->print(out);
+      this->print(out);
       abort();
     }
 #endif
@@ -143,11 +162,19 @@ void ASTScope::expand() const {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    /// Create a child for the initializer expression, if present.
+    // Create a child for the initializer expression, if present.
     if (auto child = createIfNeeded(this, patternEntry.getInit()))
       addChild(child);
 
-    /// Create a child for the next pattern binding.
+    // Create children for the variables in the pattern, if needed.
+    patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
+      if (hasAccessors(var)) {
+        if (auto varChild = createIfNeeded(this, var))
+          addChild(varChild);
+      }
+    });
+
+    // Create a child for the next pattern binding.
     if (auto child = createIfNeeded(this, patternBinding.decl))
       addChild(child);
     break;
@@ -331,6 +358,44 @@ void ASTScope::expand() const {
     if (auto bodyChild = createIfNeeded(this, forStmt->getBody()))
       addChild(bodyChild);
     break;
+
+  case ASTScopeKind::Accessors: {
+    // Collect all of the explicitly-written accessors.
+    SmallVector<FuncDecl *, 2> accessors;
+    auto addAccessor = [&](FuncDecl *accessor) {
+      if (!accessor) return;
+      if (accessor->isImplicit()) return;
+      if (accessor->getStartLoc().isInvalid()) return;
+
+      accessors.push_back(accessor);
+    };
+
+    addAccessor(abstractStorageDecl->getGetter());
+    addAccessor(abstractStorageDecl->getSetter());
+    addAccessor(abstractStorageDecl->getMaterializeForSetFunc());
+    if (abstractStorageDecl->hasAddressors()) {
+      addAccessor(abstractStorageDecl->getAddressor());
+      addAccessor(abstractStorageDecl->getMutableAddressor());
+    }
+    if (abstractStorageDecl->hasObservers()) {
+      addAccessor(abstractStorageDecl->getDidSetFunc());
+      addAccessor(abstractStorageDecl->getWillSetFunc());
+    }
+
+    // Sort the accessors by beginning source range.
+    std::sort(accessors.begin(), accessors.end(),
+      [&](FuncDecl *a1, FuncDecl *a2) {
+        return ctx.SourceMgr.isBeforeInBuffer(a1->getStartLoc(),
+                                              a2->getStartLoc());
+      });
+
+    // Add the accessor children.
+    for (auto accessor : accessors) {
+      if (auto accessorChild = createIfNeeded(this, accessor))
+        addChild(accessorChild);
+    }
+    break;
+  }
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -406,6 +471,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
     case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::Accessors:
       // Keep looking.
       parent = parent->getParent();
       continue;
@@ -434,20 +500,71 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
   }
 }
 
+/// Determine whether the given parent is a local declaration or is
+/// directly descended from one.
+static bool parentDirectDescendedFromAbstractStorageDecl(
+              const ASTScope *parent,
+              const AbstractStorageDecl *decl) {
+  while (true) {
+  switch (parent->getKind()) {
+    case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::GenericParams:
+      // Keep looking.
+      parent = parent->getParent();
+      continue;
+
+    case ASTScopeKind::Accessors:
+      return (parent->getAbstractStorageDecl() == decl);
+
+    case ASTScopeKind::SourceFile:
+    case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::AfterPatternBinding:
+    case ASTScopeKind::BraceStmt:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::IfStmt:
+    case ASTScopeKind::GuardStmt:
+    case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::ForStmt:
+    case ASTScopeKind::ForStmtInitializer:
+      // Not a direct descendant.
+      return false;
+  }
+  }
+}
+
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (!decl) return nullptr;
 
   // Implicit declarations don't have source information for name lookup.
   if (decl->isImplicit()) return nullptr;
 
+  // Accessors are always nested within their abstract storage declaration.
+  bool isAccessor = false;
+  if (auto func = dyn_cast<FuncDecl>(decl)) {
+    if (func->isAccessor()) {
+      isAccessor = true;
+      if (!parentDirectDescendedFromAbstractStorageDecl(
+             parent, func->getAccessorStorageDecl()))
+        return nullptr;
+    }
+  }
+
   // If this is a local declaration for which we have not yet produced a
-  // local declaration scope, intrdouce that local declaration scope now.
+  // local declaration scope, introduce that local declaration scope now.
   //
   // Note that pattern bindings are handled as a special case, because they
   // potentially introduce several levels of bindings.
   ASTContext &ctx = decl->getASTContext();
   bool inLocalContext = decl->getDeclContext()->isLocalContext();
-  if (!isa<PatternBindingDecl>(decl) && inLocalContext &&
+  if (!isa<PatternBindingDecl>(decl) && !isa<AbstractStorageDecl>(decl) &&
+      inLocalContext && !isAccessor &&
       !parentDirectDescendedFromLocalDeclaration(parent, decl)) {
     auto scope = new (ctx) ASTScope(ASTScopeKind::LocalDeclaration,
                                 parent);
@@ -462,8 +579,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
 
     unsigned index = (parent->getKind() == ASTScopeKind::GenericParams &&
                       parent->genericParams.decl == decl)
-                       ? parent->genericParams.index + 1
-                       : 0;
+                        ? parent->genericParams.index + 1
+                        : 0;
     if (index < genericParams->size())
       return new (ctx) ASTScope(parent, genericParams, decl, index);
 
@@ -570,6 +687,14 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     if (entry < patternBinding->getPatternList().size())
       return new (ctx) ASTScope(parent, patternBinding, entry);
 
+    return nullptr;
+  }
+
+  case DeclKind::Var:
+  case DeclKind::Subscript: {
+    auto asd = cast<AbstractStorageDecl>(decl);
+    if (hasAccessors(asd))
+      return new (ctx) ASTScope(parent, asd);
     return nullptr;
   }
   }
@@ -695,6 +820,10 @@ bool ASTScope::isContinuationScope() const {
     // Local declarations can always have a continuation.
     return true;
 
+  case ASTScopeKind::Accessors:
+    // Local declarations can have a continuation.
+    return abstractStorageDecl->getDeclContext()->isLocalContext();
+
   case ASTScopeKind::ConditionalClause:
     // The last conditional clause of a 'guard' statement can have a
     // continuation.
@@ -726,6 +855,14 @@ void ASTScope::enumerateContinuationScopes(
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
+
+    case ASTScopeKind::Accessors:
+      // Non-local variables/subscripts are hard barriers; there's nothing
+      // to continue to.
+      if (!abstractStorageDecl->getDeclContext()->isLocalContext())
+        return;
+
+      SWIFT_FALLTHROUGH;
 
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::AbstractFunctionParams:
@@ -801,6 +938,9 @@ ASTContext &ASTScope::getASTContext() const {
 
   case ASTScopeKind::LocalDeclaration:
     return localDeclaration->getASTContext();
+
+  case ASTScopeKind::Accessors:
+    return abstractStorageDecl->getASTContext();
   }
 }
 
@@ -834,6 +974,12 @@ SourceRange ASTScope::getSourceRange() const {
 
   case ASTScopeKind::AbstractFunctionParams: {
     SourceLoc endLoc = abstractFunctionParams.decl->getEndLoc();
+
+    // For an accessor, all of the parameters are implicit, so start them at
+    // the start location of the accessor.
+    if (isa<FuncDecl>(abstractFunctionParams.decl) &&
+        cast<FuncDecl>(abstractFunctionParams.decl)->isAccessor())
+      return SourceRange(abstractFunctionParams.decl->getLoc(), endLoc);
 
     // For the 'self' parameter of a member function, use the start of the
     // first parameter list... or the 'deinit' keyword for deinitializers.
@@ -976,6 +1122,10 @@ SourceRange ASTScope::getSourceRange() const {
 
   case ASTScopeKind::ForStmtInitializer:
     return SourceRange(forStmt->getFirstSemicolonLoc(), forStmt->getEndLoc());
+
+  case ASTScopeKind::Accessors: {
+    return abstractStorageDecl->getBracesRange();
+  }
   }
 }
 
@@ -1153,6 +1303,14 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::ForStmtInitializer:
     printScopeKind("ForStmtInitializer");
     printAddress(forStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::Accessors:
+    printScopeKind("Accessors");
+    printAddress(abstractStorageDecl);
+    out << " ";
+    abstractStorageDecl->dumpRef(out);
     printRange();
     break;
   }

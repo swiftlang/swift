@@ -27,6 +27,7 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class AbstractStorageDecl;
 class ASTContext;
 class BraceStmt;
 class CaseStmt;
@@ -92,6 +93,8 @@ enum class ASTScopeKind : uint8_t {
   /// Describes the scope of variables introduced in the initializer of a
   /// a C-style 'for' statement.
   ForStmtInitializer,
+  /// Scope for the accessors of an abstract storage declaration.
+  Accessors,
 };
 
 class ASTScope {
@@ -206,6 +209,10 @@ class ASTScope {
     /// A for statement, for \c kind == ASTScopeKind::ForStmt or
     /// \c kind == ASTScopeKind::ForStmtInitializer.
     ForStmt *forStmt;
+
+    /// An abstract storage declaration, for
+    /// \c kind == ASTScopeKind::Accessors.
+    AbstractStorageDecl *abstractStorageDecl;
 };
 
   /// Child scopes, sorted by source range.
@@ -311,6 +318,11 @@ class ASTScope {
     this->forStmt = forStmt;
   }
 
+  ASTScope(const ASTScope *parent, AbstractStorageDecl *abstractStorageDecl)
+      : ASTScope(ASTScopeKind::Accessors, parent) {
+    this->abstractStorageDecl = abstractStorageDecl;
+  }
+
   ~ASTScope();
 
   ASTScope(ASTScope &&) = delete;
@@ -392,6 +404,13 @@ public:
   Decl *getLocalDeclaration() const {
     assert(getKind() == ASTScopeKind::LocalDeclaration);
     return localDeclaration;
+  }
+
+  /// Retrieve the abstract storage declaration when
+  /// \c getKind() == ASTScopeKind::Accessors;
+  AbstractStorageDecl *getAbstractStorageDecl() const {
+    assert(getKind() == ASTScopeKind::Accessors);
+    return abstractStorageDecl;
   }
 
   /// Expand the entire scope map.
