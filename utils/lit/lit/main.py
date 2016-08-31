@@ -134,7 +134,7 @@ def sort_by_incremental_cache(run):
 def prepare_host(host, inputs):
     from lit.run import shellQuote, remote_script
     def err(*args):
-        print >> sys.stderr, ' '.join(args)
+        print ' '.join(args)
         return False
 
     quotedInputs = ' '.join(shellQuote(x) for x in inputs)
@@ -170,6 +170,7 @@ def prepare_distcc_hosts(inputs):
             if h == '--randomize': continue
             (host, cores) = h.split(',')[0].split('/')
             if prepare_host(host, inputs):
+                print '... found %s processes' % int(cores)
                 result += int(cores) * [host]
     return result
 
