@@ -3442,23 +3442,27 @@ case TypeKind::Id:
       if (!firstType)
         return Type();
 
+      if (firstType.getPointer() != req.getFirstType().getPointer())
+        anyChanges = true;
+
       Type secondType = req.getSecondType();
       if (secondType) {
         secondType = secondType.transform(fn);
         if (!secondType)
           return Type();
+
+        if (secondType.getPointer() != req.getSecondType().getPointer())
+          anyChanges = true;
       }
 
-      if (firstType->hasTypeParameter() ||
-          (secondType && secondType->hasTypeParameter())) {
-        if (firstType.getPointer() != req.getFirstType().getPointer() ||
-            secondType.getPointer() != req.getSecondType().getPointer())
-          anyChanges = true;
+      if (!firstType->isTypeParameter()) {
+        if (!secondType || !secondType->isTypeParameter())
+          continue;
+        std::swap(firstType, secondType);
+      }
 
-        requirements.push_back(Requirement(req.getKind(), firstType,
-                                           secondType));
-      } else
-        anyChanges = true;
+      requirements.push_back(Requirement(req.getKind(), firstType,
+                                         secondType));
     }
     
     // Transform input type.
