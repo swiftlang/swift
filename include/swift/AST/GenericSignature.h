@@ -28,6 +28,9 @@ namespace swift {
 class ArchetypeBuilder;
 class ProtocolType;
 
+using TypeConformanceMap
+  = llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>>;
+
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
 class GenericSignatureWitnessIterator {
@@ -171,15 +174,27 @@ public:
   /// the order of generic parameters in getGenericParams().
   TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
 
+  /// Variant of the above that also returns conformances.
+  void getSubstitutionMap(ArrayRef<Substitution> subs,
+                          TypeSubstitutionMap &subMap,
+                          TypeConformanceMap &conformanceMap) const;
+
   using LookupConformanceFn =
-      llvm::function_ref<ProtocolConformanceRef(Type, ProtocolType *)>;
+      llvm::function_ref<ProtocolConformanceRef(CanType, Type, ProtocolType *)>;
 
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
   void getSubstitutions(ModuleDecl &mod,
-                        const TypeSubstitutionMap &subs,
+                        const TypeSubstitutionMap &subMap,
                         LookupConformanceFn lookupConformance,
-                        SmallVectorImpl<Substitution> &result);
+                        SmallVectorImpl<Substitution> &result) const;
+
+  /// Build an array of substitutions from an interface type substitution map,
+  /// using the given function to look up conformances.
+  void getSubstitutions(ModuleDecl &mod,
+                        const TypeSubstitutionMap &subMap,
+                        const TypeConformanceMap &conformanceMap,
+                        SmallVectorImpl<Substitution> &result) const;
 
   /// Return a range that iterates through first all of the generic parameters
   /// of the signature, followed by all of their recursive member types exposed
