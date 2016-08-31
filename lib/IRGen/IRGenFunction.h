@@ -27,6 +27,7 @@
 #include "IRBuilder.h"
 #include "LocalTypeDataKind.h"
 #include "DominancePoint.h"
+#include "StackAllocation.h"
 
 namespace llvm {
   class AllocaInst;
@@ -124,6 +125,7 @@ private:
 public:
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name);
+  llvm::Instruction *getAllocaIP() { return AllocaIP; }
   Address createFixedSizeBufferAlloca(const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
@@ -575,6 +577,9 @@ private:
 
   llvm::DenseMap<CanType, std::vector<ArchetypeAccessPath>>
   ArchetypeAccessPaths;
+  
+protected:
+  StackAllocation StackAlloc;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

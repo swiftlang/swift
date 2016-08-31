@@ -431,6 +431,7 @@ public:
   };
   llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
+  llvm::StructType *OpaquePtrPairTy;  /// { %swift.opaque*, %swift.opaque* }
   llvm::StructType *ObjCClassStructTy; /// %objc_class
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
   llvm::StructType *ObjCSuperStructTy; /// %objc_super
