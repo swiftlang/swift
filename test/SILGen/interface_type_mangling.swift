@@ -42,7 +42,6 @@ func g3<U, T where U: PP, T: PQ, T.Assoc1: A>(_ x: T, y: U) {}
 func h1<T where T: Base, T: P>(_ x: T) {}
 // CHECK:       interface_type_mangling.h2 [[H_SIGNATURE]]
 func h2<T where T: P, T: Base>(_ x: T) {}
-// FIXME: Q and AnyObject constraints should be implied by base class constraint. rdar://problem/20829810
 // CHECK:       interface_type_mangling.h3 [[H_SIGNATURE]]
 func h3<T where T: P, T: Base, T: AnyObject>(_ x: T) {}
 // CHECK:       interface_type_mangling.h4 [[H_SIGNATURE]]
@@ -56,44 +55,42 @@ func i1<T where T: P, T: Q, T.Assoc1: P, T.Assoc0: Q>(_ x: T) {}
 // CHECK:       interface_type_mangling.i2 [[I_SIGNATURE]]
 func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(_ x: T) {}
 
-/* FIXME: ArchetypeBuilder introduces extra associated type equivalence
- * classes without filtering them out as redundant. */
 // CHECK-LABEL: interface_type_mangling.j01
 // CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc0 == A.Assoc1, A.Assoc0 == A.Assoc2> \(A\) -> \(\)]]
 func j01<T where T: P, T: Q, T.Assoc0 == T.Assoc1, T.Assoc1 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j02 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j02 [[J_SIGNATURE]]
 func j02<T where T: P, T: Q, T.Assoc0 == T.Assoc2, T.Assoc1 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j03 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j03 [[J_SIGNATURE]]
 func j03<T where T: P, T: Q, T.Assoc0 == T.Assoc2, T.Assoc1 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j04 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j04 [[J_SIGNATURE]]
 func j04<T where T: P, T: Q, T.Assoc1 == T.Assoc0, T.Assoc1 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j05 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j05 [[J_SIGNATURE]]
 func j05<T where T: P, T: Q, T.Assoc2 == T.Assoc0, T.Assoc1 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j06 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j06 [[J_SIGNATURE]]
 func j06<T where T: P, T: Q, T.Assoc2 == T.Assoc0, T.Assoc1 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j07 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j07 [[J_SIGNATURE]]
 func j07<T where T: P, T: Q, T.Assoc1 == T.Assoc0, T.Assoc2 == T.Assoc1>(_ x: T) {}
-// FIXME:       interface_type_mangling.j08 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j08 [[J_SIGNATURE]]
 func j08<T where T: P, T: Q, T.Assoc2 == T.Assoc0, T.Assoc2 == T.Assoc1>(_ x: T) {}
-// FIXME:       interface_type_mangling.j09 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j09 [[J_SIGNATURE]]
 func j09<T where T: P, T: Q, T.Assoc2 == T.Assoc0, T.Assoc0 == T.Assoc1>(_ x: T) {}
-// FIXME:       interface_type_mangling.j10 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j10 [[J_SIGNATURE]]
 func j10<T where T: P, T: Q, T.Assoc1 == T.Assoc2, T.Assoc0 == T.Assoc1>(_ x: T) {}
-// FIXME:       interface_type_mangling.j11 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j11 [[J_SIGNATURE]]
 func j11<T where T: P, T: Q, T.Assoc1 == T.Assoc2, T.Assoc0 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j12 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j12 [[J_SIGNATURE]]
 func j12<T where T: P, T: Q, T.Assoc1 == T.Assoc0, T.Assoc0 == T.Assoc2>(_ x: T) {}
-// FIXME:       interface_type_mangling.j13 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j13 [[J_SIGNATURE]]
 func j13<T where T: P, T: Q, T.Assoc1 == T.Assoc2, T.Assoc1 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j14 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j14 [[J_SIGNATURE]]
 func j14<T where T: P, T: Q, T.Assoc1 == T.Assoc2, T.Assoc2 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j15 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j15 [[J_SIGNATURE]]
 func j15<T where T: P, T: Q, T.Assoc1 == T.Assoc0, T.Assoc2 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j16 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j16 [[J_SIGNATURE]]
 func j16<T where T: P, T: Q, T.Assoc2 == T.Assoc1, T.Assoc1 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j17 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j17 [[J_SIGNATURE]]
 func j17<T where T: P, T: Q, T.Assoc2 == T.Assoc1, T.Assoc2 == T.Assoc0>(_ x: T) {}
-// FIXME:       interface_type_mangling.j18 [[J_SIGNATURE]]
+// CHECK:       interface_type_mangling.j18 [[J_SIGNATURE]]
 func j18<T where T: P, T: Q, T.Assoc0 == T.Assoc1, T.Assoc2 == T.Assoc0>(_ x: T) {}
 
 struct S {}

@@ -256,10 +256,15 @@ public:
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
+  /// \param buildingCanonicalManglingSignature If true, requirements
+  ///        on associated types are dropped, and types in requirements
+  ///        are canonicalized.
+  ///
   /// \returns a generic signature built from the provided list of
   ///          generic parameter types.
   GenericSignature *
-  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes,
+                      bool buildingCanonicalManglingSignature=false);
 
   /// \brief Get a generic context based on the complete list of generic
   /// parameter types.
@@ -348,13 +353,6 @@ public:
   using SameTypeRequirement
     = std::pair<PotentialArchetype *,
                 PointerUnion<Type, PotentialArchetype*>>;
-  
-  /// Retrieve the set of same-type requirements that apply to the potential
-  /// archetypes known to this builder.
-  ArrayRef<SameTypeRequirement> getSameTypeRequirements() const;
-
-  // FIXME: Compute the set of 'extra' witness tables needed to express this
-  // requirement set.
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(

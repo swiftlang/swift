@@ -153,59 +153,15 @@ GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   // the minimal set of requirements.
   std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M, 
                                                                  Context.Diags));
-  
-  builder->addGenericSignature(canonical, /*adoptArchetypes*/ false,
+
+  builder->addGenericSignature(canonical,
+                               /*adoptArchetypes*/ false,
                                /*treatRequirementsAsExplicit*/ true);
 
-  // Build a new set of minimized requirements.
-  SmallVector<Requirement, 4> requirements;
-
-  builder->enumerateRequirements([&](RequirementKind kind,
-          ArchetypeBuilder::PotentialArchetype *archetype,
-          llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
-          RequirementSource source) {
-    // Filter out redundant requirements.
-    switch (source.getKind()) {
-    case RequirementSource::Explicit:
-    case RequirementSource::Inferred:
-      // The requirement was explicit and required, keep it.
-      break;
-      
-    case RequirementSource::Protocol:
-    case RequirementSource::Redundant:
-      // The requirement was redundant, drop it.
-      return;
-
-    case RequirementSource::OuterScope:
-      llvm_unreachable("shouldn't have an outer scope!");
-    }
-
-    auto depTy = archetype->getDependentType(*builder, false);
-
-    if (kind == RequirementKind::WitnessMarker) {
-      requirements.push_back(Requirement(kind, depTy, Type()));
-      return;
-    }
-
-    Type repTy;
-    if (auto concreteTy = type.dyn_cast<Type>()) {
-      // Maybe we were equated to a concrete type...
-      repTy = concreteTy;
-    } else {
-      // ...or to a dependent type.
-      repTy = type.get<ArchetypeBuilder::PotentialArchetype *>()
-          ->getDependentType(*builder, false);
-    }
-
-    depTy = depTy->getCanonicalType();
-    repTy = repTy->getCanonicalType();
-    requirements.push_back(Requirement(kind, depTy, repTy));
-  });
-  
   // Build the minimized signature.
-  auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
-                                           requirements,
-                                           /*isKnownCanonical=*/true);
+  auto manglingSig =
+      builder->getGenericSignature(canonical->getGenericParams(),
+                                   /*buildingCanonicalManglingSignature*/ true);
   
   CanGenericSignature canSig(manglingSig);
   

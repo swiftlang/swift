@@ -57,8 +57,8 @@ class S : P2 {
 
 extension P2 where Self.T : C {
   // CHECK: superclass_constraint.(file).P2.concreteTypeWitnessViaSuperclass1
-  // CHECK: Generic signature: <Self where Self : P2, Self.T : C, Self.T : P3, Self.T.T == C.T>
-  // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P2, τ_0_0.T : C, τ_0_0.T : P3, τ_0_0.T.T == Int>
+  // CHECK: Generic signature: <Self where Self : P2, Self.T : C>
+  // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P2, τ_0_0.T : C>
   func concreteTypeWitnessViaSuperclass1(x: Self.T.T) {}
 }
 
