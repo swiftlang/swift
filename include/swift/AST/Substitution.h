@@ -75,7 +75,6 @@ private:
   friend class ProtocolConformance;
   
   Substitution subst(ModuleDecl *module,
-                     ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,
                      ArchetypeConformanceMap &conformanceMap) const;
 };
