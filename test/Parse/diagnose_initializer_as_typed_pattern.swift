@@ -12,6 +12,8 @@ let d : [X]()  // expected-error{{unexpected initializer in pattern; did you mea
 
 let e: X(), ee: Int  // expected-error{{unexpected initializer in pattern; did you mean to use '='?}} {{6-7= =}}
 
+let f:/*comment*/[X]()  // expected-error{{unexpected initializer in pattern; did you mean to use '='?}} {{6-7= = }}
+
 var _1 = 1, _2 = 2
 
 // paren follows the type, but it's part of a separate (valid) expression
