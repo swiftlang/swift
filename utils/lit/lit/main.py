@@ -7,7 +7,7 @@ See lit.pod for more information.
 """
 
 from __future__ import absolute_import
-import math, os, platform, random, re, sys, time
+import math, os, platform, random, re, sys, time, subprocess
 
 import lit.ProgressBar
 import lit.LitConfig
@@ -131,6 +131,48 @@ def sort_by_incremental_cache(run):
             return 0
     run.tests.sort(key = lambda t: sortIndex(t))
 
+def prepare_host(host, inputs):
+    from lit.run import shellQuote, remote_script
+    def err(*args):
+        print >> sys.stderr, ' '.join(args)
+        return False
+
+    quotedInputs = ' '.join(shellQuote(x) for x in inputs)
+    locateInputs = '''
+for x in %s; do 
+    if [ ! -e "$x" ]; then
+        echo "$x"
+    fi
+done''' % quotedInputs
+    try:
+        print 'locating host:', host
+        output = subprocess.check_output(
+            remote_script(host, locateInputs))
+    except KeyboardInterrupt:
+        sys.exit(2)
+    except subprocess.CalledProcessError:
+        return err('Can\'t ssh to host %r' % host)
+
+    missingPaths = [x for x in output.split('\n') if x != '']
+    if missingPaths:
+        return err('Inputs not available on host %r:\n%s' % (
+            host, ' '.join(shellQuote(x) for x in missingPaths)))
+
+    return True
+
+
+def prepare_distcc_hosts(inputs):
+    from os.path import expanduser
+    result = []
+    for l in open(expanduser('~/.distcc/hosts')):
+        for h in l.split():
+            if h.startswith('#'): break
+            if h == '--randomize': continue
+            (host, cores) = h.split(',')[0].split('/')
+            if prepare_host(host, inputs):
+                result += int(cores) * [host]
+    return result
+
 def main(builtinParameters = {}):
     # Use processes by default on Unix platforms.
     isWindows = platform.system() == 'Windows'
@@ -146,6 +188,9 @@ def main(builtinParameters = {}):
     parser.add_option("-j", "--threads", dest="numThreads", metavar="N",
                       help="Number of testing threads",
                       type=int, action="store", default=None)
+    parser.add_option("", "--distribute", dest="distribute",
+                      help="Distribute testing jobs",
+                      action="store_true", default=None)
     parser.add_option("", "--config-prefix", dest="configPrefix",
                       metavar="NAME", help="Prefix for 'lit' config files",
                       action="store", default=None)
@@ -255,20 +300,27 @@ def main(builtinParameters = {}):
         print("lit %s" % (lit.__version__,))
         return
 
-    if not args:
+    inputs = args
+
+    if not inputs:
         parser.error('No inputs specified')
 
+    hosts = None
+    if opts.distribute:
+        hosts = prepare_distcc_hosts(inputs) or None
+
     if opts.numThreads is None:
+        if hosts:
+            opts.numThreads = len(hosts)
+
 # Python <2.5 has a race condition causing lit to always fail with numThreads>1
 # http://bugs.python.org/issue1731717
 # I haven't seen this bug occur with 2.5.2 and later, so only enable multiple
 # threads by default there.
-       if sys.hexversion >= 0x2050200:
+        elif sys.hexversion >= 0x2050200:
                opts.numThreads = lit.util.detectCPUs()
-       else:
+        else:
                opts.numThreads = 1
-
-    inputs = args
 
     # Create the user defined parameters.
     userParams = dict(builtinParameters)
@@ -292,6 +344,8 @@ def main(builtinParameters = {}):
         progname = os.path.basename(sys.argv[0]),
         path = opts.path,
         quiet = opts.quiet,
+        verbose = opts.showOutput,
+        succinct = opts.succinct,
         useValgrind = opts.useValgrind,
         valgrindLeakCheck = opts.valgrindLeakCheck,
         valgrindArgs = opts.valgrindArgs,
@@ -418,7 +472,7 @@ def main(builtinParameters = {}):
     startTime = time.time()
     display = TestingProgressDisplay(opts, len(run.tests), progressBar)
     try:
-        run.execute_tests(display, opts.numThreads, opts.maxTime,
+        run.execute_tests(display, hosts or opts.numThreads * ['localhost'], opts.maxTime,
                           opts.useProcesses)
     except KeyboardInterrupt:
         sys.exit(2)

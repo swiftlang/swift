@@ -196,7 +196,10 @@ class Test:
                 self.result.code = XFAIL
         
     def getFullName(self):
-        return self.suite.config.name + ' :: ' + '/'.join(self.path_in_suite)
+        return self.suite.config.name + ' :: ' + self.getNameInSuite()
+
+    def getNameInSuite(self):
+        return '/'.join(self.path_in_suite)
 
     def getFilePath(self):
         if self.file_path:

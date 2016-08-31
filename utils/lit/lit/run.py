@@ -2,6 +2,13 @@ import os
 import threading
 import time
 import traceback
+import subprocess
+
+try:
+    from pipes import quote as shellQuote
+except:
+    from shlex import quote as shellQuote
+
 try:
     import Queue as queue
 except ImportError:
@@ -66,10 +73,11 @@ class TestProvider(object):
         return self.queue.get()
 
 class Tester(object):
-    def __init__(self, run_instance, provider, consumer):
+    def __init__(self, run_instance, provider, consumer, host):
         self.run_instance = run_instance
         self.provider = provider
         self.consumer = consumer
+        self.host = host
 
     def run(self):
         while True:
@@ -82,7 +90,7 @@ class Tester(object):
     def run_test(self, test_index):
         test = self.run_instance.tests[test_index]
         try:
-            self.run_instance.execute_test(test)
+            self.run_instance.execute_test(test, self.host)
         except KeyboardInterrupt:
             # This is a sad hack. Unfortunately subprocess goes
             # bonkers with ctrl-c and we start forking merrily.
@@ -144,11 +152,16 @@ class MultiprocessResultsConsumer(object):
 
             self.display.update(test)
 
-def run_one_tester(run, provider, display):
-    tester = Tester(run, provider, display)
+def run_one_tester(run, provider, display, host = 'localhost'):
+    tester = Tester(run, provider, display, host)
     tester.run()
 
 ###
+
+def remote_script(host, script):
+    return ['ssh', '-T', 
+            # '-o', 'ConnectTimeout 10', 
+            host, 'sh', '-c', shellQuote(script)]
 
 class Run(object):
     """
@@ -158,12 +171,37 @@ class Run(object):
     def __init__(self, lit_config, tests):
         self.lit_config = lit_config
         self.tests = tests
+        self.remoteArgs = [shellQuote(str(x)) for x in lit_config.remoteArgs]
 
-    def execute_test(self, test):
+    def remotely_execute_test(self, test, host):
+        
+        remoteCommand = [
+            'ssh', '-T', host, 
+            'cd', test.suite.getExecPath(''), '&&',
+            'python', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'lit.py')
+        ] + self.remoteArgs + [shellQuote(test.getNameInSuite())]
+
+        remoteTest = subprocess.Popen(
+            remoteCommand, 
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        output = remoteTest.communicate()[0]
+
+        if remoteTest.returncode == 0:
+            return lit.Test.Result(lit.Test.PASS, output)
+
+        return lit.Test.Result(
+            lit.Test.FAIL, 
+            ' '.join(shellQuote(x) for x in remoteCommand) + '\n' + output)
+
+    def execute_test(self, test, host):
         result = None
         start_time = time.time()
         try:
-            result = test.config.test_format.execute(test, self.lit_config)
+            if host == 'localhost':
+                result = test.config.test_format.execute(test, self.lit_config)
+            else:
+                result = self.remotely_execute_test(test, host)
 
             # Support deprecated result from execute() which returned the result
             # code and additional output as a tuple.
@@ -185,12 +223,12 @@ class Run(object):
 
         test.setResult(result)
 
-    def execute_tests(self, display, jobs, max_time=None,
+    def execute_tests(self, display, hosts, max_time=None,
                       use_processes=False):
         """
-        execute_tests(display, jobs, [max_time])
+        execute_tests(display, hosts, options)
 
-        Execute each of the tests in the run, using up to jobs number of
+        Execute each of the tests in the run, using up to len(hosts) number of
         parallel tasks, and inform the display of each individual result. The
         provided tests should be a subset of the tests available in this run
         object.
@@ -207,6 +245,8 @@ class Run(object):
         computed. Tests which were not actually executed (for any reason) will
         be given an UNRESOLVED result.
         """
+
+        jobs = len(hosts)
 
         # Choose the appropriate parallel execution implementation.
         consumer = None
@@ -250,7 +290,7 @@ class Run(object):
             run_one_tester(self, provider, consumer)
         else:
             # Otherwise, execute the tests in parallel
-            self._execute_tests_in_parallel(task_impl, provider, consumer, jobs)
+            self._execute_tests_in_parallel(task_impl, provider, consumer, hosts)
 
         # Cancel the timeout handler.
         if max_time is not None:
@@ -261,11 +301,11 @@ class Run(object):
             if test.result is None:
                 test.setResult(lit.Test.Result(lit.Test.UNRESOLVED, '', 0.0))
 
-    def _execute_tests_in_parallel(self, task_impl, provider, consumer, jobs):
+    def _execute_tests_in_parallel(self, task_impl, provider, consumer, hosts):
         # Start all of the tasks.
         tasks = [task_impl(target=run_one_tester,
-                           args=(self, provider, consumer))
-                 for i in range(jobs)]
+                           args=(self, provider, consumer, host))
+                 for host in hosts]
         for t in tasks:
             t.start()
 
