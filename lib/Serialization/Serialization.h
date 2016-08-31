@@ -199,6 +199,10 @@ private:
   uint32_t /*IdentifierID*/ LastIdentifierID =
       serialization::NUM_SPECIAL_MODULES - 1;
 
+  /// EXPERIMENTAL: If 1, XREFs to imported Objective-C members will use
+  /// selectors instead of Swift names/types.
+  unsigned EnableObjCXRefs : 1;
+
   /// Returns the record code for serializing the given vector of offsets.
   ///
   /// This allows the offset-serialization code to be generic over all kinds
@@ -338,7 +342,8 @@ private:
   void writeToStream(raw_ostream &os);
 
   template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC,
+             bool useObjCXRefs);
 
 public:
   /// Serialize a module to the given stream.

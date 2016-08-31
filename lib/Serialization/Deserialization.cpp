@@ -79,6 +79,7 @@ namespace {
       enum class Kind {
         Value,
         Type,
+        Selector,
         Operator,
         OperatorFilter,
         Accessor,
@@ -106,6 +107,9 @@ namespace {
         switch (kind) {
         case Kind::Value:
           os << getDataAs<Identifier>();
+          break;
+        case Kind::Selector:
+          os << "selector '" << getDataAs<ObjCSelector>() << "'";
           break;
         case Kind::Type:
           os << "with type " << getDataAs<Type>();
@@ -187,6 +191,10 @@ namespace {
 
     void addType(Type ty) {
       path.push_back({ PathPiece::Kind::Type, ty });
+    }
+
+    void addSelector(ObjCSelector sel) {
+      path.push_back({ PathPiece::Kind::Selector, sel });
     }
 
     void addOperator(Identifier name) {
@@ -1006,9 +1014,9 @@ getActualCtorInitializerKind(uint8_t raw) {
 
 /// Remove values from \p values that don't match the expected type or module.
 ///
-/// Any of \p expectedTy, \p expectedModule, or \p expectedGenericSig can be
-/// omitted, in which case any type or module is accepted. Values imported
-/// from Clang can also appear in any module.
+/// Either \p expectedTy or \p expectedModule can be omitted, in which case any
+/// type or module is accepted. Values imported from Clang can also appear in
+/// any module.
 static void filterValues(Type expectedTy, Module *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
                          bool inProtocolExt,
@@ -1177,6 +1185,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
   case XREF_GENERIC_PARAM_PATH_PIECE:
   case XREF_INITIALIZER_PATH_PIECE:
+  case XREF_OBJC_PATH_PIECE:
     llvm_unreachable("only in a nominal or function");
 
   default:
@@ -1270,6 +1279,68 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       values.append(members.begin(), members.end());
       filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
                    values);
+      break;
+    }
+
+    case XREF_OBJC_PATH_PIECE: {
+      bool isNullary, isInstance;
+      ArrayRef<uint64_t> rawSelectorPieceIDs;
+      XRefObjCPathPieceLayout::readRecord(scratch, isInstance, isNullary,
+                                          rawSelectorPieceIDs);
+
+      SmallVector<Identifier, 8> selectorPieces;
+      for (auto pieceID : rawSelectorPieceIDs) {
+        selectorPieces.push_back(getIdentifier(pieceID));
+      }
+
+      auto sel = ObjCSelector(getContext(),
+                              isNullary ? 0 : selectorPieces.size(),
+                              selectorPieces);
+      pathTrace.addSelector(sel);
+
+      if (values.size() != 1) {
+        error();
+        return nullptr;
+      }
+
+      ValueDecl *base = values.front();
+      values.clear();
+      if (auto objcClass = dyn_cast<ClassDecl>(base)) {
+        auto methods = objcClass->lookupDirect(sel, isInstance);
+        // FIXME: Recurse into superclasses?
+        values.append(methods.begin(), methods.end());
+
+      } else if (auto proto = dyn_cast<ProtocolDecl>(base)) {
+        // FIXME: Add a lookup cache for protocols too?
+        for (auto *member : proto->getMembers()) {
+          auto *fn = dyn_cast<AbstractFunctionDecl>(member);
+          if (!fn)
+            continue;
+          if (!fn->isObjC() || fn->getObjCSelector() != sel)
+            continue;
+          values.push_back(fn);
+        }
+        // FIXME: Recurse into inherited protocols?
+
+      } else {
+        error();
+        return nullptr;
+      }
+
+      if (values.size() > 1) {
+        // Remove renamed decls.
+        auto newEnd = std::remove_if(values.begin(), values.end(),
+                                     [this](const ValueDecl *entry) -> bool {
+          return entry->getAttrs().isUnavailableInCurrentSwift();
+        });
+        if (newEnd != values.begin()) {
+          values.erase(newEnd, values.end());
+        }
+      }
+
+      // Don't bother filtering the way we filter values regularly; the only
+      // thing we'd actually be able to filter for is a module, and we permit
+      // Clang declarations to shift around.
       break;
     }
 

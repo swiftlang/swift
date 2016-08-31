@@ -227,6 +227,10 @@ def enable_experimental_nested_generic_types :
   Flag<["-"], "enable-experimental-nested-generic-types">,
   HelpText<"Enable experimental support for nested generic types">;
 
+def enable_experimental_objc_xrefs :
+  Flag<["-"], "enable-experimental-objc-xrefs">,
+  HelpText<"Alternate serialized cross-references to imported decls">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

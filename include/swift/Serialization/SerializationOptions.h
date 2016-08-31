@@ -39,6 +39,9 @@ namespace swift {
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
+
+#warning "reset this to 'false' before merging"
+    bool EnableObjCXRefs = true;
   };
 
 } // end namespace swift

@@ -1445,6 +1445,22 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       break;
     }
 
+    // FIXME: Extend to initializers, properties, and subscripts.
+    // FIXME: Should we do this for Swift @objc decls as well?
+    if (EnableObjCXRefs && fn->getClangDecl() && fn->isObjC()) {
+      ObjCSelector sel = fn->getObjCSelector();
+      SmallVector<IdentifierID, 8> pieceIDs;
+      for (Identifier piece : sel.getSelectorPieces()) {
+        pieceIDs.push_back(addIdentifierRef(piece));
+      }
+      abbrCode = DeclTypeAbbrCodes[XRefObjCPathPieceLayout::Code];
+      XRefObjCPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                          fn->isInstanceMember(),
+                                          sel.getNumArgs() == 0,
+                                          pieceIDs);
+      break;
+    }
+
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
     bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3303,6 +3319,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
   registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
   registerDeclTypeAbbr<XRefInitializerPathPieceLayout>();
+  registerDeclTypeAbbr<XRefObjCPathPieceLayout>();
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
@@ -4047,7 +4064,8 @@ void Serializer::writeToStream(raw_ostream &os) {
 
 template <size_t N>
 Serializer::Serializer(const unsigned char (&signature)[N],
-                       ModuleOrSourceFile DC) {
+                       ModuleOrSourceFile DC, bool useObjCXRefs)
+    : EnableObjCXRefs(useObjCXRefs) {
   for (unsigned char byte : signature)
     Out.Emit(byte, 8);
 
@@ -4059,7 +4077,7 @@ Serializer::Serializer(const unsigned char (&signature)[N],
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
-  Serializer S{MODULE_SIGNATURE, DC};
+  Serializer S{MODULE_SIGNATURE, DC, options.EnableObjCXRefs};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
@@ -4077,7 +4095,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                   StringRef GroupInfoPath, ASTContext &Ctx) {
-  Serializer S{MODULE_DOC_SIGNATURE, DC};
+  Serializer S{MODULE_DOC_SIGNATURE, DC, /*unused xref option*/false};
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeDocBlockInfoBlock();
 

@@ -1235,6 +1235,13 @@ namespace decls_block {
     BCVBR<5> // index
   >;
 
+  using XRefObjCPathPieceLayout = BCRecordLayout<
+    XREF_OBJC_PATH_PIECE,
+    BCFixed<1>, // instance?
+    BCFixed<1>, // nullary selector?
+    BCArray<IdentifierIDField> // selector pieces
+  >;
+
   using SILGenNameDeclAttrLayout = BCRecordLayout<
     SILGenName_DECL_ATTR,
     BCFixed<1>, // implicit flag

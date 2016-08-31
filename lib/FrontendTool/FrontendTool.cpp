@@ -873,6 +873,7 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
+      serializationOpts.EnableObjCXRefs = opts.EnableSerializationObjCXRefs;
 
       serialize(DC, serializationOpts, SM.get());
     }
@@ -951,6 +952,7 @@ static bool performCompile(CompilerInstance &Instance,
       serializationOpts.OutputPath = opts.ModuleOutputPath.c_str();
       serializationOpts.SerializeAllSIL = true;
       serializationOpts.IsSIB = true;
+      serializationOpts.EnableObjCXRefs = opts.EnableSerializationObjCXRefs;
 
       serialize(DC, serializationOpts, SM.get());
     }
@@ -969,6 +971,7 @@ static bool performCompile(CompilerInstance &Instance,
       if (opts.SerializeBridgingHeader)
         serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
       serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+      serializationOpts.EnableObjCXRefs = opts.EnableSerializationObjCXRefs;
       serializationOpts.ExtraClangOptions =
           Invocation.getClangImporterOptions().ExtraArgs;
       if (!IRGenOpts.ForceLoadSymbolName.empty())

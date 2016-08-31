@@ -185,6 +185,9 @@ public:
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
 
+  /// If set, uses 
+  bool EnableSerializationObjCXRefs = false;
+
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;
