@@ -19,3 +19,5 @@ my_block_t __nullable blockWithNullable();
 void accepts_block(my_block_t) __attribute__((nonnull));
 void accepts_noescape_block(__attribute__((noescape)) my_block_t) __attribute__((nonnull));
 
+// Please see related tests in PrintAsObjC/imported-block-typedefs.swift.
+
