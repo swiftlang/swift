@@ -19,27 +19,40 @@ class LitConfig(object):
     easily.
     """
 
-    def __init__(self, progname, path, quiet,
+    def __init__(self, progname, path, quiet, verbose, succinct,
                  useValgrind, valgrindLeakCheck, valgrindArgs,
                  noExecute, debug, isWindows,
                  params, config_prefix = None,
                  maxIndividualTestTime = 0):
+        self.remoteArgs = ['--no-progress-bar']
         # The name of the test runner.
         self.progname = progname
         # The items to add to the PATH environment variable.
         self.path = [str(p) for p in path]
+        self.remoteArgs += sum((['--path', p] for p in self.path), [])
         self.quiet = bool(quiet)
+        self.remoteArgs += ['-q'] if quiet else []
+        self.verbose = bool(verbose)
+        self.remoteArgs += ['-s'] if succinct else []
+        self.succinct = bool(succinct)
+        self.remoteArgs += ['-v'] if verbose else []
         self.useValgrind = bool(useValgrind)
+        self.remoteArgs += ['--vg'] if useValgrind else []
         self.valgrindLeakCheck = bool(valgrindLeakCheck)
+        self.remoteArgs += ['--vg-leak'] if valgrindLeakCheck else []
         self.valgrindUserArgs = list(valgrindArgs)
+        self.remoteArgs += sum((['--vg-arg', x] for x in valgrindArgs), [])
         self.noExecute = noExecute
         self.debug = debug
+        self.remoteArgs += ['--debug'] if debug else []
         self.isWindows = bool(isWindows)
         self.params = dict(params)
+        self.remoteArgs += sum((['--param', k+'='+v] for (k,v) in self.params.items()), [])
         self.bashPath = None
 
         # Configuration files to look for when discovering test suites.
         self.config_prefix = config_prefix or 'lit'
+        self.remoteArgs += ['--config-prefix', config_prefix] if config_prefix else []
         self.config_name = '%s.cfg' % (self.config_prefix,)
         self.site_config_name = '%s.site.cfg' % (self.config_prefix,)
         self.local_config_name = '%s.local.cfg' % (self.config_prefix,)
@@ -60,6 +73,8 @@ class LitConfig(object):
             self.valgrindArgs.extend(self.valgrindUserArgs)
 
         self.maxIndividualTestTime = maxIndividualTestTime
+        self.remoteArgs += ['--timeout', maxIndividualTestTime] \
+                           if maxIndividualTestTime != 0 else []
 
     @property
     def maxIndividualTestTime(self):
