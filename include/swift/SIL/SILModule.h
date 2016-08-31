@@ -503,7 +503,7 @@ public:
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
-  std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
+  std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                SILDeclRef Requirement);
 
