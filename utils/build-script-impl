@@ -2604,7 +2604,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 echo "--- Running tests for ${product} ---"
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                    call make check
+                    call env VERBOSE=1 make check
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
