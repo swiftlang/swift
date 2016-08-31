@@ -96,7 +96,7 @@ func functionBodies1(a: Int, b: Int?) {
   default:
     break;
   }
-
+  for (var i = 0; i != 10; i += 1) { }
 }
 
 func throwing() throws { }
@@ -111,7 +111,7 @@ enum MyEnum {
   case third
 }
 
-// RUN: %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
+// RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 
@@ -188,12 +188,15 @@ enum MyEnum {
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [85:54 - 86:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-CatchStmt {{.*}} [86:11 - 87:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [86:11 - 87:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                          `-SwitchStmt {{.*}} [89:3 - 98:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          |-SwitchStmt {{.*}} [89:3 - 98:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            |-CaseStmt {{.*}} [90:29 - 91:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [91:5 - 91:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            |-CaseStmt {{.*}} [94:5 - 94:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [94:5 - 94:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-CaseStmt {{.*}} [97:5 - 97:10] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [97:5 - 97:10] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ForStmt {{.*}} [99:3 - 99:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-ForStmtInitializer {{.*}} [99:17 - 99:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [99:36 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded

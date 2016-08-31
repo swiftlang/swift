@@ -307,6 +307,30 @@ void ASTScope::expand() const {
     if (auto bodyChild = createIfNeeded(this, caseStmt->getBody()))
       addChild(bodyChild);
     break;
+
+  case ASTScopeKind::ForStmt:
+    // The for statement encloses the scope introduced by its initializers.
+    addChild(new (ctx) ASTScope(ASTScopeKind::ForStmtInitializer,
+                                this, forStmt));
+    break;
+
+  case ASTScopeKind::ForStmtInitializer:
+    // Add a child for the condition, if present.
+    if (auto cond = forStmt->getCond()) {
+      if (auto condChild = createIfNeeded(this, cond.get()))
+        addChild(condChild);
+    }
+
+    // Add a child for the increment, if present.
+    if (auto incr = forStmt->getIncrement()) {
+      if (auto incrChild = createIfNeeded(this, incr.get()))
+        addChild(incrChild);
+    }
+
+    // Add a child for the body.
+    if (auto bodyChild = createIfNeeded(this, forStmt->getBody()))
+      addChild(bodyChild);
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -402,6 +426,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::CatchStmt:
     case ASTScopeKind::SwitchStmt:
     case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::ForStmt:
+    case ASTScopeKind::ForStmtInitializer:
       // Not a direct descendant.
       return false;
     }
@@ -593,6 +619,10 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     return new (ctx) ASTScope(ASTScopeKind::ForEachStmt, parent,
                               cast<ForEachStmt>(stmt));
 
+  case StmtKind::For:
+    return new (ctx) ASTScope(ASTScopeKind::ForStmt, parent,
+                              cast<ForStmt>(stmt));
+
   case StmtKind::Do:
     return createIfNeeded(parent, cast<DoStmt>(stmt)->getBody());
 
@@ -651,6 +681,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
+  case ASTScopeKind::ForStmt:
+  case ASTScopeKind::ForStmtInitializer:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -689,6 +721,8 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::CatchStmt:
     case ASTScopeKind::SwitchStmt:
     case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::ForStmt:
+    case ASTScopeKind::ForStmtInitializer:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -761,6 +795,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::SwitchStmt:
   case ASTScopeKind::CaseStmt:
+  case ASTScopeKind::ForStmt:
+  case ASTScopeKind::ForStmtInitializer:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -934,6 +970,12 @@ SourceRange ASTScope::getSourceRange() const {
 
     // Otherwise, it covers the body.
     return caseStmt->getBody()->getSourceRange();
+
+  case ASTScopeKind::ForStmt:
+    return forStmt->getSourceRange();
+
+  case ASTScopeKind::ForStmtInitializer:
+    return SourceRange(forStmt->getFirstSemicolonLoc(), forStmt->getEndLoc());
   }
 }
 
@@ -1099,6 +1141,18 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::CaseStmt:
     printScopeKind("CaseStmt");
     printAddress(caseStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::ForStmt:
+    printScopeKind("ForStmt");
+    printAddress(forStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::ForStmtInitializer:
+    printScopeKind("ForStmtInitializer");
+    printAddress(forStmt);
     printRange();
     break;
   }

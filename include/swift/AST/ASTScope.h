@@ -87,6 +87,11 @@ enum class ASTScopeKind : uint8_t {
   SwitchStmt,
   /// Describes a 'case' statement.
   CaseStmt,
+  /// Describes a C-style 'for' statement.
+  ForStmt,
+  /// Describes the scope of variables introduced in the initializer of a
+  /// a C-style 'for' statement.
+  ForStmtInitializer,
 };
 
 class ASTScope {
@@ -197,6 +202,10 @@ class ASTScope {
 
     /// A case statement, for \c kind == ASTScopeKind::CaseStmt;
     CaseStmt *caseStmt;
+
+    /// A for statement, for \c kind == ASTScopeKind::ForStmt or
+    /// \c kind == ASTScopeKind::ForStmtInitializer.
+    ForStmt *forStmt;
 };
 
   /// Child scopes, sorted by source range.
@@ -293,6 +302,13 @@ class ASTScope {
   ASTScope(const ASTScope *parent, CaseStmt *caseStmt)
       : ASTScope(ASTScopeKind::CaseStmt, parent) {
     this->caseStmt = caseStmt;
+  }
+
+  ASTScope(ASTScopeKind kind, const ASTScope *parent, ForStmt *forStmt)
+      : ASTScope(kind, parent) {
+    assert(kind == ASTScopeKind::ForStmt ||
+           kind == ASTScopeKind::ForStmtInitializer);
+    this->forStmt = forStmt;
   }
 
   ~ASTScope();
