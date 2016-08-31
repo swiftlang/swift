@@ -29,6 +29,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class ASTContext;
 class BraceStmt;
+class CaseStmt;
 class CatchStmt;
 class Decl;
 class DoCatchStmt;
@@ -45,6 +46,7 @@ class RepeatWhileStmt;
 class SourceFile;
 class Stmt;
 class StmtConditionElement;
+class SwitchStmt;
 class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
@@ -81,6 +83,10 @@ enum class ASTScopeKind : uint8_t {
   DoCatchStmt,
   /// Describes the a catch statement.
   CatchStmt,
+  /// Describes a switch statement.
+  SwitchStmt,
+  /// Describes a 'case' statement.
+  CaseStmt,
 };
 
 class ASTScope {
@@ -185,6 +191,12 @@ class ASTScope {
 
     /// A catch statement, for \c kind == ASTScopeKind::CatchStmt.
     CatchStmt *catchStmt;
+
+    /// A switch statement, for \c kind == ASTScopeKind::SwitchStmt.
+    SwitchStmt *switchStmt;
+
+    /// A case statement, for \c kind == ASTScopeKind::CaseStmt;
+    CaseStmt *caseStmt;
 };
 
   /// Child scopes, sorted by source range.
@@ -271,6 +283,16 @@ class ASTScope {
   ASTScope(const ASTScope *parent, CatchStmt *catchStmt)
       : ASTScope(ASTScopeKind::CatchStmt, parent) {
     this->catchStmt = catchStmt;
+  }
+
+  ASTScope(const ASTScope *parent, SwitchStmt *switchStmt)
+      : ASTScope(ASTScopeKind::SwitchStmt, parent) {
+    this->switchStmt = switchStmt;
+  }
+
+  ASTScope(const ASTScope *parent, CaseStmt *caseStmt)
+      : ASTScope(ASTScopeKind::CaseStmt, parent) {
+    this->caseStmt = caseStmt;
   }
 
   ~ASTScope();

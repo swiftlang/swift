@@ -283,6 +283,30 @@ void ASTScope::expand() const {
       addChild(bodyChild);
 
     break;
+
+  case ASTScopeKind::SwitchStmt:
+    // Add a child for the subject expression.
+    if (auto subjectChild = createIfNeeded(this, switchStmt->getSubjectExpr()))
+      addChild(subjectChild);
+
+    // Add children for each of the cases.
+    for (auto caseStmt : switchStmt->getCases()) {
+      if (auto caseChild = createIfNeeded(this, caseStmt))
+        addChild(caseChild);
+    }
+    break;
+
+  case ASTScopeKind::CaseStmt:
+    // Add children for the items.
+    for (auto &caseItem : caseStmt->getMutableCaseLabelItems()) {
+      if (auto guardChild = createIfNeeded(this, caseItem.getGuardExpr()))
+        addChild(guardChild);
+    }
+
+    // Add a child for the case body.
+    if (auto bodyChild = createIfNeeded(this, caseStmt->getBody()))
+      addChild(bodyChild);
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -376,6 +400,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::ForEachPattern:
     case ASTScopeKind::DoCatchStmt:
     case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
       // Not a direct descendant.
       return false;
     }
@@ -576,6 +602,12 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   case StmtKind::Catch:
     return new (ctx) ASTScope(parent, cast<CatchStmt>(stmt));
 
+  case StmtKind::Switch:
+    return new (ctx) ASTScope(parent, cast<SwitchStmt>(stmt));
+
+  case StmtKind::Case:
+    return new (ctx) ASTScope(parent, cast<CaseStmt>(stmt));
+
   case StmtKind::Break:
   case StmtKind::Continue:
   case StmtKind::Fallthrough:
@@ -617,6 +649,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::ForEachPattern:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::CatchStmt:
+  case ASTScopeKind::SwitchStmt:
+  case ASTScopeKind::CaseStmt:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -653,6 +687,8 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::ForEachPattern:
     case ASTScopeKind::DoCatchStmt:
     case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -723,6 +759,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::ForEachPattern:
   case ASTScopeKind::DoCatchStmt:
   case ASTScopeKind::CatchStmt:
+  case ASTScopeKind::SwitchStmt:
+  case ASTScopeKind::CaseStmt:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -879,6 +917,23 @@ SourceRange ASTScope::getSourceRange() const {
 
     // Otherwise, the scope of the pattern encompasses the body.
     return catchStmt->getBody()->getSourceRange();
+
+  case ASTScopeKind::SwitchStmt:
+    return switchStmt->getSourceRange();
+
+  case ASTScopeKind::CaseStmt:
+    // The scope of the case statement begins at the first guard expression,
+    // if there is one, and extends to the end of the body.
+    // FIXME: Figure out what to do about multiple pattern bindings. We might
+    // want a more restrictive rule in those cases.
+    for (const auto &caseItem : caseStmt->getCaseLabelItems()) {
+      if (auto guardExpr = caseItem.getGuardExpr())
+        return SourceRange(guardExpr->getStartLoc(),
+                           caseStmt->getBody()->getEndLoc());
+    }
+
+    // Otherwise, it covers the body.
+    return caseStmt->getBody()->getSourceRange();
   }
 }
 
@@ -1032,6 +1087,18 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::CatchStmt:
     printScopeKind("CatchStmt");
     printAddress(catchStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::SwitchStmt:
+    printScopeKind("SwitchStmt");
+    printAddress(switchStmt);
+    printRange();
+    break;
+
+  case ASTScopeKind::CaseStmt:
+    printScopeKind("CaseStmt");
+    printAddress(caseStmt);
     printRange();
     break;
   }
