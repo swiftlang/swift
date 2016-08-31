@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
+
+// rdar://problem/27616753
+// XFAIL: *
 
 // REQUIRES: objc_interop
 
@@ -429,7 +432,7 @@ if let strArr = objImplicitOpt as? [String] {
 // CHECK: Numbers-as-doubles cast produces [3.9375, 2.71828, 0.0]
 obj = ([3.9375, 2.71828, 0] as [Double]) as AnyObject
 if let doubleArr = obj as? [Double] {
-  print(sizeof(Double.self))
+  print(MemoryLayout<Double>.size)
   print("Numbers-as-doubles cast produces \(doubleArr)")
 } else {
   print("Numbers-as-doubles failed")
@@ -437,7 +440,7 @@ if let doubleArr = obj as? [Double] {
 
 // CHECK: Numbers-as-floats cast produces [3.9375, 2.71828{{.*}}, 0.0]
 if let floatArr = obj as? [Float] {
-  print(sizeof(Float.self))
+  print(MemoryLayout<Float>.size)
   print("Numbers-as-floats cast produces \(floatArr)")
 } else {
   print("Numbers-as-floats failed")

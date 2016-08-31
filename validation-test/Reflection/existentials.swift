@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
-// RUN: %target-run %target-swift-reflection-test %t/existentials | FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
@@ -47,9 +47,9 @@ struct MyCustomError : MyProtocol, MyErrorProtocol {}
 
 struct HasError {
   let singleError: Error
-  let errorInComposition: protocol<MyProtocol, Error>
+  let errorInComposition: MyProtocol & Error
   let customError: MyErrorProtocol
-  let customErrorInComposition: protocol<MyErrorProtocol, MyProtocol>
+  let customErrorInComposition: MyErrorProtocol & MyProtocol
 }
 
 // This will be projected as a class existential, so its

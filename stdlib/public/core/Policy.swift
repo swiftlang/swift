@@ -13,6 +13,22 @@
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// Standardized uninhabited type
+//===----------------------------------------------------------------------===//
+/// The return type of functions that do not return normally; a type with no
+/// values.
+///
+/// Use `Never` as the return type when declaring a closure, function, or
+/// method that unconditionally throws an error, traps, or otherwise does
+/// not terminate.
+///
+///     func crashAndBurn() -> Never {
+///         fatalError("Something very, very bad happened")
+///     }
+@_fixed_layout
+public enum Never {}
+
+//===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
 /// The return type of functions that don't explicitly specify a return type;
@@ -62,7 +78,7 @@ public typealias FloatLiteralType = Double
 /// `BooleanLiteralType` alias. For example:
 ///
 ///     let isBool = true
-///     print("isBool is a '\(isBool.dynamicType)'")
+///     print("isBool is a '\(type(of: isBool))'")
 ///     // Prints "isBool is a 'Bool'"
 ///
 /// The type aliased by `BooleanLiteralType` must conform to the
@@ -98,69 +114,6 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
-/// The protocol to which all types implicitly conform.
-///
-/// The `Any` protocol can be used as the concrete type for an instance of any
-/// type in Swift: a class, struct, or enumeration; a metatype, such as
-/// `Int.self`; a tuple with any types of components; or a closure or function
-/// type.
-///
-/// Casting Any Instances to a Known Type
-/// =====================================
-///
-/// When you use `Any` as a concrete type, you must cast your instance back to
-/// a known type before you can access its properties or methods. Instances
-/// with a concrete type of `Any` maintain their original dynamic type and can
-/// be cast to that type using one of the type-cast operators (`as`, `as?`, or
-/// `as!`). 
-/// 
-/// For example, use `as?` to conditionally downcast the first object
-/// in a heterogeneous array to a `String`.
-///
-///     let mixed: [Any] = ["one", "two", 3, true, {(x: Int) -> Int in x * 2 }]
-///
-///     let first = = numberObjects.firstObject
-///     if let first = mixed.first as? String {
-///         print("The first item, '\(first)', is a String")
-///     }
-///     // Prints("The first item, 'one', is a String")
-///
-/// If you have prior knowledge that an `Any` instance is an instance of
-/// a particular type, you can use the `as!` operator to unconditionally
-/// downcast. Performing an invalid cast results in a runtime error.
-///
-///     let second = mixed[1] as! String
-///     print("'\(second)' is also a String")
-///     // Prints "'two' is also a String"
-///
-/// In a `switch` statement, a value is cast to a type only when pattern
-/// matching with that type succeeds. For that reason, you use the `as`
-/// operator instead of the conditional `as?` or unconditional `as!`
-/// operators.
-///
-///     for item in mixed {
-///         switch item {
-///         case let s as String:
-///             print("String: \(s)")
-///         case let i as Int:
-///             print("Integer: \(i)")
-///         case let b as Bool:
-///             print("Bool: \(b)")
-///         case let f as Int -> Int:
-///             print("Function: 2 * 5 = \(f(5))")
-///         default:
-///             print("Unrecognized type")
-///         }
-///     }
-///     // Prints "String: one"
-///     // Prints "String: two"
-///     // Prints "Integer: 3"
-///     // Prints "Bool: true"
-///     // Prints "Function: 2 * 5 = 10"
-///     
-/// - SeeAlso: `AnyObject`, `AnyClass`
-public typealias Any = protocol<>
-
 #if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///
@@ -184,12 +137,12 @@ public typealias Any = protocol<>
 /// that bridges to an Objective-C class. Many value types in Swift bridge to
 /// Objective-C counterparts, like `String` and `Int`.
 ///
-///     let s: AnyObject = "This is a bridged string."
+///     let s: AnyObject = "This is a bridged string." as NSString
 ///     print(s is NSString)
 ///     // Prints "true"
 ///
-///     let v: AnyObject = 100
-///     print(v.dynamicType)
+///     let v: AnyObject = 100 as NSNumber
+///     print(type(of: v))
 ///     // Prints "__NSCFNumber"
 ///
 /// The flexible behavior of the `AnyObject` protocol is similar to
@@ -204,34 +157,30 @@ public typealias Any = protocol<>
 /// type and can be cast to that type using one of the type-cast operators
 /// (`as`, `as?`, or `as!`).
 ///
-/// In the code samples that follow, the elements of the `NSArray` instance
-/// `numberObjects` have `AnyObject` as their type. The first example uses the
-/// conditional downcast operator (`as?`) to conditionally cast the first
-/// object in the `numberObjects` array to an instance of Swift's `String`
-/// type.
+/// This example uses the conditional downcast operator (`as?`) to
+/// conditionally cast the `s` constant declared above to an instance of
+/// Swift's `String` type.
 ///
-///     let numberObjects: NSArray = ["one", "two", 3, 4]
-///
-///     let first: AnyObject = numberObjects[0]
-///     if let first = first as? String {
-///         print("The first object, '\(first)', is a String")
+///     if let message = s as? String {
+///         print("Succesful cast to String: \(message)")
 ///     }
-///     // Prints("The first object, 'one', is a String")
+///     // Prints "Succesful cast to String: This is a bridged string."
 ///
 /// If you have prior knowledge that an `AnyObject` instance has a particular
 /// type, you can use the unconditional downcast operator (`as!`). Performing
 /// an invalid cast triggers a runtime error.
 ///
-///     let second = numberObjects.object(at: 1) as! String
-///     print("'\(second)' is also a String")
-///     // Prints "'two' is also a String"
+///     let message = s as! String
+///     print("Succesful cast to String: \(message)")
+///     // Prints "Succesful cast to String: This is a bridged string."
 ///
-///     let badCase = numberObjects.object(at: 2) as! NSDate
+///     let badCase = v as! String
 ///     // Runtime error
 ///
 /// Casting is always safe in the context of a `switch` statement.
 ///
-///     for object in numberObjects {
+///     let mixedArray: [AnyObject] = [s, v]
+///     for object in mixedArray {
 ///         switch object {
 ///         case let x as String:
 ///             print("'\(x)' is a String")
@@ -239,25 +188,8 @@ public typealias Any = protocol<>
 ///             print("'\(object)' is not a String")
 ///         }
 ///     }
-///     // Prints "'one' is a String"
-///     // Prints "'two' is a String"
-///     // Prints "'3' is not a String"
-///     // Prints "'4' is not a String"
-///
-/// You can call a method that takes an `AnyObject` parameter with an instance
-/// of any class, `@objc` protocol, or type that bridges to Objective-C. In
-/// the following example, the `toFind` constant is of type `Int`, which
-/// bridges to `NSNumber` when passed to an `NSArray` method that expects an
-/// `AnyObject` parameter:
-///
-///     let toFind = 3
-///     let i = numberObjects.index(of: toFind)
-///     if i != NSNotFound {
-///         print("Found '\(numberObjects[i])' at index \(i)")
-///     } else {
-///         print("Couldn't find \(toFind)")
-///     }
-///     // Prints "Found '3' at index 2"
+///     // Prints "'This is a bridged string.' is a String"
+///     // Prints "'100' is not a String"
 ///
 /// Accessing Objective-C Methods and Properties
 /// ============================================
@@ -271,7 +203,7 @@ public typealias Any = protocol<>
 /// properties, respectively.
 ///
 /// This example defines an `IntegerRef` type with an `@objc` method named
-/// `getIntegerValue`.
+/// `getIntegerValue()`.
 ///
 ///     class IntegerRef {
 ///         let value: Int
@@ -288,35 +220,36 @@ public typealias Any = protocol<>
 ///         return IntegerRef(100)
 ///     }
 ///
-///     let x: AnyObject = getObject()
+///     let obj: AnyObject = getObject()
 ///
-/// In the example, `x` has a static type of `AnyObject` and a dynamic type of
-/// `IntegerRef`. You can use optional chaining to call the `@objc` method
-/// `getIntegerValue()` on `x` safely. If you're sure of the dynamic type of
-/// `x`, you can call `getIntegerValue()` directly.
+/// In the example, `obj` has a static type of `AnyObject` and a dynamic type
+/// of `IntegerRef`. You can use optional chaining to call the `@objc` method
+/// `getIntegerValue()` on `obj` safely. If you're sure of the dynamic type of
+/// `obj`, you can call `getIntegerValue()` directly.
 ///
-///     let possibleValue = x.getIntegerValue?()
+///     let possibleValue = obj.getIntegerValue?()
 ///     print(possibleValue)
 ///     // Prints "Optional(100)"
 ///
-///     let certainValue = x.getIntegerValue()
+///     let certainValue = obj.getIntegerValue()
 ///     print(certainValue)
 ///     // Prints "100"
 ///
-/// If the dynamic type of `x` doesn't implement a `getIntegerValue()` method,
-/// the system returns a runtime error when you initialize `certainValue`.
+/// If the dynamic type of `obj` doesn't implement a `getIntegerValue()`
+/// method, the system returns a runtime error when you initialize
+/// `certainValue`.
 ///
-/// Alternatively, if you need to test whether `x.getValue()` exists, use
-/// optional binding before calling the method.
+/// Alternatively, if you need to test whether `obj.getIntegerValue()` exists,
+/// use optional binding before calling the method.
 ///
-///     if let f = x.getIntegerValue {
-///         print("The value of 'x' is \(f())")
+///     if let f = obj.getIntegerValue {
+///         print("The value of 'obj' is \(f())")
 ///     } else {
-///         print("'x' does not have a 'getIntegerValue()' method")
+///         print("'obj' does not have a 'getIntegerValue()' method")
 ///     }
-///     // Prints "The value of 'x' is 100"
+///     // Prints "The value of 'obj' is 100"
 ///
-/// - SeeAlso: `AnyClass`, `Any`
+/// - SeeAlso: `AnyClass`
 @objc
 public protocol AnyObject : class {}
 #else
@@ -362,7 +295,7 @@ public protocol AnyObject : class {}
 ///     print(getDefaultValue(NSString.self))
 ///     // Prints "nil"
 ///
-/// - SeeAlso: `AnyObject`, `Any`
+/// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 /// A type that supports standard bitwise arithmetic operators.
@@ -389,7 +322,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x | y           // 0b00001111
 ///
 ///   Performing a bitwise OR operation with a value and `allZeros` always
-/// returns the same value.
+///   returns the same value.
 ///
 ///         print(x | .allZeros)    // 0b00000101
 ///         // Prints "5"
@@ -403,7 +336,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x & y           // 0b00000100
 ///
 ///   Performing a bitwise AND operation with a value and `allZeros` always
-/// returns `allZeros`.
+///   returns `allZeros`.
 ///
 ///         print(x & .allZeros)    // 0b00000000
 ///         // Prints "0"
@@ -418,7 +351,7 @@ public typealias AnyClass = AnyObject.Type
 ///         let z = x ^ y           // 0b00001011
 ///
 ///   Performing a bitwise XOR operation with a value and `allZeros` always
-/// returns the same value.
+///   returns the same value.
 ///
 ///         print(x ^ .allZeros)    // 0b00000101
 ///         // Prints "5"
@@ -474,7 +407,7 @@ public protocol BitwiseOperations {
   ///     // Prints "0"
   ///
   /// - Complexity: O(1).
-  func & (lhs: Self, rhs: Self) -> Self
+  static func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in the two arguments.
   ///
@@ -493,7 +426,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func | (lhs: Self, rhs: Self) -> Self
+  static func | (lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of the two arguments.
   ///
@@ -513,7 +446,7 @@ public protocol BitwiseOperations {
   ///     // Prints "5"
   ///
   /// - Complexity: O(1).
-  func ^ (lhs: Self, rhs: Self) -> Self
+  static func ^ (lhs: Self, rhs: Self) -> Self
 
   /// Returns the inverse of the bits set in the argument.
   ///
@@ -532,7 +465,7 @@ public protocol BitwiseOperations {
   ///     let allOnes = ~UInt8.allZeros   // 0b11111111
   ///
   /// - Complexity: O(1).
-  prefix func ~ (x: Self) -> Self
+  static prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
   ///
@@ -592,108 +525,161 @@ public func ^= <T : BitwiseOperations>(lhs: inout T, rhs: T) {
 
 // Equatable types can be matched in patterns by value equality.
 @_transparent
-public func ~= <T : Equatable> (a: T, b: T) -> Bool {
+public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b
 }
+
+//===----------------------------------------------------------------------===//
+// Standard precedence groups
+//===----------------------------------------------------------------------===//
+
+precedencegroup FunctionArrowPrecedence {
+  associativity: right
+}
+precedencegroup AssignmentPrecedence {
+  assignment: true
+  associativity: right
+  higherThan: FunctionArrowPrecedence
+}
+precedencegroup TernaryPrecedence {
+  associativity: right
+  higherThan: AssignmentPrecedence
+}
+precedencegroup DefaultPrecedence {
+  higherThan: TernaryPrecedence
+}
+precedencegroup LogicalDisjunctionPrecedence {
+  associativity: left
+  higherThan: TernaryPrecedence
+}
+precedencegroup LogicalConjunctionPrecedence {
+  associativity: left
+  higherThan: LogicalDisjunctionPrecedence
+}
+precedencegroup ComparisonPrecedence {
+  higherThan: LogicalConjunctionPrecedence
+}
+precedencegroup NilCoalescingPrecedence {
+  associativity: right
+  higherThan: ComparisonPrecedence
+}
+precedencegroup CastingPrecedence {
+  higherThan: NilCoalescingPrecedence
+}
+precedencegroup RangeFormationPrecedence {
+  higherThan: CastingPrecedence
+}
+precedencegroup AdditionPrecedence {
+  associativity: left
+  higherThan: RangeFormationPrecedence
+}
+precedencegroup MultiplicationPrecedence {
+  associativity: left
+  higherThan: AdditionPrecedence
+}
+precedencegroup BitwiseShiftPrecedence {
+  higherThan: MultiplicationPrecedence
+}
+
 
 //===----------------------------------------------------------------------===//
 // Standard operators
 //===----------------------------------------------------------------------===//
 
 // Standard postfix operators.
-postfix operator ++ {}
-postfix operator -- {}
+postfix operator ++
+postfix operator --
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
 //
-// postfix operator ! {}
+// postfix operator !
 
 // Standard prefix operators.
-prefix operator ++ {}
-prefix operator -- {}
-prefix operator ! {}
-prefix operator ~ {}
-prefix operator + {}
-prefix operator - {}
+prefix operator ++
+prefix operator --
+prefix operator !
+prefix operator ~
+prefix operator +
+prefix operator -
 
 // Standard infix operators.
 
 // "Exponentiative"
 
-infix operator << { associativity none precedence 160 }
-infix operator >> { associativity none precedence 160 }
+infix operator << : BitwiseShiftPrecedence
+infix operator >> : BitwiseShiftPrecedence
 
 // "Multiplicative"
 
-infix operator   * { associativity left precedence 150 }
-infix operator  &* { associativity left precedence 150 }
-infix operator   / { associativity left precedence 150 }
-infix operator   % { associativity left precedence 150 }
-infix operator   & { associativity left precedence 150 }
+infix operator   * : MultiplicationPrecedence
+infix operator  &* : MultiplicationPrecedence
+infix operator   / : MultiplicationPrecedence
+infix operator   % : MultiplicationPrecedence
+infix operator   & : MultiplicationPrecedence
 
 // "Additive"
 
-infix operator   + { associativity left precedence 140 }
-infix operator  &+ { associativity left precedence 140 }
-infix operator   - { associativity left precedence 140 }
-infix operator  &- { associativity left precedence 140 }
-infix operator   | { associativity left precedence 140 }
-infix operator   ^ { associativity left precedence 140 }
+infix operator   + : AdditionPrecedence
+infix operator  &+ : AdditionPrecedence
+infix operator   - : AdditionPrecedence
+infix operator  &- : AdditionPrecedence
+infix operator   | : AdditionPrecedence
+infix operator   ^ : AdditionPrecedence
 
 // FIXME: is this the right precedence level for "..." ?
-infix operator  ... { associativity none precedence 135 }
-infix operator  ..< { associativity none precedence 135 }
+infix operator  ... : RangeFormationPrecedence
+infix operator  ..< : RangeFormationPrecedence
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
-// infix operator as { associativity none precedence 132 }
+// infix operator as : CastingPrecedence
 
 // "Coalescing"
-infix operator ?? { associativity right precedence 131 }
+infix operator ?? : NilCoalescingPrecedence
 
 // "Comparative"
 
-infix operator  <  { associativity none precedence 130 }
-infix operator  <= { associativity none precedence 130 }
-infix operator  >  { associativity none precedence 130 }
-infix operator  >= { associativity none precedence 130 }
-infix operator  == { associativity none precedence 130 }
-infix operator  != { associativity none precedence 130 }
-infix operator === { associativity none precedence 130 }
-infix operator !== { associativity none precedence 130 }
+infix operator  <  : ComparisonPrecedence
+infix operator  <= : ComparisonPrecedence
+infix operator  >  : ComparisonPrecedence
+infix operator  >= : ComparisonPrecedence
+infix operator  == : ComparisonPrecedence
+infix operator  != : ComparisonPrecedence
+infix operator === : ComparisonPrecedence
+infix operator !== : ComparisonPrecedence
 // FIXME: ~= will be built into the compiler.
-infix operator  ~= { associativity none precedence 130 }
+infix operator  ~= : ComparisonPrecedence
 
 // "Conjunctive"
 
-infix operator && { associativity left precedence 120 }
+infix operator && : LogicalConjunctionPrecedence
 
 // "Disjunctive"
 
-infix operator || { associativity left precedence 110 }
+infix operator || : LogicalDisjunctionPrecedence
 
 
 // User-defined ternary operators are not supported. The ? : operator is
 // hardcoded as if it had the following attributes:
-// operator ternary ? : { associativity right precedence 100 }
+// operator ternary ? : : TernaryPrecedence
 
 // User-defined assignment operators are not supported. The = operator is
 // hardcoded as if it had the following attributes:
-// infix operator = { associativity right precedence 90 }
+// infix operator = : AssignmentPrecedence
 
 // Compound
 
-infix operator  *= { associativity right precedence 90 assignment }
-infix operator  /= { associativity right precedence 90 assignment }
-infix operator  %= { associativity right precedence 90 assignment }
-infix operator  += { associativity right precedence 90 assignment }
-infix operator  -= { associativity right precedence 90 assignment }
-infix operator <<= { associativity right precedence 90 assignment }
-infix operator >>= { associativity right precedence 90 assignment }
-infix operator  &= { associativity right precedence 90 assignment }
-infix operator  ^= { associativity right precedence 90 assignment }
-infix operator  |= { associativity right precedence 90 assignment }
+infix operator  *= : AssignmentPrecedence
+infix operator  /= : AssignmentPrecedence
+infix operator  %= : AssignmentPrecedence
+infix operator  += : AssignmentPrecedence
+infix operator  -= : AssignmentPrecedence
+infix operator <<= : AssignmentPrecedence
+infix operator >>= : AssignmentPrecedence
+infix operator  &= : AssignmentPrecedence
+infix operator  ^= : AssignmentPrecedence
+infix operator  |= : AssignmentPrecedence
 
 // Workaround for <rdar://problem/14011860> SubTLF: Default
 // implementations in protocols.  Library authors should ensure
@@ -701,7 +687,7 @@ infix operator  |= { associativity right precedence 90 assignment }
 // test/Prototypes/GenericDispatch.swift for a fully documented
 // example of how this operator is used, and how its use can be hidden
 // from users.
-infix operator ~> { associativity left precedence 255 }
+infix operator ~>
 
 @available(*, unavailable, renamed: "BitwiseOperations")
 public typealias BitwiseOperationsType = BitwiseOperations

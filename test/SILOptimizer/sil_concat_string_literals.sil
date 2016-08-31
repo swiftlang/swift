@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-verify-without-invalidation | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation -sil-verify-without-invalidation | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-verify-without-invalidation | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation -sil-verify-without-invalidation | %FileCheck %s
 
 sil_stage canonical
 

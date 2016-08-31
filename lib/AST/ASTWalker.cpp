@@ -187,6 +187,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+    return false;
+  }
+
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
     if (doIt(TAD->getUnderlyingTypeLoc()))
       return true;
@@ -355,14 +359,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) { return E; }
-  Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *E) {
-    if (auto base = doIt(E->getBase())) {
-      E->setBase(base);
-      return E;
-    }
-
-    return nullptr;
-  }
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) { return E; }
 
   Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) { 
@@ -525,13 +521,39 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return nullptr;
   }
-  
+
   Expr *visitImplicitConversionExpr(ImplicitConversionExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
       return E;
     }
     return nullptr;
+  }
+  
+  Expr *visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    if (auto &keyConv = E->getKeyConversion()) {
+      if (Expr *E2 = doIt(keyConv.Conversion)) {
+        E->setKeyConversion({keyConv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+
+    if (auto &valueConv = E->getValueConversion()) {
+      if (Expr *E2 = doIt(valueConv.Conversion)) {
+        E->setValueConversion({valueConv.OrigValue, E2});
+      } else {
+        return nullptr;
+      }
+    }
+
+    return E;
   }
   
   Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
@@ -1388,16 +1410,6 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
   if (!P->isImplicit())
     if (doIt(P->getCastTypeLoc()))
       return nullptr;
-  return P;
-}
-
-Pattern *Traversal::visitNominalTypePattern(NominalTypePattern *P) {
-  for (auto &elt : P->getMutableElements()) {
-    if (Pattern *newSub = doIt(elt.getSubPattern()))
-      elt.setSubPattern(newSub);
-    else
-      return nullptr;
-  }
   return P;
 }
 

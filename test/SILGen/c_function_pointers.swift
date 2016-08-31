@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
 
-func values(_ arg: @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
+func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
 // CHECK-LABEL: sil hidden @_TF19c_function_pointers6valuesFcSiSicSiSi

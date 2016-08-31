@@ -354,6 +354,8 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
       SUCCESS_IF_DECLNAME_IS("Double", "Sd");
       SUCCESS_IF_DECLNAME_IS("Float", "Sf");
       SUCCESS_IF_DECLNAME_IS("Int", "Si");
+      SUCCESS_IF_DECLNAME_IS("UnsafeRawPointer", "SV");
+      SUCCESS_IF_DECLNAME_IS("UnsafeMutableRawPointer", "Sv");
       SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
       SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
       SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
@@ -1123,8 +1125,6 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Out << "CO";
   } else if (text == "@convention(witness_method)") {
     Out << "Cw";
-  } else if (text == "@noreturn") {
-    Out << "CN";
   } else {
     unreachable("bad impl-function-attribute");
   }

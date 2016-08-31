@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -161,7 +161,7 @@ struct CloseOverAddressOnlyConstant<T> {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}callThroughLet
-func callThroughLet(_ predicate: (Int, Int) -> Bool) {
+func callThroughLet(_ predicate: @escaping (Int, Int) -> Bool) {
   let p = predicate
   if p(1, 2) {
   }

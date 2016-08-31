@@ -20,16 +20,16 @@ class Test : NSObject {
   @available(*, unavailable, message: "use object construction 'Test(dummyParam:)'")
   class func b() -> Self
   
-  convenience init(cc x: AnyObject)
+  convenience init(cc x: Any)
   @available(*, unavailable, message: "use object construction 'Test(cc:)'")
-  class func c(_ x: AnyObject) -> Self
-  convenience init(_ x: AnyObject)
+  class func c(_ x: Any) -> Self
+  convenience init(_ x: Any)
   @available(*, unavailable, message: "use object construction 'Test(_:)'")
-  class func d(_ x: AnyObject) -> Self
+  class func d(_ x: Any) -> Self
   
-  convenience init(aa a: AnyObject, _ b: AnyObject, cc c: AnyObject)
+  convenience init(aa a: Any, _ b: Any, cc c: Any)
   @available(*, unavailable, message: "use object construction 'Test(aa:_:cc:)'")
-  class func e(_ a: AnyObject, e b: AnyObject, e c: AnyObject) -> Self
+  class func e(_ a: Any, e b: Any, e c: Any) -> Self
   
   /*not inherited*/ init(fixedType: ())
   @available(*, unavailable, message: "use object construction 'Test(fixedType:)'")
@@ -37,8 +37,8 @@ class Test : NSObject {
   
   // Would-be initializers.
   class func zz() -> Self
-  class func yy(aa x: AnyObject) -> Self
-  class func xx(_ x: AnyObject, bb xx: AnyObject) -> Self
+  class func yy(aa x: Any) -> Self
+  class func xx(_ x: Any, bb xx: Any) -> Self
   
   init()
 }
@@ -48,29 +48,29 @@ class TestError : NSObject {
   convenience init(error: ()) throws
   @available(*, unavailable, message: "use object construction 'TestError(error:)'")
   class func err1() throws -> Self
-  convenience init(aa x: AnyObject?, error: ()) throws
+  convenience init(aa x: Any?, error: ()) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:error:)'")
-  class func err2(_ x: AnyObject?) throws -> Self
-  convenience init(aa x: AnyObject?, error: (), block: () -> Void) throws
+  class func err2(_ x: Any?) throws -> Self
+  convenience init(aa x: Any?, error: (), block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:error:block:)'")
-  class func err3(_ x: AnyObject?, callback block: () -> Void) throws -> Self
-  convenience init(error: (), block: () -> Void) throws
+  class func err3(_ x: Any?, callback block: @escaping () -> Void) throws -> Self
+  convenience init(error: (), block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(error:block:)'")
-  class func err4(callback block: () -> Void) throws -> Self
+  class func err4(callback block: @escaping () -> Void) throws -> Self
   
-  convenience init(aa x: AnyObject?) throws
+  convenience init(aa x: Any?) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:)'")
-  class func err5(_ x: AnyObject?) throws -> Self
-  convenience init(aa x: AnyObject?, block: () -> Void) throws
+  class func err5(_ x: Any?) throws -> Self
+  convenience init(aa x: Any?, block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(aa:block:)'")
-  class func err6(_ x: AnyObject?, callback block: () -> Void) throws -> Self
-  convenience init(block: () -> Void) throws
+  class func err6(_ x: Any?, callback block: @escaping () -> Void) throws -> Self
+  convenience init(block: @escaping () -> Void) throws
   @available(*, unavailable, message: "use object construction 'TestError(block:)'")
-  class func err7(callback block: () -> Void) throws -> Self
+  class func err7(callback block: @escaping () -> Void) throws -> Self
   
   // Would-be initializers.
-  class func ww(_ x: AnyObject?) throws -> Self
-  class func w2(_ x: AnyObject?, error: ()) throws -> Self
+  class func ww(_ x: Any?) throws -> Self
+  class func w2(_ x: Any?, error: ()) throws -> Self
   class func vv() throws -> Self
   class func v2(error: ()) throws -> Self
   init()
@@ -80,19 +80,19 @@ class TestSub : Test {
   @available(*, unavailable, message: "superseded by import of -[NSObject init]")
   convenience init()
   convenience init(dummyParam: ())
-  convenience init(cc x: AnyObject)
-  convenience init(_ x: AnyObject)
-  convenience init(aa a: AnyObject, _ b: AnyObject, cc c: AnyObject)
+  convenience init(cc x: Any)
+  convenience init(_ x: Any)
+  convenience init(aa a: Any, _ b: Any, cc c: Any)
   init()
 }
 
 class TestErrorSub : TestError {
   convenience init(error: ()) throws
-  convenience init(aa x: AnyObject?, error: ()) throws
-  convenience init(aa x: AnyObject?, error: (), block: () -> Void) throws
-  convenience init(error: (), block: () -> Void) throws
-  convenience init(aa x: AnyObject?) throws
-  convenience init(aa x: AnyObject?, block: () -> Void) throws
-  convenience init(block: () -> Void) throws
+  convenience init(aa x: Any?, error: ()) throws
+  convenience init(aa x: Any?, error: (), block: @escaping () -> Void) throws
+  convenience init(error: (), block: @escaping () -> Void) throws
+  convenience init(aa x: Any?) throws
+  convenience init(aa x: Any?, block: @escaping () -> Void) throws
+  convenience init(block: @escaping () -> Void) throws
   init()
 }

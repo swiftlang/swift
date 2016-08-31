@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // -- Class-bound archetypes and existentials are *not* address-only and can
 //    be manipulated using normal reference type value semantics.
@@ -36,7 +36,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols21class_bound_generic_2
-func class_bound_generic_2<T : protocol<ClassBound, NotClassBound>>(x: T) -> T {
+func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : $T):
   // CHECK:   [[X_ADDR:%.*]] = alloc_box $T
@@ -62,11 +62,11 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols32class_bound_protocol_composition
-func class_bound_protocol_composition(x: protocol<ClassBound, NotClassBound>)
--> protocol<ClassBound, NotClassBound> {
+func class_bound_protocol_composition(x: ClassBound & NotClassBound)
+-> ClassBound & NotClassBound {
   var x = x
-  // CHECK: bb0([[X:%.*]] : $protocol<ClassBound, NotClassBound>):
-  // CHECK:   [[X_ADDR:%.*]] = alloc_box $protocol<ClassBound, NotClassBound>
+  // CHECK: bb0([[X:%.*]] : $ClassBound & NotClassBound):
+  // CHECK:   [[X_ADDR:%.*]] = alloc_box $ClassBound & NotClassBound
   // CHECK:   [[PB:%.*]] = project_box [[X_ADDR]]
   // CHECK:   store [[X]] to [[PB]]
   return x
@@ -83,19 +83,19 @@ func class_bound_erasure(x: ConcreteClass) -> ClassBound {
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols30class_bound_existential_upcast
-func class_bound_existential_upcast(x: protocol<ClassBound,ClassBound2>)
+func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
-  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $protocol<ClassBound, ClassBound2> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, ClassBound2>]]
+  // CHECK: [[OPENED:%.*]] = open_existential_ref {{%.*}} : $ClassBound & ClassBound2 to [[OPENED_TYPE:\$@opened(.*) ClassBound & ClassBound2]]
   // CHECK: [[PROTO:%.*]] = init_existential_ref [[OPENED]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
   // CHECK: return [[PROTO]]
 }
 
 // CHECK-LABEL: sil hidden @_TF21class_bound_protocols41class_bound_to_unbound_existential_upcast
 func class_bound_to_unbound_existential_upcast
-(x: protocol<ClassBound,NotClassBound>) -> NotClassBound {
+(x: ClassBound & NotClassBound) -> NotClassBound {
   return x
-  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $protocol<ClassBound, NotClassBound> to [[OPENED_TYPE:\$@opened(.*) protocol<ClassBound, NotClassBound>]]
+  // CHECK: [[X_OPENED:%.*]] = open_existential_ref %1 : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
   // CHECK: [[PAYLOAD_ADDR:%.*]] = init_existential_addr %0 : $*NotClassBound, [[OPENED_TYPE]]
   // CHECK: store [[X_OPENED]] to [[PAYLOAD_ADDR]]
 }

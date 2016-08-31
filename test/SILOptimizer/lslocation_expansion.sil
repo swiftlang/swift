@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -lslocation-dump -ml=only-expansion | FileCheck %s
+// RUN: %target-sil-opt %s -lslocation-dump -ml=only-expansion | %FileCheck %s
 
 sil_stage canonical
 
@@ -287,7 +287,7 @@ bb0:
 
 // CHECK-LABEL: self_loop 
 // CHECK: #0 store
-// CHECK-NEXT: alloc_stack $S5, var, name "b"{{.*}}  // users: %4, %7
+// CHECK-NEXT: alloc_stack $S5, var, name "b"{{.*}}  // users: %7, %4
 // CHECK-NEXT: Address Projection Type: $*SelfLoop
 // CHECK-NEXT: Field Type: var a: SelfLoop
 sil hidden @self_loop : $@convention(thin) () -> () {

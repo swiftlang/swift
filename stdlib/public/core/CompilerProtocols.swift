@@ -12,51 +12,6 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
-/// A type that represents a Boolean value.
-///
-/// Types that conform to the `Boolean` protocol can be used as the condition
-/// in control statements, such as `if` and `while`, and in other contexts
-/// that require a logical value, such as the `where` clause of a `case`
-/// statement.
-///
-/// Swift uses only simple Boolean values in conditional contexts to help avoid
-/// accidental programming errors and to help maintain the clarity of each
-/// control statement. Unlike other programming languages, integers or strings
-/// cannot be used where a Boolean value is expected.
-///
-/// For example, the following code sample will not compile, because it
-/// attempts to use the integer `i` in a logical context:
-///
-///     var i = 5
-///     while i {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// The correct approach in Swift is to compare the `i` value with zero in the
-/// `while` statement.
-///
-///     while i != 0 {
-///         print(i)
-///         i -= 1
-///     }
-///
-/// Conforming to the Boolean Protocol
-/// ==================================
-///
-/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
-/// `ObjCBool`---conform to the `Boolean` protocol. Expanding this set to
-/// include types that represent more than simple Boolean values is
-/// discouraged.
-///
-/// To add `Boolean` conformance to your custom type, implement a `boolValue`
-/// property that represents your type as an instance of `Bool`, the default
-/// concrete type for the `Boolean` protocol.
-public protocol Boolean {
-  /// This value expressed as a `Bool` instance.
-  var boolValue: Bool { get }
-}
-
 /// A type that can be converted to and from an associated raw value.
 ///
 /// With a `RawRepresentable` type, you can switch back and forth between a
@@ -250,10 +205,32 @@ public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
-/// Conforming types can be initialized with floating point literals.
+/// A type that can be initialized with a floating-point literal.
+///
+/// The standard library floating-point types---`Float`, `Double`, and
+/// `Float80` where available---all conform to the `ExpressibleByFloatLiteral`
+/// protocol. You can initialize a variable or constant of any of these types
+/// by assigning a floating-point literal.
+///
+///     // Type inferred as 'Double'
+///     let threshold = 6.0
+///
+///     // An array of 'Double'
+///     let measurements = [2.2, 4.1, 3.65, 4.2, 9.1]
+///
+/// Conforming to ExpressibleByFloatLiteral
+/// =======================================
+///
+/// To add `ExpressibleByFloatLiteral` conformance to your custom type,
+/// implement the required initializer.
 public protocol ExpressibleByFloatLiteral {
+  /// A type that can represent a floating-point literal.
+  ///
+  /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
+  /// where available.
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
-  /// Create an instance initialized to `value`.
+  
+  /// Creates an instance initialized to the specified floating-point value.
   init(floatLiteral value: FloatLiteralType)
 }
 
@@ -307,7 +284,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///     // Prints "ñ"
 ///
 /// Conforming to ExpressibleByUnicodeScalarLiteral
-/// =============================================
+/// ===============================================
 ///
 /// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -350,7 +327,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 ///     // Prints "❄︎"
 ///
 /// Conforming to ExpressibleByExtendedGraphemeClusterLiteral
-/// =======================================================
+/// =========================================================
 ///
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
@@ -394,7 +371,7 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
 ///     let picnicGuest = "Deserving porcupine"
 ///
 /// Conforming to ExpressibleByStringLiteral
-/// ======================================
+/// ========================================
 ///
 /// To add `ExpressibleByStringLiteral` conformance to your custom type,
 /// implement the required initializer.
@@ -476,7 +453,7 @@ public protocol ExpressibleByStringLiteral
 /// array as a parameter:
 ///
 ///     func sum(values: [Int]) -> Int {
-///         return values.reduce(0, combine: +)
+///         return values.reduce(0, +)
 ///     }
 ///
 ///     let sumOfFour = sum([5, 10, 15, 20])
@@ -501,7 +478,7 @@ public protocol ExpressibleByStringLiteral
 ///     // Prints "Zero integers: []"
 ///
 /// Conforming to ExpressibleByArrayLiteral
-/// =====================================
+/// =======================================
 ///
 /// Add the capability to be initialized with an array literal to your own
 /// custom types by declaring an `init(arrayLiteral:)` initializer. The
@@ -559,7 +536,7 @@ public protocol ExpressibleByArrayLiteral {
 ///   by assigning an instance of one of these types.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
-/// =======================================================
+/// =========================================================
 ///
 /// To add the capability to be initialized with a dictionary literal to your
 /// own custom types, declare an `init(dictionaryLiteral:)` initializer. The
@@ -592,7 +569,7 @@ public protocol ExpressibleByDictionaryLiteral {
   associatedtype Key
   /// The value type of a dictionary literal.
   associatedtype Value
-  /// Create an instance initialized with `elements`.
+  /// Creates an instance initialized with the given key-value pairs.
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 
@@ -610,7 +587,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     // Prints "One cookie: $2, 3 cookies: $6."
 ///
 /// Conforming to the ExpressibleByStringInterpolation Protocol
-/// =========================================================
+/// ===========================================================
 ///
 /// To use string interpolation to initialize instances of your custom type,
 /// implement the required initializers for `ExpressibleByStringInterpolation`
@@ -636,7 +613,9 @@ public protocol ExpressibleByDictionaryLiteral {
 ///           String(stringInterpolationSegment: " cookies: $"),
 ///           String(stringInterpolationSegment: price * number),
 ///           String(stringInterpolationSegment: "."))
-public protocol ExpressibleByStringInterpolation {
+@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
+public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
+public protocol _ExpressibleByStringInterpolation {
   /// Creates an instance by concatenating the given values.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -706,8 +685,8 @@ public protocol _ExpressibleByFileReferenceLiteral {
 public protocol _DestructorSafeContainer {
 }
 
-@available(*, unavailable, renamed: "Boolean")
-public typealias BooleanType = Boolean
+@available(*, unavailable, renamed: "Bool")
+public typealias BooleanType = Bool
 
 // Deprecated by SE-0115.
 
@@ -759,7 +738,7 @@ public typealias ArrayLiteralConvertible
 @available(*, deprecated, renamed: "ExpressibleByDictionaryLiteral")
 public typealias DictionaryLiteralConvertible
   = ExpressibleByDictionaryLiteral
-@available(*, deprecated, renamed: "ExpressibleByStringInterpolation")
+@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
 public typealias StringInterpolationConvertible
   = ExpressibleByStringInterpolation
 @available(*, deprecated, renamed: "_ExpressibleByColorLiteral")

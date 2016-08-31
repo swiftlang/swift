@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s > /dev/null
 
-// RUN: %target-swift-frontend -dump-ast -DVAR %s 2>&1 | FileCheck %s
+// RUN: %target-swift-frontend -dump-ast -DVAR %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -DVAR %s > /dev/null
 
 // CHECK: (top_level_code_decl
@@ -39,7 +39,7 @@ let closureCapture: () -> Void = { [x] in
 }
 
 // CHECK-LABEL: (defer_stmt
-// CHECK-NEXT: (func_decl implicit "$defer()" type='() -> ()' access=private captures=(x<direct><noescape>)
+// CHECK-NEXT: (func_decl implicit "$defer()" type='() -> ()' access=fileprivate captures=(x<direct><noescape>)
 defer {
   _ = x
 }

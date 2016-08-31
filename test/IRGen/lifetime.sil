@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -gnone -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -gnone -emit-ir %s | %FileCheck %s
 
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type

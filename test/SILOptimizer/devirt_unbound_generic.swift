@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 // We used to crash on this when trying to devirtualize t.boo(a, 1),
 // because it is an "apply" with unbound generic arguments and
@@ -67,7 +67,7 @@ public func doTest2<T>(_ t:T) {
 // CHECK: return
 @inline(never)
 func test3<T>(_ d: Derived<T>) {
-   d.dynamicType.boo()
+   type(of: d).boo()
 }
 
 public func doTest3<T>(_ t:T) {

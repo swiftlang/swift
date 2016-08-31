@@ -16,14 +16,15 @@ import Foundation
 @available(iOS 10.0, *)
 extension CXProviderConfiguration {
   @nonobjc
-  public final var supportedHandleTypes: Set<CXHandleType> {
+  public final var supportedHandleTypes: Set<CXHandle.HandleType> {
     get {
       return Set(__supportedHandleTypes.map {
-        CXHandleType(rawValue: $0.intValue)!
+        CXHandle.HandleType(rawValue: $0.intValue)!
       })
     }
     set {
-      __supportedHandleTypes = Set(newValue.map { $0.rawValue })
+      __supportedHandleTypes =
+        Set(newValue.lazy.map { $0.rawValue as NSNumber })
     }
   }
 }

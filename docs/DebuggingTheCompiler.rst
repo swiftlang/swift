@@ -1,5 +1,7 @@
 :orphan:
 
+.. highlight:: none
+
 Debugging the Swift Compiler
 ============================
 

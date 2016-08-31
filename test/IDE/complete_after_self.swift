@@ -1,32 +1,32 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1 < %t.self.txt
 
 //===---
 //===--- Tests for code completion after 'self'.

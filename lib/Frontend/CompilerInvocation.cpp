@@ -727,15 +727,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
-                          DiagnosticEngine &Diags, bool isImmediate) {
+                          DiagnosticEngine &Diags,
+                          const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
-
-  Opts.EnableExperimentalPatterns |=
-    Args.hasArg(OPT_enable_experimental_patterns);
 
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
@@ -745,6 +743,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
+  if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
+    Opts.DisableAvailabilityChecking = true;
   
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
@@ -769,14 +769,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
   Opts.Playground |= Args.hasArg(OPT_playground);
-  Opts.Swift3Migration |= Args.hasArg(OPT_swift3_migration);
-  Opts.WarnOmitNeedlessWords = Args.hasArg(OPT_warn_omit_needless_words);
-  Opts.StripNSPrefix |= Args.hasArg(OPT_enable_strip_ns_prefix);
   Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
 
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
-  Opts.EnableProtocolTypealiases |= Args.hasArg(OPT_enable_protocol_typealiases);
-  Opts.EnableIdAsAny |= Args.hasArg(OPT_enable_id_as_any);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
                                OPT_disable_objc_attr_requires_foundation_module)) {
@@ -1326,8 +1321,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags,
-                    FrontendOpts.actionIsImmediate())) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 

@@ -26,12 +26,14 @@ from gyb_stdlib_support import (
 // FIXME(ABI)(compiler limitation): There should be just one default
 // indices type that has conditional conformances to
 // `BidirectionalCollection` and `RandomAccessCollection`.
+// <rdar://problem/17144340>
 
 /// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
-  Elements : ${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
+  Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
   // FIXME(ABI)(compiler limitation):
   // Elements : Collection
+  // rdar://problem/20531108
 > : ${collectionForTraversal(Traversal)} {
 
   // FIXME(compiler limitation): this typealias should be inferred.

@@ -148,7 +148,7 @@ Effects *FunctionEffects::getEffectsOn(SILValue Addr) {
 
 bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
                                            SILFunction *F) {
-  if (F->getLoweredFunctionType()->isNoReturn()) {
+  if (F->hasSemanticsAttr("arc.programtermination_point")) {
     Effects.Traps = true;
     return true;
   }
@@ -365,15 +365,24 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
       return;
     }
     case ValueKind::BuiltinInst: {
-      auto &BI = cast<BuiltinInst>(I)->getBuiltinInfo();
+      auto *BInst = cast<BuiltinInst>(I);
+      auto &BI = BInst->getBuiltinInfo();
       switch (BI.ID) {
         case BuiltinValueKind::IsUnique:
           // TODO: derive this information in a more general way, e.g. add it
           // to Builtins.def
           FInfo->FE.ReadsRC = true;
           break;
+        case BuiltinValueKind::CondUnreachable:
+          FInfo->FE.Traps = true;
+          return;
         default:
           break;
+      }
+      const IntrinsicInfo &IInfo = BInst->getIntrinsicInfo();
+      if (IInfo.ID == llvm::Intrinsic::trap) {
+        FInfo->FE.Traps = true;
+        return;
       }
       // Detailed memory effects of builtins are handled below by checking the
       // memory behavior of the instruction.

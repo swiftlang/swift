@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=ProtocolThenProperty | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROTO-FIRST
-// RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=PropertyThenProtocol | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROP-FIRST
+// RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=ProtocolThenProperty | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROTO-FIRST
+// RUN: %target-swift-ide-test -print-module -source-filename %s -I %S/Inputs/category-ordering/ -module-to-print=PropertyThenProtocol | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-PROP-FIRST
 
 // REQUIRES: objc_interop
 
@@ -7,7 +7,7 @@
 // CHECK: }
 
 // CHECK-LABEL: protocol Foo {
-// CHECK: var foo: AnyObject
+// CHECK: var foo: Any
 // CHECK: }
 
 // CHECK-LABEL: class Sub : Base {
@@ -17,7 +17,7 @@
 // CHECK-PROTO-FIRST-NEXT: }
 
 // CHECK-LABEL: extension Sub {
-// CHECK: var foo: AnyObject!
+// CHECK: var foo: Any!
 // CHECK: }
 
 // CHECK-PROP-FIRST-LABEL: extension Sub : Foo {

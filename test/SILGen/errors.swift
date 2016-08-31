@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 
@@ -885,3 +885,17 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
   var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
+
+class SomeErrorClass : Error { }
+
+// CHECK-LABEL: sil_vtable SomeErrorClass
+// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _TFC6errors14SomeErrorClassD
+// CHECK-NEXT:   #SomeErrorClass.init!initializer.1: _TFC6errors14SomeErrorClasscfT_S0_
+// CHECK-NEXT: }
+
+class OtherErrorSub : OtherError { }
+
+// CHECK-LABEL: sil_vtable OtherErrorSub {
+// CHECK-NEXT:  #OtherError.init!initializer.1: _TFC6errors13OtherErrorSubcfT_S0_     // OtherErrorSub.init() -> OtherErrorSub
+// CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _TFC6errors13OtherErrorSubD        // OtherErrorSub.__deallocating_deinit
+// CHECK-NEXT:}

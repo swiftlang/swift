@@ -19,7 +19,7 @@ class X<T : Comparable> {
   init(_ x : T) {elem = x}
   deinit {
     for _ in 1...deinitIters {
-      if (elem > elem) { };
+      if (elem > elem) { }
     }
   }
 }

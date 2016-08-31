@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-deadfuncelim %s | FileCheck %s
+// RUN: %target-sil-opt -sil-deadfuncelim %s | %FileCheck %s
 
 // Check that we don't crash on this.
 
@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 private class Base {
-	private init()
+	init()
 }
 
 private class Derived : Base {

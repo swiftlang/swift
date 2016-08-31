@@ -158,7 +158,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   public func map<U>(
-    _ transform: @noescape (Wrapped) throws -> U
+    _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
     switch self {
     case .some(let y):
@@ -188,7 +188,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   public func flatMap<U>(
-    _ transform: @noescape (Wrapped) throws -> U?
+    _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
     switch self {
     case .some(let y):
@@ -304,7 +304,7 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
     line: UInt(_line))
 }
 
-public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T: Equatable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return l == r
@@ -315,7 +315,7 @@ public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func != <T : Equatable>(lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
@@ -380,44 +380,6 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l < r
-  case (nil, _?):
-    return true
-  default:
-    return false
-  }
-}
-
-public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l > r
-  default:
-    return rhs < lhs
-  }
-}
-
-public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l <= r
-  default:
-    return !(rhs < lhs)
-  }
-}
-
-public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
-  switch (lhs, rhs) {
-  case let (l?, r?):
-    return l >= r
-  default:
-    return !(lhs < rhs)
-  }
-}
-
 /// Performs a nil-coalescing operation, returning the wrapped value of an
 /// `Optional` instance or a default value.
 ///
@@ -451,7 +413,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
   case .some(let value):
@@ -504,7 +466,7 @@ public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-public func ?? <T> (optional: T?, defaultValue: @autoclosure () throws -> T?)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):

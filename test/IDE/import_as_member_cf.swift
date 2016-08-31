@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 
-// RUN: FileCheck %s -check-prefix=PRINTC -strict-whitespace < %t.printed.C.txt
+// RUN: %FileCheck %s -check-prefix=PRINTC -strict-whitespace < %t.printed.C.txt
 
 // PRINTC:      extension CCPowerSupply {
 // PRINTC-NEXT:   /*not inherited*/ init(watts watts: Double)

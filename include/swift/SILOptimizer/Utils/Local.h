@@ -154,7 +154,7 @@ bool hasDynamicSelfTypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
-bool computeMayBindDynamicSelf(SILFunction *F);
+bool mayBindDynamicSelf(SILFunction *F);
 
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
@@ -470,6 +470,7 @@ class CastOptimizer {
   /// into a bridged ObjC type.
   SILInstruction *
   optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,
@@ -531,6 +532,7 @@ public:
   /// May change the control flow.
   SILInstruction *
   optimizeBridgedCasts(SILInstruction *Inst,
+      CastConsumptionKind ConsumptionKind,
       bool isConditional,
       SILValue Src,
       SILValue Dest,

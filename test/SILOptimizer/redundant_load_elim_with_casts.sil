@@ -1,0 +1,620 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -redundant-load-elim | %FileCheck -check-prefix=CHECK-FUTURE %s
+//
+// FIXME: Contains tests which are handled by old RLE, but not current one. Mostly due to casting. Eventually we probably should
+// handle these cases if they turn out to be important. 
+//
+// The problem is the current RLE uses type projection tree/path to model fields in an object. This makes it difficult for it to
+// reason about casts, i.e. 1 memory with different types.
+//
+// Tracked by rdar://23023366
+
+import Builtin
+
+struct A {
+  var i : Builtin.Int32
+}
+
+struct A2 {
+  var i : Builtin.Int32
+}
+
+struct AA {
+  var a : A
+  var i : Builtin.Int32
+}
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+struct X {
+  var c : B
+  init()
+}
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
+class E : B { }
+
+struct C {
+  var i : Builtin.Int16
+}
+
+struct D {
+  var p : Builtin.RawPointer
+}
+
+sil @use : $@convention(thin) (Builtin.Int32) -> ()
+sil @use_a : $@convention(thin) (@in A) -> ()
+sil @escaped_a_ptr : $@convention(thin) () -> @out A
+sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+
+
+struct Agg2 {
+  var t : (Builtin.Int64, Builtin.Int32)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+struct Wrapper {
+  var value : Builtin.Int32
+}
+
+// CHECK-FUTURE: sil @tbaa_class_alias_nonclass
+// CHECK: strong_retain [[RET:%[0-9]+]]
+// CHECK: strong_retain [[RET]]
+// CHECK: return
+sil @tbaa_class_alias_nonclass : $@convention(thin) (@owned B, @inout Agg1) -> () {
+bb0(%0 : $B, %1 : $*Agg1):
+  %2 = alloc_box $B
+  %2a = project_box %2 : $@box B
+  %3 = load %1 : $*Agg1
+  %4 = store %3 to %1 : $*Agg1
+  %5 = load %2a : $*B
+  %6 = store %3 to %1 : $*Agg1
+  %7 = load %2a : $*B
+  %8 = strong_retain %5 : $B   //%7 and %5 should really be one load.
+  %9 = strong_retain %7 : $B
+  %10 = tuple()
+  %11 = return %10 : $()
+}
+
+// FIXME: When RLE uses TBAA it should remove the second load.
+// CHECK-FUTURE: sil @tbaa_struct
+// CHECK: load
+// CHECK: store
+// CHECK: load
+// CHECK: return
+sil @tbaa_struct : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
+bb0(%0 : $Builtin.RawPointer, %1 : $A2):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
+  %3 = load %2 : $*A
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %5 : $*A2
+  %20 = load %2 : $*A
+  %30 = tuple(%3 : $A, %20 : $A)
+  %31 = return %30 : $(A, A)
+}
+
+// Even with TBAA, RLE should not remove the second load.
+// CHECK-FUTURE: sil @tbaa_bind_memory
+// CHECK: load
+// CHECK: bind_memory
+// CHECK: store
+// CHECK: bind_memory
+// CHECK: load
+// CHECK: return
+sil @tbaa_bind_memory : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
+bb0(%0 : $Builtin.RawPointer, %1 : $A2):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
+  %3 = load %2 : $*A
+  %4 = integer_literal $Builtin.Word, 1
+  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A2
+  %5 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A2
+  store %1 to %5 : $*A2
+  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $A
+  %20 = load %2 : $*A
+  %30 = tuple(%3 : $A, %20 : $A)
+  %31 = return %30 : $(A, A)
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Builtin.Int32
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $A
+// CHECK: unchecked_addr_cast [[LOCAL]] : $*Optional<A> to $*Builtin.RawPointer
+// CHECK: unchecked_addr_cast [[LOCAL]] : $*Optional<A> to $*Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<A> to $Optional<Builtin.Int32>
+// CHECK: unchecked_addr_cast [[LOCAL]] : $*Optional<A> to $*Optional<Builtin.RawPointer>
+// CHECK: unchecked_addr_cast [[LOCAL]] : $*Optional<A> to $*Optional<Builtin.NativeObject>
+// CHECK: return
+sil @store_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (Optional<A>) -> () {
+bb0(%0 : $Optional<A>):
+  %1 = alloc_stack $Optional<A>
+  store %0 to %1 : $*Optional<A>
+  %2 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1 : $*Optional<A> to $*A
+  %5 = load %4 : $*A
+  %6 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1 : $*Optional<A> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1 : $*Optional<A> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1 : $*Optional<A>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+struct IntPtr {
+  var Val: Builtin.Int32
+  var Ptr: Builtin.RawPointer
+}
+
+// unchecked_addr_cast must not be promoted unless the size of the
+// source type is known to be greater or equal to the size of the
+// destination type.
+//
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_nopromote : $@convention(thin) (@inout IntPtr) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $*IntPtr)
+// CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
+// CHECK: [[CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT]] : $*IntPtr to $*Builtin.Int32
+// CHECK: store %{{.*}} to [[CAST]]
+// CHECK: unchecked_addr_cast [[CAST]] : $*Builtin.Int32 to $*IntPtr
+// CHECK: return
+sil @store_to_load_forward_unchecked_addr_cast_nopromote : $@convention(thin) (@inout IntPtr) -> () {
+bb0(%0 : $*IntPtr):
+  %1 = alloc_stack $Builtin.Int32
+  %2 = unchecked_addr_cast %0 : $*IntPtr to $*Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 3
+  store %3 to %2 : $*Builtin.Int32
+  %5 = unchecked_addr_cast %2 : $*Builtin.Int32 to $*IntPtr
+  %6 = load %5 : $*IntPtr
+  dealloc_stack %1 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is layout
+// compatible with heap references, but does not have reference
+// semantics b/c it is a trivial type. We currently do not handle such a case.
+
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]]
+// CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $B
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.RawPointer
+
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
+// CHECK: return
+sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
+bb0(%0 : $Optional<B>):
+  %1 = alloc_stack $Optional<B>
+  store %0 to %1 : $*Optional<B>
+  %2 = unchecked_addr_cast %1 : $*Optional<B> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %1 : $*Optional<B> to $*B
+  %5 = load %4 : $*B
+  %6 = unchecked_addr_cast %1 : $*Optional<B> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %1 : $*Optional<B> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %1 : $*Optional<B> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %1 : $*Optional<B> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %1 : $*Optional<B> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  dealloc_stack %1 : $*Optional<B>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// *NOTE* This does not handle raw pointer since raw pointer is only layout compatible with heap references.
+// CHECK-FUTURE: sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
+// CHECK: bb0(
+
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Builtin.Int32
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $A
+// CHECK: unchecked_addr_cast %{{.*}} : $*Optional<A> to $*Builtin.RawPointer
+// CHECK: unchecked_addr_cast %{{.*}} : $*Optional<A> to $*Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<A> to $Optional<Builtin.Int32>
+// CHECK: unchecked_addr_cast {{%[0-9]+}} : $*Optional<A> to $*Optional<Builtin.RawPointer>
+// CHECK: unchecked_addr_cast
+sil @load_to_load_forward_unchecked_addr_cast_struct : $@convention(thin) (@inout Optional<A>) -> () {
+bb0(%0 : $*Optional<A>):
+  %1 = load %0 : $*Optional<A>
+  %2 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %0 : $*Optional<A> to $*A
+  %5 = load %4 : $*A
+  %6 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %0 : $*Optional<A> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %0 : $*Optional<A> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+ }
+
+// *NOTE* This does not handle raw pointer since raw pointer is layout
+// compatible with heap references, but does not have reference
+// semantics b/c it is a trivial type. We currently do not handle such a case.
+
+// CHECK-FUTURE: sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
+// CHECK: bb0({{%[0-9]+}} : $*Optional<B>):
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.Int32
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $B
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.RawPointer
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Builtin.NativeObject
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.Int32>
+// CHECK: unchecked_trivial_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.RawPointer>
+// CHECK: unchecked_ref_bit_cast {{%[0-9]+}} : $Optional<B> to $Optional<Builtin.NativeObject>
+sil @load_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (@inout Optional<B>) -> () {
+bb0(%0 : $*Optional<B>):
+  %1 = load %0 : $*Optional<B>
+  %2 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.Int32
+  %3 = load %2 : $*Builtin.Int32
+  %4 = unchecked_addr_cast %0 : $*Optional<B> to $*B
+  %5 = load %4 : $*B
+  %6 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.RawPointer
+  %7 = load %6 : $*Builtin.RawPointer
+  %8 = unchecked_addr_cast %0 : $*Optional<B> to $*Builtin.NativeObject
+  %9 = load %8 : $*Builtin.NativeObject
+  %10 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.Int32>
+  %11 = load %10 : $*Optional<Builtin.Int32>
+  %12 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.RawPointer>
+  %13 = load %12 : $*Optional<Builtin.RawPointer>
+  %14 = unchecked_addr_cast %0 : $*Optional<B> to $*Optional<Builtin.NativeObject>
+  %15 = load %14 : $*Optional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Don't bitcast differently sized structs.
+// CHECK-FUTURE: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
+// CHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: return
+sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct : $@convention(thin) (C) -> () {
+bb0(%0 : $C):
+  %1 = alloc_stack $C
+  store %0 to %1 : $*C
+  %2 = unchecked_addr_cast %1 : $*C to $*A
+  %3 = load %2 : $*A
+  dealloc_stack %1 : $*C
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+/// Make sure that we don't crash and don't optimize here.
+// CHECK-FUTURE: sil @covering_store_with_unchecked_addr : $@convention(thin) (C, C) -> () {
+// CHECK-NOT: unchecked_trivial_bit_cast
+// CHECK: unchecked_addr_cast
+// CHECK-NOT: unchecked_trivial_bit_cast
+sil @covering_store_with_unchecked_addr : $@convention(thin) (C, C) -> () {
+bb0(%0 : $C, %1 : $C):
+  %2 = alloc_stack $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to %2 : $*C
+  br bb3
+
+bb2:
+  store %0 to %2 : $*C
+  br bb3
+
+bb3:
+  %3 = unchecked_addr_cast %2 : $*C to $*A
+  %4 = load %3 : $*A
+  dealloc_stack %2 : $*C
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+/// Make sure that we properly invalidate %3 in the following situation.
+///
+/// 1. We store %3 into the load map.
+/// 2. We see that we are storing in %4 something we just loaded meaning that we
+/// would have a dead store. We delete that store and through recursion delete %3
+/// since %3's only use is %4.
+/// 3. When we delete %3, we do not remove it from the load list.
+/// 4. %5 can write to memory, so we try to check if it can alias %0#1. We look
+/// up the load that was erased and will use it in a memory unsafe way.
+//
+// CHECK-FUTURE: sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
+// CHECK-NOT: load
+// CHECK-NOT: {{%.*}} = store
+sil @invalidate_dead_loads_with_only_store_user_correctly : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<Builtin.Int32>
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = enum $Optional<Builtin.Int32>, #Optional.some!enumelt.1, %1 : $Builtin.Int32
+  %3 = load %0 : $*Optional<Builtin.Int32>
+  store %3 to %0 : $*Optional<Builtin.Int32>
+  %5 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.Int32>, #Optional.some!enumelt.1
+  dealloc_stack %0 : $*Optional<Builtin.Int32>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+class Empty {}
+struct HoldsRef { @sil_stored var c: Empty }
+
+sil @mutator : $@convention(method) (@inout HoldsRef) -> ()
+
+// Ensure we don't forward the stored value from the switch_enum
+// branches past the inout appearance of the stored-to location.
+// CHECK-FUTURE: sil @bad_store_forward
+sil @bad_store_forward : $@convention(thin) (@guaranteed Optional<HoldsRef>) -> () {
+// CHECK: bb0
+bb0(%0 : $Optional<HoldsRef>):
+// CHECK: [[LOC:%.*]] = alloc_stack
+  %1 = alloc_stack $HoldsRef
+  switch_enum %0 : $Optional<HoldsRef>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+// CHECK: bb1([[ARG:%.*]] : ${{.*}}):
+bb1(%3 : $HoldsRef):
+// CHECK: store [[ARG]] to [[LOC]]
+  store %3 to %1 : $*HoldsRef
+// CHECK-NOT: br bb3(
+  br bb3
+
+// CHECK-NOT: bb2(
+bb2:
+  %6 = alloc_ref $Empty
+// CHECK: [[STRUCT:%.*]] = struct
+  %7 = struct $HoldsRef (%6 : $Empty)
+// CHECK: store [[STRUCT]] to [[LOC]]
+  store %7 to %1 : $*HoldsRef
+// CHECK-NOT: br bb3(
+  br bb3
+
+// CHECK-NOT: bb3(
+// CHECK: bb3
+bb3:
+// CHECK: [[FNREF:%.*]] = function_ref
+  %10 = function_ref @mutator : $@convention(method) (@inout HoldsRef) -> ()
+  retain_value %0 : $Optional<HoldsRef>
+// CHECK: apply [[FNREF]]([[LOC]])
+  %12 = apply %10(%1) : $@convention(method) (@inout HoldsRef) -> ()
+// CHECK: [[ELEM:%.*]] = struct_element_addr [[LOC]]
+  %13 = struct_element_addr %1 : $*HoldsRef, #HoldsRef.c
+// CHECK: [[REF:%.*]] = load [[ELEM]]
+  %14 = load %13 : $*Empty
+// CHECK: strong_release [[REF]]
+  strong_release %14 : $Empty
+  %16 = tuple ()
+  dealloc_stack %1 : $*HoldsRef
+  return %16 : $()
+}
+
+
+// We internally use a map vector to represent stores. This means that when we iterate over
+// the stores it should be in insertion order. Use this to test whether or not we only set
+// the no-dependency bit if we do not forward a load.
+// CHECK-FUTURE: sil @test_unchecked_addr_cast_3
+// CHECK: bb0([[ARG1:%.*]] : $D, [[ARG2:%.*]] : $D):
+// CHECK-NEXT: [[BOX1:%.*]] = alloc_stack $D
+// CHECK-NEXT: [[BOX2:%.*]] = alloc_stack $D
+// CHECK-NEXT: store [[ARG2]] to [[BOX2]] : $*D
+// CHECK-NEXT: [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG2]]
+// CHECK-NEXT: store [[ARG2]] to [[BOX1]] : $*D
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[RESULT]]
+sil @test_unchecked_addr_cast_3 : $@convention(thin) (D, D) -> Builtin.RawPointer {
+bb0(%x : $D, %y : $D):
+  %1 = alloc_stack $D
+  %2 = alloc_stack $D
+  store %x to %1 : $*D
+  store %y to %2 : $*D
+  %3 = unchecked_addr_cast %2 : $*D to $*Builtin.RawPointer
+  %l1 = load %3 : $*Builtin.RawPointer
+  store %y to %1 : $*D
+  dealloc_stack %2 : $*D
+  dealloc_stack %1 : $*D
+  return %l1 : $Builtin.RawPointer
+}
+
+
+typealias I32 = Builtin.Int32
+
+// Promote unchecked_addr_cast of tuples.
+// (A, B, C) -> (A, B) is safe
+// ((A, B), C) -> (A, B) is safe
+// ((A, B), C) -> (A, B, C) is NOT safe
+//
+// CHECK-FUTURE: sil @unchecked_addr_cast_tuple_promote
+// CHECK: bb0(%0 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32), %1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)):
+// CHECK: load %0 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+// CHECK: alloc_stack $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+// CHECK: store %{{.*}} to %{{.*}}#1 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+// CHECK: unchecked_trivial_bit_cast %{{.*}} : $(Builtin.Int32, Builtin.Int32, Builtin.Int32) to $(Builtin.Int32, Builtin.Int32)
+// CHECK: tuple_extract %{{.*}} : $(Builtin.Int32, Builtin.Int32), 0
+// CHECK: unchecked_trivial_bit_cast %{{.*}} : $(Builtin.Int32, Builtin.Int32, Builtin.Int32) to $(Builtin.Int32, Builtin.Int32)
+// CHECK: tuple_extract %{{.*}} : $(Builtin.Int32, Builtin.Int32), 1
+// CHECK: dealloc_stack %{{.*}}#0 : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+// CHECK: load %1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: alloc_stack $((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: store %{{.*}} to %{{.*}}#1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: unchecked_trivial_bit_cast %{{.*}} : $((Builtin.Int32, Builtin.Int32), Builtin.Int32) to $(Builtin.Int32, Builtin.Int32)
+// CHECK: tuple_extract %{{.*}} : $(Builtin.Int32, Builtin.Int32), 0
+// CHECK: unchecked_trivial_bit_cast %{{.*}} : $((Builtin.Int32, Builtin.Int32), Builtin.Int32) to $(Builtin.Int32, Builtin.Int32)
+// CHECK: tuple_extract %{{.*}} : $(Builtin.Int32, Builtin.Int32), 1
+// CHECK: dealloc_stack %{{.*}}#0 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: alloc_stack $((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: store %{{.*}} to %{{.*}}#1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: unchecked_addr_cast %{{.*}}#1 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32) to $*(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+// CHECK: tuple_element_addr %{{.*}} : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32), 0
+// CHECK: tuple_element_addr %{{.*}} : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32), 1
+// CHECK: tuple_element_addr %{{.*}} : $*(Builtin.Int32, Builtin.Int32, Builtin.Int32), 2
+// CHECK: load %{{.*}} : $*Builtin.Int32
+// CHECK: load %{{.*}} : $*Builtin.Int32
+// CHECK: load %{{.*}} : $*Builtin.Int32
+// CHECK: dealloc_stack %{{.*}}#0 : $*((Builtin.Int32, Builtin.Int32), Builtin.Int32)
+// CHECK: return %{{.*}} : $((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32, Builtin.Int32))
+sil @unchecked_addr_cast_tuple_promote : $@convention(thin) (@inout (I32, I32, I32), @inout ((I32, I32), I32)) -> ((I32, I32), (I32, I32), (I32, I32, I32)) {
+bb0(%0 : $*(I32, I32, I32), %1 : $*((I32, I32), I32)):
+  %2 = load %0 : $*(I32, I32, I32)
+  %3 = alloc_stack $(I32, I32, I32)
+  store %2 to %3 : $*(I32, I32, I32)
+  %5 = unchecked_addr_cast %3 : $*(I32, I32, I32) to $*(I32, I32)
+  %6 = tuple_element_addr %5 : $*(I32, I32), 0
+  %7 = tuple_element_addr %5 : $*(I32, I32), 1
+  %8 = load %6 : $*I32
+  %9 = load %7 : $*I32
+  dealloc_stack %3 : $*(I32, I32, I32)
+  %11 = load %1 : $*((I32, I32), I32)
+  %12 = alloc_stack $((I32, I32), I32)
+  store %11 to %12 : $*((I32, I32), I32)
+  %14 = unchecked_addr_cast %12 : $*((I32, I32), I32) to $*(I32, I32)
+  %15 = tuple_element_addr %14 : $*(I32, I32), 0
+  %16 = tuple_element_addr %14 : $*(I32, I32), 1
+  %17 = load %15 : $*I32
+  %18 = load %16 : $*I32
+  dealloc_stack %12 : $*((I32, I32), I32)
+  %20 = alloc_stack $((I32, I32), I32)
+  store %11 to %20 : $*((I32, I32), I32)
+  %22 = unchecked_addr_cast %20 : $*((I32, I32), I32) to $*(I32, I32, I32)
+  %23 = tuple_element_addr %22 : $*(I32, I32, I32), 0
+  %24 = tuple_element_addr %22 : $*(I32, I32, I32), 1
+  %25 = tuple_element_addr %22 : $*(I32, I32, I32), 2
+  %26 = load %23 : $*I32
+  %27 = load %24 : $*I32
+  %28 = load %25 : $*I32
+  dealloc_stack %20 : $*((I32, I32), I32)
+  %30 = tuple (%8 : $I32, %9 : $I32)
+  %31 = tuple (%17 : $I32, %18 : $I32)
+  %32 = tuple (%26 : $I32, %27 : $I32, %28 : $I32)
+  %33 = tuple (%30 : $(I32, I32), %31 : $(I32, I32), %32 : $(I32, I32, I32))
+  return %33 : $((I32, I32), (I32, I32), (I32, I32, I32))
+}
+
+// Promote unchecked_addr_cast of tuple elements.
+// (A, B, C) -> (A, B) is safe
+// ((A, B), C) -> (A, B) is safe
+// ((A, B), C) -> (A, B, C) is NOT safe
+//
+// CHECK-FUTURE: sil @forward_tuple_elements
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: unchecked_addr_cast
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: unchecked_addr_cast
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: unchecked_addr_cast
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: tuple_element_addr
+// CHECK: return
+//
+// FIXME: LoadStore optimization should be able to forward these
+// stores but cannot see through projections on the store side.  (I
+// decided not to brute force fix this, because it may be better to
+// change the canonical form of tuple load/store in this case).
+sil @forward_tuple_elements : $@convention(thin) (@inout (I32, I32, I32), @inout ((I32, I32), I32)) -> ((I32, I32), (I32, I32), (I32, I32, I32)) {
+bb0(%0 : $*(I32, I32, I32), %1 : $*((I32, I32), I32)):
+  %4 = tuple_element_addr %0 : $*(I32, I32, I32), 0
+  %5 = load %4 : $*I32
+  %6 = tuple_element_addr %0 : $*(I32, I32, I32), 1
+  %7 = load %6 : $*I32
+  %8 = tuple_element_addr %0 : $*(I32, I32, I32), 2
+  %9 = load %8 : $*I32
+  %10 = alloc_stack $(I32, I32, I32)
+  %11 = tuple_element_addr %10 : $*(I32, I32, I32), 0
+  %12 = tuple_element_addr %10 : $*(I32, I32, I32), 1
+  %13 = tuple_element_addr %10 : $*(I32, I32, I32), 2
+  store %5 to %11 : $*I32
+  store %7 to %12 : $*I32
+  store %9 to %13 : $*I32
+  %17 = unchecked_addr_cast %10 : $*(I32, I32, I32) to $*(I32, I32)
+  %18 = tuple_element_addr %17 : $*(I32, I32), 0
+  %19 = tuple_element_addr %17 : $*(I32, I32), 1
+  %20 = load %18 : $*I32
+  %21 = load %19 : $*I32
+  dealloc_stack %10 : $*(I32, I32, I32)
+  %23 = tuple_element_addr %1 : $*((I32, I32), I32), 0
+  %24 = tuple_element_addr %23 : $*(I32, I32), 0
+  %25 = load %24 : $*I32
+  %26 = tuple_element_addr %23 : $*(I32, I32), 1
+  %27 = load %26 : $*I32
+  %28 = tuple_element_addr %1 : $*((I32, I32), I32), 1
+  %29 = load %28 : $*I32
+  %30 = alloc_stack $((I32, I32), I32)
+  %31 = tuple_element_addr %30 : $*((I32, I32), I32), 0
+  %32 = tuple_element_addr %30 : $*((I32, I32), I32), 1
+  %33 = tuple_element_addr %31 : $*(I32, I32), 0
+  %34 = tuple_element_addr %31 : $*(I32, I32), 1
+  store %25 to %33 : $*I32
+  store %27 to %34 : $*I32
+  store %29 to %32 : $*I32
+  %38 = unchecked_addr_cast %30 : $*((I32, I32), I32) to $*(I32, I32)
+  %39 = tuple_element_addr %38 : $*(I32, I32), 0
+  %40 = tuple_element_addr %38 : $*(I32, I32), 1
+  %41 = load %39 : $*I32
+  %42 = load %40 : $*I32
+  dealloc_stack %30 : $*((I32, I32), I32)
+  %44 = alloc_stack $((I32, I32), I32)
+  %45 = tuple_element_addr %44 : $*((I32, I32), I32), 0
+  %46 = tuple_element_addr %44 : $*((I32, I32), I32), 1
+  %47 = tuple_element_addr %45 : $*(I32, I32), 0
+  %48 = tuple_element_addr %45 : $*(I32, I32), 1
+  store %25 to %47 : $*I32
+  store %27 to %48 : $*I32
+  store %29 to %46 : $*I32
+  %52 = unchecked_addr_cast %44 : $*((I32, I32), I32) to $*(I32, I32, I32)
+  %53 = tuple_element_addr %52 : $*(I32, I32, I32), 0
+  %54 = tuple_element_addr %52 : $*(I32, I32, I32), 1
+  %55 = tuple_element_addr %52 : $*(I32, I32, I32), 2
+  %56 = load %53 : $*I32
+  %57 = load %54 : $*I32
+  %58 = load %55 : $*I32
+  dealloc_stack %44 : $*((I32, I32), I32)
+  %60 = tuple (%20 : $I32, %21 : $I32)
+  %61 = tuple (%41 : $I32, %42 : $I32)
+  %62 = tuple (%56 : $I32, %57 : $I32, %58 : $I32)
+  %63 = tuple (%60 : $(I32, I32), %61 : $(I32, I32), %62 : $(I32, I32, I32))
+  return %63 : $((I32, I32), (I32, I32), (I32, I32, I32))
+}

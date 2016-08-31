@@ -112,6 +112,6 @@ func testImportAsMember() {
 }
 
 func testUnavailableRenamedEnum() {
-  _ = ClothingStyle.hipster
-  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'ClothingStyle.semiFormal'}} {{7-34=ClothingStyle.semiFormal}}
+  _ = NSClothingStyle.hipster
+  _ = NSClothingStyleOfficeCasual // expected-error{{'NSClothingStyleOfficeCasual' has been renamed to 'NSClothingStyle.semiFormal'}} {{7-34=NSClothingStyle.semiFormal}}
 }

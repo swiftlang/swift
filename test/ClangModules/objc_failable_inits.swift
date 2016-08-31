@@ -7,7 +7,7 @@ import Foundation
 func testDictionary() {
   // -[NSDictionary init] returns non-nil.
   var dictNonOpt = NSDictionary()
-  if dictNonOpt == nil { } // expected-error{{type 'NSDictionary' is not optional, value can never be nil}}
+  _ = dictNonOpt! // expected-error {{cannot force unwrap value of non-optional type 'NSDictionary'}}
 }
 
 func testString() throws {

@@ -164,10 +164,12 @@ enum class ImportTypeKind {
   /// considered CF-audited.
   Property,
 
-  /// \brief Import the type of an ObjC property accessor.
+  /// \brief Import the type of an ObjC property accessor marked 'weak',
+  /// 'assign', or 'unsafe_unretained'.
   ///
-  /// This behaves exactly like Property except that it accepts Void.
-  PropertyAccessor,
+  /// Like Property, but doesn't allow bridging to a value type, since that
+  /// would discard the ownership.
+  PropertyWithReferenceSemantics,
 
   /// \brief Import the underlying type of an enum.
   ///
@@ -1156,11 +1158,8 @@ public:
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
-  /// \brief Retrieve the CFStringRef typealias.
-  Type getCFStringRefType();
-
   /// \brief Determines whether the given type matches an implicit type
-  /// bound of "NSObject", which is used to validate NSDictionary/NSSet.
+  /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesNSObjectBound(Type type);
 
   /// \brief Look up and attempt to import a Clang declaration with
@@ -1384,17 +1383,17 @@ public:
     SmallVectorImpl<ProtocolConformance *> &Conformances) override;
 
   template <typename DeclTy, typename ...Targs>
-  DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
+  DeclTy *createDeclWithClangNode(ClangNode ClangN, Accessibility access,
+                                  Targs &&... Args) {
     assert(ClangN);
     void *DeclPtr = allocateMemoryForDecl<DeclTy>(SwiftContext, sizeof(DeclTy),
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
     D->setEarlyAttrValidation(true);
-    if (auto VD = dyn_cast<ValueDecl>(D))
-      VD->setAccessibility(Accessibility::Public);
+    D->setAccessibility(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
-      ASD->setSetterAccessibility(Accessibility::Public);
+      ASD->setSetterAccessibility(access);
     return D;
   }
 

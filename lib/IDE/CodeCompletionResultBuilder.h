@@ -115,6 +115,11 @@ public:
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "private ");
       break;
+    case Accessibility::FilePrivate:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "fileprivate ");
+      break;
     case Accessibility::Internal:
       // 'internal' is the default, don't add it.
       break;
@@ -122,6 +127,11 @@ public:
       addChunkWithTextNoCopy(
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
+      break;
+    case Accessibility::Open:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "open ");
       break;
     }
   }
@@ -245,7 +255,7 @@ public:
                      DeclAttrParamKeyword, Name);
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                       DeclAttrParamEqual, "=");
+                       DeclAttrParamColon, ": ");
     if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }

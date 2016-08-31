@@ -2,7 +2,7 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out
-// RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
+// RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | %FileCheck %s
 // REQUIRES: executable_test
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
@@ -138,7 +138,7 @@ case _:
 // CHECK-NEXT: got the expected quick look color
 // CHECK-NEXT: got the expected quick look bezier path
 
-let image = OSImage(contentsOfFile:Process.arguments[1])!
+let image = OSImage(contentsOfFile:CommandLine.arguments[1])!
 switch PlaygroundQuickLook(reflecting: image) {
 case .image(let image2 as OSImage) where image === image2:
   print("got the expected quick look image")
@@ -146,7 +146,7 @@ case _:
   print("got something else")
 }
 
-let color = OSColor.black()
+let color = OSColor.black
 switch PlaygroundQuickLook(reflecting: color) {
 case .color(let color2 as OSColor) where color === color2:
   print("got the expected quick look color")
@@ -213,7 +213,7 @@ dump(CGRect(x: 50, y: 60, width: 100, height: 150))
 
 @objc class CanaryBase {
   deinit {
-    print("\(self.dynamicType) overboard")
+    print("\(type(of: self)) overboard")
   }
 
   required init() { }

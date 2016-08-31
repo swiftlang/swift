@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 
@@ -25,8 +25,8 @@
 // APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
 // APPKIT-NEXT: var layer: CALayer?
-// APPKIT-NEXT: var trackingAreas: [AnyObject] { get }
-// APPKIT-NEXT: var subviews: [AnyObject]
+// APPKIT-NEXT: var trackingAreas: [Any] { get }
+// APPKIT-NEXT: var subviews: [Any]
 // APPKIT-LABEL:      extension NSView {
 // APPKIT-NEXT:   unowned(unsafe) var nextKeyView: @sil_unmanaged NSView?
 
@@ -34,7 +34,7 @@
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
 // APPKIT-NEXT: var title: String
 // APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString?
-// APPKIT-NEXT: weak var target: @sil_weak AnyObject
+// APPKIT-NEXT: weak var target: @sil_weak AnyObject!
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
 // APPKIT: extension NSNotification.Name {

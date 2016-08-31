@@ -9,9 +9,9 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/override.swiftmodule -parse -emit-objc-header-path %t/override.h
-// RUN: FileCheck %s < %t/override.h
+// RUN: %FileCheck %s < %t/override.h
 // RUN: %check-in-clang %t/override.h -I %S/Inputs/custom-modules -Wno-super-class-method-mismatch -Wno-overriding-method-mismatch
-// RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | FileCheck -check-prefix=CLANG %s
+// RUN: not %check-in-clang %t/override.h -Wno-super-class-method-mismatch -I %S/Inputs/custom-modules 2>&1 | %FileCheck -check-prefix=CLANG %s
 
 // REQUIRES: objc_interop
 
@@ -24,7 +24,7 @@ class A_Child : Base {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? { return nil }
+  override subscript(x: Int) -> Any? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
@@ -48,7 +48,7 @@ class A_Grandchild : A_Child {
   // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? { return nil }
+  override subscript(x: Int) -> Any? { return nil }
 
   // CHECK-NEXT: - (NSUInteger)foo;
   override func foo() -> Int { return 0 }
@@ -75,7 +75,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
 
   // CHECK-NEXT: - (id _Nullable)objectAtIndexedSubscript:(NSUInteger)x;
   // CHECK-NEXT: - (void)setObject:(id _Nullable)newValue atIndexedSubscript:(NSUInteger)x;
-  override subscript(x: Int) -> AnyObject? {
+  override subscript(x: Int) -> Any? {
     get { return nil }
     set {}
   }

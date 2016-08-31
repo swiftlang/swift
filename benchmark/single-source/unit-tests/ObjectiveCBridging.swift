@@ -73,7 +73,7 @@ public func run_ObjectiveCBridgeFromNSStringForced(_ N: Int) {
 
 @inline(never)
 func testObjectiveCBridgeToNSString() {
-  let nativeString = String("Native")
+  let nativeString = "Native"
 
   var s: NSString?
   for _ in 0 ..< 10_000 {
@@ -153,7 +153,7 @@ func testObjectiveCBridgeToNSArray() {
   let nativeArray = ["abcde", "abcde", "abcde", "abcde", "abcde",
     "abcde", "abcde", "abcde", "abcde", "abcde"]
 
-  var nsString : AnyObject?
+  var nsString : Any?
   for _ in 0 ..< 10_000 {
     let nsArray = nativeArray as NSArray
     nsString = nsArray.object(at: 0)
@@ -284,7 +284,7 @@ func testObjectiveCBridgeToNSDictionary() {
     "abcde10": 10]
   let key = "abcde1" as NSString
 
-  var nsNumber : AnyObject?
+  var nsNumber : Any?
   for _ in 0 ..< 10_000 {
     let nsDict = nativeDictionary as NSDictionary
     nsNumber = nsDict.object(forKey: key)
@@ -420,7 +420,7 @@ func testObjectiveCBridgeToNSSet() {
       "abcde6", "abcde7", "abcde8", "abcde9", "abcde10"])
   let key = "abcde1" as NSString
 
-  var nsString : AnyObject?
+  var nsString : Any?
   for _ in 0 ..< 10_000 {
     let nsDict = nativeSet as NSSet
     nsString = nsDict.member(key)

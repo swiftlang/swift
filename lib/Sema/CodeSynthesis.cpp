@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -37,9 +38,6 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
     ntd->addMember(D, Hint);
   } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
     ed->addMember(D, Hint);
-  } else if (isa<SourceFile>(DC)) {
-    auto *mod = DC->getParentModule();
-    mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(D));
   } else {
     assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
@@ -357,9 +355,11 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
     labelLocs.push_back(SourceLoc());
   }
   
-  // A single unlabelled value is not a tuple.
-  if (args.size() == 1 && labels[0].empty())
-    return args[0];
+  // A single unlabeled value is not a tuple.
+  if (args.size() == 1 && labels[0].empty()) {
+    return new (ctx) ParenExpr(SourceLoc(), args[0], SourceLoc(),
+                               /*hasTrailingClosure=*/false);
+  }
   
   return TupleExpr::create(ctx, SourceLoc(), args, labels, labelLocs,
                            SourceLoc(), false, IsImplicit);
@@ -480,8 +480,8 @@ static Expr *buildStorageReference(
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
-    return new (ctx) SubscriptExpr(selfDRE, indices, storage,
-                                   IsImplicit, semantics);
+    return SubscriptExpr::create(ctx, selfDRE, indices, storage,
+                                 IsImplicit, semantics);
   }
 
   // This is a potentially polymorphic access, which is unnecessary;
@@ -577,11 +577,9 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                          Ctx.getIdentifier("copy"),
                                          DeclNameLoc(), /*implicit*/true);
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
-  Nil = TupleExpr::create(Ctx, SourceLoc(), { Nil }, { Ctx.Id_with },
-                          { SourceLoc() }, SourceLoc(), false, true);
 
   //- (id)copyWithZone:(NSZone *)zone;
-  Expr *Call = new (Ctx) CallExpr(UDE, Nil, /*implicit*/true);
+  Expr *Call = CallExpr::createImplicit(Ctx, UDE, { Nil }, { Ctx.Id_with });
 
   TypeLoc ResultTy;
   ResultTy.setType(VD->getType(), true);
@@ -926,7 +924,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
                                             /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
-    SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
+    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { ValueDRE },
+                                                  { Identifier() }));
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!willSet->isFinal() &&
@@ -953,7 +952,8 @@ void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
                                             /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
-    SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
+    SetterBody.push_back(CallExpr::createImplicit(Ctx, Callee, { OldValueExpr },
+                                                  { Identifier() }));
 
     // Make sure the didSet/willSet accessors are marked final if in a class.
     if (!didSet->isFinal() &&
@@ -1135,6 +1135,17 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   return Get;
 }
 
+static ArrayRef<Substitution>
+getForwardingSubstitutions(DeclContext *DC) {
+  if (auto *env = DC->getGenericEnvironmentOfContext()) {
+    auto *sig = DC->getGenericSignatureOfContext();
+    return env->getForwardingSubstitutions(
+        DC->getParentModule(), sig);
+  }
+
+  return { };
+}
+
 void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                VarDecl *BehaviorStorage,
                                FuncDecl *DefaultInitStorage,
@@ -1211,7 +1222,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
     SelfApply->setType(InitStorageMethodTy);
     SelfApply->setThrows(false);
     
-    Expr *InitStorageParam;
+    SmallVector<Expr *, 1> InitStorageArgs;
+    SmallVector<Identifier, 1> InitStorageArgLabels;
     if (ParamInitStorage) {
       // Claim the var initializer as the parameter to the `initStorage`
       // method.
@@ -1231,16 +1243,13 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
       // Type-check the expression.
       typeCheckExpression(InitValue, DC);
 
-      InitStorageParam = InitValue;
-    } else {
-      InitStorageParam = TupleExpr::createEmpty(Context,
-                                                SourceLoc(), SourceLoc(),
-                                                /*implicit*/ true);
+      InitStorageArgs.push_back(InitValue);
+      InitStorageArgLabels.push_back(Identifier());
     }
     
-    auto InitStorageExpr = new (Context) CallExpr(SelfApply, InitStorageParam,
-                                                  /*implicit*/ true);
-    InitStorageExpr->setImplicit();
+    auto InitStorageExpr = CallExpr::createImplicit(Context,SelfApply,
+                                                    InitStorageArgs,
+                                                    InitStorageArgLabels);
     InitStorageExpr->setType(SubstStorageContextTy);
     InitStorageExpr->setThrows(false);
     
@@ -1273,12 +1282,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   addTrivialAccessorsToStorage(Storage, *this);
   
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-                   ->getForwardingSubstitutions(Context);
-  }
-  
+  auto MemberSubs = getForwardingSubstitutions(DC);
   BehaviorConformance->setWitness(BehaviorStorage,
                                  ConcreteDeclRef(Context, Storage, MemberSubs));
   BehaviorConformance->setWitness(BehaviorStorage->getGetter(),
@@ -1306,6 +1310,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     ->getResult();
 
   GenericSignature *genericSig = nullptr;
+  GenericEnvironment *genericEnv = nullptr;
 
   TypeSubstitutionMap interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
@@ -1324,6 +1329,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   if (DC->isTypeContext()) {
     if (DC->isGenericContext()) {
       genericSig = DC->getGenericSignatureOfContext();
+      genericEnv = DC->getGenericEnvironmentOfContext();
       SubstInterfaceTy = GenericFunctionType::get(genericSig,
                                                   DC->getSelfInterfaceType(),
                                                   SubstInterfaceTy,
@@ -1401,6 +1407,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   Parameter->setGenericSignature(genericSig);
+  Parameter->setGenericEnvironment(genericEnv);
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
@@ -1426,13 +1433,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
     argRefs.push_back(expr);
     argNames.push_back(DeclaredParams->get(i)->getName());
   }
-  auto argTuple = TupleExpr::create(Context, SourceLoc(), argRefs,
-                                    argNames,
-                                    {}, SourceLoc(),
-                                    /*trailing closure*/ false,
-                                    /*implicit*/ true);
-  auto apply = new (Context) CallExpr(VD->getBehavior()->Param, argTuple,
-                                      /*implicit*/ true);
+  auto apply = CallExpr::createImplicit(Context, VD->getBehavior()->Param,
+                                        argRefs, argNames);
   
   // Return the expression value.
   auto Ret = new (Context) ReturnStmt(SourceLoc(), apply,
@@ -1447,12 +1449,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
-  ArrayRef<Substitution> MemberSubs;
-  if (DC->isGenericContext()) {
-    MemberSubs = DC->getGenericParamsOfContext()
-    ->getForwardingSubstitutions(Context);
-  }
-
+  auto MemberSubs = getForwardingSubstitutions(DC);
   BehaviorConformance->setWitness(BehaviorParameter,
                                ConcreteDeclRef(Context, Parameter, MemberSubs));
 }
@@ -1927,9 +1924,9 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   ASTContext &context = tc.Context;
   SourceLoc Loc = decl->getLoc();
-  Accessibility accessLevel = decl->getFormalAccess();
-  if (!decl->hasClangNode())
-    accessLevel = std::min(accessLevel, Accessibility::Internal);
+  auto accessLevel = Accessibility::Internal;
+  if (decl->hasClangNode())
+    accessLevel = std::max(accessLevel, decl->getFormalAccess());
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<ParamDecl*, 8> params;
@@ -1965,6 +1962,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                           Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
       arg->setImplicit();
+      
       params.push_back(arg);
     }
   }
@@ -2018,7 +2016,7 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
     return;
   }
 
-  // Create a call to Swift._unimplemented_initializer
+  // Create a call to Swift._unimplementedInitializer
   auto loc = classDecl->getLoc();
   Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl,
                                           DeclNameLoc(loc),
@@ -2032,10 +2030,8 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 
   Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc,
                                                        /*Implicit=*/true);
-  className = TupleExpr::createImplicit(
-    tc.Context, {className}, {tc.Context.Id_className});
-  className->setImplicit();
-  Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
+  Expr *call = CallExpr::createImplicit(tc.Context, fn, { className },
+                                        { tc.Context.Id_className });
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(call),
                                   SourceLoc(),
@@ -2126,8 +2122,11 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*GenericParams=*/nullptr, classDecl);
 
   ctor->setImplicit();
-  ctor->setAccessibility(std::min(classDecl->getFormalAccess(),
-                                  superclassCtor->getFormalAccess()));
+
+  Accessibility access = classDecl->getFormalAccess();
+  access = std::max(access, Accessibility::Internal);
+  access = std::min(access, superclassCtor->getFormalAccess());
+  ctor->setAccessibility(access);
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
@@ -2138,6 +2137,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(classDecl->getGenericSignatureOfContext());
+  ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
   tc.configureInterfaceType(ctor);
 
   // Set the contextual type of the initializer. This will go away one day.
@@ -2196,7 +2196,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     return ctor;
   }
 
-  Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
+  Expr *superCall =
+    CallExpr::create(ctx, ctorRef, ctorArgs,
+                     superclassCtor->getFullName().getArgumentNames(), { },
+                     /*hasTrailingClosure=*/false, /*implicit=*/true);
   if (superclassCtor->hasThrows()) {
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);

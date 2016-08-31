@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -parse -dump-type-refinement-contexts %s > %t.dump 2>&1
-// RUN: FileCheck --strict-whitespace %s < %t.dump
+// RUN: %FileCheck --strict-whitespace %s < %t.dump
 
 // REQUIRES: OS=macosx
 

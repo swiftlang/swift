@@ -15,9 +15,11 @@ NSSetAPI.test("Sequence") {
   expectSequenceType(result)
 }
 
-private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
+private func compareAnythingAtAll(_ x: Any, y: Any)
   -> ExpectedComparisonResult {
-  switch (x.description < y.description, x.description == y.description) {
+  let xDescription = "\(x)"
+  let yDescription = "\(y)"
+  switch (xDescription < yDescription, xDescription == yDescription) {
   case (true, _): return .lt
   case (_, true): return .eq
   default: return .gt
@@ -27,16 +29,16 @@ private func compareAnythingAtAll(_ x: AnyObject, y: AnyObject)
 NSSetAPI.test("initWithObjects") {
   let result = NSSet(objects: 1, "two")
   // using the descriptions of 1 and "two" are fine for these tests.
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSSetAPI.test("ExpressibleByArrayLiteral") {
   let result: NSSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSSetAPI.test("CustomStringConvertible") {
-  let result = String(NSSet(objects:"a", "b", "c", "42"))
+  let result = String(describing: NSSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    b,\n    42,\n    c,\n    a\n)}"
   expectEqual(expect, result)
 }
@@ -50,16 +52,16 @@ NSOrderedSetAPI.test("Sequence") {
 
 NSOrderedSetAPI.test("initWithObjects") {
   let result = NSOrderedSet(objects: 1, "two")
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("ExpressibleByArrayLiteral") {
   let result: NSOrderedSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"] as [Any], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("CustomStringConvertible") {
-  let result = String(NSOrderedSet(objects:"a", "b", "c", "42"))
+  let result = String(describing: NSOrderedSet(objects:"a", "b", "c", "42"))
   let expect = "{(\n    a,\n    b,\n    c,\n    42\n)}"
   expectEqual(expect, result)
 }

@@ -611,15 +611,19 @@ public:
                   Elements.insert(Elements.begin() + (EI + 1), *Log);
                   ++EI;
                 }
-              }
-            } else if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
-              Added<Stmt *> Log = logDeclOrMemberRef(DRE);
-              if (*Log) {
-                Elements.insert(Elements.begin() + (EI + 1), *Log);
-                ++EI;
+                Handled = true;
               }
             }
-            Handled = true;
+            if (!Handled) {
+              if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
+                Added<Stmt *> Log = logDeclOrMemberRef(DRE);
+                if (*Log) {
+                  Elements.insert(Elements.begin() + (EI + 1), *Log);
+                  ++EI;
+                }
+              }
+            }
+            Handled = true; // Never log ()
           }
           if (!Handled) {
             // do the same as for all other expressions
@@ -969,8 +973,6 @@ public:
   Added<Stmt *> buildLoggerCallWithArgs(const char *LoggerName,
                                         MutableArrayRef<Expr *> Args,
                                         SourceRange SR) {
-    Expr *LoggerArgs = nullptr;
-
     std::pair<unsigned, unsigned> StartLC =
       Context.SourceMgr.getLineAndColumn(SR.Start);
 
@@ -1003,8 +1005,6 @@ public:
 
     ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
 
-    LoggerArgs = TupleExpr::createImplicit(Context, ArgsWithSourceRange, { });
-
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName),
@@ -1013,8 +1013,11 @@ public:
 
     LoggerRef->setImplicit(true);
 
-    ApplyExpr *LoggerCall = new (Context) CallExpr(LoggerRef, LoggerArgs, true,
-                                                   Type());
+    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+                                         Identifier());
+    ApplyExpr *LoggerCall = CallExpr::createImplicit(Context, LoggerRef,
+                                                     ArgsWithSourceRange,
+                                                     ArgLabels);
     Added<ApplyExpr*> AddedLogger(LoggerCall);
 
     if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {
@@ -1036,10 +1039,6 @@ public:
                                                  AccessSemantics::Ordinary,
                                                  Apply->getType());
 
-    ParenExpr *SendDataArgs = new (Context) ParenExpr(SourceLoc(),
-                                                      DRE,
-                                                      SourceLoc(),
-                                                      false);
     UnresolvedDeclRefExpr *SendDataRef = 
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),
@@ -1048,9 +1047,9 @@ public:
 
     SendDataRef->setImplicit(true);
 
-    Expr * SendDataCall = new (Context) CallExpr(SendDataRef,
-                                                 SendDataArgs, true,
-                                                 Type());
+    Expr * SendDataCall = CallExpr::createImplicit(Context, SendDataRef,
+                                                   { DRE },
+                                                   { Identifier() });
     Added<Expr *> AddedSendData(SendDataCall);
 
     if (!doTypeCheck(Context, TypeCheckDC, AddedSendData)) {

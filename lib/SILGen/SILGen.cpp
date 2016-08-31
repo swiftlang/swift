@@ -152,6 +152,22 @@ GET_BRIDGING_FN(Foundation, REQUIRED, Error, REQUIRED, NSError)
 #undef OPTIONAL
 #undef GENERIC
 
+static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
+                                          SILLocation loc,
+                                          const char *name) {
+  sgm.diagnose(loc, diag::bridging_function_missing,
+               sgm.getASTContext().StdlibModuleName.str(), name);
+  return nullptr;
+}
+
+#define FUNC_DECL(NAME, ID)                             \
+  FuncDecl *SILGenModule::get##NAME(SILLocation loc) {  \
+    if (auto fn = getASTContext().get##NAME(nullptr))   \
+      return fn;                                        \
+    return diagnoseMissingIntrinsic(*this, loc, ID);    \
+  }
+#include "swift/AST/KnownDecls.def"
+
 ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
   if (ObjectiveCBridgeable)
     return *ObjectiveCBridgeable;
@@ -266,6 +282,81 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   if (result) return result->getConcrete();
   return nullptr;
 }
+
+ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
+  if (BridgedStoredNSError)
+    return *BridgedStoredNSError;
+
+  // Find the _BridgedStoredNSError protocol.
+  auto &ctx = getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::BridgedStoredNSError);
+  BridgedStoredNSError = proto;
+  return proto;
+}
+
+VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
+  if (NSErrorRequirement)
+    return *NSErrorRequirement;
+
+  // Find the _BridgedStoredNSError protocol.
+  auto proto = getBridgedStoredNSError(loc);
+  if (!proto) {
+    NSErrorRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _nsError.
+  auto &ctx = getASTContext();
+  VarDecl *found = nullptr;
+  for (auto member : proto->lookupDirect(ctx.Id_nsError, true)) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      found = var;
+      break;
+    }
+  }
+
+  NSErrorRequirement = found;
+  return found;
+}
+
+Optional<ProtocolConformanceRef>
+SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
+  auto proto = getBridgedStoredNSError(loc);
+  if (!proto) return None;
+
+  // Find the conformance to _BridgedStoredNSError.
+  return SwiftModule->lookupConformance(type, proto, nullptr);
+}
+
+ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
+  if (NSErrorConformanceToError)
+    return *NSErrorConformanceToError;
+
+  auto &ctx = getASTContext();
+  auto nsError = ctx.getNSErrorDecl();
+  if (!nsError) {
+    NSErrorConformanceToError = nullptr;
+    return nullptr;
+  }
+
+  auto error = ctx.getErrorDecl();
+  if (!error) {
+    NSErrorConformanceToError = nullptr;
+    return nullptr;
+  }
+
+  auto conformance =
+    SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
+                                   cast<ProtocolDecl>(error),
+                                   nullptr);
+
+  if (conformance && conformance->isConcrete())
+    NSErrorConformanceToError = conformance->getConcrete();
+  else
+    NSErrorConformanceToError = nullptr;
+  return *NSErrorConformanceToError;
+}
+
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
@@ -484,8 +575,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   assert(F->empty() && "already emitted function?!");
 
-  F->setContextGenericParams(
-                         Types.getConstantInfo(constant).ContextGenericParams);
+  F->setGenericEnvironment(Types.getConstantInfo(constant).GenericEnv);
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -857,6 +947,21 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
     preEmitFunction(constant, arg, f, arg);
     PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
     SILGenFunction(*this, *f).emitGeneratorFunction(constant, arg);
+    postEmitFunction(constant, f);
+  });
+}
+
+void SILGenModule::
+emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
+  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
+  auto *var = pbdEntry.getAnchoringVarDecl();
+  auto *init = pbdEntry.getInit();
+
+  SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
+  emitOrDelayFunction(*this, constant, [this,constant,init](SILFunction *f) {
+    preEmitFunction(constant, init, f, init);
+    PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
+    SILGenFunction(*this, *f).emitGeneratorFunction(constant, init);
     postEmitFunction(constant, f);
   });
 }

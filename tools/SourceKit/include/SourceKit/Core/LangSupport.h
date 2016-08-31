@@ -413,6 +413,10 @@ public:
                                    bool SynthesizedExtensions,
                                    Optional<StringRef> InterestedUSR) = 0;
 
+  virtual void editorOpenTypeInterface(EditorConsumer &Consumer,
+                                       ArrayRef<const char *> Args,
+                                       StringRef TypeUSR) = 0;
+
   virtual void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                          StringRef Name,
                                          StringRef HeaderName,

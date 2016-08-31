@@ -35,5 +35,5 @@ _ = no as No
 
 import Dispatch
 if #available(OSX 10.10, iOS 8.0, *) {
-	print(DispatchQueue.global(attributes: .qosDefault))
+	print(DispatchQueue.global(qos: .default))
 }

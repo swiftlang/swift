@@ -17,10 +17,6 @@ class A {
 }
 
 struct B : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> A {
     return A()
   }
@@ -40,7 +36,7 @@ struct B : _ObjectiveCBridgeable {
 var a: [A] = []
 var b: [B] = []
 
-a = b
+a = b as [A]
 
 b = a // expected-error {{cannot assign value of type '[A]' to type '[B]'}}
 
@@ -48,6 +44,7 @@ var aa: [[A]] = []
 var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
+bb = aa // expected-error {{cannot assign value of type '[[A]]' to type '[[B]]'}}
 
 class C {
 }
@@ -58,10 +55,6 @@ class E {
 }
 
 struct F : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> E {
     return E()
   }
@@ -81,7 +74,7 @@ struct F : _ObjectiveCBridgeable {
 var e: [E] = []
 var f: [F] = []
 
-e = f
+e = f as [E]
 f = e // expected-error {{cannot assign value of type '[E]' to type '[F]'}}
 
 class G {
@@ -103,22 +96,15 @@ struct H : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
-  static func _isBridgedToObjectiveC() -> Bool {
-    return false
-  }
 }
 
 var g: [G] = []
 var h: [H] = []
 
-g = h // should type check, but cause a failure at runtime
+g = h as [G] // should type check, but cause a failure at runtime
 
 
 struct I : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
@@ -138,5 +124,5 @@ struct I : _ObjectiveCBridgeable {
 var aoa: [AnyObject] = []
 var i: [I] = []
 
-aoa = i
+aoa = i as [AnyObject]
 i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}

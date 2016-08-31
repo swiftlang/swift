@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -377,8 +377,8 @@ func canBeClass<T>(_: T) {
   Builtin.canBeClass(O.self)
   // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(OP1.self)
-  // -- FIXME: protocol<...> doesn't parse as a value
-  typealias ObjCCompo = protocol<OP1, OP2>
+  // -- FIXME: 'OP1 & OP2' doesn't parse as a value
+  typealias ObjCCompo = OP1 & OP2
   // CHECK: integer_literal $Builtin.Int8, 1
   Builtin.canBeClass(ObjCCompo.self)
 
@@ -388,7 +388,7 @@ func canBeClass<T>(_: T) {
   Builtin.canBeClass(C.self)
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(P.self)
-  typealias MixedCompo = protocol<OP1, P>
+  typealias MixedCompo = OP1 & P
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompo.self)
 
@@ -406,8 +406,8 @@ func canBeClassMetatype<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 0
   typealias OP1T = OP1.Type
   Builtin.canBeClass(OP1T.self)
-  // -- FIXME: protocol<...> doesn't parse as a value
-  typealias ObjCCompoT = protocol<OP1, OP2>.Type
+  // -- FIXME: 'OP1 & OP2' doesn't parse as a value
+  typealias ObjCCompoT = (OP1 & OP2).Type
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(ObjCCompoT.self)
 
@@ -420,7 +420,7 @@ func canBeClassMetatype<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 0
   typealias PT = P.Type
   Builtin.canBeClass(PT.self)
-  typealias MixedCompoT = protocol<OP1, P>.Type
+  typealias MixedCompoT = (OP1 & P).Type
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompoT.self)
 
@@ -461,11 +461,8 @@ func autorelease(_ o: O) {
 // CHECK-LABEL: sil hidden @_TF8builtins11unreachable
 // CHECK:         builtin "unreachable"()
 // CHECK:         return
-// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) @noreturn () -> () {
-// CANONICAL-NOT:     builtin "unreachable"
-// CANONICAL-NOT:     return
-// CANONICAL:         unreachable
-@noreturn func unreachable() {
+// CANONICAL-LABEL: sil hidden @_TF8builtins11unreachableFT_T_ : $@convention(thin) () -> () {
+func unreachable() {
   Builtin.unreachable()
 }
 
@@ -807,4 +804,13 @@ func unsafeGuaranteed_generic_return<T: AnyObject> (_ a: T) -> (T, Builtin.Int8)
 // CHECK: }
 func unsafeGuaranteedEnd(_ t: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(t)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins10bindMemory
+// CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
+// CHECK: bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
+// CHECK:   return {{%.*}} : $()
+// CHECK: }
+func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
+  Builtin.bindMemory(ptr, idx, T.self)
 }

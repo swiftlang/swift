@@ -5,7 +5,7 @@ if (SOURCEKIT_INSTALLING_INPROC)
     ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     sourcekitdInProc.cpp
     DEPENDS SourceKitSwiftLang sourcekitdAPI
-    COMPONENT_DEPENDS support coverage
+    LLVM_COMPONENT_DEPENDS support coverage
     MODULEMAP module.modulemap
     INSTALL_IN_COMPONENT sourcekit-inproc
   )
@@ -14,13 +14,17 @@ else()
   add_sourcekit_library(sourcekitdInProc
     sourcekitdInProc.cpp
     DEPENDS SourceKitSwiftLang sourcekitdAPI
-    COMPONENT_DEPENDS support coverage
+    LLVM_COMPONENT_DEPENDS support coverage
     INSTALL_IN_COMPONENT sourcekit-inproc
 
     # Note that this cannot be a static library due to the way it looks for the
     # shared library path in order to get at the runtime lib path.
     SHARED
   )
+endif()
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  target_link_libraries(sourcekitdInProc PUBLIC BlocksRuntime)
 endif()
 
 if (SOURCEKIT_BUILT_STANDALONE)

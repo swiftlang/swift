@@ -429,8 +429,9 @@ namespace llvm {
 template <> struct GraphTraits<StackPromoter *>
     : public GraphTraits<swift::SILBasicBlock*> {
   typedef StackPromoter *GraphType;
+  typedef swift::SILBasicBlock *NodeRef;
 
-  static NodeType *getEntryNode(GraphType SP) {
+  static NodeRef getEntryNode(GraphType SP) {
     return &SP->getFunction()->front();
   }
 

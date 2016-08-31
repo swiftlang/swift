@@ -47,7 +47,7 @@ using namespace swift;
 
 namespace {
   
-/// The layout of protocol<>.
+/// The layout of Any.
 using Any = OpaqueExistentialContainer;
 
 // Swift assumes Any is returned in memory. 
@@ -398,6 +398,70 @@ static const char *getFieldName(const char *fieldNames, size_t i) {
   return fieldName;
 }
 
+
+static bool loadSpecialReferenceStorage(HeapObject *owner,
+                                        OpaqueValue *fieldData,
+                                        const FieldType fieldType,
+                                        Mirror *outMirror) {
+  // isWeak() implies a reference type via Sema.
+  if (!fieldType.isWeak())
+    return false;
+
+  auto type = fieldType.getType();
+  assert(type->getKind() == MetadataKind::Optional);
+
+  auto weakField = reinterpret_cast<WeakReference *>(fieldData);
+  auto strongValue = swift_unknownWeakLoadStrong(weakField);
+
+  // Now that we have a strong reference, we need to create a temporary buffer
+  // from which to copy the whole value, which might be a native class-bound
+  // existential, which means we also need to copy n witness tables, for
+  // however many protocols are in the protocol composition. For example, if we
+  // are copying a:
+  // weak var myWeakProperty : (Protocol1 & Protocol2)?
+  // then we need to copy three values:
+  // - the instance
+  // - the witness table for Protocol1
+  // - the witness table for Protocol2
+
+  auto weakContainer =
+    reinterpret_cast<WeakClassExistentialContainer *>(fieldData);
+
+  // Create a temporary existential where we can put the strong reference.
+  // The allocateBuffer value witness requires a ValueBuffer to own the
+  // allocated storage.
+  ValueBuffer temporaryBuffer;
+
+  auto temporaryValue =
+    reinterpret_cast<ClassExistentialContainer *>(
+      type->vw_allocateBuffer(&temporaryBuffer));
+
+  // Now copy the entire value out of the parent, which will include the
+  // witness tables.
+  temporaryValue->Value = strongValue;
+  auto valueWitnessesSize = type->getValueWitnesses()->getSize() -
+                            sizeof(WeakClassExistentialContainer);
+  memcpy(temporaryValue->getWitnessTables(), weakContainer->getWitnessTables(),
+         valueWitnessesSize);
+
+  // This MagicMirror constructor creates a box to hold the loaded refernce
+  // value, which becomes the new owner for the value.
+  new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
+                              type, /*take*/ true);
+
+  type->vw_deallocateBuffer(&temporaryBuffer);
+
+  // swift_StructMirror_subscript and swift_ClassMirror_subscript
+  // requires that the owner be consumed. Since we have the new heap box as the
+  // owner now, we need to release the old owner to maintain the contract.
+  if (owner->metadata->isAnyClass())
+    swift_unknownRelease(owner);
+  else
+    swift_release(owner);
+
+  return true;
+}
+
 // -- Struct destructuring.
   
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -416,7 +480,7 @@ void swift_StructMirror_subscript(String *outString,
                                   Mirror *outMirror,
                                   intptr_t i,
                                   HeapObject *owner,
-                                  const OpaqueValue *value,
+                                  OpaqueValue *value,
                                   const Metadata *type) {
   auto Struct = static_cast<const StructMetadata *>(type);
   
@@ -427,13 +491,17 @@ void swift_StructMirror_subscript(String *outString,
   auto fieldType = Struct->getFieldTypes()[i];
   auto fieldOffset = Struct->getFieldOffsets()[i];
   
-  auto bytes = reinterpret_cast<const char*>(value);
-  auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
+  auto bytes = reinterpret_cast<char*>(value);
+  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
 
   new (outString) String(getFieldName(Struct->Description->Struct.FieldNames, i));
 
   // 'owner' is consumed by this call.
   assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
+
+  if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
+    return;
+
   new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
 }
 
@@ -614,7 +682,7 @@ void swift_ClassMirror_subscript(String *outString,
                                  Mirror *outMirror,
                                  intptr_t i,
                                  HeapObject *owner,
-                                 const OpaqueValue *value,
+                                 OpaqueValue *value,
                                  const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
 
@@ -655,10 +723,15 @@ void swift_ClassMirror_subscript(String *outString,
 #endif
   }
   
-  auto bytes = *reinterpret_cast<const char * const*>(value);
-  auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
-  
-  new (outString) String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
+  auto bytes = *reinterpret_cast<char * const *>(value);
+  auto fieldData = reinterpret_cast<OpaqueValue *>(bytes + fieldOffset);
+
+  new (outString) String(getFieldName(Clas->getDescription()->Class.FieldNames,
+                                      i));
+
+ if (loadSpecialReferenceStorage(owner, fieldData, fieldType, outMirror))
+   return;
+
   // 'owner' is consumed by this call.
   new (outMirror) Mirror(reflect(owner, fieldData, fieldType.getType()));
 }
@@ -843,15 +916,6 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
   }
 
   return object;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-extern "C" bool swift_isKind(id object, NSString *className) {
-  bool result = [object isKindOfClass:NSClassFromString(className)];
-  [object release];
-  [className release];
-
-  return result;
 }
 
 #endif

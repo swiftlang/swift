@@ -31,7 +31,7 @@ namespace SourceKit {
   typedef IntrusiveRefCntPtr<ASTUnit> ASTUnitRef;
 
 class SwiftInterfaceGenContext :
-  public swift::ThreadSafeRefCountedBase<SwiftInterfaceGenContext> {
+  public llvm::ThreadSafeRefCountedBase<SwiftInterfaceGenContext> {
 public:
   static SwiftInterfaceGenContextRef create(StringRef DocumentName,
                                             bool IsModule,
@@ -41,6 +41,11 @@ public:
                                             std::string &ErrorMsg,
                                             bool SynthesizedExtensions,
                                             Optional<StringRef> InterestedUSR);
+
+  static SwiftInterfaceGenContextRef
+    createForTypeInterface(swift::CompilerInvocation Invocation,
+                           StringRef TypeUSR,
+                           std::string &ErrorMsg);
 
   static SwiftInterfaceGenContextRef createForSwiftSource(StringRef DocumentName,
                                                           StringRef SourceFileName,

@@ -31,7 +31,7 @@ final class Dict<K,V> : ExpressibleByArrayLiteral {
   init(arrayLiteral elements: (K,V)...) {}
 }
 
-infix operator => {}
+infix operator =>
 
 func => <K, V>(k: K, v: V) -> (K,V) { return (k,v) }
 
@@ -102,4 +102,59 @@ func longArray() {
   var _=["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
 }
 
-[1,2].map // expected-error {{expression type '(@noescape (Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+[1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+
+
+// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
+func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
+  var x: T = [1] // expected-error {{contextual type 'T' cannot be used with array literal}}
+}
+
+func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
+     where T.Element : ExpressibleByIntegerLiteral {
+  let x: T = [1]
+  return x
+}
+
+class A { }
+class B : A { }
+class C : A { }
+
+/// Check for defaulting the element type to 'Any'.
+func defaultToAny(i: Int, s: String) {
+  let a1 = [1, "a", 3.5]
+  // expected-error@-1{{heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  let _: Int = a1  // expected-error{{value of type '[Any]'}}
+
+  let a2: Array = [1, "a", 3.5]
+  // expected-error@-1{{heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+
+  let _: Int = a2  // expected-error{{value of type '[Any]'}}
+
+  let a3 = []
+  // expected-error@-1{{empty collection literal requires an explicit type}}
+
+  let _: Int = a3 // expected-error{{value of type '[Any]'}}
+
+  let _: [Any] = [1, "a", 3.5]
+  let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
+  let _: [Any] = [1, "a", [3.5, "b", 3]]
+
+  let a4 = [B(), C()]
+  let _: Int = a4 // expected-error{{value of type '[A]'}}
+}
+
+/// Check handling of 'nil'.
+func joinWithNil(s: String) {
+  let a1 = [s, nil]
+  let _: Int = a1 // expected-error{{value of type '[String?]'}}
+
+  let a2 = [nil, s]
+  let _: Int = a2 // expected-error{{value of type '[String?]'}}
+
+  let a3 = ["hello", nil]
+  let _: Int = a3 // expected-error{{value of type '[String?]'}}
+
+  let a4 = [nil, "hello"]
+  let _: Int = a4 // expected-error{{value of type '[String?]'}}
+}

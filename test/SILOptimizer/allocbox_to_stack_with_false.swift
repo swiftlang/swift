@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -verify | %FileCheck %s
 
 // Make sure that materializations of computed properties such as 'false' and
 // 'true' don't leave needless stack allocations. <rdar://problem/15272642>

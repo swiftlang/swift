@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -18,7 +18,7 @@ import Swift
 
 struct XXX<T> {
   init(t: T)
-  mutating func foo(t t: T) -> Int32
+  mutating func foo(t: T) -> Int32
   var m_t: T
 }
 
@@ -511,4 +511,30 @@ bb0:
   strong_release %8 : $@callee_owned (Int32) -> Int32 // id: %15
   dealloc_stack %0 : $*@callee_owned (Int32) -> Int32 // id: %16
   return %14 : $Int32                             // id: %17
+}
+
+// test_bind<A> (Builtin.RawPointer, A.Type) -> ()
+// Check that this is specialized as T=Int.
+// CHECK-LABEL: sil shared @_TTSg5Si___TF5test9test_bindurFTBpMx_T_ 
+// CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
+// CHECK: return
+sil hidden @_TF5test9test_bindurFTBpMx_T_ : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = metatype $@thick T.Type
+  bind_memory %0 : $Builtin.RawPointer, %4 : $Builtin.Word to $*T
+  %7 = tuple ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// Invoke test_bind with T=Int.
+sil @_TF5test8call_bindFT1pBp_T_ : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  // function_ref test_bind<A> (Builtin.RawPointer, A.Type) -> ()
+  %2 = function_ref @_TF5test9test_bindurFTBpMx_T_ : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
+  %3 = metatype $@thick Int.Type
+  %4 = apply %2<Int>(%0, %3) : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
+  %5 = tuple ()
+  return %5 : $()
 }

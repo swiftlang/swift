@@ -61,9 +61,9 @@ pointer to a child node.
 Define `ChildNodeOrKey` to be a type that is an unsafe union of `Key` and
 `UnsafePointer<Node>`:
 
-  sizeof(ChildNodeOrKey)   = max(sizeof(UnsafePointer), sizeof(Key))
-  alignof(ChildNodeOrKey)  = max(alignof(UnsafePointer), alignof(Key))
-  strideof(ChildNodeOrKey) = max(strideof(UnsafePointer), strideof(Key))
+  MemoryLayout<ChildNodeOrKey>.size      = max(MemoryLayout<UnsafePointer>.size, MemoryLayout<Key>.size)
+  MemoryLayout<ChildNodeOrKey>.alignment = max(MemoryLayout<UnsafePointer>.alignment, MemoryLayout<Key>.alignment)
+  MemoryLayout<ChildNodeOrKey>.stride    = max(MemoryLayout<UnsafePointer>.stride, MemoryLayout<Key>.stride)
 
 Memory layout:
 
@@ -104,20 +104,16 @@ import SwiftShims
 //
 
 func allocBytes(count: Int, alignment: Int)
-  -> UnsafeMutablePointer<UInt8> {
-  return UnsafeMutablePointer(
-    Builtin.allocRaw(count._builtinWordValue, alignment._builtinWordValue))
+  -> UnsafeMutableRawPointer {
+  return UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: alignment)
 }
 
 func deallocBytes(
-  _ pointer: UnsafeMutablePointer<UInt8>,
+  _ pointer: UnsafeMutableRawPointer,
   byteCount: Int,
   alignment: Int
 ) {
-  Builtin.deallocRaw(
-    pointer._rawValue,
-    byteCount._builtinWordValue,
-    alignment._builtinWordValue)
+  pointer.deallocate(bytes: byteCount, alignedTo: alignment)
 }
 
 func _swift_stdlib_atomicStoreInt(
@@ -125,7 +121,7 @@ func _swift_stdlib_atomicStoreInt(
   desired: Int) {
 #if arch(x86_64)
   return _swift_stdlib_atomicStoreUInt64(
-    object: UnsafeMutablePointer(target),
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
     desired: UInt64(UInt(bitPattern: desired)))
 #endif
 }
@@ -164,7 +160,7 @@ func _dumpRec(
   }
 }
 
-struct _Stdout : OutputStream {
+struct _Stdout : TextOutputStream {
   mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
@@ -279,20 +275,20 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   typealias _Self = _PVSparseVectorNodePointer
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _childNodePopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _childNodePopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _childNodePopulationBitmapOffset: Int {
     let padding =
@@ -301,10 +297,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static var _keyPopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _keyPopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _keyPopulationBitmapOffset: Int {
     let padding =
@@ -314,10 +310,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _childNodeVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(UnsafePointer<UInt8>.self) * layout.childNodeCount
+    return MemoryLayout<UnsafePointer<UInt8>>.stride * layout.childNodeCount
   }
   static var _childNodeVectorAlignment: Int {
-    return alignof(UnsafePointer<UInt8>.self)
+    return MemoryLayout<UnsafePointer<UInt8>>.alignment
   }
   static var _childNodeVectorOffset: Int {
     let padding =
@@ -326,10 +322,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _keyVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(Key.self) * layout.keyCount
+    return MemoryLayout<Key>.stride * layout.keyCount
   }
   static var _keyVectorAlignment: Int {
-    return alignof(Key.self)
+    return MemoryLayout<Key>.alignment
   }
   static func _keyVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
     let padding =
@@ -338,10 +334,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   static func _valueVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
-    return strideof(Value.self) * layout.keyCount
+    return MemoryLayout<Value>.stride * layout.keyCount
   }
   static var _valueVectorAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static func _valueVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
     let padding =
@@ -357,10 +353,10 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     return _valueVectorOffset(layout: layout) + _valueVectorSize(layout: layout)
   }
 
-  var _nodePointer: UnsafeMutablePointer<UInt8>
+  var _nodePointer: UnsafeMutableRawPointer
 
   var _referenceCountPointer: UnsafeMutablePointer<Int> {
-    return UnsafeMutablePointer(_nodePointer)
+    return _nodePointer.assumingMemoryBound(to: Int.self)
   }
 
   var layoutParameters: _PVSparseVectorNodeLayoutParameters {
@@ -403,23 +399,23 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
 
   var childNodePopulationBitmap: _Int32Bitmap {
     unsafeAddress {
-      return UnsafePointer(
-        _nodePointer + _Self._childNodePopulationBitmapOffset)
+      return UnsafePointer((_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
     }
     nonmutating unsafeMutableAddress {
-      return UnsafeMutablePointer(
-        _nodePointer + _Self._childNodePopulationBitmapOffset)
+      return (_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
     }
   }
 
   var keyPopulationBitmap: _Int32Bitmap {
     unsafeAddress {
-      return UnsafePointer(
-        _nodePointer + _Self._keyPopulationBitmapOffset)
+      return UnsafePointer((_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
     }
     nonmutating unsafeMutableAddress {
-      return UnsafeMutablePointer(
-        _nodePointer + _Self._keyPopulationBitmapOffset)
+      return (_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
     }
   }
 
@@ -432,8 +428,8 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 
   var _childNodeVector: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._childNodeVectorOffset)
+    return (_nodePointer + _Self._childNodeVectorOffset)
+      .assumingMemoryBound(to: Optional<_PVAnyNodePointer<Key, Value>>.self)
   }
 
   var childNodes: UnsafeMutableBufferPointer<_PVAnyNodePointer<Key, Value>?> {
@@ -444,17 +440,17 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
 
   func _keyVector(layout: _PVSparseVectorNodeLayoutParameters)
     -> UnsafeMutablePointer<Key> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._keyVectorOffset(layout: layout))
+    return (_nodePointer + _Self._keyVectorOffset(layout: layout))
+      .assumingMemoryBound(to: Key.self)
   }
 
   func _valueVector(layout: _PVSparseVectorNodeLayoutParameters)
     -> UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._valueVectorOffset(layout: layout))
+    return (_nodePointer + _Self._valueVectorOffset(layout: layout))
+      .assumingMemoryBound(to: Value.self)
   }
 
-  init(_nodePointer: UnsafeMutablePointer<UInt8>) {
+  init(_nodePointer: UnsafeMutableRawPointer) {
     self._nodePointer = _nodePointer
   }
 
@@ -493,8 +489,8 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(!childNodePopulationBitmap[i]) // sanity check
     precondition(!keyPopulationBitmap[i]) // sanity check
 
-    (_keyVector(layout: layout) + keyCount).initialize(with: key)
-    (_valueVector(layout: layout) + keyCount).initialize(with: value)
+    (_keyVector(layout: layout) + keyCount).initialize(to: key)
+    (_valueVector(layout: layout) + keyCount).initialize(to: value)
 
     keyPopulationBitmap[i] = true
   }
@@ -503,7 +499,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   func initializeChildNodes(
     from newChildNodes: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?>
   ) {
-    _childNodeVector.initializeFrom(newChildNodes, count: childNodeCount)
+    _childNodeVector.initialize(from: newChildNodes, count: childNodeCount)
     for childNode in childNodes {
       childNode!.retain()
     }
@@ -520,7 +516,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
-    childNodeVector.initializeFrom(newChildNodes, count: i)
+    childNodeVector.initialize(from: newChildNodes, count: i)
     for childNode in
       UnsafeMutableBufferPointer(
         start: childNodeVector, count: i)
@@ -531,7 +527,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newChildNodes + i + 1, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -552,7 +548,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
     let childNodeVector = _childNodeVector
-    childNodeVector.initializeFrom(newChildNodes, count: i)
+    childNodeVector.initialize(from: newChildNodes, count: i)
     for childNode in
       UnsafeMutableBufferPointer(
         start: childNodeVector, count: i)
@@ -563,7 +559,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     childNodeVector[i] = newChildNode
 
     let destPointer = childNodeVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newChildNodes + i, count: childNodeCount - i - 1)
     for childNode in
       UnsafeMutableBufferPointer(
@@ -577,7 +573,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     from newKeys: UnsafeMutablePointer<Key>,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    _keyVector(layout: layout).initializeFrom(newKeys, count: layout.keyCount)
+    _keyVector(layout: layout).initialize(from: newKeys, count: layout.keyCount)
   }
 
   func copyKeys(
@@ -589,11 +585,11 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let keyVector = _keyVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
-    keyVector.initializeFrom(newKeys, count: i)
+    keyVector.initialize(from: newKeys, count: i)
     keyVector[i] = newKey
 
     let destPointer = keyVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newKeys + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -601,7 +597,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     from newValues: UnsafeMutablePointer<Value>,
     layout: _PVSparseVectorNodeLayoutParameters
   ) {
-    _valueVector(layout: layout).initializeFrom(newValues, count: layout.keyCount)
+    _valueVector(layout: layout).initialize(from: newValues, count: layout.keyCount)
   }
 
   func copyValues(
@@ -613,11 +609,11 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     precondition(bucket >= 0 && bucket < 32) // sanity check
     let valueVector = _valueVector(layout: layout)
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
-    valueVector.initializeFrom(newValues, count: i)
+    valueVector.initialize(from: newValues, count: i)
     valueVector[i] = newValue
 
     let destPointer = valueVector + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -636,18 +632,18 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     do {
       let keyVector = _keyVector(layout: layout)
-      keyVector.initializeFrom(newKeys, count: i)
+      keyVector.initialize(from: newKeys, count: i)
 
       let destPointer = keyVector + i
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newKeys + i + 1, count: layout.keyCount - i)
     }
     do {
       let valueVector = _valueVector(layout: layout)
-      valueVector.initializeFrom(newValues, count: i)
+      valueVector.initialize(from: newValues, count: i)
 
       let destPointer = valueVector + i
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newValues + i + 1, count: layout.keyCount - i)
     }
   }
@@ -665,22 +661,22 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
     let i = keyPopulationBitmap.countBitsSetBelow(bucket)
     do {
       let keyVector = _keyVector(layout: layout)
-      keyVector.initializeFrom(newKeys, count: i)
+      keyVector.initialize(from: newKeys, count: i)
 
       keyVector[i] = newKey
 
       let destPointer = keyVector + i + 1
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newKeys + i, count: layout.keyCount - i - 1)
     }
     do {
       let valueVector = _valueVector(layout: layout)
-      valueVector.initializeFrom(newValues, count: i)
+      valueVector.initialize(from: newValues, count: i)
 
       valueVector[i] = newValue
 
       let destPointer = valueVector + i + 1
-      destPointer.initializeFrom(
+      destPointer.initialize(from: 
         newValues + i, count: layout.keyCount - i - 1)
     }
   }
@@ -946,30 +942,30 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
 
   static var _childNodeOrKeyStride: Int {
     return max(
-      strideof(UnsafePointer<UInt8>.self),
-      strideof(Key.self))
+      MemoryLayout<UnsafePointer<UInt8>>.stride,
+      MemoryLayout<Key>.stride)
   }
   static var _childNodeOrKeyAlignment: Int {
     return max(
-      alignof(UnsafePointer<UInt8>.self),
-      alignof(Key.self))
+      MemoryLayout<UnsafePointer<UInt8>>.alignment,
+      MemoryLayout<Key>.alignment)
   }
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _childNodePopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _childNodePopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _childNodePopulationBitmapOffset: Int {
     let padding = max(
@@ -979,10 +975,10 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
   }
 
   static var _keyPopulationBitmapSize: Int {
-    return sizeof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.size
   }
   static var _keyPopulationBitmapAlignment: Int {
-    return alignof(_Int32Bitmap.self)
+    return MemoryLayout<_Int32Bitmap>.alignment
   }
   static var _keyPopulationBitmapOffset: Int {
     let padding = max(
@@ -1006,10 +1002,10 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
   }
 
   static var _valueArraySize: Int {
-    return strideof(Value.self) * 32
+    return MemoryLayout<Value>.stride * 32
   }
   static var _valueArrayAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static var _valueArrayOffset: Int {
     let padding =
@@ -1025,10 +1021,10 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     return _valueArrayOffset + _valueArraySize
   }
 
-  var _nodePointer: UnsafeMutablePointer<UInt8>
+  var _nodePointer: UnsafeMutableRawPointer
 
   var _referenceCountPointer: UnsafeMutablePointer<Int> {
-    return UnsafeMutablePointer(_nodePointer)
+    return _nodePointer.assumingMemoryBound(to: Int.self)
   }
 
   func retain() {
@@ -1049,14 +1045,14 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
 
   func dealloc() {
     for i in childNodePopulationBitmap.setBitIndices {
-      UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>>(
-        _childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+      (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+        .assumingMemoryBound(to: _PVAnyNodePointer<Key, Value>.self)
         .pointee.release()
     }
     if !_isPOD(Key.self) {
       for i in keyPopulationBitmap.setBitIndices {
-        UnsafeMutablePointer<Key>(
-          _childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+        (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+          .assumingMemoryBound(to: Key.self)
           .deinitialize()
       }
     }
@@ -1076,23 +1072,23 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
 
   var childNodePopulationBitmap: _Int32Bitmap {
     unsafeAddress {
-      return UnsafePointer(
-        _nodePointer + _Self._childNodePopulationBitmapOffset)
+      return UnsafePointer((_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
     }
     nonmutating unsafeMutableAddress {
-      return UnsafeMutablePointer(
-        _nodePointer + _Self._childNodePopulationBitmapOffset)
+      return (_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
     }
   }
 
   var keyPopulationBitmap: _Int32Bitmap {
     unsafeAddress {
-      return UnsafePointer(
-        _nodePointer + _Self._keyPopulationBitmapOffset)
+      return UnsafePointer((_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
     }
     nonmutating unsafeMutableAddress {
-      return UnsafeMutablePointer(
-        _nodePointer + _Self._keyPopulationBitmapOffset)
+      return (_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
     }
   }
 
@@ -1104,17 +1100,16 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     return keyPopulationBitmap.setBitCount
   }
 
-  var _childNodeOrKeyArray: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._childNodeOrKeyArrayOffset)
+  var _childNodeOrKeyArray: UnsafeMutableRawPointer {
+    return _nodePointer + _Self._childNodeOrKeyArrayOffset
   }
 
   var _valueArray: UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._valueArrayOffset)
+    return (_nodePointer + _Self._valueArrayOffset)
+      .assumingMemoryBound(to: Value.self)
   }
 
-  init(_nodePointer: UnsafeMutablePointer<UInt8>) {
+  init(_nodePointer: UnsafeMutableRawPointer) {
     self._nodePointer = _nodePointer
   }
 
@@ -1138,10 +1133,9 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     precondition(!childNodePopulationBitmap[i]) // sanity check
     precondition(!keyPopulationBitmap[i]) // sanity check
 
-    UnsafeMutablePointer<Key>(
-      _childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
-      .initialize(with: key)
-    (_valueArray + i).initialize(with: value)
+    (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+      .initializeMemory(as: Key.self, to: key)
+    (_valueArray + i).initialize(to: value)
 
     keyPopulationBitmap[i] = true
   }
@@ -1188,20 +1182,20 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   typealias _Self = _PVCollisionNodePointer
 
   static var _referenceCountSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _referenceCountAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _referenceCountOffset: Int {
     return 0
   }
 
   static var _countSize: Int {
-    return sizeof(Int.self)
+    return MemoryLayout<Int>.size
   }
   static var _countAlignment: Int {
-    return alignof(Int.self)
+    return MemoryLayout<Int>.alignment
   }
   static var _countOffset: Int {
     let padding = max(
@@ -1211,10 +1205,10 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   }
 
   static func _keyArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
-    return strideof(Key.self) * layout.keyCount
+    return MemoryLayout<Key>.stride * layout.keyCount
   }
   static var _keyArrayAlignment: Int {
-    return alignof(Key.self)
+    return MemoryLayout<Key>.alignment
   }
   static var _keyArrayOffset: Int {
     let padding =
@@ -1223,10 +1217,10 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   }
 
   static func _valueArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
-    return strideof(Value.self) * layout.keyCount
+    return MemoryLayout<Value>.stride * layout.keyCount
   }
   static var _valueArrayAlignment: Int {
-    return alignof(Value.self)
+    return MemoryLayout<Value>.alignment
   }
   static func _valueArrayOffset(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
     let padding =
@@ -1242,10 +1236,10 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     return _valueArrayOffset(layout: layout) + _valueArraySize(layout: layout)
   }
 
-  var _nodePointer: UnsafeMutablePointer<UInt8>
+  var _nodePointer: UnsafeMutableRawPointer
 
   var _referenceCountPointer: UnsafeMutablePointer<Int> {
-    return UnsafeMutablePointer(_nodePointer)
+    return _nodePointer.assumingMemoryBound(to: Int.self)
   }
 
   var layoutParameters: _PVCollisionNodePointerLayoutParameters {
@@ -1284,25 +1278,27 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
 
   var keyCount: Int {
     unsafeAddress {
-      return UnsafePointer(_nodePointer + _Self._countOffset)
+      return UnsafePointer((_nodePointer + _Self._countOffset)
+        .assumingMemoryBound(to: Int.self))
     }
     nonmutating unsafeMutableAddress {
-      return UnsafeMutablePointer(_nodePointer + _Self._countOffset)
+      return (_nodePointer + _Self._countOffset)
+        .assumingMemoryBound(to: Int.self)
     }
   }
 
   var _keyArray: UnsafeMutablePointer<Key> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._keyArrayOffset)
+    return (_nodePointer + _Self._keyArrayOffset)
+      .assumingMemoryBound(to: Key.self)
   }
 
   func _valueArray(layout: _PVCollisionNodePointerLayoutParameters)
     -> UnsafeMutablePointer<Value> {
-    return UnsafeMutablePointer(
-      _nodePointer + _Self._valueArrayOffset(layout: layout))
+    return (_nodePointer + _Self._valueArrayOffset(layout: layout))
+      .assumingMemoryBound(to: Value.self)
   }
 
-  init(_nodePointer: UnsafeMutablePointer<UInt8>) {
+  init(_nodePointer: UnsafeMutableRawPointer) {
     self._nodePointer = _nodePointer
   }
 
@@ -1326,12 +1322,12 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     self = _Self(uninitializedNodeFor: layout)
 
     let keyArray = self._keyArray
-    keyArray.initialize(with: key0)
-    (keyArray + 1).initialize(with: key1)
+    keyArray.initialize(to: key0)
+    (keyArray + 1).initialize(to: key1)
 
     let valueArray = self._valueArray(layout: layout)
-    valueArray.initialize(with: value0)
-    (valueArray + 1).initialize(with: value1)
+    valueArray.initialize(to: value0)
+    (valueArray + 1).initialize(to: value1)
   }
 
   func initializeKey(
@@ -1342,8 +1338,8 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   ) {
     precondition(i >= 0 && i < layout.keyCount) // sanity check
 
-    (_keyArray + i).initialize(with: key)
-    (_valueArray(layout: layout) + i).initialize(with: value)
+    (_keyArray + i).initialize(to: key)
+    (_valueArray(layout: layout) + i).initialize(to: value)
   }
 
   func copyValues(
@@ -1353,11 +1349,11 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     layout: _PVCollisionNodePointerLayoutParameters
   ) {
     let valueArray = _valueArray(layout: layout)
-    valueArray.initializeFrom(newValues, count: i)
+    valueArray.initialize(from: newValues, count: i)
     valueArray[i] = newValue
 
     let destPointer = valueArray + i + 1
-    destPointer.initializeFrom(
+    destPointer.initialize(from: 
       newValues + i + 1, count: layout.keyCount - i - 1)
   }
 
@@ -1371,12 +1367,12 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
     precondition(layout.keyCount >= 1)
 
     let keyArray = _keyArray
-    keyArray.initializeFrom(newKeys, count: layout.keyCount - 1)
-    (keyArray + layout.keyCount - 1).initialize(with: appendKey)
+    keyArray.initialize(from: newKeys, count: layout.keyCount - 1)
+    (keyArray + layout.keyCount - 1).initialize(to: appendKey)
 
     let valueArray = _valueArray(layout: layout)
-    valueArray.initializeFrom(newValues, count: layout.keyCount - 1)
-    (valueArray + layout.keyCount - 1).initialize(with: appendValue)
+    valueArray.initialize(from: newValues, count: layout.keyCount - 1)
+    (valueArray + layout.keyCount - 1).initialize(to: appendValue)
   }
 
   func unsafeMaybeGet(
@@ -1414,7 +1410,7 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
         } else {
           // Create a new node.
           let newNode = _PVCollisionNodePointer(uninitializedNodeFor: layout)
-          newNode._keyArray.initializeFrom(
+          newNode._keyArray.initialize(from: 
             keyArray, count: layout.keyCount)
           newNode.copyValues(
             from: valueArray,
@@ -1486,9 +1482,9 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
 struct _PVAnyNodePointer<Key : Hashable, Value>
   : CustomReflectable, Equatable {
 
-  let taggedPointer: UnsafeMutablePointer<UInt8>
+  let taggedPointer: UnsafeMutableRawPointer
 
-  init(taggedPointer: UnsafeMutablePointer<UInt8>) {
+  init(taggedPointer: UnsafeMutableRawPointer) {
     self.taggedPointer = taggedPointer
   }
 
@@ -1501,14 +1497,14 @@ struct _PVAnyNodePointer<Key : Hashable, Value>
   init(_ arrayNode: _PVArrayNodePointer<Key, Value>) {
     precondition(
       Int(bitPattern: arrayNode._nodePointer) & 0x3 == 0) // sanity check
-    self.taggedPointer = UnsafeMutablePointer(bitPattern:
+    self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
       Int(bitPattern: arrayNode._nodePointer) | 1)!
   }
 
   init(_ collisionNode: _PVCollisionNodePointer<Key, Value>) {
     precondition(
       Int(bitPattern: collisionNode._nodePointer) & 0x3 == 0) // sanity check
-    self.taggedPointer = UnsafeMutablePointer(bitPattern:
+    self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
       Int(bitPattern: collisionNode._nodePointer) | 2)!
   }
 
@@ -1516,13 +1512,13 @@ struct _PVAnyNodePointer<Key : Hashable, Value>
     return Int(bitPattern: taggedPointer) & 0x3
   }
 
-  var _untaggedPointer: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(bitPattern:
+  var _untaggedPointer: UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(bitPattern:
       Int(bitPattern: taggedPointer) & ~0x3)!
   }
 
   var _referenceCountPointer: UnsafeMutablePointer<Int> {
-    return UnsafeMutablePointer(_untaggedPointer)
+    return _untaggedPointer.assumingMemoryBound(to: Int.self)
   }
 
   var asSparseVectorNode: _PVSparseVectorNodePointer<Key, Value> {
@@ -1676,13 +1672,12 @@ func == <Key, Value> (
   return lhs.taggedPointer == rhs.taggedPointer
 }
 
-final class _NativePVDictionaryStorageRef<Key : Hashable, Value>
-  : NonObjectiveCBase {
+final internal class _NativePVDictionaryStorageRef<Key : Hashable, Value> {
 
   var _rootNode: _PVAnyNodePointer<Key, Value>?
   var _count: Int
 
-  override init() {
+  init() {
     self._rootNode = nil
     self._count = 0
   }
@@ -1788,7 +1783,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
       count = 1
       return nil
     }
-    let isUnique = isUniquelyReferenced(&_storageRef)
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
     let (oldValue, newRootNode, wasInserted) = oldRootNode.updateValue(
       value,
       forKey: key,
@@ -1811,7 +1806,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
       return nil
     }
     let hashValue = key.hashValue
-    let isUnique = isUniquelyReferenced(&_storageRef)
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
     let (oldValue, newRootNode) = oldRootNode.removeValue(
       forKey: key,
       hashValue: hashValue,
@@ -1885,14 +1880,14 @@ var PersistentVectorTests = TestSuite("PersistentVector")
 
 PersistentVectorTests.test("sizeof") {
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVSparseVectorNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVSparseVectorNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVArrayNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVArrayNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
   expectEqual(
-    sizeof(UnsafePointer<UInt8>.self),
-    sizeof(_PVAnyNodePointer<MinimalHashableValue, OpaqueValue<Int32>>.self))
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVAnyNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
 }
 
 %{

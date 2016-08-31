@@ -377,7 +377,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
 
     // Retrieve the interface type for this inherited type.
-    if (inheritedTy->hasArchetype())
+    //
+    // If we have a generic parameter, mapTypeOutOfContext() might not
+    // work yet, if we're calling this while building the generic
+    // signature. However, we're also not storing inheritedTy back
+    // anywhere, so it's OK to leave it as an archetype.
+    //
+    // FIXME: Ideally, we wouldn't have code paths that take a mix
+    // of archetypes and interface types. Other than generic parameters,
+    // the only time we get an interface type here is with invalid
+    // circular cases. That should be diagnosed elsewhere.
+    if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
       inheritedTy = ArchetypeBuilder::mapTypeOutOfContext(DC, inheritedTy);
 
     // Check whether we inherited from the same type twice.
@@ -389,7 +399,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                                      inheritedClause[i-1].getSourceRange().End);
       SourceLoc afterMyEndLoc
         = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     inherited.getSourceRange().End);
+                                     inherited.getSourceRange().Start);
 
       diagnose(inherited.getSourceRange().Start,
                diag::duplicate_inheritance, inheritedTy)
@@ -696,9 +706,10 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericSignature *TypeChecker::handleSILGenericParams(
-                    GenericParamList *genericParams,
-                    DeclContext *DC) {
+std::pair<GenericSignature *, GenericEnvironment *>
+TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
+                                    DeclContext *DC) {
+
   SmallVector<GenericParamList *, 2> nestedList;
   for (; genericParams; genericParams = genericParams->getOuterParameters()) {
     nestedList.push_back(genericParams);
@@ -712,23 +723,26 @@ GenericSignature *TypeChecker::handleSILGenericParams(
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
   GenericSignature *parentSig = nullptr;
+  GenericEnvironment *parentEnv = nullptr;
+
   for (unsigned i = 0, e = nestedList.size(); i < e; i++) {
     auto genericParams = nestedList.rbegin()[i];
     bool invalid = false;
     auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
                                                 nullptr, invalid);
     if (invalid)
-      return nullptr;
+      return std::make_pair(nullptr, nullptr);
 
     revertGenericParamList(genericParams);
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
     checkGenericParamList(&builder, genericParams, parentSig);
-    finalizeGenericParamList(builder, genericParams, DC);
-
+    parentEnv = finalizeGenericParamList(builder, genericParams,
+                                         genericSig, DC);
     parentSig = genericSig;
   }
-  return parentSig;
+
+  return std::make_pair(parentSig, parentEnv);
 }
 
 /// Check whether the given type representation will be
@@ -853,7 +867,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   // If there's no type yet, come back to it later.
   if (!current->hasType())
     return;
-
+  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
@@ -871,7 +885,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = true;
   if (current->hasAccessibility())
-    isCascading = (current->getFormalAccess() > Accessibility::Private);
+    isCascading = (current->getFormalAccess() > Accessibility::FilePrivate);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitionsVec;
@@ -1168,19 +1182,41 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
 
 namespace {
 
-class TypeAccessibilityChecker : private TypeWalker {
-  using TypeAccessibilityCacheMap =
-    decltype(TypeChecker::TypeAccessibilityCache);
-  TypeAccessibilityCacheMap &Cache;
-  SmallVector<Accessibility, 8> AccessStack;
+class TypeAccessScopeChecker : private TypeWalker {
+  using TypeAccessScopeCacheMap = TypeChecker::TypeAccessScopeCacheMap;
+  TypeAccessScopeCacheMap &Cache;
+  const SourceFile *File;
+  SmallVector<intptr_t, 8> RawScopeStack;
 
-  explicit TypeAccessibilityChecker(TypeAccessibilityCacheMap &cache)
-      : Cache(cache) {
+  static constexpr const intptr_t INVALID = -1;
+
+  explicit TypeAccessScopeChecker(TypeAccessScopeCacheMap &cache,
+                                  const SourceFile *file)
+      : Cache(cache), File(file) {
     // Always have something on the stack.
-    AccessStack.push_back(Accessibility::Private);
+    RawScopeStack.push_back((intptr_t)INVALID);
   }
 
   bool shouldVisitOriginalSubstitutedType() override { return true; }
+
+  static intptr_t intersectAccess(const intptr_t first, const intptr_t second) {
+    if (first == INVALID || second == INVALID)
+      return INVALID;
+    if (!first)
+      return second;
+    if (!second)
+      return first;
+    if (first == second)
+      return first;
+
+    auto firstDC = reinterpret_cast<const DeclContext *>(first);
+    auto secondDC = reinterpret_cast<const DeclContext *>(second);
+    if (firstDC->isChildContextOf(secondDC))
+      return first;
+    if (secondDC->isChildContextOf(firstDC))
+      return second;
+    return INVALID;
+  }
 
   Action walkToTypePre(Type ty) override {
     // Assume failure until we post-visit this node.
@@ -1188,34 +1224,42 @@ class TypeAccessibilityChecker : private TypeWalker {
     // Types.
     auto cached = Cache.find(ty);
     if (cached != Cache.end()) {
-      AccessStack.back() = std::min(AccessStack.back(), cached->second);
+      auto opaqueCached = reinterpret_cast<intptr_t>(cached->second);
+      RawScopeStack.back() = intersectAccess(RawScopeStack.back(),opaqueCached);
       return Action::SkipChildren;
     }
 
-    Accessibility current;
+    const DeclContext *DC;
     if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
-      current = alias->getDecl()->getFormalAccess();
+      DC = alias->getDecl()->getFormalAccessScope(File);
     else if (auto nominal = ty->getAnyNominal())
-      current = nominal->getFormalAccess();
+      DC = nominal->getFormalAccessScope(File);
     else
-      current = Accessibility::Public;
-    AccessStack.push_back(current);
+      DC = nullptr;
+    RawScopeStack.push_back(reinterpret_cast<intptr_t>(DC));
 
     return Action::Continue;
   }
 
   Action walkToTypePost(Type ty) override {
-    Accessibility last = AccessStack.pop_back_val();
-    Cache[ty] = last;
-    AccessStack.back() = std::min(AccessStack.back(), last);
+    auto last = RawScopeStack.pop_back_val();
+    if (last != INVALID)
+      Cache[ty] = reinterpret_cast<const DeclContext *>(last);
+    RawScopeStack.back() = intersectAccess(RawScopeStack.back(), last);
     return Action::Continue;
   }
 
 public:
-  static Accessibility getAccessibility(Type ty,
-                                        TypeAccessibilityCacheMap &cache) {
-    ty.walk(TypeAccessibilityChecker(cache));
-    return cache[ty];
+  static Optional<const DeclContext *>
+  getAccessScope(Type ty, const DeclContext *useDC,
+                 decltype(TypeChecker::TypeAccessScopeCache) &caches) {
+    const SourceFile *file = useDC->getParentSourceFile();
+    auto &cache = caches[file];
+    ty.walk(TypeAccessScopeChecker(cache, file));
+    auto iter = cache.find(ty);
+    if (iter == cache.end())
+      return None;
+    return iter->second;
   }
 };
 
@@ -1234,16 +1278,32 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
       !ED->getExtendedType()->is<ErrorType>()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
       validateDecl(nominal);
-      maxAccess = nominal->getFormalAccess();
+      maxAccess = std::max(nominal->getFormalAccess(),
+                           Accessibility::FilePrivate);
     }
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [this](const TypeLoc &TL) {
+    auto getTypeAccess = [this, ED](const TypeLoc &TL) -> Accessibility {
       if (!TL.getType())
         return Accessibility::Public;
-      return TypeAccessibilityChecker::getAccessibility(TL.getType(),
-                                                        TypeAccessibilityCache);
+      auto scopeDC =
+          TypeAccessScopeChecker::getAccessScope(TL.getType(),
+                                                 ED->getDeclContext(),
+                                                 TypeAccessScopeCache);
+      // This is an error case and will be diagnosed elsewhere.
+      if (!scopeDC.hasValue())
+        return Accessibility::Public;
+
+      if (!scopeDC.getValue())
+        return Accessibility::Public;
+      if (isa<ModuleDecl>(scopeDC.getValue()))
+        return Accessibility::Internal;
+      // Because extensions are always at top-level, they should never
+      // reference declarations not at the top level. (And any such references
+      // should be diagnosed elsewhere.) This code should not crash if that
+      // occurs, though.
+      return Accessibility::FilePrivate;
     };
 
     // Only check the trailing 'where' requirements. Other requirements come
@@ -1264,9 +1324,14 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
 
   Accessibility defaultAccess;
   if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
-    defaultAccess = AA->getAccess();
+    defaultAccess = std::max(AA->getAccess(), Accessibility::FilePrivate);
   else
-    defaultAccess = std::min(maxAccess, Accessibility::Internal);
+    defaultAccess = Accessibility::Internal;
+
+  // Don't set the max or default accessibility to 'open'.  This should
+  // be diagnosed as invalid anyway.
+  defaultAccess = std::min(defaultAccess, Accessibility::Public);
+  maxAccess = std::min(maxAccess, Accessibility::Public);
 
   // Normally putting a public member in an internal extension is harmless,
   // because that member can never be used elsewhere. But if some of the types
@@ -1308,10 +1373,22 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
   if (!D->hasAccessibility()) {
     DeclContext *DC = D->getDeclContext();
     switch (DC->getContextKind()) {
-    case DeclContextKind::SerializedLocal:
-    case DeclContextKind::AbstractClosureExpr:
-    case DeclContextKind::Initializer:
     case DeclContextKind::TopLevelCodeDecl:
+      // Variables declared in a top-level 'guard' statement can be accessed in
+      // later top-level code.
+      D->setAccessibility(Accessibility::FilePrivate);
+      break;
+    case DeclContextKind::AbstractClosureExpr:
+      if (isa<ParamDecl>(D)) {
+        // Closure parameters may need to be accessible to the enclosing
+        // context, for single-expression closures.
+        D->setAccessibility(Accessibility::FilePrivate);
+      } else {
+        D->setAccessibility(Accessibility::Private);
+      }
+      break;
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::Initializer:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
       D->setAccessibility(Accessibility::Private);
@@ -1323,16 +1400,18 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     case DeclContextKind::GenericTypeDecl: {
       auto generic = cast<GenericTypeDecl>(DC);
       validateAccessibility(generic);
-      Accessibility access = generic->getFormalAccess();
-      if (!isa<ProtocolDecl>(generic))
-        access = std::min(access, Accessibility::Internal);
+      Accessibility access = Accessibility::Internal;
+      if (isa<ProtocolDecl>(generic))
+        access = std::max(Accessibility::FilePrivate,
+                          generic->getFormalAccess());
       D->setAccessibility(access);
       break;
     }
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(DC);
       computeDefaultAccessibility(extension);
-      D->setAccessibility(extension->getDefaultAccessibility());
+      auto access = extension->getDefaultAccessibility();
+      D->setAccessibility(access);
     }
     }
   }
@@ -1352,10 +1431,16 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
 
 namespace {
 
-class TypeAccessibilityDiagnoser : private ASTWalker {
-  const ComponentIdentTypeRepr *minAccessibilityType = nullptr;
+class TypeAccessScopeDiagnoser : private ASTWalker {
+  const DeclContext *accessScope;
+  const DeclContext *useDC;
+  const ComponentIdentTypeRepr *offendingType = nullptr;
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
+    // Exit early if we've already found a problem type.
+    if (offendingType)
+      return false;
+
     auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR);
     if (!CITR)
       return true;
@@ -1364,55 +1449,84 @@ class TypeAccessibilityDiagnoser : private ASTWalker {
     if (!VD)
       return true;
 
-    if (minAccessibilityType) {
-      const ValueDecl *minDecl = minAccessibilityType->getBoundDecl();
-      if (minDecl->getFormalAccess() <= VD->getFormalAccess())
-        return true;
-    }
+    if (VD->getFormalAccessScope(useDC) != accessScope)
+      return true;
 
-    minAccessibilityType = CITR;
-    return true;
+    offendingType = CITR;
+    return false;
   }
 
+  bool walkToTypeReprPost(TypeRepr *T) override {
+    // Exit early if we've already found a problem type.
+    return offendingType != nullptr;
+  }
+
+  explicit TypeAccessScopeDiagnoser(const DeclContext *accessScope,
+                                    const DeclContext *useDC)
+    : accessScope(accessScope), useDC(useDC) {}
+
 public:
-  static const TypeRepr *findMinAccessibleType(TypeRepr *TR) {
-    TypeAccessibilityDiagnoser diagnoser;
+  static const TypeRepr *findTypeWithScope(TypeRepr *TR,
+                                           const DeclContext *accessScope,
+                                           const DeclContext *useDC) {
+    assert(accessScope && "why would we need to find a public access scope?");
+    TypeAccessScopeDiagnoser diagnoser(accessScope, useDC);
     TR->walk(diagnoser);
-    return diagnoser.minAccessibilityType;
+    return diagnoser.offendingType;
   }
 };
 } // end anonymous namespace
 
-/// Checks if the accessibility of the type described by \p TL is at least
-/// \p contextAccess. If it isn't, calls \p diagnose with a TypeRepr
+/// Checks if the access scope of the type described by \p TL contains
+/// \p contextAccessScope. If it isn't, calls \p diagnose with a TypeRepr
 /// representing the offending part of \p TL.
 ///
+/// If \p contextAccessScope is null, checks that \p TL is only made up of
+/// public types.
+///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
-/// part of the type that caused the problem could not be found.
-static void checkTypeAccessibility(
-    TypeChecker &TC, TypeLoc TL, Accessibility contextAccess,
-    llvm::function_ref<void(Accessibility, const TypeRepr *)> diagnose) {
-  // Don't spend time checking private access; this is always valid.
-  // This includes local declarations.
-  if (contextAccess == Accessibility::Private || !TL.getType())
+/// part of the type that caused the problem could not be found. The DeclContext
+/// is never null.
+static void checkTypeAccessibilityImpl(
+    TypeChecker &TC, TypeLoc TL, const DeclContext *contextAccessScope,
+    const DeclContext *useDC,
+    llvm::function_ref<void(const DeclContext *, const TypeRepr *)> diagnose) {
+  if (!TC.getLangOpts().EnableAccessControl)
+    return;
+  if (!TL.getType())
+    return;
+  // Don't spend time checking private access; this is always valid by the time
+  // we get to this point. This includes local declarations.
+  if (contextAccessScope && !isa<ModuleDecl>(contextAccessScope))
     return;
 
-  Accessibility typeAccess =
-    TypeAccessibilityChecker::getAccessibility(TL.getType(),
-                                               TC.TypeAccessibilityCache);
-  if (typeAccess >= contextAccess)
+  Optional<const DeclContext *> typeAccessScope =
+    TypeAccessScopeChecker::getAccessScope(TL.getType(), useDC,
+                                           TC.TypeAccessScopeCache);
+
+  // Note: This means that the type itself is invalid for this particular
+  // context, because it references declarations from two incompatible scopes.
+  // In this case we should have diagnosed the bad reference already.
+  if (!typeAccessScope.hasValue())
+    return;
+
+  if (!*typeAccessScope || *typeAccessScope == contextAccessScope)
     return;
 
   const TypeRepr *complainRepr = nullptr;
-  if (TypeRepr *TR = TL.getTypeRepr())
-    complainRepr = TypeAccessibilityDiagnoser::findMinAccessibleType(TR);
-  diagnose(typeAccess, complainRepr);
+  if (TypeRepr *TR = TL.getTypeRepr()) {
+    complainRepr =
+        TypeAccessScopeDiagnoser::findTypeWithScope(TR, *typeAccessScope,
+                                                    useDC);
+  }
+  diagnose(*typeAccessScope, complainRepr);
 }
 
 static void checkTypeAccessibility(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
-    llvm::function_ref<void(Accessibility, const TypeRepr *)> diagnose) {
-  checkTypeAccessibility(TC, TL, context->getFormalAccess(), diagnose);
+    llvm::function_ref<void(const DeclContext *, const TypeRepr *)> diagnose) {
+  checkTypeAccessibilityImpl(TC, TL, context->getFormalAccessScope(),
+                             context->getDeclContext(), diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -1438,6 +1552,7 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 static void checkGenericParamAccessibility(TypeChecker &TC,
                                            const GenericParamList *params,
                                            const Decl *owner,
+                                           const DeclContext *accessScope,
                                            Accessibility contextAccess) {
   if (!params)
     return;
@@ -1447,18 +1562,21 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     AEK_Parameter = 0,
     AEK_Requirement
   } accessibilityErrorKind;
-  Optional<Accessibility> minAccess;
+  const DeclContext *minAccessScope = nullptr;
   const TypeRepr *complainRepr = nullptr;
 
   for (auto param : *params) {
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
-    checkTypeAccessibility(TC, param->getInherited().front(), contextAccess,
-                           [&](Accessibility typeAccess,
-                               const TypeRepr *thisComplainRepr) {
-      if (!minAccess || *minAccess > typeAccess) {
-        minAccess = typeAccess;
+    checkTypeAccessibilityImpl(TC, param->getInherited().front(), accessScope,
+                               owner->getDeclContext(),
+                               [&](const DeclContext *typeAccessScope,
+                                   const TypeRepr *thisComplainRepr) {
+      if (!minAccessScope ||
+          typeAccessScope->isChildContextOf(minAccessScope) ||
+          (!complainRepr && typeAccessScope == minAccessScope)) {
+        minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Parameter;
       }
@@ -1466,37 +1584,45 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
   }
 
   for (auto &requirement : params->getRequirements()) {
-    auto callback = [&](Accessibility typeAccess,
+    auto callback = [&](const DeclContext *typeAccessScope,
                         const TypeRepr *thisComplainRepr) {
-      if (!minAccess || *minAccess > typeAccess) {
-        minAccess = typeAccess;
+      if (!minAccessScope ||
+          typeAccessScope->isChildContextOf(minAccessScope) ||
+          (!complainRepr && typeAccessScope == minAccessScope)) {
+        minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Requirement;
       }
     };
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
-      checkTypeAccessibility(TC, requirement.getSubjectLoc(), contextAccess,
-                             callback);
-      checkTypeAccessibility(TC, requirement.getConstraintLoc(), contextAccess,
-                             callback);
+      checkTypeAccessibilityImpl(TC, requirement.getSubjectLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 callback);
+      checkTypeAccessibilityImpl(TC, requirement.getConstraintLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 callback);
       break;
     case RequirementReprKind::SameType:
-      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(), contextAccess,
-                             callback);
-      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(), contextAccess,
-                             callback);
+      checkTypeAccessibilityImpl(TC, requirement.getFirstTypeLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 callback);
+      checkTypeAccessibilityImpl(TC, requirement.getSecondTypeLoc(),
+                                 accessScope, owner->getDeclContext(),
+                                 callback);
       break;
     }
   }
 
-  if (minAccess.hasValue()) {
+  if (minAccessScope) {
+    auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
+
     bool isExplicit =
       owner->getAttrs().hasAttribute<AccessibilityAttr>() ||
       owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
     auto diag = TC.diagnose(owner, diag::generic_param_access,
                             owner->getDescriptiveKind(), isExplicit,
-                            contextAccess, minAccess.getValue(),
+                            contextAccess, minAccess,
                             accessibilityErrorKind);
     highlightOffendingType(TC, diag, complainRepr);
   }
@@ -1505,7 +1631,9 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
 static void checkGenericParamAccessibility(TypeChecker &TC,
                                            const GenericParamList *params,
                                            const ValueDecl *owner) {
-  checkGenericParamAccessibility(TC, params, owner, owner->getFormalAccess());
+  checkGenericParamAccessibility(TC, params, owner,
+                                 owner->getFormalAccessScope(),
+                                 owner->getFormalAccess());
 }
 
 /// Checks the given declaration's accessibility to make sure it is valid given
@@ -1523,6 +1651,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::PrecedenceGroup:
   case DeclKind::Module:
     llvm_unreachable("cannot appear in a type context");
 
@@ -1556,8 +1685,10 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
         checkTypeAccessibility(TC, TypeLoc::withoutLoc(theVar->getType()),
                                theVar,
-                               [&](Accessibility typeAccess,
+                               [&](const DeclContext *typeAccessScope,
                                    const TypeRepr *complainRepr) {
+          auto typeAccess =
+              accessibilityFromScopeForDiagnostics(typeAccessScope);
           bool isExplicit =
             theVar->getAttrs().hasAttribute<AccessibilityAttr>();
           auto diag = TC.diagnose(P->getLoc(),
@@ -1588,8 +1719,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         return;
 
       checkTypeAccessibility(TC, TP->getTypeLoc(), anyVar,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *complainRepr) {
+        auto typeAccess = accessibilityFromScopeForDiagnostics(typeAccessScope);
         bool isExplicit =
           anyVar->getAttrs().hasAttribute<AccessibilityAttr>() ||
           anyVar->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
@@ -1609,8 +1741,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     auto TAD = cast<TypeAliasDecl>(D);
 
     checkTypeAccessibility(TC, TAD->getUnderlyingTypeLoc(), TAD,
-                           [&](Accessibility typeAccess,
+                           [&](const DeclContext *typeAccessScope,
                                const TypeRepr *complainRepr) {
+      auto typeAccess = accessibilityFromScopeForDiagnostics(typeAccessScope);
       bool isExplicit = TAD->getAttrs().hasAttribute<AccessibilityAttr>();
       auto diag = TC.diagnose(TAD, diag::type_alias_underlying_type_access,
                               isExplicit, TAD->getFormalAccess(),
@@ -1629,36 +1762,41 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       AEK_DefaultDefinition = 0,
       AEK_Requirement
     } accessibilityErrorKind;
-    Optional<Accessibility> minAccess;
+    const DeclContext *minAccessScope = nullptr;
     const TypeRepr *complainRepr = nullptr;
 
     std::for_each(assocType->getInherited().begin(),
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccessibility(TC, requirement, assocType,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
+        if (!minAccessScope ||
+            typeAccessScope->isChildContextOf(minAccessScope) ||
+            (!complainRepr && typeAccessScope == minAccessScope)) {
+          minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           accessibilityErrorKind = AEK_Requirement;
         }
       });
     });
     checkTypeAccessibility(TC, assocType->getDefaultDefinitionLoc(), assocType,
-                           [&](Accessibility typeAccess,
+                           [&](const DeclContext *typeAccessScope,
                                const TypeRepr *thisComplainRepr) {
-      if (!minAccess || *minAccess > typeAccess) {
-        minAccess = typeAccess;
+      if (!minAccessScope ||
+          typeAccessScope->isChildContextOf(minAccessScope) ||
+          (!complainRepr && typeAccessScope == minAccessScope)) {
+        minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_DefaultDefinition;
       }
     });
 
-    if (minAccess) {
+    if (minAccessScope) {
+      auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
       auto diag = TC.diagnose(assocType, diag::associated_type_access,
                               assocType->getFormalAccess(),
-                              *minAccess, accessibilityErrorKind);
+                              minAccess, accessibilityErrorKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
     return;
@@ -1681,8 +1819,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       if (rawTypeLocIter == ED->getInherited().end())
         return;
       checkTypeAccessibility(TC, *rawTypeLocIter, ED,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *complainRepr) {
+        auto typeAccess = accessibilityFromScopeForDiagnostics(typeAccessScope);
         bool isExplicit = ED->getAttrs().hasAttribute<AccessibilityAttr>();
         auto diag = TC.diagnose(ED, diag::enum_raw_type_access,
                                 isExplicit, ED->getFormalAccess(),
@@ -1717,8 +1856,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       if (superclassLocIter == CD->getInherited().end())
         return;
       checkTypeAccessibility(TC, *superclassLocIter, CD,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *complainRepr) {
+        auto typeAccess = accessibilityFromScopeForDiagnostics(typeAccessScope);
         bool isExplicit = CD->getAttrs().hasAttribute<AccessibilityAttr>();
         auto diag = TC.diagnose(CD, diag::class_super_access,
                                 isExplicit, CD->getFormalAccess(),
@@ -1733,28 +1873,29 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
 
-    Optional<Accessibility> minAccess;
+    const DeclContext *minAccessScope = nullptr;
     const TypeRepr *complainRepr = nullptr;
 
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccessibility(TC, requirement, proto,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
+        if (!minAccessScope ||
+            typeAccessScope->isChildContextOf(minAccessScope) ||
+            (!complainRepr && typeAccessScope == minAccessScope)) {
+          minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
         }
       });
     });
 
-    if (minAccess) {
+    if (minAccessScope) {
+      auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
       bool isExplicit = proto->getAttrs().hasAttribute<AccessibilityAttr>();
       auto diag = TC.diagnose(proto, diag::protocol_refine_access,
-                              isExplicit,
-                              proto->getFormalAccess(),
-                              *minAccess);
+                              isExplicit, proto->getFormalAccess(), minAccess);
       highlightOffendingType(TC, diag, complainRepr);
     }
     return;
@@ -1763,38 +1904,43 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   case DeclKind::Subscript: {
     auto SD = cast<SubscriptDecl>(D);
 
-    Optional<Accessibility> minAccess;
+    const DeclContext *minAccessScope = nullptr;
     const TypeRepr *complainRepr = nullptr;
     bool problemIsElement = false;
     for (auto &P : *SD->getIndices()) {
       checkTypeAccessibility(TC, P->getTypeLoc(), SD,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
+        if (!minAccessScope ||
+            typeAccessScope->isChildContextOf(minAccessScope) ||
+            (!complainRepr && typeAccessScope == minAccessScope)) {
+          minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
         }
       });
     }
 
     checkTypeAccessibility(TC, SD->getElementTypeLoc(), SD,
-                           [&](Accessibility typeAccess,
+                           [&](const DeclContext *typeAccessScope,
                                const TypeRepr *thisComplainRepr) {
-      if (!minAccess || *minAccess > typeAccess) {
-        minAccess = typeAccess;
+      if (!minAccessScope ||
+          typeAccessScope->isChildContextOf(minAccessScope) ||
+          (!complainRepr && typeAccessScope == minAccessScope)) {
+        minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         problemIsElement = true;
       }
     });
 
-    if (minAccess) {
+    if (minAccessScope) {
+      auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
       bool isExplicit =
         SD->getAttrs().hasAttribute<AccessibilityAttr>() ||
         SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(SD, diag::subscript_type_access,
                               isExplicit,
                               SD->getFormalAccess(),
-                              *minAccess,
+                              minAccess,
                               problemIsElement);
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -1818,15 +1964,17 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       FK_Initializer
     };
 
-    Optional<Accessibility> minAccess;
+    const DeclContext *minAccessScope = nullptr;
     const TypeRepr *complainRepr = nullptr;
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
         checkTypeAccessibility(TC, P->getTypeLoc(), fn,
-                               [&](Accessibility typeAccess,
+                               [&](const DeclContext *typeAccessScope,
                                    const TypeRepr *thisComplainRepr) {
-          if (!minAccess || *minAccess > typeAccess) {
-            minAccess = typeAccess;
+          if (!minAccessScope ||
+              typeAccessScope->isChildContextOf(minAccessScope) ||
+              (!complainRepr && typeAccessScope == minAccessScope)) {
+            minAccessScope = typeAccessScope;
             complainRepr = thisComplainRepr;
           }
         });
@@ -1836,24 +1984,27 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccessibility(TC, FD->getBodyResultTypeLoc(), FD,
-                             [&](Accessibility typeAccess,
+                             [&](const DeclContext *typeAccessScope,
                                  const TypeRepr *thisComplainRepr) {
-        if (!minAccess || *minAccess > typeAccess) {
-          minAccess = typeAccess;
+        if (!minAccessScope ||
+            typeAccessScope->isChildContextOf(minAccessScope) ||
+            (!complainRepr && typeAccessScope == minAccessScope)) {
+          minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           problemIsResult = true;
         }
       });
     }
 
-    if (minAccess) {
+    if (minAccessScope) {
+      auto minAccess = accessibilityFromScopeForDiagnostics(minAccessScope);
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
         D->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diag = TC.diagnose(fn, diag::function_type_access,
                               isExplicit,
                               fn->getFormalAccess(),
-                              *minAccess,
+                              minAccess,
                               isa<ConstructorDecl>(fn) ? FK_Initializer :
                                 isTypeContext ? FK_Method : FK_Function,
                               problemIsResult);
@@ -1868,8 +2019,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
     if (!EED->hasArgumentType())
       return;
     checkTypeAccessibility(TC, EED->getArgumentTypeLoc(), EED,
-                           [&](Accessibility typeAccess,
+                           [&](const DeclContext *typeAccessScope,
                                const TypeRepr *complainRepr) {
+      auto typeAccess = accessibilityFromScopeForDiagnostics(typeAccessScope);
       auto diag = TC.diagnose(EED, diag::enum_case_access,
                               EED->getFormalAccess(), typeAccess);
       highlightOffendingType(TC, diag, complainRepr);
@@ -1920,10 +2072,12 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     return ObjCReason::WitnessToObjC;
   else if (VD->isInvalid())
     return None;
+  else if (VD->isOperator())
+    return None;
   // Implicitly generated declarations are not @objc, except for constructors.
   else if (!allowImplicit && VD->isImplicit())
     return None;
-  else if (VD->getFormalAccess() == Accessibility::Private)
+  else if (VD->getFormalAccess() <= Accessibility::FilePrivate)
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
@@ -1960,11 +2114,7 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     return;
 
   // Only introduce 'dynamic' on declarations...
-  if (isa<ExtensionDecl>(D->getDeclContext())) {
-    // ...in extensions that don't override other declarations.
-    if (D->getOverriddenDecl())
-      return;
-  } else {
+  if (!isa<ExtensionDecl>(D->getDeclContext())) {
     // ...and in classes on decls marked @NSManaged.
     if (!D->getAttrs().hasAttribute<NSManagedAttr>())
       return;
@@ -2359,7 +2509,8 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     return;
   }
 
-  rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
+  if (ED->getGenericEnvironmentOfContext() != nullptr)
+    rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
   if (rawTy->is<ErrorType>())
     return;
 
@@ -2434,6 +2585,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
                   diag::enum_with_raw_type_case_with_argument);
       TC.diagnose(ED->getInherited().front().getSourceRange().Start,
                   diag::enum_raw_type_here, rawTy);
+      elt->setInvalid();
       continue;
     }
     
@@ -2452,6 +2604,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       // is the first element.
       auto nextValue = getAutomaticRawValueExpr(TC, valueKind, elt, prevValue);
       if (!nextValue) {
+        elt->setInvalid();
         break;
       }
       elt->setRawValueExpr(nextValue);
@@ -2928,6 +3081,265 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   return;
 }
 
+/// For building the higher-than component of the diagnostic path,
+/// we use the visited set, which we've embellished with information
+/// about how we reached a particular node.  This is reasonable because
+/// we need to maintain the set anyway.
+static void buildHigherThanPath(PrecedenceGroupDecl *last,
+                          const llvm::DenseMap<PrecedenceGroupDecl *,
+                                        PrecedenceGroupDecl *> &visitedFrom,
+                          raw_ostream &out) {
+  auto it = visitedFrom.find(last);
+  assert(it != visitedFrom.end());
+  auto from = it->second;
+  if (from) {
+    buildHigherThanPath(from, visitedFrom, out);
+  }
+  out << last->getName() << " -> ";
+}
+
+/// For building the lower-than component of the diagnostic path,
+/// we just do a depth-first search to find a path.
+static bool buildLowerThanPath(PrecedenceGroupDecl *start,
+                               PrecedenceGroupDecl *target,
+                               raw_ostream &out) {
+  if (start == target) {
+    out << start->getName();
+    return true;
+  }
+
+  if (start->isInvalid())
+    return false;
+
+  for (auto &rel : start->getLowerThan()) {
+    if (rel.Group && buildLowerThanPath(rel.Group, target, out)) {
+      out << " -> " << start->getName();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static void checkPrecedenceCircularity(TypeChecker &TC,
+                                       PrecedenceGroupDecl *PGD) {
+  // Don't diagnose if this group is already marked invalid.
+  if (PGD->isInvalid()) return;
+
+  // The cycle doesn't necessarily go through this specific group,
+  // so we need a proper visited set to avoid infinite loops.  We
+  // also record a back-reference so that we can easily reconstruct
+  // the cycle.
+  llvm::DenseMap<PrecedenceGroupDecl*, PrecedenceGroupDecl*> visitedFrom;
+  SmallVector<PrecedenceGroupDecl*, 4> stack;
+
+  // Fill out the targets set.
+  llvm::SmallPtrSet<PrecedenceGroupDecl*, 4> targets;
+  stack.push_back(PGD);
+  do {
+    auto cur = stack.pop_back_val();
+
+    // If we reach an invalid node, just bail out.
+    if (cur->isInvalid()) {
+      PGD->setInvalid();
+      return;
+    }
+
+    targets.insert(cur);
+
+    for (auto &rel : cur->getLowerThan()) {
+      if (!rel.Group) continue;
+
+      // We can't have cycles in the lower-than relationship
+      // because it has to point outside of the module.
+
+      stack.push_back(rel.Group);
+    }
+  } while (!stack.empty());
+
+  // Make sure that the PGD is its own source.
+  visitedFrom.insert({PGD, nullptr});
+
+  stack.push_back(PGD);
+  do {
+    auto cur = stack.pop_back_val();
+
+    // If we reach an invalid node, just bail out.
+    if (cur->isInvalid()) {
+      PGD->setInvalid();
+      return;
+    }
+
+    for (auto &rel : cur->getHigherThan()) {
+      if (!rel.Group) continue;
+
+      // Check whether we've reached a target declaration.
+      if (!targets.count(rel.Group)) {
+        // If not, check whether we've visited this group before.
+        if (visitedFrom.insert({rel.Group, cur}).second) {
+          // If not, add it to the queue.
+          stack.push_back(rel.Group);
+        }
+
+        // Note that we'll silently ignore cycles that don't go through PGD.
+        // We should eventually process the groups that are involved.
+        continue;
+      }
+
+      // Otherwise, we have something to report.
+      SmallString<128> path;
+      {
+        llvm::raw_svector_ostream str(path);
+
+        // Build the higherThan portion of the path (PGD -> cur).
+        buildHigherThanPath(cur, visitedFrom, str);
+
+        // Build the lowerThan portion of the path (rel.Group -> PGD).
+        buildLowerThanPath(PGD, rel.Group, str);
+      }
+      
+      TC.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
+      PGD->setInvalid();
+      return;
+    }
+  } while (!stack.empty());
+}
+
+/// Do a primitive lookup for the given precedence group.  This does
+/// not validate the precedence group or diagnose if the lookup fails
+/// (other than via ambiguity); for that, use
+/// TypeChecker::lookupPrecedenceGroup.
+///
+/// Pass an invalid source location to suppress diagnostics.
+static PrecedenceGroupDecl *
+lookupPrecedenceGroupPrimitive(DeclContext *dc, Identifier name,
+                               SourceLoc nameLoc) {
+  if (auto sf = dc->getParentSourceFile()) {
+    bool cascading = dc->isCascadingContextForLookup(false);
+    return sf->lookupPrecedenceGroup(name, cascading, nameLoc);
+  } else {
+    return dc->getParentModule()->lookupPrecedenceGroup(name, nameLoc);
+  }
+}
+
+void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
+  checkDeclAttributesEarly(PGD);
+  checkDeclAttributes(PGD);
+
+  if (PGD->isInvalid() || PGD->isBeingTypeChecked())
+    return;
+  PGD->setIsBeingTypeChecked(true);
+  SWIFT_DEFER { PGD->setIsBeingTypeChecked(false); };
+
+  bool isInvalid = false;
+
+  // Validate the higherThan relationships.
+  bool addedHigherThan = false;
+  for (auto &rel : PGD->getMutableHigherThan()) {
+    if (rel.Group) continue;
+
+    auto group = lookupPrecedenceGroupPrimitive(PGD->getDeclContext(),
+                                                rel.Name, rel.NameLoc);
+    if (group) {
+      rel.Group = group;
+      validateDecl(group);
+      addedHigherThan = true;
+    } else if (!PGD->isInvalid()) {
+      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      isInvalid = true;
+    }
+  }
+
+  // Validate the lowerThan relationships.
+  for (auto &rel : PGD->getMutableLowerThan()) {
+    if (rel.Group) continue;
+
+    auto dc = PGD->getDeclContext();
+    auto group = lookupPrecedenceGroupPrimitive(dc, rel.Name, rel.NameLoc);
+    if (group) {
+      if (group->getDeclContext()->getParentModule()
+            == dc->getParentModule()) {
+        if (!PGD->isInvalid()) {
+          diagnose(rel.NameLoc, diag::precedence_group_lower_within_module);
+          diagnose(group->getNameLoc(), diag::precedence_group_declared_here);
+          isInvalid = true;
+        }
+      } else {
+        rel.Group = group;
+        validateDecl(group);
+      }
+    } else if (!PGD->isInvalid()) {
+      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      isInvalid = true;
+    }
+  }
+
+  // Check for circularity.
+  if (addedHigherThan) {
+    checkPrecedenceCircularity(*this, PGD);
+  }
+
+  if (isInvalid) PGD->setInvalid();
+}
+
+PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
+                                                        Identifier name,
+                                                        SourceLoc nameLoc) {
+  auto group = lookupPrecedenceGroupPrimitive(dc, name, nameLoc);
+  if (group) {
+    validateDecl(group);
+  } else if (nameLoc.isValid()) {
+    // FIXME: avoid dignosing this multiple times per source file.
+    diagnose(nameLoc, diag::unknown_precedence_group, name);
+  }
+  return group;
+}
+
+/// Validate the given operator declaration.
+///
+/// This establishes key invariants, such as an InfixOperatorDecl's
+/// reference to its precedence group and the transitive validity of that
+/// group.
+void TypeChecker::validateDecl(OperatorDecl *OD) {
+  checkDeclAttributesEarly(OD);
+  checkDeclAttributes(OD);
+
+  if (auto IOD = dyn_cast<InfixOperatorDecl>(OD)) {
+    if (!IOD->getPrecedenceGroup()) {
+      PrecedenceGroupDecl *group = nullptr;
+
+      // If a name was given, try to look it up.
+      Identifier name = IOD->getPrecedenceGroupName();
+      if (!name.empty()) {
+        auto loc = IOD->getPrecedenceGroupNameLoc();
+        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(), name, loc);
+        if (!group && !IOD->isInvalid()) {
+          diagnose(loc, diag::unknown_precedence_group, name);
+          IOD->setInvalid();
+        }
+      }
+
+      // If that fails, or if a name was not given, use the default
+      // precedence group.
+      if (!group) {
+        group = lookupPrecedenceGroupPrimitive(OD->getDeclContext(),
+                                               Context.Id_DefaultPrecedence,
+                                               SourceLoc());
+        if (!group && name.empty() && !IOD->isInvalid()) {
+          diagnose(OD->getLoc(), diag::missing_builtin_precedence_group,
+                   Context.Id_DefaultPrecedence);
+        }
+      }
+
+      // Validate the precedence group.
+      if (group) {
+        validateDecl(group);
+        IOD->setPrecedenceGroup(group);
+      }
+    }
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2990,8 +3402,11 @@ public:
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.checkDeclAttributesEarly(OD);
-    TC.checkDeclAttributes(OD);
+    TC.validateDecl(OD);
+  }
+
+  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
+    TC.validateDecl(PGD);
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -3095,7 +3510,6 @@ public:
     }
 
     TC.checkDeclAttributes(VD);
-    TC.checkOmitNeedlessWords(VD);
   }
 
 
@@ -3340,7 +3754,7 @@ public:
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
-      if (TAD->getFormalAccess() == Accessibility::Private)
+      if (TAD->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
       
       if (TAD->getDeclContext()->isModuleScopeContext()) {
@@ -3382,9 +3796,7 @@ public:
     assocType->setIsBeingTypeChecked();
 
     TC.checkDeclAttributesEarly(assocType);
-    if (!assocType->hasAccessibility())
-      assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
-
+    TC.validateAccessibility(assocType);
     TC.checkInheritanceClause(assocType);
 
     // Check the default definition, if there is one.
@@ -3520,8 +3932,6 @@ public:
     
     for (Decl *member : ED->getMembers())
       visit(member);
-    for (Decl *global : ED->getDerivedGlobalDecls())
-      visit(global);
     
 
     TC.checkDeclAttributes(ED);
@@ -3549,8 +3959,6 @@ public:
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
-    for (Decl *Global : SD->getDerivedGlobalDecls())
-      visit(Global);
 
     TC.checkDeclAttributes(SD);
   }
@@ -3689,8 +4097,6 @@ public:
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
-    for (Decl *global : CD->getDerivedGlobalDecls())
-      visit(global);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3703,14 +4109,18 @@ public:
 
         if (auto *SF = CD->getParentSourceFile()) {
           if (auto *tracker = SF->getReferencedNameTracker()) {
-            bool isPrivate = CD->getFormalAccess() == Accessibility::Private;
+            bool isPrivate =
+                CD->getFormalAccess() <= Accessibility::FilePrivate;
             tracker->addUsedMember({Super, Identifier()}, !isPrivate);
           }
         }
 
+        bool isInvalidSuperclass = false;
+
         if (Super->isFinal()) {
           TC.diagnose(CD, diag::inheritance_from_final_class,
                       Super->getName());
+          // FIXME: should this really be skipping the rest of decl-checking?
           return;
         }
 
@@ -3727,12 +4137,38 @@ public:
         case ClassDecl::ForeignKind::CFType:
           TC.diagnose(CD, diag::inheritance_from_cf_class,
                       Super->getName());
+          isInvalidSuperclass = true;
           break;
         case ClassDecl::ForeignKind::RuntimeOnly:
           TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
                       Super->getName());
+          isInvalidSuperclass = true;
           break;
         }
+
+        // Require the superclass to be open if this is outside its
+        // defining module.  But don't emit another diagnostic if we
+        // already complained about the class being inherently
+        // un-subclassable.
+        if (!isInvalidSuperclass &&
+            Super->getFormalAccess(CD->getDeclContext())
+              < Accessibility::Open &&
+            Super->getModuleContext() != CD->getModuleContext()) {
+          TC.diagnose(CD, diag::superclass_not_open, superclassTy);
+          isInvalidSuperclass = true;
+        }
+
+        // Require superclasses to be open if the subclass is open.
+        // This is a restriction we can consider lifting in the future,
+        // e.g. to enable a "sealed" superclass whose subclasses are all
+        // of one of several alternatives.
+        if (!isInvalidSuperclass &&
+            CD->getFormalAccess() == Accessibility::Open &&
+            Super->getFormalAccess() != Accessibility::Open) {
+          TC.diagnose(CD, diag::superclass_of_open_not_open, superclassTy);
+          TC.diagnose(Super, diag::superclass_here);
+        }
+
       }
 
       checkAccessibility(TC, CD);
@@ -3777,7 +4213,8 @@ public:
 
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
+          bool isNonPrivate =
+              (PD->getFormalAccess() > Accessibility::FilePrivate);
           for (auto *parentProto : PD->getInheritedProtocols(nullptr))
             tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
@@ -3878,8 +4315,11 @@ public:
       } else if (e - i - 1 == 0 && outerGenericParams) {
         params = outerGenericParams;
       }
-      
-      auto Info = TC.applyFunctionTypeAttributes(FD, i);
+
+      // 'throws' only applies to the innermost function.
+      AnyFunctionType::ExtInfo Info;
+      if (i == 0 && FD->hasThrows())
+        Info = Info.withThrows();
       
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
@@ -3898,6 +4338,44 @@ public:
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
     auto operatorName = FD->getFullName().getBaseName();
+
+    // Check for static/final/class when we're in a type.
+    auto dc = FD->getDeclContext();
+    if (dc->isTypeContext()) {
+      // Within a class, operator functions must be 'static' or 'final'.
+      if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+        // For a class, we also need the function or class to be 'final'.
+        if (!classDecl->isFinal() && !FD->isFinal() &&
+            FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
+          if (!FD->isStatic()) {
+            TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
+                        operatorName,
+                        dc->getDeclaredInterfaceType())
+              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "static ");
+
+            FD->setStatic();
+          } else {
+            TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
+                        operatorName, dc->getDeclaredInterfaceType())
+              .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                           "final ");
+            FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+          }
+        }
+      } else if (!FD->isStatic()) {
+        // Operator functions must be static.
+        TC.diagnose(FD, diag::nonstatic_operator_in_type,
+                    operatorName,
+                    dc->getDeclaredInterfaceType())
+          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+        FD->setStatic();
+      }
+    } else if (!dc->isModuleScopeContext()) {
+      TC.diagnose(FD, diag::operator_in_local_scope);
+    }
+
     SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
@@ -4113,6 +4591,48 @@ public:
     return type->getAs<AnyFunctionType>();
   }
 
+  void checkMemberOperator(FuncDecl *FD) {
+    // Check that member operators reference the type of 'Self'.
+    if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
+
+    auto selfNominal =
+      FD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!selfNominal) return;
+
+    // Check the parameters for a reference to 'Self'.
+    bool isProtocol = isa<ProtocolDecl>(selfNominal);
+    for (auto param : *FD->getParameterList(1)) {
+      auto paramType = param->getInterfaceType();
+      if (!paramType) break;
+
+      // Look through 'inout'.
+      paramType = paramType->getInOutObjectType();
+
+      // Look through a metatype reference, if there is one.
+      if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
+        paramType = metatypeType->getInstanceType();
+
+      // Is it the same nominal type?
+      if (paramType->getAnyNominal() == selfNominal) return;
+
+      if (isProtocol) {
+        // For a protocol, is it the 'Self' type parameter?
+        if (auto genericParam = paramType->getAs<GenericTypeParamType>())
+          if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+            return;
+
+        // ... or the 'Self' archetype?
+        if (auto archetype = paramType->getAs<ArchetypeType>())
+          if (archetype->getSelfProtocol() == selfNominal) return;
+      }
+    }
+
+    // We did not find 'Self'. Complain.
+    TC.diagnose(FD, diag::operator_in_unrelated_type,
+                FD->getDeclContext()->getDeclaredTypeInContext(),
+                isProtocol, FD->getFullName());
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->hasBody()) {
@@ -4126,7 +4646,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, FD);
-      TC.checkOmitNeedlessWords(FD);
       return;
     }
 
@@ -4193,7 +4712,8 @@ public:
       gp->setOuterParameters(FD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(FD)) {
-        TC.markInvalidGenericSignature(FD);
+        auto *env = TC.markInvalidGenericSignature(FD);
+        FD->setGenericEnvironment(env);
       } else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
@@ -4216,14 +4736,18 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        TC.finalizeGenericParamList(builder, gp, FD);
+        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, FD);
+        FD->setGenericEnvironment(env);
       }
-    } else if (FD->getDeclContext()->isGenericContext()) {
+    } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
-        TC.markInvalidGenericSignature(FD);
+        auto *env = TC.markInvalidGenericSignature(FD);
+        FD->setGenericEnvironment(env);
       } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
+        FD->setGenericEnvironment(
+            FD->getDeclContext()->getGenericEnvironmentOfContext());
       } else {
         // Recursively satisfied.
         // FIXME: This is an awful hack.
@@ -4236,7 +4760,7 @@ public:
     if (semaFuncDecl(FD, &resolver))
       return;
 
-    if (!FD->isGenericContext())
+    if (!FD->getGenericSignatureOfContext())
       TC.configureInterfaceType(FD);
 
     if (FD->isInvalid())
@@ -4260,6 +4784,9 @@ public:
           }
         }
       }
+
+      if (FD->isOperator())
+        checkMemberOperator(FD);
 
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
 
@@ -4400,7 +4927,7 @@ public:
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->hasDynamicSelf()) {
         type = type->replaceCovariantResultType(subclass,
-                                                func->getNaturalArgumentCount());
+                                                func->getNumParameterLists());
       }
     } else if (isa<ConstructorDecl>(decl)) {
       type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);
@@ -4638,10 +5165,12 @@ public:
   }
 
   static void adjustFunctionTypeForOverride(Type &type) {
-    // Drop 'noreturn' and 'throws'.
+    // Drop 'throws'.
+    // FIXME: Do we want to allow overriding a function returning a value
+    // with one returning Never?
     auto fnType = type->castTo<AnyFunctionType>();
     auto extInfo = fnType->getExtInfo();
-    extInfo = extInfo.withThrows(false).withIsNoReturn(false);
+    extInfo = extInfo.withThrows(false);
     if (fnType->getExtInfo() != extInfo)
       type = fnType->withExtInfo(extInfo);
   }
@@ -4844,8 +5373,18 @@ public:
       }
 
       if (members.empty()) {
-        NameLookupOptions lookupOptions =
-            defaultMemberLookupOptions - NameLookupFlags::DynamicLookup;
+        auto lookupOptions = defaultMemberLookupOptions;
+
+        // Class methods cannot override declarations only
+        // visible via dynamic dispatch.
+        lookupOptions -= NameLookupFlags::DynamicLookup;
+
+        // Class methods cannot override declarations only
+        // visible as protocol requirements or protocol
+        // extension members.
+        lookupOptions -= NameLookupFlags::ProtocolMembers;
+        lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+
         members = TC.lookupMember(decl->getDeclContext(), superclassMetaTy,
                                   name, lookupOptions);
       }
@@ -5018,39 +5557,87 @@ public:
         }
       }
 
-      // Check accessibility.
-      // FIXME: Copied from TypeCheckProtocol.cpp.
-      Accessibility requiredAccess =
-        std::min(classDecl->getFormalAccess(), matchDecl->getFormalAccess());
-      bool shouldDiagnose = false;
-      bool shouldDiagnoseSetter = false;
-      if (requiredAccess > Accessibility::Private &&
+      // Check that the override has the required accessibility.
+      // Overrides have to be at least as accessible as what they
+      // override, except:
+      //   - they don't have to be more accessible than their class and
+      //   - a final method may be public instead of open.
+      // Also diagnose attempts to override a non-open method from outside its
+      // defining module.  This is not required for constructors, which are
+      // never really "overridden" in the intended sense here, because of
+      // course derived classes will change how the class is initialized.
+      Accessibility matchAccess =
+          matchDecl->getFormalAccess(decl->getDeclContext());
+      if (matchAccess < Accessibility::Open &&
+          matchDecl->getModuleContext() != decl->getModuleContext() &&
           !isa<ConstructorDecl>(decl)) {
-        shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
+        TC.diagnose(decl, diag::override_of_non_open,
+                    decl->getDescriptiveKind());
 
-        if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
-          auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-          if (matchASD->isSetterAccessibleFrom(classDecl)) {
-            auto ASD = cast<AbstractStorageDecl>(decl);
-            const DeclContext *accessDC = nullptr;
-            if (requiredAccess == Accessibility::Internal)
-              accessDC = classDecl->getParentModule();
-            shouldDiagnoseSetter = ASD->isSettable(accessDC) &&
-                                   !ASD->isSetterAccessibleFrom(accessDC);
-          }
-        }
-      }
-      if (shouldDiagnose || shouldDiagnoseSetter) {
-        bool overriddenForcesAccess =
-          (requiredAccess == matchDecl->getFormalAccess());
+      } else if (matchAccess == Accessibility::Open &&
+                 classDecl->getFormalAccess(decl->getDeclContext()) ==
+                   Accessibility::Open &&
+                 decl->getFormalAccess() != Accessibility::Open &&
+                 !decl->isFinal()) {
         {
           auto diag = TC.diagnose(decl, diag::override_not_accessible,
-                                  shouldDiagnoseSetter,
+                                  /*setter*/false,
                                   decl->getDescriptiveKind(),
-                                  overriddenForcesAccess);
-          fixItAccessibility(diag, decl, requiredAccess, shouldDiagnoseSetter);
+                                  /*fromOverridden*/true);
+          fixItAccessibility(diag, decl, Accessibility::Open);
         }
         TC.diagnose(matchDecl, diag::overridden_here);
+
+      } else {
+        auto matchAccessScope =
+            matchDecl->getFormalAccessScope(decl->getDeclContext());
+        const DeclContext *requiredAccessScope =
+            classDecl->getFormalAccessScope(decl->getDeclContext());
+
+        // FIXME: This is the same operation as
+        // TypeAccessScopeChecker::intersectAccess.
+        if (!requiredAccessScope) {
+          requiredAccessScope = matchAccessScope;
+        } else if (matchAccessScope) {
+          if (matchAccessScope->isChildContextOf(requiredAccessScope)) {
+            requiredAccessScope = matchAccessScope;
+          } else {
+            assert(requiredAccessScope == matchAccessScope ||
+                   requiredAccessScope->isChildContextOf(matchAccessScope));
+          }
+        }
+
+        bool shouldDiagnose = false;
+        bool shouldDiagnoseSetter = false;
+        if (!isa<ConstructorDecl>(decl)) {
+          shouldDiagnose = !decl->isAccessibleFrom(requiredAccessScope);
+
+          if (!shouldDiagnose && matchDecl->isSettable(decl->getDeclContext())){
+            auto matchASD = cast<AbstractStorageDecl>(matchDecl);
+            if (matchASD->isSetterAccessibleFrom(decl->getDeclContext())) {
+              const auto *ASD = cast<AbstractStorageDecl>(decl);
+              shouldDiagnoseSetter =
+                  ASD->isSettable(requiredAccessScope) &&
+                  !ASD->isSetterAccessibleFrom(requiredAccessScope);
+            }
+          }
+        }
+        if (shouldDiagnose || shouldDiagnoseSetter) {
+          bool overriddenForcesAccess =
+              (requiredAccessScope == matchAccessScope &&
+               matchAccess != Accessibility::Open);
+          Accessibility requiredAccess =
+              accessibilityFromScopeForDiagnostics(requiredAccessScope);
+          {
+            auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                    shouldDiagnoseSetter,
+                                    decl->getDescriptiveKind(),
+                                    overriddenForcesAccess);
+            fixItAccessibility(diag, decl, requiredAccess,
+                               shouldDiagnoseSetter);
+          }
+          TC.diagnose(matchDecl, diag::overridden_here);
+        }
       }
 
       bool mayHaveMismatchedOptionals =
@@ -5205,6 +5792,7 @@ public:
     UNINTERESTING_ATTR(Mutating)
     UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NonObjC)
+    UNINTERESTING_ATTR(NoReturn)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
@@ -5291,33 +5879,11 @@ public:
       TC.diagnose(Base, diag::overridden_here);
     }
 
-    void visitNoReturnAttr(NoReturnAttr *attr) {
-      // Disallow overriding a @noreturn function with a returning one.
-      if (Base->getAttrs().hasAttribute<NoReturnAttr>() &&
-          !Override->getAttrs().hasAttribute<NoReturnAttr>()) {
-        TC.diagnose(Override, diag::override_noreturn_with_return);
-        TC.diagnose(Base, diag::overridden_here);
-      }
-    }
-
     void visitDynamicAttr(DynamicAttr *attr) {
       if (!Override->getAttrs().hasAttribute<DynamicAttr>())
         // Dynamic is inherited.
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));
-    }
-
-    void visitSwift3MigrationAttr(Swift3MigrationAttr *attr) {
-      if (!Override->getAttrs().hasAttribute<Swift3MigrationAttr>()) {
-        // Inherit swift3_migration attribute.
-        Override->getAttrs().add(new (TC.Context) Swift3MigrationAttr(
-                                                    SourceLoc(), SourceLoc(),
-                                                    SourceLoc(),
-                                                    attr->getRenamed(),
-                                                    attr->getMessage(),
-                                                    SourceLoc(),
-                                                    /*implicit=*/true));
-      }
     }
   };
 
@@ -5580,7 +6146,7 @@ public:
   /// Compute the interface type of the given enum element.
   void computeEnumElementInterfaceType(EnumElementDecl *elt) {
     auto enumDecl = cast<EnumDecl>(elt->getDeclContext());
-    assert(enumDecl->isGenericContext() && "Not a generic enum");
+    assert(enumDecl->getGenericSignatureOfContext() && "Not a generic enum");
 
     // Build the generic function type.
     auto funcTy = elt->getType()->castTo<AnyFunctionType>();
@@ -5617,12 +6183,7 @@ public:
     
 
     TC.checkDeclAttributesEarly(EED);
-
-    EnumDecl *ED = EED->getParentEnum();
-
-    if (!EED->hasAccessibility())
-      EED->setAccessibility(ED->getFormalAccess());
-    
+    TC.validateAccessibility(EED);
     EED->setIsBeingTypeChecked();
 
     // Only attempt to validate the argument type or raw value if the element
@@ -5643,6 +6204,7 @@ public:
 
       // If we have a raw value, make sure there's a raw type as well.
       if (auto *rawValue = EED->getRawValueExpr()) {
+        EnumDecl *ED = EED->getParentEnum();
         if (!ED->hasRawType()) {
           TC.diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
           // Recover by setting the raw type as this element's type.
@@ -5680,7 +6242,7 @@ public:
     // case the enclosing enum type was illegally declared inside of a generic
     // context. (In that case, we'll post a diagnostic while visiting the
     // parent enum.)
-    if (EED->getDeclContext()->isGenericContext())
+    if (EED->getDeclContext()->getGenericSignatureOfContext())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
@@ -5727,16 +6289,31 @@ public:
     if (!IsFirstPass) {
       TC.computeDefaultAccessibility(ED);
       if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
+        const DeclContext *desiredAccessScope;
+        switch (AA->getAccess()) {
+        case Accessibility::Private:
+          assert(ED->getDeclContext()->isModuleScopeContext() &&
+                 "non-top-level extensions make 'private' != 'fileprivate'");
+          SWIFT_FALLTHROUGH;
+        case Accessibility::FilePrivate:
+          desiredAccessScope = ED->getModuleScopeContext();
+          break;
+        case Accessibility::Internal:
+          desiredAccessScope = ED->getModuleContext();
+          break;
+        case Accessibility::Public:
+        case Accessibility::Open:
+          desiredAccessScope = nullptr;
+          break;
+        }
         checkGenericParamAccessibility(TC, ED->getGenericParams(), ED,
-                                       AA->getAccess());
+                                       desiredAccessScope, AA->getAccess());
       }
       TC.checkConformancesInContext(ED, ED);
     }
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
-    for (Decl *Global : ED->getDerivedGlobalDecls())
-      visit(Global);
 
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);
@@ -5772,7 +6349,6 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, CD);
-      TC.checkOmitNeedlessWords(CD);
       return;
     }
     if (CD->hasType())
@@ -5827,7 +6403,8 @@ public:
       gp->setOuterParameters(CD->getDeclContext()->getGenericParamsOfContext());
 
       if (TC.validateGenericFuncSignature(CD)) {
-        TC.markInvalidGenericSignature(CD);
+        auto *env = TC.markInvalidGenericSignature(CD);
+        CD->setGenericEnvironment(env);
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
@@ -5842,14 +6419,19 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        TC.finalizeGenericParamList(builder, gp, CD);
+        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, CD);
+        CD->setGenericEnvironment(env);
       }
-    } else if (CD->getDeclContext()->isGenericContext()) {
+    } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
-        TC.markInvalidGenericSignature(CD);
+        auto *env = TC.markInvalidGenericSignature(CD);
+        CD->setGenericEnvironment(env);
       } else {
         // Revert all of the types within the signature of the constructor.
         TC.revertGenericFuncSignature(CD);
+
+        CD->setGenericEnvironment(
+            CD->getDeclContext()->getGenericEnvironmentOfContext());
       }
     }
 
@@ -5862,7 +6444,7 @@ public:
       configureConstructorType(CD, SelfTy,
                                CD->getParameterList(1)->getType(TC.Context));
 
-      if (!CD->isGenericContext())
+      if (!CD->getGenericSignatureOfContext())
         TC.configureInterfaceType(CD);
     }
 
@@ -5953,10 +6535,14 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getFormalAccess() < nominal->getFormalAccess()) {
+        auto requiredAccess = std::min(nominal->getFormalAccess(),
+                                       Accessibility::Public);
+        if (requiredAccess == Accessibility::Private)
+          requiredAccess = Accessibility::FilePrivate;
+        if (CD->getFormalAccess() < requiredAccess) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
-          fixItAccessibility(diag, CD, nominal->getFormalAccess());
+          fixItAccessibility(diag, CD, requiredAccess);
         }
       }
     }
@@ -5993,8 +6579,11 @@ public:
 
     Type SelfTy = configureImplicitSelf(TC, DD);
 
-    if (DD->getDeclContext()->isGenericContext())
+    if (DD->getDeclContext()->getGenericSignatureOfContext()) {
       TC.validateGenericFuncSignature(DD);
+      DD->setGenericEnvironment(
+          DD->getDeclContext()->getGenericEnvironmentOfContext());
+    }
 
     if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
@@ -6002,7 +6591,7 @@ public:
       DD->setInvalid();
     }
 
-    if (!DD->isGenericContext())
+    if (!DD->getGenericSignatureOfContext())
       TC.configureInterfaceType(DD);
 
     if (!DD->hasType()) {
@@ -6157,31 +6746,25 @@ static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
 static bool deconstructTypeForDeclCircularity(Type type,
                                               NominalDeclSet &known) {
 
-  if (auto optional = dyn_cast<OptionalType>(type.getPointer())) {
-    // unwrap optionals, check again.
-    if (deconstructTypeForDeclCircularity(optional->getBaseType(), known)) {
-      return true;
-    }
-  } else if (auto tuple = type->getAs<TupleType>()) {
+  if (auto tuple = type->getAs<TupleType>()) {
     // check each element in tuple
     for (auto Elt: tuple->getElements()) {
       if (deconstructTypeForDeclCircularity(Elt.getType(), known)) {
         return true;
       }
     }
-  } else {
-    if (auto decl = type->getAnyNominal()) {
-      // Found a circularity! Stop checking from here on out.
-      if (known.count(decl)) {
-        return true;
-      }
+  }
 
-      bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
-      if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
-        return true;
-      }
+  if (auto decl = type->getAnyNominal()) {
+    // Found a circularity! Stop checking from here on out.
+    if (known.count(decl)) {
+      return true;
     }
 
+    bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
+    if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
+      return true;
+    }
   }
 
   return false;
@@ -6255,20 +6838,19 @@ static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
 }
 
 void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
-  llvm::SmallPtrSet<NominalTypeDecl *, 16> knownTypes;
-  auto ty = decl->getDeclaredInterfaceType();
-  if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (checkStructDeclCircularity(structDecl, knownTypes, ty)) {
+  llvm::SmallPtrSet<NominalTypeDecl *, 16> known;
+  auto baseType = decl->getDeclaredInterfaceType();
+
+  if (checkNominalDeclCircularity(decl, known, baseType)) {
+    if (isa<StructDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::unsupported_recursive_type,
                decl->getDeclaredTypeInContext());
-    }
-  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-    if (checkEnumDeclCircularity(enumDecl, knownTypes, ty)) {
+    } else if (isa<EnumDecl>(decl)) {
       diagnose(decl->getLoc(),
                diag::recursive_enum_not_indirect,
                decl->getDeclaredTypeInContext())
-      .fixItInsert(decl->getStartLoc(), "indirect ");
+        .fixItInsert(decl->getStartLoc(), "indirect ");
     }
   }
 }
@@ -6305,6 +6887,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
     llvm_unreachable("not a value decl");
 
@@ -6349,7 +6932,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!assocType->hasType())
           assocType->computeType();
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(nominal->getFormalAccess());
+        typeParam->setAccessibility(std::max(nominal->getFormalAccess(),
+                                             Accessibility::Internal));
       break;
     }
 
@@ -6370,7 +6954,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!assocType->hasType())
           assocType->computeType();
       if (!typeParam->hasAccessibility())
-        typeParam->setAccessibility(fn->getFormalAccess());
+        typeParam->setAccessibility(std::max(fn->getFormalAccess(),
+                                             Accessibility::Internal));
       break;
     }
     }
@@ -6472,6 +7057,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Validate the generic type signature, which is just <Self : P>.
     auto gp = proto->getGenericParams();
+    (void) gp;
 
     validateGenericTypeSignature(proto);
 
@@ -6713,6 +7299,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::PrecedenceGroup:
   case DeclKind::IfConfig:
     llvm_unreachable("not a value decl");
 
@@ -6731,7 +7318,8 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
       auto assocType = cast<AssociatedTypeDecl>(D);
       auto prot = assocType->getProtocol();
       validateAccessibility(prot);
-      assocType->setAccessibility(prot->getFormalAccess());
+      assocType->setAccessibility(std::max(prot->getFormalAccess(),
+                                           Accessibility::Internal));
       break;
     }
 
@@ -6754,7 +7342,8 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());
       validateAccessibility(container);
-      D->setAccessibility(container->getFormalAccess());
+      D->setAccessibility(std::max(container->getFormalAccess(),
+                                   Accessibility::Internal));
     }
     break;
   }
@@ -6767,8 +7356,7 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 /// the parameter lists within the extension.
 static Type checkExtensionGenericParams(
               TypeChecker &tc, ExtensionDecl *ext,
-              Type type, GenericParamList *genericParams,
-              GenericSignature *&sig) {
+              Type type, GenericParamList *genericParams) {
   // Find the nominal type declaration and its parent type.
   Type parentType;
   NominalTypeDecl *nominal;
@@ -6791,8 +7379,7 @@ static Type checkExtensionGenericParams(
                       tc, ext, parentType,
                       nominal->getGenericParams()
                         ? genericParams->getOuterParameters()
-                        : genericParams,
-                      sig);
+                        : genericParams);
     if (!newParentType)
       return Type();
   }
@@ -6835,9 +7422,14 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
-  sig = tc.validateGenericSignature(genericParams, ext->getDeclContext(),
-                                    nullptr, inferExtendedTypeReqs, invalid);
+  GenericSignature *sig = tc.validateGenericSignature(
+      genericParams, ext->getDeclContext(),
+      nullptr, inferExtendedTypeReqs, invalid);
+  ext->setGenericSignature(sig);
+
   if (invalid) {
+    auto *env = tc.markInvalidGenericSignature(ext);
+    ext->setGenericEnvironment(env);
     return nullptr;
   }
 
@@ -6847,7 +7439,9 @@ static Type checkExtensionGenericParams(
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   tc.checkGenericParamList(&builder, genericParams, parentSig);
   inferExtendedTypeReqs(builder);
-  tc.finalizeGenericParamList(builder, genericParams, ext);
+
+  auto *env = tc.finalizeGenericParamList(builder, genericParams, nullptr, ext);
+  ext->setGenericEnvironment(env);
 
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.
@@ -6914,24 +7508,28 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
-    GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
     return;
   }
 
   // If we're extending a protocol, check the generic parameters.
-  if (auto proto = extendedType->getAs<ProtocolType>()) {
+  //
+  // Canonicalize the type to work around the fact that getAs<> cannot
+  // "look through" protocol<X, Y> where X and Y both desugar to the same
+  // thing.
+  //
+  // FIXME: Probably the above comes up elsewhere, perhaps getAs<>()
+  // should be fixed.
+  if (auto proto = extendedType->getCanonicalType()->getAs<ProtocolType>()) {
     if (!isa<ProtocolType>(extendedType.getPointer()) &&
         proto->getDecl()->getParentModule() == ext->getParentModule()) {
       // Protocols in the same module cannot be extended via a typealias;
@@ -6944,18 +7542,14 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       return;
     }
 
-    GenericSignature *sig = nullptr;
-    extendedType = checkExtensionGenericParams(*this, ext,
-                                               ext->getExtendedType(),
-                                               ext->getGenericParams(),
-                                               sig);
+    extendedType = checkExtensionGenericParams(*this, ext, proto,
+                                               ext->getGenericParams());
     if (!extendedType) {
       ext->setInvalid();
       ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
-    ext->setGenericSignature(sig);
     ext->getExtendedTypeLoc().setType(extendedType);
 
     // Speculatively ban extension of AnyObject; it won't be a
@@ -6968,6 +7562,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     }
     return;
   }
+
+  assert(extendedType->is<NominalType>());
 }
 
 ArrayRef<ProtocolDecl *>
@@ -7111,22 +7707,6 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
                                " = " + *defaultValueSuggestion);
     }
   }
-}
-
-namespace {
-  /// AST stream printer that adds extra indentation to each line.
-  class ExtraIndentStreamPrinter : public StreamPrinter {
-    StringRef ExtraIndent;
-
-  public:
-    ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
-    : StreamPrinter(out), ExtraIndent(extraIndent) { }
-
-    virtual void printIndent() {
-      printText(ExtraIndent);
-      StreamPrinter::printIndent();
-    }
-  };
 }
 
 /// Diagnose a missing required initializer.
@@ -7591,12 +8171,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         error = diag::objc_enum_case_req_objc_enum;
       else if (objcAttr->hasName() && EED->getParentCase()->getElements().size() > 1)
         error = diag::objc_enum_case_multi;
-    } else if (isa<FuncDecl>(D)) {
-      auto func = cast<FuncDecl>(D);
+    } else if (auto *func = dyn_cast<FuncDecl>(D)) {
       if (!checkObjCDeclContext(D))
         error = diag::invalid_objc_decl_context;
       else if (func->isOperator())
-        error = diag::invalid_objc_decl;
+        error = diag::objc_operator;
       else if (func->isAccessor() && !func->isGetterOrSetter())
         error = diag::objc_observing_accessor;
     } else if (isa<ConstructorDecl>(D) ||

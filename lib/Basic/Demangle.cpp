@@ -1037,6 +1037,10 @@ private:
       return createSwiftType(Node::Kind::Structure, "Float");
     if (Mangled.nextIf('i'))
       return createSwiftType(Node::Kind::Structure, "Int");
+    if (Mangled.nextIf('V'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeRawPointer");
+    if (Mangled.nextIf('v'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeMutableRawPointer");
     if (Mangled.nextIf('P'))
       return createSwiftType(Node::Kind::Structure, "UnsafePointer");
     if (Mangled.nextIf('p'))
@@ -1157,7 +1161,10 @@ private:
   NodePointer demangleBoundGenericArgs(NodePointer nominalType) {
     // Generic arguments for the outermost type come first.
     NodePointer parentOrModule = nominalType->getChild(0);
-    if (parentOrModule->getKind() != Node::Kind::Module) {
+
+    if (parentOrModule->getKind() != Node::Kind::Module &&
+        parentOrModule->getKind() != Node::Kind::Function &&
+        parentOrModule->getKind() != Node::Kind::Extension) {
       parentOrModule = demangleBoundGenericArgs(parentOrModule);
 
       // Rebuild this type with the new parent type, which may have
@@ -2118,7 +2125,6 @@ private:
   // impl-function-attribute ::= 'Cm'            // compatible with Swift method
   // impl-function-attribute ::= 'CO'            // compatible with ObjC method
   // impl-function-attribute ::= 'Cw'            // compatible with protocol witness
-  // impl-function-attribute ::= 'N'             // noreturn
   // impl-function-attribute ::= 'G'             // generic
   NodePointer demangleImplFunctionType() {
     NodePointer type = NodeFactory::create(Node::Kind::ImplFunctionType);
@@ -2140,9 +2146,6 @@ private:
       else
         return nullptr;
     }
-
-    if (Mangled.nextIf('N'))
-      addImplFunctionAttribute(type, "@noreturn");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
@@ -3465,12 +3468,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer type_list = pointer->getChild(0);
     if (!type_list)
       return;
-    bool needs_proto_marker = (type_list->getNumChildren() != 1);
-    if (needs_proto_marker)
-      Printer << "protocol<";
-    printChildren(type_list, ", ");
-    if (needs_proto_marker)
-      Printer << ">";
+    if (type_list->getNumChildren() == 0)
+      Printer << "Any";
+    else
+      printChildren(type_list, " & ");
     return;
   }
   case Node::Kind::Archetype: {

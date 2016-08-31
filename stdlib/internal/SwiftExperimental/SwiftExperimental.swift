@@ -18,19 +18,21 @@
 import Swift
 
 /// The function composition operator is the only user-defined operator that
-/// operates on functions.  That's why the numeric value of precedence does
-/// not matter right now.
-infix operator ∘ {
-  // The character is U+2218 RING OPERATOR.
-  //
-  // Confusables:
-  //
-  // U+00B0 DEGREE SIGN
-  // U+02DA RING ABOVE
-  // U+25CB WHITE CIRCLE
-  // U+25E6 WHITE BULLET
-  associativity left
-  precedence 100
+/// operates on functions.  That's why the exact precedence does not matter
+/// right now.
+infix operator ∘ : CompositionPrecedence
+// The character is U+2218 RING OPERATOR.
+//
+// Confusables:
+//
+// U+00B0 DEGREE SIGN
+// U+02DA RING ABOVE
+// U+25CB WHITE CIRCLE
+// U+25E6 WHITE BULLET
+
+precedencegroup CompositionPrecedence {
+  associativity: left
+  higherThan: TernaryPrecedence
 }
 
 /// Compose functions.
@@ -39,28 +41,28 @@ infix operator ∘ {
 ///
 /// - Returns: a function that applies ``g`` to the result of applying ``f``
 ///   to the argument of the new function.
-public func ∘<T, U, V>(g: (U) -> V, f: (T) -> U) -> ((T) -> V) {
+public func ∘<T, U, V>(g: @escaping (U) -> V, f: @escaping (T) -> U) -> ((T) -> V) {
   return { g(f($0)) }
 }
 
-infix operator ∖ { associativity left precedence 140 }
-infix operator ∖= { associativity right precedence 90 assignment }
-infix operator ∪ { associativity left precedence 140 }
-infix operator ∪= { associativity right precedence 90 assignment }
-infix operator ∩ { associativity left precedence 150 }
-infix operator ∩= { associativity right precedence 90 assignment }
-infix operator ⨁ { associativity left precedence 140 }
-infix operator ⨁= { associativity right precedence 90 assignment }
-infix operator ∈ { associativity left precedence 130 }
-infix operator ∉ { associativity left precedence 130 }
-infix operator ⊂ { associativity left precedence 130 }
-infix operator ⊄ { associativity left precedence 130 }
-infix operator ⊆ { associativity left precedence 130 }
-infix operator ⊈ { associativity left precedence 130 }
-infix operator ⊃ { associativity left precedence 130 }
-infix operator ⊅ { associativity left precedence 130 }
-infix operator ⊇ { associativity left precedence 130 }
-infix operator ⊉ { associativity left precedence 130 }
+infix operator ∖ : AdditionPrecedence
+infix operator ∖= : AssignmentPrecedence
+infix operator ∪ : AdditionPrecedence
+infix operator ∪=  : AssignmentPrecedence
+infix operator ∩ : MultiplicationPrecedence
+infix operator ∩=  : AssignmentPrecedence
+infix operator ⨁ : AdditionPrecedence
+infix operator ⨁=  : AssignmentPrecedence
+infix operator ∈ : ComparisonPrecedence
+infix operator ∉ : ComparisonPrecedence
+infix operator ⊂ : ComparisonPrecedence
+infix operator ⊄ : ComparisonPrecedence
+infix operator ⊆ : ComparisonPrecedence
+infix operator ⊈ : ComparisonPrecedence
+infix operator ⊃ : ComparisonPrecedence
+infix operator ⊅ : ComparisonPrecedence
+infix operator ⊇ : ComparisonPrecedence
+infix operator ⊉ : ComparisonPrecedence
 
 /// - Returns: The relative complement of `lhs` with respect to `rhs`.
 public func ∖ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
@@ -105,9 +107,8 @@ public func ⨁ <T, S: Sequence>(lhs: Set<T>, rhs: S) -> Set<T>
 }
 
 /// Assigns to `lhs` the set with elements in `lhs` or `rhs` but not in both.
-public func ⨁= <
-  T, S: Sequence where S.Iterator.Element == T
-  >(lhs: inout Set<T>, rhs: S) {
+public func ⨁= <T, S: Sequence>(lhs: inout Set<T>, rhs: S)
+  where S.Iterator.Element == T {
   lhs.formSymmetricDifference(rhs)
 }
 

@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend %s -c -g -o %t.o
-// RUN: dwarfdump --verify --apple-types %t.o | FileCheck --check-prefix=CHECK-ACCEL %s
-// RUN: dwarfdump --debug-info %t.o | FileCheck --check-prefix=CHECK-DWARF %s
+// RUN: dwarfdump --verify --apple-types %t.o | %FileCheck --check-prefix=CHECK-ACCEL %s
+// RUN: dwarfdump --debug-info %t.o | %FileCheck --check-prefix=CHECK-DWARF %s
 
 // REQUIRES: OS=macosx
 

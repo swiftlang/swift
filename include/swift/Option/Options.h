@@ -32,7 +32,8 @@ namespace options {
     NoBatchOption = (1 << 7),
     DoesNotAffectIncrementalBuild = (1 << 8),
     AutolinkExtractOption = (1 << 9),
-    ModuleWrapOption = (1 << 10)
+    ModuleWrapOption = (1 << 10),
+    SwiftFormatOption = (1 << 11),
   };
 
   enum ID {

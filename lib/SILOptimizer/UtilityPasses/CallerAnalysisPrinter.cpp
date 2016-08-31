@@ -32,8 +32,11 @@ class CallerAnalysisPrinterPass : public SILModuleTransform {
   void run() override {
     auto *CA = getAnalysis<CallerAnalysis>();
     for (auto &F : *getModule()) {
-      const char *hasCaller = CA->hasCaller(&F) ? "true" : "false";
-      llvm::outs() << "Function " << F.getName() << " has caller: " << hasCaller << "\n";
+      const CallerAnalysis::FunctionInfo &FI = CA->getCallerInfo(&F);
+      const char *hasCaller = FI.hasCaller() ? "true" : "false";
+      llvm::outs() << "Function " << F.getName() << " has caller: "
+                   << hasCaller << ", partial applied args = "
+                   << FI.getMinPartialAppliedArgs() << "\n";
     }
   }
 

@@ -19,6 +19,7 @@
 #include "swift/Basic/Version.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/MacroInfo.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
@@ -41,6 +42,76 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   }
 
   return false;
+}
+
+namespace {
+enum class MacroConflictAction {
+  Discard,
+  Replace,
+  AddAsAlternative
+};
+}
+
+/// Based on the Clang module structure, decides what to do when a new
+/// definition of an existing macro is seen: discard it, have it replace the
+/// old one, or add it as an alternative.
+///
+/// Specifically, if the innermost explicit submodule containing \p newMacro
+/// contains the innermost explicit submodule containing \p existingMacro,
+/// \p newMacro should replace \p existingMacro; if they're the same module,
+/// \p existingMacro should stay in place. Otherwise, they don't share an
+/// explicit module, and should be considered alternatives.
+///
+/// Note that the above assumes that macro definitions are processed in reverse
+/// order, i.e. the first definition seen is the last in a translation unit.
+///
+/// If we're not currently building a module, then the "latest" macro wins,
+/// which (by the same assumption) should be the existing macro.
+static MacroConflictAction
+considerReplacingExistingMacro(const clang::MacroInfo *newMacro,
+                               const clang::MacroInfo *existingMacro,
+                               const clang::Preprocessor *PP) {
+  assert(PP);
+  assert(newMacro);
+  assert(existingMacro);
+  assert(newMacro->getOwningModuleID() == 0);
+  assert(existingMacro->getOwningModuleID() == 0);
+
+  if (PP->getLangOpts().CurrentModule.empty())
+    return MacroConflictAction::Discard;
+
+  clang::ModuleMap &moduleInfo = PP->getHeaderSearchInfo().getModuleMap();
+  const clang::SourceManager &sourceMgr = PP->getSourceManager();
+
+  auto findContainingExplicitModule =
+      [&moduleInfo, &sourceMgr](const clang::MacroInfo *macro)
+        -> const clang::Module * {
+
+    clang::SourceLocation definitionLoc = macro->getDefinitionLoc();
+    assert(definitionLoc.isValid() &&
+           "implicitly-defined macros shouldn't show up in a module's lookup");
+    clang::FullSourceLoc fullLoc(definitionLoc, sourceMgr);
+
+    const clang::Module *module = moduleInfo.inferModuleFromLocation(fullLoc);
+    assert(module && "we are building a module; everything should be modular");
+
+    while (module->isSubModule()) {
+      if (module->IsExplicit)
+        break;
+      module = module->Parent;
+    }
+    return module;
+  };
+
+  const clang::Module *newModule = findContainingExplicitModule(newMacro);
+  const clang::Module *existingModule =
+      findContainingExplicitModule(existingMacro);
+
+  if (existingModule == newModule)
+    return MacroConflictAction::Discard;
+  if (existingModule->isSubModuleOf(newModule))
+    return MacroConflictAction::Replace;
+  return MacroConflictAction::AddAsAlternative;
 }
 
 bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
@@ -145,7 +216,6 @@ clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
     if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
       if (isa<clang::TagDecl>(decl) ||
           isa<clang::ObjCInterfaceDecl>(decl) ||
-          isa<clang::ObjCProtocolDecl>(decl) ||
           isa<clang::TypedefNameDecl>(decl))
         return decl;
     }
@@ -262,7 +332,8 @@ static bool isGlobalAsMember(SwiftLookupTable::SingleEntry entry,
 }
 
 bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
-                                     SmallVectorImpl<uintptr_t> &entries) {
+                                     SmallVectorImpl<uintptr_t> &entries,
+                                     const clang::Preprocessor *PP) {
   // Check whether this entry matches any existing entry.
   auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
@@ -272,10 +343,21 @@ bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
         matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
       return false;
 
-    // If it matches an existing macro, overwrite the existing entry.
+    // If it matches an existing macro, decide on the best course of action.
     if (macro && isMacroEntry(existingEntry)) {
-      existingEntry = encodeEntry(macro);
-      return false;
+      MacroConflictAction action =
+         considerReplacingExistingMacro(macro,
+                                        mapStoredMacro(existingEntry),
+                                        PP);
+      switch (action) {
+      case MacroConflictAction::Discard:
+        return false;
+      case MacroConflictAction::Replace:
+        existingEntry = encodeEntry(macro);
+        return false;
+      case MacroConflictAction::AddAsAlternative:
+        break;
+      }
     }
   }
 
@@ -288,7 +370,8 @@ bool SwiftLookupTable::addLocalEntry(SingleEntry newEntry,
 }
 
 void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
-                                EffectiveClangContext effectiveContext) {
+                                EffectiveClangContext effectiveContext,
+                                const clang::Preprocessor *PP) {
   assert(!Reader && "Cannot modify a lookup table stored on disk");
 
   // Translate the context.
@@ -311,7 +394,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   // If this is a global imported as a member, record is as such.
   if (isGlobalAsMember(newEntry, context)) {
     auto &entries = GlobalsAsMembers[context];
-    (void)addLocalEntry(newEntry, entries);
+    (void)addLocalEntry(newEntry, entries, PP);
   }
 
   // Find the list of entries for this base name.
@@ -321,7 +404,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   for (auto &entry : entries) {
     if (entry.Context == context) {
       // We have entries for this context.
-      (void)addLocalEntry(newEntry, entry.DeclsOrMacros);
+      (void)addLocalEntry(newEntry, entry.DeclsOrMacros, PP);
       return;
     }
   }

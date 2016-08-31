@@ -243,13 +243,13 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
       getStdlibModule(dc)->lookupValue({}, Context.getIdentifier("Bool"),
                                        NLKind::QualifiedLookup, results);
       if (results.size() != 1) {
-        diagnose(SourceLoc(), diag::bool_type_broken);
+        diagnose(SourceLoc(), diag::broken_bool);
         return Type();
       }
 
       auto tyDecl = dyn_cast<TypeDecl>(results.front());
       if (!tyDecl) {
-        diagnose(SourceLoc(), diag::bool_type_broken);
+        diagnose(SourceLoc(), diag::broken_bool);
         return Type();
       }
 
@@ -674,12 +674,25 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
-                                   bool isSILType, DeclContext *DC,
+                                   DeclContext *DC,
+                                   bool ProduceDiagnostics) {
+  return performTypeLocChecking(Ctx, T,
+                                /*isSILMode=*/false,
+                                /*isSILType=*/false,
+                                DC, ProduceDiagnostics);
+}
+
+bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
+                                   bool isSILMode,
+                                   bool isSILType,
+                                   DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
 
   // Fine to have unbound generic types.
   options |= TR_AllowUnboundGenerics;
+  if (isSILMode)
+    options |= TR_SILMode;
   if (isSILType)
     options |= TR_SILType;
 
@@ -693,9 +706,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericSignature *swift::handleSILGenericParams(ASTContext &Ctx,
-                                                GenericParamList *genericParams,
-                                                DeclContext *DC) {
+std::pair<GenericSignature *, GenericEnvironment *>
+swift::handleSILGenericParams(ASTContext &Ctx,
+                              GenericParamList *genericParams,
+                              DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
@@ -1317,7 +1331,7 @@ private:
       if (CurrentInfo.isContainedIn(NewConstraint)) {
         DiagnosticEngine &Diags = TC.Diags;
         // Some availability checks will always pass because the minimum
-        // deployment target gurantees they will never be false. We don't
+        // deployment target guarantees they will never be false. We don't
         // diagnose these checks as useless because the source file may
         // be shared with other projects/targets having older deployment
         // targets. We don't currently have a mechanism for the user to

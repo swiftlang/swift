@@ -35,7 +35,7 @@ namespace swift {
 namespace immediate {
 
 // Returns a handle to the runtime suitable for other 'dlsym' or 'dlclose' 
-// calls or 'NULL' if an error occured. 
+// calls or 'NULL' if an error occurred.
 void *loadSwiftRuntime(StringRef runtimeLibPath);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,

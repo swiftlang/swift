@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test %s | FileCheck %s
+// RUN: %target-swift-remoteast-test %s | %FileCheck %s
 
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
@@ -79,9 +79,9 @@ printType(J.Type.self)
 // CHECK: found type: J.Type
 
 protocol K {}
-typealias JK = protocol<J,K>
-typealias KJ = protocol<K,J>
+typealias JK = J & K
+typealias KJ = K & J
 printType(JK.self)
-// CHECK: found type: protocol<J, K>
+// CHECK: found type: J & K
 printType(KJ.self)
-// CHECK: found type: protocol<J, K>
+// CHECK: found type: J & K

@@ -104,7 +104,7 @@ protocol ThrowingProto {
 
 func testExistential(_ p : ThrowingProto) throws {
   try p.foo()
-  try p.dynamicType.bar()
+  try type(of: p).bar()
 }
 func testGeneric<P : ThrowingProto>(p : P) throws {
   try p.foo()
@@ -112,7 +112,7 @@ func testGeneric<P : ThrowingProto>(p : P) throws {
 }
 
 // Don't warn about the "useless" try in these cases.
-func nine_helper(_ x: Int, y: Int) throws {}
+func nine_helper(_ x: Int, y: Int) throws {} // expected-note {{'nine_helper(_:y:)' declared here}}
 func nine() throws {
   try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
 }

@@ -49,7 +49,7 @@ public:
 
   const SILFunction &getFunction() const { return F; }
 
-  // Register a definiton of a given opened archetype.
+  // Register a definition of a given opened archetype.
   void addOpenedArchetypeDef(Type archetype, SILValue Def);
 
   void removeOpenedArchetypeDef(Type archetype, SILValue Def) {
@@ -80,9 +80,18 @@ public:
   // the typedef operands of this instruction.
   void registerUsedOpenedArchetypes(const SILInstruction *I);
 
+  // Register opened archetypes referenced by this type, if they
+  // are not registered yet. Create placeholders representing forward
+  // definitions of these opened archetypes.
+  void registerUsedOpenedArchetypes(Type Ty);
+
   // Unregister archetypes opened by a given instruction.
   // Should be only called when this instruction is to be removed.
   void unregisterOpenedArchetypes(const SILInstruction *I);
+
+  // Returns true of some of the forward opened archetype definitions
+  // are unresolved.
+  bool hasUnresolvedOpenedArchetypeDefinitions();
 
   // Handling of instruction removal notifications.
   bool needsNotifications() { return true; }

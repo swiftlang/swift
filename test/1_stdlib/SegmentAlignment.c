@@ -1,7 +1,7 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: xcrun -sdk %target-sdk-name %clang -c -arch %target-cpu %s -o %t/SegmentAlignment.o
 // RUN: %target-build-swift %S/Inputs/SegmentAlignment.swift -Xlinker %t/SegmentAlignment.o -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: CPU=armv7
 

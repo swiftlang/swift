@@ -23,6 +23,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -91,6 +93,11 @@ static bool isInSystemModule(DeclContext *D) {
   if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
     return true;
   return false;
+}
+
+static Accessibility getOverridableAccessibility(DeclContext *dc) {
+  return (dc->getAsProtocolOrProtocolExtensionContext()
+            ? Accessibility::Public : Accessibility::Open);
 }
 
 /// Create a typedpattern(namedpattern(decl))
@@ -387,8 +394,8 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     = cast<FuncDecl>(getBuiltinValueDecl(C,C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
     = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, paramRef,
-                                        /*implicit*/ true);
+  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                { paramRef }, { Identifier() });
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
@@ -451,8 +458,8 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
     = cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
   auto reinterpretCastRef
     = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-  auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
-                                        /*implicit*/ true);
+  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                { selfRef }, { Identifier() });
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
@@ -643,8 +650,9 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
         C, C.getIdentifier("reinterpretCast")));
     auto reinterpretCastRef
       = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-    auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
-                                          /*implicit*/ true);
+    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+                                                  { selfRef },
+                                                  { Identifier() });
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
@@ -670,17 +678,16 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
       C, C.getIdentifier("addressof")));
     auto addressofFnRef
       = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
-    auto selfPointer = new (C) CallExpr(addressofFnRef, inoutSelf,
-                                          /*implicit*/ true);
+    auto selfPointer = CallExpr::createImplicit(C, addressofFnRef,
+                                                { inoutSelf },
+                                                { Identifier() });
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
     auto initializeFnRef
       = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
-    auto initializeArgs = TupleExpr::createImplicit(C,
-                                                   { newValueRef, selfPointer },
-                                                   {});
-    auto initialize = new (C) CallExpr(initializeFnRef, initializeArgs,
-                                       /*implicit*/ true);
+    auto initialize = CallExpr::createImplicit(C, initializeFnRef,
+                                               { newValueRef, selfPointer },
+                                               { Identifier(), Identifier() });
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
@@ -1032,6 +1039,19 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   return addErrorDomain(swiftDecl, clangNamedDecl, importer);
 }
 
+/// Determine whether this is the declaration of Objective-C's 'id' type.
+static bool isObjCId(ASTContext &ctx, const clang::Decl *decl) {
+  if (!ctx.LangOpts.EnableObjCInterop) return false;
+
+  auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
+  if (!typedefDecl) return false;
+
+  if (!typedefDecl->getDeclContext()->getRedeclContext()->isTranslationUnit())
+    return false;
+
+  return typedefDecl->getName() == "id";
+}
+
 namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
@@ -1261,7 +1281,8 @@ namespace {
       // TODO: try to find a non-mutable type to use as the superclass.
 
       auto theClass =
-        Impl.createDeclWithClangNode<ClassDecl>(decl, SourceLoc(), className,
+        Impl.createDeclWithClangNode<ClassDecl>(decl, Accessibility::Public,
+                                                SourceLoc(), className,
                                                 SourceLoc(), None,
                                                 nullptr, dc);
       theClass->computeType();
@@ -1346,12 +1367,14 @@ namespace {
       // Handle generic types.
       GenericParamList *genericParams = nullptr;
       GenericSignature *genericSig = nullptr;
+      GenericEnvironment *genericEnv = nullptr;
       auto underlyingType = typeDecl->getDeclaredInterfaceType();
 
       if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
         if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
           genericParams = generic->getGenericParams();
           genericSig = generic->getGenericSignature();
+          genericEnv = generic->getGenericEnvironment();
 
           underlyingType = ArchetypeBuilder::mapTypeIntoContext(
               generic, underlyingType);
@@ -1368,7 +1391,7 @@ namespace {
 
       // Create the type alias.
       auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                     decl,
+                     decl, Accessibility::Public,
                      Impl.importSourceLoc(decl->getLocStart()),
                      swift2Name.Imported.getBaseName(),
                      Impl.importSourceLoc(decl->getLocation()),
@@ -1376,6 +1399,7 @@ namespace {
                      genericParams, dc);
       alias->computeType();
       alias->setGenericSignature(genericSig);
+      alias->setGenericEnvironment(genericEnv);
 
       // Record that this is the Swift 2 version of this declaration.
       Impl.ImportedDecls[{decl->getCanonicalDecl(), true}] = alias;
@@ -1412,7 +1436,7 @@ namespace {
       auto Loc = Impl.importSourceLoc(decl->getLocation());
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-          decl, Loc, name, Loc, None, nullptr, dc);
+          decl, Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
       structDecl->computeType();
 
       // Import the type of the underlying storage
@@ -1526,18 +1550,6 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
-        // Ignore the 'id' typedef. We want to bridge the underlying
-        // ObjCId type.
-        //
-        // When we remove the EnableIdAsAny staging flag, the 'id' entry
-        // should be removed from MappedTypes.def, and this conditional should
-        // become unnecessary.
-        if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
-              MappedTypeNameKind::DoNothing;
-          return Impl.SwiftContext.getAnyDecl();
-        }
-      
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
@@ -1589,7 +1601,7 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl,
+                            Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
                             Name,
                             Impl.importSourceLoc(Decl->getLocation()),
@@ -1614,7 +1626,7 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl,
+                            Decl, Accessibility::Public,
                             Impl.importSourceLoc(Decl->getLocStart()),
                             Name,
                             Impl.importSourceLoc(Decl->getLocation()),
@@ -1683,12 +1695,24 @@ namespace {
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
+                                      Accessibility::Public,
                                       Impl.importSourceLoc(Decl->getLocStart()),
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
       Result->computeType();
+
+      // Make Objective-C's 'id' unavailable.
+      ASTContext &ctx = DC->getASTContext();
+      if (isObjCId(ctx, Decl)) {
+        auto attr = AvailableAttr::createUnconditional(
+                      ctx,
+                      "'id' is not available in Swift; use 'Any'", "",
+                      UnconditionalAvailabilityKind::UnavailableInSwift);
+        Result->getAttrs().add(attr);
+      }
+
       return Result;
     }
 
@@ -1752,11 +1776,8 @@ namespace {
         auto zeroInitializerRef = new (context) DeclRefExpr(zeroInitializerFunc,
                                                             DeclNameLoc(),
                                                             /*implicit*/ true);
-        auto emptyTuple = TupleExpr::createEmpty(context, SourceLoc(),
-                                                 SourceLoc(),
-                                                 /*implicit*/ true);
-        auto call = new (context) CallExpr(zeroInitializerRef, emptyTuple,
-                                           /*implicit*/ true);
+        auto call = CallExpr::createImplicit(context, zeroInitializerRef,
+                                             { }, { });
 
         auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
                                                /*implicit*/ true);
@@ -2091,7 +2112,8 @@ namespace {
         rawValueExpr->setNegative(SourceLoc());
       
       auto element
-        = Impl.createDeclWithClangNode<EnumElementDecl>(decl, SourceLoc(),
+        = Impl.createDeclWithClangNode<EnumElementDecl>(decl,
+                                        Accessibility::Public, SourceLoc(),
                                         name, TypeLoc(),
                                         SourceLoc(), rawValueExpr,
                                         theEnum);
@@ -2228,7 +2250,7 @@ namespace {
 
       // Create a struct with the underlying type as a field.
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-        Loc, name, Loc, None, nullptr, dc);
+        Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
       structDecl->computeType();
 
       ProtocolDecl *protocols[]
@@ -2287,7 +2309,7 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
-          Loc, name, Loc, None, nullptr, dc);
+          Accessibility::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
 
         ProtocolDecl *protocols[]
@@ -2341,7 +2363,8 @@ namespace {
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
           errorWrapper = Impl.createDeclWithClangNode<StructDecl>(
-                           decl, loc, name, loc, None, nullptr, dc);
+                           decl, Accessibility::Public, loc, name, loc,
+                           None, nullptr, dc);
           errorWrapper->computeType();
 
           // Add inheritance clause.
@@ -2395,7 +2418,7 @@ namespace {
 
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
-            decl, loc, enumName,
+            decl, Accessibility::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
@@ -2451,7 +2474,7 @@ namespace {
           // Add the ErrorType alias:
           //   public typealias ErrorType
           auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                         decl, loc, C.Id_ErrorType, loc,
+                         decl, Accessibility::Public, loc, C.Id_ErrorType, loc,
                          TypeLoc::withoutLoc(
                            errorWrapper->getDeclaredInterfaceType()),
                          /*genericSignature=*/nullptr, enumDecl);
@@ -2474,6 +2497,10 @@ namespace {
         result = importAsOptionSetType(dc, name, decl);
         if (!result)
           return nullptr;
+
+        // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
+        // option set enums.
+        Impl.DeclsWithSuperfluousTypedefs.insert(decl);
 
         enumeratorContext = result;
         break;
@@ -2620,6 +2647,7 @@ namespace {
       // Create the struct declaration and record it.
       auto name = importedName.Imported.getBaseName();
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
+                                 Accessibility::Public,
                                  Impl.importSourceLoc(decl->getLocStart()),
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
@@ -2940,6 +2968,7 @@ namespace {
 
       // Map this indirect field to a Swift variable.
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
+                       Accessibility::Public,
                        /*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
@@ -3022,7 +3051,7 @@ namespace {
       (void)resultType->getAnyOptionalObjectType(initOptionality);
 
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-          decl, name, /*NameLoc=*/SourceLoc(),
+          decl, Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
           initOptionality, /*FailabilityLoc=*/SourceLoc(),
           /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
           selfParam, parameterList,
@@ -3109,6 +3138,7 @@ namespace {
       result->setType(fnType);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setBodyResultType(swiftResultTy);
       result->setAccessibility(Accessibility::Public);
@@ -3256,6 +3286,7 @@ namespace {
       if (!swiftPropertyType) return nullptr;
 
       auto property = Impl.createDeclWithClangNode<VarDecl>(getter,
+                                                        Accessibility::Public,
                                                             isStatic,
                                                             /*isLet=*/false,
                                                             SourceLoc(),
@@ -3401,6 +3432,7 @@ namespace {
       result->setInterfaceType(type);
       result->setBodyResultType(resultTy);
 
+      // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccessibility(Accessibility::Public);
       finishFuncDecl(decl, result);
 
@@ -3413,10 +3445,6 @@ namespace {
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
                         AbstractFunctionDecl *result) {
-      if (decl->isNoReturn())
-        result->getAttrs().add(new (Impl.SwiftContext)
-                                   NoReturnAttr(/*IsImplicit=*/false));
-
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
       if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||
@@ -3456,7 +3484,7 @@ namespace {
         return nullptr;
 
       auto result =
-        Impl.createDeclWithClangNode<VarDecl>(decl,
+        Impl.createDeclWithClangNode<VarDecl>(decl, Accessibility::Public,
                               /*static*/ false, /*IsLet*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
@@ -3528,7 +3556,7 @@ namespace {
         isStatic = true;
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       isStatic,
+                       Accessibility::Public, isStatic,
                        Impl.shouldImportGlobalAsLet(decl->getType()),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
@@ -3850,7 +3878,7 @@ namespace {
           /*GenericParams=*/nullptr, bodyParams,
           Type(), TypeLoc(), dc, decl);
 
-      result->setAccessibility(Accessibility::Public);
+      result->setAccessibility(getOverridableAccessibility(dc));
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;
@@ -3890,6 +3918,7 @@ namespace {
       result->setType(type);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4339,7 +4368,7 @@ namespace {
 
       // Create the actual constructor.
       auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
-                      name, /*NameLoc=*/SourceLoc(),
+                      Accessibility::Public, name, /*NameLoc=*/SourceLoc(),
                       failability, /*FailabilityLoc=*/SourceLoc(),
                       /*Throws=*/importedName.ErrorInfo.hasValue(),
                       /*ThrowsLoc=*/SourceLoc(),
@@ -4364,6 +4393,7 @@ namespace {
       result->setInitializerInterfaceType(interfaceInitType);
       result->setInterfaceType(interfaceAllocType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setType(allocType);
 
@@ -4501,7 +4531,9 @@ namespace {
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
-      thunk->setAccessibility(Accessibility::Public);
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
+      thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
       assert(objcAttr);
@@ -4572,7 +4604,9 @@ namespace {
       thunk->setBodyResultType(TupleType::getEmpty(C));
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
-      thunk->setAccessibility(Accessibility::Public);
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
+      thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
       assert(objcAttr);
@@ -4804,6 +4838,9 @@ namespace {
       auto elementTy
         = getter->getInterfaceType()->castTo<AnyFunctionType>()->getResult()
             ->castTo<AnyFunctionType>()->getResult();
+      auto elementContextTy
+        = getter->getType()->castTo<AnyFunctionType>()->getResult()
+          ->castTo<AnyFunctionType>()->getResult();
 
       // Local function to mark the setter unavailable.
       auto makeSetterUnavailable = [&] {
@@ -4903,9 +4940,10 @@ namespace {
       DeclName name(C, C.Id_subscript, { Identifier() });
       auto subscript
         = Impl.createDeclWithClangNode<SubscriptDecl>(getter->getClangNode(),
+                                      getOverridableAccessibility(dc),
                                       name, decl->getLoc(), bodyParams,
                                       decl->getLoc(),
-                                      TypeLoc::withoutLoc(elementTy), dc);
+                                      TypeLoc::withoutLoc(elementContextTy),dc);
 
       /// Record the subscript as an alternative declaration.
       Impl.AlternateDecls[associateWithSetter ? setter : getter] = subscript;
@@ -5061,6 +5099,7 @@ namespace {
       for (auto *objcGenericParam : *typeParamList) {
         auto genericParamDecl =
           Impl.createDeclWithClangNode<GenericTypeParamDecl>(objcGenericParam,
+              Accessibility::Public,
               dc, Impl.SwiftContext.getIdentifier(objcGenericParam->getName()),
               Impl.importSourceLoc(objcGenericParam->getLocation()),
               /*depth*/0, /*index*/genericParams.size());
@@ -5116,25 +5155,24 @@ namespace {
             Impl.importSourceLoc(typeParamList->getRAngleLoc()));
     }
 
-    // Calculate the generic signature for the given imported generic param
-    // list. If there are any errors in doing so, return 'nullptr'.
-    GenericSignature *calculateGenericSignature(GenericParamList *genericParams,
-                                                DeclContext *dc) {
+    // Calculate the generic signature and interface type to archetype mapping
+    // from an imported generic param list.
+    std::pair<GenericSignature *, GenericEnvironment *>
+    calculateGenericSignature(GenericParamList *genericParams,
+                              DeclContext *dc) {
       ArchetypeBuilder builder(*dc->getParentModule(), Impl.SwiftContext.Diags);
+      for (auto param : *genericParams)
+        builder.addGenericParameter(param);
       for (auto param : *genericParams) {
-        if (builder.addGenericParameter(param)) {
-          return nullptr;
-        }
-      }
-      for (auto param : *genericParams) {
-        if (builder.addGenericParameterRequirements(param)) {
-          return nullptr;
-        }
+        bool result = builder.addGenericParameterRequirements(param);
+        assert(!result);
+        (void) result;
       }
       // TODO: any need to infer requirements?
-      if (builder.finalize(genericParams->getSourceRange().Start)) {
-        return nullptr;
-      }
+      bool result = builder.finalize(genericParams->getSourceRange().Start);
+      assert(!result);
+      (void) result;
+
       SmallVector<GenericTypeParamType *, 4> genericParamTypes;
       for (auto param : *genericParams) {
         genericParamTypes.push_back(
@@ -5142,10 +5180,11 @@ namespace {
         auto *archetype = builder.getArchetype(param);
         param->setArchetype(archetype);
       }
-      genericParams->setAllArchetypes(
-          Impl.SwiftContext.AllocateCopy(builder.getAllArchetypes()));
 
-      return builder.getGenericSignature(genericParamTypes);
+      auto *sig = builder.getGenericSignature(genericParamTypes);
+      auto *env = builder.getGenericEnvironment(genericParamTypes);
+
+      return std::make_pair(sig, env);
     }
 
     /// Import members of the given Objective-C container and add them to the
@@ -5483,11 +5522,14 @@ namespace {
         auto genericParams = GenericParamList::create(Impl.SwiftContext,
             SourceLoc(), toGenericParams, SourceLoc());
         result->setGenericParams(genericParams);
-        if (auto sig = calculateGenericSignature(genericParams, result)) {
-          result->setGenericSignature(sig);
-        } else {
-          return nullptr;
-        }
+
+        GenericSignature *sig;
+        GenericEnvironment *env;
+        std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+        result->setGenericSignature(sig);
+        result->setGenericEnvironment(env);
+
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
         for (auto gp : *genericParams) {
@@ -5622,6 +5664,7 @@ namespace {
 
       // Create the protocol declaration and record it.
       auto result = Impl.createDeclWithClangNode<ProtocolDecl>(decl,
+                                   Accessibility::Public,
                                    dc,
                                    Impl.importSourceLoc(decl->getLocStart()),
                                    Impl.importSourceLoc(decl->getLocation()),
@@ -5644,12 +5687,6 @@ namespace {
                                                  Type(result->getDeclaredType()),
                                                  Type(), false);
       selfDecl->setArchetype(selfArchetype);
-
-      // Set AllArchetypes of the protocol. ObjC protocols don't have associated
-      // types so only the Self archetype is present.
-      
-      result->getGenericParams()->setAllArchetypes(
-             Impl.SwiftContext.AllocateCopy(llvm::makeArrayRef(selfArchetype)));
       
       // Set the generic parameters and requirements.
       auto genericParam = selfDecl->getDeclaredType()
@@ -5661,6 +5698,15 @@ namespace {
       };
       auto sig = GenericSignature::get(genericParam, genericRequirements);
       result->setGenericSignature(sig);
+
+      TypeSubstitutionMap interfaceToArchetypeMap;
+
+      auto paramTy = selfDecl->getDeclaredType()->getCanonicalType();
+      interfaceToArchetypeMap[paramTy.getPointer()] = selfArchetype;
+
+      auto *env =
+          GenericEnvironment::get(Impl.SwiftContext, interfaceToArchetypeMap);
+      result->setGenericEnvironment(env);
 
       result->setCircularityCheck(CircularityCheck::Checked);
 
@@ -5711,6 +5757,7 @@ namespace {
         }
 
         auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                                        Accessibility::Open,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
@@ -5781,6 +5828,7 @@ namespace {
 
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                Accessibility::Open,
                                 Impl.importSourceLoc(decl->getLocStart()),
                                 name,
                                 Impl.importSourceLoc(decl->getLocation()),
@@ -5791,11 +5839,13 @@ namespace {
         auto genericParams = *gpImportResult;
         if (genericParams) {
           result->setGenericParams(genericParams);
-          if (auto sig = calculateGenericSignature(genericParams, result)) {
-            result->setGenericSignature(sig);
-          } else {
-            return nullptr;
-          }
+
+          GenericSignature *sig;
+          GenericEnvironment *env;
+          std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+          result->setGenericSignature(sig);
+          result->setGenericEnvironment(env);
         }
       } else {
         return nullptr;
@@ -6019,6 +6069,7 @@ namespace {
       }
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
+          getOverridableAccessibility(dc),
           decl->isClassProperty(), /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
@@ -6053,9 +6104,35 @@ namespace {
 
     Decl *
     VisitObjCCompatibleAliasDecl(const clang::ObjCCompatibleAliasDecl *decl) {
-      // Like C++ using declarations, name lookup simply looks through
-      // Objective-C compatibility aliases. They are not imported directly.
-      return nullptr;
+      // Import Objective-C's @compatibility_alias as typealias.
+      EffectiveClangContext effectiveContext(decl->getDeclContext()->getRedeclContext());
+      auto dc = Impl.importDeclContextOf(decl, effectiveContext);
+      if (!dc) return nullptr;
+
+      Optional<ImportedName> swift3Name;
+      auto importedName = importFullName(decl, swift3Name);
+      auto name = importedName.Imported.getBaseName();
+
+      if (name.empty()) return nullptr;
+
+      auto importedDecl = Impl.importDecl(decl->getClassInterface(),
+                                          /*useSwift2Name=*/false);
+      auto typeDecl = dyn_cast_or_null<TypeDecl>(importedDecl);
+      if (!typeDecl) return nullptr;
+
+      // Create typealias.
+      TypeAliasDecl *typealias = nullptr;
+      typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
+                    decl, Accessibility::Public,
+                    Impl.importSourceLoc(decl->getLocStart()),
+                    name,
+                    Impl.importSourceLoc(decl->getLocation()),
+                    TypeLoc::withoutLoc(typeDecl->getDeclaredType()),
+                    /*genericparams=*/nullptr, dc);
+
+      typealias->computeType();
+
+      return typealias;
     }
 
     Decl *VisitLinkageSpecDecl(const clang::LinkageSpecDecl *decl) {
@@ -6432,6 +6509,9 @@ void ClangImporter::Implementation::importAttributes(
 
 bool ClangImporter::Implementation::isUnavailableInSwift(
     const clang::Decl *decl) {
+  // 'id' is always unavailable in Swift.
+  if (isObjCId(SwiftContext, decl)) return true;
+
   // FIXME: Somewhat duplicated from importAttributes(), but this is a
   // more direct path.
   if (decl->getAvailability() == clang::AR_Unavailable) return true;
@@ -6910,8 +6990,6 @@ ClangImporter::Implementation::importDeclContextOf(
         conformsTo, protoArchetype->getSuperclass(),
         protoArchetype->getIsRecursive());
     extSelf->setArchetype(extSelfArchetype);
-    ext->getGenericParams()->setAllArchetypes(
-        SwiftContext.AllocateCopy(llvm::makeArrayRef(extSelfArchetype)));
 
     auto genericParam =
         extSelf->getDeclaredType()->castTo<GenericTypeParamType>();
@@ -6919,8 +6997,17 @@ ClangImporter::Implementation::importDeclContextOf(
         Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
         Requirement(RequirementKind::Conformance, genericParam,
                     protoDecl->getDeclaredType())};
-    auto sig = GenericSignature::get(genericParam, genericRequirements);
+    auto *sig = GenericSignature::get(genericParam, genericRequirements);
     ext->setGenericSignature(sig);
+
+    TypeSubstitutionMap interfaceToArchetypeMap;
+
+    auto paramTy = extSelf->getDeclaredType()->getCanonicalType();
+    interfaceToArchetypeMap[paramTy.getPointer()] = extSelfArchetype;
+
+    auto *env =
+        GenericEnvironment::get(SwiftContext, interfaceToArchetypeMap);
+    ext->setGenericEnvironment(env);
   }
 
   // Add the extension to the nominal type.
@@ -7015,7 +7102,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   VarDecl *var = nullptr;
   if (ClangN) {
-    var = createDeclWithClangNode<VarDecl>(ClangN, isStatic, /*IsLet*/ false,
+    var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
+                                           isStatic, /*IsLet*/ false,
                                            SourceLoc(), name, type, dc);
   } else {
     var = new (SwiftContext)
@@ -7049,7 +7137,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setStatic(isStatic);
   func->setInterfaceType(getterType);
   func->setBodyResultType(type);
-  func->setAccessibility(Accessibility::Public);
+  func->setAccessibility(getOverridableAccessibility(dc));
 
   // If we're not done type checking, build the getter body.
   if (!hasFinishedTypeChecking()) {
@@ -7064,12 +7152,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, C);
       
-      // make a "(rawValue: <subexpr>)" tuple.
-      expr = TupleExpr::create(C, SourceLoc(), expr,
-                               C.Id_rawValue, SourceLoc(),
-                               SourceLoc(), /*trailingClosure*/false,
-                               /*implicit*/true);
-      expr = new (C) CallExpr(typeRef, expr, /*Implicit=*/true);
+      expr = CallExpr::createImplicit(C, typeRef, { expr }, { C.Id_rawValue });
       if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
         expr = new (C) ForceValueExpr(expr, SourceLoc());
       break;
@@ -7126,7 +7209,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
                       ClangNode ClangN) {
 
   // Create a new VarDecl with dummy type.
-  auto var = createDeclWithClangNode<VarDecl>(ClangN,
+  auto var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
                                               isStatic, /*IsLet*/ false,
                                               SourceLoc(), name, type, dc);
   markUnavailable(var, UnavailableMessage);

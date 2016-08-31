@@ -340,6 +340,10 @@ public:
                            bool SynthesizedExtensions,
                            Optional<StringRef> InterestedUSR) override;
 
+  void editorOpenTypeInterface(EditorConsumer &Consumer,
+                               ArrayRef<const char *> Args,
+                               StringRef TypeUSR) override;
+
   void editorOpenHeaderInterface(EditorConsumer &Consumer,
                                  StringRef Name,
                                  StringRef HeaderName,

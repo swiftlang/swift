@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -69,9 +69,9 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_TF20objc_blocks_bridging10callBlocks
 func callBlocks(_ x: Foo,
-  f: (Int) -> Int,
-  g: (String) -> String,
-  h: (String?) -> String?
+  f: @escaping (Int) -> Int,
+  g: @escaping (String) -> String,
+  h: @escaping (String?) -> String?
 ) -> (Int, String, String?, String?) {
   // CHECK: [[FOO:%.*]] =  class_method [volatile] %0 : $Foo, #Foo.foo!1.foreign
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
@@ -110,10 +110,10 @@ class Test: NSObject {
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CLOSURE]])
 // CHECK:         return [[RESULT]]
 
-func clearDraggingItemImageComponentsProvider(_ x: DraggingItem) {
+func clearDraggingItemImageComponentsProvider(_ x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPs9AnyObject___XFdCb__aGSqCSo7NSArray__
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaP___XFdCb__aGSqCSo7NSArray__
 // CHECK:         [[CONVERT:%.*]] = function_ref @_TFE10FoundationSa19_bridgeToObjectiveCfT_CSo7NSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[CONVERTED]]

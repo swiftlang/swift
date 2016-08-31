@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 class A {
@@ -9,7 +9,7 @@ class B : A {
 }
 
 func printA(_ v: A) { v.printA() }
-func printOpt<T>(_ subprint: (T) -> ()) -> (T?) -> () {
+func printOpt<T>(_ subprint: @escaping (T) -> ()) -> (T?) -> () {
   return { x in
     switch (x) {
     case .some(let y): print(".some(", terminator: ""); subprint(y); print(")", terminator: "")

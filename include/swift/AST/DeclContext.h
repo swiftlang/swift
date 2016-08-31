@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class GenericEnvironment;
   class ASTContext;
   class ASTWalker;
   class CanType;
@@ -284,14 +285,19 @@ public:
   /// type for non-type contexts.
   Type getDeclaredInterfaceType() const;
 
-  /// \brief Retrieve the innermost generic parameters introduced by this
-  /// context or one of its parent contexts, or null if this context is not
-  /// directly dependent on any generic parameters.
+  /// \brief Retrieve the innermost generic parameters of this context or any
+  /// of its parents.
+  ///
+  /// FIXME: Remove this
   GenericParamList *getGenericParamsOfContext() const;
 
-  /// \brief Retrieve the interface generic type parameters and requirements
-  /// exposed by this context.
+  /// \brief Retrieve the innermost generic signature of this context or any
+  /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;
+
+  /// \brief Retrieve the innermost archetypes of this context or any
+  /// of its parents.
+  GenericEnvironment *getGenericEnvironmentOfContext() const;
   
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
@@ -571,10 +577,6 @@ class IterableDeclContext {
   /// Lazy member loader context data.
   uint64_t LazyLoaderContextData = 0;
 
-  /// Global declarations that were synthesized on this declaration's behalf,
-  /// such as default operator definitions derived for protocol conformances.
-  ArrayRef<Decl*> DerivedGlobalDecls;
-
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -618,18 +620,6 @@ public:
 
   /// Load all of the members of this context.
   void loadAllMembers() const;
-
-  /// Retrieve global declarations that were synthesized on this
-  /// declaration's behalf.
-  ArrayRef<Decl *> getDerivedGlobalDecls() const {
-    return DerivedGlobalDecls;
-  }
-
-  /// Set global declarations that were synthesized on this
-  /// declaration's behalf.
-  void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
-    DerivedGlobalDecls = decls;
-  }
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);

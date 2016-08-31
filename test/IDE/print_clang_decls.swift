@@ -11,17 +11,17 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=TAG_DECLS_AND_TYPEDEFS -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=TAG_DECLS_AND_TYPEDEFS -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes.bits -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=nullability -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
@@ -86,10 +86,10 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSArray.  Bbb.{{$}}
 // FOUNDATION-NEXT: {{^}}class NSArray : NSObject {{{$}}
-// FOUNDATION-NEXT: subscript(idx: Int) -> AnyObject { get }
+// FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum RuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case mince{{$}}
@@ -97,13 +97,13 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct RuncingOptions : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
-// FOUNDATION-NEXT: {{^}}  static var none: RuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var enableMince: RuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var enableQuince: RuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var none: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableMince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
@@ -115,16 +115,16 @@
 // CTYPESBITS-NEXT: {{^}}var MY_INT: Int32 { get }{{$}}
 // CTYPESBITS-NOT: FooStruct1
 
-// CHECK-NULLABILITY: func getId1() -> AnyObject?
+// CHECK-NULLABILITY: func getId1() -> Any?
 // CHECK-NULLABILITY: var global_id: AnyObject?
 // CHECK-NULLABILITY: class SomeClass {
-// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> AnyObject{{$}}
-// CHECK-NULLABILITY:   func methodC() -> AnyObject?
-// CHECK-NULLABILITY:   var property: AnyObject?
+// CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> Any{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: (@escaping (Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: (@escaping (Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodC() -> Any?
+// CHECK-NULLABILITY:   var property: Any?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}
-// CHECK-NULLABILITY:   func optArrayMethod() -> [AnyObject]?
+// CHECK-NULLABILITY:   func optArrayMethod() -> [Any]?
 // CHECK-NULLABILITY: }
 // CHECK-NULLABILITY: func compare_classes(_ sc1: SomeClass, _ sc2: SomeClass, _ sc3: SomeClass!)

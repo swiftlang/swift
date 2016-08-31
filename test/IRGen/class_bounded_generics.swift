@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -126,14 +126,14 @@ func not_class_bounded_archetype<T : NotClassBound>(_ x: T) -> T {
 
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics44class_bounded_archetype_to_not_class_bounded{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound, i8** %T.NotClassBound) {{.*}} {
 func class_bounded_archetype_to_not_class_bounded
-<T:protocol<ClassBound, NotClassBound>>(_ x:T) -> T {
+<T: ClassBound & NotClassBound>(_ x:T) -> T {
   // CHECK: alloca %objc_object*, align 8
   return not_class_bounded_archetype(x)
 }
 
 /* TODO Abstraction remapping to non-class-bounded witnesses
 func class_and_not_class_bounded_archetype_methods
-<T:protocol<ClassBound, NotClassBound>>(_ x:T, y:T) {
+<T: ClassBound & NotClassBound>(_ x:T, y:T) {
   x.classBoundMethod()
   x.classBoundBinaryMethod(y)
   x.notClassBoundMethod()
@@ -182,34 +182,34 @@ func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
-func class_bounded_protocol_conversion_1(_ x: protocol<ClassBound, ClassBound2>)
+func class_bounded_protocol_conversion_1(_ x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
 }
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics35class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**, i8**) {{.*}} {
-func class_bounded_protocol_conversion_2(_ x: protocol<ClassBound, ClassBound2>)
+func class_bounded_protocol_conversion_2(_ x: ClassBound & ClassBound2)
 -> ClassBound2 {
   return x
 }
 
 // CHECK-LABEL: define hidden { %objc_object*, i8** } @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_1
-(_ x:protocol<ClassBound, ObjCClassBound>) -> ClassBound {
+(_ x: ClassBound & ObjCClassBound) -> ClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*, i8**) {{.*}} {
 func objc_class_bounded_protocol_conversion_2
-(_ x:protocol<ClassBound, ObjCClassBound>) -> ObjCClassBound {
+(_ x: ClassBound & ObjCClassBound) -> ObjCClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*)
 func objc_class_bounded_protocol_conversion_3
-(_ x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound {
+(_ x: ObjCClassBound & ObjCClassBound2) -> ObjCClassBound {
   return x
 }
 // CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics40objc_class_bounded_protocol_conversion{{.*}}(%objc_object*)
 func objc_class_bounded_protocol_conversion_4
-(_ x:protocol<ObjCClassBound, ObjCClassBound2>) -> ObjCClassBound2 {
+(_ x: ObjCClassBound & ObjCClassBound2) -> ObjCClassBound2 {
   return x
 }
 
@@ -255,7 +255,7 @@ class SomeSwiftClass {
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 10
 // CHECK-NEXT: load void (%swift.type*)*, void (%swift.type*)** [[T3]], align 8
 func class_bounded_metatype<T: SomeSwiftClass>(_ t : T) {
-  t.dynamicType.foo()
+  type(of: t).foo()
 }
 
 class WeakRef<T: AnyObject> {

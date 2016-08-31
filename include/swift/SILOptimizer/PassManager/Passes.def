@@ -81,6 +81,8 @@ PASS(RedundantOverflowCheckRemoval, "remove-redundant-overflow-checks",
      "Removes redundant overflow checks")
 PASS(DCE, "dce",
      "Eliminate dead code")
+PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
+     "Create function with removed dead arguments")
 PASS(DeadFunctionElimination, "sil-deadfuncelim",
      "Remove unused functions")
 PASS(DeadObjectElimination, "deadobject-elim",
@@ -169,6 +171,9 @@ PASS(LSLocationPrinter, "lslocation-dump",
      "Dump LSLocation results from analyzing all accessed locations")
 PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
+PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
+     "Test pass that hoists conditional fails to predecessors blocks when "
+     "profitable")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
 PASS(RCIdentityDumper, "rc-id-dumper",

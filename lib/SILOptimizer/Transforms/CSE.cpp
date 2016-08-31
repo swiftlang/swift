@@ -358,7 +358,7 @@ public:
                               X->getMember().getHashCode(),
                               X->getConformance(),
                               X->getType(),
-                              !X->getOpenedArchetypeOperands().empty(),
+                              !X->getTypeDependentOperands().empty(),
                               llvm::hash_combine_range(
                               Operands.begin(),
                               Operands.end()));
@@ -645,7 +645,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
     auto User = Use->getUser();
-    if (User->mayHaveOpenedArchetypeOperands()) {
+    if (!User->getTypeDependentOperands().empty()) {
       if (canHandle(User)) {
         auto It = AvailableValues->begin(User);
         if (It != AvailableValues->end()) {
@@ -673,7 +673,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   SILOpenedArchetypesTracker OpenedArchetypesTracker(*Inst->getFunction());
   // Register the new archetype to be used.
   OpenedArchetypesTracker.registerOpenedArchetypes(dyn_cast<SILInstruction>(V));
-  // Use a cloner. It makes copying the instruction and remaping of
+  // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(I->getFunction());
   Cloner.registerOpenedExistentialRemapping(
@@ -685,7 +685,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // by a dominating one.
   for (auto Candidate : Candidates) {
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        Candidate->getOpenedArchetypeOperands());
+        Candidate->getTypeDependentOperands());
     Builder.setInsertionPoint(Candidate);
     auto NewI = Cloner.clone(Candidate);
     Candidate->replaceAllUsesWith(NewI);
@@ -744,7 +744,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
       // Instructions producing a new opened archetype need a special handling,
-      // because replacing these intructions may require a replacement
+      // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
       if (!isa<OpenExistentialRefInst>(Inst) ||
           processOpenExistentialRef(Inst, V, I)) {
@@ -884,7 +884,7 @@ static ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
   for (auto *UI : getNonDebugUses(OE)) {
     auto *User = UI->getUser();
     if (!isa<WitnessMethodInst>(User) &&
-        User->isOpenedArchetypeOperand(UI->getOperandNumber()))
+        User->isTypeDependentOperand(UI->getOperandNumber()))
       continue;
     // Check that we have a single Apply user.
     if (auto *AA = dyn_cast<ApplyInst>(User)) {

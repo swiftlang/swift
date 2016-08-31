@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 
 sil_stage canonical
 
@@ -124,10 +124,9 @@ bb2:
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil @exit : $@convention(thin) @noreturn () -> () {
+sil @exit : $@convention(thin) () -> Never {
 bb0:
-  %1 = tuple ()
-  return %1 : $()
+  br bb0
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
@@ -147,8 +146,8 @@ bb0(%0 : $B):
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
   %8 = strong_release %1 : $@box B
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -164,8 +163,8 @@ bb0(%0: $B, %1: $Builtin.Int1):
 bb1:
   %22 = br bb2
 bb2:
-  %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
-  %10 = apply %9() : $@convention(thin) @noreturn () -> ()
+  %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
+  %10 = apply %9() : $@convention(thin) () -> Never
   unreachable
 }
 
@@ -826,23 +825,6 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32, %2 : $@callee_owned (Builtin.Int3
   %5 = tuple ()
   // CHECK: return
   return %5 : $()
-}
-
-//CHECK-LABEL: remove_init_ex
-//CHECK: alloc_stack $Bool
-//CHECK-NOT: init_existential_addr
-//CHECK: return
-sil @remove_init_ex : $@convention(thin) (Int) -> () {
-bb0(%0 : $Int):
-  %1 = alloc_stack $Boolean
-  %2 = init_existential_addr %1 : $*Boolean, $Bool
-  %3 = integer_literal $Builtin.Int1, 1
-  %4 = struct $Bool (%3 : $Builtin.Int1)
-  store %4 to %2 : $*Bool
-  destroy_addr %1 : $*Boolean
-  dealloc_stack %1 : $*Boolean
-  %8 = tuple ()
-  return %8 : $()
 }
 
 // CHECK-LABEL: sil @generic_is_objc
@@ -2757,8 +2739,8 @@ bb0(%0 : $Int, %1 : $Double):
   cond_br undef, bb1, bb2
 
 bb1:
-  %f2 = function_ref @noreturn_func : $@convention(thin) @noreturn () -> ()
-  %a2 = apply %f2() : $@convention(thin) @noreturn () -> ()
+  %f2 = function_ref @noreturn_func : $@convention(thin) () -> Never
+  %a2 = apply %f2() : $@convention(thin) () -> Never
   unreachable
 
 bb2:
@@ -2768,7 +2750,7 @@ bb2:
 }
 
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
-sil @noreturn_func : $@convention(thin) @noreturn () -> ()
+sil @noreturn_func : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil @remove_destroy_array
 // CHECK-NOT: destroyArray

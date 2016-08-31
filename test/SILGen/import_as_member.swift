@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s 2>&1 | FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s 2>&1 | %FileCheck --check-prefix=SIL %s
 // REQUIRES: objc_interop
 import ImportAsMember.A
-import ImportAsMember.Proto
 import ImportAsMember.Class
 
 public func returnGlobalVar() -> Double {
@@ -12,14 +11,6 @@ public func returnGlobalVar() -> Double {
 // SIL:   %2 = load %0 : $*Double
 // SIL:   return %2 : $Double
 // SIL-NEXT: }
-
-// SIL-LABEL: sil {{.*}}useProto{{.*}} (@owned IAMProto) -> () {
-// TODO: Add in body checks
-public func useProto(p: IAMProto) {
-	p.mutateSomeState()
-	let v = p.someValue
-	p.someValue = v+1
-}
 
 // SIL-LABEL: sil {{.*}}anchor{{.*}} () -> () {
 func anchor() {}

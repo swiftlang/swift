@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift -parse-stdlib
 
+precedencegroup AssignmentPrecedence { assignment: true }
+
 var word: Builtin.Word
 var i16: Builtin.Int16
 var i32: Builtin.Int32

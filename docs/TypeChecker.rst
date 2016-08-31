@@ -608,7 +608,7 @@ types formed by the conversion relationship, e.g., there is an edge
 ``A -> B`` in the latter if ``A`` is convertible to ``B``. ``B`` would
 therefore be higher in the lattice than ``A``, and the topmost element
 of the lattice is the element to which all types can be converted,
-``protocol<>`` (often called "top"). 
+``Any`` (often called "top").
 
 The concrete types "above" and "below" a given type variable provide
 bounds on the possible concrete types that can be assigned to that

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 import Swift
@@ -20,7 +20,7 @@ a.value.name = "DaveA"
 a.value.locations.append("Princeton")
 a.value.locations.append("San Jose")
 for x in 0..<10 {
-  (a.baseAddress + x).initialize(with: x)
+  (a.baseAddress + x).initialize(to: x)
 }
 
 print("buffer has storage: \(a.storage != nil)")

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
-// REQUIRES: rdar24878556
 
 // REQUIRES: CPU=x86_64
 

@@ -1,10 +1,10 @@
 // RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
-// RUN: FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
-// RUN: FileCheck -check-prefix=SYMBOL %s < %t.sil
+// RUN: %FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
+// RUN: %FileCheck -check-prefix=SYMBOL %s < %t.sil
 
 // RUN: %target-swift-frontend -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
-// RUN: FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
-// RUN: FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
+// RUN: %FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
+// RUN: %FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 
 import witness_tables_b
 

@@ -4,10 +4,14 @@ else()
   set(SOURCEKITD_TEST_DEPEND sourcekitd)
 endif()
 
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  set(SOURCEKITD_TEST_DEPEND ${SOURCEKITD_TEST_DEPEND} dispatch swiftCore)
+endif()
+
 add_sourcekit_executable(complete-test
   complete-test.cpp
   DEPENDS ${SOURCEKITD_TEST_DEPEND}
-  COMPONENT_DEPENDS support option
+  LLVM_COMPONENT_DEPENDS support option
 )
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

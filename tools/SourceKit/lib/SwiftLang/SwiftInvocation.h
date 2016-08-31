@@ -26,7 +26,7 @@ namespace SourceKit {
 
 /// Encompasses an invocation for getting an AST. This is used to control AST
 /// sharing among different requests.
-class SwiftInvocation : public swift::ThreadSafeRefCountedBase<SwiftInvocation> {
+class SwiftInvocation : public llvm::ThreadSafeRefCountedBase<SwiftInvocation> {
 public:
   ~SwiftInvocation();
 

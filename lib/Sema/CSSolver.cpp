@@ -20,6 +20,8 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
+#include <stack>
+#include <queue>
 using namespace swift;
 using namespace constraints;
 
@@ -47,7 +49,8 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 ///
 /// \returns the type to bind to, if the binding is okay.
 static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs, 
-                                         TypeVariableType *typeVar, Type type) {
+                                         TypeVariableType *typeVar, Type type,
+                                         bool *isNilLiteral = nullptr) {
   if (!type)
     return None;
 
@@ -63,8 +66,15 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   // If the type is a type variable itself, don't permit the binding.
   // FIXME: This is a hack. We need to be smarter about whether there's enough
   // structure in the type to produce an interesting binding, or not.
-  if (type->getRValueType()->is<TypeVariableType>())
+  if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
+    if (isNilLiteral &&
+        bindingTypeVar->getImpl().literalConformanceProto &&
+        bindingTypeVar->getImpl().literalConformanceProto->isSpecificProtocol(
+          KnownProtocolKind::ExpressibleByNilLiteral))
+      *isNilLiteral = true;
+    
     return None;
+  }
 
   // Okay, allow the binding (with the simplified type).
   return type;
@@ -191,6 +201,10 @@ Solution ConstraintSystem::finalize(
     solution.OpenedExistentialTypes.insert(openedExistential);
   }
 
+  // Remember the defaulted type variables.
+  solution.DefaultedTypeVariables.insert(DefaultedTypeVariables.begin(),
+                                         DefaultedTypeVariables.end());
+
   return solution;
 }
 
@@ -247,6 +261,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     OpenedExistentialTypes.push_back(openedExistential);
   }
 
+  // Register the defaulted type variables.
+  DefaultedTypeVariables.append(solution.DefaultedTypeVariables.begin(),
+                                solution.DefaultedTypeVariables.end());
+
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 }
@@ -286,16 +304,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     }
   }
 
-  if (auto functionTy = type->getAs<FunctionType>()) {
-    // FIXME: Can weaken input type, but we really don't want to get in the
-    // business of strengthening the result type.
-
-    // An @autoclosure function type can be viewed as scalar of the result
-    // type.
-    if (functionTy->isAutoClosure())
-      result.push_back(functionTy->getResult());
-  }
-
   if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
@@ -310,10 +318,6 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
     result.push_back(lvalue->getObjectType());
   if (auto iot = type->getAs<InOutType>())
     result.push_back(iot->getObjectType());
-
-  // Try to unwrap implicitly unwrapped optional types.
-  if (auto objectType = type->getImplicitlyUnwrappedOptionalObjectType())
-    result.push_back(objectType);
 
   // FIXME: lots of other cases to consider!
   return result;
@@ -445,6 +449,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
+  numDefaultedTypeVariables = cs.DefaultedTypeVariables.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -501,6 +506,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
+  // Remove any defaulted type variables.
+  truncate(cs.DefaultedTypeVariables, numDefaultedTypeVariables);
+  
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
 
@@ -523,6 +531,7 @@ namespace {
   enum class LiteralBindingKind : unsigned char {
     None,
     Collection,
+    Float,
     Atom,
   };
 
@@ -537,7 +546,16 @@ namespace {
     AllowedBindingKind Kind;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;    
+    Optional<ProtocolDecl *> DefaultedProtocol;
+
+    /// Whether this is a binding that comes from a 'Defaultable' constraint.
+    bool IsDefaultableBinding = false;
+
+    PotentialBinding(Type type, AllowedBindingKind kind,
+                     Optional<ProtocolDecl *> defaultedProtocol = None,
+                     bool isDefaultableBinding = false)
+      : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
+        IsDefaultableBinding(isDefaultableBinding) { }
   };
 
   struct PotentialBindings {
@@ -556,25 +574,35 @@ namespace {
     /// Whether this type variable is only bound above by existential types.
     bool SubtypeOfExistentialType = false;
 
+    /// The number of defaultable bindings.
+    unsigned NumDefaultableBindings = 0;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
       return !Bindings.empty();
+    }
+
+    /// Whether there are any non-defaultable bindings.
+    bool hasNonDefaultableBindings() const {
+      return Bindings.size() > NumDefaultableBindings;
     }
 
     /// Compare two sets of bindings, where \c x < y indicates that
     /// \c x is a better set of bindings that \c y.
     friend bool operator<(const PotentialBindings &x, 
                           const PotentialBindings &y) {
-      return std::make_tuple(x.FullyBound,
+      return std::make_tuple(!x.hasNonDefaultableBindings(),
+                             x.FullyBound,
                              x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
-                             -x.Bindings.size())
-        < std::make_tuple(y.FullyBound,
+                             -(x.Bindings.size() - x.NumDefaultableBindings))
+        < std::make_tuple(!y.hasNonDefaultableBindings(),
+                          y.FullyBound,
                           y.SubtypeOfExistentialType,
                           static_cast<unsigned char>(y.LiteralBinding),
                           y.InvolvesTypeVariables,
-                          -y.Bindings.size());
+                          -(y.Bindings.size() - y.NumDefaultableBindings));
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -583,6 +611,10 @@ namespace {
       case KnownProtocolKind::ExpressibleByArrayLiteral:
       case KnownProtocolKind::ExpressibleByStringInterpolation:
         LiteralBinding = LiteralBindingKind::Collection;
+        break;
+
+      case KnownProtocolKind::ExpressibleByFloatLiteral:
+        LiteralBinding = LiteralBindingKind::Float;
         break;
 
       default:
@@ -646,7 +678,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::TypeMember:
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
@@ -668,11 +699,44 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
   cs.getConstraintGraph().gatherConstraints(typeVar, constraints);
 
-  // Consider each of the constraints related to this type variable.
   PotentialBindings result;
+  Optional<unsigned> lastSupertypeIndex;
+
+  // Local function to add a potential binding to the list of bindings,
+  // coalescing supertype bounds when we are able to compute the meet.
+  auto addPotentialBinding = [&](PotentialBinding binding,
+                                 bool allowJoinMeet = true) {
+    // If this is a non-defaulted supertype binding, check whether we can
+    // combine it with another supertype binding by computing the 'join' of the
+    // types.
+    if (binding.Kind == AllowedBindingKind::Supertypes &&
+        !binding.BindingType->hasTypeVariable() &&
+        !binding.DefaultedProtocol &&
+        !binding.IsDefaultableBinding &&
+        allowJoinMeet) {
+      if (lastSupertypeIndex) {
+        // Can we compute a join?
+        auto &lastBinding = result.Bindings[*lastSupertypeIndex];
+        if (auto meet =
+                Type::join(lastBinding.BindingType, binding.BindingType)) {
+          // Replace the last supertype binding with the join. We're done.
+          lastBinding.BindingType = meet;
+          return;
+        }
+      }
+
+      // Record this as the most recent supertype index.
+      lastSupertypeIndex = result.Bindings.size();
+    }
+
+    result.Bindings.push_back(std::move(binding));
+  };
+
+  // Consider each of the constraints related to this type variable.
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
-  bool hasDefaultableConstraint = false;
+  SmallVector<Constraint *, 2> defaultableConstraints;
+  bool addOptionalSupertypeBindings = false;
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
@@ -702,14 +766,13 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
-    case ConstraintKind::BridgedToObjectiveC:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;
 
     case ConstraintKind::Defaultable:
       // Do these in a separate pass.
-      hasDefaultableConstraint = true;
+      defaultableConstraints.push_back(constraint);
       continue;
 
     case ConstraintKind::Disjunction:
@@ -743,8 +806,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
           continue;
 
         result.foundLiteralBinding(constraint->getProtocol());
-        result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getProtocol()});
+        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getProtocol()});
         continue;
       }
 
@@ -770,8 +833,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (!matched) {
         result.foundLiteralBinding(constraint->getProtocol());
         exactTypes.insert(defaultType->getCanonicalType());
-        result.Bindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getProtocol()});
+        addPotentialBinding({defaultType, AllowedBindingKind::Subtypes,
+                             constraint->getProtocol()});
       }
 
       continue;
@@ -851,11 +914,18 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     // Check whether we can perform this binding.
     // FIXME: this has a super-inefficient extraneous simplifyType() in it.
-    if (auto boundType = checkTypeOfBinding(cs, typeVar, type)) {
+    bool isNilLiteral = false;
+    if (auto boundType = checkTypeOfBinding(cs, typeVar, type, &isNilLiteral)) {
       type = *boundType;
       if (type->hasTypeVariable())
         result.InvolvesTypeVariables = true;
     } else {
+      // If the bound is a 'nil' literal type, add optional supertype bindings.
+      if (isNilLiteral && kind == AllowedBindingKind::Supertypes) {
+        addOptionalSupertypeBindings = true;
+        continue;
+      }
+
       result.InvolvesTypeVariables = true;
       continue;
     }
@@ -911,10 +981,10 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
-      result.Bindings.push_back({type, kind, None});
+      addPotentialBinding({type, kind, None});
     if (alternateType &&
         exactTypes.insert(alternateType->getCanonicalType()).second)
-      result.Bindings.push_back({alternateType, kind, None});
+      addPotentialBinding({alternateType, kind, None}, /*allowJoinMeet=*/false);
   }
 
   // If we have any literal constraints, check whether there is already a
@@ -985,17 +1055,14 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     }
   }
 
-  // If we haven't found any other bindings yet, go ahead and consider
-  // the defaulting constraints.
-  if (result.Bindings.empty() && hasDefaultableConstraint) {
-    for (Constraint *constraint : constraints) {
-      if (constraint->getKind() != ConstraintKind::Defaultable)
-        continue;
+  /// Add defaultable constraints last.
+  for (auto constraint : defaultableConstraints) {
+    Type type = constraint->getSecondType();
+    if (!exactTypes.insert(type->getCanonicalType()).second)
+      continue;
 
-      result.Bindings.push_back({constraint->getSecondType(),
-                                 AllowedBindingKind::Exact,
-                                 None});
-    }
+    ++result.NumDefaultableBindings;
+    addPotentialBinding({type, AllowedBindingKind::Exact, None, true});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1008,22 +1075,31 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
                          binding.Kind == AllowedBindingKind::Subtypes;
                 });
 
-  return result;
-}
+  // If we're supposed to add optional supertype bindings, do so now.
+  if (addOptionalSupertypeBindings) {
+    for (unsigned i : indices(result.Bindings)) {
+      // Only interested in supertype bindings.
+      auto &binding = result.Bindings[i];
+      if (binding.Kind != AllowedBindingKind::Supertypes) continue;
 
-void ConstraintSystem::getComputedBindings(TypeVariableType *tvt,
-                                               SmallVectorImpl<Type> &bindings) {
-  // If the type variable is fixed, look no further.
-  if (auto fixedType = tvt->getImpl().getFixedType(nullptr)) {
-    bindings.push_back(fixedType);
-    return;
+      // If the type doesn't conform to ExpressibleByNilLiteral,
+      // produce an optional of that type as a potential binding. We
+      // overwrite the binding in place because the non-optional type
+      // will fail to type-check against the nil-literal conformance.
+      auto nominalBindingDecl = binding.BindingType->getAnyNominal();
+      if (!nominalBindingDecl) continue;
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (!nominalBindingDecl->lookupConformance(
+            cs.DC->getParentModule(),
+            cs.getASTContext().getProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral),
+            conformances)) {
+        binding.BindingType = OptionalType::get(binding.BindingType);
+      }
+    }
   }
-  
-  PotentialBindings potentialBindings = getPotentialBindings(*this, tvt);
-  
-  for (auto binding : potentialBindings.Bindings) {
-    bindings.push_back(binding.BindingType);
-  }
+
+  return result;
 }
 
 /// \brief Try each of the given type variable bindings to find solutions
@@ -1077,7 +1153,12 @@ static bool tryTypeVariableBindings(
       log <<"\n";
     }
 
-    for (auto binding : bindings) {
+    for (const auto &binding : bindings) {
+      // If this is a defaultable binding and we have found any solutions,
+      // don't explore the default binding.
+      if (binding.IsDefaultableBinding && anySolved)
+        continue;
+
       auto type = binding.BindingType;
 
       // If the type variable can't bind to an lvalue, make sure the
@@ -1141,6 +1222,12 @@ static bool tryTypeVariableBindings(
                        typeVar,
                        type,
                        typeVar->getImpl().getLocator());
+
+      // If this was from a defaultable binding note that.
+      if (binding.IsDefaultableBinding) {
+        cs.DefaultedTypeVariables.push_back(typeVar);
+      }
+
       if (!cs.solveRec(solutions, allowFreeTypeVariables))
         anySolved = true;
 
@@ -1248,6 +1335,349 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
   return std::move(solutions[0]);
 }
 
+bool ConstraintSystem::Candidate::solve() {
+  // Cleanup after constraint system generation/solving,
+  // because it would assign types to expressions, which
+  // might interfere with solving higher-level expressions.
+  ExprCleaner cleaner(E);
+
+  // Allocate new constraint system for sub-expression.
+  ConstraintSystem cs(TC, DC, None);
+
+  // Set contextual type if present. This is done before constraint generation
+  // to give a "hint" to that operation about possible optimizations.
+  auto CT = IsPrimary ? CS.getContextualType() : CS.getContextualType(E);
+  if (!CT.isNull())
+    cs.setContextualType(E, CS.getContextualTypeLoc(),
+                         CS.getContextualTypePurpose());
+
+  // Generate constraints for the new system.
+  if (auto generatedExpr = cs.generateConstraints(E)) {
+    E = generatedExpr;
+  } else {
+    // Failure to generate constraint system for sub-expression means we can't
+    // continue solving sub-expressions.
+    return true;
+  }
+
+  // If there is contextual type present, add an explicit "conversion"
+  // constraint to the system.
+  if (!CT.isNull()) {
+    auto constraintKind = ConstraintKind::Conversion;
+    if (CS.getContextualTypePurpose() == CTP_CallArgument)
+      constraintKind = ConstraintKind::ArgumentConversion;
+
+    cs.addConstraint(constraintKind, E->getType(), CT,
+                     cs.getConstraintLocator(E), /*isFavored=*/true);
+  }
+
+  // Try to solve the system and record all available solutions.
+  llvm::SmallVector<Solution, 2> solutions;
+  {
+    SolverState state(cs);
+    cs.solverState = &state;
+
+    // Use solveRec() instead of solve() in here, because solve()
+    // would try to deduce the best solution, which we don't
+    // really want. Instead, we want the reduced set of domain choices.
+    cs.solveRec(solutions, FreeTypeVariableBinding::Allow);
+
+    cs.solverState = nullptr;
+  }
+
+  // No solutions for the sub-expression means that either main expression
+  // needs salvaging or it's inconsistent (read: doesn't have solutions).
+  if (solutions.empty())
+    return true;
+
+  // Record found solutions as suggestions.
+  this->applySolutions(solutions);
+  return false;
+}
+
+void ConstraintSystem::Candidate::applySolutions(
+                            llvm::SmallVectorImpl<Solution> &solutions) const {
+  // A collection of OSRs with their newly reduced domains,
+  // it's domains are sets because multiple solutions can have the same
+  // choice for one of the type variables, and we want no duplication.
+  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSet<ValueDecl *, 2>>
+    domains;
+  for (auto &solution : solutions) {
+    for (auto choice : solution.overloadChoices) {
+      // Some of the choices might not have locators.
+      if (!choice.getFirst())
+        continue;
+
+      auto anchor = choice.getFirst()->getAnchor();
+      // Anchor is not available or expression is not an overload set.
+      if (!anchor || !isa<OverloadSetRefExpr>(anchor))
+        continue;
+
+      auto OSR = cast<OverloadSetRefExpr>(anchor);
+      auto overload = choice.getSecond().choice;
+      auto type = overload.getDecl()->getInterfaceType();
+
+      // One of the solutions has polymorphic type assigned with one of it's
+      // type variables. Such functions can only be properly resolved
+      // via complete expression, so we'll have to forget solutions
+      // we have already recorded. They might not include all viable overload
+      // choices.
+      if (type->is<GenericFunctionType>()) {
+        return;
+      }
+
+      domains[OSR].insert(overload.getDecl());
+    }
+  }
+
+  // Reduce the domains.
+  for (auto &domain : domains) {
+    auto OSR = domain.getFirst();
+    auto &choices = domain.getSecond();
+
+    // If the domain wasn't reduced, skip it.
+    if (OSR->getDecls().size() == choices.size()) continue;
+
+    // Update the expression with the reduced domain.
+    MutableArrayRef<ValueDecl *> decls
+      = TC.Context.AllocateUninitialized<ValueDecl *>(choices.size());
+    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
+    OSR->setDecls(decls);
+  }
+}
+
+void ConstraintSystem::shrink(Expr *expr) {
+  typedef llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>> DomainMap;
+
+  // A collection of original domains of all of the expressions,
+  // so they can be restored in case of failure.
+  DomainMap domains;
+
+  struct ExprCollector : public ASTWalker {
+    Expr *PrimaryExpr;
+
+    // The primary constraint system.
+    ConstraintSystem &CS;
+
+    // All of the sub-expressions of certain type (binary/unary/calls) in
+    // depth-first order.
+    std::queue<Candidate> &SubExprs;
+
+    // Counts the number of overload sets present in the tree so far.
+    // Note that the traversal is depth-first.
+    std::stack<std::pair<ApplyExpr *, unsigned>,
+               llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4>>
+      ApplyExprs;
+
+    // A collection of original domains of all of the expressions,
+    // so they can be restored in case of failure.
+    DomainMap &Domains;
+
+    ExprCollector(Expr *expr, ConstraintSystem &cs,
+                  std::queue<Candidate> &container, DomainMap &domains)
+        : PrimaryExpr(expr), CS(cs), SubExprs(container), Domains(domains) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // A dictionary expression is just a set of tuples; try to solve ones
+      // that have overload sets.
+      if (auto dictionaryExpr = dyn_cast<DictionaryExpr>(expr)) {
+        bool isPrimaryExpr = expr == PrimaryExpr;
+        for (auto element : dictionaryExpr->getElements()) {
+          unsigned numOverlaods = 0;
+          element->walk(OverloadSetCounter(numOverlaods));
+
+          // There are no overload sets in the element; skip it.
+          if (numOverlaods == 0)
+            continue;
+
+          // FIXME: Could we avoid creating a separate dictionary expression
+          // here by introducing a contextual type on the element?
+          auto dict = DictionaryExpr::create(CS.getASTContext(),
+                                             dictionaryExpr->getLBracketLoc(),
+                                             { element },
+                                             dictionaryExpr->getRBracketLoc(),
+                                             dictionaryExpr->getType());
+
+          // Make each of the dictionary elements an independent dictionary,
+          // such makes it easy to type-check everything separately.
+          SubExprs.push(Candidate(CS, dict, isPrimaryExpr));
+        }
+
+        // Don't try to walk into the dictionary.
+        return { false, expr };
+      }
+
+      // Consider all of the collections to be candidates,
+      // FIXME: try to split collections into parts for simplified solving.
+      if (isa<CollectionExpr>(expr)) {
+        SubExprs.push(Candidate(CS, expr, false));
+        return {false, expr};
+      }
+
+      // Let's not attempt to type-check closures or default values,
+      // which has already been type checked anyway.
+      if (isa<ClosureExpr>(expr) || isa<DefaultValueExpr>(expr)) {
+        return { false, expr };
+      }
+
+      // Coerce to type expressions are only viable if they have
+      // a single child expression.
+      if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+        if (!coerceExpr->getSubExpr()) {
+          return { false, expr };
+        }
+      }
+
+      if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {
+        Domains[OSR] = OSR->getDecls();
+      }
+
+      if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
+        auto func = applyExpr->getFn();
+        // Let's record this function application for post-processing
+        // as well as if it contains overload set, see walkToExprPost.
+        ApplyExprs.push({ applyExpr, isa<OverloadSetRefExpr>(func) });
+      }
+
+      return { true, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      // If there are sub-expressions to consider and
+      // contextual type is involved, let's add top-most expression
+      // to the queue just to make sure that we didn't miss any solutions.
+      if (expr == PrimaryExpr && !SubExprs.empty()) {
+        if (!CS.getContextualType().isNull()) {
+          SubExprs.push(Candidate(CS, expr, true));
+          return expr;
+        }
+      }
+
+      if (!isa<ApplyExpr>(expr))
+        return expr;
+
+      unsigned numOverloadSets = 0;
+      // Let's count how many overload sets do we have.
+      while (!ApplyExprs.empty()) {
+        auto application = ApplyExprs.top();
+        auto applyExpr = application.first;
+
+        // Add overload sets tracked by current expression.
+        numOverloadSets += application.second;
+        ApplyExprs.pop();
+
+        // We've found the current expression, so record the number of
+        // overloads.
+        if (expr == applyExpr) {
+          ApplyExprs.push({ applyExpr, numOverloadSets });
+          break;
+        }
+      }
+
+      // If there are fewer than two overloads in the chain
+      // there is no point of solving this expression,
+      // because we won't be able to reduce it's domain.
+      if (numOverloadSets > 1)
+        SubExprs.push(Candidate(CS, expr, expr == PrimaryExpr));
+
+      return expr;
+    }
+  };
+
+  std::queue<Candidate> expressions;
+  ExprCollector collector(expr, *this, expressions, domains);
+
+  // Collect all of the binary/unary and call sub-expressions
+  // so we can start solving them separately.
+  expr->walk(collector);
+
+  while (!expressions.empty()) {
+    auto &candidate = expressions.front();
+
+    // If there are no results, let's forget everything we know about the
+    // system so far. This actually is ok, because some of the expressions
+    // might require manual salvaging.
+    if (candidate.solve()) {
+      // Let's restore all of the original OSR domains for this sub-expression,
+      // this means that we can still make forward progress with solving of the
+      // top sub-expressions.
+      candidate.getExpr()->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        if (auto OSR = dyn_cast<OverloadSetRefExpr>(childExpr)) {
+          auto domain = domains.find(OSR);
+          if (domain == domains.end())
+            return childExpr;
+
+          OSR->setDecls(domain->getSecond());
+        }
+
+        return childExpr;
+      });
+    }
+
+    expressions.pop();
+  }
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::solve(Expr *&expr,
+                        Type convertType,
+                        ExprTypeCheckListener *listener,
+                        SmallVectorImpl<Solution> &solutions,
+                        FreeTypeVariableBinding allowFreeTypeVariables) {
+  assert(!solverState && "use solveRec for recursive calls");
+
+  // Try to shrink the system by reducing disjunction domains. This
+  // goes through every sub-expression and generate it's own sub-system, to
+  // try to reduce the domains of those subexpressions.
+  shrink(expr);
+
+  // Generate constraints for the main system.
+  if (auto generatedExpr = generateConstraints(expr))
+    expr = generatedExpr;
+  else {
+    return SolutionKind::Error;
+  }
+
+  // If there is a type that we're expected to convert to, add the conversion
+  // constraint.
+  if (convertType) {
+    auto constraintKind = ConstraintKind::Conversion;
+    if (getContextualTypePurpose() == CTP_CallArgument)
+      constraintKind = ConstraintKind::ArgumentConversion;
+
+    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
+      convertType = convertType.transform([&](Type type) -> Type {
+        if (type->is<UnresolvedType>())
+          return createTypeVariable(getConstraintLocator(expr), 0);
+        return type;
+      });
+    }
+
+    addConstraint(constraintKind, expr->getType(), convertType,
+                  getConstraintLocator(expr), /*isFavored*/ true);
+  }
+
+  // Notify the listener that we've built the constraint system.
+  if (listener && listener->builtConstraints(*this, expr)) {
+    return SolutionKind::Error;
+  }
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    log << "---Initial constraints for the given expression---\n";
+    expr->print(log);
+    log << "\n";
+    print(log);
+  }
+
+  // Try to solve the constraint system using computed suggestions.
+  solve(solutions, allowFreeTypeVariables);
+
+  // If there are no solutions let's mark system as unsolved,
+  // and solved otherwise even if there are multiple solutions still present.
+  return solutions.empty() ? SolutionKind::Unsolved : SolutionKind::Solved;
+}
+
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   assert(!solverState && "use solveRec for recursive calls");
@@ -1271,7 +1701,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Remove the solver state.
   this->solverState = nullptr;
-  
+
   // We fail if there is no solution.
   return solutions.empty();
 }

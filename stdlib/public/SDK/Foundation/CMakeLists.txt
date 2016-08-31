@@ -7,6 +7,9 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   ExtraStringAPIs.swift
   ReferenceConvertible.swift
   AffineTransform.swift
+  Calendar.swift
+  TimeZone.swift
+  Locale.swift
   CharacterSet.swift
   Date.swift
   DateComponents.swift
@@ -21,19 +24,20 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   IndexSetThunks.m
   Measurement.swift
   Notification.swift
-  NotificationThunks.m
   NSStringEncodings.swift
   PersonNameComponents.swift
+  TypePreservingNSNumber.mm
   URL.swift
   URLComponents.swift
   URLRequest.swift
   UUID.swift
-  UserInfo.swift
   Hashing.swift
   Hashing.m
   Thunks.mm
 
-  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch os
   SWIFT_MODULE_DEPENDS_OSX XPC
   FRAMEWORK_DEPENDS Foundation)
 

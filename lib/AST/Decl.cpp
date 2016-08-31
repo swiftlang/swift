@@ -102,6 +102,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(TopLevelCode);
   TRIVIAL_KIND(IfConfig);
   TRIVIAL_KIND(PatternBinding);
+  TRIVIAL_KIND(PrecedenceGroup);
   TRIVIAL_KIND(InfixOperator);
   TRIVIAL_KIND(PrefixOperator);
   TRIVIAL_KIND(PostfixOperator);
@@ -217,6 +218,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(StaticLet, "static let");
   ENTRY(ClassVar, "class var");
   ENTRY(ClassLet, "class let");
+  ENTRY(PrecedenceGroup, "precedence group");
   ENTRY(InfixOperator, "infix operator");
   ENTRY(PrefixOperator, "prefix operator");
   ENTRY(PostfixOperator, "postfix operator");
@@ -534,72 +536,6 @@ void GenericParamList::addTrailingWhereClause(
   Requirements = newRequirements;
 }
 
-ArrayRef<Substitution>
-GenericParamList::getForwardingSubstitutions(ASTContext &C) {
-  SmallVector<Substitution, 4> subs;
-
-  // TODO: IRGen wants substitutions for secondary archetypes.
-  // for (auto &param : params->getNestedGenericParams()) {
-  //  ArchetypeType *archetype = param.getAsTypeParam()->getArchetype();
-
-  for (auto archetype : getAllNestedArchetypes()) {
-    // "Check conformance" on each declared protocol to build a
-    // conformance map.
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-
-    for (ProtocolDecl *proto : archetype->getConformsTo()) {
-      conformances.push_back(ProtocolConformanceRef(proto));
-    }
-
-    // Build an identity mapping with the derived conformances.
-    auto replacement = SubstitutedType::get(archetype, archetype, C);
-    subs.push_back({replacement, C.AllocateCopy(conformances)});
-  }
-
-  return C.AllocateCopy(subs);
-}
-
-/// \brief Add the nested archetypes of the given archetype to the set
-/// of all archetypes.
-void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
-                                      SmallPtrSetImpl<ArchetypeType*> &known,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  for (auto nested : archetype->getNestedTypes()) {
-    auto nestedArch = nested.second.getAsArchetype();
-    if (!nestedArch)
-      continue;
-    if (known.insert(nestedArch).second) {
-      assert(!nestedArch->isPrimary() && "Unexpected primary archetype");
-      all.push_back(nestedArch);
-      addNestedArchetypes(nestedArch, known, all);
-    }
-  }
-}
-
-ArrayRef<ArchetypeType*>
-GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
-                                      SmallVectorImpl<ArchetypeType*> &all) {
-  // This should be kept in sync with ArchetypeBuilder::getAllArchetypes().
-
-  assert(all.empty());
-  llvm::SmallPtrSet<ArchetypeType*, 8> known;
-
-  // Collect all the primary archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    if (known.insert(archetype).second)
-      all.push_back(archetype);
-  }
-
-  // Collect all the nested archetypes.
-  for (auto param : params) {
-    auto archetype = param->getArchetype();
-    addNestedArchetypes(archetype, known, all);
-  }
-
-  return all;
-}
-
 TrailingWhereClause::TrailingWhereClause(
                        SourceLoc whereLoc,
                        ArrayRef<RequirementRepr> requirements)
@@ -657,6 +593,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PostfixOperator:
   case DeclKind::EnumCase:
   case DeclKind::IfConfig:
+  case DeclKind::PrecedenceGroup:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -806,11 +743,6 @@ void ExtensionDecl::setGenericParams(GenericParamList *params) {
   }
 }
 
-void ExtensionDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
-}
-
 DeclRange ExtensionDecl::getMembers() const {
   loadAllMembers();
   return IterableDeclContext::getMembers();
@@ -944,6 +876,13 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     InitCheckedAndRemoved.setInt(F | Flags::Removed);
   }
+}
+
+VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
+  SmallVector<VarDecl *, 8> variables;
+  getPattern()->collectVariables(variables);
+  assert(variables.size() > 0);
+  return variables[0];
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -1224,7 +1163,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   // Private and (unversioned) internal variables always have a
   // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -1266,6 +1205,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PrecedenceGroup:
     llvm_unreachable("non-value decls shouldn't get here");
 
   case DeclKind::Func:
@@ -1304,6 +1244,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::PrecedenceGroup:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -1426,12 +1367,12 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 /// we may need to compare the extended information.
 ///
 /// In the type of the function declaration, none of the extended information
-/// is relevant. We cannot overload purely on @noreturn, 'throws', or the
-/// calling convention of the declaration itself.
+/// is relevant. We cannot overload purely on 'throws' or the calling
+/// convention of the declaration itself.
 ///
 /// For function parameter types, we do want to be able to overload on
 /// 'throws', since that is part of the mangled symbol name, but not
-/// @noreturn or @noescape.
+/// @noescape.
 static AnyFunctionType::ExtInfo
 mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
                     bool topLevelFunction) {
@@ -1789,12 +1730,9 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
   return resultLoc.isValid() ? resultLoc : getStartLoc();
 }
 
-/// Returns true if \p VD needs to be treated as publicly-accessible at the SIL,
-/// LLVM, and machine levels.
-///
-/// The most common causes of this are -enable-testing and versioned non-public
-/// declarations.
-static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
+/// Returns true if \p VD needs to be treated as publicly-accessible
+/// at the SIL, LLVM, and machine levels due to being versioned.
+static bool isVersionedInternalDecl(const ValueDecl *VD) {
   assert(VD->getFormalAccess() == Accessibility::Internal);
 
   if (VD->getAttrs().hasAttribute<VersionedAttr>())
@@ -1805,10 +1743,26 @@ static bool isInternalDeclEffectivelyPublic(const ValueDecl *VD) {
       if (ASD->getAttrs().hasAttribute<VersionedAttr>())
         return true;
 
-  if (VD->getModuleContext()->isTestingEnabled())
-    return true;
-
   return false;
+}
+
+/// Return the accessibility of an internal or public declaration
+/// that's been testably imported.
+static Accessibility getTestableAccess(const ValueDecl *decl) {
+  // Non-final classes are considered open to @testable importers.
+  if (auto cls = dyn_cast<ClassDecl>(decl)) {
+    if (!cls->isFinal())
+      return Accessibility::Open;
+
+  // Non-final overridable class members are considered open to
+  // @testable importers.
+  } else if (decl->isPotentiallyOverridable()) {
+    if (!cast<ValueDecl>(decl)->isFinal())
+      return Accessibility::Open;
+  }
+
+  // Everything else is considered public.
+  return Accessibility::Public;
 }
 
 Accessibility ValueDecl::getEffectiveAccess() const {
@@ -1817,12 +1771,21 @@ Accessibility ValueDecl::getEffectiveAccess() const {
   // Handle @testable.
   switch (effectiveAccess) {
   case Accessibility::Public:
+    if (getModuleContext()->isTestingEnabled())
+      effectiveAccess = getTestableAccess(this);
+    break;
+  case Accessibility::Open:
     break;
   case Accessibility::Internal:
-    if (isInternalDeclEffectivelyPublic(this))
+    if (getModuleContext()->isTestingEnabled())
+      effectiveAccess = getTestableAccess(this);
+    else if (isVersionedInternalDecl(this))
       effectiveAccess = Accessibility::Public;
     break;
+  case Accessibility::FilePrivate:
+    break;
   case Accessibility::Private:
+    effectiveAccess = Accessibility::FilePrivate;
     break;
   }
 
@@ -1841,10 +1804,68 @@ Accessibility ValueDecl::getEffectiveAccess() const {
     }
 
   } else if (getDeclContext()->isLocalContext()) {
-    effectiveAccess = Accessibility::Private;
+    effectiveAccess = Accessibility::FilePrivate;
   }
 
   return effectiveAccess;
+}
+
+Accessibility ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
+  assert((getFormalAccess() == Accessibility::Internal ||
+          getFormalAccess() == Accessibility::Public) &&
+         "should be able to fast-path non-internal cases");
+  assert(useDC && "should fast-path non-scoped cases");
+  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+    if (useSF->hasTestableImport(getModuleContext()))
+      return getTestableAccess(this);
+  return getFormalAccess();
+}
+
+const DeclContext *
+ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
+  const DeclContext *result = getDeclContext();
+  Accessibility access = getFormalAccess(useDC);
+
+  while (!result->isModuleScopeContext()) {
+    if (result->isLocalContext())
+      return result;
+
+    if (access == Accessibility::Private) {
+      return result;
+    }
+
+    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
+      access = std::min(access, enclosingNominal->getFormalAccess(useDC));
+
+    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
+      // Just check the base type. If it's a constrained extension, Sema should
+      // have already enforced access more strictly.
+      if (auto extendedTy = enclosingExt->getExtendedType()) {
+        if (auto nominal = extendedTy->getAnyNominal()) {
+          access = std::min(access, nominal->getFormalAccess(useDC));
+        }
+      }
+
+    } else {
+      llvm_unreachable("unknown DeclContext kind");
+    }
+
+    result = result->getParent();
+  }
+
+  switch (access) {
+  case Accessibility::Private:
+  case Accessibility::FilePrivate:
+    assert(result->isModuleScopeContext());
+    return result;
+  case Accessibility::Internal:
+    return result->getParentModule();
+  case Accessibility::Public:
+  case Accessibility::Open:
+    return nullptr;
+  }
+
+  return result;
 }
 
 
@@ -1880,7 +1901,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 bool NominalTypeDecl::hasFixedLayout() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
-  if (getEffectiveAccess() != Accessibility::Public)
+  if (getEffectiveAccess() < Accessibility::Public)
     return true;
 
   // Check for an explicit @_fixed_layout attribute.
@@ -1924,14 +1945,10 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   if (!knownProtocol)
     return false;
 
-  // All nominal types can derive their Error conformance.
-  if (*knownProtocol == KnownProtocolKind::Error)
-    return true;
-
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
     switch (*knownProtocol) {
-    // Enums with raw types can implicitly derive their RawRepresentable
-    // conformance.
+    // The presence of a raw type is an explicit declaration that
+    // the compiler should derive a RawRepresentable conformance.
     case KnownProtocolKind::RawRepresentable:
       return enumDecl->hasRawType();
     
@@ -2117,11 +2134,6 @@ void GenericTypeDecl::setGenericParams(GenericParamList *params) {
   if (params)
     for (auto Param : *params)
       Param->setDeclContext(this);
-}
-
-void GenericTypeDecl::setGenericSignature(GenericSignature *sig) {
-  assert(!GenericSig && "Already have generic signature");
-  GenericSig = sig;
 }
 
 
@@ -3634,10 +3646,10 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     LetVarInOutLoc(PD->getLetVarInOutLoc()),
-    typeLoc(PD->getTypeLoc()),
     DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
+  typeLoc = PD->getTypeLoc();
 }
 
 
@@ -3875,10 +3887,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   if (Type objectTy = indexTy->getAnyOptionalObjectType())
     indexTy = objectTy;
 
-  if (getASTContext().getBridgedToObjC(getDeclContext(), indexTy, resolver))
-    return ObjCSubscriptKind::Keyed;
-
-  return ObjCSubscriptKind::None;
+  return ObjCSubscriptKind::Keyed;
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
@@ -4364,7 +4373,7 @@ Type FuncDecl::getResultType() const {
   if (resultTy->is<ErrorType>())
     return resultTy;
 
-  for (unsigned i = 0, e = getNaturalArgumentCount(); i != e; ++i)
+  for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
     resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
 
   if (!resultTy)
@@ -4377,10 +4386,7 @@ bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex
-    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
-  
-  auto *params = getParameterList(opArgIndex);
+  auto *params = getParameterList(getDeclContext()->isTypeContext());
   return params->size() == 1 && !params->get(0)->isVariadic();
 }
 
@@ -4388,11 +4394,10 @@ bool FuncDecl::isBinaryOperator() const {
   if (!isOperator())
     return false;
   
-  unsigned opArgIndex
-    = getDeclContext()->getAsProtocolOrProtocolExtensionContext() ? 1 : 0;
-  
-  auto *params = getParameterList(opArgIndex);
-  return params->size() == 2 && !params->get(1)->isVariadic();
+  auto *params = getParameterList(getDeclContext()->isTypeContext());
+  return params->size() == 2 &&
+    !params->get(0)->isVariadic() &&
+    !params->get(1)->isVariadic();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -4662,7 +4667,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       if (!apply)
         return { true, E };
 
-      auto Callee = apply->getFn()->getSemanticsProvidingExpr();
+      auto Callee = apply->getSemanticFn();
       
       Expr *arg;
 
@@ -4760,15 +4765,78 @@ SourceRange DestructorDecl::getSourceRange() const {
   return { getDestructorLoc(), getBody()->getEndLoc() };
 }
 
-void InfixOperatorDecl::collectOperatorKeywordRanges(SmallVectorImpl
-                                                     <CharSourceRange> &Ranges) {
+PrecedenceGroupDecl *
+PrecedenceGroupDecl::create(DeclContext *dc,
+                            SourceLoc precedenceGroupLoc,
+                            SourceLoc nameLoc,
+                            Identifier name,
+                            SourceLoc lbraceLoc,
+                            SourceLoc associativityKeywordLoc,
+                            SourceLoc associativityValueLoc,
+                            Associativity associativity,
+                            SourceLoc assignmentKeywordLoc,
+                            SourceLoc assignmentValueLoc,
+                            bool isAssignment,
+                            SourceLoc higherThanLoc,
+                            ArrayRef<Relation> higherThan,
+                            SourceLoc lowerThanLoc,
+                            ArrayRef<Relation> lowerThan,
+                            SourceLoc rbraceLoc) {
+  void *memory = dc->getASTContext().Allocate(sizeof(PrecedenceGroupDecl) +
+                    (higherThan.size() + lowerThan.size()) * sizeof(Relation),
+                                              alignof(PrecedenceGroupDecl));
+  return new (memory) PrecedenceGroupDecl(dc, precedenceGroupLoc, nameLoc, name,
+                                          lbraceLoc, associativityKeywordLoc,
+                                          associativityValueLoc, associativity,
+                                          assignmentKeywordLoc,
+                                          assignmentValueLoc, isAssignment,
+                                          higherThanLoc, higherThan,
+                                          lowerThanLoc, lowerThan, rbraceLoc);
+}
+
+PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
+                                         SourceLoc precedenceGroupLoc,
+                                         SourceLoc nameLoc,
+                                         Identifier name,
+                                         SourceLoc lbraceLoc,
+                                         SourceLoc associativityKeywordLoc,
+                                         SourceLoc associativityValueLoc,
+                                         Associativity associativity,
+                                         SourceLoc assignmentKeywordLoc,
+                                         SourceLoc assignmentValueLoc,
+                                         bool isAssignment,
+                                         SourceLoc higherThanLoc,
+                                         ArrayRef<Relation> higherThan,
+                                         SourceLoc lowerThanLoc,
+                                         ArrayRef<Relation> lowerThan,
+                                         SourceLoc rbraceLoc)
+  : Decl(DeclKind::PrecedenceGroup, dc),
+    PrecedenceGroupLoc(precedenceGroupLoc), NameLoc(nameLoc),
+    LBraceLoc(lbraceLoc), RBraceLoc(rbraceLoc),
+    AssociativityKeywordLoc(associativityKeywordLoc),
+    AssociativityValueLoc(associativityValueLoc),
+    AssignmentKeywordLoc(assignmentKeywordLoc),
+    AssignmentValueLoc(assignmentValueLoc),
+    HigherThanLoc(higherThanLoc), LowerThanLoc(lowerThanLoc), Name(name),
+    NumHigherThan(higherThan.size()), NumLowerThan(lowerThan.size()) {
+  PrecedenceGroupDeclBits.Associativity = unsigned(associativity);
+  PrecedenceGroupDeclBits.IsAssignment = isAssignment;
+  memcpy(getHigherThanBuffer(), higherThan.data(),
+         higherThan.size() * sizeof(Relation));
+  memcpy(getLowerThanBuffer(), lowerThan.data(),
+         lowerThan.size() * sizeof(Relation));
+}
+
+void PrecedenceGroupDecl::collectOperatorKeywordRanges(
+                                    SmallVectorImpl<CharSourceRange> &Ranges) {
   auto AddToRange = [&] (SourceLoc Loc, StringRef Word) {
     if (Loc.isValid())
       Ranges.push_back(CharSourceRange(Loc, strlen(Word.data())));
   };
-  AddToRange(AssociativityLoc, "associativity");
-  AddToRange(AssignmentLoc, "assignment");
-  AddToRange(PrecedenceLoc, "precedence");
+  AddToRange(AssociativityKeywordLoc, "associativity");
+  AddToRange(AssignmentKeywordLoc, "assignment");
+  AddToRange(HigherThanLoc, "higherThan");
+  AddToRange(LowerThanLoc, "lowerThan");
 }
 
 bool FuncDecl::isDeferBody() const {
@@ -4781,17 +4849,14 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
     return {};
 
   // Make sure the clang node has swift_newtype attribute
-  if (!structDecl->getClangNode())
-    return {};
-  auto clangNode = structDecl->getClangNode();
-  if (!clangNode.getAsDecl() ||
-      !clangNode.castAsDecl()->getAttr<clang::SwiftNewtypeAttr>())
+  auto clangNode = structDecl->getClangDecl();
+  if (!clangNode || !clangNode->hasAttr<clang::SwiftNewtypeAttr>())
     return {};
 
   // Underlying type is the type of rawValue
   for (auto member : structDecl->getMembers())
     if (auto varDecl = dyn_cast<VarDecl>(member))
-      if (varDecl->getName().str() == "rawValue")
+      if (varDecl->getName() == getASTContext().Id_rawValue)
         return varDecl->getType();
 
   return {};

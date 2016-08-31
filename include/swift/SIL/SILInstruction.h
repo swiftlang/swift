@@ -169,33 +169,52 @@ public:
   /// Return the array of operands for this instruction.
   ArrayRef<Operand> getAllOperands() const;
 
-  /// Return the array of opened archetype operands for this instruction.
-  ArrayRef<Operand> getOpenedArchetypeOperands() const;
+  /// Return the array of type dependent operands for this instruction.
+  ///
+  /// Type dependent operands are hidden operands, i.e. not part of the SIL
+  /// syntax (although they are printed as "type-defs" in comments).
+  /// Their purpose is to establish a def-use relationship between
+  ///   -) an instruction/argument which defines a type, e.g. open_existential
+  /// and
+  ///   -) this instruction, which uses the type, but doesn't use the defining
+  ///      instruction as value-operand, e.g. a type in the substitution list.
+  ///
+  /// Currently there are two kinds of type dependent operands:
+  ///
+  /// 1. for opened archetypes:
+  ///     %o = open_existential_addr %0 : $*P to $*@opened("UUID") P
+  ///     %w = witness_method $@opened("UUID") P, ... // type-defs: %o
+  ///
+  /// 2. for the dynamic self argument:
+  ///     sil @foo : $@convention(method) (@thick X.Type) {
+  ///     bb0(%0 : $@thick X.Type):
+  ///       %a = apply %f<@dynamic_self X>() ... // type-defs: %0
+  ///
+  /// The type dependent operands are just there to let optimizations know that
+  /// there is a dependency between the instruction/argument which defines the
+  /// type and the instruction which uses the type.
+  ArrayRef<Operand> getTypeDependentOperands() const;
 
   /// Return the array of mutable operands for this instruction.
   MutableArrayRef<Operand> getAllOperands();
 
-  /// Return the array of opened archetypes operands for this instruction.
-  MutableArrayRef<Operand> getOpenedArchetypeOperands();
-
-  /// Returns true if a given kind of instruciton may have opened archetype
-  /// operands.
-  bool mayHaveOpenedArchetypeOperands() const;
+  /// Return the array of mutable type depedent operands for this instruction.
+  MutableArrayRef<Operand> getTypeDependentOperands();
 
   unsigned getNumOperands() const { return getAllOperands().size(); }
 
-  unsigned getNumOpenedArchetypeOperands() const {
-    return getOpenedArchetypeOperands().size();
+  unsigned getNumTypeDependentOperands() const {
+    return getTypeDependentOperands().size();
   }
 
-  bool isOpenedArchetypeOperand(unsigned i) const {
-    return i >= getNumOperands() - getNumOpenedArchetypeOperands();
+  bool isTypeDependentOperand(unsigned i) const {
+    return i >= getNumOperands() - getNumTypeDependentOperands();
   }
 
-  bool isOpenedArchetypeOperand(Operand &O) const {
+  bool isTypeDependentOperand(Operand &O) const {
     assert(O.getUser() == this &&
            "Operand does not belong to a SILInstruction");
-    return isOpenedArchetypeOperand(O.getOperandNumber());
+    return isTypeDependentOperand(O.getOperandNumber());
   }
 
   SILValue getOperand(unsigned Num) const {
@@ -375,15 +394,11 @@ public:
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
-  bool hasOpenedArchetypeOperands() const {
-    return false;
-  }
-
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return {};
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return {};
   }
 
@@ -393,14 +408,14 @@ public:
 };
 
 /// A template base class for instructions that take a single regular SILValue
-/// operand, a set of opened archetypes operands and has no result
+/// operand, a set of type dependent operands and has no result
 /// or a single value result. The operands are tail allocated after the
 /// instruction. Further trailing data can be allocated as well if
 /// TRAILING_TYPES are provided.
 template<ValueKind KIND, typename DERIVED,
          typename BASE, bool HAS_RESULT,
          typename... TRAILING_TYPES>
-class UnaryInstructionWithOpenArchetypesBase :
+class UnaryInstructionWithTypeDependentOperandsBase :
   public BASE,
   protected llvm::TrailingObjects<DERIVED, Operand, TRAILING_TYPES...> {
 
@@ -420,12 +435,12 @@ protected:
   using TrailingBase::totalSizeToAlloc;
 
   // Total number of operands of this instruction.
-  // It is number of opened archetype operands + 1.
+  // It is number of type dependent operands + 1.
   unsigned NumOperands;
 
 public:
   // Destruct tail allocated objects.
-  ~UnaryInstructionWithOpenArchetypesBase() {
+  ~UnaryInstructionWithTypeDependentOperandsBase() {
     Operand *Operands = &getAllOperands()[0];
     for (unsigned i = 0, end = NumOperands; i < end; ++i) {
       Operands[i].~Operand();
@@ -437,40 +452,40 @@ public:
     return NumOperands;
   }
 
-  UnaryInstructionWithOpenArchetypesBase(
+  UnaryInstructionWithTypeDependentOperandsBase(
       SILDebugLocation DebugLoc, SILValue Operand,
-      ArrayRef<SILValue> OpenedArchetypeOperands)
-      : BASE(KIND, DebugLoc), NumOperands(1 + OpenedArchetypeOperands.size()) {
+      ArrayRef<SILValue> TypeDependentOperands)
+      : BASE(KIND, DebugLoc), NumOperands(1 + TypeDependentOperands.size()) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           Operand, OpenedArchetypeOperands);
+                                           Operand, TypeDependentOperands);
   }
 
   template <typename X = void>
-  UnaryInstructionWithOpenArchetypesBase(
+  UnaryInstructionWithTypeDependentOperandsBase(
       SILDebugLocation DebugLoc, SILValue Operand,
-      ArrayRef<SILValue> OpenedArchetypeOperands,
+      ArrayRef<SILValue> TypeDependentOperands,
       typename std::enable_if<has_result<X>::value, SILType>::type Ty)
       : BASE(KIND, DebugLoc, Ty),
-        NumOperands(1 + OpenedArchetypeOperands.size())
+        NumOperands(1 + TypeDependentOperands.size())
   {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           Operand, OpenedArchetypeOperands);
+                                           Operand, TypeDependentOperands);
   }
 
   template <typename X = void, typename... A>
-  UnaryInstructionWithOpenArchetypesBase(
+  UnaryInstructionWithTypeDependentOperandsBase(
       SILDebugLocation DebugLoc, SILValue Operand,
-      ArrayRef<SILValue> OpenedArchetypeOperands,
+      ArrayRef<SILValue> TypeDependentOperands,
       typename std::enable_if<has_result<X>::value, SILType>::type Ty,
       A &&... args)
       : BASE(KIND, DebugLoc, Ty, std::forward<A>(args)...),
-        NumOperands(1 + OpenedArchetypeOperands.size())
+        NumOperands(1 + TypeDependentOperands.size())
   {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           Operand, OpenedArchetypeOperands);
+                                           Operand, TypeDependentOperands);
   }
 
-  unsigned getNumOpenedArchetypeOperands() const {
+  unsigned getNumTypeDependentOperands() const {
     return NumOperands - 1;
   }
 
@@ -494,15 +509,11 @@ public:
             static_cast<size_t>(NumOperands)};
   }
 
-  bool hasOpenedArchetypeOperands() const {
-    return NumOperands > 1;
-  }
-
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands().slice(1);
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands().slice(1);
   }
 
@@ -510,7 +521,6 @@ public:
     return V->getKind() == KIND;
   }
 };
-
 
 /// Holds common debug information about local variables and function
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
@@ -605,7 +615,7 @@ class AllocStackInst final
   TailAllocatedDebugVariable VarInfo;
 
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
-                 ArrayRef<SILValue> OpenedArchetypeOperands,
+                 ArrayRef<SILValue> TypeDependentOperands,
                  SILFunction &F,
                  SILDebugVariable Var);
 
@@ -650,11 +660,11 @@ public:
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
 
@@ -676,7 +686,7 @@ class AllocRefInst final
   bool ObjC : 1;
 
   AllocRefInst(SILDebugLocation Loc, SILType type, SILFunction &F, bool objc,
-               bool canBeOnStack, ArrayRef<SILValue> OpenedArchetypeOperands);
+               bool canBeOnStack, ArrayRef<SILValue> TypeDependentOperands);
 
   static AllocRefInst *create(SILDebugLocation Loc, SILType type,
                               SILFunction &F, bool objc, bool canBeOnStack,
@@ -698,11 +708,11 @@ public:
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
 
@@ -719,7 +729,7 @@ public:
 /// the given metatype value. Aside from the reference count, the
 /// instance is returned uninitialized.
 class AllocRefDynamicInst final
-    : public UnaryInstructionWithOpenArchetypesBase<
+    : public UnaryInstructionWithTypeDependentOperandsBase<
                                   ValueKind::AllocRefDynamicInst,
                                   AllocRefDynamicInst,
                                   AllocationInst,
@@ -729,7 +739,7 @@ class AllocRefDynamicInst final
   bool ObjC;
 
   AllocRefDynamicInst(SILDebugLocation DebugLoc, SILValue operand,
-                      ArrayRef<SILValue> OpenedArchetypeOperands, SILType ty,
+                      ArrayRef<SILValue> TypeDependentOperands, SILType ty,
                       bool objc);
 
   static AllocRefDynamicInst *
@@ -743,7 +753,7 @@ public:
 
 /// AllocValueBufferInst - Allocate memory in a value buffer.
 class AllocValueBufferInst final
-    : public UnaryInstructionWithOpenArchetypesBase<
+    : public UnaryInstructionWithTypeDependentOperandsBase<
                                   ValueKind::AllocValueBufferInst,
                                   AllocValueBufferInst,
                                   AllocationInst,
@@ -752,7 +762,7 @@ class AllocValueBufferInst final
 
   AllocValueBufferInst(SILDebugLocation DebugLoc, SILType valueType,
                        SILValue operand,
-                       ArrayRef<SILValue> OpenedArchetypeOperands);
+                       ArrayRef<SILValue> TypeDependentOperands);
 
   static AllocValueBufferInst *
   create(SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
@@ -779,7 +789,7 @@ class AllocBoxInst final
   TailAllocatedDebugVariable VarInfo;
 
   AllocBoxInst(SILDebugLocation DebugLoc, SILType ElementType,
-               ArrayRef<SILValue> OpenedArchetypeOperands, SILFunction &F,
+               ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
                SILDebugVariable Var);
 
   static AllocBoxInst *create(SILDebugLocation Loc, SILType elementType,
@@ -821,11 +831,11 @@ public:
     return {getTrailingObjects<Operand>(), NumOperands};
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
 
@@ -851,7 +861,7 @@ class AllocExistentialBoxInst final
   AllocExistentialBoxInst(SILDebugLocation DebugLoc, SILType ExistentialType,
                           CanType ConcreteType,
                           ArrayRef<ProtocolConformanceRef> Conformances,
-                          ArrayRef<SILValue> OpenedArchetypeOperands,
+                          ArrayRef<SILValue> TypeDependentOperands,
                           SILFunction *Parent);
 
   static AllocExistentialBoxInst *
@@ -883,11 +893,11 @@ public:
     return {getTrailingObjects<Operand>(), NumOperands};
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return getAllOperands();
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
 
@@ -943,12 +953,12 @@ protected:
   ApplyInstBase(ValueKind kind, SILDebugLocation DebugLoc, SILValue callee,
                 SILType substCalleeType, ArrayRef<Substitution> substitutions,
                 ArrayRef<SILValue> args,
-                ArrayRef<SILValue> openedArchetypesOperands,
+                ArrayRef<SILValue> TypeDependentOperands,
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         NumSubstitutions(substitutions.size()), NonThrowing(false),
         NumCallArguments(args.size()),
-        Operands(this, args, openedArchetypesOperands, callee) {
+        Operands(this, args, TypeDependentOperands, callee) {
     static_assert(sizeof(Impl) == sizeof(*this),
         "subclass has extra storage, cannot use TailAllocatedOperandList");
     memcpy(getSubstitutionsStorage(), substitutions.begin(),
@@ -957,11 +967,11 @@ protected:
 
   static void *allocate(SILFunction &F,
                         ArrayRef<Substitution> substitutions,
-                        ArrayRef<SILValue> openedArchetypesOperands,
+                        ArrayRef<SILValue> TypeDependentOperands,
                         ArrayRef<SILValue> args) {
     return allocateApplyInst(
         F, sizeof(Impl) + decltype(Operands)::getExtraSize(
-                              args.size() + openedArchetypesOperands.size()) +
+                              args.size() + TypeDependentOperands.size()) +
                sizeof(substitutions[0]) * substitutions.size(),
         alignof(Impl));
   }
@@ -1001,6 +1011,10 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     return SubstCalleeType;
+  }
+
+  bool isCalleeNoReturn() const {
+    return getSubstCalleeSILType().isNoReturnFunction();
   }
 
   bool isCalleeThin() const {
@@ -1068,15 +1082,11 @@ public:
     return NumCallArguments;
   }
 
-  bool hasOpenedArchetypeOperands() const {
-    return getAllOperands().size() - 1 - getNumCallArguments() != 0;
-  }
-
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return Operands.getDynamicAsArray().slice(NumCallArguments);
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return Operands.getDynamicAsArray().slice(NumCallArguments);
   }
 };
@@ -1209,7 +1219,7 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
             SILType SubstCalleeType, SILType ReturnType,
             ArrayRef<Substitution> Substitutions,
             ArrayRef<SILValue> Args,
-            ArrayRef<SILValue> OpenedArchetypeOperands,
+            ArrayRef<SILValue> TypeDependentOperands,
             bool isNonThrowing);
 
   static ApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
@@ -1241,7 +1251,7 @@ class PartialApplyInst
                    SILType SubstCalleeType,
                    ArrayRef<Substitution> Substitutions,
                    ArrayRef<SILValue> Args,
-                   ArrayRef<SILValue> OpenedArchetypeOperands,
+                   ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType);
 
   static PartialApplyInst *create(SILDebugLocation DebugLoc, SILValue Callee,
@@ -1572,6 +1582,10 @@ public:
     return V->getKind() == ValueKind::StringLiteralInst;
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Memory instructions.
+//===----------------------------------------------------------------------===//
 
 /// StringLiteralInst::Encoding hashes to its underlying integer representation.
 static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
@@ -2047,6 +2061,83 @@ public:
   }
 };
 
+/// BindMemoryInst -
+/// "bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $T"
+/// Binds memory at the raw pointer %0 to type $T with enough capacity
+/// to hold $1 values.
+class BindMemoryInst final :
+    public SILInstruction,
+    protected llvm::TrailingObjects<BindMemoryInst, Operand> {
+
+  typedef llvm::TrailingObjects<BindMemoryInst, Operand> TrailingBase;
+  friend TrailingBase;
+  using TrailingBase::totalSizeToAlloc;
+
+  friend class SILBuilder;
+
+  enum { BaseOperIdx, IndexOperIdx, NumFixedOpers };
+
+  SILType BoundType;
+
+  // Fixed operands + opened archetype operands.
+  unsigned NumOperands;
+
+  static BindMemoryInst *create(
+    SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+
+  BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
+                 SILType BoundType,
+                 ArrayRef<SILValue> TypeDependentOperands);
+
+public:
+  // Destruct tail allocated objects.
+  ~BindMemoryInst() {
+    Operand *Operands = &getAllOperands()[0];
+    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
+      Operands[i].~Operand();
+    }
+  }
+
+  SILValue getBase() const { return getAllOperands()[BaseOperIdx].get(); }
+
+  SILValue getIndex() const { return getAllOperands()[IndexOperIdx].get(); }
+
+  SILType getBoundType() const { return BoundType ; }
+
+  // Implement llvm::TrailingObjects.
+  size_t numTrailingObjects(
+      typename TrailingBase::template OverloadToken<Operand>) const {
+    return NumOperands;
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return {TrailingBase::template getTrailingObjects<Operand>(),
+            static_cast<size_t>(NumOperands)};
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return {TrailingBase::template getTrailingObjects<Operand>(),
+            static_cast<size_t>(NumOperands)};
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(2);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(2);
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::BindMemoryInst;
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Conversion instructions.
+//===----------------------------------------------------------------------===//
+
 /// ConversionInst - Abstract class representing instructions that convert
 /// values.
 ///
@@ -2147,7 +2238,7 @@ public:
 /// Convert a heap object reference to a different type without any runtime
 /// checks.
 class UncheckedRefCastInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::UncheckedRefCastInst,
                                 UncheckedRefCastInst,
                                 ConversionInst,
@@ -2156,9 +2247,9 @@ class UncheckedRefCastInst final
   friend class SILBuilder;
 
   UncheckedRefCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                       ArrayRef<SILValue> OpenedArchetypeOperands, SILType Ty)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands, Ty) {}
+                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands, Ty) {}
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
@@ -2207,7 +2298,7 @@ public:
 };
 
 class UncheckedAddrCastInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::UncheckedAddrCastInst,
                                 UncheckedAddrCastInst,
                                 ConversionInst,
@@ -2216,9 +2307,9 @@ class UncheckedAddrCastInst final
   friend class SILBuilder;
 
   UncheckedAddrCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        ArrayRef<SILValue> OpenedArchetypeOperands, SILType Ty)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands, Ty) {}
+                        ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands, Ty) {}
   static UncheckedAddrCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
@@ -2226,7 +2317,7 @@ class UncheckedAddrCastInst final
 
 /// Convert a value's binary representation to a trivial type of the same size.
 class UncheckedTrivialBitCastInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::UncheckedTrivialBitCastInst,
                                 UncheckedTrivialBitCastInst,
                                 ConversionInst,
@@ -2235,10 +2326,10 @@ class UncheckedTrivialBitCastInst final
   friend class SILBuilder;
 
   UncheckedTrivialBitCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                              ArrayRef<SILValue> OpenedArchetypeOperands,
+                              ArrayRef<SILValue> TypeDependentOperands,
                               SILType Ty)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands, Ty) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands, Ty) {}
 
   static UncheckedTrivialBitCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
@@ -2247,7 +2338,7 @@ class UncheckedTrivialBitCastInst final
   
 /// Bitwise copy a value into another value of the same size or smaller.
 class UncheckedBitwiseCastInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::UncheckedBitwiseCastInst,
                                 UncheckedBitwiseCastInst,
                                 ConversionInst,
@@ -2256,10 +2347,10 @@ class UncheckedBitwiseCastInst final
   friend class SILBuilder;
 
   UncheckedBitwiseCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                           ArrayRef<SILValue> OpenedArchetypeOperands,
+                           ArrayRef<SILValue> TypeDependentOperands,
                            SILType Ty)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands, Ty) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands, Ty) {}
   static UncheckedBitwiseCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
@@ -2489,7 +2580,7 @@ class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::UnconditionalCheckedCastInst,
                                 UnconditionalCheckedCastInst,
                                 ConversionInst,
@@ -2498,10 +2589,10 @@ class UnconditionalCheckedCastInst final
   friend class SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               ArrayRef<SILValue> OpenedArchetypeOperands,
+                               ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestTy)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands,
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands,
                                                DestTy) {}
 
   static UnconditionalCheckedCastInst *
@@ -3187,7 +3278,7 @@ class MetatypeInst final
 
   /// Constructs a MetatypeInst
   MetatypeInst(SILDebugLocation DebugLoc, SILType Metatype,
-               ArrayRef<SILValue> OpenedArchetypeOperands);
+               ArrayRef<SILValue> TypeDependentOperands);
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
                               SILFunction *F,
@@ -3209,11 +3300,11 @@ public:
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
@@ -3466,14 +3557,14 @@ class WitnessMethodInst final
 
   WitnessMethodInst(SILDebugLocation DebugLoc, CanType LookupType,
                     ProtocolConformanceRef Conformance, SILDeclRef Member,
-                    SILType Ty, ArrayRef<SILValue> OpenedArchetypeOperands,
+                    SILType Ty, ArrayRef<SILValue> TypeDependentOperands,
                     bool Volatile = false)
       : MethodInst(ValueKind::WitnessMethodInst, DebugLoc, Ty, Member,
                    Volatile),
         LookupType(LookupType), Conformance(Conformance),
-        NumOperands(OpenedArchetypeOperands.size()) {
+        NumOperands(TypeDependentOperands.size()) {
     TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
-                                           OpenedArchetypeOperands);
+                                           TypeDependentOperands);
   }
 
   static WitnessMethodInst *
@@ -3512,11 +3603,11 @@ public:
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  ArrayRef<Operand> getOpenedArchetypeOperands() const {
+  ArrayRef<Operand> getTypeDependentOperands() const {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
-  MutableArrayRef<Operand> getOpenedArchetypeOperands() {
+  MutableArrayRef<Operand> getTypeDependentOperands() {
     return { getTrailingObjects<Operand>(), NumOperands };
   }
 
@@ -3529,14 +3620,25 @@ public:
 /// constant referring to some Objective-C method, performs dynamic method
 /// lookup to extract the implementation of that method. This method lookup
 /// can fail at run-time
-class DynamicMethodInst
-  : public UnaryInstructionBase<ValueKind::DynamicMethodInst, MethodInst>
+class DynamicMethodInst final
+  : public UnaryInstructionWithTypeDependentOperandsBase<
+                                   ValueKind::DynamicMethodInst,
+                                   DynamicMethodInst,
+                                   MethodInst,
+                                   true>
 {
   friend class SILBuilder;
 
   DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+                    ArrayRef<SILValue> TypeDependentOperands,
+                    SILDeclRef Member, SILType Ty, bool Volatile)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member, Volatile) {}
+
+  static DynamicMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, bool Volatile, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// Given the address of an existential, "opens" the
@@ -3593,7 +3695,7 @@ class OpenExistentialBoxInst
 /// value of the given type, and returns the address of the uninitialized
 /// concrete value inside the existential container.
 class InitExistentialAddrInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::InitExistentialAddrInst,
                                 InitExistentialAddrInst,
                                 SILInstruction,
@@ -3605,11 +3707,11 @@ class InitExistentialAddrInst final
   ArrayRef<ProtocolConformanceRef> Conformances;
 
   InitExistentialAddrInst(SILDebugLocation DebugLoc, SILValue Existential,
-                          ArrayRef<SILValue> OpenedArchetypeOperands,
+                          ArrayRef<SILValue> TypeDependentOperands,
                           CanType ConcreteType, SILType ConcreteLoweredType,
                           ArrayRef<ProtocolConformanceRef> Conformances)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Existential,
-                             OpenedArchetypeOperands,
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Existential,
+                             TypeDependentOperands,
                              ConcreteLoweredType.getAddressType()),
         ConcreteType(ConcreteType), Conformances(Conformances) {}
 
@@ -3637,7 +3739,7 @@ public:
 /// conformances, creates a class existential value referencing the
 /// class instance.
 class InitExistentialRefInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                 ValueKind::InitExistentialRefInst,
                                 InitExistentialRefInst,
                                 SILInstruction,
@@ -3650,10 +3752,10 @@ class InitExistentialRefInst final
 
   InitExistentialRefInst(SILDebugLocation DebugLoc, SILType ExistentialType,
                          CanType FormalConcreteType, SILValue Instance,
-                         ArrayRef<SILValue> OpenedArchetypeOperands,
+                         ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Instance,
-                                               OpenedArchetypeOperands,
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Instance,
+                                               TypeDependentOperands,
                                                ExistentialType),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
@@ -3679,7 +3781,7 @@ public:
 /// of conformances, creates an existential metatype value referencing
 /// the metatype.
 class InitExistentialMetatypeInst final
-  : public UnaryInstructionWithOpenArchetypesBase<
+  : public UnaryInstructionWithTypeDependentOperandsBase<
                                   ValueKind::InitExistentialMetatypeInst,
                                   InitExistentialMetatypeInst,
                                   SILInstruction,
@@ -3693,7 +3795,7 @@ class InitExistentialMetatypeInst final
   InitExistentialMetatypeInst(SILDebugLocation DebugLoc,
                               SILType existentialMetatypeType,
                               SILValue metatype,
-                              ArrayRef<SILValue> OpenedArchetypeOperands,
+                              ArrayRef<SILValue> TypeDependentOperands,
                               ArrayRef<ProtocolConformanceRef> conformances);
 
   static InitExistentialMetatypeInst *
@@ -4189,7 +4291,7 @@ public:
   }
 };
 
-/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Int64"
+/// IndexAddrInst - "%2 : $*T = index_addr %0 : $*T, %1 : $Builtin.Word"
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexAddrInst : public IndexingInst {
@@ -4208,7 +4310,7 @@ public:
 
 /// IndexRawPointerInst
 /// %2 : $Builtin.RawPointer \
-///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Int64
+///   = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
 /// This takes an address and indexes it, striding by the pointed-
 /// to type.  This is used to index into arrays of uniform elements.
 class IndexRawPointerInst : public IndexingInst {
@@ -4751,7 +4853,7 @@ public:
 /// The success branch destination block receives the cast result as a BB
 /// argument.
 class CheckedCastBranchInst final:
-  public UnaryInstructionWithOpenArchetypesBase<
+  public UnaryInstructionWithTypeDependentOperandsBase<
                               ValueKind::CheckedCastBranchInst,
                               CheckedCastBranchInst,
                               TermInst,
@@ -4765,11 +4867,11 @@ class CheckedCastBranchInst final:
 
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                         SILValue Operand,
-                        ArrayRef<SILValue> OpenedArchetypeOperands,
+                        ArrayRef<SILValue> TypeDependentOperands,
                         SILType DestTy,
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
-      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
-                                               OpenedArchetypeOperands),
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                               TypeDependentOperands),
         DestTy(DestTy), IsExact(IsExact),
         DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
 
@@ -4898,7 +5000,7 @@ class TryApplyInst
   TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
                SILType substCalleeType, ArrayRef<Substitution> substitutions,
                ArrayRef<SILValue> args,
-               ArrayRef<SILValue> openedArchetypesOperands,
+               ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB);
 
   static TryApplyInst *create(SILDebugLocation DebugLoc, SILValue callee,
@@ -4995,6 +5097,11 @@ public:
   }
   SILType getSubstCalleeSILType() const {
     FOREACH_IMPL_RETURN(getSubstCalleeSILType());
+  }
+
+  /// Check if this is a call of a never-returning function.
+  bool isCalleeNoReturn() const {
+    FOREACH_IMPL_RETURN(isCalleeNoReturn());
   }
 
   bool isCalleeThin() const {

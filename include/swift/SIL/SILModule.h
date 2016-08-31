@@ -480,7 +480,7 @@ public:
   /// SILModule. Eventually the uses should probably be refactored.
   SILFunction *createFunction(
       SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-      GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+      GenericEnvironment *genericEnv, Optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
       IsFragile_t isFragile, IsThunk_t isThunk = IsNotThunk,
       SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,

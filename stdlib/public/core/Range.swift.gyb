@@ -81,7 +81,7 @@ public enum _DisabledRangeIndex_ {}
 public struct CountableRange<Bound> : RandomAccessCollection
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : SignedInteger {
 
   /// The range's lower bound.
@@ -420,11 +420,27 @@ extension ${Self}
   /// Returns a Boolean value indicating whether this range and the given range
   /// contain an element in common.
   ///
-  /// For example:
+  /// This example shows two overlapping ranges:
   ///
   ///     let x: ${Self} = 0${op}20
   ///     print(x.overlaps(10${other_op}1000 as ${OtherSelf}))
   ///     // Prints "true"
+  ///
+% if 'Closed' in Self:
+  /// Because a closed range includes its upper bound, the ranges in the
+  /// following example also overlap:
+  ///
+  ///     let y: ${OtherSelf} = 20${op}30
+  ///     print(x.overlaps(y))
+  ///     // Prints "true"
+% else:
+  /// Because a half-open range does not include its upper bound, the ranges
+  /// in the following example do not overlap:
+  ///
+  ///     let y: ${OtherSelf} = 20${op}30
+  ///     print(x.overlaps(y))
+  ///     // Prints "false"
+% end
   ///
   /// - Parameter other: A range to check for elements in common.
   /// - Returns: `true` if this range and `other` have at least one element in
@@ -500,16 +516,16 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : Equatable {}
+extension ${Self} : Equatable {
+  public static func == (lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
+    return
+      lhs.lowerBound == rhs.lowerBound &&
+      lhs.upperBound == rhs.upperBound
+  }
 
-public func == <Bound>(lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
-  return
-    lhs.lowerBound == rhs.lowerBound &&
-    lhs.upperBound == rhs.upperBound
-}
-
-public func ~= <Bound> (pattern: ${Self}<Bound>, value: Bound) -> Bool {
-  return pattern.contains(value)
+  public static func ~= (pattern: ${Self}<Bound>, value: Bound) -> Bool {
+    return pattern.contains(value)
+  }
 }
 % end
 
@@ -519,6 +535,7 @@ public func ~= <Bound> (pattern: ${Self}<Bound>, value: Bound) -> Bool {
 % ]:
 // FIXME(ABI)(compiler limitation): replace this extension with a conditional
 // conformance.
+// rdar://problem/17144340
 /// Ranges whose `Bound` is `Strideable` with `Integer` `Stride` have all
 /// the capabilities of `RandomAccessCollection`s, just like
 /// `CountableRange` and `CountableClosedRange`.
@@ -543,7 +560,9 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 /// Returns a half-open range that contains its lower bound but not its upper
 /// bound.
 ///
-/// For example:
+/// Use the half-open range operator (`..<`) to create a range of any type that
+/// conforms to the `Comparable` protocol. This example creates a
+/// `Range<Double>` from zero up to, but not including, 5.0.
 ///
 ///     let lessThanFive = 0.0..<5.0
 ///     print(lessThanFive.contains(3.14))  // Prints "true"
@@ -553,7 +572,7 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
+public func ..< <Bound : Comparable>(minimum: Bound, maximum: Bound)
   -> Range<Bound> {
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")
@@ -563,11 +582,20 @@ public func ..< <Bound : Comparable> (minimum: Bound, maximum: Bound)
 /// Returns a countable half-open range that contains its lower bound but not
 /// its upper bound.
 ///
-/// For example:
+/// Use the half-open range operator (`..<`) to create a range of any type that
+/// conforms to the `Strideable` protocol with an associated integer `Stride`
+/// type, such as any of the standard library's integer types. This example
+/// creates a `CountableRange<Int>` from zero up to, but not including, 5.
 ///
 ///     let upToFive = 0..<5
 ///     print(upToFive.contains(3))         // Prints "true"
 ///     print(upToFive.contains(5))         // Prints "false"
+///
+/// You can use sequence or collection methods on the `upToFive` countable
+/// range.
+///
+///     print(upToFive.count)               // Prints "5"
+///     print(upToFive.last)                // Prints "4"
 ///
 /// - Parameters:
 ///   - minimum: The lower bound for the range.
@@ -578,7 +606,7 @@ public func ..< <Bound>(
 ) -> CountableRange<Bound>
   where
   // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : protocol<_Strideable, Comparable>,
+  Bound : _Strideable & Comparable,
   Bound.Stride : Integer {
 
   // FIXME: swift-3-indexing-model: tests for traps.

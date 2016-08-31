@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 // REQUIRES: executable_test
 
 // REQUIRES: CPU=x86_64
@@ -396,7 +396,7 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
 
-func testOnce(_ p: Builtin.RawPointer, f: @convention(thin) () -> ()) {
+func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(thin) () -> ()) {
   Builtin.once(p, f)
 }
 
@@ -408,12 +408,12 @@ struct S {}
 protocol P {}
 
 // CHECK-LABEL: define hidden void @_TF8builtins10canBeClass
-func canBeClass<T>(_ f: (Builtin.Int8) -> (), _: T) {
+func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
-  typealias ObjCCompo = protocol<OP1, OP2>
+  typealias ObjCCompo = OP1 & OP2
   // CHECK: call void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
 
@@ -423,7 +423,7 @@ func canBeClass<T>(_ f: (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(C.self))
   // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
-  typealias MixedCompo = protocol<OP1, P>
+  typealias MixedCompo = OP1 & P
   // CHECK: call void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
 

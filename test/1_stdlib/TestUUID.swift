@@ -75,7 +75,7 @@ class TestUUID : TestUUIDSuper {
         var bytes: [UInt8] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         let valFromBytes = bytes.withUnsafeMutableBufferPointer { buffer -> UUID in
             ref.getBytes(buffer.baseAddress)
-            return UUID(uuid: UnsafePointer<uuid_t>(buffer.baseAddress!).pointee)
+            return UUID(uuid: UnsafeRawPointer(buffer.baseAddress!).load(as: uuid_t.self))
         }
         let valFromStr = UUID(uuidString: ref.uuidString)
         expectEqual(ref.uuidString, valFromRef.uuidString)
@@ -88,6 +88,34 @@ class TestUUID : TestUUIDSuper {
         let ref = NSUUID()
         let val = UUID(uuidString: ref.uuidString)!
         expectEqual(ref.hashValue, val.hashValue, "Hashes of references and values should be identical")
+    }
+
+    func test_AnyHashableContainingUUID() {
+        let values: [UUID] = [
+            UUID(uuidString: "e621e1f8-c36c-495a-93fc-0c247a3e6e5f")!,
+            UUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
+            UUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(UUID.self, type(of: anyHashables[0].base))
+        expectEqual(UUID.self, type(of: anyHashables[1].base))
+        expectEqual(UUID.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSUUID() {
+        let values: [NSUUID] = [
+            NSUUID(uuidString: "e621e1f8-c36c-495a-93fc-0c247a3e6e5f")!,
+            NSUUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
+            NSUUID(uuidString: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")!,
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(UUID.self, type(of: anyHashables[0].base))
+        expectEqual(UUID.self, type(of: anyHashables[1].base))
+        expectEqual(UUID.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
     }
 }
 
@@ -102,6 +130,8 @@ UUIDTests.test("test_uuidString") { TestUUID().test_uuidString() }
 UUIDTests.test("test_description") { TestUUID().test_description() }
 UUIDTests.test("test_roundTrips") { TestUUID().test_roundTrips() }
 UUIDTests.test("test_hash") { TestUUID().test_hash() }
+UUIDTests.test("test_AnyHashableContainingUUID") { TestUUID().test_AnyHashableContainingUUID() }
+UUIDTests.test("test_AnyHashableCreatedFromNSUUID") { TestUUID().test_AnyHashableCreatedFromNSUUID() }
 runAllTests()
 #endif
 

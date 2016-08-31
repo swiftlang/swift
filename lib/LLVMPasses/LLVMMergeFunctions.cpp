@@ -2160,6 +2160,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     IRBuilder<> Builder(CI);
 
     FunctionType *NewFuncTy = New->getFunctionType();
+    (void) NewFuncTy;
     unsigned ParamIdx = 0;
     
     // Add the existing parameters.

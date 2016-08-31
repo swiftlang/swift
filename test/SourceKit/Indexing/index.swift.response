@@ -145,7 +145,7 @@
     {
       key.kind: source.lang.swift.decl.function.operator.infix,
       key.name: "+(_:_:)",
-      key.usr: "s:ZF5indexoi1pFTCS_2CCS0__S0_",
+      key.usr: "s:F5indexoi1pFTCS_2CCS0__S0_",
       key.line: 19,
       key.column: 6,
       key.entities: [
@@ -275,7 +275,7 @@
         {
           key.kind: source.lang.swift.ref.function.operator.infix,
           key.name: "+(_:_:)",
-          key.usr: "s:ZF5indexoi1pFTCS_2CCS0__S0_",
+          key.usr: "s:F5indexoi1pFTCS_2CCS0__S0_",
           key.line: 38,
           key.column: 5
         },
@@ -704,7 +704,7 @@
                 {
                   key.kind: source.lang.swift.ref.function.operator.infix,
                   key.name: "+(_:_:)",
-                  key.usr: "s:ZFsoi1pFTSiSi_Si",
+                  key.usr: "s:Fsoi1pFTSiSi_Si",
                   key.line: 86,
                   key.column: 8
                 }
@@ -789,7 +789,7 @@
         {
           key.kind: source.lang.swift.ref.function.operator.prefix,
           key.name: "++(_:)",
-          key.usr: "s:ZFsop2ppFRSiSi",
+          key.usr: "s:Fsop2ppFRSiSi",
           key.line: 95,
           key.column: 3
         },
@@ -855,7 +855,7 @@
         {
           key.kind: source.lang.swift.ref.function.operator.prefix,
           key.name: "++(_:)",
-          key.usr: "s:ZFsop2ppFRSiSi",
+          key.usr: "s:Fsop2ppFRSiSi",
           key.line: 98,
           key.column: 3
         },

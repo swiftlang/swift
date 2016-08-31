@@ -99,7 +99,7 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
 %   for p in withPredicateValues:
 // workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     comparePredicate = "<" if p else ""
-%     commaComparePredicate = ", isOrderedBefore: <" if p else ""
+%     commaComparePredicate = ", by: <" if p else ""
 %     name = "lessPredicate" if p else "noPredicate"
 
 Algorithm.test("${t}/sorted/${name}") {
@@ -110,7 +110,7 @@ Algorithm.test("${t}/sorted/${name}") {
 
   // Similar test for sorting with predicate
 %       if comparePredicate:
-  sortedAry1 = ary.sorted(isOrderedBefore: ${comparePredicate})
+  sortedAry1 = ary.sorted(by: ${comparePredicate})
 %       else:
   sortedAry1 = ary.sorted()
 %       end
@@ -153,7 +153,8 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
 
 Algorithm.test("partition/CrashOnSingleElement") {
   var a = DefaultedMutableRandomAccessCollection([10])
-  expectEqual(a.startIndex, a.partition())
+  let first = a.first!
+  expectEqual(a.startIndex, a.partition(by: {$0 >= first}))
 }
 
 runAllTests()

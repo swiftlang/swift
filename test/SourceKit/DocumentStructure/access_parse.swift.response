@@ -61,7 +61,7 @@
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "fpFunc()",
           key.offset: 149,
           key.length: 16,
@@ -130,7 +130,7 @@
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "fpFunc()",
           key.offset: 325,
           key.length: 16,
@@ -223,7 +223,7 @@
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "fpFunc()",
           key.offset: 547,
           key.length: 16,
@@ -292,7 +292,7 @@
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.private,
+          key.accessibility: source.lang.swift.accessibility.fileprivate,
           key.name: "fpFunc()",
           key.offset: 725,
           key.length: 16,
@@ -447,7 +447,7 @@
     {
       key.kind: source.lang.swift.decl.var.global,
       key.accessibility: source.lang.swift.accessibility.public,
-      key.setter_accessibility: source.lang.swift.accessibility.private,
+      key.setter_accessibility: source.lang.swift.accessibility.fileprivate,
       key.name: "pubFPSetProp",
       key.offset: 1083,
       key.length: 22,

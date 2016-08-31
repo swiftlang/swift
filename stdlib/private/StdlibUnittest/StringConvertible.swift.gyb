@@ -30,7 +30,7 @@ public struct CustomPrintableValue
   public static var timesDebugDescriptionWasCalled = ResettableValue(0)
 
   public static var descriptionImpl =
-    ResettableValue<(value: Int, identity: Int) -> String>({
+    ResettableValue<(_ value: Int, _ identity: Int) -> String>({
       (value: Int, identity: Int) -> String in
       if identity == 0 {
         return "(value: \(value)).description"
@@ -40,7 +40,7 @@ public struct CustomPrintableValue
     })
 
   public static var debugDescriptionImpl =
-    ResettableValue<(value: Int, identity: Int) -> String>({
+    ResettableValue<(_ value: Int, _ identity: Int) -> String>({
       (value: Int, identity: Int) -> String in
       CustomPrintableValue.timesDescriptionWasCalled.value += 1
       if identity == 0 {
@@ -97,7 +97,7 @@ extension CustomPrintableValue : CustomStringConvertible {
   public var description: String {
     CustomPrintableValue.timesDescriptionWasCalled.value += 1
     return CustomPrintableValue.descriptionImpl.value(
-      value: value, identity: identity)
+      value, identity)
   }
 }
 
@@ -105,14 +105,14 @@ extension CustomPrintableValue : CustomDebugStringConvertible {
   public var debugDescription: String {
     CustomPrintableValue.timesDebugDescriptionWasCalled.value += 1
     return CustomPrintableValue.debugDescriptionImpl.value(
-      value: value, identity: identity)
+      value, identity)
   }
 }
 
 public func expectPrinted<T>(
   expectedOneOf patterns: [String], _ object: T, ${TRACE}
 ) {
-  let actual = String(object)
+  let actual = String(describing: object)
   if !patterns.contains(actual) {
     expectationFailure(
       "expected: any of \(String(reflecting: patterns))\n"

@@ -12,7 +12,7 @@ func test1(inout var x : Int) {}  // expected-error {{parameter may not have mul
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
 func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
-func test3(f : (inout x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
+func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
 
 func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
@@ -117,10 +117,11 @@ leavings<T>(x: T) {} // expected-error {{found an unexpected second identifier i
 // expected-note@-1 {{join the identifiers together}} {{6-9=hammerleavings}}
 // expected-note@-2 {{join the identifiers together with camel-case}} {{6-9=hammerLeavings}}
 
-prefix operator % {}
+prefix operator %
 prefix func %<T>(x: T) -> T { return x } // No error expected - the < is considered an identifier but is peeled off by the parser.
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
   // expected-note@-1 {{did you mean to constrain 'T' with the 'AnyObject' protocol?}} {{16-21=AnyObject}}
-  weak var value: T // expected-error {{'weak' may not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
+  weak var value: T // expected-error {{'weak' may only be applied to class and class-bound protocol types}}
+  // expected-error@-1 {{use of undeclared type 'T'}}
 }

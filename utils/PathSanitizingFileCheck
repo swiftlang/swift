@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+# utils/PathSanitizingFileCheck -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See http://swift.org/LICENSE.txt for license information
+# See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from __future__ import print_function
+
+import argparse
+import subprocess
+import sys
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+PathSanitizingFileCheck is a wrapper around LLVM's FileCheck.  In addition
+to all FileCheck features, PathSanitizingFileCheck can replace given
+strings in the input with other strings.  This feature is used to replace
+paths to the source and build directories with path-independent
+constants.""")
+
+    parser.add_argument(
+        "--sanitize",
+        help="replace the given string with another string",
+        metavar="REPLACEMENT=SOURCE",
+        action="append",
+        dest="sanitize_strings",
+        default=[])
+
+    args, unknown_args = parser.parse_known_args()
+
+    stdin = sys.stdin.read()
+    for s in args.sanitize_strings:
+        replacement, pattern = s.split('=', 1)
+        stdin = stdin.replace(pattern, replacement)
+
+    p = subprocess.Popen(["FileCheck"] + unknown_args, stdin=subprocess.PIPE)
+    stdout, stderr = p.communicate(stdin)
+    if stdout is not None:
+        print(stdout)
+    if stderr is not None:
+        print(stderr, file=sys.stderr)
+    return p.wait()
+
+
+if __name__ == '__main__':
+    exit(main())
+

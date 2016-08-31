@@ -327,23 +327,34 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   return anyRemoved;
 }
 
-static bool matchesDiscriminator(Identifier discriminator,
-                                 const ValueDecl *value) {
-  if (value->getFormalAccess() != Accessibility::Private)
-    return false;
+namespace {
+enum class DiscriminatorMatch {
+  NoDiscriminator,
+  Matches,
+  Different
+};
+}
+
+static DiscriminatorMatch matchDiscriminator(Identifier discriminator,
+                                             const ValueDecl *value) {
+  if (value->getFormalAccess() > Accessibility::FilePrivate)
+    return DiscriminatorMatch::NoDiscriminator;
 
   auto containingFile =
     dyn_cast<FileUnit>(value->getDeclContext()->getModuleScopeContext());
   if (!containingFile)
-    return false;
+    return DiscriminatorMatch::Different;
 
-  return
-    discriminator == containingFile->getDiscriminatorForPrivateValue(value);
+  if (discriminator == containingFile->getDiscriminatorForPrivateValue(value))
+    return DiscriminatorMatch::Matches;
+
+  return DiscriminatorMatch::Different;
 }
 
-static bool matchesDiscriminator(Identifier discriminator,
-                                 UnqualifiedLookupResult lookupResult) {
-  return matchesDiscriminator(discriminator, lookupResult.getValueDecl());
+static DiscriminatorMatch
+matchDiscriminator(Identifier discriminator,
+                   UnqualifiedLookupResult lookupResult) {
+  return matchDiscriminator(discriminator, lookupResult.getValueDecl());
 }
 
 template <typename Result>
@@ -353,19 +364,21 @@ static void filterForDiscriminator(SmallVectorImpl<Result> &results,
   if (discriminator.empty())
     return;
 
-  auto doesNotMatch = [discriminator](Result next) -> bool {
-    return !matchesDiscriminator(discriminator, next);
-  };
-
-  auto lastMatchIter = std::find_if_not(results.rbegin(), results.rend(),
-                                        doesNotMatch);
+  auto lastMatchIter = std::find_if(results.rbegin(), results.rend(),
+                                    [discriminator](Result next) -> bool {
+    return
+      matchDiscriminator(discriminator, next) == DiscriminatorMatch::Matches;
+  });
   if (lastMatchIter == results.rend())
     return;
 
   Result lastMatch = *lastMatchIter;
 
   auto newEnd = std::remove_if(results.begin(), lastMatchIter.base()-1,
-                               doesNotMatch);
+                               [discriminator](Result next) -> bool {
+    return
+      matchDiscriminator(discriminator, next) == DiscriminatorMatch::Different;
+  });
   results.erase(newEnd, results.end());
   results.push_back(lastMatch);
 }
@@ -417,7 +430,18 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       ValueDecl *MetaBaseDecl = 0;
       GenericParamList *GenericParams = nullptr;
       Type ExtendedType;
-
+      bool isTypeLookup = false;
+      
+      // If this declcontext is an initializer for a static property, then we're
+      // implicitly doing a static lookup into the parent declcontext.
+      if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC))
+        if (!DC->getParent()->isModuleScopeContext()) {
+          if (auto PBD = PBI->getBinding()) {
+            isTypeLookup = PBD->isStatic();
+            DC = DC->getParent();
+          }
+        }
+      
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
         // Look for local variables; normally, the parser resolves these
         // for us, but it can't do the right thing inside local types.
@@ -511,6 +535,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           isCascadingUse = DC->isCascadingContextForLookup(false);
       }
 
+      // If this is implicitly a lookup into the static members, add a metatype
+      // wrapper.
+      if (isTypeLookup && ExtendedType)
+        ExtendedType = MetatypeType::get(ExtendedType, Ctx);
+      
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
@@ -540,15 +569,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
-        bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
         bool FoundAny = false;
         for (auto Result : Lookup) {
-          // If we're looking into an instance, skip static functions.
-          if (!isMetatypeType &&
-              isa<FuncDecl>(Result) &&
-              cast<FuncDecl>(Result)->isStatic())
-            continue;
-
           // Classify this declaration.
           FoundAny = true;
 
@@ -558,16 +580,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               Results.push_back(UnqualifiedLookupResult(Result));
             else
               Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
-            continue;
-          } else if (auto FD = dyn_cast<FuncDecl>(Result)) {
-            if (FD->isStatic() && !isMetatypeType)
-              continue;
-          } else if (isa<EnumElementDecl>(Result)) {
-            auto lookupRes = UnqualifiedLookupResult(MetaBaseDecl, Result);
-            if (!BaseDecl->getType()->is<MetatypeType>()) {
-              lookupRes.IsPromotedInstanceRef = true;
-            }
-            Results.push_back(lookupRes);
             continue;
           }
 
@@ -886,6 +898,9 @@ void NominalTypeDecl::addedMember(Decl *member) {
 
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
+    if (getExtendedType()->is<ErrorType>())
+      return;
+
     auto nominal = getExtendedType()->getAnyNominal();
     if (nominal->LookupTable.getPointer()) {
       // Make sure we have the complete list of extensions.
@@ -1019,10 +1034,13 @@ static bool checkAccessibility(const DeclContext *useDC,
                                const DeclContext *sourceDC,
                                Accessibility access) {
   if (!useDC)
-    return access == Accessibility::Public;
+    return access >= Accessibility::Public;
 
+  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
   switch (access) {
   case Accessibility::Private:
+    return useDC == sourceDC || useDC->isChildContextOf(sourceDC);
+  case Accessibility::FilePrivate:
     return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
   case Accessibility::Internal: {
     const Module *sourceModule = sourceDC->getParentModule();
@@ -1035,6 +1053,7 @@ static bool checkAccessibility(const DeclContext *useDC,
     return false;
   }
   case Accessibility::Public:
+  case Accessibility::Open:
     return true;
   }
   llvm_unreachable("bad Accessibility");

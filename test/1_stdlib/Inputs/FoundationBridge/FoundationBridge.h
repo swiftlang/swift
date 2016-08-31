@@ -52,4 +52,21 @@ void takesData(NSData *object);
 NSData *returnsData();
 BOOL identityOfData(NSData *data);
 
+#pragma mark - NSCalendar verification
+
+@interface CalendarBridgingTester : NSObject
+- (NSCalendar *)autoupdatingCurrentCalendar;
+- (BOOL)verifyAutoupdatingCalendar:(NSCalendar *)calendar;
+@end
+
+@interface TimeZoneBridgingTester : NSObject
+- (NSTimeZone *)autoupdatingCurrentTimeZone;
+- (BOOL)verifyAutoupdatingTimeZone:(NSTimeZone *)tz;
+@end
+
+@interface LocaleBridgingTester : NSObject
+- (NSLocale *)autoupdatingCurrentLocale;
+- (BOOL)verifyAutoupdatingLocale:(NSLocale *)locale;
+@end
+
 NS_ASSUME_NONNULL_END

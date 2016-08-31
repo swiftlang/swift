@@ -40,11 +40,11 @@
 /// Region B to Region A, that means there is no blocking operation from where
 /// the release was in Region B and where the release is hoisted to in Region A.
 ///
-/// The question is whether we can introduce such operation while we hoist other
-/// releases. The answer is NO. because if such releases exist, they would be
-/// blocked by the old release (we remove old release and recreate new ones at
-/// the end of the pass) and will not be able to be hoisted beyond the old 
-/// release.
+/// The question is whether we can introduce such operation while we hoist
+/// other releases. The answer is NO. because if such releases exist, they
+/// would be blocked by the old release (we remove old release and recreate new
+/// ones at the end of the pass) and will not be able to be hoisted beyond the
+/// old release.
 ///
 /// This proof also hinges on the fact that if release A interferes with
 /// releases B then release B must interfere with release A. i.e. the 2
@@ -64,19 +64,18 @@
 ///
 /// TODO: There are a lot of code duplications between retain and release code
 /// motion in the data flow part. Consider whether we can share them.
-/// Essentially, we can implement the release code motion by inverting the retain
-/// code motion, but this can also make the code less readable.
+/// Essentially, we can implement the release code motion by inverting the 
+/// retain code motion, but this can also make the code less readable.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-rr-code-motion"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
-#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
@@ -94,19 +93,10 @@ STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
-llvm::cl::opt<bool> DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
 
-//===----------------------------------------------------------------------===//
-//                             Utility 
-//===----------------------------------------------------------------------===//
-
-static bool isRetainInstruction(SILInstruction *I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
-}
-
-static bool isReleaseInstruction(SILInstruction *I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
-}
+/// Disable optimization if we have to break critical edges in the function.
+llvm::cl::opt<bool>
+DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                             Block State 
@@ -139,6 +129,7 @@ struct BlockState {
   /// RCRootVault. If this bit is set, that means this is potentially a retain
   /// or release that can be sunk or hoisted to this point. This is used to
   /// optimize the time for computing genset and killset.
+  ///
   /// NOTE: this vector contains an approximation of whether there will be a
   /// retain or release to a certain point of a basic block.
   llvm::SmallBitVector BBMaxSet;
@@ -199,13 +190,14 @@ protected:
   /// retain or release.
   SILValue getRCRoot(SILInstruction *I) {
     assert(isRetainInstruction(I) || isReleaseInstruction(I) &&
-           "Extracting RC root from Invalid instruction");
+           "Extracting RC root from invalid instruction");
     return getRCRoot(I->getOperand(0));
   }
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA, SILFunction *F,
+  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+                    SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
     : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI) {}
@@ -286,6 +278,8 @@ public:
   RetainBlockState(bool IsEntry, unsigned size, bool MultiIteration) {
     // Iterative forward data flow.
     BBSetIn.resize(size, false);
+    // Initilize to true if we are running optimistic data flow, i.e.
+    // MultiIteration is true.
     BBSetOut.resize(size, MultiIteration);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
   
@@ -327,7 +321,7 @@ public:
   RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                           SILFunction *F, PostOrderFunctionInfo *PO,
                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI) {
+    : CodeMotionContext(BPA, F, PO, AA, RCFI) {
     MultiIteration = requireIteration();
   }
 
@@ -396,8 +390,9 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
 
   // Initialize all the data flow bit vector for all basic blocks.
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA.Allocate()) RetainBlockState(&BB == &*F->begin(),
-                                 RCRootVault.size(), MultiIteration);
+    BlockStates[&BB] = new (BPA.Allocate())
+                            RetainBlockState(&BB == &*F->begin(),
+                            RCRootVault.size(), MultiIteration);
   }
 }
 
@@ -607,6 +602,8 @@ public:
   /// constructor.
   ReleaseBlockState(bool IsExit, unsigned size, bool MultiIteration) {
     // backward data flow.
+    // Initilize to true if we are running optimistic data flow, i.e.
+    // MultiIteration is true.
     BBSetIn.resize(size, MultiIteration);
     BBSetOut.resize(size, false);
     BBMaxSet.resize(size, !IsExit && MultiIteration);
@@ -655,10 +652,10 @@ public:
                            AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI),
-        FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {
-    MultiIteration = requireIteration(); 
-  }
+    : CodeMotionContext(BPA, F, PO, AA, RCFI),
+      FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {
+    MultiIteration = requireIteration();
+  } 
 
   /// virtual destructor.
   virtual ~ReleaseCodeMotionContext() {}
@@ -727,16 +724,10 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   }
 
   // Initialize all the data flow bit vector for all basic blocks.
-  llvm::SmallPtrSet<SILBasicBlock *, 2> Exits;
-  auto Return = F->findReturnBB();
-  auto Throw = F->findThrowBB();
-  if (Return != F->end())
-    Exits.insert(&*Return);
-  if (Throw != F->end())
-    Exits.insert(&*Throw);
   for (auto &BB : *F) {
-    BlockStates[&BB] = new (BPA.Allocate()) ReleaseBlockState(Exits.count(&BB),
-                                            RCRootVault.size(), MultiIteration);
+    BlockStates[&BB] = new (BPA.Allocate())
+            ReleaseBlockState(BB.getTerminator()->isFunctionExiting(),
+                              RCRootVault.size(), MultiIteration);
   }
 }
 
@@ -981,11 +972,11 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
 namespace {
 
 /// Code motion kind.
-enum CMKind : unsigned { Retain = 0, Release = 1};
+enum CodeMotionKind : unsigned { Retain = 0, Release = 1};
 
 class RRCodeMotion : public SILFunctionTransform {
   /// Whether to hoist releases or sink retains.
-  CMKind Kind;
+  CodeMotionKind Kind;
 
   /// Freeze epilogue release or not.
   bool FreezeEpilogueReleases;
@@ -994,10 +985,11 @@ public:
   StringRef getName() override { return "SIL Retain Release Code Motion"; }
 
   /// Constructor.
-  RRCodeMotion(CMKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
+  RRCodeMotion(CodeMotionKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
 
   /// The entry point to the transformation.
   void run() override {
+    // Code motion disabled.
     if (DisableRRCodeMotion)
       return;
 
@@ -1056,15 +1048,16 @@ public:
 
 /// Sink Retains.
 SILTransform *swift::createRetainSinking() {
-  return new RRCodeMotion(CMKind::Retain, false);
+  return new RRCodeMotion(CodeMotionKind::Retain, false);
 }
 
-/// Hoist releases, but not epilogue release.
+/// Hoist releases, but not epilogue release. ASO relies on epilogue releases
+/// to prove knownsafety on enclosed releases.
 SILTransform *swift::createReleaseHoisting() {
-  return new RRCodeMotion(CMKind::Release, true);
+  return new RRCodeMotion(CodeMotionKind::Release, true);
 }
 
 /// Hoist all releases.
 SILTransform *swift::createLateReleaseHoisting() {
-  return new RRCodeMotion(CMKind::Release, false);
+  return new RRCodeMotion(CodeMotionKind::Release, false);
 }

@@ -392,6 +392,47 @@ getAnyBaseClassDocComment(swift::markup::MarkupContext &MC,
   return None;
 }
 
+static Optional<DocComment *>
+getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
+                                 const ProtocolDecl *ProtoExt,
+                                 const Decl *D) {
+
+  auto getSingleRequirementWithNonemptyDoc = [](const ProtocolDecl *P,
+                                                const ValueDecl *VD)
+    -> const ValueDecl * {
+      SmallVector<ValueDecl *, 2> Members;
+      P->lookupQualified(P->getType(), VD->getFullName(),
+                         NLOptions::NL_ProtocolMembers,
+                         /*resolver=*/nullptr, Members);
+    SmallVector<const ValueDecl *, 1> ProtocolRequirements;
+    for (auto Member : Members)
+      if (!Member->isDefinition())
+        ProtocolRequirements.push_back(Member);
+
+    if (ProtocolRequirements.size() == 1) {
+      auto Requirement = ProtocolRequirements.front();
+      if (!Requirement->getRawComment().isEmpty())
+        return Requirement;
+    }
+
+    return nullptr;
+  };
+
+  if (const auto *VD = dyn_cast<ValueDecl>(D)) {
+    SmallVector<const ValueDecl *, 4> RequirementsWithDocs;
+    if (auto Requirement = getSingleRequirementWithNonemptyDoc(ProtoExt, VD))
+      RequirementsWithDocs.push_back(Requirement);
+
+    for (auto Proto : ProtoExt->getInheritedProtocols(/*resolver=*/nullptr))
+      if (auto Requirement = getSingleRequirementWithNonemptyDoc(Proto, VD))
+        RequirementsWithDocs.push_back(Requirement);
+
+    if (RequirementsWithDocs.size() == 1)
+      return getSingleDocComment(MC, RequirementsWithDocs.front());
+  }
+  return None;
+}
+
 Optional<DocComment *>
 swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
   auto Doc = getSingleDocComment(MC, D);
@@ -404,8 +445,9 @@ swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
     if (auto BaseClassDoc = getAnyBaseClassDocComment(MC, CD, D))
       return BaseClassDoc;
 
-  // FIXME: Look at protocol requirement declarations if a protocol
-  // extension implementation doesn't have a doc comment.
+  if (const auto *PE = D->getDeclContext()->getAsProtocolExtensionContext())
+    if (auto ReqDoc = getProtocolRequirementDocComment(MC, PE, D))
+      return ReqDoc;
 
   return None;
 }

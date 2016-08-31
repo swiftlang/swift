@@ -1,5 +1,5 @@
 // RUN: %swift -parse -verify -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift
-// RUN: not %swift -parse -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: not %swift -parse -target x86_64-apple-macosx10.51 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | %FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -17,23 +17,23 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
   // when importing deprecated enums do not themselves trigger deprecation
   // warnings in the synthesized code.
 
-  _ = ClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
 }
 
 func useClassThatTriggersImportOExplicitlyUnavailableOptions() {
-  _ = ClassWithPotentiallyUnavailableOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithPotentiallyUnavailableOptionsInMethodSignature.sharedInstance()
 }
 
 func useClassThatTriggersImportOfPotentiallyUnavailableOptions() {
-  _ = ClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  _ = DeprecatedOptions.first // expected-warning {{'DeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
-  _ = DeprecatedEnum.first    // expected-warning {{'DeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedOptions.first // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+  _ = NSDeprecatedEnum.first    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.51: Use a different API}}
 }
 
-func useInSignature(_ options: DeprecatedOptions) { // expected-warning {{'DeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
+func useInSignature(_ options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.51: Use a different API}}
 }
 
 class SuperClassWithDeprecatedInitializer {
@@ -53,11 +53,11 @@ func callImplicitInitializerOnSubClassWithSynthesizedDesignedInitializerOverride
 }
 
 @available(OSX, introduced: 10.9, deprecated: 10.51)
-class DeprecatedSuperClass {
+class NSDeprecatedSuperClass {
   var i : Int = 7 // Causes initializer to be synthesized
 }
 
-class NotDeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass { // expected-warning {{'DeprecatedSuperClass' was deprecated in OS X 10.51}}
+class NotDeprecatedSubClassOfDeprecatedSuperClass : NSDeprecatedSuperClass { // expected-warning {{'NSDeprecatedSuperClass' was deprecated in OS X 10.51}}
 }
 
 func callImplicitInitializerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
@@ -68,7 +68,7 @@ func callImplicitInitializerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
 }
 
 @available(OSX, introduced: 10.9, deprecated: 10.51)
-class DeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass {
+class NSDeprecatedSubClassOfDeprecatedSuperClass : NSDeprecatedSuperClass {
 }
 
 // Tests synthesis of materializeForSet

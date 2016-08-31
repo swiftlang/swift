@@ -40,6 +40,7 @@ public:
   BAD_MEMBER(Protocol)
   BAD_MEMBER(TopLevelCode)
   BAD_MEMBER(Operator)
+  BAD_MEMBER(PrecedenceGroup)
 
   // The children of these are automatically inserted into the
   // surrounding context.

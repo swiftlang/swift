@@ -103,7 +103,9 @@ extension String {
   /// - Parameter body: A closure that takes a character view as its argument.
   /// - Returns: The return value of the `body` closure, if any, is the return
   ///   value of this method.
-  public mutating func withMutableCharacters<R>(_ body: (inout CharacterView) -> R) -> R {
+  public mutating func withMutableCharacters<R>(
+    _ body: (inout CharacterView) -> R
+  ) -> R {
     // Naively mutating self.characters forces multiple references to
     // exist at the point of mutation. Instead, temporarily move the
     // core of this string into a CharacterView.
@@ -234,6 +236,9 @@ extension String.CharacterView : BidirectionalCollection {
     )
   }
 
+  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
   @inline(never)
@@ -273,7 +278,10 @@ extension String.CharacterView : BidirectionalCollection {
     
     return start._position - startIndexUTF16
   }
-  
+
+  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
+  //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
   @inline(never)

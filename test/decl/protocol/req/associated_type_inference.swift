@@ -171,7 +171,7 @@ public protocol Thenable {
 }
 
 public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(_ success: (t: T, _: CorePromise<T>) -> T) -> Self {
+    public func then(_ success: @escaping (_ t: T, _: CorePromise<T>) -> T) -> Self {
         return self.then() { (t: T) -> T in
             return success(t: t, self)
         }

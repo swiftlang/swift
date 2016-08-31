@@ -726,6 +726,22 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
+  // Foreign classes should not be freed by sending -release.
+  // They should also probably not be freed with object_dispose(),
+  // either.
+  //
+  // However, in practice, the only time we should try to free an
+  // instance of a foreign class here is inside an initializer
+  // delegating to a factory initializer. In this case, the object
+  // was allocated with +allocWithZone:, so calling object_dispose()
+  // should be OK.
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
+    selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
+    IGF.Builder.CreateCall(IGF.IGM.getObjectDisposeFn(),
+                           {selfValue});
+    return;
+  }
+
   llvm::Value *size, *alignMask;
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
@@ -1892,7 +1908,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
                                                          /*implicit=*/true));
   SwiftRootClass->setImplicit();
-  SwiftRootClass->setAccessibility(Accessibility::Public);
+  SwiftRootClass->setAccessibility(Accessibility::Open);
   
   SwiftRootClasses.insert({name, SwiftRootClass});
   return SwiftRootClass;

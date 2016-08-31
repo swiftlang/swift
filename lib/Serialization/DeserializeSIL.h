@@ -108,14 +108,6 @@ namespace swift {
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
 
-    /// A helper method to get a type based on a TypeID.
-    /// If this type is an opened archetype and its
-    /// definition is not seen yet, create a placeholder
-    /// SILValue representing a forward definition and
-    /// register it as a definition of this opened archetype.
-    Type getType(SILBuilder &Builder, ModuleFile *MF,
-                 serialization::TypeID TID);
-
 public:
     Identifier getModuleIdentifier() const {
       return MF->getAssociatedModule()->getName();

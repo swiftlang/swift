@@ -2,20 +2,28 @@
 
 // This disables importing the stdlib intentionally.
 
-infix operator == {
-  associativity left
-  precedence 110
+infix operator == : Equal
+precedencegroup Equal {
+  associativity: left
+  higherThan: FatArrow
 }
 
-infix operator & {
-  associativity left
-  precedence 150
+infix operator & : BitAnd
+precedencegroup BitAnd {
+  associativity: left
+  higherThan: Equal
 }
 
-infix operator => {
-  associativity right
-  precedence 100
+infix operator => : FatArrow
+precedencegroup FatArrow {
+  associativity: right
+  higherThan: AssignmentPrecedence
 }
+precedencegroup AssignmentPrecedence {
+  assignment: true
+}
+
+precedencegroup DefaultPrecedence {}
 
 struct Man {}
 struct TheDevil {}
@@ -42,8 +50,8 @@ func test1() {
   Man() == Five() => TheDevil() == Six() => God() == Seven()
 }
 
-postfix operator *!* {}
-prefix operator *!* {}
+postfix operator *!*
+prefix operator *!*
 
 struct LOOK {}
 struct LOOKBang {
@@ -61,9 +69,9 @@ func test2() {
 LOOK()*!*.exclaim()
 
 
-prefix operator ^ {}
-infix operator ^ {}
-postfix operator ^ {}
+prefix operator ^
+infix operator ^
+postfix operator ^
 
 postfix func ^ (x: God) -> TheDevil {}
 prefix func ^ (x: TheDevil) -> God {}
@@ -84,13 +92,13 @@ var _ : God = Man()^() // expected-error{{cannot convert value of type 'Man' to 
 
 func &(x : Man, y : Man) -> Man { return x } // forgive amp_prefix token
 
-prefix operator ⚽️ {}
+prefix operator ⚽️
 
 prefix func ⚽️(x: Man) { }
 
-infix operator ?? {
-  associativity right
-  precedence 100
+infix operator ?? : OptTest
+precedencegroup OptTest {
+  associativity: right
 }
 
 func ??(x: Man, y: TheDevil) -> TheDevil {
@@ -103,7 +111,7 @@ func test3(a: Man, b: Man, c: TheDevil) -> TheDevil {
 
 // <rdar://problem/17821399> We don't parse infix operators bound on both
 // sides that begin with ! or ? correctly yet.
-infix operator !! {}
+infix operator !!
 
 func !!(x: Man, y: Man) {}
 let foo = Man()

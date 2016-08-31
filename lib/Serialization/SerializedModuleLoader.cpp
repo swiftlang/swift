@@ -67,7 +67,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   return std::error_code();
 }
 
-static std::error_code
+static bool
 findModule(ASTContext &ctx, AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> &moduleDocBuffer,
@@ -110,8 +110,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
     }
-    if (!err || err != std::errc::no_such_file_or_directory)
-      return err;
+    if (!err)
+      return true;
   }
 
   {
@@ -127,20 +127,20 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                                  archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer,
                                  scratch);
-      if (!err || err != std::errc::no_such_file_or_directory)
-        return err;
+      if (!err)
+        return true;
     }
   }
 
   // If we're not allowed to look in the runtime library import path, stop.
   if (ctx.SearchPathOpts.SkipRuntimeLibraryImportPath)
-    return std::make_error_code(std::errc::no_such_file_or_directory);
+    return false;
 
   // Search the runtime import path.
   isFramework = false;
-  return openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
-                         moduleFilename.str(), moduleDocFilename.str(),
-                         moduleBuffer, moduleDocBuffer, scratch);
+  return !openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
+                          moduleFilename.str(), moduleDocFilename.str(),
+                          moduleBuffer, moduleDocBuffer, scratch);
 }
 
 FileUnit *SerializedModuleLoader::loadAST(
@@ -378,14 +378,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Otherwise look on disk.
   if (!moduleInputBuffer) {
-    if (std::error_code err = findModule(Ctx, moduleID, moduleInputBuffer,
-                                         moduleDocInputBuffer,
-                                         isFramework)) {
-      if (err != std::errc::no_such_file_or_directory) {
-        Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                           moduleID.first, err.message());
-      }
-
+    if (!findModule(Ctx, moduleID, moduleInputBuffer, moduleDocInputBuffer,
+                    isFramework)) {
       return nullptr;
     }
 
@@ -490,6 +484,11 @@ TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
 OperatorDecl *SerializedASTFile::lookupOperator(Identifier name,
                                                 DeclKind fixity) const {
   return File.lookupOperator(name, fixity);
+}
+
+PrecedenceGroupDecl *
+SerializedASTFile::lookupPrecedenceGroup(Identifier name) const {
+  return File.lookupPrecedenceGroup(name);
 }
 
 void SerializedASTFile::lookupVisibleDecls(Module::AccessPathTy accessPath,

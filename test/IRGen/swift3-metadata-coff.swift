@@ -1,4 +1,10 @@
-// RUN: %swift -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | FileCheck %s
+// RUN: %swift -target thumbv7--windows-itanium -parse-stdlib -parse-as-library -module-name Swift -O -emit-ir %s -o - | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=ARM
+
+precedencegroup AssignmentPrecedence {
+  assignment: true
+}
 
 public enum Optional<Wrapped> {
   case none
@@ -13,8 +19,10 @@ public struct S : P {
   public typealias T = Optional<S>
 }
 
+var gg = S()
+
 public func f(s : S) -> (() -> ()) {
-  return { _ = s }
+  return { gg = s }
 }
 
 // CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant {{.*}}, section ".sw3cptr"

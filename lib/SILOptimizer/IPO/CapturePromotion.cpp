@@ -46,6 +46,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -444,7 +445,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *Fn = M.createFunction(
-      Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
+      Orig->getLinkage(), ClonedName, SubstTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
@@ -663,7 +664,7 @@ isNonmutatingCapture(SILArgument *BoxArg) {
 static bool
 isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   auto *U = O->getUser();
-  if (U->isOpenedArchetypeOperand(*O))
+  if (U->isTypeDependentOperand(*O))
     return true;
   // Marking the boxed value as escaping is OK. It's just a DI annotation.
   if (isa<MarkFunctionEscapeInst>(U))
@@ -862,14 +863,17 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   // Create the substitution maps.
   TypeSubstitutionMap InterfaceSubs;
   TypeSubstitutionMap ContextSubs;
+  ArchetypeConformanceMap ConformanceMap;
 
   ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
   auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
-  auto *genericParams = F->getContextGenericParams();
+  auto *genericParams = F->getGenericEnvironment();
 
   if (!ApplySubs.empty()) {
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-    ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
+    genericParams->getSubstitutionMap(F->getModule().getSwiftModule(),
+                                      genericSig, ApplySubs,
+                                      ContextSubs, ConformanceMap);
   } else {
     assert(!genericSig && "Function type has Unexpected generic signature!");
     assert(!genericParams &&

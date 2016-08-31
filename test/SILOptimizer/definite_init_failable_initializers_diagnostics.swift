@@ -91,7 +91,7 @@ class ErrantClass : ErrantBaseClass {
       something(self) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
       // FIXME: not diagnosed
-      something(self.dynamicType)
+      something(type(of: self))
 
       throw e
     }

@@ -16,7 +16,7 @@ import Foundation
 class X {
     var x: [String]?
     func a(b: [NSObject: AnyObject]) {
-        x = Y().c(b[""])
+        x = Y().c(b["" as NSString])
     }
 }
 class Y {

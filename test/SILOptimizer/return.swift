@@ -9,8 +9,34 @@ func singleBlock2() -> Int {
   y += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
+enum NoCasesButNotNever {}
+
+func diagnoseNoCaseEnumMissingReturn() -> NoCasesButNotNever {
+} // expected-error {{function with uninhabited return type 'NoCasesButNotNever' is missing call to another never-returning function on all paths}} 
+
+func diagnoseNeverMissingBody() -> Never {
+} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}} 
+
+_ = { () -> Never in
+}() // expected-error {{closure with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}-
+
+func diagnoseNeverWithBody(i : Int) -> Never {
+  if (i == -1) {
+    print("Oh no!")
+  } else {
+    switch i {
+    case 0:
+      exit()
+    case 1:
+      fatalError()
+    default:
+      repeat { } while true 
+    } 
+  }
+} // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
+
 class MyClassWithClosure {
-  var f : (s: String) -> String = { (s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
+  var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
@@ -32,20 +58,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   x += 1
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
-@noreturn func MYsubscriptNonASCII(idx: Int) -> UnicodeScalar {
-} // no-warning
-
-@noreturn @_silgen_name("exit") func exit () -> ()
-@noreturn func tryingToReturn (x: Bool) -> () {
-  if x {
-    return // expected-error {{return from a 'noreturn' function}}
-  }
-  exit()
-}
-
-@noreturn func implicitReturnWithinNoreturn() {
-  _ = 0
-}// expected-error {{return from a 'noreturn' function}}
+@_silgen_name("exit") func exit () -> Never
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {
@@ -62,12 +75,8 @@ func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
 } // no error
 
 class TuringMachine {
-  @noreturn func halt() {
+  func halt() -> Never {
     repeat { } while true
-  }
-
-  @noreturn func eatTape() {
-    return // expected-error {{return from a 'noreturn' function}}
   }
 }
 
@@ -96,7 +105,7 @@ func whileTrueLoop() -> Int {
 }
 
 func testUnreachableAfterNoReturn(x: Int) -> Int {
-  exit(); // expected-note{{a call to a noreturn function}}
+  exit(); // expected-note{{a call to a never-returning function}}
   return x; // expected-warning {{will never be executed}}
 }
 
@@ -117,13 +126,13 @@ func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
 
 func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   let x:Int = 5
-  exit(); // expected-note{{a call to a noreturn function}}
+  exit(); // expected-note{{a call to a never-returning function}}
   exit(); // expected-warning {{will never be executed}}
   return x
 }
 
 func testUnreachableAfterNoReturnMethod() -> Int {
-  TuringMachine().halt(); // expected-note{{a call to a noreturn function}}
+  TuringMachine().halt(); // expected-note{{a call to a never-returning function}}
   return 0; // expected-warning {{will never be executed}}
 }
 

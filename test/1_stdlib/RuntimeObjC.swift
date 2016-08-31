@@ -51,11 +51,6 @@ struct SwiftObjectCanaryStruct {
   var value: Int
 }
 
-struct NotBridgedValueType {
-  // Keep it pointer-sized.
-  var canaryRef = SwiftObjectCanary()
-}
-
 struct BridgedValueType : _ObjectiveCBridgeable {
   init(value: Int) {
     self.value = value
@@ -63,10 +58,6 @@ struct BridgedValueType : _ObjectiveCBridgeable {
 
   func _bridgeToObjectiveC() -> ClassA {
     return ClassA(value: value)
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
   }
 
   static func _forceBridgeFromObjectiveC(
@@ -118,10 +109,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
     return ClassA(value: value0)
   }
 
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-
   static func _forceBridgeFromObjectiveC(
     _ x: ClassA,
     result: inout BridgedLargeValueType?
@@ -159,52 +146,6 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   var (value0, value1, value2, value3): (Int, Int, Int, Int)
   var (value4, value5, value6, value7): (Int, Int, Int, Int)
-  var canaryRef = SwiftObjectCanary()
-}
-
-
-struct ConditionallyBridgedValueType<T> : _ObjectiveCBridgeable {
-  init(value: Int) {
-    self.value = value
-  }
-
-  func _bridgeToObjectiveC() -> ClassA {
-    return ClassA(value: value)
-  }
-
-  static func _forceBridgeFromObjectiveC(
-    _ x: ClassA,
-    result: inout ConditionallyBridgedValueType?
-  ) {
-    assert(x.value % 2 == 0, "not bridged from Objective-C")
-    result = ConditionallyBridgedValueType(value: x.value)
-  }
-
-  static func _conditionallyBridgeFromObjectiveC(
-    _ x: ClassA,
-    result: inout ConditionallyBridgedValueType?
-  ) -> Bool {
-    if x.value % 2 == 0 {
-      result = ConditionallyBridgedValueType(value: x.value)
-      return true
-    }
-
-    result = nil
-    return false
-  }
-
-  static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
-      -> ConditionallyBridgedValueType {
-    var result: ConditionallyBridgedValueType? = nil
-    _forceBridgeFromObjectiveC(source!, result: &result)
-    return result!
-  }
-
-  static func _isBridgedToObjectiveC() -> Bool {
-    return ((T.self as Any) as? String.Type) == nil
-  }
-
-  var value: Int
   var canaryRef = SwiftObjectCanary()
 }
 
@@ -287,56 +228,29 @@ Runtime.test("_canBeClass") {
 }
 
 Runtime.test("bridgeToObjectiveC") {
-  expectEmpty(_bridgeToObjectiveC(NotBridgedValueType()))
+  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
 
-  expectEqual(42, (_bridgeToObjectiveC(BridgedValueType(value: 42)) as! ClassA).value)
-
-  expectEqual(42, (_bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
-
-  expectEqual(42, (_bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as! ClassA).value)
-
-  expectEmpty(_bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
+  expectEqual(42, (_bridgeAnythingToObjectiveC(BridgedLargeValueType(value: 42)) as! ClassA).value)
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
-  expectTrue(_bridgeToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
+  expectTrue(_bridgeAnythingToObjectiveC(bridgedVerbatimRef) === bridgedVerbatimRef)
 }
 
 Runtime.test("bridgeToObjectiveC/NoLeak") {
   withSwiftObjectCanary(
-    { NotBridgedValueType() },
-    { expectEmpty(_bridgeToObjectiveC($0)) })
-
-  withSwiftObjectCanary(
     { BridgedValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
+    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedLargeValueType(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
-
-  withSwiftObjectCanary(
-    { ConditionallyBridgedValueType<Int>(value: 42) },
-    { expectEqual(42, (_bridgeToObjectiveC($0) as! ClassA).value) })
-
-  withSwiftObjectCanary(
-    { ConditionallyBridgedValueType<String>(value: 42) },
-    { expectEmpty(_bridgeToObjectiveC($0)) })
+    { expectEqual(42, (_bridgeAnythingToObjectiveC($0) as! ClassA).value) })
 
   withSwiftObjectCanary(
     { BridgedVerbatimRefType() },
-    { expectTrue(_bridgeToObjectiveC($0) === $0) })
+    { expectTrue(_bridgeAnythingToObjectiveC($0) === $0) })
 }
 
 Runtime.test("forceBridgeFromObjectiveC") {
-  // Bridge back using NotBridgedValueType.
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      ClassA(value: 21), NotBridgedValueType.self))
-
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      ClassA(value: 42), NotBridgedValueType.self))
-
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
-      BridgedVerbatimRefType(), NotBridgedValueType.self))
 
   // Bridge back using BridgedValueType.
   expectEmpty(_conditionallyBridgeFromObjectiveC(
@@ -378,13 +292,11 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectFalse(_isBridgedToObjectiveC(NotBridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(NotBridgedValueType))
   expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
   expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
 }
@@ -401,13 +313,13 @@ Runtime.test("typeName") {
   expectEqual("NSObject", _typeName(NSObject.self))
 
   var a : Any = SomeObjCClass()
-  expectEqual("a.SomeObjCClass", _typeName(a.dynamicType))
+  expectEqual("a.SomeObjCClass", _typeName(type(of: a)))
   
   a = SomeNSObjectSubclass()
-  expectEqual("a.SomeNSObjectSubclass", _typeName(a.dynamicType))
+  expectEqual("a.SomeNSObjectSubclass", _typeName(type(of: a)))
 
   a = NSObject()
-  expectEqual("NSObject", _typeName(a.dynamicType))
+  expectEqual("NSObject", _typeName(type(of: a)))
 }
 
 class GenericClass<T> {}
@@ -443,11 +355,11 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassPS_9ProtocolA__",
               NSStringFromClass(GenericClass<ProtocolA>.self))
   expectEqual("_TtGC1a12GenericClassPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>>.self))
+              NSStringFromClass(GenericClass<ProtocolA & ProtocolB>.self))
   expectEqual("_TtGC1a12GenericClassPMPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolA, ProtocolB>.Type>.self))
+              NSStringFromClass(GenericClass<(ProtocolA & ProtocolB).Type>.self))
   expectEqual("_TtGC1a12GenericClassMPS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolB, ProtocolA>.Protocol>.self))
+              NSStringFromClass(GenericClass<(ProtocolB & ProtocolA).Protocol>.self))
 
   expectEqual("_TtGC1a12GenericClassCSo7CFArray_",
               NSStringFromClass(GenericClass<CFArray>.self))
@@ -460,7 +372,7 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassPSo9NSCopying__",
               NSStringFromClass(GenericClass<NSCopying>.self))
   expectEqual("_TtGC1a12GenericClassPSo9NSCopyingS_9ProtocolAS_9ProtocolB__",
-              NSStringFromClass(GenericClass<protocol<ProtocolB, NSCopying, ProtocolA>>.self))
+              NSStringFromClass(GenericClass<ProtocolB & NSCopying & ProtocolA>.self))
 
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
@@ -767,15 +679,14 @@ Reflection.test("MetatypeMirror") {
     dump(objcProtocolConcreteMetatype, to: &output)
     expectEqual(expectedObjCProtocolConcrete, output)
 
-    typealias Composition = protocol<SomeNativeProto, SomeObjCProto>
-    let compositionConcreteMetatype = Composition.self
-    let expectedComposition = "- protocol<a.SomeNativeProto, a.SomeObjCProto> #0\n"
+    let compositionConcreteMetatype = (SomeNativeProto & SomeObjCProto).self
+    let expectedComposition = "- a.SomeNativeProto & a.SomeObjCProto #0\n"
     output = ""
     dump(compositionConcreteMetatype, to: &output)
     expectEqual(expectedComposition, output)
     
     let objcDefinedProtoType = NSObjectProtocol.self
-    expectEqual(String(objcDefinedProtoType), "NSObject")
+    expectEqual(String(describing: objcDefinedProtoType), "NSObject")
   }
 }
 
@@ -836,7 +747,7 @@ Reflection.test("Unmanaged/nil") {
 Reflection.test("Unmanaged/not-nil") {
   var output = ""
   var optionalURL: Unmanaged<CFURL>? =
-    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/", nil))
+    Unmanaged.passRetained(CFURLCreateWithString(nil, "http://llvm.org/" as CFString, nil))
   dump(optionalURL, to: &output)
 
   let expected =
@@ -905,7 +816,7 @@ Reflection.test("Name of metatype of artificial subclass") {
   obj.addObserver(obj, forKeyPath: "foo", options: [.new], context: &KVOHandle)
   obj.removeObserver(obj, forKeyPath: "foo")
 
-  expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")
+  expectEqual("\(type(of: obj))", "TestArtificialSubclass")
 }
 
 @objc class StringConvertibleInDebugAndOtherwise : NSObject {

@@ -22,9 +22,8 @@
 #include "Initialization.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -1584,10 +1583,12 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
 static ArrayRef<Substitution>
 getNonMemberVarDeclSubstitutions(SILGenModule &SGM, VarDecl *var) {
   ArrayRef<Substitution> substitutions;
-  if (auto genericParams
-      = var->getDeclContext()->getGenericParamsOfContext())
-    substitutions =
-        genericParams->getForwardingSubstitutions(SGM.getASTContext());
+  auto *dc = var->getDeclContext();
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
+    auto *genericSig = dc->getGenericSignatureOfContext();
+    substitutions = genericEnv->getForwardingSubstitutions(
+        SGM.SwiftModule, genericSig);
+  }
   return substitutions;
 }
 

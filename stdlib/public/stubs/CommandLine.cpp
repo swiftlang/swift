@@ -29,11 +29,11 @@
 #include "../SwiftShims/RuntimeStubs.h"
 #include "../SwiftShims/GlobalObjects.h"
 
-// Backing storage for overrides of `Swift.Process.arguments`.
+// Backing storage for overrides of `Swift.CommandLine.arguments`.
 static char **_swift_stdlib_ProcessOverrideUnsafeArgv = nullptr;
 static int _swift_stdlib_ProcessOverrideUnsafeArgc = 0;
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
   _swift_stdlib_ProcessOverrideUnsafeArgv = argv;
   _swift_stdlib_ProcessOverrideUnsafeArgc = argc;
@@ -45,7 +45,7 @@ extern "C" void _swift_stdlib_overrideUnsafeArgvArgc(char **argv, int argc) {
 extern "C" char ***_NSGetArgv(void);
 extern "C" int *_NSGetArgc(void);
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -58,7 +58,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return *_NSGetArgv();
 }
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -92,7 +92,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 #elif defined (_MSC_VER)
 #include <stdlib.h>
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
 
@@ -105,7 +105,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return __argv;
 }
 #else // __ANDROID__; Add your favorite arch's command line arg grabber here.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
     *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;

@@ -5,7 +5,7 @@
 import Foundation
 import user_objc
 
-let aliasOriginal = AliasesEnum.byName
+let aliasOriginal = NSAliasesEnum.byName
 
 switch aliasOriginal {
 case .original:

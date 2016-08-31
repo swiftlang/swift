@@ -35,11 +35,11 @@ extension Array : MyArrayBufferProtocol {
   }
 }
 
-func myArrayReplace<B: MyArrayBufferProtocol, C: Collection
-  where C.Iterator.Element == B.Element, B.Index == Int
-  >(
-  _ target: inout B, _ subRange: Range<Int>, _ newValues: C
-) {
+func myArrayReplace<
+  B: MyArrayBufferProtocol,
+  C: Collection
+>(_ target: inout B, _ subRange: Range<Int>, _ newValues: C)
+  where C.Iterator.Element == B.Element, B.Index == Int {
   target.myReplace(subRange, with: newValues)
 }
 

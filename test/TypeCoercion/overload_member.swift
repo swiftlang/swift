@@ -89,7 +89,7 @@ func test_mixed_overload_coerce(_ a: A, x: inout X, y: Y, z: Z) {
 func test_mixed_method_value_coerce(_ a: A) {
   var _ : (X) -> X = a.mixed
   var _ : (Y) -> Y = A.mixed
-  var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
+  var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
   var _ : (A) -> (X) -> X = A.mixed
 }
 
@@ -130,8 +130,8 @@ extension A {
 
   func test_mixed_method_value_coerce() {
     var _ : (X) -> X = mixed
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(x: X) -> X' to specified type '(Y) -> Y'}}
+    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
+    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
     var _ : (A) -> (X) -> X = A.mixed
   }
 

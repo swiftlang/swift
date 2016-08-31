@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa=basic-aa -mem-behavior-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -aa=basic-aa -mem-behavior-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -130,7 +130,7 @@ bb0(%0 : $Int32):
 // CHECK-LABEL: @allocstack_apply_no_escaping
 // CHECK: PAIR #1.
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
-// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %5, %7
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
 // CHECK-NEXT:  r=0,w=0,se=0
 sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
@@ -147,7 +147,7 @@ bb0(%0 : $Int32):
 // CHECK-LABEL: @allocstack_apply_read_only
 // CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
-// CHECK-NEXT:   %1 = alloc_stack $X{{.*}}                      // users: %2, %4, %5
+// CHECK-NEXT:   %1 = alloc_stack $X{{.*}}                      // users: %5, %4, %2
 // CHECK-NEXT: r=1,w=0,se=0
 sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
 bb0(%0 : $X):
@@ -175,7 +175,7 @@ struct TwoInts {
 // CHECK-LABEL: @combination_of_read_and_write_effects
 // CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
-// CHECK-NEXT:   %0 = alloc_stack $TwoInts{{.*}}                // users: %1, %2, %5
+// CHECK-NEXT:   %0 = alloc_stack $TwoInts{{.*}}                // users: %5, %2, %1
 // CHECK-NEXT: r=1,w=1,se=1
 sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
 bb0:

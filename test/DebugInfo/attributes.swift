@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module %s -emit-ir -g -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -24,9 +24,9 @@ class SwiftClass {
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "_TtXwGSqC10attributes10SwiftClass_",{{.*}} line: [[@LINE+1]]
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "_TtXwGSqC10attributes10SwiftClass_"
 weak var    weakRef1    : SwiftClass? = strongRef1
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "_TtXoC10attributes10SwiftClass",{{.*}} line: [[@LINE+1]]
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "_TtXoC10attributes10SwiftClass"
 unowned var unownedRef1 : SwiftClass
 
 protocol Protocol1 : class {

@@ -5,7 +5,7 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: not %target-swift-frontend %s -parse
 
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // http://www.openradar.me/18041799
@@ -14,4 +14,4 @@
 func a(b: Int = 0) {
 }
 let c = a
-c() // expected-error {{missing argument for parameter 'b' in call}}
+c()

@@ -10,23 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Traditional C-style assert with an optional message.
+/// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal sanity checks that are active
-/// during testing but do not impact performance of shipping code.
-/// To check for invalid usage in Release builds; see `precondition`.
+/// Use this function for internal sanity checks that are active during testing
+/// but do not impact performance of shipping code. To check for invalid usage
+/// in Release builds, see `precondition(_:_:file:line:)`.
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
-///   configuration): if `condition` evaluates to false, stop program
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
+///   configuration): If `condition` evaluates to `false`, stop program
 ///   execution in a debuggable state after printing `message`.
 ///
-/// * In -O builds (the default for Xcode's Release configuration),
+/// * In `-O` builds (the default for Xcode's Release configuration),
 ///   `condition` is not evaluated, and there are no effects.
 ///
-/// * In -Ounchecked builds, `condition` is not evaluated, but the
-///   optimizer may assume that it *would* evaluate to `true`. Failure
-///   to satisfy that assumption in -Ounchecked builds is a serious
-///   programming error.
+/// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
+///   may assume that it *always* evaluates to `true`. Failure to satisfy that
+///   assumption is a serious programming error.
+///
+/// - Parameters:
+///   - condition: The condition to test. `condition` is only evaluated in
+///     playgrounds and `-Onone` builds.
+///   - message: A string to print if `condition` is evaluated to `false`. The
+///     default is an empty string.
+///   - file: The file name to print with `message` if the assertion fails. The
+///     default is the file where `assert(_:_:file:line:)` is called.
+///   - line: The line number to print along with `message` if the assertion
+///     fails. The default is the line number where `assert(_:_:file:line:)`
+///     is called.
 @_transparent
 public func assert(
   _ condition: @autoclosure () -> Bool,
@@ -42,22 +52,33 @@ public func assert(
   }
 }
 
-/// Check a necessary condition for making forward progress.
+/// Checks a necessary condition for making forward progress.
 ///
-/// Use this function to detect conditions that must prevent the
-/// program from proceeding even in shipping code.
+/// Use this function to detect conditions that must prevent the program from
+/// proceeding, even in shipping code.
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
-///   configuration): if `condition` evaluates to false, stop program
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
+///   configuration): If `condition` evaluates to `false`, stop program
 ///   execution in a debuggable state after printing `message`.
 ///
-/// * In -O builds (the default for Xcode's Release configuration):
-///   if `condition` evaluates to false, stop program execution.
+/// * In `-O` builds (the default for Xcode's Release configuration): If
+///   `condition` evaluates to `false`, stop program execution.
 ///
-/// * In -Ounchecked builds, `condition` is not evaluated, but the
-///   optimizer may assume that it *would* evaluate to `true`. Failure
-///   to satisfy that assumption in -Ounchecked builds is a serious
-///   programming error.
+/// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
+///   may assume that it *always* evaluates to `true`. Failure to satisfy that
+///   assumption is a serious programming error.
+///
+/// - Parameters:
+///   - condition: The condition to test. `condition` is not evaluated in
+///     `-Ounchecked` builds.
+///   - message: A string to print if `condition` is evaluated to `false` in a
+///     playground or `-Onone` build. The default is an empty string.
+///   - file: The file name to print with `message` if the precondition fails.
+///     The default is the file where `precondition(_:_:file:line:)` is
+///     called.
+///   - line: The line number to print along with `message` if the assertion
+///     fails. The default is the line number where
+///     `precondition(_:_:file:line:)` is called.
 @_transparent
 public func precondition(
   _ condition: @autoclosure () -> Bool,
@@ -76,24 +97,31 @@ public func precondition(
   }
 }
 
-/// Indicate that an internal sanity check failed.
+/// Indicates that an internal sanity check failed.
 ///
-/// Use this function to stop the program, without impacting the
-/// performance of shipping code, when control flow is not expected to
-/// reach the call (e.g. in the `default` case of a `switch` where you
-/// have knowledge that one of the other cases must be satisfied). To
-/// protect code from invalid usage in Release builds; see
-/// `preconditionFailure`.
+/// Use this function to stop the program, without impacting the performance of
+/// shipping code, when control flow is not expected to reach the call---for
+/// example, in the `default` case of a `switch` where you have knowledge that
+/// one of the other cases must be satisfied. To protect code from invalid
+/// usage in Release builds, see `preconditionFailure(_:file:line:)`.
 ///
 /// * In playgrounds and -Onone builds (the default for Xcode's Debug
-///   configuration) stop program execution in a debuggable state
-///   after printing `message`.
+///   configuration), stop program execution in a debuggable state after
+///   printing `message`.
 ///
 /// * In -O builds, has no effect.
 ///
-/// * In -Ounchecked builds, the optimizer may assume that this
-///   function will never be called. Failure to satisfy that assumption
-///   is a serious programming error.
+/// * In -Ounchecked builds, the optimizer may assume that this function is
+///   never called. Failure to satisfy that assumption is a serious
+///   programming error.
+///
+/// - Parameters:
+///   - message: A string to print in a playground or `-Onone` build. The
+///     default is an empty string.
+///   - file: The file name to print with `message`. The default is the file
+///     where `assertionFailure(_:file:line:)` is called.
+///   - line: The line number to print along with `message`. The default is the
+///     line number where `assertionFailure(_:file:line:)` is called.
 @inline(__always)
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),
@@ -108,26 +136,35 @@ public func assertionFailure(
   }
 }
 
-/// Indicate that a precondition was violated.
+/// Indicates that a precondition was violated.
 ///
-/// Use this function to stop the program when control flow can only
-/// reach the call if your API was improperly used.
+/// Use this function to stop the program when control flow can only reach the
+/// call if your API was improperly used. This function's effects vary
+/// depending on the build flag used:
 ///
-/// * In playgrounds and -Onone builds (the default for Xcode's Debug
-///   configuration), stop program execution in a debuggable state
-///   after printing `message`.
+/// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
+///   configuration), stops program execution in a debuggable state after
+///   printing `message`.
 ///
-/// * In -O builds (the default for Xcode's Release configuration),
-///   stop program execution.
+/// * In `-O` builds (the default for Xcode's Release configuration), stops
+///   program execution.
 ///
-/// * In -Ounchecked builds, the optimizer may assume that this
-///   function will never be called. Failure to satisfy that assumption
-///   is a serious programming error.
-@_transparent @noreturn
+/// * In `-Ounchecked` builds, the optimizer may assume that this function is
+///   never called. Failure to satisfy that assumption is a serious
+///   programming error.
+///
+/// - Parameters:
+///   - message: A string to print in a playground or `-Onone` build. The
+///     default is an empty string.
+///   - file: The file name to print with `message`. The default is the file
+///     where `preconditionFailure(_:file:line:)` is called.
+///   - line: The line number to print along with `message`. The default is the
+///     line number where `preconditionFailure(_:file:line:)` is called.
+@_transparent
 public func preconditionFailure(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message(), file, line,
@@ -138,12 +175,19 @@ public func preconditionFailure(
   _conditionallyUnreachable()
 }
 
-/// Unconditionally print a `message` and stop execution.
-@_transparent @noreturn
+/// Unconditionally prints a given message and stops execution.
+///
+/// - Parameters:
+///   - message: The string to print. The default is an empty string.
+///   - file: The file name to print with `message`. The default is the file
+///     where `fatalError(_:file:line:)` is called.
+///   - line: The line number to print along with `message`. The default is the
+///     line number where `fatalError(_:file:line:)` is called.
+@_transparent
 public func fatalError(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _assertionFailed("fatal error", message(), file, line,
     flags: _fatalErrorFlags())
 }
@@ -171,11 +215,11 @@ public func _precondition(
   }
 }
 
-@_transparent @noreturn
+@_transparent
 public func _preconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _precondition(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }
@@ -222,10 +266,11 @@ public func _debugPrecondition(
   }
 }
 
-@_transparent @noreturn
+@_transparent
 public func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
-  file: StaticString = #file, line: UInt = #line) {
+  file: StaticString = #file, line: UInt = #line
+) -> Never {
   if _isDebugAssertConfiguration() {
     _precondition(false, message, file: file, line: line)
   }
@@ -251,11 +296,11 @@ public func _sanityCheck(
 #endif
 }
 
-@_transparent @noreturn
+@_transparent
 public func _sanityCheckFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
-) {
+) -> Never {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }

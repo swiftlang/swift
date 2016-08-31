@@ -392,7 +392,10 @@ public:
   /// hasReferenceSemantics() - Do objects of this type have reference
   /// semantics?
   bool hasReferenceSemantics();
-  
+
+  /// Is this an uninhabited type, such as 'Never'?
+  bool isUninhabited();
+
   /// Is this the 'Any' type?
   bool isAny();
 
@@ -585,6 +588,9 @@ public:
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
 
+  /// \brief Check if this type is equal to Swift.Bool.
+  bool isBool();
+
   /// \brief Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
 
@@ -747,10 +753,6 @@ public:
   /// Returns a new function type exactly like this one but with the self
   /// parameter replaced. Only makes sense for function members of types.
   Type replaceSelfParameterType(Type newSelf);
-
-  /// Returns a function type that is not 'noreturn', but is otherwise the same
-  /// as this type.
-  Type getWithoutNoReturn(unsigned UncurryLevel);
 
   /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
@@ -2123,15 +2125,13 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |representation|isAutoClosure|noReturn|noEscape|throws|
-    //   |    0 .. 3    |      4      |   5    |    6   |   7  |
+    //   |representation|isAutoClosure|noEscape|throws|
+    //   |    0 .. 3    |      4      |    5   |   6  |
     //
     enum : uint16_t { RepresentationMask     = 0x00F };
     enum : uint16_t { AutoClosureMask        = 0x010 };
-    enum : uint16_t { NoReturnMask           = 0x020 };
-    enum : uint16_t { NoEscapeMask           = 0x040 };
-    enum : uint16_t { ThrowsMask             = 0x080 };
-    enum : uint16_t { ExplicitlyEscapingMask = 0x100 };
+    enum : uint16_t { NoEscapeMask           = 0x020 };
+    enum : uint16_t { ThrowsMask             = 0x040 };
 
     uint16_t Bits;
 
@@ -2146,26 +2146,21 @@ public:
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation Rep, bool IsNoReturn, bool Throws) {
-      Bits = ((unsigned) Rep) |
-             (IsNoReturn ? NoReturnMask : 0) |
-             (Throws ? ThrowsMask : 0);
+    ExtInfo(Representation Rep, bool Throws) {
+      Bits = ((unsigned) Rep) | (Throws ? ThrowsMask : 0);
     }
 
     // Constructor with no defaults.
-    ExtInfo(Representation Rep, bool IsNoReturn,
-            bool IsAutoClosure, bool IsNoEscape, bool IsExplicitlyEscaping,
+    ExtInfo(Representation Rep,
+            bool IsAutoClosure, bool IsNoEscape,
             bool Throws)
-      : ExtInfo(Rep, IsNoReturn, Throws) {
+      : ExtInfo(Rep, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
-      Bits |= (IsExplicitlyEscaping ? ExplicitlyEscapingMask : 0);
     }
 
-    bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
-    bool isExplicitlyEscaping() const { return Bits & ExplicitlyEscapingMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2208,12 +2203,6 @@ public:
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
-    }
-    ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
-      if (IsNoReturn)
-        return ExtInfo(Bits | NoReturnMask);
-      else
-        return ExtInfo(Bits & ~NoReturnMask);
     }
     ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
       if (IsAutoClosure)
@@ -2283,10 +2272,6 @@ public:
     return getExtInfo().getRepresentation();
   }
   
-  bool isNoReturn() const {
-    return getExtInfo().isNoReturn();
-  }
-
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
   bool isAutoClosure() const {
@@ -2299,12 +2284,6 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  /// \brief True if the parameter declaration it is attached to has explicitly
-  /// been marked with the @escaping attribute. This is a temporary measure.
-  bool isExplicitlyEscaping() const {
-    return getExtInfo().isExplicitlyEscaping();
-  }
-  
   bool throws() const {
     return getExtInfo().throws();
   }
@@ -2388,7 +2367,9 @@ struct CallArgParam {
 /// Break an argument type into an array of \c CallArgParams.
 ///
 /// \param type The type to decompose.
-SmallVector<CallArgParam, 4> decomposeArgType(Type type);
+/// \param argumentLabels The argument labels to use.
+SmallVector<CallArgParam, 4>
+decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Break a parameter type into an array of \c CallArgParams.
 ///
@@ -2864,14 +2845,13 @@ public:
   class ExtInfo {
     // Feel free to rearrange or add bits, but if you go over 15,
     // you'll need to adjust both the Bits field below and
-    // BaseType::AnyFunctionTypeBits.
+    // TypeBase::AnyFunctionTypeBits.
 
-    //   |representation|noReturn|pseudogeneric|
-    //   |    0 .. 3    |   4    |      5      |
+    //   |representation|pseudogeneric|
+    //   |    0 .. 3    |      4      |
     //
     enum : uint16_t { RepresentationMask = 0x00F };
-    enum : uint16_t { NoReturnMask       = 0x010 };
-    enum : uint16_t { PseudogenericMask  = 0x020 };
+    enum : uint16_t { PseudogenericMask  = 0x010 };
 
     uint16_t Bits;
 
@@ -2884,18 +2864,14 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isNoReturn, bool isPseudogeneric) {
+    ExtInfo(Representation rep, bool isPseudogeneric) {
       Bits = ((unsigned) rep) |
-             (isNoReturn ? NoReturnMask : 0) |
              (isPseudogeneric ? PseudogenericMask : 0);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
     /// is not permitted to dynamically depend on its type arguments.
     bool isPseudogeneric() const { return Bits & PseudogenericMask; }
-
-    /// Do functions of this type return normally?
-    bool isNoReturn() const { return Bits & NoReturnMask; }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -2953,12 +2929,6 @@ public:
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
-    }
-    ExtInfo withIsNoReturn(bool IsNoReturn = true) const {
-      if (IsNoReturn)
-        return ExtInfo(Bits | NoReturnMask);
-      else
-        return ExtInfo(Bits & ~NoReturnMask);
     }
     ExtInfo withIsPseudogeneric(bool isPseudogeneric = true) const {
       if (isPseudogeneric)
@@ -3203,10 +3173,6 @@ public:
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
-  }
-
-  bool isNoReturn() const {
-    return getExtInfo().isNoReturn();
   }
 
   bool isPseudogeneric() const {
@@ -3473,7 +3439,7 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// \code
 /// protocol P { /* ... */ }
 /// protocol Q { /* ... */ }
-/// var x : protocol<P, Q>
+/// var x : P & Q
 /// \endcode
 ///
 /// Here, the type of x is a composition of the protocols 'P' and 'Q'.
@@ -3782,12 +3748,10 @@ public:
   /// True if this is the 'Self' parameter of a protocol or an associated type
   /// of 'Self'.
   bool isSelfDerived() {
-    ArchetypeType *t = this;
+    ArchetypeType *t = getPrimary();
 
-    do {
-      if (t->getSelfProtocol())
-        return true;
-    } while ((t = t->getParent()));
+    if (t && t->getSelfProtocol())
+      return true;
 
     return false;
   }
@@ -3842,6 +3806,16 @@ public:
   /// archetype, e.g., 
   bool isPrimary() const { 
     return ParentOrOpened.isNull();
+  }
+
+  /// getPrimary - Return the primary archetype parent of this archetype.
+  ArchetypeType *getPrimary() const {
+    assert(!getOpenedExistentialType() && "Check for opened existential first");
+
+    auto *archetype = this;
+    while (auto *parent = archetype->getParent())
+      archetype = parent;
+    return const_cast<ArchetypeType *>(archetype);
   }
 
   /// Retrieve the ID number of this opened existential.

@@ -316,7 +316,7 @@ class MismatchOptional : MismatchOptionalBase {
   // expected-error@-2 {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{47-47=?}}
   // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{55-56=}}
 
-  override func functionParam(x: (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{46-46=)?}}
+  override func functionParam(x: @escaping (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{56-56=)?}}
   override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
 
   override func nameAndTypeMismatch(_: Int) {}

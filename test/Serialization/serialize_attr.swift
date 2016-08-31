@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
-// RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -enable-sil-verify-all %t/serialize_attr.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %t/serialize_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-sil-opt -enable-sil-verify-all %t/serialize_attr.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 

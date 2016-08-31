@@ -34,9 +34,9 @@ typealias CBoolBlock = (Bool) -> Bool
 typealias ObjCBoolBlock = (Bool) -> Bool
 typealias DarwinBooleanBlock = (Bool) -> Bool
 
-func testCBoolFnToBlock(_: @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
-func testObjCBoolFnToBlock(_: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
-func testDarwinBooleanFnToBlock(_: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
+func testCBoolFnToBlock(_: @escaping @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
+func testObjCBoolFnToBlock(_: @escaping @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
+func testDarwinBooleanFnToBlock(_: @escaping @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
 
 func testCBoolFnToBlockTypedef(_: CBoolFn) -> CBoolBlock
 func testObjCBoolFnToBlockTypedef(_: ObjCBoolFn) -> ObjCBoolBlock
@@ -67,13 +67,13 @@ class Test : NSObject {
   var propObjCBoolBlock: (Bool) -> Bool
   var propDarwinBooleanBlock: (Bool) -> Bool
   
-  func testCBoolFn(toBlock fp: @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
-  func testObjCBoolFn(toBlock fp: @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
-  func testDarwinBooleanFn(toBlock fp: @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
+  func testCBoolFn(toBlock fp: @escaping @convention(c) (Bool) -> Bool) -> (Bool) -> Bool
+  func testObjCBoolFn(toBlock fp: @escaping @convention(c) (ObjCBool) -> ObjCBool) -> (Bool) -> Bool
+  func testDarwinBooleanFn(toBlock fp: @escaping @convention(c) (DarwinBoolean) -> DarwinBoolean) -> (Bool) -> Bool
   
-  func produceCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (Bool) -> Bool)?>)
-  func produceObjCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (ObjCBool) -> ObjCBool)?>)
-  func produceDarwinBooleanBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
+  func produceCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@escaping @convention(block) (Bool) -> Bool)?>)
+  func produceObjCBoolBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@escaping @convention(block) (ObjCBool) -> ObjCBool)?>)
+  func produceDarwinBooleanBlockTypedef(_ outBlock: AutoreleasingUnsafeMutablePointer<(@escaping @convention(block) (DarwinBoolean) -> DarwinBoolean)?>)
   
   init()
 }

@@ -46,18 +46,13 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     llvm_unreachable("unhandled case in MissingReturn");
   }
 
-  bool isNoReturn = F->getLoweredFunctionType()->isNoReturn();
-
-  // No action required if the function returns 'Void' or that the
-  // function is marked 'noreturn'.
-  if (ResTy->isVoid() || isNoReturn)
-    return;
-
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
+  auto diagID = F->isNoReturnFunction() ? diag::missing_never_call
+                                        : diag::missing_return;
   diagnose(Context,
            L.getEndSourceLoc(),
-           diag::missing_return, ResTy,
+           diagID, ResTy,
            FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
 }
 
@@ -100,24 +95,6 @@ static void diagnoseUnreachable(const SILInstruction *I,
   }
 }
 
-static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
-  auto *TI = dyn_cast<TermInst>(I);
-  if (!TI || !(isa<BranchInst>(TI) || isa<ReturnInst>(TI)))
-    return;
-
-  const SILBasicBlock *BB = TI->getParent();
-  const SILFunction *F = BB->getParent();
-
-  // Warn if we reach a return inside a noreturn function.
-  if (F->getLoweredFunctionType()->isNoReturn()) {
-    SILLocation L = TI->getLoc();
-    if (L.is<ReturnLocation>())
-      diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
-    if (L.is<ImplicitReturnLocation>())
-      diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
-  }
-}
-
 /// \brief Issue diagnostics whenever we see Builtin.static_report(1, ...).
 static void diagnoseStaticReports(const SILInstruction *I,
                                   SILModule &M) {
@@ -151,7 +128,6 @@ class EmitDFDiagnostics : public SILFunctionTransform {
     for (auto &BB : *getFunction())
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
-        diagnoseReturn(&I, M.getASTContext());
         diagnoseStaticReports(&I, M);
       }
   }

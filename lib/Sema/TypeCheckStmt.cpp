@@ -765,10 +765,14 @@ public:
 
       // If someone is using an unlabeled break inside of an 'if' or 'do'
       // statement, produce a more specific error.
-      if (S->getTargetName().empty() && !ActiveLabeledStmts.empty() &&
-          (isa<IfStmt>(ActiveLabeledStmts.back()) ||
-           isa<DoStmt>(ActiveLabeledStmts.back())))
+      if (S->getTargetName().empty() &&
+          std::any_of(ActiveLabeledStmts.rbegin(),
+                      ActiveLabeledStmts.rend(),
+                      [&](Stmt *S) -> bool {
+                        return isa<IfStmt>(S) || isa<DoStmt>(S);
+                      })) {
         diagid = diag::unlabeled_break_outside_loop;
+      }
 
       TC.diagnose(S->getLoc(), diagid);
       return nullptr;
@@ -998,7 +1002,13 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   }
   return false;
 }
-  
+
+static bool isDiscardableType(Type type) {
+  return (type->is<ErrorType>() ||
+          type->isUninhabited() ||
+          type->lookThroughAllAnyOptionalTypes()->isVoid());
+}
+
 void TypeChecker::checkIgnoredExpr(Expr *E) {
   // For parity with C, several places in the grammar accept multiple
   // comma-separated expressions and then bind them together as an implicit
@@ -1041,10 +1051,10 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     return;
   }
 
-  // If the result of this expression is of type "()" potentially wrapped in
-  // optionals, then it is safe to ignore.
-  if (valueE->getType()->lookThroughAllAnyOptionalTypes()->isVoid() ||
-      valueE->getType()->is<ErrorType>())
+  // If the result of this expression is of type "Never" or "()"
+  // (the latter potentially wrapped in optionals) then it is
+  // safe to ignore.
+  if (isDiscardableType(valueE->getType()))
     return;
   
   // Complain about '#selector'.
@@ -1299,9 +1309,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
                                             Context.Id_init, DeclNameLoc(),
                                             /*Implicit=*/true);
-  Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
-                                      /*Implicit=*/true);
-  r = new (Context) CallExpr(r, args, /*Implicit=*/true);
+  r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*Implicit=*/true);
@@ -1321,7 +1329,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                        apply->getFn()->getSemanticsProvidingExpr());
+                        apply->getSemanticFn());
   if (!otherCtorRef)
     return false;
   
@@ -1343,8 +1351,15 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
   // only one designated initializer.
   if (implicitlyGenerated) {
     auto superclassTy = ctor->getExtensionType();
-    NameLookupOptions lookupOptions
-      = defaultConstructorLookupOptions | NameLookupFlags::KnownPrivate;
+    auto lookupOptions = defaultConstructorLookupOptions;
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+
+    // If a constructor is only visible as a witness for a protocol
+    // requirement, it must be an invalid override. Also, protocol
+    // extensions cannot yet define designated initializers.
+    lookupOptions -= NameLookupFlags::ProtocolMembers;
+    lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+
     for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
                                              lookupOptions)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member.Decl);
@@ -1457,8 +1472,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
         std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
           if (auto apply = dyn_cast<ApplyExpr>(E)) {
-            if (isa<OtherConstructorDeclRefExpr>(
-                  apply->getFn()->getSemanticsProvidingExpr())) {
+            if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
               Found = apply;
               return { false, E };
             }

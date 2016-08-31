@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
-// RUN: %target-run %t/a.out.optimized | FileCheck %s
+// RUN: %target-run %t/a.out.optimized | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -19,11 +19,11 @@ func allToIntOrZero<T>(_ x: T) -> Int {
   return 0
 }
 
-func anyToInt(_ x: protocol<>) -> Int {
+func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
 
-func anyToIntOrZero(_ x: protocol<>) -> Int {
+func anyToIntOrZero(_ x: Any) -> Int {
   if x is Int {
     return x as! Int
   }
@@ -58,11 +58,11 @@ func allToCOrE<T>(_ x: T) -> C {
   return E()
 }
 
-func anyToC(_ x: protocol<>) -> C {
+func anyToC(_ x: Any) -> C {
   return x as! C
 }
 
-func anyToCOrE(_ x: protocol<>) -> C {
+func anyToCOrE(_ x: Any) -> C {
   if x is C {
     return x as! C
   }
@@ -80,11 +80,11 @@ func allClassesToCOrE<T : Class>(_ x: T) -> C {
   return E()
 }
 
-func anyClassToC(_ x: protocol<Class>) -> C {
+func anyClassToC(_ x: Class) -> C {
   return x as! C
 }
 
-func anyClassToCOrE(_ x: protocol<Class>) -> C {
+func anyClassToCOrE(_ x: Class) -> C {
   if x is C {
     return x as! C
   }
@@ -139,12 +139,12 @@ print(allMetasToAllMetas(C.self, D.self)) // CHECK: false
 print(C.self is D.Type) // CHECK: false
 print((D.self as C.Type) is D.Type) // CHECK: true
 
-let t: Any.Type = (1 as Any).dynamicType
+let t: Any.Type = type(of: 1 as Any)
 print(t is Int.Type) // CHECK: true
 print(t is Float.Type) // CHECK: false
 print(t is C.Type) // CHECK: false
 
-let u: Any.Type = (D() as Any).dynamicType
+let u: Any.Type = type(of: (D() as Any))
 print(u is C.Type) // CHECK: true
 print(u is D.Type) // CHECK: true
 print(u is E.Type) // CHECK: false
@@ -154,12 +154,19 @@ print(u is Int.Type) // CHECK: false
 // CHECK-LABEL: AnyObject casts:
 print("AnyObject casts:")
 print(allToAll(C(), AnyObject.self)) // CHECK-NEXT: true
-print(allToAll(C().dynamicType, AnyObject.self)) // CHECK-NEXT: true
+print(allToAll(type(of: C()), AnyObject.self)) // CHECK-NEXT: true
 // Bridging
 print(allToAll(0, AnyObject.self)) // CHECK-NEXT: true
 
+// This will get bridged using _SwiftValue.
 struct NotBridged { var x: Int }
-print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK-NEXT: false
+print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK-NEXT: true
+print(allToAll(NotBridged(x: 0), NSCopying.self)) // CHECK-NEXT: true
+
+// These casts fail (intentionally) even though _SwiftValue does
+// technically conform to these protocols through NSObject.
+print(allToAll(NotBridged(x: 0), CustomStringConvertible.self)) // CHECK-NEXT: false
+print(allToAll(NotBridged(x: 0), (AnyObject & CustomStringConvertible).self)) // CHECK-NEXT: false
 
 //
 // rdar://problem/19482567

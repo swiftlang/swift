@@ -79,7 +79,7 @@ FoundationTestSuite.test("NSArray") {
 
   // Iteration
   var result = [String]()
-  for x: AnyObject in nsArr {
+  for x: Any in nsArr {
     result.append((x as! NSObject).description)
   }
   expectEqualSequence(["1", "2.5", "Hello"], result)
@@ -126,9 +126,9 @@ FoundationTestSuite.test("NSDictionary") {
   assert((nsDict[1]! as! NSString).isEqual("Hello"))
   assert((nsDict[2]! as! NSString).isEqual("World"))
 
-  let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
-  assert(nsMutableDict["Hello"]!.isEqual(1))
-  assert(nsMutableDict["World"]!.isEqual(2))
+  let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2 as NSNumber]
+  assert((nsMutableDict["Hello"]! as AnyObject).isEqual(1))
+  assert((nsMutableDict["World"]! as AnyObject).isEqual(2))
 }
 
 //===----------------------------------------------------------------------===//
@@ -189,9 +189,9 @@ class ClassWithDtor : NSObject {
 FoundationTestSuite.test("rdar://17584531") {
   // <rdar://problem/17584531>
   // Type checker used to be confused by this.
-  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"]]]]
-  var dict2 = dict["people"]?[0] as! NSDictionary
-  expectEqual("Optional(255)", String(dict2["id"]))
+  var dict: NSDictionary = ["status": 200, "people": [["id": 255, "name": ["first": "John", "last": "Appleseed"] as NSDictionary] as NSDictionary] as NSArray]
+  var dict2 = dict["people"].flatMap { $0 as? NSArray }?[0] as! NSDictionary
+  expectEqual("Optional(255)", String(describing: dict2["id" as NSString]))
 }
 
 FoundationTestSuite.test("DarwinBoolean smoke test") {
@@ -230,7 +230,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
       var someProperty: String = ""
     }
     let f = ObjCClass()
-    UM.registerUndoWithTarget(f) { target in
+    UM.registerUndo(withTarget: f) { target in
       target.someProperty = "expected"
     }
     UM.undo()
@@ -245,7 +245,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
       var someOtherProperty: String = ""
     }
     var b = SwiftClass()
-    UM.registerUndoWithTarget(b) { target in
+    UM.registerUndo(withTarget:b) { target in
       target.someOtherProperty = "expected"
     }
     UM.undo()
@@ -384,7 +384,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
 }
 
 FoundationTestSuite.test("NotificationCenter/addObserver(_:selector:name:object:)") {
-  let obj: AnyObject = "Hello"
+  let obj: AnyObject = "Hello" as NSString
   NotificationCenter.default.addObserver(obj, selector: Selector("blah:"),
                                          name: nil, object: nil)
   let name = "hello"

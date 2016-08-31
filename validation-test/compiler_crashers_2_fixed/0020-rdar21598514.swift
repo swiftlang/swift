@@ -109,17 +109,17 @@ extension LoggingSequenceType {
   }
 
   public func map<T>(
-    @noescape transform: (Base.Iterator.Element) -> T
+    transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     ++SequenceLog.map[selfType]
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Iterator.Element) -> Bool
+    isIncluded: (Base.Iterator.Element) -> Bool
   ) -> [Base.Iterator.Element] {
     ++SequenceLog.filter[selfType]
-    return base.filter(includeElement)
+    return base.filter(isIncluded)
   }
   
   public func _customContainsEquatableElement(
@@ -133,7 +133,7 @@ extension LoggingSequenceType {
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    @noescape _ preprocess: (Self) -> R
+    _ preprocess: (Self) -> R
   ) -> R? {
     ++SequenceLog._preprocessingPass[selfType]
     return base._preprocessingPass { _ in preprocess(self) }

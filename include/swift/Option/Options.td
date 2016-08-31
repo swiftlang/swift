@@ -29,6 +29,9 @@ def AutolinkExtractOption : OptionFlag;
 // The option should be accepted by swift -modulewrap
 def ModuleWrapOption : OptionFlag;
 
+// The option should be accepted by swift-format
+def SwiftFormatOption : OptionFlag;
+
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -99,7 +102,7 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftFormatOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -121,7 +124,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption]>,
+         NoInteractiveOption, SwiftFormatOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -129,6 +132,10 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
+
+def tools_directory : Separate<["-"], "tools-directory">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Look for external executables (ld, clang, binutils) in <directory>">, MetaVarName<"<directory>">;
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
@@ -166,6 +173,9 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
 
 def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
   HelpText<"Save intermediate compilation results">;
+def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Prints the total time it took to execute all compilation tasks">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -230,6 +240,10 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Treat warnings as errors">;
+
+def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Continue building, even after errors are encountered">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -309,6 +323,31 @@ def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the assert_configuration replacement. "
            "Possible values are Debug, Release, Unchecked, DisableReplacement.">;
+
+// Code formatting options
+
+def code_formatting_Group : OptionGroup<"<code formatting options>">;
+
+def use_tabs : Flag<["-"], "use-tabs">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Use tabs for indentation.">;
+
+def in_place : Flag<["-"], "in-place">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Overwrite input file with formatted file.">;
+
+def tab_width : Separate<["-"], "tab-width">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Width of tab character.">, MetaVarName<"<n>">;
+
+def indent_width : Separate<["-"], "indent-width">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"Number of characters to indent.">, MetaVarName<"<n>">;
+
+def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
+  Flags<[SwiftFormatOption]>,
+  HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
+           "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
 // File types
 

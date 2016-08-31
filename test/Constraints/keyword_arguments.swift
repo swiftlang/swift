@@ -58,7 +58,7 @@ reservedExpr(1, `do`) // expected-error{{missing argument label 'y:' in call}}{{
 reservedExpr(1, y: `do`)
 
 class GenericCtor<U> {
-  init<T>(t : T) {}
+  init<T>(t : T) {}  // expected-note {{'init(t:)' declared here}}
 }
 GenericCtor<Int>()  // expected-error{{missing argument for parameter 't' in call}}
 
@@ -135,9 +135,9 @@ variadics1(x: 1, y: 2, 1, 2)
 variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed parameter #0}} {{12-25=x: 6}} {{27-31=1, 2, 3, 4, 5}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed argument #1}} {{12-25=x: 6}} {{27-31=1, 2, 3, 4, 5}}
 
-func variadics2(x: Int, y: Int = 2, z: Int...) { }
+func variadics2(x: Int, y: Int = 2, z: Int...) { } // expected-note {{'variadics2(x:y:z:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics2(x: 1, y: 2, z: 1)
@@ -173,8 +173,8 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{unnamed parameter #1 must precede argument 'y'}} {{12-16=1, 2, 3}} {{18-25=y: 0}}
-variadics3(z: 1, 1) // expected-error{{unnamed parameter #1 must precede argument 'z'}} {{12-16=1}} {{18-19=z: 1}}
+variadics3(y: 0, 1, 2, 3) // expected-error{{unnamed argument #2 must precede argument 'y'}} {{12-16=1, 2, 3}} {{18-25=y: 0}}
+variadics3(z: 1, 1) // expected-error{{unnamed argument #2 must precede argument 'z'}} {{12-16=1}} {{18-19=z: 1}}
 
 func variadics4(x: Int..., y: Int = 2, z: Int = 3) { }
 
@@ -200,7 +200,7 @@ variadics4()
 variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
 variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-16=x: 1}} {{18-22=z: 1}}
 
-func variadics5(_ x: Int, y: Int, _ z: Int...) { }
+func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{'variadics5(_:y:_:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -209,10 +209,10 @@ variadics5(1, y: 2, 1, 2)
 variadics5(1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed parameter #1}} {{15-28=y: 7}} {{30-34=2, 3, 4, 5, 6}}
+variadics5(1, 2, 3, 4, 5, 6, y: 7) // expected-error{{argument 'y' must precede unnamed argument #2}} {{15-28=y: 7}} {{30-34=2, 3, 4, 5, 6}}
 variadics5(y: 1, 2, 3, 4, 5, 6, 7) // expected-error{{missing argument for parameter #1 in call}}
 
-func variadics6(x: Int..., y: Int = 2, z: Int) { }
+func variadics6(x: Int..., y: Int = 2, z: Int) { } // expected-note 4 {{'variadics6(x:y:z:)' declared here}}
 
 // Using variadics (in-order, complete)
 variadics6(x: 1, 2, 3, y: 0, z: 1)
@@ -233,7 +233,7 @@ variadics6(x: 1) // expected-error{{missing argument for parameter 'z' in call}}
 variadics6() // expected-error{{missing argument for parameter 'z' in call}}
 
 func outOfOrder(_ a : Int, b: Int) {
-  outOfOrder(b: 42, 52)  // expected-error {{unnamed parameter #1 must precede argument 'b'}} {{14-19=52}} {{21-23=b: 42}}
+  outOfOrder(b: 42, 52)  // expected-error {{unnamed argument #2 must precede argument 'b'}} {{14-19=52}} {{21-23=b: 42}}
 }
 
 // -------------------------------------------
@@ -241,11 +241,11 @@ func outOfOrder(_ a : Int, b: Int) {
 // -------------------------------------------
 // FIXME: Diagnostics could be improved with all missing names, or
 // simply # of arguments required.
-func missingargs1(x: Int, y: Int, z: Int) {}
+func missingargs1(x: Int, y: Int, z: Int) {} // expected-note {{'missingargs1(x:y:z:)' declared here}}
 
 missingargs1(x: 1, y: 2) // expected-error{{missing argument for parameter 'z' in call}}
 
-func missingargs2(x: Int, y: Int, _ z: Int) {}
+func missingargs2(x: Int, y: Int, _ z: Int) {} // expected-note {{'missingargs2(x:y:_:)' declared here}}
 missingargs2(x: 1, y: 2) // expected-error{{missing argument for parameter #3 in call}}
 
 // -------------------------------------------
@@ -365,10 +365,10 @@ mismatchOverloaded1.method2(5) { $0 }
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
-func testValuesOfFunctionType(_ f1: (_: Int, arg: Int) -> () ) {
-  f1(3, arg: 5)
-  f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}} {{6-9=}} {{12-12=arg: }}
-  f1(3, 5) // expected-error{{missing argument label 'arg:' in call}} {{9-9=arg: }}
+func testValuesOfFunctionType(_ f1: (_: Int, _ arg: Int) -> () ) {
+  f1(3, arg: 5) // expected-error{{extraneous argument label 'arg:' in call}}{{9-14=}}
+  f1(x: 3, 5) // expected-error{{extraneous argument label 'x:' in call}} {{6-9=}} 
+  f1(3, 5)
 }
 
 

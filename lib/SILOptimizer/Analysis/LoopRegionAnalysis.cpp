@@ -1036,19 +1036,21 @@ namespace llvm {
 template <> struct GraphTraits<LoopRegionWrapper> {
   using NodeType = LoopRegionWrapper;
   using ChildIteratorType = alledge_iterator;
+  typedef LoopRegionWrapper *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *BB) { return BB; }
+  static NodeRef getEntryNode(NodeRef BB) { return BB; }
 
-  static ChildIteratorType child_begin(NodeType *N) { return N->begin(); }
-  static ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 template <>
 struct GraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
     : public GraphTraits<LoopRegionWrapper> {
   using GraphType = LoopRegionFunctionInfoGrapherWrapper;
+  typedef LoopRegionWrapper *NodeRef;
 
-  static NodeType *getEntryNode(GraphType *F) { return &F->Data[0]; }
+  static NodeRef getEntryNode(GraphType *F) { return &F->Data[0]; }
 
   using nodes_iterator = std::vector<LoopRegionWrapper>::iterator;
 

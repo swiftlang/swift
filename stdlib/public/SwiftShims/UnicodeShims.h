@@ -66,16 +66,16 @@ _swift_stdlib_unicode_compare_utf16_utf16(const __swift_uint16_t *Left,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __attribute__((__pure__)) __swift_int32_t
-_swift_stdlib_unicode_compare_utf8_utf16(const char *Left,
+_swift_stdlib_unicode_compare_utf8_utf16(const unsigned char *Left,
                                          __swift_int32_t LeftLength,
                                          const __swift_uint16_t *Right,
                                          __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __attribute__((__pure__)) __swift_int32_t
-_swift_stdlib_unicode_compare_utf8_utf8(const char *Left,
+_swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *Left,
                                         __swift_int32_t LeftLength,
-                                        const char *Right,
+                                        const unsigned char *Right,
                                         __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -84,7 +84,8 @@ _swift_stdlib_unicode_hash(const __swift_uint16_t *Str, __swift_int32_t Length);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __attribute__((__pure__)) __swift_intptr_t
-_swift_stdlib_unicode_hash_ascii(const char *Str, __swift_int32_t Length);
+_swift_stdlib_unicode_hash_ascii(const unsigned char *Str,
+                                 __swift_int32_t Length);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t _swift_stdlib_unicode_strToUpper(

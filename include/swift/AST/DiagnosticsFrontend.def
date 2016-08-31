@@ -152,6 +152,12 @@ ERROR(verify_encountered_fatal,none,
 ERROR(error_parse_input_file,none,
   "error parsing input file '%0' (%1)", (StringRef, StringRef))
 
+ERROR(error_formatting_multiple_file_ranges,none,
+  "file ranges don't support multiple input files", ())
+
+ERROR(error_formatting_invalid_range,none,
+  "file range is invalid", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

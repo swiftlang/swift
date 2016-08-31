@@ -56,7 +56,7 @@ public extension NSGradient {
     self.init(
       colors: objects.map { $0.0 },
       atLocations: objects.map { $0.1 },
-      colorSpace: NSColorSpace.genericRGB())
+      colorSpace: NSColorSpace.genericRGB)
   }
 }
 

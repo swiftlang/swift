@@ -170,23 +170,21 @@ namespace llvm {
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
   using NodeType = swift::DominanceInfoNode;
   using ChildIteratorType = NodeType::iterator;
+  typedef swift::DominanceInfoNode *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *N) { return N; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 template <> struct GraphTraits<const swift::DominanceInfoNode *> {
   using NodeType = const swift::DominanceInfoNode;
   using ChildIteratorType = NodeType::const_iterator;
+  typedef const swift::DominanceInfoNode *NodeRef;
 
-  static NodeType *getEntryNode(NodeType *N) { return N; }
-  static inline ChildIteratorType child_begin(NodeType *N) {
-    return N->begin();
-  }
-  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+  static NodeRef getEntryNode(NodeRef N) { return N; }
+  static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
+  static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
 };
 
 } // end namespace llvm

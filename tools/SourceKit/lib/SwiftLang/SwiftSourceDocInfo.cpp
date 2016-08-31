@@ -403,7 +403,7 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeTransformForQuickHelp(BaseTy, VD->getDeclContext());
+    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -423,7 +423,7 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
   if (BaseTy)
-    PO.setArchetypeTransformForQuickHelp(BaseTy, VD->getDeclContext());
+    PO.setArchetypeSelfTransformForQuickHelp(BaseTy, VD->getDeclContext());
 
   // If it's implicit, try to find an overridden ValueDecl that's not implicit.
   // This will ensure we can properly annotate TypeRepr with a usr
@@ -670,7 +670,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
     llvm::raw_svector_ostream OS(SS);
     SwiftLangSupport::printTypeUSR(ContainerTy, OS);
   }
-  unsigned MangedContainerTypeEnd = SS.size();
+  unsigned MangledContainerTypeEnd = SS.size();
 
   unsigned DocCommentBegin = SS.size();
   {
@@ -750,7 +750,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(OS);
         if (BaseType)
-          PO.setArchetypeTransform(BaseType, VD->getDeclContext());
+          PO.setArchetypeSelfTransform(BaseType, VD->getDeclContext());
         RelatedDecl->print(Printer, PO);
       } else {
         llvm::SmallString<128> Buf;
@@ -791,7 +791,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
                                 MangledTypeEnd - MangledTypeStart);
 
   StringRef ContainerTypeUsr = StringRef(SS.begin()+MangledContainerTypeStart,
-                            MangedContainerTypeEnd - MangledContainerTypeStart);
+                            MangledContainerTypeEnd - MangledContainerTypeStart);
   StringRef DocComment = StringRef(SS.begin()+DocCommentBegin,
                                    DocCommentEnd-DocCommentBegin);
   StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,

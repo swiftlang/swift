@@ -89,8 +89,16 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
+bool TypeBase::isUninhabited() {
+  if (auto nominalDecl = getAnyNominal())
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
+      if (enumDecl->getAllElements().empty())
+        return true;
+  return false;
+}
+
 bool TypeBase::isAny() {
-  return isEqual(getASTContext().getAnyDecl()->getDeclaredType());
+  return isEqual(getASTContext().TheAnyType);
 }
 
 bool TypeBase::isAnyClassReferenceType() {
@@ -510,8 +518,19 @@ bool TypeBase::isLegalSILType() {
 }
 
 bool TypeBase::isVoid() {
-  return isEqual(getASTContext().TheEmptyTupleType);
+  if (auto TT = getAs<TupleType>())
+    return TT->getNumElements() == 0;
+  return false;
 }
+
+/// \brief Check if this type is equal to Swift.Bool.
+bool TypeBase::isBool() {
+  if (auto NTD = getAnyNominal())
+    if (isa<StructDecl>(NTD))
+      return getASTContext().getBoolDecl() == NTD;
+  return false;
+}
+
 
 bool TypeBase::isAssignableType() {
   if (isLValueType()) return true;
@@ -597,8 +616,18 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type,
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawPointerDecl()) {
+      PTK = PTK_UnsafeMutableRawPointer;
+      return C.TheEmptyTupleType;
+    }
+    if (nominalTy->getDecl() == C.getUnsafeRawPointerDecl()) {
+      PTK = PTK_UnsafeRawPointer;
+      return C.TheEmptyTupleType;
+    }
+  }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    auto &C = getASTContext();
     if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
       PTK = PTK_UnsafeMutablePointer;
     } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
@@ -786,8 +815,53 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallVector<CallArgParam, 4> swift::decomposeArgType(Type type) {
-  return decomposeParamType(type, nullptr, /*level=*/0);
+SmallVector<CallArgParam, 4>
+swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
+  SmallVector<CallArgParam, 4> result;
+  switch (type->getKind()) {
+  case TypeKind::Tuple: {
+    auto tupleTy = cast<TupleType>(type.getPointer());
+
+    // If we have one argument label but a tuple argument with != 1 element,
+    // put the whole tuple into the argument.
+    // FIXME: This horribleness is due to the mis-modeling of arguments as
+    // ParenType or TupleType.
+    if (argumentLabels.size() == 1 && tupleTy->getNumElements() != 1) {
+      // Break out to do the default thing below.
+      break;
+    }
+
+    for (auto i : range(0, tupleTy->getNumElements())) {
+      const auto &elt = tupleTy->getElement(i);
+      assert(!elt.isVararg() && "Vararg argument tuple doesn't make sense");
+      CallArgParam argParam;
+      argParam.Ty = elt.getType();
+      argParam.Label = argumentLabels[i];
+      result.push_back(argParam);
+    }
+    return result;
+  }
+
+  case TypeKind::Paren: {
+    CallArgParam argParam;
+    argParam.Ty = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    result.push_back(argParam);
+    return result;
+  }
+
+  default:
+    // Default behavior below; inject the argument as the sole parameter.
+    break;
+  }
+
+  // Just inject this parameter.
+  assert(result.empty());
+  CallArgParam argParam;
+  argParam.Ty = type;
+  assert(argumentLabels.size() == 1);
+  argParam.Label = argumentLabels[0];
+  result.push_back(argParam);
+  return result;
 }
 
 SmallVector<CallArgParam, 4>
@@ -906,27 +980,6 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
   return FunctionType::get(input,
                            fnTy->getResult(),
                            fnTy->getExtInfo());
-}
-
-Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
-  if (UncurryLevel == 0)
-    return this;
-
-  auto *FnType = this->castTo<AnyFunctionType>();
-  Type InputType = FnType->getInput();
-  Type ResultType = FnType->getResult()->getWithoutNoReturn(UncurryLevel - 1);
-  auto TheExtInfo = FnType->getExtInfo().withIsNoReturn(false);
-  if (auto *GFT = dyn_cast<GenericFunctionType>(FnType)) {
-    return GenericFunctionType::get(GFT->getGenericSignature(),
-                                    InputType, ResultType,
-                                    TheExtInfo);
-  }
-  if (auto *PFT = dyn_cast<PolymorphicFunctionType>(FnType)) {
-    return PolymorphicFunctionType::get(InputType, ResultType,
-                                        &PFT->getGenericParams(),
-                                        TheExtInfo);
-  }
-  return FunctionType::get(InputType, ResultType, TheExtInfo);
 }
 
 /// Retrieve the object type for a 'self' parameter, digging into one-element
@@ -1532,8 +1585,6 @@ bool TypeBase::isSpelledLike(Type other) {
       return false;
     if (fMe->getRepresentation() != fThem->getRepresentation())
       return false;
-    if (fMe->isNoReturn() != fThem->isNoReturn())
-      return false;
     if (!fMe->getInput()->isSpelledLike(fThem->getInput()))
       return false;
     if (!fMe->getResult()->isSpelledLike(fThem->getResult()))
@@ -1975,11 +2026,17 @@ static ForeignRepresentableKind
 getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
-    // If the instance type is not representable, the metatype is not
-    // representable.
     auto instanceType = metatype->getInstanceType();
+
+    // Consider metatype of any existential type as not Objective-C
+    // representable.
+    if (metatype->is<MetatypeType>() && instanceType->isAnyExistentialType())
+      return ForeignRepresentableKind::None;
+
+    // If the instance type is not representable verbatim, the metatype is not
+    // representable.
     if (getObjCObjectRepresentable(instanceType, dc)
-          == ForeignRepresentableKind::None)
+          != ForeignRepresentableKind::Object)
       return ForeignRepresentableKind::None;
 
     // Objective-C metatypes are trivially representable.
@@ -2010,12 +2067,10 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
   
   // Any can be bridged to id.
-  if (type->getASTContext().LangOpts.EnableIdAsAny) {
-    if (type->isAny()) {
-      return ForeignRepresentableKind::Bridged;
-    }
+  if (type->isAny()) {
+    return ForeignRepresentableKind::Bridged;
   }
-  
+
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
     if (auto clas = tyContext->getAsClassOrClassExtensionContext())
@@ -2137,33 +2192,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
     return { ForeignRepresentableKind::Object, nullptr };
 
-  // In Objective-C, existentials involving Error are bridged
-  // to NSError.
-  if (language == ForeignLanguage::ObjectiveC &&
-      type->isExistentialWithError()) {
-    return { ForeignRepresentableKind::BridgedError, nullptr };
-  }
-
-  /// Determine whether the given type is a type that is bridged to NSError
-  /// because it conforms to the Error protocol.
-  auto isBridgedErrorViaConformance = [dc](Type type) -> bool {
-    ASTContext &ctx = type->getASTContext();
-    auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (!errorProto) return false;
-
-    return dc->getParentModule()->lookupConformance(type, errorProto,
-                                                    ctx.getLazyResolver())
-             .hasValue();
-  };
-
   auto nominal = type->getAnyNominal();
-  if (!nominal) {
-    /// It might still be a bridged Error via conformance to Error.
-    if (isBridgedErrorViaConformance(type))
-      return { ForeignRepresentableKind::BridgedError, nullptr };
-
-    return failure();
-  }
+  if (!nominal) return failure();
 
   ASTContext &ctx = nominal->getASTContext();
 
@@ -2197,12 +2227,19 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Optional structs are not representable in (Objective-)C if they
-        // originally came from C, whether or not they are bridged. If they
-        // are defined in Swift, they are only representable if they are
-        // bridged (checked below).
+        // originally came from C, whether or not they are bridged, unless they
+        // came from swift_newtype. If they are defined in Swift, they are only
+        // representable if they are bridged (checked below).
         if (wasOptional) {
-          if (nominal->hasClangNode())
+          if (nominal->hasClangNode()) {
+            Type underlyingType =
+                nominal->getDeclaredType()->getSwiftNewtypeUnderlyingType();
+            if (underlyingType) {
+              return getForeignRepresentable(OptionalType::get(underlyingType),
+                                             language, dc);
+            }
             return failure();
+          }
           break;
         }
       }
@@ -2215,6 +2252,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   PointerTypeKind pointerKind;
   if (auto pointerElt = type->getAnyPointerElementType(pointerKind)) {
     switch (pointerKind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:
       // An UnsafeMutablePointer<T> or UnsafePointer<T> is
@@ -2246,13 +2285,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Determine whether this nominal type is known to be representable
   // in this foreign language.
   auto result = ctx.getForeignRepresentationInfo(nominal, language, dc);
-  if (result.getKind() == ForeignRepresentableKind::None) {
-    /// It might still be a bridged Error via conformance to Error.
-    if (isBridgedErrorViaConformance(type))
-      return { ForeignRepresentableKind::BridgedError, nullptr };
-
-    return failure();
-  }
+  if (result.getKind() == ForeignRepresentableKind::None) return failure();
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
@@ -2410,13 +2443,10 @@ static bool canOverride(CanType t1, CanType t2,
     if (!fn1)
       return false;
 
-    // Allow ExtInfos to differ in these ways:
-    //   - the overriding type may be noreturn even if the base type isn't
-    //   - the base type may be throwing even if the overriding type isn't
+    // Allow the base type to be throwing even if the overriding type isn't
     auto ext1 = fn1->getExtInfo();
     auto ext2 = fn2->getExtInfo();
     if (ext2.throws()) ext1 = ext1.withThrows(true);
-    if (ext1.isNoReturn()) ext2 = ext2.withIsNoReturn(true);
     if (ext1 != ext2)
       return false;
 
@@ -2737,21 +2767,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-TypeSubstitutionMap
-GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
-  TypeSubstitutionMap map;
-  
-  for (auto arch : getAllNestedArchetypes()) {
-    auto sub = Subs.front();
-    Subs = Subs.slice(1);
-    
-    map.insert({arch, sub.getReplacement()});
-  }
-  
-  assert(Subs.empty() && "did not use all substitutions?!");
-  return map;
-}
-
 FunctionType *
 GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   auto params = getGenericParams();
@@ -2865,7 +2880,8 @@ Type DependentMemberType::substBaseType(Module *module,
                               None);
 }
 
-Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
+Type Type::subst(Module *module,
+                 const TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
@@ -2965,8 +2981,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType()
-                    ->castTo<GenericTypeParamType>()]
+                    ->getCanonicalType().getPointer()]
       = baseTy;
     return substitutions;
   }
@@ -2997,8 +3012,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()]
-          = args[i];
+                        .getPointer()] = args[i];
       }
 
       // Continue looking into the parent.
@@ -3447,8 +3461,6 @@ case TypeKind::Id:
         anyChanges = true;
     }
     
-    auto sig = GenericSignature::get(genericParams, requirements);
-
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
@@ -3466,11 +3478,12 @@ case TypeKind::Id:
       return *this;
 
     // If no generic parameters remain, this is a non-generic function type.
-    if (genericParams.empty())
+    if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
+    }
 
     // Produce the new generic function type.
-    
+    auto sig = GenericSignature::get(genericParams, requirements);
     return GenericFunctionType::get(sig, inputTy, resultTy,
                                     function->getExtInfo());
   }

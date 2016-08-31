@@ -13,19 +13,19 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ f: @noescape () throws -> Result
+  _ x: T, _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
-  return try f()
+  return try body()
 }
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ f: @noescape (T) throws -> Result
+  _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
-  return try f(x)
+  return try body(x)
 }
 
 extension String {
@@ -41,10 +41,10 @@ extension String {
   ///   it is used as the return value of the `withCString(_:)` method.
   /// - Returns: The return value of the `f` closure, if any.
   public func withCString<Result>(
-    _ f: @noescape (UnsafePointer<Int8>) throws -> Result
+    _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      try f(UnsafePointer($0.baseAddress!))
+    return try self.utf8CString.withUnsafeBufferPointer {
+      try body($0.baseAddress!)
     }
   }
 }
@@ -60,79 +60,85 @@ public func _fixLifetime<T>(_ x: T) {
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
-  _ arg: inout T,
-  _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  to arg: inout T,
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
-}
-
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
-public func withUnsafeMutablePointers<A0, A1, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ body: @noescape (
-    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)))
-}
-
-/// Like `withUnsafeMutablePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
-public func withUnsafeMutablePointers<A0, A1, A2, Result>(
-  _ arg0: inout A0,
-  _ arg1: inout A1,
-  _ arg2: inout A2,
-  _ body: @noescape (
-    UnsafeMutablePointer<A0>,
-    UnsafeMutablePointer<A1>,
-    UnsafeMutablePointer<A2>
-  ) throws -> Result
-) rethrows -> Result {
-  return try body(
-    UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)),
-    UnsafeMutablePointer<A2>(Builtin.addressof(&arg2)))
 }
 
 /// Invokes `body` with an `UnsafePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
-  _ arg: inout T,
-  _ body: @noescape (UnsafePointer<T>) throws -> Result
+  to arg: inout T,
+  _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
 }
 
-/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
+@available(*, unavailable, renamed: "withUnsafeMutablePointer(to:_:)")
+public func withUnsafeMutablePointer<T, Result>(
+  _ arg: inout T,
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, renamed: "withUnsafePointer(to:_:)")
+public func withUnsafePointer<T, Result>(
+  _ arg: inout T,
+  _ body: (UnsafePointer<T>) throws -> Result
+) rethrows -> Result
+{
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: (
+    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, A2, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: (
+    UnsafeMutablePointer<A0>,
+    UnsafeMutablePointer<A1>,
+    UnsafeMutablePointer<A2>
+  ) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
 public func withUnsafePointers<A0, A1, Result>(
   _ arg0: inout A0,
   _ arg1: inout A1,
-  _ body: @noescape (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
+  _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
 ) rethrows -> Result {
-  return try body(
-    UnsafePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafePointer<A1>(Builtin.addressof(&arg1)))
+  Builtin.unreachable()
 }
 
-/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
-/// and `arg2`.
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
 public func withUnsafePointers<A0, A1, A2, Result>(
   _ arg0: inout A0,
   _ arg1: inout A1,
   _ arg2: inout A2,
-  _ body: @noescape (
+  _ body: (
     UnsafePointer<A0>,
     UnsafePointer<A1>,
     UnsafePointer<A2>
   ) throws -> Result
 ) rethrows -> Result {
-  return try body(
-    UnsafePointer<A0>(Builtin.addressof(&arg0)),
-    UnsafePointer<A1>(Builtin.addressof(&arg1)),
-    UnsafePointer<A2>(Builtin.addressof(&arg2)))
+  Builtin.unreachable()
 }

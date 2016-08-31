@@ -10,20 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-public func == (
-  lhs: String.UnicodeScalarView.Index,
-  rhs: String.UnicodeScalarView.Index
-) -> Bool {
-  return lhs._position == rhs._position
-}
-
-public func < (
-  lhs: String.UnicodeScalarView.Index,
-  rhs: String.UnicodeScalarView.Index
-) -> Bool {
-  return lhs._position < rhs._position
-}
-
 extension String {
   /// A view of a string's contents as a collection of Unicode scalar values.
   ///
@@ -114,7 +100,7 @@ extension String {
     ///     // Prints "♥︎ 💘"
     ///     print(hearts.unicodeScalars[j].value)
     ///     // Prints "9829"
-    public struct Index : Comparable {
+    public struct Index {
       public // SPI(Foundation)
       init(_position: Int) {
         self._position = _position
@@ -188,7 +174,7 @@ extension String {
       case .emptyInput:
         _sanityCheckFailure("cannot subscript using an endIndex")
       case .error:
-        return UnicodeScalar(0xfffd)
+        return UnicodeScalar(0xfffd)!
       }
     }
 
@@ -218,13 +204,15 @@ extension String {
             self._baseSet = true
           if _base.isASCII {
             self._ascii = true
-            self._asciiBase = UnsafeBufferPointer<UInt8>(
-              start: UnsafePointer(_base._baseAddress),
+            self._asciiBase = UnsafeBufferPointer(
+              start: _base._baseAddress?.assumingMemoryBound(
+                to: UTF8.CodeUnit.self),
               count: _base.count).makeIterator()
           } else {
             self._ascii = false
             self._base = UnsafeBufferPointer<UInt16>(
-              start: UnsafePointer(_base._baseAddress),
+              start: _base._baseAddress?.assumingMemoryBound(
+                to: UTF16.CodeUnit.self),
               count: _base.count).makeIterator()
           }
         } else {
@@ -326,6 +314,22 @@ extension String {
     set {
       _core = newValue._core
     }
+  }
+}
+
+extension String.UnicodeScalarView.Index : Comparable {
+  public static func == (
+    lhs: String.UnicodeScalarView.Index,
+    rhs: String.UnicodeScalarView.Index
+  ) -> Bool {
+    return lhs._position == rhs._position
+  }
+
+  public static func < (
+    lhs: String.UnicodeScalarView.Index,
+    rhs: String.UnicodeScalarView.Index
+  ) -> Bool {
+    return lhs._position < rhs._position
   }
 }
 
@@ -573,6 +577,8 @@ extension String.UnicodeScalarIndex {
 }
 
 extension String.UnicodeScalarView {
+  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
     if i == startIndex || i == endIndex {
       return true

@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
-infix operator ==== {}
-infix operator <<<< {}
-infix operator <><> {}
+infix operator ====
+infix operator <<<<
+infix operator <><>
 
 // <rdar://problem/13782566>
 // Check that func op<T>() parses without a space between the name and the
@@ -128,7 +128,7 @@ func rdar16786220(inout let c: Int) -> () { // expected-error {{parameter may no
 
 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
-infix operator !!! {}
+infix operator !!!
 
 func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }
 func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false }
@@ -155,3 +155,7 @@ func testCurryFixits() {
   func f5(_ x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=}} {{21-23=, }}
   func f5a(_ x: Int, y: Int) {}
 }
+
+// Bogus diagnostic talking about a 'var' where there is none
+func invalidInOutParam(x: inout XYZ) {}
+// expected-error@-1{{use of undeclared type 'XYZ'}}

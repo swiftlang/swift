@@ -18,32 +18,32 @@ public struct ChangeSize {
   private var _version: T
 }
 
-@_fixed_layout public class ChangeFieldOffsetsOfFixedLayout {
+@_fixed_layout open class ChangeFieldOffsetsOfFixedLayout {
   public init(major: Int32, minor: Int32, patch: Int32) {
     self.major = ChangeSize(version: major)
     self.minor = ChangeSize(version: minor)
     self.patch = ChangeSize(version: patch)
   }
 
-  public var major: ChangeSize
-  public var minor: ChangeSize
-  public var patch: ChangeSize
+  open var major: ChangeSize
+  open var minor: ChangeSize
+  open var patch: ChangeSize
 
-  public func getVersion() -> String {
+  open func getVersion() -> String {
     return "\(major.version).\(minor.version).\(patch.version)"
   }
 }
 
-@_fixed_layout public class ChangeSizeOfSuperclass : ChangeFieldOffsetsOfFixedLayout {
+@_fixed_layout open class ChangeSizeOfSuperclass : ChangeFieldOffsetsOfFixedLayout {
   public init() {
     self.codename = "Big Bang"
 
     super.init(major: 7, minor: 0, patch: 0)
   }
 
-  public var codename: String
+  open var codename: String
 
-  public override func getVersion() -> String {
+  open override func getVersion() -> String {
     return "\(super.getVersion()) (\(codename))";
   }
 }

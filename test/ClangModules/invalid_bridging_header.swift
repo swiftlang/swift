@@ -1,5 +1,5 @@
 // RUN: not %target-swift-frontend-parse -import-objc-header %S/Inputs/invalid_bridging_header.h %s > %t.out 2>&1 
-// RUN: FileCheck %s < %t.out
+// RUN: %FileCheck %s < %t.out
 
 // REQUIRES: objc_interop
 

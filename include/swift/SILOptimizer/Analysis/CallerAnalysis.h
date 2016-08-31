@@ -19,18 +19,10 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
-
-/// NOTE: this can be extended to contain the callsites of the function.
-struct CallerAnalysisFunctionInfo {
-  /// A list of all the functions this function calls.
-  llvm::SetVector<SILFunction *> Callees;
-  /// A list of all the callers this function has.
-  llvm::SetVector<SILFunction *> Callers;
-};
 
 /// CallerAnalysis relies on keeping the Caller/Callee relation up-to-date
 /// lazily. i.e. when a function is invalidated, instead of recomputing the
@@ -44,13 +36,59 @@ struct CallerAnalysisFunctionInfo {
 /// to run every function through the a sequence of function passes which might
 /// invalidate the functions and make the computed list incomplete. So
 /// O(n) * O(n) = O(n^2).
+///
+/// In addition of caller information this analysis also provides information
+/// about partial applies of a function.
 class CallerAnalysis : public SILAnalysis {
 
+public:
+
+  /// NOTE: this can be extended to contain the callsites of the function.
+  class FunctionInfo {
+    friend class CallerAnalysis;
+
+    /// A list of all the functions this function calls or partially applies.
+    llvm::SetVector<SILFunction *> Callees;
+    /// A list of all the callers this function has.
+    llvm::SmallSet<SILFunction *, 4> Callers;
+
+    /// The number of partial applied arguments of this function.
+    ///
+    /// Specifically, it stores the minimum number of partial applied arguments
+    /// of each function which contain one or multiple partial_applys of this
+    /// function.
+    /// This is a little bit off-topic because a partial_apply is not really
+    /// a "call" of this function.
+    llvm::DenseMap<SILFunction *, int> PartialAppliers;
+
+  public:
+    /// Returns true if this function has at least one caller.
+    bool hasCaller() const {
+      return !Callers.empty();
+    }
+
+    /// Returns non zero if this function is partially applied anywhere.
+    ///
+    /// The return value is the minimum number of partially applied arguments.
+    /// Usually all partial applies of a function partially apply the same
+    /// number of arguments anyway.
+    int getMinPartialAppliedArgs() const {
+      int minArgs = 0;
+      for (auto Iter : PartialAppliers) {
+        int numArgs = Iter.second;
+        if (minArgs == 0 || numArgs < minArgs)
+          minArgs = numArgs;
+      }
+      return minArgs;
+    }
+  };
+  
+private:
   /// Current module we are analyzing.
   SILModule &Mod;
 
   /// A map between all the functions and their callsites in the module.
-  llvm::DenseMap<SILFunction *, CallerAnalysisFunctionInfo> CallInfo;
+  llvm::DenseMap<SILFunction *, FunctionInfo> FuncInfos;
 
   /// A list of functions that needs to be recomputed.
   llvm::SetVector<SILFunction *> RecomputeFunctionList;
@@ -74,7 +112,7 @@ public:
   CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
     // Make sure we compute everything first time called.
     for (auto &F : Mod) {
-      CallInfo.FindAndConstruct(&F);
+      FuncInfos.FindAndConstruct(&F);
       RecomputeFunctionList.insert(&F);
     }
   }
@@ -89,7 +127,7 @@ public:
 
   virtual void invalidate(SILFunction *F, InvalidationKind K) {
     // Should we invalidate based on the invalidation kind.
-    bool shouldInvalidate = K & InvalidationKind::Calls;
+    bool shouldInvalidate = K & InvalidationKind::CallsAndInstructions;
     if (!shouldInvalidate)
       return;
 
@@ -111,20 +149,18 @@ public:
     if (!shouldInvalidate)
       return;
 
-    CallInfo.clear();
+    FuncInfos.clear();
     RecomputeFunctionList.clear();
     for (auto &F : Mod) {
       RecomputeFunctionList.insert(&F);
     }
   }
 
-  /// Return true if the function has a caller inside current module.
-  bool hasCaller(SILFunction *F) {
+  const FunctionInfo &getCallerInfo(SILFunction *F) {
     // Recompute every function in the invalidated function list and empty the
     // list.
     processRecomputeFunctionList();
-    auto Iter = CallInfo.FindAndConstruct(F);
-    return !Iter.second.Callers.empty();
+    return FuncInfos[F];
   }
 };
 

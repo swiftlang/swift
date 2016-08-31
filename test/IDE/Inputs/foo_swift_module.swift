@@ -1,17 +1,18 @@
-infix operator %%% {
-  associativity left
-  precedence 200
+infix operator %%% : High
+precedencegroup High {
+  associativity: left
+  higherThan: BitwiseShiftPrecedence
 }
 
 public func %%% (lhs: Int, rhs: Int) -> Int {
   return lhs + rhs
 }
 
-postfix operator => {}
+postfix operator =>
 public postfix func =>(lhs: Int) -> Int {
   return lhs + 1
 }
-postfix operator =-> {}
+postfix operator =->
 internal postfix func =->(lhs: Int) -> Int {
   return lhs + 1
 }

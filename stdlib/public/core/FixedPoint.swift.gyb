@@ -13,6 +13,7 @@
 %{
 
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
+from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
 
 #
 # Utility code for later in this template
@@ -524,6 +525,46 @@ extension ${Self} {
 % end
 
 extension ${Self} {
+// Construction of integers from floating point numbers.
+%   for src_type in all_floating_point_types():
+%     Src = src_type.stdlib_name
+%     srcBits = src_type.bits
+%     (lower, upper) = getFtoIBounds(floatBits=srcBits, intBits=int(bits), signed=signed)
+
+%     if srcBits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  /// Creates a new instance by rounding the given floating-point value toward
+  /// zero.
+  ///
+  /// - Parameter other: A floating-point value. When `other` is rounded toward
+  ///   zero, the result must be within the range `${Self}.min...${Self}.max`.
+  @_transparent
+  public init(_ value: ${Src}) {
+    _precondition(value.isFinite,
+      "${Src} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(value > ${str(lower)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(value < ${str(upper)}.0,
+      "${Src} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+  }
+
+  /// Creates a ${Self} whose value is `value`
+  /// if no rounding is necessary, nil otherwise.
+  @inline(__always)
+  public init?(exactly value: ${Src}) {
+    self._value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(value._value)
+    if ${Src}(self) != value {
+      return nil
+    }
+  }
+%     if srcBits == 80:
+#endif
+%     end
+%   end
+
   /// Construct a `${Self}` having the same memory representation as
   /// the `${OtherSelf}` `bitPattern`.  No range or overflow checking
   /// occurs, and the resulting `${Self}` may not have the same numeric
@@ -570,7 +611,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 ///
 /// - SeeAlso: `BitwiseOperations`
 @_transparent
-public prefix func ~(rhs: ${Self}) -> ${Self} {
+public prefix func ~ (rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }

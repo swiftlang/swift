@@ -39,6 +39,16 @@ enum class DynamicCastFeasibility {
   WillFail,
 };
 
+static inline DynamicCastFeasibility
+atWorst(DynamicCastFeasibility feasibility, DynamicCastFeasibility worstCase) {
+  return (feasibility > worstCase ? worstCase : feasibility);
+}
+
+static inline DynamicCastFeasibility
+atBest(DynamicCastFeasibility feasibility, DynamicCastFeasibility bestCase) {
+  return (feasibility < bestCase ? bestCase : feasibility);
+}
+
 /// Classify the feasibility of a dynamic cast.  The source and target
 /// types should be unlowered formal types.
 DynamicCastFeasibility classifyDynamicCast(

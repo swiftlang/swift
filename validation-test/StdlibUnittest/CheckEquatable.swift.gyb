@@ -1,0 +1,137 @@
+// RUN: %target-run-simple-swiftgyb > %t.stdout 2>&1
+// RUN: %FileCheck %s < %t.stdout
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
+var AssertionsTestSuite = TestSuite("Assertions")
+
+AssertionsTestSuite.test("checkEquatable/Good") {
+  do {
+    let xs: [MinimalEquatableValue] = []
+    checkEquatable(xs, oracle: { _, _ in fatalError(); () })
+  }
+
+  do {
+    let xs: [MinimalEquatableValue] = (0..<1).map(MinimalEquatableValue.init)
+    checkEquatable(xs, oracle: { _, _ in true })
+  }
+
+  for count in [1, 2, 3, 4, 20] {
+    let xs = (0..<count).map(MinimalEquatableValue.init)
+    MinimalEquatableValue.equalImpl.value = { $0 == $1 }
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+}
+
+AssertionsTestSuite.test("checkEquatable/BrokenReflexivity/1") {
+  let xs: [MinimalEquatableValue] = (0..<2).map(MinimalEquatableValue.init)
+  MinimalEquatableValue.equalImpl.value = {
+    i, j in
+    return i == 0 && j == 0
+  }
+  expectFailure {
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+}
+// CHECK: stdout>>> bad oracle: broken reflexivity at index 1
+// CHECK: [        OK ] Assertions.checkEquatable/BrokenReflexivity/1
+
+AssertionsTestSuite.test("checkEquatable/BrokenSymmetry/1") {
+  let xs: [MinimalEquatableValue] = (0..<2).map(MinimalEquatableValue.init)
+  MinimalEquatableValue.equalImpl.value = {
+    i, j in
+    return i == j || (i == 0 && j == 1)
+  }
+  expectFailure {
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+}
+// CHECK: stdout>>> bad oracle: broken symmetry between indices 0, 1
+// CHECK: stdout>>> bad oracle: broken symmetry between indices 1, 0
+// CHECK: [        OK ] Assertions.checkEquatable/BrokenSymmetry/1
+
+AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/1") {
+  let xs: [MinimalEquatableValue] = (0..<3).map(MinimalEquatableValue.init)
+  MinimalEquatableValue.equalImpl.value = {
+    i, j in
+    switch (min(i, j), max(i, j)) {
+    case (0, 0), (1, 1), (2, 2), (0, 1), (1, 2):
+      return true
+    default:
+      return false
+    }
+  }
+  expectFailure {
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
+}
+// CHECK: stdout>>> bad oracle: broken transitivity at indices 1, 2, 0
+// CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/1
+
+AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/2") {
+  let xs: [MinimalEquatableValue] = (0..<10).map(MinimalEquatableValue.init)
+  MinimalEquatableValue.equalImpl.value = {
+    i, j in
+    switch (min(i, j), max(i, j)) {
+    case (1, 4), (4, 7):
+      return true
+    case (let i, let j) where i == j:
+      return true
+    default:
+      return false
+    }
+  }
+  expectFailure {
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
+}
+// CHECK: stdout>>> bad oracle: broken transitivity at indices 4, 7, 1
+// CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/2
+
+AssertionsTestSuite.test("checkEquatable/BrokenTransitivity/3") {
+  let xs: [MinimalEquatableValue] = (0..<10).map(MinimalEquatableValue.init)
+  MinimalEquatableValue.equalImpl.value = {
+    i, j in
+    switch (min(i, j), max(i, j)) {
+    case (1, 7):
+      return false
+    default:
+      return true
+    }
+  }
+  expectFailure {
+    checkEquatable(
+      xs, oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) })
+  }
+  checkEquatable(
+    xs,
+    oracle: { MinimalEquatableValue($0) == MinimalEquatableValue($1) },
+    allowBrokenTransitivity: true)
+}
+// CHECK: stdout>>> bad oracle: broken transitivity at indices 0, 7, 1
+// CHECK: [        OK ] Assertions.checkEquatable/BrokenTransitivity/3
+
+runAllTests()
+

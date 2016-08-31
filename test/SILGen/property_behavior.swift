@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors %s | %FileCheck %s
 protocol behavior {
   associatedtype Value
 }
@@ -9,7 +9,7 @@ extension behavior {
   }
 }
 
-// TODO: global accessor doesn't get walked because it's in DerivedFileUnit
+// TODO: global accessor doesn't get walked??
 var global: Int __behavior behavior
 
 struct S1<T> {

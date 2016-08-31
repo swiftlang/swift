@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -19,10 +19,6 @@ class BridgedObjC : NSObject { }
 func == (x: BridgedObjC, y: BridgedObjC) -> Bool { return true }
 
 struct BridgedSwift : Hashable, _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   var hashValue: Int { return 0 }
 
   func _bridgeToObjectiveC() -> BridgedObjC {
@@ -136,7 +132,7 @@ func testDictionaryDowncastConditional(_ dict: Dictionary<NSObject, AnyObject>)
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedSwift>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs30_dictionaryDownCastConditional
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>{{.*}} // user: %6
   return dict as? Dictionary<BridgedObjC, BridgedSwift>
 }
@@ -145,7 +141,7 @@ func testDictionaryDowncastBridgedVConditional(_ dict: Dictionary<NSObject, AnyO
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedObjC>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs30_dictionaryDownCastConditional
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedObjC>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as? Dictionary<BridgedSwift, BridgedObjC>
 }
@@ -154,7 +150,7 @@ func testDictionaryDowncastBridgedKConditional(_ dict: Dictionary<NSObject, AnyO
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKV(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedSwift> {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs31_dictionaryBridgeFromObjectiveC
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs19_dictionaryDownCast
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   return dict as! Dictionary<BridgedSwift, BridgedSwift>
 }
@@ -163,7 +159,7 @@ func testDictionaryDowncastBridgedKV(_ dict: Dictionary<NSObject, AnyObject>)
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKVConditional(_ dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedSwift>? {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs42_dictionaryBridgeFromObjectiveCConditional
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFs30_dictionaryDownCastConditional
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as? Dictionary<BridgedSwift, BridgedSwift>
 }
@@ -198,7 +194,7 @@ func testSetDowncastConditional(_ dict: Set<NSObject>)
 // CHECK: bb0([[SET:%[0-9]+]] : $Set<NSObject>)
 func testSetDowncastBridged(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift> {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs24_setBridgeFromObjectiveC
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs12_setDownCast
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Set<τ_0_1>
   return dict as! Set<BridgedSwift>
 }
@@ -208,6 +204,6 @@ func testSetDowncastBridged(_ dict: Set<NSObject>)
 func testSetDowncastBridgedConditional(_ dict: Set<NSObject>) 
        -> Set<BridgedSwift>? {
   return dict as? Set<BridgedSwift>
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs35_setBridgeFromObjectiveCConditional
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFs23_setDownCastConditional
   // CHECK: apply [[DOWNCAST_FN]]<NSObject, BridgedSwift>([[SET]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Hashable, τ_0_1 : Hashable> (@owned Set<τ_0_0>) -> @owned Optional<Set<τ_0_1>>
 }

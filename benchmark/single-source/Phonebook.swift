@@ -69,7 +69,7 @@ public func run_Phonebook(_ N: Int) {
     }
   }
   for _ in 1...N {
-    var t = Names;
+    var t = Names
     t.sort()
   }
 }

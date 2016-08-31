@@ -73,7 +73,6 @@ func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
 OptionalTests.test("Equatable") {
   expectEqual([true, false, false, false, false, true], testRelation(==))
   expectEqual([false, true, true, true, true, false], testRelation(!=))
-  expectEqual([false, true, false, false, true, false], testRelation(<))
 }
 
 OptionalTests.test("CustomReflectable") {
@@ -352,8 +351,8 @@ class TestString : CustomStringConvertible, CustomDebugStringConvertible {
     return "XString"
   }
 }
-class TestStream : Streamable {
-  func write<Target : OutputStream>(to target: inout Target) {
+class TestStream : TextOutputStreamable {
+  func write<Target : TextOutputStream>(to target: inout Target) {
     target.write("AStream")
   }
 }
@@ -368,15 +367,15 @@ func debugPrintStr<T>(_ a: T) -> String {
 // Furthermore, printing an Optional should always print the debug
 // description regardless of whether the wrapper type conforms to an
 // output stream protocol.
-OptionalTests.test("Optional OutputStream") {
+OptionalTests.test("Optional TextOutputStream") {
   let optNoString: TestNoString? = TestNoString()
   expectFalse(optNoString is CustomStringConvertible)
   expectFalse(canGenericCast(optNoString, CustomStringConvertible.self))
-  expectFalse(optNoString is Streamable)
-  expectFalse(canGenericCast(optNoString, Streamable.self))
+  expectFalse(optNoString is TextOutputStreamable)
+  expectFalse(canGenericCast(optNoString, TextOutputStreamable.self))
   expectTrue(optNoString is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optNoString, CustomDebugStringConvertible.self))
-  expectEqual(String(optNoString), "Optional(main.TestNoString)")
+  expectEqual(String(describing: optNoString), "Optional(main.TestNoString)")
   expectEqual(debugPrintStr(optNoString), "Optional(main.TestNoString)")
 
   let optString: TestString? = TestString()
@@ -384,17 +383,17 @@ OptionalTests.test("Optional OutputStream") {
   expectTrue(canGenericCast(optString, CustomStringConvertible.self))
   expectTrue(optString is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optString, CustomDebugStringConvertible.self))
-  expectEqual(String(TestString()), "AString")
-  expectEqual(String(optString), "Optional(XString)")
+  expectEqual(String(describing: TestString()), "AString")
+  expectEqual(String(describing: optString), "Optional(XString)")
   expectEqual(debugPrintStr(optString), "Optional(XString)")
 
   let optStream: TestStream? = TestStream()
-  expectTrue(optStream is Streamable)
-  expectTrue(canGenericCast(optStream, Streamable.self))
+  expectTrue(optStream is TextOutputStreamable)
+  expectTrue(canGenericCast(optStream, TextOutputStreamable.self))
   expectTrue(optStream is CustomDebugStringConvertible)
   expectTrue(canGenericCast(optStream, CustomDebugStringConvertible.self))
-  expectEqual(String(TestStream()), "AStream")
-  expectEqual(String(optStream), "Optional(AStream)")
+  expectEqual(String(describing: TestStream()), "AStream")
+  expectEqual(String(describing: optStream), "Optional(AStream)")
   expectEqual(debugPrintStr(optStream), "Optional(AStream)")
 }
 

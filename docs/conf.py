@@ -287,6 +287,8 @@ from pygments.lexers import get_lexer_by_name as original_get_lexer_by_name  # n
 def swift_get_lexer_by_name(_alias, *args, **kw):
     if _alias == 'swift':
         return swift_pygments_lexers.SwiftLexer()
+    elif _alias == 'sil':
+        return swift_pygments_lexers.SILLexer()
     elif _alias == 'swift-console':
         return swift_pygments_lexers.SwiftConsoleLexer()
     else:

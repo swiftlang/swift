@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o %t.ll
-// RUN: FileCheck %s < %t.ll
-// RUN: FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
-// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | FileCheck %s --check-prefix=SIL-CHECK
+// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck --check-prefix=CHECK-SCOPES %s < %t.ll
+// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -primary-file %s -o - | %FileCheck %s --check-prefix=SIL-CHECK
 
 func markUsed<T>(_ t: T) {}
 

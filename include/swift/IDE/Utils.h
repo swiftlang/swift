@@ -198,14 +198,12 @@ private:
 } // namespace ide
 
 class ArchetypeTransformer {
-  std::function<Type(Type)> TheFunc = nullptr;
-  DeclContext *DC;
-  Type BaseTy;
-  llvm::DenseMap<TypeBase *, Type> Cache;
-  TypeSubstitutionMap Map;
+  struct Implementation;
+  Implementation &Impl;
 public:
   ArchetypeTransformer(DeclContext *DC, Type Ty);
   llvm::function_ref<Type(Type)> getTransformerFunc();
+  ~ArchetypeTransformer();
 };
 } // namespace swift
 

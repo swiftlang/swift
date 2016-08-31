@@ -1,5 +1,5 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-jit-run %s -I %S -enable-source-import | FileCheck %s
+// RUN: %target-jit-run %s -I %S -enable-source-import | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: swift_interpreter
@@ -40,7 +40,7 @@ func getMandelbrotIterations(_ c: Complex, maxIterations: Int) -> Int {
   return n
 }
 
-func fractal (_ densityFunc:(c: Complex, maxIterations: Int) -> Int,
+func fractal (_ densityFunc:(_ c: Complex, _ maxIterations: Int) -> Int,
               xMin:Double, xMax:Double,
               yMin:Double, yMax:Double,
               rows:Int, cols:Int,
@@ -53,7 +53,7 @@ func fractal (_ densityFunc:(c: Complex, maxIterations: Int) -> Int,
   for row in stride(from: xMin, to: xMax, by: dX) {
     for col in stride(from: yMin, to: yMax, by: dY) {
       var c = Complex(real: col, imag: row)
-      printDensity(densityFunc(c: c, maxIterations: maxIterations))
+      printDensity(densityFunc(c, maxIterations))
     }
     print("\n", terminator: "")
   }

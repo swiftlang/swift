@@ -274,7 +274,6 @@ public:
     }
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
-                                          /*noreturn*/ false,
                                           /*throws*/ flags.throws());
 
     // The result type must be materializable.
@@ -427,8 +426,7 @@ private:
     DeclContext *dc = getNotionalDC();
 
     TypeLoc loc(repr);
-    if (performTypeLocChecking(Ctx, loc, /*SILType*/ false, dc,
-                               /*diagnose*/ false))
+    if (performTypeLocChecking(Ctx, loc, dc, /*diagnose*/ false))
       return Type();
 
     return loc.getType();

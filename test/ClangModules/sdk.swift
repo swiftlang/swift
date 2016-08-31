@@ -12,7 +12,7 @@ func available_DateFormatter(_ a: DateFormatter) {}
 
 // Some traditional Objective-C types should fail with fixits.
 
-func unavailable_id(_ a: id) {} // expected-error {{use of undeclared type 'id'; did you mean to use 'AnyObject'?}} {{26-28=AnyObject}}
+func unavailable_id(_ a: id) {} // expected-error {{'id' is unavailable in Swift: 'id' is not available in Swift; use 'Any'}}
 func unavailable_Class(_ a: Class) {} // expected-error {{use of undeclared type 'Class'; did you mean to use 'AnyClass'?}} {{29-34=AnyClass}}
 func unavailable_BOOL(_ a: BOOL) {} // expected-error {{use of undeclared type 'BOOL'; did you mean to use 'ObjCBool'?}} {{28-32=ObjCBool}}
 func unavailable_SEL(_ a: SEL) {} // expected-error {{use of undeclared type 'SEL'; did you mean to use 'Selector'?}} {{27-30=Selector}}

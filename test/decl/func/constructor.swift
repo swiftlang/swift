@@ -32,7 +32,7 @@ Z(a: 1, b: 2) // expected-warning{{unused}}
 struct A {
   var i, j : Int
   
-  init(x : Int) {
+  init(x : Int) { // expected-note {{'init(x:)' declared here}}
     i = x
     j = x
   }
@@ -57,7 +57,7 @@ B(x: 1) // expected-warning{{unused}}
 B(i: 1, j: 2.5) // expected-warning{{unused}}
 
 
-struct F {
+struct F {  // expected-note {{'init(d:b:c:)' declared here}}
   var d : D
   var b : B
   var c : C
@@ -65,7 +65,9 @@ struct F {
 
 struct C {
   var d : D
-  init(d : D) { } // suppress implicit constructors
+
+  // suppress implicit initializers
+  init(d : D) { } // expected-note {{'init(d:)' declared here}}
 }
 
 struct D {

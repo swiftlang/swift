@@ -94,6 +94,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (id) initWithArray: (NSArray<T>*) array;
 @end
 
+@interface NSLifetimeTracked : NSObject
++ (unsigned) count;
+@end
+
+@interface TestingBool : NSObject
+- (void) shouldBeTrueObjCBool: (BOOL)value;
+- (void) shouldBeTrueCBool: (_Bool)value;
+@end
+
 NS_ASSUME_NONNULL_END
 
 #endif

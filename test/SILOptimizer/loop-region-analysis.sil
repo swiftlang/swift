@@ -1,6 +1,6 @@
 // All bbs should have IDs that match the rpo order put out when printing with -sil-sort-output
 
-// RUN: %target-sil-opt %s -loop-region-view-text -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -module-name Swift -loop-region-view-text -o /dev/null | %FileCheck %s
 
 import Builtin
 
@@ -8,13 +8,15 @@ import Builtin
 // Declarations //
 //////////////////
 
+enum Never {}
+
 enum ManyCase {
   case One
   case Two
   case Three
 }
 
-sil @no_return_func : $@convention(thin) @noreturn () -> ()
+sil @no_return_func : $@convention(thin) () -> Never
 
 ///////////
 // Tests //
@@ -2359,8 +2361,8 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  %0 = function_ref @no_return_func : $@convention(thin) @noreturn () -> ()
-  apply %0() : $@convention(thin) @noreturn () -> ()
+  %0 = function_ref @no_return_func : $@convention(thin) () -> Never
+  apply %0() : $@convention(thin) () -> Never
   unreachable
 
 bb3:
@@ -2506,7 +2508,7 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  apply undef() : $@convention(thin) @noreturn () -> ()
+  apply undef() : $@convention(thin) () -> Never
   unreachable
 
 bb3:
@@ -2528,7 +2530,7 @@ bb8:
   cond_br undef, bb4, bb9
 
 bb9:
-  apply undef() : $@convention(thin) @noreturn () -> ()
+  apply undef() : $@convention(thin) () -> Never
   unreachable
 }
 

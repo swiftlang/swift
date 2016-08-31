@@ -112,6 +112,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(IndexRawPointerInst, IndexingInst, None, DoesNotRelease)
     VALUE_RANGE(IndexingInst, IndexAddrInst, IndexRawPointerInst)
 
+  // BindMemory has no physical side effect. Semantically it writes to
+  // its affected memory region because any reads or writes accessing
+  // that memory must be dependent on the bind operation.
+  INST(BindMemoryInst, SILInstruction, MayWrite, DoesNotRelease)
+
   // Reference Counting
   ABSTRACT_VALUE(RefCountingInst, SILInstruction)
     INST(StrongRetainInst, RefCountingInst, MayHaveSideEffects, DoesNotRelease)

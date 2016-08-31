@@ -185,7 +185,8 @@ if(PYTHONINTERP_FOUND)
       endif()
 
       set(validation_test_dependencies
-          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+          "swiftStdlibCollectionUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+          "swiftStdlibUnicodeUnittest-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
 
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)

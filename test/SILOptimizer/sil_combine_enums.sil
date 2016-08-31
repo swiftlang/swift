@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,6 +7,13 @@ import Swift
 
 class SomeClass {
   func hash() -> Int
+}
+
+enum Numerals {
+  case One
+  case Two
+  case Three
+  case Four
 }
 
 sil @external_func: $@convention(thin) () -> ()
@@ -177,6 +184,68 @@ bb2:
   unreachable
 }
 
+// Check that cond_br(select_enum) is converted into switch_enum.
+// CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum2
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: }
+sil @convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // All cases but one are the same. So, they can be made a default for the switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, case #Numerals.Four!enumelt: %3 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+// Check that cond_br(select_enum) is converted into switch_enum.
+// This test checks that select_enum instructions with default cases are handled correctly.
+// CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum3
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: }
+sil @convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // There is only one case, whose result is different from default and other cases
+  // Thus all other cases can be folded into a default cases of a switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, default %3 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
 
 // Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
 // is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
@@ -203,6 +272,64 @@ bb1:
 bb2:
   %10 = function_ref @external_func: $@convention(thin) () -> ()
   apply %10(): $@convention(thin) () -> ()
+  br bb1
+}
+
+// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
+// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
+//
+// CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum2
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: return
+sil @dont_convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
+bb0(%0 : $Numerals):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // There are two cases for each possible outcome.
+  // This means that we would always get a critical edge, if we convert it into a switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, case #Numerals.Four!enumelt: %2 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
+  br bb1
+}
+
+// Check that cond_br(select_enum) is not converted into switch_enum,
+// because the result of the default case is not an integer literal.
+// CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum3
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: return
+sil @dont_convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals, Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : $Numerals, %1 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int1, -1
+  // All cases but one are the same. So, they can be made a default for the switch_enum.
+  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, default %1 : $Builtin.Int1
+
+  cond_br %4, bb2, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Int64, 10
+  return %7 : $Builtin.Int64
+
+bb2:
+  %10 = function_ref @external_func: $@convention(thin) () -> ()
+  apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
   br bb1
 }
 

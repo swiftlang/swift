@@ -17,7 +17,7 @@ public protocol _Pointer {
   /// The underlying raw pointer value.
   var _rawValue: Builtin.RawPointer { get }
 
-  /// Construct a pointer from a raw value.
+  /// Creates a pointer from a raw value.
   init(_ _rawValue: Builtin.RawPointer)
 }
 
@@ -56,8 +56,8 @@ func _convertConstArrayToPointerArgument<
   if let addr = opaquePointer {
     validPointer = ToPointer(addr._rawValue)
   } else {
-    let lastAlignedValue = ~(alignof(FromElement.self) - 1)
-    let lastAlignedPointer = UnsafePointer<Void>(bitPattern: lastAlignedValue)!
+    let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
+    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
     validPointer = ToPointer(lastAlignedPointer._rawValue)
   }
   return (owner, validPointer)
@@ -87,6 +87,6 @@ public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer
 >(_ str: String) -> (AnyObject?, ToPointer) {
-  let utf8 = Array(str.nulTerminatedUTF8)
+  let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }

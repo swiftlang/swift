@@ -4,13 +4,13 @@
 // RUN: cat %s >> %t.shebang.swift
 // RUN: chmod u+x %t.shebang.swift
 
-// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift | FileCheck -check-prefix=NONE %s
-// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift a b c | FileCheck -check-prefix=THREE-ARGS %s
+// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift | %FileCheck -check-prefix=NONE %s
+// RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift a b c | %FileCheck -check-prefix=THREE-ARGS %s
 
 // REQUIRES: swift_interpreter
 
 print("Begin")
-for arg in Process.arguments {
+for arg in CommandLine.arguments {
   print(arg)
 }
 print("End")

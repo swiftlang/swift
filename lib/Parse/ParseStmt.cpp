@@ -412,9 +412,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SourceLoc StartLoc = Tok.getLoc();
       auto CD = cast<ConstructorDecl>(CurDeclContext);
       // Hint at missing 'self.' or 'super.' then skip this statement.
-      bool isConvenient = CD->isConvenienceInit();
-      diagnose(StartLoc, diag::invalid_nested_init, isConvenient)
-        .fixItInsert(StartLoc, isConvenient ? "self." : "super.");
+      bool isSelf = !CD->isDesignatedInit() || !isa<ClassDecl>(CD->getParent());
+      diagnose(StartLoc, diag::invalid_nested_init, isSelf)
+        .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
     } else {
       ParserStatus ExprOrStmtStatus = parseExprOrStmt(Result);
@@ -847,8 +847,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   auto DRE = new (Context) DeclRefExpr(tempDecl, DeclNameLoc(loc),
                                        /*Implicit*/true,
                                        AccessSemantics::DirectToStorage);
-  auto args = TupleExpr::createEmpty(Context, loc, loc, true);
-  auto call = new (Context) CallExpr(DRE, args, /*implicit*/true);
+  auto call = CallExpr::createImplicit(Context, DRE, { }, { });
   
   auto DS = new (Context) DeferStmt(DeferLoc, tempDecl, call);
   return makeParserResult(Status, DS);
@@ -1189,7 +1188,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // they were in Swift 2 and earlier.
     SourceLoc whereLoc;
     if (consumeIf(tok::kw_where, whereLoc)) {
-      diagnose(whereLoc, diag::expected_comma_stmtcondition_w)
+      diagnose(whereLoc, diag::expected_comma_stmtcondition)
         .fixItReplace(whereLoc, ",");
       return true;
     }
@@ -2114,9 +2113,7 @@ static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
   // to just turn it into BraceStmt(CallExpr(TheClosure, VoidTuple)).  This also
   // more correctly handles the implicit ReturnStmt injected into single-expr
   // closures.
-  auto voidArg = TupleExpr::createEmpty(Ctx, CE->getEndLoc(), CE->getEndLoc(),
-                                        /*implicit*/true);
-  ASTNode theCall = new (Ctx) CallExpr(CE, voidArg, /*implicit*/true);
+  ASTNode theCall = CallExpr::createImplicit(Ctx, CE, { }, { });
   return BraceStmt::create(Ctx, CE->getStartLoc(), theCall, CE->getEndLoc(),
                            /*implicit*/true);
 }

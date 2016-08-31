@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil -O | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-sil -O | %FileCheck %s
 
 var inputval = nonTrivialInit(false)
 

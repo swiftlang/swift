@@ -60,14 +60,14 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// Returns a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
 
-  /// Create an instance with elements `transform(x)` for each element
+  /// Creates an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -81,6 +81,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
 // FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
 // collapsed into one `LazyMapCollection` using conditional conformances.
 // Maybe even combined with `LazyMapSequence`.
+// rdar://problem/17144340
 
 % for Traversal in TRAVERSALS:
 %   Self = "LazyMap" + collectionForTraversal(Traversal)
@@ -114,7 +115,7 @@ public struct ${Self}<
   }
 %   end
 
-  /// Access the element at `position`.
+  /// Accesses the element at `position`.
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
@@ -144,13 +145,13 @@ public struct ${Self}<
     return _base.indices
   }
 
-  /// Returns `true` iff `self` is empty.
+  /// A Boolean value indicating whether the collection is empty.
   public var isEmpty: Bool { return _base.isEmpty }
 
-  /// Returns the number of elements.
+  /// The number of elements in the collection.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
-  ///   O(N) otherwise.
+  ///   O(*n*) otherwise.
   public var count: Base.IndexDistance {
     return _base.count
   }
@@ -188,7 +189,7 @@ public struct ${Self}<
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  internal init(_base: Base, transform: (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -206,7 +207,7 @@ extension LazySequenceProtocol {
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
-    _ transform: (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(_base: self.elements, transform: transform)
   }
@@ -223,7 +224,7 @@ extension LazyCollectionProtocol
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
-    _ transform: (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Iterator.Element) -> U
   ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
     return LazyMap${collectionForTraversal(Traversal)}(
       _base: self.elements,

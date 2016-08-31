@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 
 class C {}
 protocol P: class {}
@@ -37,16 +37,16 @@ struct ReferenceStorageTypeLayout<T> {
 
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[UNOWNED_XI]]{{(,|_bt,)}} i32 0, i32 0)
-  unowned(safe)   var pqs:  protocol<P, Q>
+  unowned(safe)   var pqs:  P & Q
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[REF_XI]]_pod, i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_12_4_[[REF_XI]]_pod, i32 0, i32 0)
-  unowned(unsafe) var pqu:  protocol<P, Q>
+  unowned(unsafe) var pqu:  P & Q
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
-  weak            var pqwo: protocol<P, Q>?
+  weak            var pqwo: (P & Q)?
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_24_8_[[WEAK_XI]], i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_12_4_[[WEAK_XI]], i32 0, i32 0)
-  weak            var pqwi: protocol<P, Q>!
+  weak            var pqwi: (P & Q)!
 
   // -- Unknown-refcounted existential without witness tables.
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXo[[UNKNOWN:B[Oo]]], i32 17)

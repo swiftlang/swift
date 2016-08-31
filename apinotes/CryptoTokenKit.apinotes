@@ -1,0 +1,81 @@
+---
+Name: CryptoTokenKit
+Classes:
+- Name: TKSmartCardSlotManager
+  Methods:
+  - Selector: 'getSlotWithName:reply:'
+    MethodKind: Instance
+    SwiftName: getSlot(withName:reply:)
+- Name: TKSmartCard
+  Properties:
+  - Name: valid
+    SwiftName: isValid
+  - Name: sensitive
+    SwiftName: isSensitive
+  Methods:
+  - Selector: 'transmitRequest:reply:'
+    MethodKind: Instance
+    SwiftName: transmit(_:reply:)
+  - Selector: 'userInteractionForSecurePINVerificationWithPINFormat:APDU:PINByteOffset:'
+    MethodKind: Instance
+    SwiftName: userInteractionForSecurePINVerification(_:apdu:pinByteOffset:)
+  - Selector: 'userInteractionForSecurePINChangeWithPINFormat:APDU:currentPINByteOffset:newPINByteOffset:'
+    MethodKind: Instance
+    SwiftName: userInteractionForSecurePINChange(_:apdu:currentPINByteOffset:newPINByteOffset:)
+  - Selector: 'sendIns:p1:p2:data:le:reply:'
+    MethodKind: Instance
+    SwiftPrivate: true
+  - Selector: 'sendIns:p1:p2:data:le:sw:error:'
+    MethodKind: Instance
+    SwiftPrivate: true
+  - Selector: 'inSessionWithError:executeBlock:'
+    MethodKind: Instance
+    SwiftPrivate: true
+- Name: TKSmartCardATRInterfaceGroup
+  SwiftName: TKSmartCardATR.InterfaceGroup
+Protocols:
+- Name: TKTokenSessionDelegate
+  Methods:
+  - Selector: 'tokenSession:supportsOperation:usingKey:algorithm:'
+    MethodKind: Instance
+    SwiftName: tokenSession(_:supports:keyObjectID:algorithm:)
+  - Selector: 'tokenSession:signData:usingKey:algorithm:error:'
+    MethodKind: Instance
+    SwiftName: tokenSession(_:sign:keyObjectID:algorithm:)
+  - Selector: 'tokenSession:decryptData:usingKey:algorithm:error:'
+    MethodKind: Instance
+    SwiftName: tokenSession(_:decrypt:keyObjectID:algorithm:)
+  - Selector: 'tokenSession:performKeyExchangeWithPublicKey:usingKey:algorithm:parameters:error:'
+    MethodKind: Instance
+    SwiftName: tokenSession(_:performKeyExchange:keyObjectID:algorithm:parameters:)
+- Name: TKTokenDelegate
+  Methods:
+  - Selector: 'token:createSessionWithError:'
+    MethodKind: Instance
+    SwiftName: createSession(_:)
+Enumerators:
+- Name: TKSmartCardPINEncodingASCII
+  SwiftName: ascii
+- Name: TKSmartCardPINEncodingBCD
+  SwiftName: bcd
+- Name: TKSmartCardProtocolT0
+  SwiftName: t0
+- Name: TKSmartCardProtocolT1
+  SwiftName: t1
+- Name: TKSmartCardProtocolT15
+  SwiftName: t15
+Tags:
+- Name: TKSmartCardSlotState
+  SwiftName: TKSmartCardSlot.State
+- Name: TKSmartCardPINCharset
+  SwiftName: TKSmartCardPINFormat.Charset
+- Name: TKSmartCardPINEncoding
+  SwiftName: TKSmartCardPINFormat.Encoding
+- Name: TKSmartCardPINJustification
+  SwiftName: TKSmartCardPINFormat.Justification
+- Name: TKSmartCardPINCompletion
+  SwiftName: TKSmartCardUserInteractionForPINOperation.Completion
+- Name: TKSmartCardPINConfirmation
+  SwiftName: TKSmartCardUserInteractionForSecurePINChange.Confirmation
+- Name: TKErrorCode
+  NSErrorDomain: TKErrorDomain

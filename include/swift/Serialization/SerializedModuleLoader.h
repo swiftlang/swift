@@ -123,6 +123,9 @@ public:
   virtual OperatorDecl *lookupOperator(Identifier name,
                                        DeclKind fixity) const override;
 
+  virtual PrecedenceGroupDecl *
+  lookupPrecedenceGroup(Identifier name) const override;
+
   virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer,
                                   NLKind lookupKind) const override;

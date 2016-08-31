@@ -13,7 +13,7 @@ var func1 : () -> ()    // No input, no output.
 var func2 : (Int) -> Int
 var func3 : () -> () -> ()                   // Takes nothing, returns a fn.
 var func3a : () -> (() -> ())                // same as func3
-var func6 : (fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
+var func6 : (_ fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
 var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
 
 // Top-Level expressions.  These are 'main' content.
@@ -80,9 +80,10 @@ func basictest() {
 }
 
 // Infix operators and attribute lists.
-infix operator %% {
-  associativity left
-  precedence 2
+infix operator %% : MinPrecedence
+precedencegroup MinPrecedence {
+  associativity: left
+  lowerThan: AssignmentPrecedence
 }
 
 func %%(a: Int, b: Int) -> () {}
@@ -112,7 +113,7 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 }
 
 // Error recovery.
-func testfunc2 (_: ((), Int) -> Int) -> Int {}
+func testfunc2 (_: (((), Int)) -> Int) -> Int {}
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
@@ -152,7 +153,7 @@ func test3(_ arg1: Int, arg2: Int) -> Int {
   return 4
 }
 
-func test4() -> ((arg1: Int, arg2: Int) -> Int) {
+func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
   return test3
 }
 
@@ -176,10 +177,10 @@ func w4(_: Int) -> Int { return 4 }
 func b1() {}
 
 func foo1(_ a: Int, b: Int) -> Int {}
-func foo2(_ a: Int) -> (b: Int) -> Int {}
+func foo2(_ a: Int) -> (_ b: Int) -> Int {}
 func foo3(_ a: Int = 2, b: Int = 3) {}
 
-prefix operator ^^ {}
+prefix operator ^^
 
 prefix func ^^(a: Int) -> Int {
   return a + 1
@@ -229,8 +230,10 @@ func test_lambda() {
 }
 
 func test_lambda2() {
-  // expected-warning @+1 {{result of call is unused}}
-  { () -> protocol<Int> in // expected-error {{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
+  { () -> protocol<Int> in
+    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
+    // expected-error @-2 {{non-protocol type 'Int' cannot be used within a protocol composition}}
+    // expected-warning @-3 {{result of call is unused}}
     return 1
   }()
 }
@@ -244,7 +247,7 @@ func test_floating_point() {
 
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
 }
 
 // More realistic examples.
@@ -549,7 +552,7 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var e3 = Empty(Float(d))
 }
 
-struct Rule {
+struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
   var target: String
   var dependencies: String
 }
@@ -620,7 +623,7 @@ func magic_literals() {
 //===----------------------------------------------------------------------===//
 
 
-infix operator +-+= {}
+infix operator +-+=
 @discardableResult
 func +-+= (x: inout Int, y: Int) -> Int { return 0}
 
@@ -672,15 +675,15 @@ func unusedExpressionResults() {
 //===----------------------------------------------------------------------===//
 
 func arrayLiterals() { 
-  var a = [1,2,3]
-  var b : [Int] = []
-  var c = []  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
+  let _ = [1,2,3]
+  let _ : [Int] = []
+  let _ = []  // expected-error {{empty collection literal requires an explicit type}}
 }
 
 func dictionaryLiterals() {
-  var a = [1 : "foo",2 : "bar",3 : "baz"]
-  var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{cannot infer type for empty collection literal without a contextual type}}
+  let _ = [1 : "foo",2 : "bar",3 : "baz"]
+  let _: Dictionary<Int, String> = [:]
+  let _ = [:]  // expected-error {{empty collection literal requires an explicit type}}
 }
 
 func invalidDictionaryLiteral() {
@@ -703,10 +706,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-Int.self == nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil == Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-Int.self != nil // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
-nil != Int.self // expected-error {{type 'Int.Type' is not optional, value can never be nil}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -724,8 +727,8 @@ func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
 func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
-  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
-  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=((}} {{29-29=) != nil)}}
+  if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
+  if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
 
@@ -735,6 +738,12 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: CountableClosedRange<Int>
   let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'CountableClosedRange<Int>?' and 'Int'}}
   // expected-note @-1 {{overloads for '??' exist with these partially matching parameter lists:}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
+  
+  
+  // <rdar://problem/27457457> [Type checker] Diagnose unsavory optional injections
+  // Accidental optional injection for ??.
+  let i = 42
+  _ = i ?? 17 // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int', so the right side is never used}} {{9-15=}}
 }
 
 // <rdar://problem/19772570> Parsing of as and ?? regressed
@@ -749,10 +758,11 @@ func testParenExprInTheWay() {
 
   if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if !(x & 4.0) {}  // expected-error {{no '&' candidates produce the expected contextual result type 'Bool'}}
+  //expected-note @-1 {{overloads for '&' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, T, Self}}
 
   
-  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization
@@ -787,7 +797,7 @@ func inoutTests(_ arr: inout Int) {
   func takeAny(_ x: Any) {}
   takeAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
   func takeManyAny(_ x: Any...) {}
-  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any' (aka 'protocol<>')}}
+  takeManyAny(&x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
   takeManyAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
   func takeIntAndAny(_ x: Int, _ y: Any) {}
   takeIntAndAny(1, &x) // expected-error{{'&' used with non-inout argument of type 'Any'}}
@@ -804,8 +814,8 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(_ x: Int, _ y: Int, _ z: String = "") {}
-    func g<T>(_ x: T, _ y: T, _ z: String = "") {}
+    func f(_ x: Int, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
+    func g<T>(_ x: T, _ y: T, _ z: String = "") {} // expected-note 2 {{'g' declared here}}
 
     f(1) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
@@ -828,7 +838,7 @@ func r23185177(_ x: P?) -> [String] {
 
 // <rdar://problem/22913570> Miscompile: wrong argument parsing when calling a function in swift2.0
 func r22913570() {
-  func f(_ from: Int = 0, to: Int) {}
+  func f(_ from: Int = 0, to: Int) {} // expected-note {{'f(_:to:)' declared here}}
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
@@ -862,3 +872,24 @@ let _ = (x, 3).1
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 
+
+// SE-0101 sizeof family functions are reconfigured into MemoryLayout
+protocol Pse0101 {
+  associatedtype Value
+  func getIt() -> Value
+}
+class Cse0101<U> {
+  typealias T = U
+  var val: U { fatalError() }
+}
+func se0101<P: Pse0101>(x: Cse0101<P>) {
+  // Note: The first case is actually not allowed, but it is very common and can be compiled currently.
+  _ = sizeof(P) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-16=>.size}} {{none}}
+                // expected-warning@-1 {{missing '.self' for reference to metatype of type 'P'}}
+  _ = sizeof(P.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{15-21=>.size}} {{none}}
+  _ = sizeof(P.Value.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{21-27=>.size}} {{none}}
+  _ = sizeof(Cse0101<P>.self) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-14=MemoryLayout<}} {{24-30=>.size}} {{none}}
+  _ = alignof(Cse0101<P>.T.self) // expected-error {{'alignof' is unavailable: use MemoryLayout<T>.alignment instead.}} {{7-15=MemoryLayout<}} {{27-33=>.alignment}} {{none}}
+  _ = strideof(P.Type.self) // expected-error {{'strideof' is unavailable: use MemoryLayout<T>.stride instead.}} {{7-16=MemoryLayout<}} {{22-28=>.stride}} {{none}}
+  _ = sizeof(type(of: x)) // expected-error {{'sizeof' is unavailable: use MemoryLayout<T>.size instead.}} {{7-26=MemoryLayout<Cse0101<P>>.size}} {{none}}
+}

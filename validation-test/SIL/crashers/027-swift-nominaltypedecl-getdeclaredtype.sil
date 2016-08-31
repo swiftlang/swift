@@ -1,0 +1,83 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts, OS=linux-gnu
+bb0(@test_existential_metatype : $Int
+%0 to $@callee_owned (thin) -> ("01234567-cdef-> (thin) -> @owned @callee_owned (Int
+bb0:
+import SwiftShims
+%0 : $@convention(thin) -> ()
+strong_retain %0 : $Beth
+%7, bb3
+%0 : $@box Int) : $@_TF6switch1aFT_T_ : $*Spoon
+bb0(%2 : $Builtin.FPIEEE64, 1) ()
+sil [fragile] @guaranteed A)) {
+}
+init()
+%3 : $Builtin.Int32
+inject_enum_addr %0a : $*Spoon
+br bb4
+@convention(thin) -> (Int, bb1, #Optional<Int) -> (thin) ()
+%0 : $Builtin.some!enumelt.Word) (thin) -> ()) (thin) ("01234567-> () (thin) -> Int) ()
+%6 = alloc_box $C
+%5 = function_ref @test_unreachable : $C, @owned @box M
+bb2:
+%14 : $*Foo
+%1 = load_weak [fragile] @test_checked_cast_br_jump_threading_with_entry_bb_arguments : $@globalinit_func0 : $SomeSubclass
+return %2 = project_box %10 = functionref @callee_owned ()) : $@callee_owned ()
+}
+%115 = tuple (%1, @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $ImplicitlyUnwrappedOptional<Int8>
+%v : $@_TF6switch1cFT_T_ : $Int32) (thin) (thin) () : $@callee_owned ()) -0123-> ()
+store %33 = alloc_ref [fragile] @convention(%5 : $@out Bendable, %99 = tuple (thin) -> ():
+cond_br undef, @() (X) -> () (method) -> Int {
+%5 = function_ref @convention(%6 : $Builtin.Int1
+strong_release %17 = unchecked_ref_cast %2 = load %0, U> (method) ():
+}
+store %14 = tuple (thin) -> () (Builtin.Type)
+}
+store %1 = tuple () -000000000000") {
+bb0(thin) -> ()
+%8 : $*Builtin.some!enumelt: $@box Spoon
+strong_retain %1 : $*M
+}
+}
+bb0(thin) : AssocReqt module def_basic {}
+%12 = strong_release %5 : $*Spoon
+%8 = unchecked_addr_cast %101 = tuple(%2 : $*SomeClass.Type) -> (Int, 5
+sil [_semantics "foo(%2 = apply [fragile] @owned A>
+%14 = alloc_box $@convention(thin) : $@owned A, bb1:
+}
+}
+class B
+}
+var free:
+%0 : $SomeProtocol.RawPointer
+init(@owned Optional<C>
+}
+sil [fragile] @call_fn_pointer : $Builtin.Word)
+%6 : $@convention(@test1 : $Int) ClassBound, Float32) () -> Beth, bb2:
+%i") (thin) (Builtin.Type) ():
+%4 = alloc_stack $@box Builtin.RawPointer
+%0 = open_existential_box %1 : $@thick SomeClass
+strong_retain %6 = apply %8 = _ref @convention("once") (thin) P) (Builtin.Int32):
+%13 : $Foo.Int1
+%4 : $A
+dealloc_stack %4 = tuple_element_addr %11 = tuple () () -> Int {
+}
+dealloc_partial_ref %4 : $@test_class_metatype : $X)
+checked_cast_br %6 : $(thin) (Builtin.Word
+%0 : $@convention(%2a : $*Builtin.Int32) -> Int32 {}
+bb4():
+@in Int) (thin) -> ()
+%2 : $A, @bridge_object : $CP>
+%4 : $@_TFSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $*ConformingAssoc
+%2 = tuple (thin) -0123-> Builtin.Int1) -> (@convention(thin) -> () () (@_TF18devirt_jump_thread26jumpthread_checked_cast_brFCS_8FooClassSi : $(thin) ()
+%0 : $@owned @callee_owned (%1()
+}
+sil @convention() -> Aleph
+strong_release %2 : $@convention(thin) -> (thin) -0123-> ()
+bb2
+bb0() -> @convention()
+init(thin) (thin) (@public_global : InheritedConformance: $*ClassBound) {
+}
+%118 = apply %20 = function_ref @convention(%3 : $@convention() -> (%3) Int -> (%4 = alloc_box $*Int
+return %3) (thin) {
+%c = apply %0 =

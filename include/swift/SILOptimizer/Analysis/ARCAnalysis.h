@@ -39,6 +39,11 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
+/// Return true if this is a retain instruction.
+bool isRetainInstruction(SILInstruction *II);
+
+/// Return true if this is a release instruction.
+bool isReleaseInstruction(SILInstruction *II);
 
 using RetainList = llvm::SmallVector<SILInstruction *, 1>;
 using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;
@@ -393,10 +398,10 @@ SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
 
 namespace swift {
 
-/// EpilogueARCBlockState - Keep track of whether a epilogue ARC instruction has
-/// been found.
+/// EpilogueARCBlockState - Keep track of whether an epilogue ARC instruction
+/// has been found.
 struct EpilogueARCBlockState {
-  /// Keep track of whether a eplogue release has been found before and after
+  /// Keep track of whether an epilogue release has been found before and after
   /// this basic block.
   bool BBSetIn;
   /// The basic block local SILValue we are interested to find epilogue ARC in.
@@ -450,6 +455,16 @@ private:
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
 
+  /// Return true if this is a function exitting block this epilogue ARC
+  /// matcher is interested in. 
+  bool isInterestedFunctionExitingBlock(SILBasicBlock *BB) {
+    if (EpilogueARCKind::Release == Kind)  
+      return BB->getTerminator()->isFunctionExiting();
+
+    return BB->getTerminator()->isFunctionExiting() &&
+           BB->getTerminator()->getTermKind() != TermKind::ThrowInst;
+  }
+
   /// Return true if this is a function exit block.
   bool isExitBlock(SILBasicBlock *BB) {
     return ExitBlocks.count(BB);
@@ -484,7 +499,8 @@ public:
     // Initialize the epilogue arc data flow context.
     initializeDataflow();
     // Converge the data flow.
-    convergeDataflow();
+    if (!convergeDataflow())
+      return false;
     // Lastly, find the epilogue ARC instructions.
     return computeEpilogueARC();
   }
@@ -499,7 +515,7 @@ public:
   void initializeDataflow();
 
   /// Keep iterating until the data flow is converged.
-  void convergeDataflow();
+  bool convergeDataflow();
 
   /// Find the epilogue ARC instructions.
   bool computeEpilogueARC();

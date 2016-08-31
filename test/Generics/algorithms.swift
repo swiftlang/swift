@@ -1,19 +1,19 @@
 // RUN: %target-parse-verify-swift
 
 protocol Eq {
-  func ==(lhs: Self, rhs: Self) -> Bool
-  func !=(lhs: Self, rhs: Self) -> Bool
+  static func ==(lhs: Self, rhs: Self) -> Bool
+  static func !=(lhs: Self, rhs: Self) -> Bool
 }
 
 protocol Comparable: Eq {
-  func <(lhs: Self, rhs: Self) -> Bool
-  func <=(lhs: Self, rhs: Self) -> Bool
-  func >=(lhs: Self, rhs: Self) -> Bool
-  func >(lhs: Self, rhs: Self) -> Bool
+  static func <(lhs: Self, rhs: Self) -> Bool
+  static func <=(lhs: Self, rhs: Self) -> Bool
+  static func >=(lhs: Self, rhs: Self) -> Bool
+  static func >(lhs: Self, rhs: Self) -> Bool
 }
 
-func find<R : IteratorProtocol where R.Element : Eq>
-       (_ range : R, value : R.Element) -> R {
+func find<R : IteratorProtocol>(_ range : R, value : R.Element) -> R
+  where R.Element : Eq {
   var result = range
   for x in IteratorSequence(range) {
     if x == value {
@@ -37,8 +37,8 @@ func findIf<R : IteratorProtocol>(
   return result
 }
 
-func count<R : IteratorProtocol where R.Element : Eq>
-       (_ range : R, value : R.Element) -> Int {
+func count<R : IteratorProtocol>(_ range : R, value : R.Element) -> Int
+  where R.Element : Eq {
   var result = 0
   for x in IteratorSequence(range) {
     if x == value {
@@ -63,10 +63,8 @@ func countIf<
 func equal<
   R1 : IteratorProtocol,
   R2 : IteratorProtocol
-  where
-  R1.Element : Eq,
-  R1.Element == R2.Element
->(_ range1 : R1, range2 : R2) -> Bool {
+  >(_ range1 : R1, range2 : R2) -> Bool
+  where R1.Element : Eq, R1.Element == R2.Element {
 
   var range1 = range1
   var range2 = range2
@@ -105,10 +103,8 @@ func equalIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
 func mismatch<
   R1 : IteratorProtocol,
   R2 : IteratorProtocol
-  where
-  R1.Element : Eq,
-  R1.Element == R2.Element
->(_ range1 : R1, range2 : R2) -> (R1, R2) {
+>(_ range1 : R1, range2 : R2) -> (R1, R2)
+  where R1.Element : Eq, R1.Element == R2.Element {
   var range1 = range1
   var range2 = range2
   var prev1 = range1, prev2 = range2
@@ -142,8 +138,8 @@ func mismatchIf<R1 : IteratorProtocol, R2 : IteratorProtocol>
   return (prev1, prev2)
 }
 
-func minElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
-       -> R.Element {
+func minElement<R : IteratorProtocol>(_ range: R) -> R.Element
+  where R.Element : Comparable {
   var range = range
   var result = range.next()!
   for next in IteratorSequence(range) {
@@ -154,8 +150,8 @@ func minElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
   return result
 }
 
-func maxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
-       -> R.Element {
+func maxElement<R : IteratorProtocol>(_ range: R) -> R.Element
+  where R.Element : Comparable {
   var range = range
   var result = range.next()!
   for next in IteratorSequence(range) {
@@ -166,8 +162,8 @@ func maxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
   return result
 }
 
-func minMaxElement<R : IteratorProtocol where R.Element : Comparable>(_ range: R)
-       -> (R.Element, R.Element) {
+func minMaxElement<R : IteratorProtocol>(_ range: R) -> (R.Element, R.Element)
+  where R.Element : Comparable {
   var range = range
   var min = range.next()!, max = min
   for next in IteratorSequence(range) {
@@ -183,8 +179,9 @@ protocol RandomAccessStream : IteratorProtocol {
   subscript (r : Range<Int>) -> Self { get }
 }
 
-func lowerBound<R : RandomAccessStream where R.Element : Comparable>
-       (_ inputrange : R, value : R.Element) -> R {
+func lowerBound<R : RandomAccessStream>
+  (_ inputrange : R, value : R.Element) -> R
+  where R.Element : Comparable {
   var range = inputrange
   while range.size() > 1 {
     let mid = range.size() / 2
@@ -197,8 +194,9 @@ func lowerBound<R : RandomAccessStream where R.Element : Comparable>
   return range
 }
 
-func upperBound<R : RandomAccessStream where R.Element : Comparable>
-       (_ inputrange : R, value : R.Element) -> R {
+func upperBound<R : RandomAccessStream>
+  (_ inputrange : R, value : R.Element) -> R
+  where R.Element : Comparable {
   var range = inputrange
   while range.size() > 1 {
     let mid = range.size() / 2

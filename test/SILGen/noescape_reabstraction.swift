@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 struct S {}
 
-func noescape_concrete(_ x: @noescape (S) -> S) {
+func noescape_concrete(_ x: (S) -> S) {
   noescape_generic(x)
 }
 
-func noescape_generic<T>(_ x: @noescape (T) -> T) {
+func noescape_generic<T>(_ x: (T) -> T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF22noescape_reabstraction17noescape_concreteFFVS_1SS0_T_

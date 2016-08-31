@@ -301,7 +301,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     Result = Builder.createTuple(Loc, VoidTy, { });
 
   // Function marked as @NoReturn must be followed by 'unreachable'.
-  if (NewFunc->getLoweredFunctionType()->isNoReturn())
+  if (NewFunc->isNoReturnFunction())
     Builder.createUnreachable(Loc);
   else {
     auto GenResultTy = GenericFunc->mapTypeIntoContext(

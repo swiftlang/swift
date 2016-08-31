@@ -19,6 +19,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
@@ -587,17 +588,20 @@ public:
   void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
     if (IGM.IRGen.Opts.Optimize)
       return;
-    for (auto &Variable : ValueVariables) {
+    for (auto &Variable : reversed(ValueVariables)) {
       auto VarDominancePoint = Variable.first;
       llvm::Value *Storage = Variable.second;
       if (getActiveDominancePoint() == VarDominancePoint ||
           isActiveDominancePointDominatedBy(VarDominancePoint)) {
         llvm::Type *ArgTys;
-        auto *Ty = Storage->getType()->getScalarType();
-        // Pointers and Floats are expected to fit into a register.
-        if (Ty->isPointerTy() || Ty->isFloatingPointTy())
-          ArgTys = { Storage->getType() };
+        auto *Ty = Storage->getType();
+        // Vectors, Pointers and Floats are expected to fit into a register.
+        if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
+          ArgTys = { Ty };
         else {
+          // If this is not a scalar or vector type, we can't handle it.
+          if (isa<llvm::CompositeType>(Ty))
+            continue;
           // The storage is guaranteed to be no larger than the register width.
           // Extend the storage so it would fit into a register.
           llvm::Type *IntTy;
@@ -613,6 +617,24 @@ public:
         auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
         auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
         Builder.CreateCall(InlineAsm, Storage);
+        // Propagate the dbg.value intrinsics into the later basic blocks.  Note
+        // that this shouldn't be necessary. LiveDebugValues should be doing
+        // this but can't in general because it currently only tracks register
+        // locations.
+        auto It = llvm::BasicBlock::iterator(Variable.second);
+        auto *BB = Variable.second->getParent();
+        auto *CurBB = Builder.GetInsertBlock();
+        if (BB != CurBB)
+          for (auto I = std::next(It), E = BB->end(); I != E; ++I) {
+            auto *DVI = dyn_cast<llvm::DbgValueInst>(I);
+            if (DVI && DVI->getValue() == Variable.second)
+              IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
+                  DVI->getValue(), 0, DVI->getVariable(), DVI->getExpression(),
+                  DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
+            else
+              // Found all dbg.value instrinsics describing this location.
+              break;
+        }
       }
     }
   }
@@ -704,6 +726,7 @@ public:
     Alignment align(layout->getAlignment());
 
     auto alloca = createAlloca(aggregateType, align, Name + ".debug");
+    ArtificialLocation AutoRestore(getDebugScope(), IGM.DebugInfo, Builder);
     size_t i = 0;
     for (auto val : vals) {
       auto addr = Builder.CreateStructGEP(alloca, i,
@@ -720,14 +743,17 @@ public:
                                     DebugTypeInfo Ty,
                                     SILType SILTy,
                                     const SILDebugScope *DS,
+                                    ValueDecl *VarDecl,
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
     // Force all archetypes referenced by the type to be bound by this point.
     // TODO: just make sure that we have a path to them that the debug info
     //       can follow.
-    if (!IGM.IRGen.Opts.Optimize && Ty.getType()->hasArchetype())
-      Ty.getType()->getCanonicalType().visit([&](Type t) {
+    auto runtimeTy = getRuntimeReifiedType(IGM,
+                                           Ty.getType()->getCanonicalType());
+    if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
+      runtimeTy.visit([&](Type t) {
         if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
           emitTypeMetadataRef(archetype);
        });
@@ -735,11 +761,11 @@ public:
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
-                                             ArgNo, Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
+                                             Name, ArgNo, Indirection);
     } else
-      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, Name, 0,
-                                             Indirection);
+      IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
+                                             Name, 0, Indirection);
   }
 
   void emitFailBB() {
@@ -871,6 +897,8 @@ public:
 
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
+
+  void visitBindMemoryInst(BindMemoryInst *i);
 
   void visitCondFailInst(CondFailInst *i);
   
@@ -1489,9 +1517,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
         countArgs(CurSILFn->getDeclContext()) + 1 + BB->getBBArgs().size();
     auto Storage = emitShadowCopy(ErrorResultSlot.getAddress(), getDebugScope(),
                                   Name, ArgNo);
-    IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI,
-                                           getDebugScope(), Name, ArgNo,
-                                           IndirectValue, ArtificialValue);
+    IGM.DebugInfo->emitVariableDeclaration(
+        Builder, Storage, DTI, getDebugScope(), nullptr, Name, ArgNo,
+        IndirectValue, ArtificialValue);
   }
 }
 
@@ -1586,9 +1614,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
           ArgsEmitted = true;
         }
       }
+      if (isa<TermInst>(&I))
+        emitDebugVariableRangeExtension(BB);
     }
-    if (isa<TermInst>(&I))
-      emitDebugVariableRangeExtension(BB);
     visit(&I);
 
     assert(!EmissionNotes.count(&I) &&
@@ -3207,8 +3235,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   Explosion e = getLoweredExplosion(SILVal);
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitShadowCopy(e.claimAll(), i->getDebugScope(), Name, ArgNo, Copy);
-  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(), Name,
-                               ArgNo);
+  emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
+                               i->getDecl(), Name, ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3237,7 +3265,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   unsigned ArgNo = i->getVarInfo().ArgNo;
   emitDebugVariableDeclaration(
       emitShadowCopy(Addr, i->getDebugScope(), Name, ArgNo), DbgTy,
-      i->getType(), i->getDebugScope(), Name, ArgNo,
+      i->getType(), i->getDebugScope(), Decl, Name, ArgNo,
       DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
@@ -3508,7 +3536,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     auto DbgTy = DebugTypeInfo(Decl, RealType, type, Unwrap);
     StringRef Name = getVarName(i);
     if (auto DS = i->getDebugScope())
-      emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Name,
+      emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
                                    i->getVarInfo().ArgNo);
   }
 }
@@ -3677,8 +3705,8 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     DebugTypeInfo DbgTy(Decl, i->getElementType().getSwiftType(), type, false);
     IGM.DebugInfo->emitVariableDeclaration(
         Builder,
-          emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
-        DbgTy, i->getDebugScope(), Name, 0,
+        emitShadowCopy(boxWithAddr.getAddress(), i->getDebugScope(), Name, 0),
+        DbgTy, i->getDebugScope(), Decl, Name, 0,
         DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
   }
 }
@@ -4564,6 +4592,10 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   }
 }
 
+// This is a no-op because we do not lower Swift TBAA info to LLVM IR, and it
+// does not produce any values.
+void IRGenSILFunction::visitBindMemoryInst(swift::BindMemoryInst *) {}
+
 static DeallocStackInst *
 findPairedDeallocStackForDestroyAddr(DestroyAddrInst *destroyAddr) {
   // This peephole only applies if the address being destroyed is the
@@ -4622,19 +4654,21 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
 
-  // Emit unique side-effecting inline asm calls in order to eliminate
-  // the possibility that an LLVM optimization or code generation pass
-  // will merge these blocks back together again. We emit an empty asm
-  // string with the side-effect flag set, and with a unique integer
-  // argument for each cond_fail we see in the function.
-  llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-  llvm::Type *argTys = { asmArgTy };
-  llvm::FunctionType *asmFnTy =
-    llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-  llvm::InlineAsm *inlineAsm =
-    llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-  Builder.CreateCall(inlineAsm,
-                     llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+  if (IGM.IRGen.Opts.Optimize) {
+    // Emit unique side-effecting inline asm calls in order to eliminate
+    // the possibility that an LLVM optimization or code generation pass
+    // will merge these blocks back together again. We emit an empty asm
+    // string with the side-effect flag set, and with a unique integer
+    // argument for each cond_fail we see in the function.
+    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+    llvm::Type *argTys = { asmArgTy };
+    llvm::FunctionType *asmFnTy =
+      llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+    llvm::InlineAsm *inlineAsm =
+      llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+    Builder.CreateCall(inlineAsm,
+                       llvm::ConstantInt::get(asmArgTy, NumCondFails++));
+  }
 
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic =

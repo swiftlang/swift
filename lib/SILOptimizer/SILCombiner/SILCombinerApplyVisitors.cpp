@@ -721,6 +721,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   FullApplySite NewAI;
   Builder.setCurrentDebugScope(AI.getDebugScope());
+  Builder.addOpenedArchetypeOperands(AI.getInstruction());
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
@@ -774,9 +775,9 @@ getConformanceAndConcreteType(FullApplySite AI,
   }
 
   if (ConcreteType->isOpenedExistential()) {
-    assert(!InitExistential->getOpenedArchetypeOperands().empty() &&
+    assert(!InitExistential->getTypeDependentOperands().empty() &&
            "init_existential is supposed to have a typedef operand");
-    ConcreteTypeDef = InitExistential->getOpenedArchetypeOperands()[0].get();
+    ConcreteTypeDef = InitExistential->getTypeDependentOperands()[0].get();
   }
 
   // Find the conformance for the protocol we're interested in.
@@ -1038,13 +1039,6 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
     Builder.createReleaseValue(Call->getLoc(), OnX, Atomicity::Atomic);
 }
 
-static bool isCastTypeKnownToSucceed(SILType Type, SILModule &Mod) {
-  auto *M = Mod.getSwiftModule();
-  return M->getASTContext()
-      .getBridgedToObjC(M, Type.getSwiftRValueType(), nullptr)
-      .hasValue();
-}
-
 /// Replace an application of a cast composition f_inverse(f(x)) by x.
 bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
                                               StringRef FInverseName,
@@ -1055,12 +1049,6 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
 
   // We need to know how to replace the call by reference counting instructions.
   if (!knowHowToEmitReferenceCountInsts(FInverse))
-    return false;
-
-  // We need to know that the cast will succeed.
-  if (!isCastTypeKnownToSucceed(FInverse->getArgument(0)->getType(),
-                                FInverse->getModule()) ||
-      !isCastTypeKnownToSucceed(FInverse->getType(), FInverse->getModule()))
     return false;
 
   // Need to have a matching 'f'.
@@ -1169,6 +1157,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // The type of the substitution is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand()->getType();
+    Builder.addOpenedArchetypeOperands(AI);
     auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
                                       substTy, AI->getType(),
                                       AI->getSubstitutions(), Arguments,

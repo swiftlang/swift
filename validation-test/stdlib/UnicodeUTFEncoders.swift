@@ -60,7 +60,7 @@ func nthUnicodeScalar(_ n: UInt32) -> UnicodeScalar {
   for r in unicodeScalarRanges {
     count += r.upperBound - r.lowerBound
     if count > n {
-      return UnicodeScalar(r.upperBound - (count - n))
+      return UnicodeScalar(r.upperBound - (count - n))!
     }
   }
   _preconditionFailure("Index out of range")
@@ -106,7 +106,7 @@ final class CodecTest<Codec : TestableUnicodeCodec> {
 
     // Use Cocoa to encode the scalar
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
-    let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
+    let nsEncoded = nsEncodeBuffer[0..<(used/MemoryLayout<CodeUnit>.size)]
     var encodeIndex = encodeBuffer.startIndex
     let encodeOutput: (CodeUnit) -> Void = {
       self.encodeBuffer[encodeIndex] = $0
@@ -122,15 +122,15 @@ final class CodecTest<Codec : TestableUnicodeCodec> {
     default:
       fatalError("decoding failed")
     }
-    expectEqual(
+    expectEqualTest(
       scalar, decoded,
       "Decoding failed: \(asHex(scalar.value)) => " +
       "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
     ) { $0 == $1 }
 
     encodeIndex = encodeBuffer.startIndex
-    Codec.encode(scalar, sendingOutputTo: encodeOutput)
-    expectEqual(
+    Codec.encode(scalar, into: encodeOutput)
+    expectEqualTest(
       nsEncoded, encodeBuffer[0..<encodeIndex],
       "Decoding failed: \(asHex(nsEncoded)) => " +
         "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer[0]))"

@@ -269,10 +269,12 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
 
   switch (classType->getEffectiveAccess()) {
     case Accessibility::Private:
+    case Accessibility::FilePrivate:
       return SILFunction::NotRelevant;
     case Accessibility::Internal:
       return SILFunction::InternalClass;
     case Accessibility::Public:
+    case Accessibility::Open:
       return SILFunction::PublicClass;
   }
 }
@@ -315,7 +317,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == constantType);
-    assert(fn->getLinkage() == linkage);
+    assert(fn->getLinkage() == linkage ||
+           (forDefinition == ForDefinition_t::NotForDefinition &&
+            fn->getLinkage() ==
+                constant.getLinkage(ForDefinition_t::ForDefinition)));
     if (forDefinition) {
       // In all the cases where getConstantLinkage returns something
       // different for ForDefinition, it returns an available-externally
@@ -404,13 +409,13 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
 
 SILFunction *SILModule::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
     IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope, DeclContext *DC) {
   return SILFunction::create(*this, linkage, name, loweredType,
-                             contextGenericParams, loc, isBareSILFunction,
+                             genericEnv, loc, isBareSILFunction,
                              isTrans, isFragile, isThunk, classVisibility,
                              inlineStrategy, EK, InsertBefore, DebugScope, DC);
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
 
@@ -92,5 +92,40 @@ public func arraysOfGenericParam<T: AnyObject>(y: Array<T>) {
   x.propertyArrayOfThings = y
 }
 
+// CHECK-LABEL: sil shared @_TFF21objc_imported_generic11genericFuncuRxs9AnyObjectrFMxT_U_FT_T_ : $@convention(thin) <V where V : AnyObject> () -> () {
+// CHECK:  [[INIT:%.*]] = function_ref @_TFCSo12GenericClassCfT_GS_x_ : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@thick GenericClass<τ_0_0>.Type) -> @owned GenericClass<τ_0_0>
+// CHECK:  [[META:%.*]] = metatype $@thick GenericClass<V>.Type
+// CHECK:  apply [[INIT]]<V>([[META]])
+// CHECK:  return
+func genericFunc<V: AnyObject>(_ v: V.Type) {
+  let _ = {
+    var _ = GenericClass<V>()
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TF21objc_imported_generic23configureWithoutOptionsFT_T_ : $@convention(thin) () -> ()
+// CHECK: [[NIL_FN:%.*]] = function_ref @_TFSqCfT10nilLiteralT__GSqx_ : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
+// CHECK: apply [[NIL_FN]]<[GenericOption : Any]>({{.*}})
+// CHECK: return
+func configureWithoutOptions() {
+  _ = GenericClass<NSObject>(options: nil)
+}
+
+// foreign to native thunk for init(options:), uses GenericOption : Hashable
+// conformance
+
+// CHECK-LABEL: sil shared [thunk] @_TTOFCSo12GenericClasscfT7optionsGSqGVs10DictionaryVSC13GenericOptionP____GSQGS_x__ : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned ImplicitlyUnwrappedOptional<GenericClass<T>>
+// CHECK: [[FN:%.*]] = function_ref @_TFE10FoundationVs10Dictionary19_bridgeToObjectiveCfT_CSo12NSDictionary : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+// CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+// CHECK: return
+
+// This gets emitted down here for some reason
+
 // CHECK-LABEL: sil shared [thunk] @_TTOFCSo12GenericClasscfT13arrayOfThings
 // CHECK:         class_method [volatile] {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned ImplicitlyUnwrappedOptional<GenericClass<τ_0_0>>
+
+// Make sure we emitted the witness table for the above conformance
+
+// CHECK-LABEL: sil_witness_table shared [fragile] GenericOption: Hashable module objc_generics {
+// CHECK: method #Hashable.hashValue!getter.1: @_TTWVSC13GenericOptions8Hashable13objc_genericsFS0_g9hashValueSi
+// CHECK: }

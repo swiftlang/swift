@@ -131,7 +131,7 @@
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init()",
-      key.sourcetext: "init() {\n<#code#>\n}",
+      key.sourcetext: "override init() {\n<#code#>\n}",
       key.description: "init()",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
@@ -225,6 +225,15 @@
       key.name: "postfix",
       key.sourcetext: "postfix",
       key.description: "postfix",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "precedencegroup",
+      key.sourcetext: "precedencegroup",
+      key.description: "precedencegroup",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.num_bytes_to_erase: 0

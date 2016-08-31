@@ -32,12 +32,12 @@ func nsobject_as_class_cast<T>(_ x: NSObject, _: T) {
 
 // <rdar://problem/20294245> QoI: Error message mentions value rather than key for subscript
 func test(_ a : CFString!, b : CFString) {
-  var dict = NSMutableDictionary()
+  let dict = NSMutableDictionary()
   let object = NSObject()
-  dict[a] = object // expected-error {{argument type 'CFString!' does not conform to expected type 'NSCopying'}}
+  dict[a] = object
 
 
-  dict[b] = object // expected-error {{argument type 'CFString' does not conform to expected type 'NSCopying'}}
+  dict[b] = object
 }
 
 

@@ -1,9 +1,9 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
-// RUN: llvm-bcanalyzer %t/alias.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -I %t %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck -check-prefix=OUTPUT %s
+// RUN: %target-run %t/a.out | %FileCheck -check-prefix=OUTPUT %s
 // REQUIRES: executable_test
 
 // CHECK-NOT: UnknownCode

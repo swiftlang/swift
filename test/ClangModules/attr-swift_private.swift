@@ -2,10 +2,10 @@
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -parse %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
-// RUN: FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt
+// RUN: %FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt
 // RUN: diff -U3 %S/Inputs/SwiftPrivateAttr.txt %t.txt
 
 // Look for identifiers with "Priv" in them that haven't been prefixed.

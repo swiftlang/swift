@@ -23,19 +23,6 @@ set -e
 
 umask 0022
 
-#
-# Options that can be "configured" by editing this file.
-#
-# These options are not exposed as command line options on purpose.  If you
-# need to change any of these, you should do so on trunk or in a branch.
-#
-
-LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64;PowerPC;SystemZ"
-
-#
-# End of configurable options.
-#
-
 # Declare the set of known settings along with each one's description
 #
 # If you add a user-settable variable, add it to this list.
@@ -70,7 +57,6 @@ KNOWN_SETTINGS=(
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
-    llvm-enable-assertions      "1"              "enable assertions in LLVM and Clang"
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
@@ -86,12 +72,12 @@ KNOWN_SETTINGS=(
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
+    libdispatch-build-type      "Debug"          "the build variant for libdispatch"
     playgroundlogger-build-type "Debug"          "the build variant for PlaygroundLogger"
     playgroundsupport-build-type "Debug"         "the build variant for PlaygroundSupport"
     xctest-build-type           "Debug"          "the build variant for xctest"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
     enable-asan                 ""               "enable Address Sanitizer"
-    enable-ubsan                ""               "enable Undefined Behavior Sanitizer"
     cmake                       ""               "path to the cmake binary"
     distcc                      ""               "use distcc in pump mode"
     distcc-pump                 ""               "the path to distcc pump executable. This argument is required if distcc is set."
@@ -173,7 +159,8 @@ KNOWN_SETTINGS=(
     build-serialized-stdlib-unittest "0"         "set to 1 to build the StdlibUnittest module with -sil-serialize-all"
     build-sil-debugging-stdlib  "0"              "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
     check-incremental-compilation "0"            "set to 1 to compile swift libraries multiple times to check if incremental compilation works"
-    source-tree-includes-tests  "1"              "set to 0 to allow the build to proceed when 'test' directory is missing (required for B&I builds)"
+    llvm-include-tests          "1"              "Set to true to generate testing targets for LLVM. Set to true by default."
+    swift-include-tests         "1"              "Set to true to generate testing targets for Swift. This allows the build to proceed when 'test' directory is missing (required for B&I builds)"
     native-llvm-tools-path      ""               "directory that contains LLVM tools that are executable on the build machine"
     native-clang-tools-path     ""               "directory that contains Clang tools that are executable on the build machine"
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
@@ -233,10 +220,24 @@ KNOWN_SETTINGS=(
     android-deploy-device-path         ""        "Path on an Android device to which built Swift stdlib products will be deployed"
     check-args-only                    ""        "set to check all arguments are known. Exit with status 0 if success, non zero otherwise"
     common-cmake-options               ""        "CMake options used for all targets, including LLVM/Clang"
+    cmark-cmake-options                ""        "CMake options used for all cmark targets"
+    ninja-cmake-options                ""        "CMake options used for all ninja targets"
+    foundation-cmake-options           ""        "CMake options used for all foundation targets"
+    libdispatch-cmake-options          ""        "CMake options used for all libdispatch targets"
+    llbuild-cmake-options              ""        "CMake options used for all llbuild targets"
+    lldb-cmake-options                 ""        "CMake options used for all lldb targets"
+    llvm-cmake-options                 ""        "CMake options used for all llvm targets"
+    ninja-cmake-options                ""        "CMake options used for all ninja targets"
+    swift-cmake-options                ""        "CMake options used for all swift targets"
+    swiftpm-cmake-options              ""        "CMake options used for all swiftpm targets"
+    xctest-cmake-options               ""        "CMake options used for all xctest targets"
+    playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
+    playgroundlogger-cmake-options     ""        "CMake options used for all playgroundlogger targets"
     # TODO: Remove this some time later.
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
 
 # Centralized access point for traced command invocation.
@@ -629,8 +630,6 @@ function set_build_options_for_host() {
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
                 -DLLVM_ENABLE_LIBCXX:BOOL=TRUE
-                -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-                -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -676,6 +675,22 @@ function set_build_options_for_host() {
             exit 1
             ;;
     esac
+
+
+    llvm_cmake_options+=(
+        -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+        -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
+    )
+
+    # If we are asked to not generate test targets for LLVM and or Swift,
+    # disable as many LLVM tools as we can. This improves compile time when
+    # compiling with LTO.
+    #
+    # *NOTE* Currently we do not support testing LLVM via build-script. But in a
+    # future commit we will.
+    #for arg in "$(compute_cmake_llvm_tool_disable_flags)"; do
+    #    llvm_cmake_options+=( ${arg} )
+    #done
 
     if [[ "${llvm_target_arch}" ]] ; then
         llvm_cmake_options+=(
@@ -1477,7 +1492,7 @@ function build_directory_bin() {
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
             libdispatch)
-                echo "${root}/bin"
+                echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             playgroundlogger)
                 # FIXME: var name for build type
@@ -1705,53 +1720,12 @@ for host in "${ALL_HOSTS[@]}"; do
         fi
     fi
 
-    case "${COMPILER_VENDOR}" in
-        none)
-            ;;
-        apple)
-            llvm_cmake_options=(
-                "${llvm_cmake_options[@]}"
-                -DCLANG_VENDOR=Apple
-                -DCLANG_VENDOR_UTI=com.apple.compilers.llvm.clang
-                -DPACKAGE_VERSION="${CLANG_USER_VISIBLE_VERSION}"
-            )
-            swift_cmake_options=(
-                "${swift_cmake_options[@]}"
-                -DSWIFT_VENDOR=Apple
-                -DSWIFT_VENDOR_UTI=com.apple.compilers.llvm.swift
-                -DSWIFT_VERSION="${SWIFT_USER_VISIBLE_VERSION}"
-                -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-            )
-            ;;
-        *)
-            echo "unknown compiler vendor"
-            exit 1
-            ;;
-    esac
-
     llvm_cmake_options=(
         "${llvm_cmake_options[@]}"
         -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
         -DINTERNAL_INSTALL_PREFIX="local"
     )
 
-    if [[ "${CLANG_COMPILER_VERSION}" ]] ; then
-        llvm_cmake_options=(
-            "${llvm_cmake_options[@]}"
-            -DCLANG_REPOSITORY_STRING="clang-${CLANG_COMPILER_VERSION}"
-        )
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DCLANG_COMPILER_VERSION="${CLANG_COMPILER_VERSION}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-        )
-    fi
-    if [[ "${SWIFT_COMPILER_VERSION}" ]] ; then
-        swift_cmake_options=(
-            "${swift_cmake_options[@]}"
-            -DSWIFT_COMPILER_VERSION="${SWIFT_COMPILER_VERSION}"
-        )
-    fi
     if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
@@ -1759,7 +1733,7 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${ENABLE_ASAN}" ]] ; then
+    if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
@@ -1832,6 +1806,11 @@ for host in "${ALL_HOSTS[@]}"; do
         llvm_build_dir=$(build_directory ${host} llvm)
         module_cache="${build_dir}/module-cache"
 
+        # Add any specific cmake options specified by build-script
+        product_cmake_options_name=$(to_varname "${product}")_CMAKE_OPTIONS
+        product_cmake_options=(${!product_cmake_options_name}) # convert to array
+        cmake_options+=("${product_cmake_options[@]}")
+
         case ${product} in
             cmark)
                 cmake_options=(
@@ -1865,14 +1844,40 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
-                    -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
-                    -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
-                    -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     "${llvm_cmake_options[@]}"
                 )
+
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                    -DLLVM_BUILD_TOOLS=NO
+                    -DLLVM_INSTALL_TOOLCHAIN_ONLY=YES
+                    -DLLVM_INCLUDE_TESTS=NO
+                    -DCLANG_INCLUDE_TESTS=NO
+                    -DLLVM_INCLUDE_UTILS=NO
+                    -DLLVM_TOOL_LLI_BUILD=NO
+                    -DLLVM_TOOL_LLVM_AR_BUILD=NO
+                    -DCLANG_TOOL_CLANG_CHECK_BUILD=NO
+                    -DCLANG_TOOL_ARCMT_TEST_BUILD=NO
+                    -DCLANG_TOOL_C_ARCMT_TEST_BUILD=NO
+                    -DCLANG_TOOL_C_INDEX_TEST_BUILD=NO
+                    -DCLANG_TOOL_DRIVER_BUILD=NO
+                    -DCLANG_TOOL_DIAGTOOL_BUILD=NO
+                    -DCLANG_TOOL_SCAN_BUILD_BUILD=NO
+                    -DCLANG_TOOL_SCAN_VIEW_BUILD=NO
+                    -DCLANG_TOOL_CLANG_FORMAT_BUILD=NO
+                    )
+                fi
+                
+                if [[ $(true_false "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
+                    cmake_options+=(
+                        -DLLVM_INCLUDE_TESTS=NO
+                        -DCLANG_INCLUDE_TESTS=NO
+                    )
+                fi
+
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -1925,7 +1930,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
                 else
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
-                    build_tests_this_time=${SOURCE_TREE_INCLUDES_TESTS}
+                    build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
                 # Command-line parameters override any autodetection that we
@@ -1980,6 +1985,23 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${swift_cmake_options[@]}"
                 )
 
+                if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
+                    cmake_options+=(
+                    -DSWIFT_TOOL_SIL_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_IDE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REMOTEAST_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_LLDB_MODULEIMPORT_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SIL_EXTRACT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_LLVM_OPT_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_ANALYZER_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_SDK_DIGESTER_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SOURCEKITD_REPL_BUILD=FALSE
+                    -DSWIFT_TOOL_COMPLETE_TEST_BUILD=FALSE
+                    -DSWIFT_TOOL_SWIFT_REFLECTION_DUMP_BUILD=FALSE
+                    )
+                fi
+
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
@@ -1989,6 +2011,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_LLVM_BUILD:PATH="${llvm_build_dir}"
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
@@ -2264,16 +2288,26 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
-                if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                    echo "Reconfiguring libdispatch"
                     # First time building; need to run autotools and configure
+                    if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
+                        dispatch_build_variant_arg="release"
+                    elif [[ "$LIBDISPATCH_BUILD_TYPE" == "RelWithDebInfo" ]]; then
+                        dispatch_build_variant_arg="releasedebuginfo"
+                    else
+                        dispatch_build_variant_arg="debug"
+                    fi
                     call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
                     with_pushd "${LIBDISPATCH_SOURCE_DIR}" \
                         call autoreconf -fvi
                     with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                         call env CC="${LLVM_BIN}/clang" CXX="${LLVM_BIN}/clang++" SWIFTC="${SWIFTC_BIN}" \
                             "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
+                            --with-build-variant=$dispatch_build_variant_arg \
                             --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
-
+                else
+                    echo "Skipping reconfiguration of libdispatch"
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                     call make

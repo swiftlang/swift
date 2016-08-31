@@ -59,7 +59,6 @@ public:
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
@@ -73,7 +72,6 @@ public:
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Specialize)
-  IGNORED_ATTR(Swift3Migration)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
@@ -83,6 +81,65 @@ public:
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
 #undef IGNORED_ATTR
+
+  // @noreturn has been replaced with a 'Never' return type.
+  void visitNoReturnAttr(NoReturnAttr *attr) {
+    if (auto FD = dyn_cast<FuncDecl>(D)) {
+      auto &SM = TC.Context.SourceMgr;
+
+      auto diag = TC.diagnose(attr->getLocation(),
+                              diag::noreturn_not_supported);
+      auto range = attr->getRangeWithAt();
+      if (range.isValid())
+        range.End = range.End.getAdvancedLoc(1);
+      diag.fixItRemove(range);
+
+      auto *last = FD->getParameterList(FD->getNumParameterLists() - 1);
+
+      // If the declaration already has a result type, we're going
+      // to change it to 'Never'.
+      bool hadResultType = false;
+      bool isEndOfLine = false;
+      SourceLoc resultLoc;
+      if (FD->getBodyResultTypeLoc().hasLocation()) {
+        const auto &typeLoc = FD->getBodyResultTypeLoc();
+        hadResultType = true;
+        resultLoc = typeLoc.getSourceRange().Start;
+
+      // If the function 'throws', insert the result type after the
+      // 'throws'.
+      } else {
+        if (FD->getThrowsLoc().isValid()) {
+          resultLoc = FD->getThrowsLoc();
+
+        // Otherwise, insert the result type after the final parameter
+        // list.
+        } else if (last->getRParenLoc().isValid()) {
+          resultLoc = last->getRParenLoc();
+        }
+
+        if (Lexer::getLocForEndOfToken(SM, resultLoc).getAdvancedLoc(1) ==
+            Lexer::getLocForEndOfLine(SM, resultLoc))
+          isEndOfLine = true;
+
+        resultLoc = Lexer::getLocForEndOfToken(SM, resultLoc);
+      }
+
+      if (hadResultType) {
+        diag.fixItReplace(resultLoc, "Never");
+      } else {
+        std::string fix = " -> Never";
+
+        if (!isEndOfLine)
+          fix = fix + " ";
+
+        diag.fixItInsert(resultLoc, fix);
+      }
+
+      FD->getBodyResultTypeLoc() = TypeLoc::withoutLoc(
+          TC.Context.getNeverType());
+    }
+  }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
@@ -118,6 +175,15 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr) {
+    // Reject combining 'final' with 'open'.
+    if (auto accessibility = D->getAttrs().getAttribute<AccessibilityAttr>()) {
+      if (accessibility->getAccess() == Accessibility::Open) {
+        TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
+                    D->getDescriptiveKind());
+        return;
+      }
+    }
+
     // Accept and remove the 'final' attribute from members of protocol
     // extensions.
     if (D->getDeclContext()->getAsProtocolExtensionContext()) {
@@ -276,7 +342,7 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
-  if (type->isObjCExistentialType())
+  if (type->isObjCExistentialType() || type->isAny())
     return None; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
@@ -672,7 +738,6 @@ public:
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
@@ -733,8 +798,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
         .highlight(param->getSourceRange());
       return true;
     }
-  } else if (ty->isObjCExistentialType()) {
-    // @objc existential types are okay
+  } else if (ty->isObjCExistentialType() || ty->isAny()) {
+    // @objc existential types are okay, as is Any.
     // Nothing to do.
   } else {
     // No other types are permitted.
@@ -1278,6 +1343,13 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    if (attr->getAccess() == Accessibility::Open) {
+      TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
+      return;
+    }
+
     Type extendedTy = extension->getExtendedType();
     Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
@@ -1292,7 +1364,8 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
     TC.computeDefaultAccessibility(extension);
-    if (attr->getAccess() > extension->getMaxAccessibility()) {
+    Accessibility maxAccess = extension->getMaxAccessibility();
+    if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1300,9 +1373,8 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                       diag::access_control_ext_requirement_member_more,
                       attr->getAccess(),
                       D->getDescriptiveKind(),
-                      extension->getMaxAccessibility());
-      swift::fixItAccessibility(diag, cast<ValueDecl>(D),
-                                extension->getMaxAccessibility());
+                      maxAccess);
+      swift::fixItAccessibility(diag, cast<ValueDecl>(D), maxAccess);
       return;
     }
 
@@ -1315,6 +1387,15 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                               extAttr->getAccess());
       swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
+    }
+  }
+
+  if (attr->getAccess() == Accessibility::Open) {
+    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+        !attr->isInvalid()) {
+      TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
     }
   }
 }
@@ -1521,7 +1602,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
     return;
 
   // This decl attribute has been moved to being a type attribute.
-  auto text = attr->isEscaping() ? "@autoclosure(escaping) " : "@autoclosure ";
+  auto text = attr->isEscaping() ? "@autoclosure @escaping " : "@autoclosure ";
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type,
            "@autoclosure")
     .fixItRemove(attr->getRangeWithAt())
@@ -1565,10 +1646,6 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
     return;
   }
 
-  // Just stop if we've already applied this attribute.
-  if (FTy->isNoEscape())
-    return;
-
   // This range can be implicit e.g. if we're in the middle of diagnosing
   // @autoclosure.
   auto attrRemovalRange = attr->getRangeWithAt();
@@ -1578,9 +1655,15 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   }
   
   // This decl attribute has been moved to being a type attribute.
-  diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
-    .fixItRemove(attrRemovalRange) 
-    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  if (!attr->isImplicit()) {
+    diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
+        .fixItRemove(attrRemovalRange)
+        .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  }
+
+  // Stop if we've already applied this attribute.
+  if (FTy->isNoEscape())
+    return;
 
   // Change the type to include the noescape bit.
   PD->overwriteType(FunctionType::get(FTy->getInput(), FTy->getResult(),
@@ -1649,21 +1732,6 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
 
   // Change the type to the appropriate reference storage type.
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
-}
-
-AnyFunctionType::ExtInfo
-TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
-                                         unsigned i) {
-  auto info = AnyFunctionType::ExtInfo();
-
-  // For curried functions, 'throws' and 'noreturn' only applies to the
-  // innermost function.
-  if (i == 0) {
-    info = info.withIsNoReturn(func->getAttrs().hasAttribute<NoReturnAttr>());
-    info = info.withThrows(func->hasThrows());
-  }
-
-  return info;
 }
 
 Optional<Diag<>>

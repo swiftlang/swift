@@ -1,5 +1,7 @@
 :orphan:
 
+.. highlight:: bash
+
 Git Workflows
 =============
 

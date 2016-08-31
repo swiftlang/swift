@@ -1,17 +1,21 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-func andc<T : Boolean>(_ x: Bool, _ y: T) -> Bool {
+protocol MyBoolean {
+  var boolValue: Bool { get }
+}
+
+func andc<T : MyBoolean>(_ x: Bool, _ y: T) -> Bool {
   return x && !y.boolValue
 }
 
-struct Truthy : Boolean {
+struct Truthy : MyBoolean {
   var boolValue: Bool {
     return true
   }
 }
 
-struct Falselike : Boolean {
+struct Falselike : MyBoolean {
   var boolValue: Bool {
     return false
   }
@@ -22,10 +26,10 @@ print(andc(false, Truthy())) // CHECK: false
 print(andc(true, Falselike())) // CHECK: true
 print(andc(false, Falselike())) // CHECK: false
 
-func must<T : Boolean>(_ x: T) {
+func must<T : MyBoolean>(_ x: T) {
   assert(x.boolValue)
 }
-func shant<T : Boolean>(_ x: T) {
+func shant<T : MyBoolean>(_ x: T) {
   assert(!x.boolValue)
 }
 

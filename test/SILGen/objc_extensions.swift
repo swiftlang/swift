@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -20,11 +20,13 @@ extension Sub {
 
   func foo() {
   }
+
+  override func objCBaseMethod() {}
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions20testOverridePropertyFCS_3SubT_
 func testOverrideProperty(_ obj: Sub) {
-  // CHECK: = function_ref @_TFC15objc_extensions3Subs4propGSQSS_
+  // CHECK: = class_method [volatile] %0 : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String!) -> ()
   obj.prop = "abc"
 } // CHECK: }
 
@@ -45,7 +47,13 @@ extension Sub {
   }
 }
 
-class SubSub : Sub { }
+class SubSub : Sub {
+// CHECK-LABEL: sil hidden @_TFC15objc_extensions6SubSub14objCBaseMethodfT_T_
+// CHECK:  super_method [volatile] %0 : $SubSub, #Sub.objCBaseMethod!1.foreign : (Sub) -> () -> () , $@convention(objc_method) (Sub) -> ()
+  override func objCBaseMethod() {
+    super.objCBaseMethod()
+  }
+}
 
 extension SubSub {
   // CHECK-LABEL: sil hidden @_TFC15objc_extensions6SubSubs9otherPropSS
@@ -60,7 +68,7 @@ extension SubSub {
 
 // SR-1025
 extension Base {
-  private static var x = 1
+  fileprivate static var x = 1
 }
 
 // CHECK-LABEL: sil hidden @_TF15objc_extensions19testStaticVarAccessFT_T_

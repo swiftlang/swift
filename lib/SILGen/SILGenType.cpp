@@ -93,7 +93,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto thunk =
       M.createFunction(SILLinkage::Private,
                        name, overrideInfo.SILFnType,
-                       derivedDecl->getGenericParams(), loc, IsBare,
+                       derivedDecl->getGenericEnvironment(), loc, IsBare,
                        IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
@@ -316,11 +316,6 @@ public:
 
   /// Emit SIL functions for all the members of the type.
   void emitType() {
-    // Force type lowering to lower the type, so that we have a chance to
-    // check for infinite value types even if there are no other references
-    // to this type.
-    SGM.Types.getTypeLowering(theType->getDeclaredTypeInContext());
-
     // Start building a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType))
       genVTable.emplace(SGM, theClass);
@@ -330,10 +325,6 @@ public:
         genVTable->visit(member);
 
       visit(member);
-    }
-
-    for (Decl *member : theType->getDerivedGlobalDecls()) {
-      SGM.visit(member);
     }
 
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
@@ -388,12 +379,15 @@ public:
   void visitEnumElementDecl(EnumElementDecl *ued) {}
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
-    // Emit initializers for static variables.
-    if (!pd->isStatic()) return;
-
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-      if (pd->getInit(i))
-        SGM.emitGlobalInitialization(pd, i);
+    // Emit initializers.
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+      if (pd->getInit(i)) {
+        if (pd->isStatic())
+          SGM.emitGlobalInitialization(pd, i);
+        else
+          SGM.emitStoredPropertyInitialization(pd, i);
+      }
+    }
   }
 
   void visitVarDecl(VarDecl *vd) {
@@ -440,8 +434,6 @@ public:
   void emitExtension(ExtensionDecl *e) {
     for (Decl *member : e->getMembers())
       visit(member);
-    for (Decl *member : e->getDerivedGlobalDecls())
-      SGM.visit(member);
 
     if (!e->getExtendedType()->isExistentialType()) {
       // Emit witness tables for protocol conformances introduced by the
@@ -483,17 +475,19 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
-    if (!pd->isStatic()) return;
-
-    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-      if (pd->getInit(i))
+    for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
+      if (pd->getInit(i)) {
+        assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);
+      }
+    }
   }
 
   void visitVarDecl(VarDecl *vd) {
     if (vd->hasBehavior())
       SGM.emitPropertyBehavior(vd);
-    if (vd->isStatic() && vd->hasStorage()) {
+    if (vd->hasStorage()) {
+      assert(vd->isStatic() && "stored property in extension?!");
       ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
       NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
       return emitTypeMemberGlobalVariable(SGM, ext->getGenericParams(),

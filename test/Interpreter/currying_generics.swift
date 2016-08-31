@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-func curry<T, U, V>(_ f: (T, U) -> V) -> (T) -> (U) -> V {
+func curry<T, U, V>(_ f: @escaping (T, U) -> V) -> (T) -> (U) -> V {
   return { x in { y in f(x, y) } }
 }
 
-func curry<T1, T2, T3, T4>(_ f: (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
+func curry<T1, T2, T3, T4>(_ f: @escaping (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
   return { x in { y in { z in f(x, y, z) } } }
 }
 
@@ -91,13 +91,13 @@ print(test_compose_closure(20)) // CHECK-NEXT: 21
 
 // rdar://problem/18988428
 
-func clamp<T: Comparable>(_ minValue: T, _ maxValue: T) -> (n: T) -> T {
+func clamp<T: Comparable>(_ minValue: T, _ maxValue: T) -> (T) -> T {
     return { n in max(minValue, min(n, maxValue)) }
 }
 
 let clampFoo2 = clamp(10.0, 30.0)
 
-print(clampFoo2(n: 3.0)) // CHECK-NEXT: 10.0
+print(clampFoo2(3.0)) // CHECK-NEXT: 10.0
 
 // rdar://problem/19195470
 
@@ -105,12 +105,12 @@ func pair<T,U> (_ a: T) -> (U) -> (T,U) {
 	return { b in (a,b)	}
 }
 
-func pair_<T,U> (_ a: T) -> (b: U) -> (T,U) {
+func pair_<T,U> (_ a: T) -> (_ b: U) -> (T,U) {
 	return { b in (a,b) }
 }
 
-infix operator <+> { }
-func <+><T,U,V> (lhs: T?, rhs: (T) -> (U) -> V) -> (U) -> V? {
+infix operator <+>
+func <+><T,U,V> (lhs: T?, rhs: @escaping (T) -> (U) -> V) -> (U) -> V? {
 	if let x = lhs {
 		return { y in .some(rhs(x)(y)) }
 	} else {
@@ -130,11 +130,11 @@ print((b <+> pair_)(a!)) // CHECK-NEXT: (42, 23)
 struct Identity<A> { let value: A }
 struct Const<A, B> { let value: A }
 
-func fmap<A, B>(_ f: (A) -> B) -> (Identity<A>) -> Identity<B> {
+func fmap<A, B>(_ f: @escaping (A) -> B) -> (Identity<A>) -> Identity<B> {
 	return { identity in Identity(value: f(identity.value)) }
 }
 
-func fmap<A, B>(_ f: (A) -> B) -> (Const<A, B>) -> Const<A, B> {
+func fmap<A, B>(_ f: @escaping (A) -> B) -> (Const<A, B>) -> Const<A, B> {
 	return { const in const }
 }
 
@@ -160,44 +160,38 @@ func runIdentity<A>(_ i: Identity<A>) -> A {
 }
 
 
-func view<S, A>(_ lens: ((A) -> Const<A, S>) -> (S) -> (((A) -> S) -> (Const<A, S>) -> Const<A, S>) -> Const<A, S>) -> (S) -> A {
+func view<S, A>(_ lens: @escaping (@escaping (A) -> Const<A, S>) -> (S) -> (@escaping (@escaping (A) -> S) -> (Const<A, S>) -> Const<A, S>) -> Const<A, S>) -> (S) -> A {
 	return { s in getConst(lens(_Const)(s)(fmap)) }
 }
 
-func over<S, A>(_ lens: ((A) -> Identity<A>) -> (S) -> (((A) -> S) -> (Identity<A>) -> Identity<S>) -> Identity<S>) -> ((A) -> A) -> (S) -> S {
+func over<S, A>(_ lens: @escaping (@escaping (A) -> Identity<A>) -> (S) -> (@escaping (@escaping (A) -> S) -> (Identity<A>) -> Identity<S>) -> Identity<S>) -> (@escaping (A) -> A) -> (S) -> S {
 	return { f in { s in runIdentity(lens({ _Identity(f($0)) })(s)(fmap)) } }
 }
 
-func set<S, A>(_ lens: ((A) -> Identity<A>) -> (S) -> (((A) -> S) -> (Identity<A>) -> Identity<S>) -> Identity<S>) -> (A) -> (S) -> S {
+func set<S, A>(_ lens: @escaping (@escaping (A) -> Identity<A>) -> (S) -> (@escaping (@escaping (A) -> S) -> (Identity<A>) -> Identity<S>) -> Identity<S>) -> (A) -> (S) -> S {
 	return { x in { y in over(lens)(const(x))(y) } }
 }
 
-func _1<A, B, C, D>(_ f: (A) -> C) -> (A, B) -> (((A) -> (A, B)) -> (C) -> D) -> D {
+func _1<A, B, C, D>(_ f: @escaping (A) -> C) -> (A, B) -> (@escaping (@escaping (A) -> (A, B)) -> (C) -> D) -> D {
 	return { (x, y) in { fmap in fmap({ ($0, y) })(f(x)) } }
 }
 
-func _2<A, B, C, D>(_ f: (B) -> C) -> (A, B) -> (((B) -> (A, B)) -> (C) -> D) -> D {
+func _2<A, B, C, D>(_ f: @escaping (B) -> C) -> (A, B) -> (@escaping (@escaping (B) -> (A, B)) -> (C) -> D) -> D {
     return { (x, y) in { fmap in fmap({ (x, $0) })(f(y)) } }
 }
 
 
-public func >>> <T, U, V> (f: (T) -> U, g: (U) -> V) -> (T) -> V {
+public func >>> <T, U, V> (f: @escaping (T) -> U, g: @escaping (U) -> V) -> (T) -> V {
 	return { g(f($0)) }
 }
 
-public func <<< <T, U, V> (f: (U) -> V, g: (T) -> U) -> (T) -> V {
+public func <<< <T, U, V> (f: @escaping (U) -> V, g: @escaping (T) -> U) -> (T) -> V {
 	return { f(g($0)) }
 }
 
 
-infix operator >>> {
-	associativity right
-	precedence 170
-}
-infix operator <<< {
-	associativity right
-	precedence 170
-}
+infix operator >>>
+infix operator <<<
 
 let pt1 = view(_1)((1, 2))
 print(pt1) // CHECK-NEXT: 1

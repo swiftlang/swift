@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -I %S/../Inputs -enable-source-import -emit-silgen -enable-resilience %s | %FileCheck %s --check-prefix=CHECK
 
 import resilient_protocol
 
@@ -174,29 +174,29 @@ extension ResilientStorage {
 public protocol ResilientOperators {
   associatedtype AssocType : P
 
-  prefix func ~~~(s: Self)
-  func <*><T>(s: Self, t: T)
-  func <**><T>(t: T, s: Self) -> AssocType
-  func <===><T : ResilientOperators>(t: T, s: Self) -> T.AssocType
+  static prefix func ~~~(s: Self)
+  static func <*><T>(s: Self, t: T)
+  static func <**><T>(t: T, s: Self) -> AssocType
+  static func <===><T : ResilientOperators>(t: T, s: Self) -> T.AssocType
 }
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsop3tttfxT_
-// CHECK-LABEL: sil @_TZF19protocol_resilienceop3ttturFxT_
+// CHECK-LABEL: sil @_TF19protocol_resilienceop3ttturFxT_
 public prefix func ~~~<S>(s: S) {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi3lmgurfTxqd___T_
-// CHECK-LABEL: sil @_TZF19protocol_resilienceoi3lmgu0_rFTq_x_T_
+// CHECK-LABEL: sil @_TF19protocol_resilienceoi3lmgu0_rFTq_x_T_
 public func <*><T, S>(s: S, t: T) {}
 
 // Swap the generic parameters to make sure we don't mix up our DeclContexts
 // when mapping interface types in and out
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi4lmmgurfTqd__x_wx9AssocType
-// CHECK-LABEL: sil @_TZF19protocol_resilienceoi4lmmgu0_RxS_18ResilientOperatorsrFTq_x_wx9AssocType
+// CHECK-LABEL: sil @_TF19protocol_resilienceoi4lmmgu0_RxS_18ResilientOperatorsrFTq_x_wx9AssocType
 public func <**><S : ResilientOperators, T>(t: T, s: S) -> S.AssocType {}
 
 // CHECK-LABEL: sil [transparent] [thunk] @_TZFP19protocol_resilience18ResilientOperatorsoi5leeeguRd__S0_rfTqd__x_wd__9AssocType
-// CHECK-LABEL: sil @_TZF19protocol_resilienceoi5leeegu0_RxS_18ResilientOperators_S0_rFTxq__wx9AssocType
+// CHECK-LABEL: sil @_TF19protocol_resilienceoi5leeegu0_RxS_18ResilientOperators_S0_rFTxq__wx9AssocType
 public func <===><T : ResilientOperators, S : ResilientOperators>(t: T, s: S) -> T.AssocType {}
 
 

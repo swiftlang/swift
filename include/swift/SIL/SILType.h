@@ -128,12 +128,12 @@ public:
 
   ///  Apply a substitution to the type to produce another lowered SIL type.
   static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy);
+                           const TypeSubstitutionMap &subs, SILType SrcTy);
 
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
                                           ModuleDecl *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -285,7 +285,11 @@ public:
   /// True if the type, or the referenced type of an address type, is a
   /// scalar reference-counted type.
   bool isReferenceCounted(SILModule &M) const;
-  
+
+  /// Returns true if the referenced type is a function type that never
+  /// returns.
+  bool isNoReturnFunction() const;
+
   /// Returns true if the referenced type has reference semantics.
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();
@@ -447,7 +451,7 @@ public:
                            ArrayRef<Substitution> Subs) const;
 
   SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                TypeSubstitutionMap &subs) const;
+                const TypeSubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.

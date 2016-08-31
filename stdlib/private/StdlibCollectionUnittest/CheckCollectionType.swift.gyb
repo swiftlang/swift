@@ -486,6 +486,9 @@ internal func _product<C1 : Collection, C2 : Collection>(
     return '''    
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
@@ -500,19 +503,19 @@ internal func _product<C1 : Collection, C2 : Collection>(
 
   testParams = '''
     _ testNamePrefix: String = "",
-    makeCollection: ([C.Iterator.Element]) -> C,
-    wrapValue: (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: (C.Iterator.Element) -> OpaqueValue<Int>,
+    makeCollection: @escaping ([C.Iterator.Element]) -> C,
+    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: (
+    makeCollectionOfEquatable: @escaping (
       [CollectionWithEquatableElement.Iterator.Element]
     ) -> CollectionWithEquatableElement,
 
-    wrapValueIntoEquatable: (
+    wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable:
-      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping (
+      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -536,10 +539,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -561,7 +565,7 @@ extension TestSuite {
       return makeCollectionOfEquatable(elements.map(wrapValueIntoEquatable))
     }
 
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     //===------------------------------------------------------------------===//
     // generate()
@@ -1198,10 +1202,12 @@ extension TestSuite {
     ${testConstraints('BidirectionalCollection')} {
 
     var testNamePrefix = testNamePrefix
-    if checksAdded.contains(#function) {
+
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addCollectionTests(${forwardTestArgs})
 
@@ -1209,7 +1215,7 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     // FIXME: swift-3-indexing-model - add tests for the follow?
     //          index(before: of i: Index) -> Index
@@ -1515,14 +1521,15 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addBidirectionalCollectionTests(${forwardTestArgs})
     
-    testNamePrefix += String(C.Type.self)
+    testNamePrefix += String(describing: C.Type.self)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
@@ -1568,10 +1575,11 @@ extension TestSuite {
   ) where
     ${testConstraints(collectionForTraversal(Traversal))} {
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     func toCollection(_ r: CountableRange<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })

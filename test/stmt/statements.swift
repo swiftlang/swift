@@ -53,8 +53,8 @@ func funcdecl5(_ a: Int, y: Int) {
   } else if (y == 2) {
   }
 
-  // FIXME: This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{type 'Int' does not conform to protocol 'Boolean'}}
+  // This diagnostic is terrible - rdar://12939553
+  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
 
   if true {
     if (B) {
@@ -94,7 +94,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'Boolean'}}
+  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
 }
 
 // test "builder" API style
@@ -159,7 +159,7 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
-  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{result of call to 'init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)' is unused}}
+  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{expression of type 'String' is unused}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -407,7 +407,7 @@ func testThrowNil() throws {
 // Even if the condition fails to typecheck, save it in the AST anyway; the old
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
-  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any' (aka 'protocol<>')}}
+  if let _ = b ?? b {} // expected-error {{initializer for conditional binding must have Optional type, not 'Any'}}
 }
 
 
@@ -467,6 +467,28 @@ func r25178926(_ a : Type) {
   }
 }
 
+do {
+  guard 1 == 2 else {
+    break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+  }
+}
+
+func fn(a: Int) {
+  guard a < 1 else {
+    break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
+  }
+}
+
+func fn(x: Int) {
+  if x >= 0 {
+    guard x < 1 else {
+      guard x < 2 else {
+        break // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+      }
+      return
+    }
+  }
+}
 
 
 // Errors in case syntax

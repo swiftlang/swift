@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name foo -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -module-name foo -emit-ir %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -15,7 +15,7 @@ class Base<T> {
   }
 
   func present() {
-    print("\(self.dynamicType) \(T.self) \(first) \(second)")
+    print("\(type(of: self)) \(T.self) \(first) \(second)")
   }
 }
 

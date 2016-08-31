@@ -379,6 +379,26 @@ static OperatorFixity getDeclFixity(const ValueDecl *decl) {
   llvm_unreachable("bad UnaryOperatorKind");
 }
 
+/// Returns true if one of the ancestor DeclContexts of \p D is either marked
+/// private or is a local context.
+static bool isInPrivateOrLocalContext(const ValueDecl *D) {
+  const DeclContext *DC = D->getDeclContext();
+  if (!DC->isTypeContext()) {
+    assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
+           "unexpected context kind");
+    return DC->isLocalContext();
+  }
+
+  auto declaredType = DC->getDeclaredTypeOfContext();
+  if (!declaredType || declaredType->is<ErrorType>())
+    return false;
+
+  auto *nominal = declaredType->getAnyNominal();
+  if (nominal->getFormalAccess() <= Accessibility::FilePrivate)
+    return true;
+  return isInPrivateOrLocalContext(nominal);
+}
+
 void Mangler::mangleDeclName(const ValueDecl *decl) {
   if (decl->getDeclContext()->isLocalContext()) {
     // Mangle local declarations with a numeric discriminator.
@@ -387,47 +407,28 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
     // Fall through to mangle the <identifier>.
 
   } else if (decl->hasAccessibility() &&
-             decl->getFormalAccess() == Accessibility::Private) {
+             decl->getFormalAccess() <= Accessibility::FilePrivate &&
+             !isInPrivateOrLocalContext(decl)) {
     // Mangle non-local private declarations with a textual discriminator
     // based on their enclosing file.
     // decl-name ::= 'P' identifier identifier
 
-    // Don't bother to use the private discriminator if the enclosing context
-    // is also private.
-    auto isWithinPrivateNominal = [](const Decl *D) -> bool {
-      const DeclContext *DC = D->getDeclContext();
-      if (!DC->isTypeContext()) {
-        assert((DC->isModuleScopeContext() || DC->isLocalContext()) &&
-               "do we need a private discriminator for this context?");
-        return false;
-      }
+    // The first <identifier> is a discriminator string unique to the decl's
+    // original source file.
+    auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
+    auto fileUnit = cast<FileUnit>(topLevelContext);
 
-      auto declaredType = DC->getDeclaredTypeOfContext();
-      if (!declaredType || declaredType->is<ErrorType>())
-        return false;
+    Identifier discriminator =
+      fileUnit->getDiscriminatorForPrivateValue(decl);
+    assert(!discriminator.empty());
+    assert(!isNonAscii(discriminator.str()) &&
+           "discriminator contains non-ASCII characters");
+    (void)isNonAscii;
+    assert(!clang::isDigit(discriminator.str().front()) &&
+           "not a valid identifier");
 
-      return (declaredType->getAnyNominal()->getFormalAccess()
-              == Accessibility::Private);
-    };
-
-    if (!isWithinPrivateNominal(decl)) {
-      // The first <identifier> is a discriminator string unique to the decl's
-      // original source file.
-      auto topLevelContext = decl->getDeclContext()->getModuleScopeContext();
-      auto fileUnit = cast<FileUnit>(topLevelContext);
-
-      Identifier discriminator =
-        fileUnit->getDiscriminatorForPrivateValue(decl);
-      assert(!discriminator.empty());
-      assert(!isNonAscii(discriminator.str()) &&
-             "discriminator contains non-ASCII characters");
-      (void) isNonAscii;
-      assert(!clang::isDigit(discriminator.str().front()) &&
-             "not a valid identifier");
-
-      Buffer << 'P';
-      mangleIdentifier(discriminator);
-    }
+    Buffer << 'P';
+    mangleIdentifier(discriminator);
     // Fall through to mangle the name.
   }
 
@@ -978,7 +979,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
     // <impl-function-attribute> ::= 'Cc'             // C global function
     // <impl-function-attribute> ::= 'Cm'             // Swift method
     // <impl-function-attribute> ::= 'CO'             // ObjC method
-    // <impl-function-attribute> ::= 'N'              // noreturn
     // <impl-function-attribute> ::= 'g'              // pseudogeneric
     // <impl-function-attribute> ::= 'G'              // generic
     // <impl-parameter> ::= <impl-convention> <type>
@@ -1041,7 +1041,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       break;
     }
     
-    if (fn->isNoReturn()) Buffer << 'N';
     if (fn->isPolymorphic()) {
       Buffer << (fn->isPseudogeneric() ? 'g' : 'G');
       mangleGenericSignature(fn->getGenericSignature());
@@ -1391,6 +1390,12 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
     return true;
   } else if (name == "Float") {
     Buffer << "Sf";
+    return true;
+  } else if (name == "UnsafeRawPointer") {
+    Buffer << "SV";
+    return true;
+  } else if (name == "UnsafeMutableRawPointer") {
+    Buffer << "Sv";
     return true;
   } else if (name == "UnsafePointer") {
     Buffer << "SP";

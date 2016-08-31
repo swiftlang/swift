@@ -38,13 +38,21 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
 
     print("--- Updating '" + repo_path + "' ---")
     with shell.pushd(repo_path, dry_run=False, echo=False):
-        shell.call(["git", "fetch"], echo=True)
+        shell.call(["git", "fetch", "--recurse-submodules=yes"], echo=True)
 
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
                        echo=True)
-            shell.call(['git', 'reset', '--hard', 'HEAD'],
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'clean', '-fdx'],
                        echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
+            status = shell.call(['git', 'reset', '--hard', 'HEAD'],
+                       echo=True)
+            if status:
+                print("Please, commit your changes.")
+                print(status)
+                exit(1)
 
         if branch:
             status = shell.capture(['git', 'status', '--porcelain', '-uno'],
@@ -193,9 +201,9 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         dest='skip_repository_list',
         action="append")
     parser.add_argument(
-        "--branch",
-        help='Obtain Sources for specific branch',
-        metavar='BRANCH',
+        "--scheme", "--branch",
+        help='Use branches from the specified branch-scheme',
+        metavar='BRANCH-SCHEME',
         dest='scheme')
     parser.add_argument(
         '--reset-to-remote',

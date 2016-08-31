@@ -1,0 +1,558 @@
+//===--- UnsafeRawPointer.swift.gyb ---------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%import gyb
+
+% for mutable in (True, False):
+%  Self = 'UnsafeMutableRawPointer' if mutable else 'UnsafeRawPointer'
+%  a_Self = 'an `UnsafeMutableRawPointer`' if mutable else 'an `UnsafeRawPointer`'
+%  Mutable = 'Mutable' if mutable else ''
+
+/// A raw pointer for accessing untyped data. This provides no
+/// automatic memory management, no type safety, and no alignment
+/// guarantees. This implements Strideable to provide a view
+/// of byte-addressable memory.
+@_fixed_layout
+public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
+  /// The underlying raw pointer.
+  /// Implements conformance to the public protocol `_Pointer`.
+  public let _rawValue: Builtin.RawPointer
+
+  /// Creates ${a_Self} from another `${Self}`.
+  @_transparent
+  public init(_ other: Unsafe${Mutable}RawPointer) {
+    self = other
+  }
+
+  /// Creates ${a_Self} from another `${Self}`.
+  ///
+  /// Returns `nil` if `other` is `nil`.
+  @_transparent
+  public init?(_ other: Unsafe${Mutable}RawPointer?) {
+    guard let unwrapped = other else { return nil }
+    self = unwrapped
+  }
+
+  /// Converts a builtin raw pointer to ${a_Self}.
+  @_transparent
+  public init(_ _rawValue: Builtin.RawPointer) {
+    self._rawValue = _rawValue
+  }
+
+  /// Converts an opaque pointer to ${a_Self}.
+  @_transparent
+  public init(_ other: OpaquePointer) {
+    _rawValue = other._rawValue
+  }
+
+  /// Converts an opaque pointer to ${a_Self}.
+  ///
+  /// Returns `nil` if `from` is `nil`.
+  @_transparent
+  public init?(_ other: OpaquePointer?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+
+  /// Converts a pattern of bits to ${a_Self}.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
+  @_transparent
+  public init?(bitPattern: Int) {
+    if bitPattern == 0 { return nil }
+    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+  }
+
+  /// Converts a pattern of bits to ${a_Self}.
+  ///
+  /// Returns `nil` if `bitPattern` is zero.
+  @_transparent
+  public init?(bitPattern: UInt) {
+    if bitPattern == 0 { return nil }
+    _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+  }
+
+  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
+  @_transparent
+  public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
+    _rawValue = other._rawValue
+  }
+
+  /// Converts an Unsafe${Mutable}Pointer to ${a_Self}.
+  ///
+  /// Returns `nil` if `other` is `nil`.
+  @_transparent
+  public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+
+%  if mutable:
+  /// Converts an UnsafeRawPointer to ${a_Self}.
+  @_transparent
+  public init(mutating other: UnsafeRawPointer) {
+    _rawValue = other._rawValue
+  }
+
+  /// Converts an UnsafeRawPointer to ${a_Self}.
+  ///
+  /// Returns `nil` if `other` is `nil`.
+  @_transparent
+  public init?(mutating other: UnsafeRawPointer?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+%  else: # !mutable
+  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
+  @_transparent
+  public init(_ other: UnsafeMutableRawPointer) {
+    _rawValue = other._rawValue
+  }
+
+  /// Converts an UnsafeMutableRawPointer to ${a_Self}.
+  ///
+  /// Returns `nil` if `other` is `nil`.
+  @_transparent
+  public init?(_ other: UnsafeMutableRawPointer?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+
+  /// Converts an UnsafeMutablePointer to ${a_Self}.
+  @_transparent
+  public init<T>(_ other: UnsafeMutablePointer<T>) {
+    _rawValue = other._rawValue
+  }
+
+  /// Converts an UnsafeMutablePointer to ${a_Self}.
+  ///
+  /// Returns `nil` if `other` is `nil`.
+  @_transparent
+  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
+    guard let unwrapped = other else { return nil }
+    _rawValue = unwrapped._rawValue
+  }
+%  end # !mutable
+
+%  if mutable:
+  /// Allocates and points at uninitialized memory for `size` bytes with
+  /// `alignedTo` alignment.
+  ///
+  /// - Postcondition: The memory is allocated, but not initialized.
+  public static func allocate(bytes size: Int, alignedTo: Int)
+  -> UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(Builtin.allocRaw(
+        size._builtinWordValue, alignedTo._builtinWordValue))
+  }
+%  end # mutable
+
+  /// Deallocates uninitialized memory allocated for `bytes` number of bytes
+  /// with `alignedTo` alignment.
+  ///
+  /// - Precondition: The memory is not initialized.
+  /// - Postcondition: The memory has been deallocated.
+  public func deallocate(bytes: Int, alignedTo: Int) {
+    Builtin.deallocRaw(
+      _rawValue, bytes._builtinWordValue, alignedTo._builtinWordValue)
+  }
+  
+  /// Binds the allocated memory to type `T` and returns an
+  /// `Unsafe${Mutable}Pointer<T>` to the bound memory at `self`.
+  ///
+  /// - Precondition: The memory is uninitialized.
+  /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
+  ///   through `self` + `count` * `MemoryLayout<T>.stride`
+  /// - Warning: Binding memory to a type is potentially undefined if the
+  ///   memory is ever accessed as an unrelated type.
+  @_transparent
+  @discardableResult
+  public func bindMemory<T>(to type: T.Type, capacity count: Int)
+  -> Unsafe${Mutable}Pointer<T> {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
+    return Unsafe${Mutable}Pointer<T>(_rawValue)
+  }
+
+  /// Converts from ${a_Self} to Unsafe${Mutable}Pointer<T> given that
+  /// the region of memory starting at `self` is already bound to type `T`.
+  ///
+  /// - Precondition: The memory is bound to 'T' starting at `self` for some
+  ///   unspecified capacity.
+  ///
+  /// - Warning: Accessing memory via the returned pointer is undefined if the
+  ///   if the memory has not been bound to `T`.
+  @_transparent
+  public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
+    return Unsafe${Mutable}Pointer<T>(_rawValue)
+  }
+
+%  if mutable:
+  /// Initializes this memory location `self + strideof(T) * index`
+  /// with `count` consecutive copies of `value` and binds the
+  /// initialized memory to type `T`.
+  ///
+  /// Returns an `UnsafeMutablePointer<T>` to this memory.
+  ///
+  /// - Precondition: The memory at
+  ///  `self + index * strideof(T)..<self + (index + count) * strideof(T)`
+  ///  is uninitialized.
+  ///
+  /// - Precondition: The underlying pointer is properly aligned for
+  ///                 accessing `T`.
+  ///
+  /// - Precondition: `index` is non-negative.
+  ///
+  /// - Precondition: `count` is non-negative.
+  ///
+  /// - Postcondition: The memory at
+  ///  `(self + strideof(T) * index)..<(self + strideof(T) * index) + count`
+  ///  is bound to type `T` and initialized; the value should eventually be
+  ///  destroyed or moved from to avoid leaks.
+  @discardableResult
+  public func initializeMemory<T>(as type: T.Type, at index: Int = 0,
+    count: Int = 1, to value: T
+  ) -> UnsafeMutablePointer<T> {
+    _debugPrecondition(index >= 0,
+      "UnsafeMutableRawPointer.initializeMemory: negative index")
+    _debugPrecondition(count >= 0,
+      "UnsafeMutableRawPointer.initializeMemory: negative count")
+
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
+    var nextPtr = self + index &* MemoryLayout<T>.stride
+    for _ in 0..<count {
+      Builtin.initialize(value, nextPtr._rawValue)
+      nextPtr += MemoryLayout<T>.stride
+    }
+    return UnsafeMutablePointer(_rawValue)
+  }
+
+  /// Initializes memory starting at `self` with `count` `T` values beginning
+  /// at `source` and binds the initialized memory to type `T`.
+  ///
+  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  ///
+  /// - Precondition: `count >= 0`
+  /// - Precondition: The memory regions `source..<source + count` and
+  ///   `self..<self + count * MemoryLayout<T>.stride` do not overlap.
+  /// - Precondition: The memory at
+  ///   `self..<self + count * MemoryLayout<T>.stride` is uninitialized, and
+  ///   the `T` values at `source..<source + count` are initialized.
+  /// - Precondition: The underlying pointer is properly aligned for accessing
+  ///   `T`.
+  /// - Postcondition: The memory at
+  ///   `self..<self + count * MemoryLayout<T>.stride` is bound to type `T`.
+  /// - Postcondition: The `T` values at
+  ///   `self..<self + count * MemoryLayout<T>.stride` and
+  ///   `source..<source + count` are initialized.
+  @discardableResult
+  public func initializeMemory<T>(
+    as type: T.Type, from source: UnsafePointer<T>, count: Int
+  ) -> UnsafeMutablePointer<T> {
+    _debugPrecondition(
+      count >= 0,
+      "UnsafeMutableRawPointer.initializeMemory with negative count")
+    _debugPrecondition(
+      (UnsafeRawPointer(self + count * MemoryLayout<T>.stride)
+        <= UnsafeRawPointer(source))
+      || UnsafeRawPointer(source + count) <= UnsafeRawPointer(self),
+      "UnsafeMutableRawPointer.initializeMemory overlapping range")
+
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
+    Builtin.copyArray(
+      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+    // This builtin is equivalent to:
+    // for i in 0..<count {
+    //   (self.assumingMemoryBound(to: T.self) + i).initialize(to: source[i])
+    // }
+    return UnsafeMutablePointer(_rawValue)
+  }
+
+  /// Initializes memory starting at `self` with the elements of
+  /// `source` and binds the initialized memory to type `T`.
+  ///
+  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  ///
+  /// - Precondition: The memory at `self..<self + source.count *
+  ///   MemoryLayout<T>.stride` is uninitialized.
+  ///
+  /// - Postcondition: The memory at `self..<self + source.count *
+  ///   MemoryLayout<T>.stride` is bound to type `T`.
+  ///
+  /// - Postcondition: The `T` values at `self..<self + source.count *
+  ///   MemoryLayout<T>.stride` are initialized.
+  ///
+  /// TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  @discardableResult
+  public func initializeMemory<C : Collection>(
+    as: C.Iterator.Element.Type, from source: C
+  ) -> UnsafeMutablePointer<C.Iterator.Element> {
+    // Initialize and bind each element of the container.
+    for (index, element) in source.enumerated() {
+      self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
+    }
+    return UnsafeMutablePointer(_rawValue)
+  }
+
+  /// Initializes memory starting at `self` with `count` `T` values
+  /// beginning at `source`, binds the initialized memory to type `T`,
+  /// and returns the source memory to an uninitialized state.
+  ///
+  /// Returns an `UnsafeMutablePointer<T>` this memory.
+  ///
+  /// - Precondition: `count >= 0`
+  ///
+  /// - Precondition: The memory at `self..<self + count *
+  ///   MemoryLayout<T>.stride` is uninitialized and the `T` values at
+  ///   `source..<source + count` are initialized.
+  ///
+  /// - Postcondition: The memory at `self..<self + count *
+  ///   MemoryLayout<T>.stride` is bound to type `T`.
+  ///
+  /// - Postcondition: The `T` values at `self..<self + count *
+  ///   MemoryLayout<T>.stride` are initialized and the memory at
+  ///   `source..<source + count` is uninitialized.
+  @discardableResult
+  public func moveInitializeMemory<T>(
+    as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
+  ) -> UnsafeMutablePointer<T> {
+    _debugPrecondition(
+      count >= 0,
+      "UnsafeMutableRawPointer.moveInitializeMemory with negative count")
+
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, type)
+    if self < UnsafeMutableRawPointer(source)
+       || self >= UnsafeMutableRawPointer(source + count) {
+      // initialize forward from a disjoint or following overlapping range.
+      Builtin.takeArrayFrontToBack(
+        T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // for i in 0..<count {
+      //   (self.assumingMemoryBound(to: T.self) + i)
+      //   .initialize(to: (source + i).move())
+      // }
+    }
+    else {
+      // initialize backward from a non-following overlapping range.
+      Builtin.takeArrayBackToFront(
+        T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      // This builtin is equivalent to:
+      // var src = source + count
+      // var dst = self.assumingMemoryBound(to: T.self) + count
+      // while dst != self {
+      //   (--dst).initialize(to: (--src).move())
+      // }
+    }
+    return UnsafeMutablePointer(_rawValue)
+  }
+%  end # mutable
+
+  /// Reads raw bytes from memory at `self + offset` and constructs a
+  /// value of type `T`.
+  ///
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  ///   aligned for accessing `T`.
+  ///
+  /// - Precondition: The memory is initialized to a value of some type, `U`,
+  ///   such that `T` is layout compatible with `U`.
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
+      "load from misaligned raw pointer")
+
+    return Builtin.loadRaw((self + offset)._rawValue)
+  }
+
+%  if mutable:
+  /// Stores a value's bytes into raw memory at `self + offset`.
+  ///  
+  /// - Precondition: The underlying pointer plus `offset` is properly
+  ///   aligned for storing type `T`.
+  ///
+  /// - Precondition: `T` is a trivial type.
+  ///
+  /// - Precondition: The memory is uninitialized, or initialized to
+  ///   some trivial type `U` such that `T` and `U` are mutually layout
+  ///   compatible.
+  /// 
+  /// - Postcondition: The memory is initialized to raw bytes. If the
+  ///   memory is bound to type `U`, then it now contains a value of
+  ///   type `U`.
+  ///
+  /// - Note: A trivial type can be copied with just a bit-for-bit
+  ///   copy without any indirection or reference-counting operations.
+  ///   Generally, native Swift types that do not contain strong or
+  ///   weak references or other forms of indirection are trivial, as
+  ///   are imported C structs and enums.
+  ///
+  /// - Note: Storing a copy of a nontrivial value into memory
+  ///   requires that the user know the type of value previously in
+  ///   memory, and requires initialization or assignment of the
+  ///   memory. This can be achieved via a typed `UnsafeMutablePointer`
+  ///   or via a raw pointer `self`, as follows, where `U` is the
+  ///   previous type and `T` is the copied value's type:
+  ///   `let typedPtr = self.bindMemory(to: U.self, capacity: 1)`
+  ///   `typedPtr.deinitialize(count: 1)`
+  ///   `self.initializeMemory(as: T.self, to: newValue)`
+  public func storeBytes<T>(
+    of value: T, toByteOffset offset: Int = 0, as: T.Type
+  ) {
+    _debugPrecondition(0 == (UInt(bitPattern: self + offset)
+        & (UInt(MemoryLayout<T>.alignment) - 1)),
+      "storeBytes to misaligned raw pointer")
+
+    var temp = value
+    withUnsafeMutablePointer(to: &temp) { source in
+      let rawSrc = UnsafeMutableRawPointer(source)._rawValue
+      // FIXME: to be replaced by _memcpy when conversions are implemented.
+      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
+        (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
+        /*alignment:*/ Int32(0)._value,
+        /*volatile:*/ false._value)
+    }
+  }
+  
+  /// Copies `count` bytes from `source` into memory at `self`.
+  ///  
+  /// - Precondition: `count` is non-negative.
+  ///
+  /// - Precondition: The memory at `source..<source + count` is
+  ///   initialized to some trivial type `T`.
+  ///
+  /// - Precondition: If the memory at `self..<self+count` is bound to
+  ///   a type `U`, then `U` is a trivial type, the underlying
+  ///   pointers `source` and `self` are properly aligned for type
+  ///   `U`, and `count` is a multiple of `MemoryLayout<U>.stride`.
+  ///
+  /// - Postcondition: The memory at `self..<self+count` is
+  ///   initialized to raw bytes. If the memory is bound to type `U`,
+  ///   then it contains values of type `U`.
+  public func copyBytes(from source: UnsafeRawPointer, count: Int) {
+    _debugPrecondition(
+      count >= 0, "UnsafeMutableRawPointer.copyBytes with negative count")
+
+    _memmove(dest: self, src: source, size: UInt(count))
+  }
+%  end # mutable
+
+  //
+  // Protocol conformance
+  //
+
+  /// The pointer's hash value.
+  ///
+  /// The hash value is not guaranteed to be stable across different
+  /// invocations of the same program.  Do not persist the hash value across
+  /// program runs.
+  public var hashValue: Int {
+    return Int(bitPattern: self)
+  }
+
+  /// Returns `x - self`.
+  public func distance(to x: ${Self}) -> Int {
+    return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
+        Builtin.ptrtoint_Word(_rawValue)))
+  }
+
+  /// Returns `self + n`.
+  public func advanced(by n: Int) -> ${Self} {
+    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
+  }
+}
+
+/// - Note: This may be more efficient than Strideable's implementation
+///   calling ${Self}.distance().
+@_transparent
+public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
+  return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+}
+
+/// - Note: This is an unsigned comparison unlike Strideable's implementation.
+@_transparent
+public func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
+  return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
+}
+
+extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
+  /// A textual representation of the pointer, suitable for debugging.
+  public var debugDescription: String {
+    return _rawPointerToString(_rawValue)
+  }
+}
+
+extension Unsafe${Mutable}RawPointer : CustomReflectable {
+  public var customMirror: Mirror {
+    let ptrValue = UInt64(
+      bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
+    return Mirror(self, children: ["pointerValue": ptrValue])
+  }
+}
+
+extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
+  var summary: String {
+    let selfType = "${Self}"
+    let ptrValue = UInt64(
+      bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
+    return ptrValue == 0
+    ? "\(selfType)(nil)"
+    : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
+  }
+
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(summary)
+  }
+}
+
+extension OpaquePointer {
+  public init(_ from: Unsafe${Mutable}RawPointer) {
+    self._rawValue = from._rawValue
+  }
+
+  public init?(_ from: Unsafe${Mutable}RawPointer?) {
+    guard let unwrapped = from else { return nil }
+    self._rawValue = unwrapped._rawValue
+  }
+}
+
+extension Int {
+  public init(bitPattern: Unsafe${Mutable}RawPointer?) {
+    if let bitPattern = bitPattern {
+      self = Int(Builtin.ptrtoint_Word(bitPattern._rawValue))
+    } else {
+      self = 0
+    }
+  }
+}
+
+extension UInt {
+  public init(bitPattern: Unsafe${Mutable}RawPointer?) {
+    if let bitPattern = bitPattern {
+      self = UInt(Builtin.ptrtoint_Word(bitPattern._rawValue))
+    } else {
+      self = 0
+    }
+  }
+}
+
+% end # for mutable
+
+extension UnsafeMutableRawPointer {
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable(); return nil }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
+
+  @available(*, unavailable, renamed: "init(mutating:)")
+  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable(); return nil }
+}

@@ -21,6 +21,9 @@
 module SwiftGlibc [system] {
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
   link "pthread"
+  // FIXME: util contains rarely used functions and not usually needed. Unfortunately
+  // link directive doesn't work in the submodule yet.
+  link "util"
 % end
 
   link "dl"
@@ -30,6 +33,14 @@ module SwiftGlibc [system] {
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
     module complex {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
+      export *
+    }
+    module pty {
+      header "${GLIBC_INCLUDE_PATH}/pty.h"
+      export *
+    }
+    module utmp {
+      header "${GLIBC_INCLUDE_PATH}/utmp.h"
       export *
     }
 % end
@@ -338,6 +349,10 @@ module SwiftGlibc [system] {
       }
       module select {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/select.h"
+        export *
+      }
+      module sendfile {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sendfile.h"
         export *
       }
       module socket {

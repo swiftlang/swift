@@ -41,6 +41,12 @@ struct BigStruct {
 
 @interface Gadget : NSObject
 - (BOOL) negate:(BOOL) b;
+- (_Bool) invert:(_Bool) b;
+
+- (BOOL) negateThrowing:(BOOL) b error:(NSError **) error;
+
+// This one is not imported as a 'throws' function in Swift
+- (_Bool) invertThrowing:(_Bool) b error:(NSError **) error;
 @end
 
 @protocol Pasta

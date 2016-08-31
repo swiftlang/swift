@@ -4,9 +4,16 @@ if(POLICY CMP0051)
   cmake_policy(SET CMP0051 NEW)
 endif()
 
+if(POLICY CMP0054)
+  cmake_policy(SET CMP0054 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+# First include general CMake utilities.
+include(SwiftUtils)
 
 #
 # User-configurable options that control the inclusion and default build
@@ -79,7 +86,6 @@ set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
 set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
     STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
 
-include(SwiftBuildType)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)
   set(SWIFT_STDLIB_ASSERTIONS_default FALSE)
@@ -119,36 +125,6 @@ set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
 # This is not used on Darwin.
 set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
-
-set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
-
-# Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
-set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
-    "A semicolon-separated list of components to install ${_SWIFT_KNOWN_INSTALL_COMPONENTS}")
-# Components are disjoint set of files that can be installed by Swift.  The
-# components would approximately correspond to packages in a Debian-style Linux
-# packaging.  The following components are defined:
-#
-# * autolink-driver -- the Swift driver support tools
-# * compiler -- the Swift compiler and (on supported platforms) the REPL.
-# * clang-builtin-headers -- install a copy of Clang builtin headers under
-#   'lib/swift/clang'.  This is useful when Swift compiler is installed in
-#   isolation.
-# * clang-resource-dir-symlink -- install a symlink to the Clang resource
-#   directory (which contains builtin headers) under 'lib/swift/clang'.  This is
-#   useful when Clang and Swift are installed side-by-side.
-# * stdlib -- the Swift standard library.
-# * stdlib-experimental -- the Swift standard library module for experimental
-#   APIs.
-# * sdk-overlay -- the Swift SDK overlay.
-# * editor-integration -- scripts for Swift integration in IDEs other than
-#   Xcode;
-# * tools -- tools (other than the compiler) useful for developers writing
-#   Swift code.
-# * testsuite-tools -- extra tools required to run the Swift testsuite.
-# * toolchain-dev-tools -- install development tools useful in a shared toolchain
-# * dev -- headers and libraries required to use Swift compiler as a library.
 
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
@@ -351,16 +327,17 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
-include(SwiftUtils)
+include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
 include(AddSwift)
 include(SwiftConfigureSDK)
-include(SwiftInstallComponents)
+include(SwiftComponents)
 include(SwiftList)
 
-swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
+# Configure swift include, install, build components.
+swift_configure_components()
 
 if("${CMAKE_VERSION}" VERSION_LESS "3.0")
   set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS FALSE)
@@ -831,11 +808,6 @@ if(SWIFT_INCLUDE_TOOLS)
   add_subdirectory(include)
   add_subdirectory(lib)
   add_subdirectory(tools)
-endif()
-
-is_sdk_requested("${SWIFT_HOST_VARIANT_SDK}" SWIFT_HOST_SDK_REQUESTED)
-if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_STDLIB AND SWIFT_HOST_SDK_REQUESTED)
-  add_subdirectory(tools/swift-reflection-dump)
 endif()
 
 add_subdirectory(utils)

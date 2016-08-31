@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -18,8 +18,7 @@ var global_cond: Bool = false
 func bar(_ x: Int) {}
 func foo(_ x: Int, _ y: Bool) {}
 
-@noreturn
-func abort() { abort() }
+func abort() -> Never { abort() }
 
 
 
@@ -529,7 +528,7 @@ func testRequireExprPattern(_ a : Int) {
   // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
-  // CHECK: function_ref static Swift.~= infix <A where A: Swift.Equatable> (A, A) -> Swift.Bool
+  // CHECK: function_ref Swift.~= infix <A where A: Swift.Equatable> (A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
   guard case 4 = a else { marker_2(); return }
 
@@ -564,9 +563,9 @@ func testRequireOptional1(_ a : Int?) -> Int {
   guard let t = a else { abort() }
 
   // CHECK:  bb2:
-  // CHECK-NEXT:    // function_ref statements.abort () -> ()
-  // CHECK-NEXT:    %6 = function_ref @_TF10statements5abortFT_T_
-  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) @noreturn () -> ()
+  // CHECK-NEXT:    // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:    %6 = function_ref @_TF10statements5abortFT_Os5Never
+  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) () -> Never
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -585,51 +584,12 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   return %4 : $String
 
   // CHECK:        bb2:
-  // CHECK-NEXT:   // function_ref statements.abort () -> ()
-  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_T_
+  // CHECK-NEXT:   // function_ref statements.abort () -> Swift.Never
+  // CHECK-NEXT:   %8 = function_ref @_TF10statements5abortFT_Os5Never
   // CHECK-NEXT:   %9 = apply %8()
   // CHECK-NEXT:   unreachable
   return t
 }
-
-enum MyOptional<Wrapped> {
-  case none
-  case some(Wrapped)
-}
-
-// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
-// CHECK: bb0(%0 : $*T, %1 : $*MyOptional<T>):
-// CHECK-NEXT: debug_value_addr %1 : $*MyOptional<T>, let, name "a"
-// CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
-// CHECK-NEXT: %4 = alloc_stack $MyOptional<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOptional<T>
-// CHECK-NEXT: switch_enum_addr %4 : $*MyOptional<T>, case #MyOptional.some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInRequire<T>(_ a: MyOptional<T>) -> T {
-  // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4
-  // CHECK-NEXT:   dealloc_stack %3
-  // CHECK-NEXT:   br bb3
-  guard let t = a else { abort() }
-
-  // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOptional<T>, #MyOptional.some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
-  // CHECK-NEXT:     dealloc_stack %4
-  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3
-  // CHECK-NEXT:     destroy_addr %1 : $*MyOptional<T>
-  // CHECK-NEXT:     tuple ()
-  // CHECK-NEXT:     return
-
-  // CHECK:    bb3:
-  // CHECK-NEXT:     // function_ref statements.abort () -> ()
-  // CHECK-NEXT:     %18 = function_ref @_TF10statements5abortFT_T_
-  // CHECK-NEXT:     %19 = apply %18() : $@convention(thin) @noreturn () -> ()
-  // CHECK-NEXT:     unreachable
-
-  return t
-}
-
 
 
 // CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmission

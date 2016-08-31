@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -8,8 +8,8 @@ class DWARF {
   typealias DIEOffset = UInt32
   // CHECK-DAG: ![[VOID:.*]] = !DICompositeType({{.*}}identifier: "_TtT_"
   // CHECK-DAG: ![[PRIVATETYPE:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_TtaC9typealias5DWARFP{{.+}}11PrivateType",{{.*}} line: [[@LINE+1]], baseType: ![[VOID]])
-  private typealias PrivateType = ()
-  private static func usePrivateType() -> PrivateType { return () }
+  fileprivate typealias PrivateType = ()
+  fileprivate static func usePrivateType() -> PrivateType { return () }
 }
 
 func main () {

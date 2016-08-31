@@ -251,7 +251,7 @@ takes precedence for files in the Swift project"
       compilation-error-regexp-alist-alist)
     
 (push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
-(push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\([^,]*\\), line \\([0-9]+\\)$"
+(push `(swift-stdlibunittest-failure "^\\(?:\\(?:stdout\\|stderr\\)>>> *\\)?check failed at \\(.*?\\), line \\([0-9]+\\)$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
 

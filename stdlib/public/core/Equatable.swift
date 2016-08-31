@@ -17,9 +17,9 @@
 /// A type that can be compared for value equality.
 ///
 /// Types that conform to the `Equatable` protocol can be compared for equality
-/// using the is-equal-to operator (`==`) or inequality using the
-/// is-not-equal-to operator (`!=`). Most basic types in the Swift standard
-/// library conform to `Equatable`.
+/// using the equal-to operator (`==`) or inequality using the not-equal-to
+/// operator (`!=`). Most basic types in the Swift standard library conform to
+/// `Equatable`.
 ///
 /// Some sequence and collection operations can be used more simply when the
 /// elements conform to `Equatable`. For example, to check whether an array
@@ -48,10 +48,10 @@
 /// `Comparable` protocols, which allow more uses of your custom type, such as
 /// constructing sets or sorting the elements of a collection.
 ///
-/// To adopt the `Equatable` protocol, implement the "is equal to" operator
-/// (`==`). The standard library provides an implementation for the "is not
-/// equal to" operator (`!=`) for any `Equatable` type, which calls the custom
-/// `==` function and negates its result.
+/// To adopt the `Equatable` protocol, implement the equal-to operator (`==`)
+/// as a static method of your type. The standard library provides an
+/// implementation for the not-equal-to operator (`!=`) for any `Equatable`
+/// type, which calls the custom `==` function and negates its result.
 ///
 /// As an example, consider a `StreetAddress` structure that holds the parts of
 /// a street address: a house or building number, the street name, and an
@@ -75,12 +75,13 @@
 /// closure in each call, extend the `StreetAddress` type to conform to
 /// `Equatable`.
 ///
-///     extension StreetAddress: Equatable { }
-///     func ==(lhs: StreetAddress, rhs: StreetAddress) -> Bool {
-///         return
-///             lhs.number == rhs.number &&
-///             lhs.street == rhs.street &&
-///             lhs.unit == rhs.unit
+///     extension StreetAddress: Equatable {
+///         static func == (lhs: StreetAddress, rhs: StreetAddress) -> Bool {
+///             return
+///                 lhs.number == rhs.number &&
+///                 lhs.street == rhs.street &&
+///                 lhs.unit == rhs.unit
+///         }
 ///     }
 ///
 /// The `StreetAddress` type now conforms to `Equatable`. You can use `==` to
@@ -130,15 +131,15 @@
 ///         init(_ value: Int) {
 ///             self.value = value
 ///         }
+///
+///         static func == (lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///             return lhs.value == rhs.value
+///         }
 ///     }
 ///
-///     func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
-///         return lhs.value == rhs.value
-///     }
-///
-/// The implementation of the `==` function returns the same value whether
-/// its two arguments are the same instance or are two different instances
-/// with the same integer stored in their `value` properties. For example:
+/// The implementation of the `==` function returns the same value whether its
+/// two arguments are the same instance or are two different instances with
+/// the same integer stored in their `value` properties. For example:
 ///
 ///     let a = IntegerRef(100)
 ///     let b = IntegerRef(100)
@@ -147,7 +148,7 @@
 ///     // Prints "true, true"
 ///
 /// Class instance identity, on the other hand, is compared using the
-/// triple-equals "is identical to" operator (`===`). For example:
+/// triple-equals identical-to operator (`===`). For example:
 ///
 ///     let c = a
 ///     print(a === c, b === c, separator: ", ")
@@ -161,7 +162,7 @@ public protocol Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  func == (lhs: Self, rhs: Self) -> Bool
+  static func == (lhs: Self, rhs: Self) -> Bool
 }
 
 /// Returns a Boolean value indicating whether two values are not equal.
@@ -169,7 +170,7 @@ public protocol Equatable {
 /// Inequality is the inverse of equality. For any values `a` and `b`, `a != b`
 /// implies that `a == b` is `false`.
 ///
-/// This is the default implementation of the is-not-equal-to operator (`!=`)
+/// This is the default implementation of the not-equal-to operator (`!=`)
 /// for any type that conforms to `Equatable`.
 ///
 /// - Parameters:
@@ -183,10 +184,54 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 // Reference comparison
 //===----------------------------------------------------------------------===//
 
-/// Returns `true` iff `lhs` and `rhs` are references to the same object
-/// instance (in other words, are identical pointers).
+/// Returns a Boolean value indicating whether two references point to the same
+/// object instance.
 ///
-/// - SeeAlso: `Equatable`, `==`
+/// This operator tests whether two instances have the same identity, not the
+/// same value. For value equality, see the equal-to operator (`==`) and the
+/// `Equatable` protocol.
+///
+/// The following example defines an `IntegerRef` type, an integer type with
+/// reference semantics.
+///
+///     class IntegerRef: Equatable {
+///         let value: Int
+///         init(_ value: Int) {
+///             self.value = value
+///         }
+///     }
+///
+///     func ==(lhs: IntegerRef, rhs: IntegerRef) -> Bool {
+///         return lhs.value == rhs.value
+///     }
+///
+/// Because `IntegerRef` is a class, its instances can be compared using the
+/// identical-to operator (`===`). In addition, because `IntegerRef` conforms
+/// to the `Equatable` protocol, instances can also be compared using the
+/// equal-to operator (`==`).
+///
+///     let a = IntegerRef(10)
+///     let b = a
+///     print(a == b)
+///     // Prints "true"
+///     print(a === b)
+///     // Prints "true"
+///
+/// The identical-to operator (`===`) returns `false` when comparing two
+/// references to different object instances, even if the two instances have
+/// the same value.
+///
+///     let c = IntegerRef(10)
+///     print(a == c)
+///     // Prints "true"
+///     print(a === c)
+///     // Prints "false"
+///
+/// - Parameters:
+///   - lhs: A reference to compare.
+///   - rhs: Another reference to compare.
+///
+/// - SeeAlso: `Equatable`, `==`, `!==`
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -201,6 +246,18 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   }
 }
 
+/// Returns a Boolean value indicating whether two references point to
+/// different object instances.
+///
+/// This operator tests whether two instances have different identities, not
+/// different values. For value inequality, see the not-equal-to operator
+/// (`!=`) and the `Equatable` protocol.
+///
+/// - Parameters:
+///   - lhs: A reference to compare.
+///   - rhs: Another reference to compare.
+///
+/// - SeeAlso: `Equatable`, `===`, `!=`
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT -enable-testing
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -disable-access-control -D ACCESS_DISABLED
-// RUN: not %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | FileCheck -check-prefix=TESTABLE %s
+// RUN: not %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | %FileCheck -check-prefix=TESTABLE %s
 
 #if TESTABLE
 @testable import has_accessibility
@@ -16,7 +16,7 @@ import has_accessibility
 #endif
 
 // This deliberately has the wrong import kind.
-import var has_accessibility.zz // expected-error {{no such decl in module}}
+import var has_accessibility.zz // expected-error {{variable 'zz' does not exist in module 'has_accessibility'}}
 
 func markUsed<T>(_ t: T) {}
 
@@ -53,6 +53,15 @@ Foo.b()
 Foo.c() // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 _ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal' protection level}}
+
+// <rdar://problem/27982012> QoI: Poor diagnostic for inaccessible initializer
+struct rdar27982012 {
+  var x: Int
+  private init(_ x: Int) { self.x = x }
+}
+
+_ = { rdar27982012($0.0) }((1, 2)) // expected-error {{type of expression is ambiguous without more context}}
+
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
@@ -96,9 +105,10 @@ protocol MethodProto {
 }
 
 extension OriginallyEmpty : MethodProto {}
-extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 #if !ACCESS_DISABLED
+extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
+
 extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}}
 #endif
 
@@ -108,9 +118,10 @@ protocol TypeProto {
 }
 
 extension OriginallyEmpty {}
+#if !ACCESS_DISABLED
 extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
-#if !ACCESS_DISABLED
+
 extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
 #endif
 
@@ -129,8 +140,8 @@ private class PrivateBox<T> { // expected-note 2 {{type declared here}}
   typealias AlwaysFloat = Float
 }
 
-let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private because its type uses a private type}}
-let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private because its type uses a private type}}
+let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
+let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
 #endif
 
 
@@ -144,7 +155,11 @@ struct ConformerByLocalType : TypeProto {
 }
 
 private struct PrivateConformerByLocalType : TypeProto {
-  private struct TheType {} // okay
+  struct TheType {} // okay
+}
+
+private struct PrivateConformerByLocalTypeBad : TypeProto {
+  private struct TheType {} // expected-error {{struct 'TheType' must be as accessible as its enclosing type because it matches a requirement in protocol 'TypeProto'}} {{3-10=fileprivate}}
 }
 #endif
 

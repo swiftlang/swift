@@ -1,6 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -Xfrontend -enable-experimental-patterns %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 enum Singleton {
@@ -286,7 +286,7 @@ func print(_ suit: Suit) {
 }
 
 func optionableSuits() {
-  var optionables: [Optionable<Suit>] = [
+  let optionables: [Optionable<Suit>] = [
     .Mere(.Spades),
     .Mere(.Diamonds),
     .Nought,
@@ -295,7 +295,7 @@ func optionableSuits() {
 
   for o in optionables {
     switch o {
-    case .Mere(var x):
+    case .Mere(let x):
       print(x)
     case .Nought:
       print("---")
@@ -414,8 +414,8 @@ func test_spare_bit_aggregate(_ x: MultiPayloadSpareBitAggregates) {
     print(".x(\(i32), \(i64))")
   case .y(let a, let b):
     print(".y(\(a.id), \(b.id))")
-  case .z(S(a: let a, b: let b)):
-    print(".z(\(a), \(b))")
+  case .z(let s):
+    print(".z(\(s))")
   }
 }
 
@@ -428,7 +428,7 @@ test_spare_bit_aggregate(.x(22, 44))
 // CHECK-DAG: ~X(222)
 // CHECK-DAG: ~X(444)
 test_spare_bit_aggregate(.y(Rdar15383966(222), Rdar15383966(444)))
-// CHECK: .z(333, 666)
+// CHECK: .z(S(a: 333, b: 666))
 test_spare_bit_aggregate(.z(S(333, 666)))
 
 print("---")
@@ -440,7 +440,7 @@ struct OptionalTuple<T> {
   }
 }
 func test_optional_generic_tuple<T>(_ a: OptionalTuple<T>) -> T {
-  print("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
+  print("optional pair is same size as pair: \(MemoryLayout.size(ofValue: a) == MemoryLayout<T>.size*2)")
   return a.value!.0
 }
 print("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
@@ -513,7 +513,7 @@ func presentEitherOr<T, U>(_ e: EitherOr<T, U>) {
 }
 
 @inline(never)
-func presentEitherOrsOf<T, U>(t t: T, u: U) {
+func presentEitherOrsOf<T, U>(t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Left(t))
   presentEitherOr(EitherOr<T, U>.Middle)
   presentEitherOr(EitherOr<T, U>.Center)

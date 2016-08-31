@@ -170,10 +170,10 @@ extension SCNGeometryElement {
       fatalError("Expected constant number of indices per primitive")
     }
     self.init(
-      data: Data(bytes: UnsafePointer<UInt8>(indices), count: indexCount * sizeof(IndexType.self)),
+      data: Data(bytes: indices, count: indexCount * MemoryLayout<IndexType>.stride),
       primitiveType: primitiveType,
       primitiveCount: primitiveCount,
-      bytesPerIndex: sizeof(IndexType.self))
+      bytesPerIndex: MemoryLayout<IndexType>.stride)
     _fixLifetime(indices)
   }
 }
@@ -229,7 +229,7 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
 extension SCNSceneSource {
   public func entryWithIdentifier<T>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(
-      self, uid as NSString, entryClass as! AnyObject) as! T?
+      self, uid as NSString, entryClass as! AnyClass) as! T?
   }
 }
 

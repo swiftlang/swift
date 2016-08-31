@@ -37,11 +37,6 @@ module ImportAsMember {
     header "ImportAsMemberC.h"
   }
 
-  module Proto {
-    requires objc
-    header "ImportAsMemberProto.h"
-  }
-
   module Class {
     requires objc
     header "ImportAsMemberClass.h"
@@ -58,3 +53,9 @@ module InferImportAsMember {
   export *
   header "InferImportAsMember.h"
 }
+
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
+  export *
+}
+

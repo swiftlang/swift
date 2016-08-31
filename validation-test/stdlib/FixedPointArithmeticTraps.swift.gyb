@@ -258,7 +258,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSize") {
   a = get${IntTy}(a ${operation} get${IntTy}(0))
   a = get${IntTy}(a ${operation} get${IntTy}(1))
 
-  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8)
+  let shiftAmount = ${IntTy}(MemoryLayout<${IntTy}>.size * 8)
 
   // Overflow in ${description}.
   expectCrashLater()
@@ -271,7 +271,7 @@ FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
 
   a = get${IntTy}(a ${operation} get${IntTy}(0))
 
-  let shiftAmount = ${IntTy}(sizeof(${IntTy}.self) * 8 + 1)
+  let shiftAmount = ${IntTy}(MemoryLayout<${IntTy}>.size * 8 + 1)
 
   // Overflow in ${description}.
   expectCrashLater()

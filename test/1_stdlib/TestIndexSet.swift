@@ -79,6 +79,7 @@ class TestIndexSet : TestIndexSetSuper {
         
         r = someIndexes.indexRange(in: 100..<201)
         expectEqual(r.lowerBound, r.upperBound)
+        expectTrue(r.isEmpty)
         
         r = someIndexes.indexRange(in: 0..<100)
         expectEqual(r.lowerBound, someIndexes.startIndex)
@@ -87,6 +88,9 @@ class TestIndexSet : TestIndexSetSuper {
         r = someIndexes.indexRange(in: 1..<11)
         expectEqual(1, someIndexes[r.lowerBound])
         expectEqual(11, someIndexes[r.upperBound])
+        
+        let empty = IndexSet()
+        expectTrue(empty.indexRange(in: 1..<3).isEmpty)
     }
     
     func testMutation() {
@@ -728,6 +732,36 @@ class TestIndexSet : TestIndexSetSuper {
         }
     }
     
+    func test_findIndex() {
+        var i = IndexSet()
+        
+        // Verify nil result for empty sets
+        expectEqual(nil, i.first)
+        expectEqual(nil, i.last)
+        expectEqual(nil, i.integerGreaterThan(5))
+        expectEqual(nil, i.integerLessThan(5))
+        expectEqual(nil, i.integerGreaterThanOrEqualTo(5))
+        expectEqual(nil, i.integerLessThanOrEqualTo(5))
+        
+        i.insert(integersIn: 5..<10)
+        i.insert(integersIn: 15..<20)
+
+        // Verify non-nil result
+        expectEqual(5, i.first)
+        expectEqual(19, i.last)
+        
+        expectEqual(nil, i.integerGreaterThan(19))
+        expectEqual(5, i.integerGreaterThan(3))
+        
+        expectEqual(nil, i.integerLessThan(5))
+        expectEqual(5, i.integerLessThan(6))
+        
+        expectEqual(nil, i.integerGreaterThanOrEqualTo(20))
+        expectEqual(19, i.integerGreaterThanOrEqualTo(19))
+        
+        expectEqual(nil, i.integerLessThanOrEqualTo(4))
+        expectEqual(5, i.integerLessThanOrEqualTo(5))
+    }
 
     // MARK: -
     // MARK: Performance Testing
@@ -757,6 +791,34 @@ class TestIndexSet : TestIndexSetSuper {
         }
         */
     }
+
+    func test_AnyHashableContainingIndexSet() {
+        let values: [IndexSet] = [
+            IndexSet([0, 1]),
+            IndexSet([0, 1, 2]),
+            IndexSet([0, 1, 2]),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(IndexSet.self, type(of: anyHashables[0].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[1].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
+
+    func test_AnyHashableCreatedFromNSIndexSet() {
+        let values: [NSIndexSet] = [
+            NSIndexSet(index: 0),
+            NSIndexSet(index: 1),
+            NSIndexSet(index: 1),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(IndexSet.self, type(of: anyHashables[0].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[1].base))
+        expectEqual(IndexSet.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -778,7 +840,10 @@ IndexSetTests.test("testSubsequences") { TestIndexSet().testSubsequences() }
 IndexSetTests.test("testFiltering") { TestIndexSet().testFiltering() }
 IndexSetTests.test("testFilteringRanges") { TestIndexSet().testFilteringRanges() }
 IndexSetTests.test("testShift") { TestIndexSet().testShift() }
+IndexSetTests.test("test_findIndex") { TestIndexSet().test_findIndex() }
 // IndexSetTests.test("testIndexingPerformance") { TestIndexSet().testIndexingPerformance() }
+IndexSetTests.test("test_AnyHashableContainingIndexSet") { TestIndexSet().test_AnyHashableContainingIndexSet() }
+IndexSetTests.test("test_AnyHashableCreatedFromNSIndexSet") { TestIndexSet().test_AnyHashableCreatedFromNSIndexSet() }
 runAllTests()
 #endif
 

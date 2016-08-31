@@ -1,0 +1,14 @@
+// RUN: %target-swift-frontend -emit-ir -verify %s
+
+import Swift
+
+class C {}
+
+sil @foo : $@convention(thin) (@inout @sil_unowned C, @owned C) -> () {
+entry(%0 : $*@sil_unowned C, %1 : $C):
+  store_unowned %1 to [initialization] %0 : $*@sil_unowned C
+  store_unowned %1 to %0 : $*@sil_unowned C
+  return undef : $()
+}
+
+sil_vtable C {}

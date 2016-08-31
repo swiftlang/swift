@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir > %t.ll
-// RUN: FileCheck %s -check-prefix=GLOBAL < %t.ll
-// RUN: FileCheck %s < %t.ll
+// RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
+// RUN: %FileCheck %s < %t.ll
 // REQUIRES: CPU=x86_64
 
 protocol P {}
@@ -44,7 +44,7 @@ struct GenericWithUniversal<T> : Assocked {
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1P_ to i8*)
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @_TWTuRx23associated_type_witness1PxS_1QrGVS_9Fulfilledx_S_8AssockedS_5AssocPS_1Q_ to i8*)
 // GLOBAL-SAME:  ]
-struct Fulfilled<T : protocol<P, Q> > : Assocked {
+struct Fulfilled<T : P & Q> : Assocked {
   typealias Assoc = T
 }
 

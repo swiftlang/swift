@@ -26,7 +26,7 @@ public func run_SetIsSubsetOf(_ N: Int) {
     otherSet.insert(Int(truncatingBitPattern: Random()))
   }
 
-  var isSubset = false;
+  var isSubset = false
   for _ in 0 ..< N * 5000 {
     isSubset = set.isSubset(of: otherSet)
     if isSubset {
@@ -104,23 +104,20 @@ public func run_SetIntersect(_ N: Int) {
   sink(&and)
 }
 
-class Box<T : Hashable where T : Equatable> : Hashable {
+class Box<T : Hashable> : Hashable {
   var value: T
 
   init(_ v: T) {
     value = v
   }
 
-  var hashValue : Int {
+  var hashValue: Int {
     return value.hashValue
   }
-}
 
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
-  return lhs.value == rhs.value
+  static func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 @inline(never)
@@ -137,7 +134,7 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
     otherSet.insert(Box(Int(truncatingBitPattern: Random())))
   }
 
-  var isSubset = false;
+  var isSubset = false
   for _ in 0 ..< N * 5000 {
     isSubset = set.isSubset(of: otherSet)
     if isSubset {

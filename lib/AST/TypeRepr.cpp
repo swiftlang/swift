@@ -198,7 +198,7 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
   return new (Ctx) NamedTypeRepr(T->getName(), visit(T->getTypeRepr()),
-                                 T->getNameLoc());
+                                 T->getNameLoc(), T->getUnderscoreLoc());
 }
 
 TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
@@ -210,8 +210,8 @@ TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
   }
 
   return new (Ctx) ProtocolCompositionTypeRepr(protocols,
-                                               T->getProtocolLoc(),
-                                               T->getAngleBrackets());
+                                               T->getStartLoc(),
+                                               T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -264,30 +264,41 @@ void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
 
 void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
                                    const PrintOptions &Opts) const {
-  printAttrs(Printer);
+  printAttrs(Printer, Opts);
   printTypeRepr(Ty, Printer, Opts);
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
   StreamPrinter Printer(OS);
-  printAttrs(Printer);
+  printAttrs(Printer, PrintOptions());
 }
 
-void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
+void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
+                                    const PrintOptions &Options) const {
   const TypeAttributes &Attrs = getAttrs();
-  if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";
 
-  switch (Attrs.has(TAK_autoclosure)*2 + Attrs.has(TAK_noescape)) {
-  case 0: break;  // Nothing specified.
-  case 1: Printer << "@noescape "; break;
-  case 2: Printer << "@autoclosure(escaping) "; break;
-  case 3: Printer << "@autoclosure "; break;
-  }
-  if (Attrs.has(TAK_escaping))     Printer << "@escaping ";
-  if (Attrs.has(TAK_thin))         Printer << "@thin ";
-  if (Attrs.has(TAK_thick))        Printer << "@thick ";
-  if (Attrs.convention.hasValue()) {
-    Printer << "@convention(" << Attrs.convention.getValue() << ") ";
+  auto hasAttr = [&](TypeAttrKind K) -> bool {
+    if (Options.excludeAttrKind(K))
+      return false;
+    return Attrs.has(K);
+  };
+
+  if (hasAttr(TAK_autoclosure))
+    Printer.printSimpleAttr("@autoclosure") << " ";
+  if (hasAttr(TAK_escaping))
+    Printer.printSimpleAttr("@escaping") << " ";
+
+  if (hasAttr(TAK_thin))
+    Printer.printSimpleAttr("@thin") << " ";
+  if (hasAttr(TAK_thick))
+    Printer.printSimpleAttr("@thick") << " ";
+
+  if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+    Printer.printAttrName("@convention");
+    Printer << "(" << Attrs.convention.getValue() << ")";
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    Printer << " ";
   }
 }
 
@@ -416,9 +427,19 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
 void NamedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (!Id.empty()) {
-    Printer.printName(Id, PrintNameContext::TupleElement);
+  if (isNamedParameter()) {
+    // Printing empty Identifier is same as printing '_'.
+    Printer.printName(Identifier(), PrintNameContext::FunctionParameterExternal);
+    if (!Id.empty()) {
+      Printer << " ";
+      Printer.printName(Id, PrintNameContext::FunctionParameterLocal);
+    }
     Printer << ": ";
+  } else {
+    if (!Id.empty()) {
+      Printer.printName(Id, PrintNameContext::TupleElement);
+      Printer << ": ";
+    }
   }
   printTypeRepr(Ty, Printer, Opts);
 }
@@ -426,24 +447,26 @@ void NamedTypeRepr::printImpl(ASTPrinter &Printer,
 ProtocolCompositionTypeRepr *
 ProtocolCompositionTypeRepr::create(ASTContext &C,
                                     ArrayRef<IdentTypeRepr *> Protocols,
-                                    SourceLoc ProtocolLoc,
-                                    SourceRange AngleBrackets) {
+                                    SourceLoc FirstTypeLoc,
+                                    SourceRange CompositionRange) {
   return new (C) ProtocolCompositionTypeRepr(C.AllocateCopy(Protocols),
-                                             ProtocolLoc, AngleBrackets);
+                                             FirstTypeLoc, CompositionRange);
 }
 
 void ProtocolCompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                             const PrintOptions &Opts) const {
-  Printer << "protocol<";
-  bool First = true;
-  for (auto Proto : Protocols) {
-    if (First)
-      First = false;
-    else
-      Printer << ", ";
-    printTypeRepr(Proto, Printer, Opts);
+  if (Protocols.empty()) {
+    Printer << "Any";
+  } else {
+    bool First = true;
+    for (auto Proto : Protocols) {
+      if (First)
+        First = false;
+      else
+        Printer << " & ";
+      printTypeRepr(Proto, Printer, Opts);
+    }
   }
-  Printer << ">";
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
-// RUN: %target-swift-frontend -O -emit-ir -primary-file %s | FileCheck %s --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT
 
 func use_metadata<F>(_ f: F) {}
 
@@ -73,7 +73,7 @@ class SubFoo: Foo {
 @inline(never)
 func testMakeFoo(_ p: P) -> Foo.Type {
   let foo = p.makeFoo()
-  return foo.dynamicType
+  return type(of: foo)
 }
 
 // The protocol witness for metadata_dominance.P.makeFoo () -> metadata_dominance.Foo in

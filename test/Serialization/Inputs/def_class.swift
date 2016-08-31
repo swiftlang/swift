@@ -1,8 +1,7 @@
-public class Empty {}
+open class Empty {}
 
-@swift3_migration(renamed: "DosInts", message: "because I can")
-public class TwoInts {
-  public var x, y : Int
+open class TwoInts {
+  open var x, y : Int
   
   required public init(a : Int, b : Int) {
     x = a
@@ -10,9 +9,8 @@ public class TwoInts {
   }
 }
 
-public class ComputedProperty {
-  @swift3_migration(renamed: "theValue", message: "because I can")
-  public var value : Int {
+open class ComputedProperty {
+  open var value : Int {
     get {
       var result = 0
       return result
@@ -22,8 +20,7 @@ public class ComputedProperty {
     }
   }
 
-  @swift3_migration(message: "something else")
-  public var readOnly : Int {
+  open var readOnly : Int {
     return 42
   }
 
@@ -32,9 +29,9 @@ public class ComputedProperty {
 
 
 // Generics
-public class Pair<A, B> {
-  public var first : A
-  public var second : B
+open class Pair<A, B> {
+  open var first : A
+  open var second : B
 
   public init(a : A, b : B) {
     first = a
@@ -42,10 +39,10 @@ public class Pair<A, B> {
   }
 }
 
-public class GenericCtor<U> {
+open class GenericCtor<U> {
   public init<T>(_ t : T) {}
   
-  public func doSomething<T>(_ t : T) {}
+  open func doSomething<T>(_ t : T) {}
 }
 
 
@@ -58,10 +55,10 @@ public extension Resettable {
   final func doReset() { self.reset() }
 }
 
-public class ResettableIntWrapper : Resettable {
-  public var value : Int
+open class ResettableIntWrapper : Resettable {
+  open var value : Int
   public init() { value = 0 }
-  public func reset() {
+  open func reset() {
     var zero = 0
     value = zero
   }
@@ -71,7 +68,7 @@ public protocol Computable {
   func compute()
 }
 
-public typealias Cacheable = protocol<Resettable, Computable>
+public typealias Cacheable = Resettable & Computable
 
 public protocol SpecialResettable : Resettable, Computable {}
 
@@ -95,35 +92,35 @@ public protocol ClassProto : class {}
 }
 
 
-public class OptionalImplementer : ObjCProtoWithOptional {
-  public func unrelated() {}
+open class OptionalImplementer : ObjCProtoWithOptional {
+  open func unrelated() {}
   public init() {}
 }
 
 
 // Inheritance
-public class StillEmpty : Empty, Resettable {
-  public func reset() {}
+open class StillEmpty : Empty, Resettable {
+  open func reset() {}
   public override init() {}
 }
 
-public class BoolPair<T> : Pair<Bool, Bool>, PairLike {
+open class BoolPair<T> : Pair<Bool, Bool>, PairLike {
   public init() { super.init(a: false, b: false) }
-  public func bothTrue() -> Bool {
+  open func bothTrue() -> Bool {
     return first && second
   }
 
-  public func getFirst() -> Bool { return first }
-  public func getSecond() -> Bool { return second }
+  open func getFirst() -> Bool { return first }
+  open func getSecond() -> Bool { return second }
 }
 
-public class SpecialPair<A> : Pair<Int, Int>, Computable {
-  public func compute() {}
+open class SpecialPair<A> : Pair<Int, Int>, Computable {
+  open func compute() {}
 }
 
-public class OtherPair<A, B> : PairLike {
-  public var first : A
-  public var second : B
+open class OtherPair<A, B> : PairLike {
+  open var first : A
+  open var second : B
 
   public init(a : A, b : B) {
     first = a
@@ -133,14 +130,14 @@ public class OtherPair<A, B> : PairLike {
   public typealias FirstType = Bool
   public typealias SecondType = Bool
 
-  public func getFirst() -> Bool { return true }
-  public func getSecond() -> Bool { return true }
+  open func getFirst() -> Bool { return true }
+  open func getSecond() -> Bool { return true }
 }
 
-public class OtherBoolPair<T> : OtherPair<Bool, Bool> {
+open class OtherBoolPair<T> : OtherPair<Bool, Bool> {
 }
 
-public class RequiresPairLike<P : PairLike> { }
+open class RequiresPairLike<P : PairLike> { }
 
 public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> { 
   return RequiresPairLike<OtherBoolPair<Bool>>()
@@ -148,15 +145,15 @@ public func getReqPairLike() -> RequiresPairLike<OtherBoolPair<Bool>> {
 
 
 // Subscripts
-public class ReadonlySimpleSubscript {
-  public subscript(x : Int) -> Bool {
+open class ReadonlySimpleSubscript {
+  open subscript(x : Int) -> Bool {
     return true
   }
   public init() {}
 }
 
-public class ComplexSubscript {
-  public subscript(x : Int, y : Bool) -> Int {
+open class ComplexSubscript {
+  open subscript(x : Int, y : Bool) -> Int {
     set(newValue) {
       // do nothing!
     }
@@ -169,17 +166,17 @@ public class ComplexSubscript {
 
 
 // Destructor
-public class Resource {
+open class Resource {
   public init() { }
   deinit {}
 }
 
 
 // Ownership
-public class ResourceSharer {
+open class ResourceSharer {
   // FIXME: Cannot perform in-class initialization here
-  public unowned var alwaysPresent : Resource
-  public weak var maybePresent : Resource?
+  open unowned var alwaysPresent : Resource
+  open weak var maybePresent : Resource?
 
   public init (res: Resource) {
     self.alwaysPresent = res

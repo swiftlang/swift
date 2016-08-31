@@ -56,7 +56,7 @@ public:
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
       IsProtocolMethod(isProtocolMethod),
-      ParamCount(fn->getNaturalArgumentCount()) {
+      ParamCount(fn->getNumParameterLists()) {
     TheFunction = fn;
   }
 
@@ -64,7 +64,7 @@ public:
     : TheKind(Kind::Closure),
       IsRethrows(false),
       IsProtocolMethod(false),
-      ParamCount(closure->getNaturalArgumentCount()) {
+      ParamCount(1) {
     TheClosure = closure;
   }
 
@@ -380,11 +380,6 @@ classifyFunctionByType(Type type, unsigned numArgs) {
   }
 }
 
-template <class T>
-static ThrowingKind classifyFunctionBodyWithoutContext(T *fn) {
-  return classifyFunctionByType(fn->getType(), fn->getNaturalArgumentCount());
-}
-
 /// A class for collecting information about rethrowing functions.
 class ApplyClassifier {
   llvm::DenseMap<void*, ThrowingKind> Cache;
@@ -410,6 +405,12 @@ public:
     // Decompose the application.
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
+
+    // If any of the arguments didn't type check, fail.
+    for (auto arg : args) {
+      if (!arg->getType() || arg->getType()->is<ErrorType>())
+        return Classification::forInvalidCode();
+    }
 
     // If we're applying more arguments than the natural argument
     // count, then this is a call to the opaque value returned from
@@ -850,9 +851,8 @@ public:
   };
 
 private:
-  template <class T>
-  static Kind getKindForFunctionBody(T *fn) {
-    switch (classifyFunctionBodyWithoutContext(fn)) {
+  static Kind getKindForFunctionBody(Type type, unsigned numArgs) {
+    switch (classifyFunctionByType(type, numArgs)) {
     case ThrowingKind::None:
       return Kind::NonThrowingFunction;
     case ThrowingKind::Invalid:
@@ -885,7 +885,8 @@ public:
       result.RethrowsDC = D;
       return result;
     }
-    return Context(getKindForFunctionBody(D));
+    return Context(getKindForFunctionBody(
+        D->getType(), D->getNumParameterLists()));
   }
 
   static Context forInitializer(Initializer *init) {
@@ -908,7 +909,7 @@ public:
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
-    auto kind = getKindForFunctionBody(E);
+    auto kind = getKindForFunctionBody(E->getType(), 1);
     if (kind != Kind::Handled && isa<AutoClosureExpr>(E))
       kind = Kind::NonThrowingAutoClosure;
     return Context(kind);

@@ -61,6 +61,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
 
   switch (D->getEffectiveAccess()) {
   case Accessibility::Public:
+  case Accessibility::Open:
     return FormalLinkage::PublicUnique;
   case Accessibility::Internal:
     // If we're serializing all function bodies, type metadata for internal
@@ -69,6 +70,7 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
         == ResilienceStrategy::Fragile)
       return FormalLinkage::PublicUnique;
     return FormalLinkage::HiddenUnique;
+  case Accessibility::FilePrivate:
   case Accessibility::Private:
     // Why "hidden" instead of "private"? Because the debugger may need to
     // access these symbols.
@@ -145,6 +147,7 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
   // FIXME: This should be using std::min(protocol's access, type's access).
   switch (C->getProtocol()->getEffectiveAccess()) {
     case Accessibility::Private:
+    case Accessibility::FilePrivate:
       return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
 
     case Accessibility::Internal:

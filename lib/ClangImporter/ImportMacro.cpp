@@ -346,11 +346,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       } else {
         return nullptr;
       }
+      if (!castClangType->isBuiltinType() && !castTypeIsId) {
+        return nullptr;
+      }
     } else {
       auto builtinType = builtinTypeForToken(tokenI[1],
                                              impl.getClangASTContext());
       if (builtinType) {
         castType = &builtinType.getValue();
+      } else {
+        return nullptr;
       }
     }
     tokenI += 3;
@@ -476,21 +481,33 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
         auto firstInteger = firstValue.getInt();
         auto secondInteger = secondValue.getInt();
+        auto firstBitWidth = firstInteger.getBitWidth();
+        auto secondBitWidth = secondInteger.getBitWidth();
         auto type = firstConstant.second;
 
         clang::APValue value;
         if (tokenI[1].is(clang::tok::pipe)) {
-          if (firstInteger.getBitWidth() == secondInteger.getBitWidth()) {
-            value = clang::APValue(firstInteger | secondInteger);
-          } else {
-            return nullptr;
+          if (firstBitWidth < secondBitWidth) {
+            firstInteger = firstInteger.extend(secondBitWidth);
+            type = secondConstant.second;
+          } else if (secondBitWidth < firstBitWidth) {
+            secondInteger = secondInteger.extend(firstBitWidth);
+            type = firstConstant.second;
           }
+          firstInteger.setIsUnsigned(true);
+          secondInteger.setIsUnsigned(true);
+          value = clang::APValue(firstInteger | secondInteger);
         } else if (tokenI[1].is(clang::tok::amp)) {
-          if (firstInteger.getBitWidth() == secondInteger.getBitWidth()) {
-            value = clang::APValue(firstInteger & secondInteger);
-          } else {
-            return nullptr;
+          if (firstBitWidth < secondBitWidth) {
+            firstInteger = firstInteger.extend(secondBitWidth);
+            type = secondConstant.second;
+          } else if (secondBitWidth < firstBitWidth) {
+            secondInteger = secondInteger.extend(firstBitWidth);
+            type = firstConstant.second;
           }
+          firstInteger.setIsUnsigned(true);
+          secondInteger.setIsUnsigned(true);
+          value = clang::APValue(firstInteger & secondInteger);
         } else if (tokenI[1].is(clang::tok::pipepipe)) {
           auto firstBool = firstInteger.getBoolValue();
           auto secondBool = firstInteger.getBoolValue();

@@ -38,13 +38,13 @@ extension _StringCore {
     if _fastPath(elementWidth == 1) {
       // How many UTF-16 code units might we use before we've filled up
       // our _UTF8Chunk with UTF-8 code units?
-      let utf16Count = Swift.min(sizeof(_UTF8Chunk.self), count - i)
+      let utf16Count = Swift.min(MemoryLayout<_UTF8Chunk>.size, count - i)
 
       var result: _UTF8Chunk = ~0 // Start with all bits set
 
       _memcpy(
-        dest: UnsafeMutablePointer(Builtin.addressof(&result)),
-        src: UnsafeMutablePointer(startASCII + i),
+        dest: UnsafeMutableRawPointer(Builtin.addressof(&result)),
+        src: startASCII + i,
         size: numericCast(utf16Count))
 
       // Convert the _UTF8Chunk into host endianness.
@@ -154,7 +154,7 @@ extension String {
   ///
   ///     print(strncmp(s1, s2, 14))
   ///     // Prints "0"
-  ///     print(String(s1.utf8.prefix(14))
+  ///     print(String(s1.utf8.prefix(14)))
   ///     // Prints "They call me '"
   ///
   /// Extending the compared character count to 15 includes the differing
@@ -162,7 +162,7 @@ extension String {
   ///
   ///     print(strncmp(s1, s2, 15))
   ///     // Prints "-17"
-  ///     print(String(s1.utf8.prefix(14))
+  ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
   public struct UTF8View
     : Collection, 
@@ -205,7 +205,7 @@ extension String {
     ///     }
     ///     // Prints "[72, 101, 97, 114, 116, 115]"
     ///     // Prints "Hearts"
-    public struct Index : Comparable {
+    public struct Index {
       internal typealias Buffer = _StringCore._UTF8Chunk
 
       init(_coreIndex: Int, _ _buffer: Buffer) {
@@ -253,7 +253,7 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF << numericCast((sizeof(Buffer.self) &- 1) &* 8)
+        return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
@@ -375,7 +375,7 @@ extension String {
       return UTF8View(self._core)
     }
     set {
-      self = String(newValue)
+      self = String(describing: newValue)
     }
   }
 
@@ -383,37 +383,42 @@ extension String {
     return _core.elementWidth == 1 ? _core.startASCII : nil
   }
 
-  /// A contiguously stored null-terminated UTF-8 representation of
-  /// the string.
+  /// A contiguously stored null-terminated UTF-8 representation of the string.
   ///
-  /// To access the underlying memory, invoke
-  /// `withUnsafeBufferPointer` on the array.
+  /// To access the underlying memory, invoke `withUnsafeBufferPointer` on the
+  /// array.
   ///
   ///     let s = "Hello!"
-  ///     let bytes = s.nulTerminatedUTF8
+  ///     let bytes = s.utf8CString
   ///     print(bytes)
   ///     // Prints "[72, 101, 108, 108, 111, 33, 0]"
-  ///     
+  ///
   ///     bytes.withUnsafeBufferPointer { ptr in
-  ///         print(strlen(UnsafePointer(ptr.baseAddress!)))
+  ///         print(strlen(ptr.baseAddress!))
   ///     }
   ///     // Prints "6"
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    var result = ContiguousArray<UTF8.CodeUnit>()
+  public var utf8CString: ContiguousArray<CChar> {
+    var result = ContiguousArray<CChar>()
     result.reserveCapacity(utf8.count + 1)
-    result += utf8
+    for c in utf8 {
+      result.append(CChar(bitPattern: c))
+    }
     result.append(0)
     return result
   }
 
   internal func _withUnsafeBufferPointerToUTF8<R>(
-    _ body: @noescape (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
+    _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
     let ptr = _contiguousUTF8
     if ptr != nil {
       return try body(UnsafeBufferPointer(start: ptr, count: _core.count))
     }
-    return try nulTerminatedUTF8.withUnsafeBufferPointer(body)
+    var nullTerminatedUTF8 = ContiguousArray<UTF8.CodeUnit>()
+    nullTerminatedUTF8.reserveCapacity(utf8.count + 1)
+    nullTerminatedUTF8 += utf8
+    nullTerminatedUTF8.append(0)
+    return try nullTerminatedUTF8.withUnsafeBufferPointer(body)
   }
 
   /// Creates a string corresponding to the given sequence of UTF-8 code units.
@@ -449,54 +454,55 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
-// FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
-//        assuming String.UTF8View.Index continues to exist
-public func == (
-  lhs: String.UTF8View.Index,
-  rhs: String.UTF8View.Index
-) -> Bool {
-  // If the underlying UTF16 index differs, they're unequal
-  if lhs._coreIndex != rhs._coreIndex {
-    return false
-  }
-
-  // Match up bytes in the buffer
-  var buffer = (lhs._buffer, rhs._buffer)
-  var isContinuation: Bool
-  repeat {
-    let unit = (
-      UTF8.CodeUnit(truncatingBitPattern: buffer.0),
-      UTF8.CodeUnit(truncatingBitPattern: buffer.1))
-
-    isContinuation = UTF8.isContinuation(unit.0)
-    if !isContinuation {
-      // We don't check for unit equality in this case because one of
-      // the units might be an 0xFF read from the end of the buffer.
-      return !UTF8.isContinuation(unit.1)
-    }
-    // Continuation bytes must match exactly
-    else if unit.0 != unit.1 {
+extension String.UTF8View.Index : Comparable {
+  // FIXME: swift-3-indexing-model: add complete set of forwards for Comparable 
+  //        assuming String.UTF8View.Index continues to exist
+  public static func == (
+    lhs: String.UTF8View.Index,
+    rhs: String.UTF8View.Index
+  ) -> Bool {
+    // If the underlying UTF16 index differs, they're unequal
+    if lhs._coreIndex != rhs._coreIndex {
       return false
     }
 
-    // Move the buffers along.
-    buffer = (
-      String.UTF8Index._nextBuffer(after: buffer.0),
-      String.UTF8Index._nextBuffer(after: buffer.1))
-  }
-  while true
-}
+    // Match up bytes in the buffer
+    var buffer = (lhs._buffer, rhs._buffer)
+    var isContinuation: Bool
+    while true {
+      let unit = (
+        UTF8.CodeUnit(truncatingBitPattern: buffer.0),
+        UTF8.CodeUnit(truncatingBitPattern: buffer.1))
 
-public func < (
-  lhs: String.UTF8View.Index,
-  rhs: String.UTF8View.Index
-) -> Bool {
-  if lhs._coreIndex == rhs._coreIndex && lhs._buffer != rhs._buffer {
-    // The index with more continuation bytes remaining before the next
-    return lhs._utf8ContinuationBytesUntilNextUnicodeScalar >
-      rhs._utf8ContinuationBytesUntilNextUnicodeScalar
+      isContinuation = UTF8.isContinuation(unit.0)
+      if !isContinuation {
+        // We don't check for unit equality in this case because one of
+        // the units might be an 0xFF read from the end of the buffer.
+        return !UTF8.isContinuation(unit.1)
+      }
+      // Continuation bytes must match exactly
+      else if unit.0 != unit.1 {
+        return false
+      }
+
+      // Move the buffers along.
+      buffer = (
+        String.UTF8Index._nextBuffer(after: buffer.0),
+        String.UTF8Index._nextBuffer(after: buffer.1))
+    }
   }
-  return lhs._coreIndex < rhs._coreIndex
+
+  public static func < (
+    lhs: String.UTF8View.Index,
+    rhs: String.UTF8View.Index
+  ) -> Bool {
+    if lhs._coreIndex == rhs._coreIndex && lhs._buffer != rhs._buffer {
+      // The index with more continuation bytes remaining before the next
+      return lhs._utf8ContinuationBytesUntilNextUnicodeScalar >
+        rhs._utf8ContinuationBytesUntilNextUnicodeScalar
+    }
+    return lhs._coreIndex < rhs._coreIndex
+  }
 }
 
 // Index conversions
@@ -708,3 +714,9 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
   }
 }
 
+extension String {
+  @available(*, unavailable, message: "Please use String.utf8CString instead.")
+  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
+    Builtin.unreachable()
+  }
+}

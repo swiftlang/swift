@@ -9,6 +9,7 @@ var FixedPoint = TestSuite("FixedPoint")
 %{
 
 import gyb
+from SwiftIntTypes import all_integer_types
 
 test_bit_patterns = [
   0x0000000000000000,
@@ -60,6 +61,32 @@ def get_fixed_point_hash(bit_pattern, src_bits, word_bits):
             bit_pattern ^ (bit_pattern >> 32), word_bits, True)
 
 }%
+
+//===----------------------------------------------------------------------===//
+// 'Int.Stride' type
+//===----------------------------------------------------------------------===//
+
+FixedPoint.test("Integers.Stride") {
+#if arch(i386) || arch(arm)
+
+% for self_ty in all_integer_types(32):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+% for self_ty in all_integer_types(64):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#else
+
+_UnimplementedError()
+
+#endif
+}
 
 //===----------------------------------------------------------------------===//
 // 'Int(truncatingBitPattern:)' initializer
@@ -266,15 +293,15 @@ _UnimplementedError()
 //===----------------------------------------------------------------------===//
 
 func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
-  var x = numericCast(0b11_1010_00) as T
-  var y = numericCast(0b10_1100_10) as T
+  let x = numericCast(0b11_1010_00) as T
+  let y = numericCast(0b10_1100_10) as T
 
   expectEqual(0b10_1000_00, x & y)
   expectEqual(0b11_1110_10, x | y)
   expectEqual(0b01_0110_10, x ^ y)
   expectEqual(0b00_0101_11, (~x) & 0xff)
 
-  var z = T.allZeros
+  let z = T.allZeros
   expectEqual(x, x | z)
   expectEqual(x, x ^ z)
   expectEqual(z, x & z)
@@ -344,30 +371,16 @@ BoolTestSuite.test("init()") {
   expectFalse(v)
 }
 
-struct Booleanish : Boolean {
-  let boolValue: Bool
-}
-
-BoolTestSuite.test("init<T : Boolean>(_:)") {
+BoolTestSuite.test("Boolean") {
   do {
-    let v = Bool(Booleanish(boolValue: false))
+    var v = false
+    expectType(Bool.self, &v)
     expectFalse(v)
   }
   do {
-    let v = Bool(Booleanish(boolValue: true))
+    var v = true
+    expectType(Bool.self, &v)
     expectTrue(v)
-  }
-}
-
-BoolTestSuite.test("Boolean") {
-  do {
-    var v: Bool = false
-    expectIsBooleanType(&v)
-    expectFalse(v.boolValue)
-  }
-  do {
-    var v: Bool = true
-    expectTrue(v.boolValue)
   }
 }
 
@@ -383,10 +396,7 @@ BoolTestSuite.test("CustomStringConvertible") {
 }
 
 BoolTestSuite.test("Equatable,Hashable") {
-  checkHashable(true, false, false)
-  checkHashable(false, false, true)
-  checkHashable(true, true, true)
-
+  checkHashable([false, true], equalityOracle: { $0 == $1 })
   expectNotEqual(false.hashValue, true.hashValue)
 }
 

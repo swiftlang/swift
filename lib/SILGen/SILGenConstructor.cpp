@@ -17,6 +17,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -253,9 +254,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
-    auto nominal = ctor->getDeclContext()
-        ->getAsNominalTypeOrNominalTypeExtensionContext();
-    emitMemberInitializers(selfDecl, nominal);
+    auto *dc = ctor->getDeclContext();
+    auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    emitMemberInitializers(dc, selfDecl, nominal);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -491,9 +492,11 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArrayRef<Substitution> subs;
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
-  if (auto *genericParamList = ctor->getGenericParamsOfContext())
-    forwardingSubs =
-        genericParamList->getForwardingSubstitutions(getASTContext());
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+    auto *genericSig = ctor->getGenericSignatureOfContext();
+    forwardingSubs = genericEnv->getForwardingSubstitutions(
+        SGM.SwiftModule, genericSig);
+  }
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
@@ -526,7 +529,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // TODO: If we could require Objective-C classes to have an attribute to get
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto *dc = ctor->getDeclContext();
+  auto selfClassDecl = dc->getAsClassOrClassExtensionContext();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
@@ -642,7 +646,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // Note that 'self' has been fully initialized at this point.
   } else {
     // Emit the member initializers.
-    emitMemberInitializers(selfDecl, selfClassDecl);
+    emitMemberInitializers(dc, selfDecl, selfClassDecl);
   }
 
   emitProfilerIncrement(ctor->getBody());
@@ -841,7 +845,19 @@ static SILValue getBehaviorSetterFn(SILGenFunction &gen, VarDecl *behaviorVar) {
   return gen.B.createFunctionRef(behaviorVar, setFn);
 }
 
-void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
+static Type getInitializationTypeInContext(
+    DeclContext *fromDC, DeclContext *toDC,
+    Expr *init) {
+  auto interfaceType =
+      ArchetypeBuilder::mapTypeOutOfContext(fromDC, init->getType());
+  auto resultType =
+      ArchetypeBuilder::mapTypeIntoContext(toDC, interfaceType);
+
+  return resultType;
+}
+
+void SILGenFunction::emitMemberInitializers(DeclContext *dc,
+                                            VarDecl *selfDecl,
                                             NominalTypeDecl *nominal) {
   for (auto member : nominal->getMembers()) {
     // Find instance pattern binding declarations that have initializers.
@@ -854,7 +870,30 @@ void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
 
         // Cleanup after this initialization.
         FullExpr scope(Cleanups, entry.getPattern());
-        emitMemberInit(*this, selfDecl, entry.getPattern(), emitRValue(init));
+
+        // Get the substitutions for the constructor context.
+        ArrayRef<Substitution> subs;
+        auto *genericEnv = dc->getGenericEnvironmentOfContext();
+        if (genericEnv) {
+          auto *genericSig = dc->getGenericSignatureOfContext();
+          subs = genericEnv->getForwardingSubstitutions(
+              SGM.SwiftModule, genericSig);
+        }
+
+        // Get the type of the initialization result, in terms
+        // of the constructor context's archetypes.
+        CanType resultType = getInitializationTypeInContext(
+            pbd->getDeclContext(), dc, init)->getCanonicalType();
+        AbstractionPattern origResultType(resultType);
+
+        // FIXME: Can emitMemberInit() share code with
+        // InitializationForPattern in SILGenDecl.cpp?
+        RValue result = emitApplyOfStoredPropertyInitializer(
+                                  init, entry, subs,
+                                  resultType, origResultType,
+                                  SGFContext());
+
+        emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
       }
     }
     
@@ -913,7 +952,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   prepareEpilog(TupleType::getEmpty(getASTContext()), false, cleanupLoc);
 
   // Emit the initializers.
-  emitMemberInitializers(cd->getDestructor()->getImplicitSelfDecl(), cd);
+  emitMemberInitializers(cd, selfDecl, cd);
 
   // Return 'self'.
   B.createReturn(loc, selfArg);

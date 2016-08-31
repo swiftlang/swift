@@ -15,6 +15,16 @@ _all_integer_type_bitwidths = [8, 16, 32, 64]
 int_max_bits = max(_all_integer_type_bitwidths)
 
 
+def int_max(bits, signed):
+    bits = bits - 1 if signed else bits
+    bits = max(bits, 0)
+    return (1 << bits) - 1
+
+
+def int_min(bits, signed):
+    return (-1 * int_max(bits, signed) - 1) if signed else 0
+
+
 class SwiftIntegerType(object):
 
     def __init__(self, is_word, bits, is_signed):
@@ -26,6 +36,9 @@ class SwiftIntegerType(object):
             self.possible_bitwidths = [32, 64]
         else:
             self.possible_bitwidths = [bits]
+
+        self.min = int_min(bits, is_signed)
+        self.max = int_max(bits, is_signed)
 
         # Derived properties
         self.stdlib_name = \

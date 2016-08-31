@@ -10,7 +10,7 @@ function(handle_swift_sources
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
-      "DEPENDS;API_NOTES;COMPILE_FLAGS"
+      "DEPENDS;API_NOTES;COMPILE_FLAGS;MODULE_NAME"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB} "IS_STDLIB" IS_STDLIB_arg)
@@ -59,16 +59,6 @@ function(handle_swift_sources
   endif()
 
   if(swift_sources)
-    # Special-case hack to create Swift.o for the core standard library.
-    if(SWIFTSOURCES_IS_STDLIB_CORE)
-      set(swift_obj_base "Swift")
-    else()
-      # Otherwise, get the name from the first swift input file.  Also a hack!
-      # TODO: Fix it, <rdar://problem/17535693>.
-      list(GET swift_sources 0 swift_obj_base)
-      get_filename_component(swift_obj_base ${swift_obj_base} NAME_WE)
-    endif()
-
     compute_library_subdir(SWIFTSOURCES_LIBRARY_SUBDIR
       "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_ARCHITECTURE}")
     set(objsubdir "/${SWIFTSOURCES_LIBRARY_SUBDIR}")
@@ -76,7 +66,7 @@ function(handle_swift_sources
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}")
 
     set(swift_obj
-        "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
+        "${CMAKE_CURRENT_BINARY_DIR}${objsubdir}/${SWIFTSOURCES_MODULE_NAME}${CMAKE_C_OUTPUT_EXTENSION}")
 
     # FIXME: We shouldn't /have/ to build things in a single process.
     # <rdar://problem/15972329>
@@ -95,6 +85,7 @@ function(handle_swift_sources
         SDK ${SWIFTSOURCES_SDK}
         ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
         API_NOTES ${SWIFTSOURCES_API_NOTES}
+        MODULE_NAME ${SWIFTSOURCES_MODULE_NAME}
         ${IS_MAIN_arg}
         ${IS_STDLIB_arg}
         ${IS_STDLIB_CORE_arg}
@@ -139,8 +130,7 @@ endfunction()
 #     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
 #                                       # into this directory.
-#     [MODULE_NAME]                     # The module name. If not specified, the name
-#                                       # is derived from the output name
+#     [MODULE_NAME]                     # The module name.
 #     [IS_STDLIB]                       # Install produced files.
 #     [EMIT_SIB]                        # Emit the file as a sib file instead of a .o
 #     )
@@ -179,6 +169,13 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   if("${SWIFTFILE_INSTALL_IN_COMPONENT}" STREQUAL "")
     message(FATAL_ERROR "INSTALL_IN_COMPONENT is required")
+  endif()
+
+  if ("${SWIFTFILE_MODULE_NAME}" STREQUAL "")
+    get_filename_component(SWIFTFILE_MODULE_NAME "${first_output}" NAME_WE)
+    message(SEND_ERROR
+      "No module name specified; did you mean to use MODULE_NAME "
+      "${SWIFTFILE_MODULE_NAME}?")
   endif()
 
   set(source_files)
@@ -275,13 +272,6 @@ function(_compile_swift_files dependency_target_out_var_name)
 
   if(NOT SWIFTFILE_IS_MAIN)
     # Determine the directory where the module file should be placed.
-    if (SWIFTFILE_MODULE_NAME)
-      set(module_name "${SWIFTFILE_MODULE_NAME}")
-      list(APPEND swift_flags
-          "-module-name" "${module_name}")
-    else()
-      get_filename_component(module_name "${first_output}" NAME_WE)
-    endif()
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
     elseif(SWIFTFILE_IS_STDLIB)
@@ -293,8 +283,8 @@ function(_compile_swift_files dependency_target_out_var_name)
     if (NOT SWIFTFILE_EMIT_SIB)
       # Right now sib files seem to not be output when we emit a module. So
       # don't emit it.
-      set(module_file "${module_dir}/${module_name}.swiftmodule")
-      set(module_doc_file "${module_dir}/${module_name}.swiftdoc")
+      set(module_file "${module_dir}/${SWIFTFILE_MODULE_NAME}.swiftmodule")
+      set(module_doc_file "${module_dir}/${SWIFTFILE_MODULE_NAME}.swiftdoc")
       list(APPEND swift_flags
           "-parse-as-library"
           "-emit-module" "-emit-module-path" "${module_file}")
@@ -309,7 +299,7 @@ function(_compile_swift_files dependency_target_out_var_name)
     # add the relevant flags to our swift_flags.
     if (SWIFT_EXPERIMENTAL_EXTRA_REGEXP_FLAGS OR SWIFT_EXPERIMENTAL_EXTRA_NEGATIVE_REGEXP_FLAGS)
       set(extra_swift_flags_for_module)
-      _add_extra_swift_flags_for_module("${module_name}" extra_swift_flags_for_module)
+      _add_extra_swift_flags_for_module("${SWIFTFILE_MODULE_NAME}" extra_swift_flags_for_module)
       if (extra_swift_flags_for_module)
         list(APPEND swift_flags ${extra_swift_flags_for_module})
       endif()

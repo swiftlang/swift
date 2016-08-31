@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -51,9 +51,9 @@ class Observer : NSObject {
   }
 
   override func observeValue(forKeyPath:String?,
-                             of obj:AnyObject?,
-                             change:Dictionary<NSKeyValueChangeKey, AnyObject>?,
-                             context:UnsafeMutablePointer<Void>?) {
+                             of obj:Any?,
+                             change:Dictionary<NSKeyValueChangeKey, Any>?,
+                             context:UnsafeMutableRawPointer?) {
     target!.print()
   }
 }
@@ -100,9 +100,9 @@ class ObserverKVO : NSObject {
   }
 
   override func observeValue(forKeyPath:String?,
-                             of obj:AnyObject?,
-                             change:Dictionary<NSKeyValueChangeKey, AnyObject>?,
-                             context:UnsafeMutablePointer<Void>?) {
+                             of obj:Any?,
+                             change:Dictionary<NSKeyValueChangeKey, Any>?,
+                             context:UnsafeMutableRawPointer?) {
     if context == &kvoContext {
       target!.print()
     }

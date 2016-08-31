@@ -2,8 +2,8 @@
 
 class C {}
 var c = C()
-if c as C { // expected-error{{type 'C' does not conform to protocol 'Boolean'}}
+if c as C { // expected-error{{'C' is not convertible to 'Bool'}}
 }
 
-if ({1} as () -> Int) { // expected-error{{type '() -> Int' does not conform to protocol 'Boolean'}}
+if ({1} as () -> Int) { // expected-error{{'() -> Int' is not convertible to 'Bool'}}
 }

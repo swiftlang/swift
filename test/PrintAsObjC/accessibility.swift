@@ -1,22 +1,22 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -parse-as-library %s -parse -emit-objc-header-path %t/accessibility.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility.h
 // RUN: %check-in-clang %t/accessibility.h
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -parse -emit-objc-header-path %t/accessibility-internal.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-internal.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-internal.h
 // RUN: %check-in-clang %t/accessibility-internal.h
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -parse -import-objc-header %S/../Inputs/empty.h -emit-objc-header-path %t/accessibility-imported-header.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-imported-header.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-imported-header.h
 // RUN: %check-in-clang %t/accessibility-imported-header.h
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -parse -DMAIN -emit-objc-header-path %t/accessibility-main.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-main.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-main.h
 // RUN: %check-in-clang %t/accessibility-main.h
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -parse -application-extension -emit-objc-header-path %t/accessibility-appext.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-appext.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-appext.h
 // RUN: %check-in-clang %t/accessibility-appext.h
 
 // REQUIRES: objc_interop

@@ -289,8 +289,6 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 
 
 // Func
-ERROR(func_decl_nonglobal_operator,none,
-      "operators are only allowed at global scope", ())
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
 ERROR(static_func_decl_global_scope,none,
@@ -298,6 +296,9 @@ ERROR(static_func_decl_global_scope,none,
       (StaticSpellingKind))
 ERROR(func_decl_expected_arrow,none,
       "expected '->' after function parameter tuple", ())
+WARNING(operator_static_in_protocol,none,
+        "operator '%0' declared in protocol must be 'static'",
+        (StringRef))
 
 // Enum
 ERROR(expected_lbrace_enum,PointsToFirstBadToken,
@@ -378,32 +379,36 @@ ERROR(expected_operator_name_after_operator,PointsToFirstBadToken,
 ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
       "%0 is considered to be an identifier, not an operator", (Identifier))
 
+WARNING(deprecated_operator_body,PointsToFirstBadToken,
+        "operator should no longer be declared with body", ())
+WARNING(deprecated_operator_body_use_group,PointsToFirstBadToken,
+        "operator should no longer be declared with body; "
+        "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
-ERROR(expected_lbrace_after_operator,PointsToFirstBadToken,
-      "expected '{' after operator name in 'operator' declaration", ())
-ERROR(expected_operator_attribute,none,
-      "expected operator attribute identifier in 'operator' declaration body", ())
-ERROR(unknown_prefix_operator_attribute,none,
-      "'%0' is not a valid prefix operator attribute", (StringRef))
-ERROR(unknown_postfix_operator_attribute,none,
-      "'%0' is not a valid postfix operator attribute", (StringRef))
-ERROR(unknown_infix_operator_attribute,none,
-      "'%0' is not a valid infix operator attribute", (StringRef))
-ERROR(operator_associativity_redeclared,none,
-      "'associativity' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_associativity,none,
-      "expected identifier after 'associativity' in 'operator' declaration body", ())
-ERROR(unknown_infix_operator_associativity,none,
-      "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
-ERROR(operator_precedence_redeclared,none,
-      "'precedence' for infix operator declared multiple times", ())
-ERROR(operator_assignment_redeclared,none,
-      "'assignment' for infix operator declared multiple times", ())
-ERROR(expected_infix_operator_precedence,none,
-      "expected integer literal after 'precedence' in 'operator' declaration body", ())
-ERROR(invalid_infix_operator_precedence,none,
-      "'precedence' must be in the range of 0 to 255", ())
+
+// PrecedenceGroup
+ERROR(expected_precedencegroup_name,none,
+      "expected identifier after 'precedencegroup'", ())
+ERROR(expected_precedencegroup_lbrace,none,
+      "expected '{' after name of precedence group", ())
+
+ERROR(expected_precedencegroup_attribute,none,
+      "expected operator attribute identifier in precedence group body", ())
+ERROR(unknown_precedencegroup_attribute,none,
+      "'%0' is not a valid precedence group attribute", (StringRef))
+ERROR(expected_precedencegroup_attribute_colon,none,
+      "expected colon after attribute name in precedence group", (StringRef))
+ERROR(precedencegroup_attribute_redeclared,none,
+      "'%0' attribute for precedence group declared multiple times",
+      (StringRef))
+ERROR(expected_precedencegroup_associativity,none,
+      "expected 'none', 'left', or 'right' after 'associativity'", ())
+ERROR(expected_precedencegroup_assignment,none,
+      "expected 'true' or 'false' after 'assignment'", ())
+ERROR(expected_precedencegroup_relation,none,
+      "expected name of related precedence group after '%0'",
+      (StringRef))
 
 // SIL
 ERROR(inout_not_attribute, none,
@@ -614,6 +619,9 @@ ERROR(expected_type_before_arrow,none,
       "expected type before '->'", ())
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
+ERROR(function_type_argument_label,none,
+      "function types cannot have argument label %0; use '_' instead",
+      (Identifier))
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -645,14 +653,21 @@ ERROR(protocol_method_argument_init,none,
       "default argument not permitted in a protocol method", ())
 ERROR(protocol_init_argument_init,none,
       "default argument not permitted in a protocol initializer", ())
+ERROR(tuple_type_multiple_labels,none,
+      "tuple element cannot have two labels", ())
 
 // Protocol Types
-ERROR(expected_langle_protocol,PointsToFirstBadToken,
-      "expected '<' in protocol composition type", ())
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol composition type", ())
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
       "protocol composition is neither allowed nor needed here", ())
+
+WARNING(deprecated_protocol_composition,none,
+        "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
+WARNING(deprecated_protocol_composition_single,none,
+        "'protocol<...>' composition syntax is deprecated and not needed here", ())
+WARNING(deprecated_any_composition,none,
+        "'protocol<>' syntax is deprecated; use 'Any' instead", ())
 
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
@@ -697,6 +712,8 @@ ERROR(expected_parameter_type,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
 ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
+ERROR(expected_parameter_colon,PointsToFirstBadToken,
+      "expected ':' following argumant label and parameter name", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
@@ -728,6 +745,9 @@ ERROR(parameter_unnamed,none,
 
 ERROR(parameter_curry_syntax_removed,none,
       "curried function declaration syntax has been removed; use a single parameter list", ())
+
+ERROR(initializer_as_typed_pattern,none,
+      "unexpected initializer in pattern; did you mean to use '='?", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -772,8 +792,6 @@ ERROR(expected_close_after_else_directive,none,
       "further conditions after #else are unreachable", ())
 
 /// Associatedtype Statement
-WARNING(typealias_in_protocol_deprecated,none,
-      "use of 'typealias' to declare associated types is deprecated; use 'associatedtype' instead", ())
 ERROR(typealias_inside_protocol_without_type,none,
       "typealias is missing an assigned type; use 'associatedtype' to define an associated type requirement", ())
 ERROR(associatedtype_outside_protocol,none,
@@ -803,13 +821,8 @@ ERROR(expected_comma_stmtcondition,none,
 ERROR(expected_expr_conditional,PointsToFirstBadToken,
       "expected expression in conditional", ())
 
-// FIXME: Upgrade these two diagnostics to errors in Swift 3.
-WARNING(expected_binding_keyword,none,
+ERROR(expected_binding_keyword,none,
       "expected '%0' in conditional", (StringRef))
-// FIXME: just replace with expected_comma_stmtcondition
-WARNING(expected_comma_stmtcondition_w,none,
-        "expected ',' joining parts of a multi-clause condition", ())
-
 
 ERROR(expected_expr_conditional_var,PointsToFirstBadToken,
       "expected expression after '=' in conditional binding", ())
@@ -1098,6 +1111,16 @@ ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
+// Type-of expressions.
+ERROR(expr_typeof_expected_label_of,PointsToFirstBadToken,
+      "expected argument label 'of:' within 'type(...)'", ())
+ERROR(expr_typeof_expected_expr,PointsToFirstBadToken,
+      "expected an expression within 'type(of: ...)'", ())
+ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete 'type(of: ...)' expression", ())
+ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
+      "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
+
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1196,6 +1219,12 @@ ERROR(attr_noescape_conflicts_escaping_autoclosure,none,
 ERROR(attr_noescape_implied_by_autoclosure,none,
       "@noescape is implied by @autoclosure and should not be "
       "redundantly specified", ())
+WARNING(attr_autoclosure_escaping_deprecated,none,
+        "@autoclosure(escaping) is deprecated; use @autoclosure @escaping instead",
+        ())
+WARNING(attr_noescape_deprecated,none,
+        "@noescape is the default and is deprecated",
+        ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1232,16 +1261,6 @@ ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
 ERROR(effects_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
-
-// swift3_migration
-ERROR(attr_swift3_migration_label,none,
-      "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-WARNING(warn_attr_swift3_migration_unknown_label,none,
-        "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-ERROR(attr_swift3_migration_expected_rparen,none,
-      "expected ')' after name for 'swift3_migration' attribute", ())
-ERROR(attr_bad_swift_name,none,
-      "ill-formed Swift name '%0'", (StringRef))
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
@@ -1288,6 +1307,9 @@ ERROR(where_without_generic_params,none,
       "'where' clause cannot be attached to "
       "%select{a non-generic|a protocol|an associated type}0 "
       "declaration", (unsigned))
+WARNING(where_inside_brackets,none,
+        "'where' clause next to generic parameters is deprecated "
+        "and will be removed in the future version of Swift", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

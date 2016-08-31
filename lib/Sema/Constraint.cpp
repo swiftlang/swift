@@ -39,12 +39,16 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
-                       DeclName Member, ConstraintLocator *locator,
+                       DeclName Member, FunctionRefKind functionRefKind,
+                       ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
     RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Types { First, Second, Member }, Locator(locator)
 {
+  TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
+  assert(getFunctionRefKind() == functionRefKind);
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -79,7 +83,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
     assert(!Member && "Type property cannot have a member");
     assert(Second.isNull() && "Type property with second type");
     break;
@@ -128,7 +131,7 @@ Constraint::Constraint(ConstraintKind kind,
 Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
+  : Kind(kind), FixData(fix.getData()), TheFix(fix.getKind()),
     HasRestriction(false), HasFix(true),
     IsActive(false), RememberChoice(false), IsFavored(false),
     NumTypeVariables(typeVars.size()),
@@ -165,7 +168,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
     return create(cs, getKind(), getFirstType(), getSecondType(),
-                  DeclName(), getLocator());
+                  DeclName(), FunctionRefKind::Compound, getLocator());
 
   case ConstraintKind::BindOverload:
     return createBindOverload(cs, getFirstType(), getOverloadChoice(),
@@ -175,17 +178,16 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::TypeMember:
     return create(cs, getKind(), getFirstType(), Type(), getMember(), 
-                  getLocator());
+                  getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Defaultable:
     return create(cs, getKind(), getFirstType(), getSecondType(),
-                  getMember(), getLocator());
+                  getMember(), getFunctionRefKind(), getLocator());
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
     return create(cs, getKind(), getFirstType(), Type(), DeclName(),
-                  getLocator());
+                  FunctionRefKind::Compound, getLocator());
 
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
@@ -304,10 +306,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " is a class";
     skipSecond = true;
     break;
-  case ConstraintKind::BridgedToObjectiveC:
-    Out << " is bridged to an Objective-C type";
-    skipSecond = true;
-    break;
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
@@ -400,6 +398,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[bridge-to-objc]";
   case ConversionRestrictionKind::BridgeFromObjC:
     return "[bridge-from-objc]";
+  case ConversionRestrictionKind::HashableToAnyHashable:
+    return "[hashable-to-anyhashable]";
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
     return "[cf-toll-free-bridge-to-objc]";
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
@@ -431,8 +431,6 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: force downcast";
   case FixKind::AddressOf:
     return "fix: add address-of";
-  case FixKind::OptionalToBoolean:
-    return "fix: convert optional to boolean";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
   }
@@ -487,7 +485,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Archetype:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     constraint->getFirstType()->getTypeVariables(typeVars);
@@ -516,6 +513,7 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second, DeclName member,
+                               FunctionRefKind functionRefKind,
                                ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
@@ -528,7 +526,8 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(kind, first, second, member, locator, typeVars);
+  return new (mem) Constraint(kind, first, second, member, functionRefKind,
+                              locator, typeVars);
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 

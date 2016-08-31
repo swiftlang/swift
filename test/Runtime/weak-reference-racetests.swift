@@ -15,7 +15,7 @@ class WBox<T: AnyObject> {
 
 class WeakReferenceRaceData {
   let closure: () -> Void
-  init(_ closure: () -> Void) {
+  init(_ closure: @escaping () -> Void) {
     self.closure = closure
   }
 }

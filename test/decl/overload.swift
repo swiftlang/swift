@@ -136,8 +136,8 @@ func ovl_argname1(a: Int, b: Int) { }
 // Overloading with generics
 protocol P1 { }
 protocol P2 { }
-func ovl_generic1<T: protocol<P1, P2>>(t: T) { } // expected-note{{previous}}
-func ovl_generic1<U: protocol<P1, P2>>(t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
+func ovl_generic1<T: P1 & P2>(t: T) { } // expected-note{{previous}}
+func ovl_generic1<U: P1 & P2>(t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
 
 func ovl_generic2<T : P1>(_: T) {} // expected-note{{previously declared here}}
 func ovl_generic2<T : P1>(_: T) {} // expected-error{{invalid redeclaration of 'ovl_generic2'}}
@@ -217,34 +217,18 @@ func != <T>(lhs : T, rhs : NoneType) -> Bool { // expected-error{{invalid redecl
   return true
 }
 
-// <rdar://problem/15082356>
-func &&(lhs: Boolean, rhs: @autoclosure () -> Boolean) -> Bool { // expected-note{{previously declared}}
-  return lhs.boolValue && rhs().boolValue
-}
-
-func &&(lhs: Boolean, rhs: @autoclosure () -> Boolean) -> Bool { // expected-error{{invalid redeclaration of '&&'}}
-  return lhs.boolValue || rhs().boolValue
-}
 
 // throws
 func throwsFunc(code: Int) { } // expected-note{{previously declared}}
-@noreturn func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
+func throwsFunc(code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
 
 // throws function parameter -- OK
 func throwsFuncParam(_ fn: () throws -> ()) { }
 func throwsFuncParam(_ fn: () -> ()) { }
 
-// @noreturn
-func noreturn(code: Int) { } // expected-note{{previously declared}}
-@noreturn func noreturn(code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
-
-// <rdar://problem/19816831>
-func noreturn_1(x: @noreturn (Int) -> Int) { } // expected-note{{previously declared}}
-func noreturn_1(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noreturn_1(x:)'}}
-
-// @noescape
-func noescape(x: @noescape (Int) -> Int) { } // expected-note{{previously declared}}
-func noescape(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
+// @escaping
+func escaping(x: @escaping (Int) -> Int) { } // expected-note{{previously declared}}
+func escaping(x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'escaping(x:)'}}
 
 // @autoclosure
 func autoclosure(f: () -> Int) { }
@@ -272,10 +256,6 @@ protocol ProtocolWithMutating {
   mutating func test2(_ a: Int?) // expected-note {{previously declared}}
   func test2(_ a: Int!) // expected-error{{invalid redeclaration of 'test2'}}
 
-  @noreturn
-  mutating func test3() // expected-note {{previously declared}}
-  func test3() // expected-error {{invalid redeclaration of 'test3()'}}
-
   mutating static func classTest1() // expected-error {{static functions may not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
   static func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
 }
@@ -286,10 +266,6 @@ struct StructWithMutating {
 
   mutating func test2(_ a: Int?) { } // expected-note {{previously declared}}
   func test2(_ a: Int!) { } // expected-error{{invalid redeclaration of 'test2'}}
-
-  @noreturn
-  mutating func test3() { } // expected-note {{previously declared}}
-  func test3() { } // expected-error {{invalid redeclaration of 'test3()'}}
 }
 
 enum EnumWithMutating {

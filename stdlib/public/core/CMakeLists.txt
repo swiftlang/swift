@@ -17,6 +17,7 @@
 # configuring with -DSWIFT_CHECK_ESSENTIAL_STDLIB=YES
 set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
   ArrayBody.swift
   ArrayBuffer.swift
@@ -28,7 +29,6 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
-  Boolean.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -44,6 +44,7 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  DropWhile.swift.gyb
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -57,6 +58,11 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointTypes.swift.gyb
   Hashable.swift
   HashedCollections.swift.gyb
+  # WORKAROUND: This file name is not sorted alphabetically in the list because
+  # if we do so, the compiler crashes.
+  AnyHashable.swift
+  # END WORKAROUND
+  HashedCollectionsAnyHashableExtensions.swift.gyb
   Hashing.swift
   HeapBuffer.swift
   ImplicitlyUnwrappedOptional.swift
@@ -72,6 +78,7 @@ set(SWIFTLIB_ESSENTIAL
   LifetimeManager.swift
   ManagedBuffer.swift
   Map.swift.gyb
+  MemoryLayout.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
@@ -82,6 +89,7 @@ set(SWIFTLIB_ESSENTIAL
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
@@ -122,6 +130,7 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb
+  UnsafeRawPointer.swift.gyb
   WriteBackMutableSlice.swift
   )
 
@@ -134,7 +143,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
-  Process.swift
+  CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift
@@ -142,10 +151,10 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-set(swift_core_link_flags)
+set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
-set(swift_stdlib_compile_flags)
+set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
@@ -167,7 +176,7 @@ else()
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
       OUTPUT_VARIABLE ENV_SYSTEMROOT)
 

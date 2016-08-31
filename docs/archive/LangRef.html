@@ -1255,7 +1255,7 @@
     type-metatype ::= type-simple '.' 'Type'
   </pre>
 
-  <p>Every type has an associated metatype <tt>T.dynamicType</tt>.  A value of the metatype
+<p>Every type has an associated metatype <tt>type(of: T)</tt>.  A value of the metatype
     type is a reference to a global object which describes the type.
     Most metatype types are singleton and therefore require no
     storage, but metatypes associated with <a href="#decl-class">class
@@ -1324,16 +1324,14 @@
   <!-- _____________________________________________________________________ -->
   <h3 id="type-composition">Protocol Composition Types</h3>
   <pre class="grammar">
-   type-composition ::= 'protocol' '&lt;' type-composition-list? '&gt;'
-
-   type-composition-list ::= <a href="#type-identifier">type-identifier</a> (',' <a href="#type-identifier">type-identifier</a>)*
+   type-composition ::= <a href="#type-identifier">type-identifier</a> ('&amp;' <a href="#type-identifier">type-identifier</a>)*
   </pre>
 
   <p>A protocol composition type composes together a number of
   protocols to describe a type that meets the requirements of each of
-  those protocols. A protocol composition type <code>protocol&lt;A,
-  B&gt;</code> is similar to an explicitly-defined protocol that
-  inherits both <code>A</code> and <code>B</code></p>
+  those protocols. A protocol composition type <code>A &amp; B</code>
+  is similar to an explicitly-defined protocol that inherits both
+  <code>A</code> and <code>B</code></p>
 
 <pre class="example">
 protocol C : A, B { }
@@ -1348,18 +1346,17 @@ protocol C : A, B { }
     conform to that name.
   </div>
   
-  <p>Each of the types named in the
-  <code>type-composition-list</code> shall refer to either a protocol
-  or to a protocol composition. The list may be empty, in which case
-  every type conforms to the empty protocol composition. This is how
-  the <code>Any</code> type is defined in the standard library.</p>
+  <p>Each of the types named in the <code>type-composition</code> shall
+  refer to either a protocol or to a protocol composition. The empty
+  protocol composition is the keyword <code>Any</code> and every
+  type conforms to it.
 
  <pre class="example">
     <i>// A value that represents any type</i>
-    var any : protocol&lt;&gt; = 17
+    var any : Any = 17
 
     <i>// A value that conforms to both the Document and Enumerator protocols</i>
-    var doc : protocol&lt;Document,Enumerator&gt;
+    var doc : Document &amp; Enumerator
     doc.isEmpty()       <i>// uses Enumerator.isEmpty()</i>
     doc.title = "Hello" <i>// uses Document.title</i>
 </pre>

@@ -73,6 +73,31 @@ public:
     if (!type)
       return;
 
+    // We want to look through type aliases here.
+    type = type->getCanonicalType();
+    
+    class TypeCaptureWalker : public TypeWalker {
+      AnyFunctionRef AFR;
+      llvm::function_ref<void(Type)> Callback;
+    public:
+      explicit TypeCaptureWalker(AnyFunctionRef AFR,
+                                 llvm::function_ref<void(Type)> callback)
+        : AFR(AFR), Callback(callback) {}
+    
+      Action walkToTypePre(Type ty) override {
+        Callback(ty);
+        // Pseudogeneric classes don't use their generic parameters so we
+        // don't need to visit them.
+        if (AFR.isObjC()) {
+          if (auto clas = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal())) {
+            if (clas->usesObjCGenericsModel()) {
+              return Action::SkipChildren;
+            }
+          }
+        }
+        return Action::Continue;
+      }
+    };
     // If the type contains dynamic 'Self', conservatively assume we will
     // need 'Self' metadata at runtime. We could generalize the analysis
     // used below for usages of generic parameters in Objective-C
@@ -85,60 +110,32 @@ public:
     // retainable pointer. Similarly stored property access does not
     // need it, etc.
     if (type->hasDynamicSelfType()) {
-      type.visit([&](Type t) {
+      type.walk(TypeCaptureWalker(AFR, [&](Type t) {
         if (auto *dynamicSelf = t->getAs<DynamicSelfType>()) {
           if (DynamicSelfCaptureLoc.isInvalid()) {
             DynamicSelfCaptureLoc = loc;
             DynamicSelf = dynamicSelf;
           }
         }
-      });
+      }));
     }
 
-    // Nothing to do if the type is concrete.
-    if (!type->hasArchetype())
-      return;
-
-    // Walk the type to see if we have any archetypes that are *not* open
-    // existentials and that aren't type-erased.
-    class CapturesTypeWalker final : public TypeWalker {
-      SourceLoc &GenericParamCaptureLoc;
-      SourceLoc CurLoc;
-
-    public:
-      CapturesTypeWalker(SourceLoc &GenericParamCaptureLoc,
-                         SourceLoc curLoc)
-        : GenericParamCaptureLoc(GenericParamCaptureLoc),
-          CurLoc(curLoc) {}
-
-      Action walkToTypePre(Type t) override {
-        // Similar to dynamic 'Self', IRGen doesn't really need type metadata
-        // for class-bound archetypes in nearly as many cases as with opaque
-        // archetypes.
-        //
-        // Perhaps this entire analysis should happen at the SILGen level,
-        // instead, but even there we don't really have enough information to
-        // perform it accurately.
-        if (t->is<ArchetypeType>() && !t->isOpenedExistential()) {
-          if (GenericParamCaptureLoc.isInvalid())
-            GenericParamCaptureLoc = CurLoc;
-          return Action::Continue;
+    // Similar to dynamic 'Self', IRGen doesn't really need type metadata
+    // for class-bound archetypes in nearly as many cases as with opaque
+    // archetypes.
+    //
+    // Perhaps this entire analysis should happen at the SILGen level,
+    // instead, but even there we don't really have enough information to
+    // perform it accurately.
+    if (type->hasArchetype()) {
+      type.walk(TypeCaptureWalker(AFR, [&](Type t) {
+        if (t->is<ArchetypeType>() &&
+            !t->isOpenedExistential() &&
+          GenericParamCaptureLoc.isInvalid()) {
+          GenericParamCaptureLoc = loc;
         }
-
-        // ObjC generic type parameters don't have a runtime representation,
-        // so they don't count as captures.
-        if (auto bgt = t->getAs<BoundGenericClassType>()) {
-          if (bgt->getDecl()->hasClangNode()) {
-            return Action::SkipChildren;
-          }
-        }
-
-        return Action::Continue;
-      }
-    };
-
-    type.walk(CapturesTypeWalker(GenericParamCaptureLoc,
-                                 loc));
+      }));
+    }
   }
 
   /// Add the specified capture to the closure's capture list, diagnosing it
@@ -179,17 +176,35 @@ public:
       // Otherwise, diagnose this as an invalid capture.
       bool isDecl = AFR.getAbstractFunctionDecl() != nullptr;
 
-      TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use :
-                  diag::closure_noescape_use, VD->getName());
+      TC.diagnose(Loc, isDecl ? diag::decl_closure_noescape_use
+                              : diag::closure_noescape_use,
+                  VD->getName());
 
-      if (VD->getType()->castTo<AnyFunctionType>()->isAutoClosure())
-        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure,
-                    VD->getName());
+      // If we're a parameter, emit a helpful fixit to add @escaping
+      auto paramDecl = dyn_cast<ParamDecl>(VD);
+      bool isAutoClosure =
+          VD->getType()->castTo<AnyFunctionType>()->isAutoClosure();
+      if (paramDecl && !isAutoClosure) {
+        TC.diagnose(paramDecl->getStartLoc(), diag::noescape_parameter,
+                    paramDecl->getName())
+            .fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
+                         "@escaping ");
+      } else if (isAutoClosure) {
+        // TODO: add in a fixit for autoclosure
+        TC.diagnose(VD->getLoc(), diag::noescape_autoclosure, VD->getName());
+      }
     }
   }
 
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
+
+    // Capture the generic parameters of the decl.
+    if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
+      for (auto sub : DRE->getDeclRef().getSubstitutions()) {
+        checkType(sub.getReplacement(), DRE->getLoc());
+      }
+    }
 
     // DC is the DeclContext where D was defined
     // CurDC is the DeclContext where D was referenced
@@ -411,8 +426,10 @@ public:
     // doesn't require its type metadata.
     if (auto declRef = dyn_cast<DeclRefExpr>(E))
       return (!declRef->getDecl()->isObjC()
-              && !E->getType()->hasRetainablePointerRepresentation()
-              && !E->getType()->is<AnyMetatypeType>());
+              && !E->getType()->getLValueOrInOutObjectType()
+                              ->hasRetainablePointerRepresentation()
+              && !E->getType()->getLValueOrInOutObjectType()
+                              ->is<AnyMetatypeType>());
 
     // Loading classes or metatypes doesn't require their metadata.
     if (isa<LoadExpr>(E))
@@ -420,17 +437,22 @@ public:
               && !E->getType()->is<AnyMetatypeType>());
 
     // Accessing @objc members doesn't require type metadata.
+    // rdar://problem/27796375 -- allocating init entry points for ObjC
+    // initializers are generated as true Swift generics, so reify type
+    // parameters.
     if (auto memberRef = dyn_cast<MemberRefExpr>(E))
       return !memberRef->getMember().getDecl()->hasClangNode();
 
     if (auto applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (auto methodApply = dyn_cast<ApplyExpr>(applyExpr->getFn())) {
         if (auto callee = dyn_cast<DeclRefExpr>(methodApply->getFn())) {
-          return !callee->getDecl()->isObjC();
+          return !callee->getDecl()->isObjC()
+            || isa<ConstructorDecl>(callee->getDecl());
         }
       }
       if (auto callee = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
-        return !callee->getDecl()->isObjC();
+        return !callee->getDecl()->isObjC()
+          || isa<ConstructorDecl>(callee->getDecl());
       }
     }
 
@@ -489,6 +511,14 @@ public:
       if (E->getType()->isObjCExistentialType()
           || E->getType()->is<AnyMetatypeType>())
         return false;
+      
+      // We also special case Any erasure in pseudogeneric contexts
+      // not to rely on concrete type metadata by erasing from AnyObject
+      // as a waypoint.
+      if (E->getType()->isAny()
+          && erasure->getSubExpr()->getType()->is<ArchetypeType>())
+        return false;
+
       // Erasure to a Swift protocol always captures the type metadata from
       // its subexpression.
       checkType(erasure->getSubExpr()->getType(),
@@ -496,11 +526,28 @@ public:
       return true;
     }
 
+    
     // Converting an @objc metatype to AnyObject doesn't require type
     // metadata.
     if (isa<ClassMetatypeToObjectExpr>(E)
         || isa<ExistentialMetatypeToObjectExpr>(E))
       return false;
+    
+    // Casting to an ObjC class doesn't require the metadata of its type
+    // parameters, if any.
+    if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+      if (auto clas = dyn_cast_or_null<ClassDecl>(
+                         cast->getCastTypeLoc().getType()->getAnyNominal())) {
+        if (clas->usesObjCGenericsModel()) {
+          return false;
+        }
+      }
+    }
+    
+    // Assigning an object doesn't require type metadata.
+    if (auto assignment = dyn_cast<AssignExpr>(E))
+      return !assignment->getSrc()->getType()
+        ->hasRetainablePointerRepresentation();
 
     return true;
   }

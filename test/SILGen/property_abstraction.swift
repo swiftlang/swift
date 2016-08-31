@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -26,7 +26,7 @@ func getF(_ x: Foo<Int, Int>) -> (Int) -> Int {
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(_ x: inout Foo<Int, Int>, f: (Int) -> Int) {
+func setF(_ x: inout Foo<Int, Int>, f: @escaping (Int) -> Int) {
   x.f = f
 }
 
@@ -88,7 +88,7 @@ func getF(_ x: Bar<Int, Int>) -> (Int) -> Int {
   }
 }
 
-func makeF(_ f: (Int) -> Int) -> Bar<Int, Int> {
+func makeF(_ f: @escaping (Int) -> Int) -> Bar<Int, Int> {
   return Bar.F(f)
 }
 

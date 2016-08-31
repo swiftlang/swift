@@ -1,12 +1,14 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_extension_base.swift -o %t
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
 import Foundation
 import gizmo
+import objc_extension_base
 
 // Check that metadata for nested enums added in extensions to imported classes
 // gets emitted concretely.
@@ -49,7 +51,7 @@ extension Gizmo: NewProtocol {
   }
 
   // Overrides a class method of NSObject
-  public override class func initialize() {
+  open override class func initialize() {
   }
 }
 
@@ -156,4 +158,17 @@ class NSDogcow : NSObject {}
 // CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = private constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, __objc_const", align 8
 extension NSDogcow {
   @NSManaged var woof: Int
+}
+
+class  SwiftSubGizmo : SwiftBaseGizmo {
+
+  // Don't crash on this call. Emit an objC method call to super.
+  //
+  // CHECK-LABEL: define {{.*}} @_TFC15objc_extensions13SwiftSubGizmo4frobfT_T_
+  // CHECK: _TMaC15objc_extensions13SwiftSubGizmo
+  // CHECK: objc_msgSendSuper2
+  // CHECK: ret
+  public override func frob() {
+    super.frob()
+  }
 }

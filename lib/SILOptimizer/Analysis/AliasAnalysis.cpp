@@ -641,9 +641,9 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
 }
 
 bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
-  // Treat applications of @noreturn functions as decrementing ref counts. This
+  // Treat applications of no-return functions as decrementing ref counts. This
   // causes the apply to become a sink barrier for ref count increments.
-  if (FAS.getCallee()->getType().getAs<SILFunctionType>()->isNoReturn())
+  if (FAS.isCalleeNoReturn())
     return true;
 
   /// If the pointer cannot escape to the function we are done.

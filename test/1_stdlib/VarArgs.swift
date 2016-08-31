@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift -parse-stdlib %s | FileCheck %s
+// RUN: %target-run-stdlib-swift -parse-stdlib %s | %FileCheck %s
 // REQUIRES: executable_test
 
 import Swift

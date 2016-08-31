@@ -27,6 +27,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -446,8 +447,6 @@ enum ScoreKind {
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
   SK_NonDefaultLiteral,
-  /// An implicit bridged conversion between collection types.
-  SK_CollectionBridgedConversion,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
@@ -598,6 +597,9 @@ public:
   /// The opened existential type for a given locator.
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
+
+  /// The type variables that were bound via a Defaultable constraint.
+  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -899,6 +901,9 @@ public:
   /// Note: this is only used to support ObjCSelectorExpr at the moment.
   llvm::SmallPtrSet<Expr *, 2> UnevaluatedRootExprs;
 
+  /// The original CS if this CS was created as a simplification of another CS
+  ConstraintSystem *baseCS = nullptr;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -993,6 +998,56 @@ private:
   /// used for the 'self' of an existential type.
   SmallVector<std::pair<ConstraintLocator *, ArchetypeType *>, 4>
     OpenedExistentialTypes;
+
+public:
+  /// The type variables that were bound via a Defaultable constraint.
+  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
+
+  /// The type variable used to describe the element type of the given array
+  /// literal.
+  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
+    ArrayElementTypeVariables;
+
+
+  /// The type variables used to describe the key and value types of the given
+  /// dictionary literal.
+  llvm::SmallDenseMap<DictionaryExpr *,
+                      std::pair<TypeVariableType *, TypeVariableType *>>
+    DictionaryElementTypeVariables;
+
+private:
+  /// \brief Describe the candidate expression for partial solving.
+  /// This class used used by shrink & solve methods which apply
+  /// variation of directional path consistency algorithm in attempt
+  /// to reduce scopes of the overload sets (disjunctions) in the system.
+  class Candidate {
+    Expr *E;
+    bool IsPrimary;
+
+    ConstraintSystem &CS;
+    TypeChecker &TC;
+    DeclContext *DC;
+
+  public:
+    Candidate(ConstraintSystem &cs, Expr *expr, bool primaryExpr)
+        : E(expr), IsPrimary(primaryExpr), CS(cs), TC(cs.TC), DC(cs.DC) {}
+
+    /// \brief Return underlaying expression.
+    Expr *getExpr() const { return E; }
+
+    /// \brief Try to solve this candidate sub-expression
+    /// and re-write it's OSR domains afterwards.
+    ///
+    /// \returs true on solver failure, false otherwise.
+    bool solve();
+
+    /// \brief Apply solutions found by solver as reduced OSR sets for
+    /// for current and all of it's sub-expressions.
+    ///
+    /// \param solutions The solutions found by running solver on the
+    /// this candidate expression.
+    void applySolutions(llvm::SmallVectorImpl<Solution> &solutions) const;
+  };
 
   /// \brief Describes the current solver state.
   struct SolverState {
@@ -1118,6 +1173,9 @@ public:
 
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
+
+    /// The length of \c DefaultedTypeVariables.
+    unsigned numDefaultedTypeVariables;
 
     /// The previous score.
     Score PreviousScore;
@@ -1248,6 +1306,10 @@ public:
     return contextualType;
   }
 
+  const Expr *getContextualTypeNode() const {
+    return contextualTypeNode;
+  }
+
   ContextualTypePurpose getContextualTypePurpose() const {
     return contextualTypePurpose;
   }
@@ -1349,7 +1411,7 @@ public:
     assert(first && "Missing first type");
     assert(second && "Missing second type");
     auto c = Constraint::create(*this, kind, first, second, DeclName(),
-                                locator);
+                                FunctionRefKind::Compound, locator);
     if (isFavored) c->setFavored();
     addConstraint(c);
   }
@@ -1363,25 +1425,29 @@ public:
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+                                FunctionRefKind functionRefKind,
                                 ConstraintLocator *locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
     addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
-                                     baseTy, memberTy, name, locator));
+                                     baseTy, memberTy, name, functionRefKind,
+                                     locator));
   }
 
   /// \brief Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
   void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
                                           Type memberTy,
+                                          FunctionRefKind functionRefKind,
                                           ConstraintLocator *locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
     addConstraint(Constraint::create(*this,
                                      ConstraintKind::UnresolvedValueMember,
-                                     baseTy, memberTy, name, locator));
+                                     baseTy, memberTy, name, functionRefKind,
+                                     locator));
   }
 
   /// \brief Add an archetype constraint.
@@ -1389,7 +1455,7 @@ public:
     assert(baseTy);
     addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
                                      baseTy, Type(), DeclName(),
-                                         locator));
+                                     FunctionRefKind::Compound, locator));
   }
   
   /// \brief Remove an inactive constraint from the current constraint graph.
@@ -1488,6 +1554,9 @@ public:
   /// \brief Determine if the type in question is a Set<T>.
   bool isSetType(Type t);
 
+  /// \brief Determine if the type in question is AnyHashable.
+  bool isAnyHashableType(Type t);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
@@ -1540,6 +1609,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openFunctionType(
       AnyFunctionType *funcType,
+      unsigned numArgumentLabelsToRemove,
       ConstraintLocatorBuilder locator,
       llvm::DenseMap<CanType, TypeVariableType *> &replacements,
       DeclContext *innerDC,
@@ -1598,6 +1668,7 @@ public:
                           ValueDecl *decl,
                           bool isTypeReference,
                           bool isSpecialized,
+                          FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr);
 
@@ -1625,6 +1696,7 @@ public:
                           Type baseTy, ValueDecl *decl,
                           bool isTypeReference,
                           bool isDynamicResult,
+                          FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
                           llvm::DenseMap<CanType, TypeVariableType *>
@@ -1721,10 +1793,6 @@ public:
     /// Indicates we're unwrapping an optional type for a value-to-optional
     /// conversion.
     TMF_UnwrappingOptional = 0x8,
-    
-    /// Indicates we're applying an operator function with a nil-literal
-    /// argument.
-    TMF_ApplyingOperatorWithNil = 0x10,
   };
 
 private:
@@ -1825,6 +1893,7 @@ public:
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
                                          DeclName memberName, Type baseTy,
+                                         FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
@@ -1860,6 +1929,7 @@ private:
   SolutionKind simplifyConstructionConstraint(Type valueType, 
                                               FunctionType *fnType,
                                               unsigned flags,
+                                              FunctionRefKind functionRefKind,
                                               ConstraintLocator *locator);
 
   /// \brief Attempt to simplify the given conformance constraint.
@@ -1911,10 +1981,6 @@ private:
   /// \brief Attempt to simplify the given class constraint.
   SolutionKind simplifyClassConstraint(const Constraint &constraint);
   
-  /// \brief Attempt to simplify the given bridge constraint.
-  SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
-                                                                &constraint);
-
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(const Constraint &c);
 
@@ -1938,10 +2004,10 @@ public:
   /// \brief Simplify the system of constraints, by breaking down complex
   /// constraints into simpler constraints.
   ///
-  /// The result of simplification is a constraint system that consisting of
+  /// The result of simplification is a constraint system consisting of
   /// only simple constraints relating type variables to each other or
   /// directly to fixed types. There are no constraints that involve
-  /// type constructors on both sides. the simplified constraint system may,
+  /// type constructors on both sides. The simplified constraint system may,
   /// of course, include type variables for which we have constraints but
   /// no fixed type. Such type variables are left to the solver to bind.
   ///
@@ -1963,7 +2029,36 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
+
+  /// \brief Find reduced domains of disjunction constraints for given
+  /// expression, this is achived to solving individual sub-expressions
+  /// and combining resolving types. Such algorithm is called directional
+  /// path consistency because it goes from children to parents for all
+  /// related sub-expressions taking union of their domains.
+  ///
+  /// \param expr The expression to find reductions for.
+  void shrink(Expr *expr);
+
  public:
+
+  /// \brief Solve the system of constraints generated from provided expression.
+  ///
+  /// \param expr The expression to generate constraints from.
+  /// \param convertType The expected type of the expression.
+  /// \param listener The callback to check solving progress.
+  /// \param solutions The set of solutions to the system of constraints.
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns Error is an error occured, Solved is system is consistent
+  /// and solutions were found, Unsolved otherwise.
+  SolutionKind solve(Expr *&expr,
+                     Type convertType,
+                     ExprTypeCheckListener *listener,
+                     SmallVectorImpl<Solution> &solutions,
+                     FreeTypeVariableBinding allowFreeTypeVariables
+                       = FreeTypeVariableBinding::Disallow);
+
   /// \brief Solve the system of constraints.
   ///
   /// \param solutions The set of solutions to this system of constraints.
@@ -2055,11 +2150,6 @@ public:
   Expr *applySolutionShallow(const Solution &solution, Expr *expr,
                              bool suppressDiagnostics);
   
-  /// \brief Obtain the specializations computed for a type variable. This is
-  /// useful when emitting diagnostics for computed type variables.
-  void getComputedBindings(TypeVariableType *tvt,
-                           SmallVectorImpl<Type> &bindings);
-  
   /// Extract the base type from an array or slice type.
   /// \param type The array type to inspect.
   /// \returns the base type of the array.
@@ -2125,11 +2215,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
                              sources, variadicArgs);
 }
-
-
-/// \brief Return whether the function argument indicated by `locator` has a
-/// trailing closure.
-bool hasTrailingClosure(const ConstraintLocatorBuilder &locator);
 
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
@@ -2250,6 +2335,90 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 
+/// ExprCleaner - This class is used by shrink to ensure that in
+/// no situation will an expr node be left with a dangling type variable stuck
+/// to it.  Often type checking will create new AST nodes and replace old ones
+/// (e.g. by turning an UnresolvedDotExpr into a MemberRefExpr).  These nodes
+/// might be left with pointers into the temporary constraint system through
+/// their type variables, and we don't want pointers into the original AST to
+/// dereference these now-dangling types.
+class ExprCleaner {
+  llvm::SmallDenseMap<Expr *, Type> Exprs;
+  llvm::SmallDenseMap<TypeLoc *, Type> TypeLocs;
+  llvm::SmallDenseMap<Pattern *, Type> Patterns;
+public:
+
+  ExprCleaner(Expr *E) {
+    struct ExprCleanserImpl : public ASTWalker {
+      ExprCleaner *TS;
+      ExprCleanserImpl(ExprCleaner *TS) : TS(TS) {}
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+        TS->Exprs.insert({ expr, expr->getType() });
+        return { true, expr };
+      }
+
+      bool walkToTypeLocPre(TypeLoc &TL) override {
+        TS->TypeLocs.insert({ &TL, TL.getType() });
+        return true;
+      }
+
+      std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+        TS->Patterns.insert({ P, P->getType() });
+        return { true, P };
+      }
+
+      // Don't walk into statements.  This handles the BraceStmt in
+      // non-single-expr closures, so we don't walk into their body.
+      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+        return { false, S };
+      }
+    };
+
+    E->walk(ExprCleanserImpl(this));
+  }
+
+  ~ExprCleaner() {
+    // Check each of the expression nodes to verify that there are no type
+    // variables hanging out.  If so, just nuke the type.
+    for (auto E : Exprs) {
+      E.getFirst()->setType(E.getSecond());
+    }
+
+    for (auto TL : TypeLocs) {
+      TL.getFirst()->setType(TL.getSecond(), false);
+    }
+
+    for (auto P : Patterns) {
+      P.getFirst()->setType(P.getSecond());
+    }
+  }
+};
+
+/**
+ * Count the number of overload sets present
+ * in the expression and all of the children.
+ */
+class OverloadSetCounter : public ASTWalker {
+  unsigned &NumOverloads;
+
+public:
+  OverloadSetCounter(unsigned &overloads)
+  : NumOverloads(overloads)
+  {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
+      // If we've found function application and it's
+      // function is an overload set, count it.
+      if (isa<OverloadSetRefExpr>(applyExpr->getFn()))
+        ++NumOverloads;
+    }
+
+    // Always recur into the children.
+    return { true, expr };
+  }
+};
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

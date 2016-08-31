@@ -311,6 +311,13 @@ class BuildScriptInvocation(object):
                 platform.system() != "Darwin"):
             args.build_foundation = True
 
+        # Foundation has a dependency on libdispatch.
+        # On OS X, libdispatch is provided by the OS.
+        # On Linux, we must ensure that it is built manually.
+        if (args.build_foundation and
+                platform.system() != "Darwin"):
+            args.build_libdispatch = True
+
         # Propagate global --skip-build
         if args.skip_build:
             args.skip_build_linux = True
@@ -575,8 +582,8 @@ class BuildScriptInvocation(object):
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
+            "--libdispatch-build-type", args.libdispatch_build_variant,
             "--xctest-build-type", args.build_variant,
-            "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
@@ -589,6 +596,29 @@ class BuildScriptInvocation(object):
             "--build-args=%s" % ' '.join(
                 pipes.quote(arg) for arg in cmake.build_args()),
         ]
+
+        # Compute any product specific cmake arguments.
+        for product_class in self.compute_product_classes():
+            product_name = product_class.product_name()
+            product = product_class(
+                args=args,
+                toolchain=self.toolchain,
+                source_dir=self.workspace.source_dir(product_name),
+                # FIXME: This is incorrect since it always assumes the host
+                # target I think?
+                build_dir=self.workspace.build_dir(
+                    args.host_target, product_name))
+            cmake_opts = product.cmake_options
+
+            # FIXME: We should be using pipes.quote here but we run into issues
+            # with build-script-impl/cmake not being happy with all of the
+            # extra "'" in the strings. To fix this easily, we really need to
+            # just invoke cmake from build-script directly rather than futzing
+            # with build-script-impl. This makes even more sense since there
+            # really isn't a security issue here.
+            impl_args += [
+                "--%s-cmake-options=%s" % (product_name, ' '.join(cmake_opts))
+            ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -609,11 +639,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--enable-asan"]
         if args.enable_ubsan:
             impl_args += ["--enable-ubsan"]
-        if args.clang_compiler_version:
-            impl_args += [
-                "--clang-compiler-version=%s" % (
-                    args.clang_compiler_version)
-            ]
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:
@@ -970,6 +995,11 @@ def main_preset():
         help="use distcc",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "-j", "--jobs",
+        help="the number of parallel build jobs to use",
+        type=int,
+        dest="build_jobs")
+    parser.add_argument(
         "preset_substitutions_raw",
         help="'name=value' pairs that are substituted in the preset",
         nargs="*",
@@ -1012,6 +1042,8 @@ def main_preset():
     build_script_args += preset_args
     if args.distcc:
         build_script_args += ["--distcc"]
+    if args.build_jobs:
+        build_script_args += ["--jobs", str(args.build_jobs)]
 
     diagnostics.note(
         "using preset '" + args.preset + "', which expands to \n\n" +
@@ -1277,11 +1309,13 @@ details of the setups of other systems or automated environments.""")
         help="build libdispatch",
         action=arguments.action.optional_bool,
         dest="build_libdispatch")
-    projects_group.add_argument("--playgroundlogger",
+    projects_group.add_argument(
+        "--playgroundlogger",
         help="build playgroundlogger",
         action="store_true",
         dest="build_playgroundlogger")
-    projects_group.add_argument("--playgroundsupport",
+    projects_group.add_argument(
+        "--playgroundsupport",
         help="build PlaygroundSupport",
         action="store_true",
         dest="build_playgroundsupport")
@@ -1446,6 +1480,7 @@ details of the setups of other systems or automated environments.""")
         const=False,
         dest="lldb_assertions")
 
+    # FIXME: This should be one option using a choices.
     cmake_generator_group = parser.add_argument_group(
         title="Select the CMake generator")
     cmake_generator_group.add_argument(
@@ -1778,6 +1813,13 @@ details of the setups of other systems or automated environments.""")
              "must be escaped with a '\\'",
         action="append", dest="extra_swift_args", default=[])
 
+    llvm_group = parser.add_argument_group(
+        title="Build settings specific for LLVM")
+    llvm_group.add_argument(
+        '--llvm-targets-to-build',
+        help='LLVM target generators to build',
+        default="X86;ARM;AArch64;PowerPC;SystemZ")
+
     android_group = parser.add_argument_group(
         title="Build settings for Android")
     android_group.add_argument(
@@ -1847,10 +1889,40 @@ details of the setups of other systems or automated environments.""")
         help="enable Undefined Behavior Sanitizer",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "--enable-tsan",
+        help="enable Thread Sanitizer for swift tools",
+        action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--enable-tsan-runtime",
+        help="enable Thread Sanitizer on the swift runtime")
+
+    parser.add_argument(
+        "--compiler-vendor",
+        choices=["none", "apple"],
+        default="none",
+        help="Compiler vendor name")
+    parser.add_argument(
         "--clang-compiler-version",
         help="string that indicates a compiler version for Clang",
         type=arguments.type.clang_compiler_version,
         metavar="MAJOR.MINOR.PATCH")
+    parser.add_argument(
+        "--clang-user-visible-version",
+        help="User-visible version of the embedded Clang and LLVM compilers",
+        type=arguments.type.clang_compiler_version,
+        default="3.8.0",
+        metavar="MAJOR.MINOR.PATCH")
+    parser.add_argument(
+        "--swift-compiler-version",
+        help="string that indicates a compiler version for Swift",
+        type=arguments.type.swift_compiler_version,
+        metavar="MAJOR.MINOR")
+    parser.add_argument(
+        "--swift-user-visible-version",
+        help="User-visible version of the embedded Swift compiler",
+        type=arguments.type.swift_compiler_version,
+        default="3.0",
+        metavar="MAJOR.MINOR")
 
     parser.add_argument(
         "--darwin-deployment-version-osx",

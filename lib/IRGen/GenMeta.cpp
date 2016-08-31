@@ -236,7 +236,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type, nullptr)
+    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type)
              ->getCanonicalType();
   };
 
@@ -267,8 +267,8 @@ static bool isTypeErasedGenericClassType(CanType type) {
 }
 
 // Get the type that exists at runtime to represent a compile-time type.
-static CanType
-getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+CanType
+irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
@@ -1340,7 +1340,7 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // Non-native types are just wrapped in various ways.
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
     // We emit a completely different pattern for foreign classes.
-    if (classDecl->isForeign()) {
+    if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
       return emitForeignTypeMetadataRef(IGF, type);
     }
 
@@ -2414,8 +2414,10 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      types.push_back(FieldTypeInfo(prop->getType()->getCanonicalType(),
-                                    /*indirect*/ false));
+      auto propertyType = prop->getType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(propertyType,
+                                    /*indirect*/ false,
+                                    propertyType->is<WeakStorageType>()));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2431,7 +2433,7 @@ namespace {
       auto caseType = elt.decl->getArgumentType()->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
-      types.push_back(FieldTypeInfo(caseType, isIndirect));
+      types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2760,6 +2762,18 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
+  // Bind archetype access paths if the type is generic.
+  if (type->isGenericContext()) {
+    auto declCtxt = type;
+    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
+      auto getInContext = [&](CanType type) -> CanType {
+        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type)
+            ->getCanonicalType();
+      };
+      bindArchetypeAccessPaths(IGF, generics, getInContext);
+    }
+  }
+
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
@@ -2784,9 +2798,13 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     
     auto metadata = IGF.emitTypeMetadataRef(fieldTy);
 
+    auto fieldTypeInfo = fieldTypes[i];
+
     // Mix in flag bits.
-    if (fieldTypes[i].isIndirect()) {
-      auto flags = FieldType().withIndirect(true);
+    if (fieldTypeInfo.hasFlags()) {
+      auto flags = FieldType()
+        .withIndirect(fieldTypeInfo.isIndirect())
+        .withWeak(fieldTypeInfo.isWeak());
       auto metadataBits = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
       metadataBits = IGF.Builder.CreateOr(metadataBits,
                    llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()));
@@ -5505,7 +5523,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
   case KnownProtocolKind::IteratorProtocol:
-  case KnownProtocolKind::Boolean:
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:

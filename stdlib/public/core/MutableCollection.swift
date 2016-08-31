@@ -15,9 +15,12 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `MutableCollection` protocol instead, because it has a more complete
 /// interface.
-public protocol MutableIndexable : Indexable {
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
+public typealias MutableIndexable = _MutableIndexable
+public protocol _MutableIndexable : _Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
@@ -214,7 +217,7 @@ public protocol MutableIndexable : Indexable {
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : MutableIndexable, Collection {
+public protocol MutableCollection : _MutableIndexable, Collection {
   // FIXME: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
@@ -267,6 +270,46 @@ public protocol MutableCollection : MutableIndexable, Collection {
   ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence {get set}
 
+  /// Reorders the elements of the collection such that all the elements
+  /// that match the given predicate are after all the elements that do
+  /// not match the predicate.
+  ///
+  /// After partitioning a collection, there is a pivot index `p` where
+  /// no element before `p` satisfies the `belongsInSecondPartition`
+  /// predicate and every element at or after `p` satisfies
+  /// `belongsInSecondPartition`.
+  ///
+  /// In the following example, an array of numbers is partitioned by a
+  /// predicate that matches elements greater than 30.
+  ///
+  ///     var numbers = [30, 40, 20, 30, 30, 60, 10]
+  ///     let p = numbers.partition(by: { $0 > 30 })
+  ///     // p == 5
+  ///     // numbers == [30, 10, 20, 30, 30, 60, 40]
+  ///
+  /// The `numbers` array is now arranged in two partitions. The first
+  /// partition, `numbers.prefix(upTo: p)`, is made up of the elements that
+  /// are not greater than 30. The second partition, `numbers.suffix(from: p)`,
+  /// is made up of the elements that *are* greater than 30.
+  ///
+  ///     let first = numbers.prefix(upTo: p)
+  ///     // first == [30, 10, 20, 30, 30]
+  ///     let second = numbers.suffix(from: p)
+  ///     // second == [60, 40]
+  ///
+  /// - Parameter belongsInSecondPartition: A predicate used to partition
+  ///   the collection. All elements satisfying this predicate are ordered
+  ///   after all elements not satisfying it.
+  /// - Returns: The index of the first element in the reordered collection
+  ///   that matches `belongsInSecondPartition`. If no elements in the
+  ///   collection match `belongsInSecondPartition`, the returned index is
+  ///   equal to the collection's `endIndex`.
+  ///
+  /// - Complexity: O(*n*)
+  mutating func partition(
+    by belongsInSecondPartition: (Iterator.Element) throws -> Bool
+  ) rethrows -> Index
+  
   /// Call `body(p)`, where `p` is a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal
@@ -278,7 +321,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME(ABI)(compiler limitation): the signature should use
   // UnsafeMutableBufferPointer, but the compiler can't handle that.
@@ -291,7 +334,7 @@ public protocol MutableCollection : MutableIndexable, Collection {
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: @noescape (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
+    _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }

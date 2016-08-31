@@ -30,7 +30,7 @@ function(manpage)
       unused_var
       COMMAND
         "${POD2MAN}" "--section" "${MP_MAN_SECTION}"
-        "--center" "${MP_PAGE_HEADER}" "--release"
+        "--center" "${MP_PAGE_HEADER}" "--release=\"swift ${SWIFT_VERSION}\""
         "--name" "${MP_MAN_FILE_BASENAME}"
         "--stderr"
         "${MP_SOURCE}" > "${output_file_name}"

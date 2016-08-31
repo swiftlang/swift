@@ -40,8 +40,8 @@ public struct CollectionMisuseResiliencyChecks {
 }
 
 % for inc, protocol, direction, end in (
-%  ('inc', 'Indexable', 'after', 'end'),
-%  ('dec', 'BidirectionalIndexable', 'before', 'start')):
+%  ('inc', '_Indexable', 'after', 'end'),
+%  ('dec', '_BidirectionalIndexable', 'before', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -91,7 +91,7 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
@@ -128,7 +128,7 @@ public func checkForwardIndex<Instances, BaseCollection>(
   endIndex: Instances.Iterator.Element, ${TRACE}
 ) where
   Instances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
@@ -158,7 +158,7 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
   ${TRACE}
 ) where
   Instances: Collection,
-  BaseCollection : BidirectionalIndexable,
+  BaseCollection : _BidirectionalIndexable,
   Instances.Iterator.Element == BaseCollection.Index,
   // FIXME(compiler limitation): these constraints should be applied to
   // associated types of Collection.
@@ -197,7 +197,7 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : RandomAccessIndexable,
+  BaseCollection : _RandomAccessIndexable,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,
   // FIXME(compiler limitation): these constraints should be applied to
@@ -230,7 +230,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 ) where
   Instances : Collection,
   Distances : Collection,
-  BaseCollection : Indexable,
+  BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
   Distances.Iterator.Element == BaseCollection.IndexDistance,
   // FIXME(compiler limitation): these constraints should be applied to
@@ -388,7 +388,7 @@ public func check${Traversal}Collection<
         successor3 = succ(successor3)
         for s in [ successor1, successor2, successor3 ] {
           expectEqual(allIndices[i + 1], s, ${trace})
-          expectEqual(
+          expectEqualTest(
             expectedArray[i + 1], collection[s], ${trace}, sameValue: sameValue)
         }
       }
@@ -403,14 +403,14 @@ public func check${Traversal}Collection<
         predecessor3 = pred(predecessor3)
         for p in [ predecessor1, predecessor2, predecessor3 ] {
           expectEqual(allIndices[i - 1], p, ${trace})
-          expectEqual(
+          expectEqualTest(
             expectedArray[i - 1], collection[p], ${trace}, sameValue: sameValue)
         }
       }
       for i in 1..<allIndices.count {
         let index = succ(pred(allIndices[i]))
         expectEqual(allIndices[i], index, ${trace})
-        expectEqual(
+        expectEqualTest(
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
       }
 
@@ -514,7 +514,7 @@ public func checkSliceableWithBidirectionalIndex<
 
 
 public func checkRangeReplaceable<C, N>(
-  _ makeCollection: () -> C,
+  _ makeCollection: @escaping () -> C,
   _ makeNewValues: (Int) -> N
 ) where
   C : RangeReplaceableCollection,

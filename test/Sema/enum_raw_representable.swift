@@ -47,7 +47,7 @@ var foos: [Foo] = deserialize([1, 2, 3])
 var bars: [Bar] = deserialize([1.2, 3.4, 5.6])
 
 // Infer RawValue from witnesses.
-enum Color : Int, RawRepresentable {
+enum Color : Int {
   case red
   case blue
 
@@ -61,3 +61,9 @@ enum Color : Int, RawRepresentable {
 }
 
 var colorRaw: Color.RawValue = 7.5
+
+// Mismatched case types
+
+enum BadPlain : UInt { // expected-error {{'BadPlain' declares raw type 'UInt', but does not conform to RawRepresentable and conformance could not be synthesized}}
+    case a = "hello"   // expected-error {{cannot convert value of type 'String' to raw type 'UInt'}}
+}

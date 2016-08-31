@@ -870,6 +870,9 @@ public:
   bool isSingleton() const {
     // If we only have one root node, there is no interesting explosion
     // here. Exit early.
+    //
+    // NOTE: In case of a type unable to be exploded, e.g. enum, we treated it
+    // as a singleton.
     if (ProjectionTreeNodes.size() == 1)
       return true;
 

@@ -445,7 +445,7 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
 
   // If this entry is synthesized or implied, scan to determine
   // whether there are any explicit better conformances that make this
-  // conformance trivially superseded (and, therefore, no worth
+  // conformance trivially superseded (and, therefore, not worth
   // recording).
   auto &conformanceEntries = Conformances[protocol];
   if (kind == ConformanceEntryKind::Implied ||
@@ -458,7 +458,9 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
 
       case ConformanceEntryKind::Implied:
         // An implied conformance is better than a synthesized one.
-        if (kind == ConformanceEntryKind::Synthesized)
+        // Ignore implied circular protocol inheritance
+        if (kind == ConformanceEntryKind::Synthesized ||
+            existingEntry->getProtocol() == protocol)
           return false;
         break;
 

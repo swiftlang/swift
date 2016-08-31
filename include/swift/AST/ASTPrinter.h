@@ -175,18 +175,25 @@ public:
 
   ASTPrinter &operator<<(DeclName name);
 
-  void printKeyword(StringRef Name) {
+  void printKeyword(StringRef name) {
     callPrintNamePre(PrintNameContext::Keyword);
-    *this << Name;
+    *this << name;
     printNamePost(PrintNameContext::Keyword);
   }
 
-  void printAttrName(StringRef Name, bool needAt = false) {
+  void printAttrName(StringRef name, bool needAt = false) {
     callPrintNamePre(PrintNameContext::Attribute);
     if (needAt)
       *this << "@";
-    *this << Name;
+    *this << name;
     printNamePost(PrintNameContext::Attribute);
+  }
+
+  ASTPrinter &printSimpleAttr(StringRef name, bool needAt = false) {
+    callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+    printAttrName(name, needAt);
+    printStructurePost(PrintStructureKind::BuiltinAttribute);
+    return *this;
   }
 
   void printName(Identifier Name,
@@ -272,6 +279,20 @@ public:
   explicit StreamPrinter(raw_ostream &OS) : OS(OS) {}
 
   void printText(StringRef Text) override;
+};
+
+/// AST stream printer that adds extra indentation to each line.
+class ExtraIndentStreamPrinter : public StreamPrinter {
+  StringRef ExtraIndent;
+
+public:
+  ExtraIndentStreamPrinter(raw_ostream &out, StringRef extraIndent)
+  : StreamPrinter(out), ExtraIndent(extraIndent) { }
+
+  virtual void printIndent() {
+    printText(ExtraIndent);
+    StreamPrinter::printIndent();
+  }
 };
 
 bool shouldPrint(const Decl *D, PrintOptions &Options);

@@ -36,7 +36,6 @@ bool swift::canBeArgumentLabel(StringRef identifier) {
 
 bool swift::canBeMemberName(StringRef identifier) {
   return llvm::StringSwitch<bool>(identifier)
-    .Case("dynamicType", false)
     .Case("init", false)
     .Case("Protocol", false)
     .Case("self", false)

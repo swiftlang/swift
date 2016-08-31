@@ -66,6 +66,14 @@ public:
   SILBuilder &getBuilder() { return Builder; }
 
 protected:
+  void beforeVisit(ValueBase *V) {
+    if (auto I = dyn_cast<SILInstruction>(V)) {
+      // Update the set of available opened archetypes with the opened
+      // archetypes used by the current instruction.
+     doPreProcess(I);
+    }
+  }
+
 #define VALUE(CLASS, PARENT) \
   void visit##CLASS(CLASS *I) {                                       \
     llvm_unreachable("SILCloner visiting non-instruction?");          \
@@ -213,9 +221,9 @@ public:
   void doPreProcess(SILInstruction *Orig) {
     // Extend the set of available opened archetypes by the opened archetypes
     // used by the instruction being cloned.
-    auto OpenedArchetypeOperands = Orig->getOpenedArchetypeOperands();
+    auto TypeDependentOperands = Orig->getTypeDependentOperands();
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        OpenedArchetypeOperands);
+        TypeDependentOperands);
   }
 
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -262,6 +270,7 @@ public:
     {
       setInsertionPoint(SC.getBuilder().getInsertionBB(),
                         SC.getBuilder().getInsertionPoint());
+      setOpenedArchetypesTracker(SC.getBuilder().getOpenedArchetypesTracker());
     }
 
   ~SILBuilderWithPostProcess() {
@@ -380,9 +389,6 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I) {
-    // Update the set of available opened archetypes with the opened archetypes
-    // used by the current instruction.
-    doPreProcess(&*I);
     asImpl().visit(&*I);
   }
   // Iterate over successors to do the depth-first search.
@@ -786,6 +792,17 @@ SILCloner<ImplClass>::visitCopyAddrInst(CopyAddrInst *Inst) {
                                 getOpValue(Inst->getDest()),
                                 Inst->isTakeOfSrc(),
                                 Inst->isInitializationOfDest()));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitBindMemoryInst(BindMemoryInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+    getBuilder().createBindMemory(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getBase()),
+                                  getOpValue(Inst->getIndex()),
+                                  getOpType(Inst->getBoundType())));
 }
 
 template<typename ImplClass>
