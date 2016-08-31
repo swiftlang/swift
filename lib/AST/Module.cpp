@@ -622,7 +622,7 @@ TypeBase::gatherAllSubstitutions(Module *module,
     }
 
   auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
 
     auto *proto = protoType->getDecl();
