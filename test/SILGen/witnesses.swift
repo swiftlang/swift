@@ -483,3 +483,26 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: strong_release
   // CHECK-NEXT: return [[RES]]
 }
+
+protocol Crashable {
+  func crash()
+}
+
+class CrashableBase {
+  func crash() {}
+}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGC9witnesses16GenericCrashablex_S_9CrashableS_FS1_5crashfT_T_ : $@convention(witness_method) <T> (@in_guaranteed GenericCrashable<T>) -> ()
+// CHECK:       bb0(%0 : $*GenericCrashable<T>):
+// CHECK-NEXT: [[BOX:%.*]] = alloc_stack $GenericCrashable<T>
+// CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]] : $*GenericCrashable<T>
+// CHECK-NEXT: [[SELF:%.*]] = load [[BOX]] : $*GenericCrashable<T>
+// CHECK-NEXT: [[BASE:%.*]] = upcast [[SELF]] : $GenericCrashable<T> to $CrashableBase
+// CHECK-NEXT: [[FN:%.*]] = class_method [[BASE]] : $CrashableBase, #CrashableBase.crash!1 : (CrashableBase) -> () -> () , $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: apply [[FN]]([[BASE]]) : $@convention(method) (@guaranteed CrashableBase) -> ()
+// CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT: strong_release [[SELF]] : $GenericCrashable<T>
+// CHECK-NEXT: dealloc_stack [[BOX]] : $*GenericCrashable<T>
+// CHECK-NEXT: return [[RESULT]] : $()
+
+class GenericCrashable<T> : CrashableBase, Crashable {}
