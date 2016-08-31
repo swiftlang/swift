@@ -50,11 +50,10 @@ Substitution Substitution::subst(Module *module,
 
   assert(sig && env);
   env->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
-  return subst(module, subs, subMap, conformanceMap);
+  return subst(module, subMap, conformanceMap);
 }
 
 Substitution Substitution::subst(Module *module,
-                                 ArrayRef<Substitution> subs,
                                  TypeSubstitutionMap &subMap,
                                  ArchetypeConformanceMap &conformanceMap) const {
   // Substitute the replacement.
@@ -76,7 +75,7 @@ Substitution Substitution::subst(Module *module,
     // If we have a concrete conformance, we need to substitute the
     // conformance to apply to the new type.
     if (c.isConcrete()) {
-      auto substC = c.getConcrete()->subst(module, substReplacement, subs,
+      auto substC = c.getConcrete()->subst(module, substReplacement,
                                            subMap, conformanceMap);
       substConformances.push_back(ProtocolConformanceRef(substC));
       if (c != substConformances.back())
