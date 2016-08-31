@@ -273,7 +273,7 @@ static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
 /// (Base may be also the same as BoundDerived or may be
 /// non-generic at all).
 static CanType bindSuperclass(CanType Superclass,
-                                          SILType BoundDerived) {
+                              SILType BoundDerived) {
   assert(BoundDerived && "Expected non-null type!");
 
   SILType BoundSuperclass = BoundDerived;
