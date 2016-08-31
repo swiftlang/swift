@@ -172,12 +172,9 @@ public:
   /// flags for a concatenated paths is simply the bitwise-or of the
   /// flags of the component paths.
   enum Flag : unsigned {
-    /// Is this not a simple path?
-    IsNotSimple = 0x1,
-
     /// Does this path involve a function conversion, i.e. a
     /// FunctionArgument or FunctionResult node?
-    IsFunctionConversion = 0x2,
+    IsFunctionConversion = 0x1,
   };
 
   static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
@@ -202,12 +199,6 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case OpenedGeneric:
-      return 0;
-
-    case FunctionArgument:
-    case FunctionResult:
-      return IsFunctionConversion;
-
     case Archetype:
     case AssociatedType:
     case GenericArgument:
@@ -216,7 +207,11 @@ public:
     case TupleElement:
     case Requirement:
     case Witness:
-      return IsNotSimple;
+      return 0;
+
+    case FunctionArgument:
+    case FunctionResult:
+      return IsFunctionConversion;
     }
     llvm_unreachable("bad path element kind");
   }
@@ -436,12 +431,6 @@ public:
   }
 
   unsigned getSummaryFlags() const { return summaryFlags; }
-
-  /// \brief Determines whether this locator has a "simple" path, without
-  /// any transformations that break apart types.
-  bool hasSimplePath() const {
-    return !(getSummaryFlags() & IsNotSimple);
-  }
 
   /// \brief Determines whether this locator is part of a function
   /// conversion.
