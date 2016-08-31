@@ -673,6 +673,13 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
 
 bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
   for (SILValue Arg : BI->getArguments()) {
+
+    // Exclude some types of arguments where Ptr can never escape to.
+    if (isa<MetatypeInst>(Arg))
+      continue;
+    if (Arg->getType().is<BuiltinIntegerType>())
+      continue;
+
     // A builtin can only release an object if it can escape to one of the
     // builtin's arguments.
     if (EA->canEscapeToValue(Ptr, Arg))
