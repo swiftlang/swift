@@ -324,9 +324,10 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [161:10 - 161:19] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [161:10 - 161:19] expanded
 
-// CHECK-EXPANDED: {{^}}`-BraceStmt {{.*}} [164:1 - 164:16] expanded
-// CHECK-EXPANDED-NEXT: {{^}}  `-Closure {{.*}} [164:1 - 164:14] expanded
-// CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [164:1 - 164:14] expanded
+// CHECK-EXPANDED: `-TopLevelCode {{.*}} [164:1 - 164:16] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [164:1 - 164:16] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [164:1 - 164:14] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [164:1 - 164:14] expanded
 
 // RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20 %s 2> %t.searches
 // RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches

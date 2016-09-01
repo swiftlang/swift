@@ -49,6 +49,7 @@ class SourceFile;
 class Stmt;
 class StmtConditionElement;
 class SwitchStmt;
+class TopLevelCodeDecl;
 class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
@@ -104,6 +105,8 @@ enum class ASTScopeKind : uint8_t {
   Accessors,
   /// Scope for a closure.
   Closure,
+  /// Scope for top-level code.
+  TopLevelCode,
 };
 
 class ASTScope {
@@ -235,6 +238,10 @@ class ASTScope {
 
     /// The closure, for \c kind == ASTScopeKind::Closure.
     ClosureExpr *closure;
+
+    /// The top-level code declaration for
+    /// \c kind == ASTScopeKind::TopLevelCodeDecl.
+    TopLevelCodeDecl *topLevelCode;
   };
 
   /// Child scopes, sorted by source range.
@@ -357,6 +364,11 @@ class ASTScope {
   ASTScope(const ASTScope *parent, ClosureExpr *closure)
       : ASTScope(ASTScopeKind::Closure, parent) {
     this->closure = closure;
+  }
+
+  ASTScope(const ASTScope *parent, TopLevelCodeDecl *topLevelCode)
+      : ASTScope(ASTScopeKind::TopLevelCode, parent) {
+    this->topLevelCode = topLevelCode;
   }
 
   ~ASTScope();

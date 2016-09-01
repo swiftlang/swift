@@ -465,6 +465,12 @@ void ASTScope::expand() const {
     if (auto bodyChild = createIfNeeded(this, closure->getBody()))
       addChild(bodyChild);
     break;
+
+  case ASTScopeKind::TopLevelCode:
+    /// Add a child for the body.
+    if (auto bodyChild = createIfNeeded(this, topLevelCode->getBody()))
+      addChild(bodyChild);
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -566,6 +572,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
       return false;
     }
@@ -608,6 +615,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
       return false;
     }
@@ -650,6 +658,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
       // Not a direct descendant.
       return false;
     }
@@ -735,14 +744,15 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::TopLevelCode: {
     // Drop top-level statements containing just an IfConfigStmt.
     // FIXME: The modeling of IfConfig is weird.
-    auto braceStmt = cast<TopLevelCodeDecl>(decl)->getBody();
+    auto topLevelCode = cast<TopLevelCodeDecl>(decl);
+    auto braceStmt = topLevelCode->getBody();
     auto elements = braceStmt->getElements();
     if (elements.size() == 1 &&
         elements[0].is<Stmt *>() &&
         isa<IfConfigStmt>(elements[0].get<Stmt *>()))
       return nullptr;
 
-    return createIfNeeded(parent, braceStmt);
+    return new (ctx) ASTScope(parent, topLevelCode);
   }
 
   case DeclKind::Class:
@@ -1004,6 +1014,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
+  case ASTScopeKind::TopLevelCode:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -1046,6 +1057,7 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
     case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -1141,6 +1153,9 @@ ASTContext &ASTScope::getASTContext() const {
 
   case ASTScopeKind::Accessors:
     return abstractStorageDecl->getASTContext();
+
+  case ASTScopeKind::TopLevelCode:
+    return static_cast<Decl *>(topLevelCode)->getASTContext();
   }
 }
 
@@ -1369,6 +1384,9 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return SourceRange(closure->getInLoc(), closure->getEndLoc());
 
     return closure->getSourceRange();
+
+  case ASTScopeKind::TopLevelCode:
+    return topLevelCode->getSourceRange();
   }
 }
 
@@ -1620,6 +1638,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::Closure:
     printScopeKind("Closure");
     printAddress(closure);
+    printRange();
+    break;
+
+  case ASTScopeKind::TopLevelCode:
+    printScopeKind("TopLevelCode");
+    printAddress(topLevelCode);
     printRange();
     break;
   }
