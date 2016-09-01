@@ -1276,6 +1276,17 @@ public:
       }
       return *Fulfillments;
     }
+
+    void bindArchetypeAccessPathsInConformance(IRGenFunction &IGF) {
+      auto declCtx = Conformance.getDeclContext();
+      if (auto generics = declCtx->getGenericSignatureOfContext()) {
+        auto getInContext = [&](CanType type) -> CanType {
+          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type, nullptr)
+              ->getCanonicalType();
+        };
+        bindArchetypeAccessPaths(IGF, generics, getInContext);
+      }
+    }
   };
 }
 
@@ -1334,6 +1345,9 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
 
   // Bind local type data from the metadata argument.
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
+
+  // Bind archetype access paths.
+  bindArchetypeAccessPathsInConformance(IGF);
 
   // For now, assume that an associated type is cheap enough to access
   // that it doesn't need a new cache entry.
@@ -1457,6 +1471,9 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
   IGF.bindLocalTypeDataFromTypeMetadata(associatedType, IsExact,
                                         associatedTypeMetadata);
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
+
+  // Bind archetype access paths.
+  bindArchetypeAccessPathsInConformance(IGF);
 
   // For now, assume that finding an abstract conformance is always
   // fast enough that it's not worth caching.
@@ -1832,9 +1849,8 @@ void addPotentialArchetypeAccessPath(IRGenFunction &IGF,
                              {srcBaseArchetype, association});
 }
 
-static void bindArchetypeAccessPaths(IRGenFunction &IGF,
-                                     GenericSignature *Generics,
-                                     GetTypeParameterInContextFn getInContext) {
+void irgen::bindArchetypeAccessPaths(IRGenFunction &IGF, GenericSignature *Generics,
+                              GetTypeParameterInContextFn getInContext) {
   // Remember all the extra ways we have of reaching the parameter
   // archetypes due to type equality constraints.
   for (auto reqt : Generics->getRequirements()) {
