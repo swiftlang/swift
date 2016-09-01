@@ -1483,11 +1483,11 @@ void ConstraintSystem::shrink(Expr *expr) {
       if (auto dictionaryExpr = dyn_cast<DictionaryExpr>(expr)) {
         bool isPrimaryExpr = expr == PrimaryExpr;
         for (auto element : dictionaryExpr->getElements()) {
-          unsigned numOverlaods = 0;
-          element->walk(OverloadSetCounter(numOverlaods));
+          unsigned numOverloads = 0;
+          element->walk(OverloadSetCounter(numOverloads));
 
           // There are no overload sets in the element; skip it.
-          if (numOverlaods == 0)
+          if (numOverloads == 0)
             continue;
 
           // FIXME: Could we avoid creating a separate dictionary expression
@@ -1576,7 +1576,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
       // If there are fewer than two overloads in the chain
       // there is no point of solving this expression,
-      // because we won't be able to reduce it's domain.
+      // because we won't be able to reduce its domain.
       if (numOverloadSets > 1)
         SubExprs.push(Candidate(CS, expr, expr == PrimaryExpr));
 
@@ -1627,7 +1627,7 @@ ConstraintSystem::solve(Expr *&expr,
   assert(!solverState && "use solveRec for recursive calls");
 
   // Try to shrink the system by reducing disjunction domains. This
-  // goes through every sub-expression and generate it's own sub-system, to
+  // goes through every sub-expression and generate its own sub-system, to
   // try to reduce the domains of those subexpressions.
   shrink(expr);
 
