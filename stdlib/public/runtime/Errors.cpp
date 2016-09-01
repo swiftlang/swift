@@ -271,3 +271,11 @@ swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "fatal error: call of deleted method\n");
 }
+
+
+// Crash due to a retain count overflow.
+// FIXME: can't pass the object's address from InlineRefCounts without hacks
+void swift::swift_abortRetainOverflow() {
+  swift::fatalError(FatalErrorFlags::ReportBacktrace,
+                    "fatal error: object was retained too many times");
+}

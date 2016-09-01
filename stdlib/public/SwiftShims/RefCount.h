@@ -39,6 +39,12 @@ typedef struct {
 #define acquire std::memory_order_acquire
 #define release std::memory_order_release
 
+// Error reporting functions
+namespace swift {
+  LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+  void swift_abortRetainOverflow();
+};
+
 // Basic encoding of refcount and flag data into the object's header.
 // FIXME: Specialize this for a 32-bit field on 32-bit architectures.
 class InlineRefCountBits {
@@ -63,28 +69,29 @@ class InlineRefCountBits {
     IsDeinitingBitCount = 1,
     IsDeinitingMask = MaskForField(IsDeiniting),
 
-    StrongRefCountShift = ShiftAfterField(IsDeiniting),
-    StrongRefCountBitCount = 28,
-    StrongRefCountMask = MaskForField(StrongRefCount),
+    StrongExtraRefCountShift = ShiftAfterField(IsDeiniting),
+    StrongExtraRefCountBitCount = 29,
+    StrongExtraRefCountMask = MaskForField(StrongExtraRefCount),
 
-    DiscriminatorShift = ShiftAfterField(StrongRefCount),
-    DiscriminatorBitCount = 2,
-    DiscriminatorMask = MaskForField(Discriminator),
+    UseSlowRCShift = ShiftAfterField(StrongExtraRefCount),
+    UseSlowRCBitCount = 1,
+    UseSlowRCMask = MaskForField(UseSlowRC),
 
+    // FIXME: 63 bits but MSB must always be zero. Handle that differently.
     SideTableShift = 0,
-    SideTableBitCount = 62,
+    SideTableBitCount = 63,
     SideTableMask = MaskForField(SideTable)
   };
 
-  static_assert(StrongRefCountShift == IsDeinitingShift + 1, 
-                "IsDeiniting must be LSB-wards of StrongRefCount");
-  static_assert(DiscriminatorShift + DiscriminatorBitCount == sizeof(bits)*8,
-                "Discriminator must be MSB");
-  static_assert(SideTableBitCount + DiscriminatorBitCount == sizeof(bits)*8,
+  static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1, 
+                "IsDeiniting must be LSB-wards of StrongExtraRefCount");
+  static_assert(UseSlowRCShift + UseSlowRCBitCount == sizeof(bits)*8,
+                "UseSlowRC must be MSB");
+  static_assert(SideTableBitCount + UseSlowRCBitCount == sizeof(bits)*8,
                "wrong bit count for InlineRefCountBits side table version");
   static_assert(UnownedRefCountBitCount + IsPinnedBitCount +
-                IsDeinitingBitCount + StrongRefCountBitCount +
-                DiscriminatorBitCount == sizeof(bits)*8,
+                IsDeinitingBitCount + StrongExtraRefCountBitCount +
+                UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for InlineRefCountBits refcount version");
 # undef MaskForField
 # undef ShiftAfterField
@@ -94,20 +101,18 @@ class InlineRefCountBits {
 # define SetField(name, val) \
   bits = (bits & ~name##Mask) | (((uint64_t(val) << name##Shift) & name##Mask))
 
-  enum class DiscriminatorValue {
-    /* 00 */ Normal = 0,
-    /* 01 */ Unused = 1,
-    /* 10 */ HasSideTable = 2,
-    /* 11 */ Unusual = 3, 
-  };
-
   // InlineRefCountBits uses always_inline everywhere
   // to improve performance of debug builds.
   
  private:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  DiscriminatorValue getDiscriminator() const {
-    return DiscriminatorValue(GetField(Discriminator));
+  bool getUseSlowRC() const {
+    return bool(GetField(UseSlowRC));
+  }
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  void setUseSlowRC(bool value) {
+    SetField(UseSlowRC, value);
   }
 
  public:
@@ -116,21 +121,23 @@ class InlineRefCountBits {
   InlineRefCountBits() = default;
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  constexpr InlineRefCountBits(uint32_t strongCount, uint32_t unownedCount)
-    : bits((uint64_t(strongCount)  <<  StrongRefCountShift) |
-           (uint64_t(unownedCount) << UnownedRefCountShift))
+  constexpr InlineRefCountBits(uint32_t strongExtraCount, uint32_t unownedCount)
+    : bits((uint64_t(strongExtraCount) << StrongExtraRefCountShift) |
+           (uint64_t(unownedCount)     << UnownedRefCountShift))
   { }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool hasSideTable() const {
-    return getDiscriminator() == DiscriminatorValue::HasSideTable;
+    // FIXME: change this when introducing immutable RC objects
+    return getUseSlowRC();
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   uintptr_t getSideTable() const {
     assert(hasSideTable());
     // Stored value is a shifted pointer.
-    return uintptr_t(GetField(SideTable)) << DiscriminatorBitCount;
+    // FIXME: Don't hard-code this shift amount?
+    return uintptr_t(GetField(SideTable)) << 2;
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -152,26 +159,25 @@ class InlineRefCountBits {
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  uint32_t getStrongRefCount() const {
+  uint32_t getStrongExtraRefCount() const {
     assert(!hasSideTable());
-    return uint32_t(GetField(StrongRefCount));
+    return uint32_t(GetField(StrongExtraRefCount));
   }
 
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setHasSideTable(bool value) {
     bits = 0;
-    SetField(Discriminator,
-             value ? uint32_t(DiscriminatorValue::HasSideTable)
-                   : uint32_t(DiscriminatorValue::Normal));
+    setUseSlowRC(value);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setSideTable(uintptr_t value) {
     assert(hasSideTable());
-    // Stored value is a shifted pointer
-    uintptr_t storedValue = value >> DiscriminatorShift;
-    assert(storedValue << DiscriminatorShift == value);
+    // Stored value is a shifted pointer.
+    // FIXME: Don't hard-code this shift amount?
+    uintptr_t storedValue = value >> 2;
+    assert(storedValue << 2 == value);
     SetField(SideTable, storedValue);
   }
 
@@ -194,25 +200,49 @@ class InlineRefCountBits {
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void setStrongRefCount(uint32_t value) {
+  void setStrongExtraRefCount(uint32_t value) {
     assert(!hasSideTable());
-    SetField(StrongRefCount, value);
+    SetField(StrongExtraRefCount, value);
   }
   
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void incrementStrongRefCount(uint32_t inc = 1) {
-    setStrongRefCount(getStrongRefCount() + inc);
+  // Returns true if the increment is a fast-path result.
+  // Returns false if the increment should fall back to some slow path
+  // (for example, because UseSlowRC is set or because the refcount overflowed).
+  LLVM_ATTRIBUTE_ALWAYS_INLINE LLVM_ATTRIBUTE_UNUSED_RESULT
+  bool incrementStrongExtraRefCount(uint32_t inc = 1) {
+    // This deliberately overflows into the UseSlowRC field.
+    bits += uint64_t(inc) << StrongExtraRefCountShift;
+    return (int64_t(bits) >= 0);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void incrementUnownedRefCount(uint32_t inc = 1) {
     setUnownedRefCount(getUnownedRefCount() + inc);
   }
+  
+  // Returns true if the decrement is a fast-path result.
+  // Returns false if the decrement should fall back to some slow path
+  // (for example, because UseSlowRC is set
+  // or because the refcount is now zero and should deinit).
+  template <bool ClearPinnedFlag>
+  LLVM_ATTRIBUTE_ALWAYS_INLINE LLVM_ATTRIBUTE_UNUSED_RESULT
+  bool decrementStrongExtraRefCount(uint32_t dec = 1) {
+    // ClearPinnedFlag assumes the flag is already set.
+    if (ClearPinnedFlag)
+      assert(getIsPinned() && "unpinning reference that was not pinned");
+    
+    if (getIsDeiniting())
+      assert(getStrongExtraRefCount() >= dec  &&  
+             "releasing reference whose refcount is already zero");
+    else 
+      assert(getStrongExtraRefCount() + 1 >= dec  &&  
+             "releasing reference whose refcount is already zero");
 
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void decrementStrongRefCount(uint32_t dec = 1) {    
-    setStrongRefCount(getStrongRefCount() - dec);
+    uint64_t unpin = ClearPinnedFlag ? (uint64_t(1) << IsPinnedShift) : 0;
+    // This deliberately underflows by borrowing from the UseSlowRC field.
+    bits -= unpin + (uint64_t(dec) << StrongExtraRefCountShift);
+    return (int64_t(bits) >= 0);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -237,6 +267,48 @@ class InlineRefCountBits {
 class InlineRefCounts {
   std::atomic<InlineRefCountBits> refCounts;
 
+  // Template parameters.
+  enum ClearPinnedFlag { DontClearPinnedFlag = false,
+                         DoClearPinnedFlag = true };
+  enum Atomicity { NonAtomic = false, Atomic = true }; 
+
+  // Out-of-line slow paths.
+  
+  LLVM_ATTRIBUTE_NOINLINE
+  void incrementSlow(InlineRefCountBits oldbits, uint32_t n = 1) {
+    if (oldbits.hasSideTable()) {
+      // Out-of-line slow path.
+      abort();
+    } else {
+      swift::swift_abortRetainOverflow();
+    }
+  }
+
+  LLVM_ATTRIBUTE_NOINLINE
+  void incrementNonAtomicSlow(InlineRefCountBits oldbits, uint32_t n = 1) {
+    if (oldbits.hasSideTable()) {
+      // Out-of-line slow path.
+      abort();
+    } else {
+      swift::swift_abortRetainOverflow();
+    }
+  }
+
+  LLVM_ATTRIBUTE_NOINLINE
+  bool tryIncrementAndPinSlow() {
+    abort();
+  }
+
+  LLVM_ATTRIBUTE_NOINLINE
+  bool tryIncrementAndPinNonAtomicSlow() {
+    abort();
+  }
+
+  LLVM_ATTRIBUTE_NOINLINE
+  bool tryIncrementSlow() {
+    abort();
+  }
+
  public:
   enum Initialized_t { Initialized };
 
@@ -247,16 +319,16 @@ class InlineRefCounts {
   
   // Refcount of a new object is 1.
   constexpr InlineRefCounts(Initialized_t)
-    : refCounts(InlineRefCountBits(1, 1)) { }
+    : refCounts(InlineRefCountBits(0, 1)) { }
 
   void init() {
-    refCounts.store(InlineRefCountBits(1, 1), relaxed);
+    refCounts.store(InlineRefCountBits(0, 1), relaxed);
   }
 
   /// Initialize for a stack promoted object. This prevents that the final
   /// release frees the memory of the object.
   void initForNotFreeing() {
-    refCounts.store(InlineRefCountBits(1, 2), relaxed);
+    refCounts.store(InlineRefCountBits(0, 2), relaxed);
   }
 
 
@@ -266,14 +338,19 @@ class InlineRefCounts {
     InlineRefCountBits newbits;
     do {
       newbits = oldbits;
-      newbits.incrementStrongRefCount();
+      bool fast = newbits.incrementStrongExtraRefCount();
+      if (!fast)
+        return incrementSlow(oldbits); 
     } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
   }
 
   void incrementNonAtomic() {
-    auto bits = refCounts.load(relaxed);
-    bits.incrementStrongRefCount();
-    refCounts.store(bits, relaxed);
+    auto oldbits = refCounts.load(relaxed);
+    auto newbits = oldbits;
+    bool fast = newbits.incrementStrongExtraRefCount();
+    if (!fast)
+      return incrementNonAtomicSlow(oldbits);
+    refCounts.store(newbits, relaxed);
   }
 
   // Increment the reference count by n.
@@ -282,14 +359,19 @@ class InlineRefCounts {
     InlineRefCountBits newbits;
     do {
       newbits = oldbits;
-      newbits.incrementStrongRefCount(n);
+      bool fast = newbits.incrementStrongExtraRefCount(n);
+      if (!fast)
+        return incrementSlow(oldbits, n);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
   }
 
   void incrementNonAtomic(uint32_t n) {
-    auto bits = refCounts.load(relaxed);
-    bits.incrementStrongRefCount(n);
-    refCounts.store(bits, relaxed);
+    auto oldbits = refCounts.load(relaxed);
+    auto newbits = oldbits;
+    bool fast = newbits.incrementStrongExtraRefCount(n);
+    if (!fast)
+      return incrementNonAtomicSlow(oldbits, n);
+    refCounts.store(newbits, relaxed);
  }
 
   // Try to simultaneously set the pinned flag and increment the
@@ -306,14 +388,15 @@ class InlineRefCounts {
     InlineRefCountBits newbits;
     do {
       // If the flag is already set, just fail.
-      if (oldbits.getIsPinned()) {
+      if (oldbits.getIsPinned())
         return false;
-      }
 
       // Try to simultaneously set the flag and increment the reference count.
       newbits = oldbits;
       newbits.setIsPinned(true);
-      newbits.incrementStrongRefCount();
+      bool fast = newbits.incrementStrongExtraRefCount();
+      if (!fast)
+        return tryIncrementAndPinSlow();
     } while (! refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
     return true;
   }
@@ -322,13 +405,14 @@ class InlineRefCounts {
     auto bits = refCounts.load(relaxed);
 
     // If the flag is already set, just fail.
-    if (bits.getIsPinned()) {
+    if (bits.getIsPinned())
       return false;
-    }
 
     // Try to simultaneously set the flag and increment the reference count.
     bits.setIsPinned(true);
-    bits.incrementStrongRefCount();
+    bool fast = bits.incrementStrongExtraRefCount();
+    if (!fast)
+      return tryIncrementAndPinNonAtomicSlow();
     refCounts.store(bits, relaxed);
     return true;
   }
@@ -338,12 +422,13 @@ class InlineRefCounts {
     auto oldbits = refCounts.load(relaxed);
     InlineRefCountBits newbits;    
     do {
-      if (oldbits.getIsDeiniting()) {
+      if (oldbits.getIsDeiniting())
         return false;
-      }
 
       newbits = oldbits;
-      newbits.incrementStrongRefCount();
+      bool fast = newbits.incrementStrongExtraRefCount();
+      if (!fast)
+        return tryIncrementSlow();
     } while (! refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
     return true;
   }
@@ -353,25 +438,29 @@ class InlineRefCounts {
   //
   // Precondition: the pinned flag is set.
   bool decrementAndUnpinShouldDeinit() {
-    return doDecrementShouldDeinit<true>();
+    return doDecrementShouldDeinit<DoClearPinnedFlag>();
   }
 
   bool decrementAndUnpinShouldDeinitNonAtomic() {
-    return doDecrementShouldDeinitNonAtomic<true>();
+    return doDecrementShouldDeinitNonAtomic<DoClearPinnedFlag>();
   }
 
   // Decrement the reference count.
   // Return true if the caller should now deinit the object.
   bool decrementShouldDeinit() {
-    return doDecrementShouldDeinit<false>();
+    return doDecrementShouldDeinit<DontClearPinnedFlag>();
   }
 
   bool decrementShouldDeinitNonAtomic() {
-    return doDecrementShouldDeinitNonAtomic<false>();
+    return doDecrementShouldDeinitNonAtomic<DontClearPinnedFlag>();
   }
 
   bool decrementShouldDeinitN(uint32_t n) {
-    return doDecrementShouldDeinitN<false>(n);
+    return doDecrementShouldDeinit<DontClearPinnedFlag>(n);
+  }
+
+  bool decrementShouldDeinitNNonAtomic(uint32_t n) {
+    return doDecrementShouldDeinitNonAtomic<DontClearPinnedFlag>(n);
   }
 
   // Non-atomically release the last strong reference and mark the
@@ -380,36 +469,42 @@ class InlineRefCounts {
   // Precondition: the reference count must be 1
   void decrementFromOneAndDeinitNonAtomic() {
     auto bits = refCounts.load(relaxed);
-    assert(bits.getStrongRefCount() == 1 && "Expect a count of 1");
+    assert(bits.getStrongExtraRefCount() == 0 && "Expect a refcount of 1");
 
-    bits.setStrongRefCount(0);
+    bits.setStrongExtraRefCount(0);
     bits.setIsDeiniting(true);
     refCounts.store(bits, relaxed);
-  }
-
-  bool decrementShouldDeinitNNonAtomic(uint32_t n) {
-    return doDecrementShouldDeinitNNonAtomic<false>(n);
   }
 
   // Return the reference count.
   // Once deinit begins the reference count is undefined.
   uint32_t getCount() const {
     auto bits = refCounts.load(relaxed);
-    return bits.getStrongRefCount();
+    return bits.getStrongExtraRefCount() + 1;
   }
 
   // Return whether the reference count is exactly 1.
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
-    return getCount() == 1;
+    auto bits = refCounts.load(relaxed);
+    assert(!bits.getIsDeiniting());
+    if (bits.hasSideTable())
+      abort();
+    return bits.getStrongExtraRefCount() == 0;
   }
 
   // Return whether the reference count is exactly 1 or the pin flag
   // is set. Once deinit begins the reference count is undefined.
   bool isUniquelyReferencedOrPinned() const {
     auto bits = refCounts.load(relaxed);
-    return (bits.getStrongRefCount() == 1 || bits.getIsPinned());
-    // FIXME: rewrite with rotate if compiler doesn't do it.
+    assert(!bits.getIsDeiniting());
+    if (bits.hasSideTable())
+      abort();
+    return (bits.getStrongExtraRefCount() == 0 || bits.getIsPinned());
+    
+    // FIXME: check if generated code is efficient.
+    // We can't use the old rotate implementation below because
+    // the strong refcount field is now biased.
 
     // Rotating right by one sets the sign bit to the pinned bit. After
     // rotation, the dealloc flag is the least significant bit followed by the
@@ -431,301 +526,90 @@ class InlineRefCounts {
   }
 
 private:
-  template <bool ClearPinnedFlag>
-  bool doDecrementShouldDeinit() {
-    auto oldbits = refCounts.load(relaxed);
-    InlineRefCountBits newbits;
-    
-    bool performDeinit;
-    do {
-      newbits = oldbits;
 
-      // ClearPinnedFlag assumes the pinned flag is already set.
-      assert(!(ClearPinnedFlag && !oldbits.getIsPinned()) &&
-             "unpinning reference that was not pinned");
-      assert(oldbits.getStrongRefCount() >= 1 &&
-             "releasing reference with a refcount of zero");
-
-      // FIXME: hand optimize these bit operations if necessary
-      if (ClearPinnedFlag) {
-        newbits.setIsPinned(false);
-      }
-      newbits.decrementStrongRefCount();
-      performDeinit = (newbits.getStrongRefCount() == 0 &&
-                       !newbits.getIsDeiniting());
-      if (performDeinit) {
-        newbits.setIsDeiniting(true);
-      }
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                               release, relaxed));
-    if (performDeinit) {
-      std::atomic_thread_fence(acquire);
-    }
-    return performDeinit;
-    
-    /*  Old implementation for optimization reference:
-
-    // If we're being asked to clear the pinned flag, we can assume
-    // it's already set.
-    constexpr uint32_t quantum =
-      (ClearPinnedFlag ? RC_ONE + RC_PINNED_FLAG : RC_ONE);
-    uint32_t newval = __atomic_sub_fetch(&strongRefCount, quantum, __ATOMIC_RELEASE);
-
-    assert((!ClearPinnedFlag || !(newval & RC_PINNED_FLAG)) &&
-           "unpinning reference that was not pinned");
-    assert(newval + quantum >= RC_ONE &&
-           "releasing reference with a refcount of zero");
-
-    // If we didn't drop the reference count to zero, or if the
-    // deallocating flag is already set, we're done; don't start
-    // deallocation.  We can assume that the pinned flag isn't set
-    // unless the refcount is nonzero, and or'ing it in gives us a
-    // more efficient mask: the check just becomes "is newval nonzero".
-    if ((newval & (RC_COUNT_MASK | RC_PINNED_FLAG | RC_DEALLOCATING_FLAG))
-          != 0) {
-      // Refcount is not zero. We definitely do not need to deallocate.
-      return false;
-    }
-
-    // Refcount is now 0 and is not already deallocating.  Try to set
-    // the deallocating flag.  This must be atomic because it can race
-    // with weak retains.
-    //
-    // This also performs the before-deinit acquire barrier if we set the flag.
-    static_assert(RC_FLAGS_COUNT == 2,
-                  "fix decrementShouldDeinit() if you add more flags");
-    uint32_t oldval = 0;
-    newval = RC_DEALLOCATING_FLAG;
-    return __atomic_compare_exchange(&strongRefCount, &oldval, &newval, 0,
-                                     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
-    */
+  // Second slow path of doDecrementShouldDeinit, where the
+  // object may have a side table entry.
+  template <ClearPinnedFlag clearPinnedFlag>
+  bool doDecrementShouldDeinitSlow2(InlineRefCountBits oldbits) {
+    abort();
   }
-
-  template <bool ClearPinnedFlag>
-  bool doDecrementShouldDeinitNonAtomic() {
-    auto oldbits = refCounts.load(relaxed);
+  
+  // First slow path of doDecrementShouldDeinit, where the object
+  // may need to be deinited.
+  // Side table paths are handled in doDecrementShouldDeinitSlow2().
+  // FIXME: can we do the non-atomic thing here?
+  template <Atomicity isAtomic, ClearPinnedFlag clearPinnedFlag>
+  bool doDecrementShouldDeinitSlow1(InlineRefCountBits oldbits,
+                                    uint32_t dec = 1) {
     InlineRefCountBits newbits;
-
-    // FIXME: can probably do this without CAS once zeroing weak references
-    // are pushed to the side table. Then the presence of inline RC will
-    // prove that the object is not already weakly-referenced so there can't
-    // be a race vs a weak load; and presumably no other thread can see
-    // the object so there can't be a race vs a weak store.
-    
-    bool performDeinit;
-    do {
-      newbits = oldbits;
-
-      // ClearPinnedFlag assumes the pinned flag is already set.
-      assert(!(ClearPinnedFlag && !oldbits.getIsPinned()) &&
-             "unpinning reference that was not pinned");
-      assert(oldbits.getStrongRefCount() >= 1 &&
-             "releasing reference with a refcount of zero");
-
-      // FIXME: hand optimize these bit operations if necessary
-      if (ClearPinnedFlag) {
-        newbits.setIsPinned(false);
-      }
-      newbits.decrementStrongRefCount();
-      performDeinit = (newbits.getStrongRefCount() == 0 &&
-                       !newbits.getIsDeiniting());
-      if (performDeinit) {
-        newbits.setIsDeiniting(true);
-      }
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                               release, relaxed));
-    if (performDeinit) {
-      std::atomic_thread_fence(acquire);
-    }
-    return performDeinit;
-    
-    /* Old implementation for optimization reference:
-
-    // If we're being asked to clear the pinned flag, we can assume
-    // it's already set.
-    constexpr uint32_t quantum =
-      (ClearPinnedFlag ? RC_ONE + RC_PINNED_FLAG : RC_ONE);
-    uint32_t val = __atomic_load_n(&strongRefCount, __ATOMIC_RELAXED);
-    val -= quantum;
-    __atomic_store_n(&strongRefCount, val, __ATOMIC_RELEASE);
-    uint32_t newval = strongRefCount;
-
-    assert((!ClearPinnedFlag || !(newval & RC_PINNED_FLAG)) &&
-           "unpinning reference that was not pinned");
-    assert(newval + quantum >= RC_ONE &&
-           "releasing reference with a refcount of zero");
-
-    // If we didn't drop the reference count to zero, or if the
-    // deallocating flag is already set, we're done; don't start
-    // deallocation.  We can assume that the pinned flag isn't set
-    // unless the refcount is nonzero, and or'ing it in gives us a
-    // more efficient mask: the check just becomes "is newval nonzero".
-    if ((newval & (RC_COUNT_MASK | RC_PINNED_FLAG | RC_DEALLOCATING_FLAG))
-          != 0) {
-      // Refcount is not zero. We definitely do not need to deallocate.
-      return false;
-    }
-
-    // Refcount is now 0 and is not already deallocating.  Try to set
-    // the deallocating flag.  This must be atomic because it can race
-    // with weak retains.
-    //
-    // This also performs the before-deinit acquire barrier if we set the flag.
-    static_assert(RC_FLAGS_COUNT == 2,
-                  "fix decrementShouldDeinit() if you add more flags");
-    uint32_t oldval = 0;
-    newval = RC_DEALLOCATING_FLAG;
-    return __atomic_compare_exchange(&strongRefCount, &oldval, &newval, 0,
-                                     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
-    */
-  }
-
-  template <bool ClearPinnedFlag>
-  bool doDecrementShouldDeinitN(uint32_t n) {
-    auto oldbits = refCounts.load(relaxed);
-    InlineRefCountBits newbits;
-    
-    bool performDeinit;
-    do {
-      newbits = oldbits;
-
-      // ClearPinnedFlag assumes the pinned flag is already set.
-      assert(!(ClearPinnedFlag && !oldbits.getIsPinned()) &&
-             "unpinning reference that was not pinned");
-      assert(oldbits.getStrongRefCount() >= n &&
-             "releasing reference with a refcount of zero");
-
-      // FIXME: hand optimize these bit operations if necessary
-      if (ClearPinnedFlag) {
-        newbits.setIsPinned(false);
-      }
-      newbits.decrementStrongRefCount(n);
-      performDeinit = (newbits.getStrongRefCount() == 0 &&
-                       !newbits.getIsDeiniting());
-      if (performDeinit) {
-        newbits.setIsDeiniting(true);
-      }
-    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                               release, relaxed));
-    if (performDeinit) {
-      std::atomic_thread_fence(acquire);
-    }
-    return performDeinit;
-    
-
-    /* Old implementation for optimization reference:
-
-    // If we're being asked to clear the pinned flag, we can assume
-    // it's already set.
-    uint32_t delta = (n << RC_FLAGS_COUNT) + (ClearPinnedFlag ? RC_PINNED_FLAG : 0);
-    uint32_t newval = __atomic_sub_fetch(&strongRefCount, delta, __ATOMIC_RELEASE);
-
-    assert((!ClearPinnedFlag || !(newval & RC_PINNED_FLAG)) &&
-           "unpinning reference that was not pinned");
-    assert(newval + delta >= RC_ONE &&
-           "releasing reference with a refcount of zero");
-
-    // If we didn't drop the reference count to zero, or if the
-    // deallocating flag is already set, we're done; don't start
-    // deallocation.  We can assume that the pinned flag isn't set
-    // unless the refcount is nonzero, and or'ing it in gives us a
-    // more efficient mask: the check just becomes "is newval nonzero".
-    if ((newval & (RC_COUNT_MASK | RC_PINNED_FLAG | RC_DEALLOCATING_FLAG))
-          != 0) {
-      // Refcount is not zero. We definitely do not need to deallocate.
-      return false;
-    }
-
-    // Refcount is now 0 and is not already deallocating.  Try to set
-    // the deallocating flag.  This must be atomic because it can race
-    // with weak retains.
-    //
-    // This also performs the before-deinit acquire barrier if we set the flag.
-    static_assert(RC_FLAGS_COUNT == 2,
-                  "fix decrementShouldDeinit() if you add more flags");
-    uint32_t oldval = 0;
-    newval = RC_DEALLOCATING_FLAG;
-    return __atomic_compare_exchange(&strongRefCount, &oldval, &newval, 0,
-                                     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
-    */
-  }
-
-  template <bool ClearPinnedFlag>
-  bool doDecrementShouldDeinitNNonAtomic(uint32_t n) {
-    auto oldbits = refCounts.load(relaxed);
-    InlineRefCountBits newbits;
-
-    // FIXME: can probably do this without CAS once zeroing weak references
-    // are pushed to the side table. Then the presence of inline RC will
-    // prove that the object is not already weakly-referenced so there can't
-    // be a race vs a weak load; and presumably no other thread can see
-    // the object so there can't be a race vs a weak store.
     
     bool performDeinit;
     do {
       newbits = oldbits;
       
-      // ClearPinnedFlag assumes the pinned flag is already set.
-      assert(!(ClearPinnedFlag && !oldbits.getIsPinned()) &&
-             "unpinning reference that was not pinned");
-      assert(oldbits.getStrongRefCount() >= n &&
-             "releasing reference with a refcount of zero");
-
-      // FIXME: hand optimize these bit operations if necessary
-      if (ClearPinnedFlag) {
-        newbits.setIsPinned(false);
+      bool fast = newbits.decrementStrongExtraRefCount<clearPinnedFlag>(dec);
+      if (fast) {
+        // Decrement completed normally. New refcount is not zero.
+        performDeinit = false;
       }
-      newbits.decrementStrongRefCount(n);
-      performDeinit = (newbits.getStrongRefCount() == 0 &&
-                       !newbits.getIsDeiniting());
-      if (performDeinit) {
+      else if (oldbits.hasSideTable()) {
+        // Decrement failed because we're on some other slow path.
+        return doDecrementShouldDeinitSlow2<clearPinnedFlag>(oldbits);
+      } else {
+        // Decrement underflowed. Begin deinit.
+        newbits = oldbits;  // Undo failed decrement of newbits.
+        performDeinit = true;
+        newbits.setStrongExtraRefCount(0);
         newbits.setIsDeiniting(true);
+        if (clearPinnedFlag)
+          newbits.setIsPinned(false);
       }
     } while (! refCounts.compare_exchange_weak(oldbits, newbits,
                                                release, relaxed));
-    if (performDeinit) {
+    if (performDeinit)
       std::atomic_thread_fence(acquire);
-    }
+
     return performDeinit;
+  }
+  
+  template <ClearPinnedFlag clearPinnedFlag>
+  bool doDecrementShouldDeinit(uint32_t n = 1) {
+    auto oldbits = refCounts.load(relaxed);
+    InlineRefCountBits newbits;
+    
+    do {
+      newbits = oldbits;
+      bool fast = newbits.decrementStrongExtraRefCount<clearPinnedFlag>(n);
+      if (!fast)
+        return
+          doDecrementShouldDeinitSlow1<Atomic, clearPinnedFlag>(oldbits, n);
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              release, relaxed));
 
-    /* Old implementation for optimization reference:
+    return false;  // don't deinit
+  }
 
-    // If we're being asked to clear the pinned flag, we can assume
-    // it's already set.
-    uint32_t delta = (n << RC_FLAGS_COUNT) + (ClearPinnedFlag ? RC_PINNED_FLAG : 0);
-    uint32_t val = __atomic_load_n(&strongRefCount, __ATOMIC_RELAXED);
-    val -= delta;
-    __atomic_store_n(&strongRefCount, val, __ATOMIC_RELEASE);
-    uint32_t newval = val;
+  template <ClearPinnedFlag clearPinnedFlag>
+  bool doDecrementShouldDeinitNonAtomic(uint32_t n = 1) {
+    auto oldbits = refCounts.load(relaxed);
+    InlineRefCountBits newbits;
 
-    assert((!ClearPinnedFlag || !(newval & RC_PINNED_FLAG)) &&
-           "unpinning reference that was not pinned");
-    assert(newval + delta >= RC_ONE &&
-           "releasing reference with a refcount of zero");
+    // FIXME: can probably do this without CAS once zeroing weak references
+    // are pushed to the side table. Then the presence of inline RC will
+    // prove that the object is not already weakly-referenced so there can't
+    // be a race vs a weak load; and presumably no other thread can see
+    // the object so there can't be a race vs a weak store.
+    
+    do {
+      newbits = oldbits;
+      bool fast = newbits.decrementStrongExtraRefCount<clearPinnedFlag>(n);
+      if (!fast)
+        return
+          doDecrementShouldDeinitSlow1<NonAtomic, clearPinnedFlag>(oldbits);
+    } while (! refCounts.compare_exchange_weak(oldbits, newbits,
+                                               release, relaxed));
 
-    // If we didn't drop the reference count to zero, or if the
-    // deallocating flag is already set, we're done; don't start
-    // deallocation.  We can assume that the pinned flag isn't set
-    // unless the refcount is nonzero, and or'ing it in gives us a
-    // more efficient mask: the check just becomes "is newval nonzero".
-    if ((newval & (RC_COUNT_MASK | RC_PINNED_FLAG | RC_DEALLOCATING_FLAG))
-          != 0) {
-      // Refcount is not zero. We definitely do not need to deallocate.
-      return false;
-    }
-
-    // Refcount is now 0 and is not already deallocating.  Try to set
-    // the deallocating flag.  This must be atomic because it can race
-    // with weak retains.
-    //
-    // This also performs the before-deinit acquire barrier if we set the flag.
-    static_assert(RC_FLAGS_COUNT == 2,
-                  "fix decrementShouldDeinit() if you add more flags");
-    uint32_t oldval = 0;
-    newval = RC_DEALLOCATING_FLAG;
-    return __atomic_compare_exchange(&strongRefCount, &oldval, &newval, 0,
-                                     __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
-    */
+    return false;  // don't deinit
   }
 
 
