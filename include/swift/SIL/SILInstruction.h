@@ -5945,17 +5945,25 @@ private:
   unsigned NumTrueArgs;
   /// The number of arguments for the False branch.
   unsigned NumFalseArgs;
+  /// The number of times the True branch was executed.
+  Optional<uint64_t> TrueBBCount;
+  /// The number of times the False branch was executed.
+  Optional<uint64_t> FalseBBCount;
 
   /// The first argument is the condition; the rest are BB arguments.
   TailAllocatedOperandList<1> Operands;
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                 ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse);
+                 ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
+                 Optional<uint64_t> TrueBBCount,
+                 Optional<uint64_t> FalseBBCount);
 
   /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
   /// the Condition value. Both blocks must not take any arguments.
   static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
                                 SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
+                                Optional<uint64_t> TrueBBCount,
+                                Optional<uint64_t> FalseBBCount,
                                 SILFunction &F);
 
   /// Construct a CondBranchInst that will either branch to TrueBB and pass
@@ -5965,7 +5973,10 @@ private:
                                 SILBasicBlock *TrueBB,
                                 ArrayRef<SILValue> TrueArgs,
                                 SILBasicBlock *FalseBB,
-                                ArrayRef<SILValue> FalseArgs, SILFunction &F);
+                                ArrayRef<SILValue> FalseArgs, 
+                                Optional<uint64_t> TrueBBCount,
+                                Optional<uint64_t> FalseBBCount,
+                                SILFunction &F);
 
 public:
   SILValue getCondition() const { return Operands[ConditionIdx].get(); }
@@ -5981,6 +5992,9 @@ public:
   const SILBasicBlock *getTrueBB() const { return DestBBs[0]; }
   SILBasicBlock *getFalseBB() { return DestBBs[1]; }
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
+
+  Optional<uint64_t> getTrueBBCount() const { return TrueBBCount; }
+  Optional<uint64_t> getFalseBBCount() const { return FalseBBCount; }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;

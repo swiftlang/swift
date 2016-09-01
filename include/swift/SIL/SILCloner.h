@@ -2119,7 +2119,8 @@ SILCloner<ImplClass>::visitCondBranchInst(CondBranchInst *Inst) {
                                   getOpValue(Inst->getCondition()),
                                   getOpBasicBlock(Inst->getTrueBB()), TrueArgs,
                                   getOpBasicBlock(Inst->getFalseBB()),
-                                  FalseArgs));
+                                  FalseArgs, Inst->getTrueBBCount(),
+                                  Inst->getFalseBBCount()));
 }
 
 template<typename ImplClass>
