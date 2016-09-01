@@ -1088,7 +1088,7 @@ SourceFile &ASTScope::getSourceFile() const {
   return getParent()->getSourceFile();
 }
 
-SourceRange ASTScope::getSourceRange() const {
+SourceRange ASTScope::getSourceRangeImpl() const {
   switch (kind) {
   case ASTScopeKind::Preexpanded:
     return SourceRange(children().front()->getSourceRange().Start,

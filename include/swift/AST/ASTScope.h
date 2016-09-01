@@ -112,6 +112,9 @@ class ASTScope {
   /// whether the children of this node have already been expanded.
   mutable llvm::PointerIntPair<const ASTScope *, 1, bool> parentAndExpanded;
 
+  /// The cached source range.
+  mutable SourceRange CachedSourceRange;
+
   /// Union describing the various kinds of AST nodes that can introduce
   /// scopes.
   union {
@@ -396,6 +399,9 @@ class ASTScope {
   void enumerateContinuationScopes(
          llvm::function_ref<void(ASTScope *)> fn) const;
 
+  /// Compute the source range of this scope.
+  SourceRange getSourceRangeImpl() const;
+
   /// Retrieve the ASTContext in which this scope exists.
   ASTContext &getASTContext() const;
 
@@ -420,7 +426,13 @@ public:
   }
 
   /// Determine the source range covered by this scope.
-  SourceRange getSourceRange() const;
+  SourceRange getSourceRange() const {
+    if (CachedSourceRange.isInvalid() ||
+        getKind() == ASTScopeKind::SourceFile) {
+      CachedSourceRange = getSourceRangeImpl();
+    }
+    return CachedSourceRange;
+  }
 
   /// Retrieve the local declatation when
   /// \c getKind() == ASTScopeKind::LocalDeclaration.
