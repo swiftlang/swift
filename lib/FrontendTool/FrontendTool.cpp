@@ -793,7 +793,28 @@ static bool performCompile(CompilerInstance &Instance,
       SF->print(llvm::outs(), PrintOptions::printEverything());
     else if (Action == FrontendOptions::DumpScopeMaps) {
       ASTScope &scope = SF->getScope();
-      scope.expandAll();
+
+      if (opts.DumpScopeMapLocations.empty()) {
+        scope.expandAll();
+      } else if (auto bufferID = SF->getBufferID()) {
+        SourceManager &sourceMgr = Instance.getSourceMgr();
+        // Probe each of the locations, and dump what we find.
+        for (auto lineColumn : opts.DumpScopeMapLocations) {
+          SourceLoc loc = sourceMgr.getLocForLineCol(*bufferID,
+                                                     lineColumn.first,
+                                                     lineColumn.second);
+          if (loc.isInvalid()) continue;
+
+          llvm::errs() << "***Scope at " << lineColumn.first << ":"
+            << lineColumn.second << "***\n";
+          auto locScope = scope.findInnermostEnclosingScope(loc);
+          locScope->print(llvm::errs(), 0, false, false);
+        }
+
+        llvm::errs() << "***Complete scope map***\n";
+      }
+
+      // Print the resulting map.
       scope.print(llvm::errs());
     } else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);

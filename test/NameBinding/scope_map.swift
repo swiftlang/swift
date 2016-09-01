@@ -166,7 +166,6 @@ func closures() {
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
-
 // CHECK-EXPANDED: SourceFile{{.*}}scope_map.swift{{.*}}expanded
 // CHECK-EXPANDED-NEXT: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
 // CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
@@ -313,3 +312,24 @@ func closures() {
 // CHECK-EXPANDED: {{^}}`-BraceStmt {{.*}} [164:1 - 164:16] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-Closure {{.*}} [164:1 - 164:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [164:1 - 164:14] expanded
+
+// RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20 %s 2> %t.searches
+// RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches
+
+// CHECK-SEARCHES-LABEL: ***Scope at 70:8***
+// CHECK-SEARCHES-NEXT: AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
+// CHECK-SEARCHES-LABEL: ***Scope at 26:20***
+// CHECK-SEARCHES-NEXT: AbstractFunctionParams {{.*}} init(t:u:) param 1:0 [26:17 - 27:3] expanded
+// CHECK-SEARCHES-LABEL: ***Complete scope map***
+// CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - {{.*}}:1] expanded
+// CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES: |-TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
+// CHECK-SEARCHES-NEXT:   |-GenericParams {{.*}} param 0 [26:8 - 27:3] expanded
+// CHECK-SEARCHES-NEXT:     `-GenericParams {{.*}} param 1 [26:11 - 27:3] expanded
+// CHECK-SEARCHES-NEXT:       `-AbstractFunctionParams {{.*}} init(t:u:) param 0:0 [26:13 - 27:3] expanded
+// CHECK-SEARCHES-NEXT:         `-AbstractFunctionParams {{.*}} init(t:u:) param 1:0 [26:17 - 27:3] expanded
+// CHECK-SEARCHES-NEXT:           `-AbstractFunctionParams {{.*}} init(t:u:) param 1:1 [26:23 - 27:3] unexpanded
+// CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES: |-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
+// CHECK-SEARCHES: |-BraceStmt {{.*}} [102:24 - 102:26] unexpanded
+// CHECK-SEARCHES-NOT: {{ expanded}}

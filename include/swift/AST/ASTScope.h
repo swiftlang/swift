@@ -436,6 +436,9 @@ public:
     return abstractStorageDecl;
   }
 
+  /// Find the innermost enclosing scope that contains this source location.
+  const ASTScope *findInnermostEnclosingScope(SourceLoc loc) const;
+
   /// Expand the entire scope map.
   ///
   /// Normally, the scope map will be expanded only as needed by its queries,
@@ -444,7 +447,8 @@ public:
 
   /// Print out this scope for debugging/reporting purposes.
   void print(llvm::raw_ostream &out, unsigned level = 0,
-             bool lastChild = false) const;
+             bool lastChild = false,
+             bool printChildren = true) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");

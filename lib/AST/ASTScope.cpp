@@ -1298,6 +1298,51 @@ SourceRange ASTScope::getSourceRange() const {
   }
 }
 
+/// Find the innermost enclosing scope that contains this source location.
+const ASTScope *ASTScope::findInnermostEnclosingScope(SourceLoc loc) const {
+  ASTContext &ctx = getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  // Search up the tree to find the nearest parent that contains this source
+  // location.
+  const ASTScope *searchNode = this;
+  while (!sourceMgr.rangeContainsTokenLoc(searchNode->getSourceRange(), loc))
+    searchNode = searchNode->getParent();
+
+  while (true) {
+    // Expand the children of the search node.
+    if (!searchNode->isExpanded()) searchNode->expand();
+
+    // Use binary search to find the child that contains this location.
+    struct CompareLocs {
+      SourceManager &sourceMgr;
+
+      bool operator()(const ASTScope *scope, SourceLoc loc) {
+        return sourceMgr.isBeforeInBuffer(scope->getSourceRange().End, loc);
+      }
+
+      bool operator()(SourceLoc loc, const ASTScope *scope) {
+        return sourceMgr.isBeforeInBuffer(loc, scope->getSourceRange().End);
+      }
+    };
+    auto child = std::lower_bound(searchNode->children().begin(),
+                                  searchNode->children().end(),
+                                  loc, CompareLocs { sourceMgr });
+
+    // If we found a child whose source range encloses the given location,
+    // continue with that child.
+    if (child != searchNode->children().end() &&
+        sourceMgr.rangeContainsTokenLoc((*child)->getSourceRange(), loc)) {
+      searchNode = *child;
+      continue;
+    }
+
+    // Otherwise, our current search node is the best we could find.
+    assert(sourceMgr.rangeContainsTokenLoc(searchNode->getSourceRange(), loc));
+    return searchNode;
+  };
+}
+
 void ASTScope::expandAll() const {
   if (!isExpanded())
     expand();
@@ -1307,7 +1352,7 @@ void ASTScope::expandAll() const {
 }
 
 void ASTScope::print(llvm::raw_ostream &out, unsigned level,
-                     bool lastChild) const {
+                     bool lastChild, bool printChildren) const {
   SourceManager &sourceMgr = getASTContext().SourceMgr;
 
   // Indent for levels 2+.
@@ -1503,11 +1548,13 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
 
   out << "\n";
 
-  // Print the children. In some cases, we can be "unexpanded" but still have
-  // children.
-  for (unsigned i : indices(storedChildren)) {
-    storedChildren[i]->print(out, level + 1,
-                             /*lastChild=*/i == storedChildren.size()-1);
+  if (printChildren) {
+    // Print the children. In some cases, we can be "unexpanded" but still have
+    // children.
+    for (unsigned i : indices(storedChildren)) {
+      storedChildren[i]->print(out, level + 1,
+                               /*lastChild=*/i == storedChildren.size()-1);
+    }
   }
 }
 
