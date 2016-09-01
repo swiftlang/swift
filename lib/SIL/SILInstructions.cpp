@@ -1083,13 +1083,7 @@ BranchInst *BranchInst::create(SILDebugLocation Loc,
   return ::new (Buffer) BranchInst(Loc, DestBB, Args);
 }
 
-CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
-                               SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                               ArrayRef<SILValue> Args, unsigned NumTrue,
-                               unsigned NumFalse)
-    : InstructionBase(Loc),
-      DestBBs{{this, TrueBB}, {this, FalseBB}}, NumTrueArgs(NumTrue),
-      NumFalseArgs(NumFalse), Operands(this, Args, Condition) {
+CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition, SILBasicBlock *TrueBB, SILBasicBlock *FalseBB, ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse, Optional<uint64_t> TrueBBCount, Optional<uint64_t> FalseBBCount) : TermInst(ValueKind::CondBranchInst, Loc), DestBBs{{this, TrueBB}, {this, FalseBB}}, NumTrueArgs(NumTrue), NumFalseArgs(NumFalse), TrueBBCount(TrueBBCount),FalseBBCount(FalseBBCount), Operands(this, Args, Condition) {
   assert(Args.size() == (NumTrueArgs + NumFalseArgs) &&
          "Invalid number of args");
   assert(TrueBB != FalseBB && "Identical destinations");
@@ -1098,15 +1092,20 @@ CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
 CondBranchInst *CondBranchInst::create(SILDebugLocation Loc,
                                        SILValue Condition,
                                        SILBasicBlock *TrueBB,
-                                       SILBasicBlock *FalseBB, SILFunction &F) {
-  return create(Loc, Condition, TrueBB, {}, FalseBB, {}, F);
+                                       SILBasicBlock *FalseBB,
+                                       Optional<uint64_t> TrueBBCount,
+                                       Optional<uint64_t> FalseBBCount,
+                                       SILFunction &F) {
+  return create(Loc, Condition, TrueBB, {}, FalseBB, {}, TrueBBCount,
+                FalseBBCount, F);
 }
 
 CondBranchInst *
 CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                        SILBasicBlock *TrueBB, ArrayRef<SILValue> TrueArgs,
                        SILBasicBlock *FalseBB, ArrayRef<SILValue> FalseArgs,
-                       SILFunction &F) {
+                       Optional<uint64_t> TrueBBCount,
+                       Optional<uint64_t> FalseBBCount, SILFunction &F) {
   SmallVector<SILValue, 4> Args;
   Args.append(TrueArgs.begin(), TrueArgs.end());
   Args.append(FalseArgs.begin(), FalseArgs.end());
@@ -1115,7 +1114,8 @@ CondBranchInst::create(SILDebugLocation Loc, SILValue Condition,
                               decltype(Operands)::getExtraSize(Args.size()),
                             alignof(CondBranchInst));
   return ::new (Buffer) CondBranchInst(Loc, Condition, TrueBB, FalseBB, Args,
-                                       TrueArgs.size(), FalseArgs.size());
+                                       TrueArgs.size(), FalseArgs.size(),
+                                       TrueBBCount, FalseBBCount);
 }
 
 OperandValueArrayRef CondBranchInst::getTrueArgs() const {
