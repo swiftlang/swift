@@ -137,10 +137,22 @@ void ASTScope::expand() const {
         child->print(out);
         out << "***Previous child node***\n";
         prevChild->print(out);
+        out << "***Parent node***\n";
+        this->print(out);
         abort();
       }
 
-      // FIXME: Make sure that the we don't overlap the previous child.
+      // The previous child must not overlap this child.
+      if (sourceMgr.isBeforeInBuffer(childRange.End, prevChildRange.End)) {
+        auto &out = verificationError() << "unexpected child overlap\n";
+        out << "***Child node***\n";
+        child->print(out);
+        out << "***Previous child node***\n";
+        prevChild->print(out);
+        out << "***Parent node***\n";
+        this->print(out);
+        abort();
+      }
     }
 #endif
 
