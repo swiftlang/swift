@@ -664,6 +664,17 @@ public:
 
 } // end anonymous namespace
 
+SILGenProfiling::SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
+    : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping), NumRegionCounters(0),
+      FunctionHash(0), LoadedCounts(std::error_code()) {
+  if (!SGM.PGOReader)
+    return;
+
+  // FIXME: We need some kind of error tracking mechanism here, like clang's
+  // PGOStats tracker.
+  LoadedCounts = SGM.PGOReader->getInstrProfRecord(PGOFuncName, FunctionHash);
+}
+
 static llvm::GlobalValue::LinkageTypes
 getEquivalentPGOLinkage(FormalLinkage Linkage) {
   switch (Linkage) {
@@ -685,6 +696,10 @@ void SILGenProfiling::assignRegionCounters(Decl *Root) {
 
   if (auto *ParentFile = cast<DeclContext>(Root)->getParentSourceFile())
     CurrentFileName = ParentFile->getFilename();
+
+  PGOFuncName = llvm::getPGOFuncName(
+      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
+      CurrentFileName);
 
   MapRegionCounters Mapper(RegionCounterMap);
 
@@ -735,10 +750,6 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   auto Int32Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = SGM.Types.getLoweredType(BuiltinIntegerType::get(64, C));
 
-  std::string PGOFuncName = llvm::getPGOFuncName(
-      CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
-      CurrentFileName);
-
   SILLocation Loc = getLocation(Node);
   SILValue Args[] = {
       // The intrinsic must refer to the function profiling name var, which is
@@ -750,4 +761,16 @@ void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
       Builder.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   Builder.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                         SGM.Types.getEmptyTupleType(), {}, Args);
+}
+
+Optional<uint64_t> SILGenProfiling::loadExecutionCount(ASTNode Node) {
+  if (!LoadedCounts)
+    return None;
+
+  auto CounterIt = RegionCounterMap.find(Node);
+  assert(CounterIt != RegionCounterMap.end() &&
+         "region does not have an associated counter");
+
+  unsigned CounterIndexForFunc = CounterIt->second;
+  return LoadedCounts->Counts[CounterIndexForFunc];
 }

@@ -28,6 +28,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/Subsystems.h"
+#include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
 #include "ManagedValue.h"
 #include "RValue.h"
@@ -41,6 +42,16 @@ using namespace Lowering;
 SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   : M(M), Types(M.Types), SwiftModule(SM), TopLevelSGF(nullptr),
     Profiler(nullptr) {
+  SILOptions &Opts = M.getOptions();
+  if (!Opts.UseProfile.empty()) {
+    auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
+    if (auto E = ReaderOrErr.getError()) {
+      diagnose(SourceLoc(), diag::profile_read_error, Opts.UseProfile,
+               E.message());
+      Opts.UseProfile.erase();
+    }
+    PGOReader = std::move(ReaderOrErr.get());
+  }
 }
 
 SILGenModule::~SILGenModule() {

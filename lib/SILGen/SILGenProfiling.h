@@ -14,6 +14,7 @@
 #define SWIFT_SILGEN_PROFILING_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ProfileData/InstrProf.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -41,19 +42,23 @@ private:
   FormalLinkage CurrentFuncLinkage;
   unsigned NumRegionCounters;
   uint64_t FunctionHash;
+  std::string PGOFuncName;
   llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
+  llvm::ErrorOr<llvm::InstrProfRecord> LoadedCounts;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
 public:
-  SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping)
-      : SGM(SGM), EmitCoverageMapping(EmitCoverageMapping),
-        NumRegionCounters(0), FunctionHash(0) {}
+  SILGenProfiling(SILGenModule &SGM, bool EmitCoverageMapping);
 
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
 
   /// Emit SIL to increment the counter for \c Node.
   void emitCounterIncrement(SILGenBuilder &Builder, ASTNode Node);
+
+  /// Load the execution count corresponding to \p Node from a profile, if one
+  /// is available.
+  Optional<uint64_t> loadExecutionCount(ASTNode Node);
 
 private:
   /// Map counters to ASTNodes and set them up for profiling the given function.
