@@ -175,7 +175,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     c[index] = wrapValue(OpaqueValue(9999))
   }
 
-  let tests = _product(
+  let tests = cartesianProduct(
     subscriptRangeTests,
     _SubSequenceSubscriptOnIndexMode.all)
 
@@ -328,7 +328,7 @@ if isFixedLengthCollection {
 }
 
 if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
-  let tests = _product(
+  let tests = cartesianProduct(
     subscriptRangeTests,
     _SubSequenceSubscriptOnRangeMode.all)
 
