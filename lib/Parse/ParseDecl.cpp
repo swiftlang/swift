@@ -3427,8 +3427,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
                                        AddressorKind::NotAddressor, this,
                                        SourceLoc());
 
-    TheDecl->setBody(BraceStmt::create(Context, LastValidLoc, {},
-                                       Tok.getLoc()));
+    TheDecl->setBody(BraceStmt::create(Context, VarLBLoc, {}, Tok.getLoc()));
     TheDecl->setInvalid();
     Decls.push_back(TheDecl);
     return true;
