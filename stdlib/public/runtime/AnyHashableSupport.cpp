@@ -75,7 +75,7 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
     return entry->baseTypeThatConformsToHashable;
   }
   if (!KnownToConformToHashable &&
-      !swift_conformsToProtocol(type, &_TMps8Hashable)) {
+      !swift_conformsToProtocol(type, &HashableProtocolDescriptor)) {
     // Don't cache the negative response because we don't invalidate
     // this cache when a new conformance is loaded dynamically.
     return nullptr;
@@ -88,7 +88,7 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
         _swift_class_getSuperclass(baseTypeThatConformsToHashable);
     if (!superclass)
       break;
-    if (!swift_conformsToProtocol(superclass, &_TMps8Hashable))
+    if (!swift_conformsToProtocol(superclass, &HashableProtocolDescriptor))
       break;
     baseTypeThatConformsToHashable = superclass;
   }
@@ -148,7 +148,7 @@ extern "C" void _swift_stdlib_makeAnyHashableUpcastingToHashableBaseType(
           getValueFromSwiftValue(srcSwiftValue);
 
       if (auto unboxedHashableWT =
-              swift_conformsToProtocol(type, &_TMps8Hashable)) {
+              swift_conformsToProtocol(type, &HashableProtocolDescriptor)) {
         ValueBuffer unboxedCopyBuf;
         auto unboxedValueCopy = unboxedType->vw_initializeBufferWithCopy(
             &unboxedCopyBuf, const_cast<OpaqueValue *>(unboxedValue));

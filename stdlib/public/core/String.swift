@@ -704,10 +704,10 @@ extension String {
   @effects(readonly)
   @_semantics("string.concat")
   public static func + (lhs: String, rhs: String) -> String {
-    var lhs = lhs
     if lhs.isEmpty {
       return rhs
     }
+    var lhs = lhs
     lhs._core.append(rhs._core)
     return lhs
   }
