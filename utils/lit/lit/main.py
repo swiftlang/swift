@@ -354,6 +354,7 @@ def main(builtinParameters = {}):
         valgrindLeakCheck = opts.valgrindLeakCheck,
         valgrindArgs = opts.valgrindArgs,
         noExecute = opts.noExecute,
+        tmp_root = '/tmp/distributed-lit' if opts.distribute or opts.slave else '/',
         debug = opts.debug,
         isWindows = isWindows,
         params = userParams,

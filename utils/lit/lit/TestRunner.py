@@ -524,12 +524,13 @@ def parseIntegratedTestScriptCommands(source_path, keywords):
     finally:
         f.close()
 
-def getTempPaths(test):
+def getTempPaths(test, lit_config):
     """Get the temporary location, this is always relative to the test suite
     root, not test source root."""
     execpath = test.getExecPath()
-    execdir,execbase = os.path.split(execpath)
-    tmpDir = os.path.join(execdir, 'Output')
+    execdir,execbase = os.path.split(execpath)    
+    tmp_root = os.path.join(lit_config.tmp_root, os.path.relpath(execdir, '/'))    
+    tmpDir = os.path.join(tmp_root, 'Output')
     tmpBase = os.path.join(tmpDir, execbase)
     return tmpDir, tmpBase
 
@@ -720,7 +721,7 @@ def executeShTest(test, litConfig, useExternalSh,
     if litConfig.noExecute:
         return lit.Test.Result(Test.PASS)
 
-    tmpDir, tmpBase = getTempPaths(test)
+    tmpDir, tmpBase = getTempPaths(test, litConfig)
     substitutions = list(extra_substitutions)
     substitutions += getDefaultSubstitutions(test, tmpDir, tmpBase,
                                              normalize_slashes=useExternalSh)
