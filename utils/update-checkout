@@ -14,9 +14,9 @@ from __future__ import print_function
 import argparse
 import json
 import os
-import subprocess
-import sys
 import re
+import sys
+
 
 from functools import reduce
 
@@ -45,12 +45,12 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
                        echo=True)
-            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'clean', '-fdx'],
-                       echo=True)
-            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'],
-                       echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git',
+                        'clean', '-fdx'], echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git',
+                        'reset', '--hard', 'HEAD'], echo=True)
             status = shell.call(['git', 'reset', '--hard', 'HEAD'],
-                       echo=True)
+                                echo=True)
             if status:
                 print("Please, commit your changes.")
                 print(status)
@@ -102,10 +102,10 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                     repo_branch = "ci_pr_{0}".format(pr_id)
                     with shell.pushd(repo_path, dry_run=False, echo=False):
                         shell.capture(["git", "branch", "-D", repo_branch],
-                            echo=True, allow_non_zero_exit=True)
+                                      echo=True, allow_non_zero_exit=True)
                         shell.call(["git", "fetch", "origin",
-                            "pull/{0}/merge:{1}".format(pr_id, repo_branch)],
-                            echo=True)
+                                    "pull/{0}/merge:{1}".format(pr_id, repo_branch)],
+                                   echo=True)
                 break
         update_single_repository(repo_path,
                                  repo_branch,
