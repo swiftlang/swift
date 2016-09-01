@@ -44,7 +44,7 @@ NOTE(note_from_clang,none,
   "%0", (StringRef))
 
 ERROR(clang_cannot_build_module,Fatal,
-  "could not build Objective-C module '%0'", (StringRef))
+  "could not build module '%0'", (StringRef))
 
 ERROR(bridging_header_missing,Fatal,
   "bridging header '%0' does not exist", (StringRef))

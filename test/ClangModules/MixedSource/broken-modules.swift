@@ -22,7 +22,7 @@ import MissingDependencyFromSwift
 
 import MissingDependencyFromClang
 // CHECK: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1:9: error: module 'Dependency' not found
-// CHECK: broken-modules.swift:[[@LINE-2]]:8: error: could not build Objective-C module 'MissingDependencyFromClang'
+// CHECK: broken-modules.swift:[[@LINE-2]]:8: error: could not build module 'MissingDependencyFromClang'
 // CHECK: error: no such module 'MissingDependencyFromClang'
 
 import BrokenClangModule
@@ -34,7 +34,7 @@ import BrokenClangModule
 // CLANG-CHECK: a-fake-file.h:45:11: note: expanded from macro 'I'
 // CLANG-CHECK: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:11:35: error: expected ';' after top level declarator
 
-// CHECK: broken-modules.swift:[[@LINE-9]]:8: error: could not build Objective-C module 'BrokenClangModule'
+// CHECK: broken-modules.swift:[[@LINE-9]]:8: error: could not build module 'BrokenClangModule'
 // CHECK: error: no such module 'BrokenClangModule'
 // CHECK-BRIDGING-HEADER: error: failed to import bridging header '{{.*}}/BrokenClangModule.h'
 
