@@ -26,30 +26,16 @@
 
 namespace swift {
 
-/// A bump pointer for metadata allocations. Since metadata is (currently)
-/// never released, it does not support deallocation. This allocator by itself
-/// is not thread-safe; in concurrent uses, allocations must be guarded by
-/// a lock, such as the per-metadata-cache lock used to guard metadata
-/// instantiations. All allocations are pointer-aligned.
-class MetadataAllocator {
-  /// Address of the next available space. The allocator grabs a page at a time,
-  /// so the need for a new page can be determined by page alignment.
-  ///
-  /// Initializing to -1 instead of nullptr ensures that the first allocation
-  /// triggers a page allocation since it will always span a "page" boundary.
-  std::atomic<uintptr_t> NextValue;
-  
-public:
-  constexpr MetadataAllocator() : NextValue(~(uintptr_t)0) {}
+// For now, use malloc and free as our standard allocator for
+// metadata caches.  It might make sense in the future to take
+// advantage of the fact that we know that most allocations here
+// won't ever be deallocated.
+using MetadataAllocator = llvm::MallocAllocator;
 
-  // Don't copy or move, please.
-  MetadataAllocator(const MetadataAllocator &) = delete;
-  MetadataAllocator(MetadataAllocator &&) = delete;
-  MetadataAllocator &operator=(const MetadataAllocator &) = delete;
-  MetadataAllocator &operator=(MetadataAllocator &&) = delete;
-  
-  void *alloc(size_t size);
-};
+/// A typedef for simple global caches.
+template <class EntryTy>
+using SimpleGlobalCache =
+  ConcurrentMap<EntryTy, /*destructor*/ false, MetadataAllocator>;
 
 // A wrapper around a pointer to a metadata cache entry that provides
 // DenseMap semantics that compare values in the key vector for the metadata
@@ -144,9 +130,10 @@ public:
   static Impl *allocate(MetadataAllocator &allocator,
                         const void * const *arguments,
                         size_t numArguments, size_t payloadSize) {
-    void *buffer = allocator.alloc(sizeof(Impl)  +
-                                   numArguments * sizeof(void*) +
-                                   payloadSize);
+    void *buffer = allocator.Allocate(sizeof(Impl)  +
+                                      numArguments * sizeof(void*) +
+                                      payloadSize,
+                                      alignof(Impl));
     void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
     auto result = new (resultPtr) Impl(numArguments);
 
@@ -237,6 +224,9 @@ template <class ValueTy> class MetadataCache {
     static size_t getExtraAllocationSize(const Key &key) {
       return key.KeyData.size() * sizeof(void*);
     }
+    size_t getExtraAllocationSize() const {
+      return getKeyData().size() * sizeof(void*);
+    }
 
     int compareWithKey(const Key &key) const {
       // Order by hash first, then by the actual key data.
@@ -261,10 +251,7 @@ template <class ValueTy> class MetadataCache {
   };
 
   /// The concurrent map.
-  ConcurrentMap<Entry> Map;
-
-  static_assert(sizeof(Map) == 2 * sizeof(void*),
-                "offset of Head is not at proper offset");
+  ConcurrentMap<Entry, /*Destructor*/ false, MetadataAllocator> Map;
 
   struct ConcurrencyControl {
     Mutex Lock;
@@ -272,12 +259,9 @@ template <class ValueTy> class MetadataCache {
   };
   std::unique_ptr<ConcurrencyControl> Concurrency;
 
-  /// Allocator for entries of this cache.
-  MetadataAllocator Allocator;
-  
 public:
   MetadataCache() : Concurrency(new ConcurrencyControl()) {}
-  ~MetadataCache() {}
+  ~MetadataCache() = default;
 
   /// Caches are not copyable.
   MetadataCache(const MetadataCache &other) = delete;
@@ -286,7 +270,7 @@ public:
   /// Get the allocator for metadata in this cache.
   /// The allocator can only be safely used while the cache is locked during
   /// an addMetadataEntry call.
-  MetadataAllocator &getAllocator() { return Allocator; }
+  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
 
   /// Look up a cached metadata entry. If a cache match exists, return it.
   /// Otherwise, call entryBuilder() and add that to the cache.
