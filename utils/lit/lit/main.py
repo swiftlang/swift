@@ -163,16 +163,25 @@ done''' % quotedInputs
 
 def prepare_distcc_hosts(inputs):
     from os.path import expanduser
-    result = []
+    hosts = []
     for l in open(expanduser('~/.distcc/hosts')):
         for h in l.split():
             if h.startswith('#'): break
             if h == '--randomize': continue
-            (host, cores) = h.split(',')[0].split('/')
+            (host, processCount) = h.split(',')[0].split('/')
+            processCount = int(processCount)
             if prepare_host(host, inputs):
-                print '... found %s processes' % int(cores)
-                result += int(cores) * [host]
-    return result
+                print '... found %s processes' % processCount
+                hosts += int(processCount) * [host]
+
+    localhost_names = 'localhost', '127.0.0.1'
+    nonlocal_hosts = [h for h in hosts if h not in localhost_names]
+    local_hosts = [h for h in hosts if h in localhost_names]
+    # free up some cores for serving files if any jobs will be distributed
+    if nonlocal_hosts:
+        from multiprocessing import cpu_count
+        local_hosts = local_hosts[:cpu_count() - 1]
+    return local_hosts + nonlocal_hosts
 
 def main(builtinParameters = {}):
     # Use processes by default on Unix platforms.
