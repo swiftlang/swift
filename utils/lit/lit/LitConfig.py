@@ -24,7 +24,7 @@ class LitConfig(object):
                  noExecute, debug, isWindows,
                  params, config_prefix = None,
                  maxIndividualTestTime = 0):
-        self.remoteArgs = ['--no-progress-bar']
+        self.remoteArgs = ['--no-progress-bar', '--slave']
         # The name of the test runner.
         self.progname = progname
         # The items to add to the PATH environment variable.
