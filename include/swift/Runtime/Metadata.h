@@ -1569,10 +1569,21 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
-  TargetClassMetadata(const TargetClassMetadata& other): Description(other.getDescription().get()) {
-    memcpy(this, &other, sizeof(*this));
-    setDescription(other.getDescription().get());
-  }
+  // Description's copy ctor is deleted so we have to do this the hard way.
+  TargetClassMetadata(const TargetClassMetadata& other)
+    : TargetHeapMetadata<Runtime>(other),
+      SuperClass(other.SuperClass),
+      CacheData{other.CacheData[0], other.CacheData[1]},
+      Data(other.Data),
+      Flags(other.Flags),
+      InstanceAddressPoint(other.InstanceAddressPoint),
+      InstanceSize(other.InstanceSize),
+      InstanceAlignMask(other.InstanceAlignMask),
+      Reserved(other.Reserved),
+      ClassSize(other.ClassSize),
+      ClassAddressPoint(other.ClassAddressPoint),
+      Description(other.Description.get()),
+      IVarDestroyer(other.IVarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
