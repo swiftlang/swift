@@ -82,6 +82,9 @@ NOTE(convert_let_to_var,none,
 NOTE(note_typo_candidate,none,
      "did you mean '%0'?", (StringRef))
 
+NOTE(profile_read_error,none,
+     "failed to load profile data '%0': '%1'", (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
