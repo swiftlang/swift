@@ -15,12 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/ABI/System.h"
 #include "llvm/Support/MathExtras.h"
+#include "MetadataCache.h"
 #include "Private.h"
 #include "swift/Runtime/Debug.h"
 #include <algorithm>
@@ -174,7 +174,7 @@ public:
 
 } // end anonymous namespace
 
-static ConcurrentMap<BoxCacheEntry, false> Boxes;
+static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 BoxPair::Return

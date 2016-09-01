@@ -68,101 +68,6 @@ static int compareIntegers(T left, T right) {
   return (left == right ? 0 : left < right ? -1 : 1);
 }
 
-static uintptr_t swift_pageSize() {
-#if defined(__APPLE__)
-  return vm_page_size;
-#elif defined(_MSC_VER)
-  SYSTEM_INFO SystemInfo;
-  GetSystemInfo(&SystemInfo);
-  return SystemInfo.dwPageSize;
-#else
-  return sysconf(_SC_PAGESIZE);
-#endif
-}
-
-// allocate memory up to a nearby page boundary
-static void *swift_allocateMetadataRoundingToPage(size_t size) {
-  const uintptr_t PageSizeMask = SWIFT_LAZY_CONSTANT(swift_pageSize()) - 1;
-  size = (size + PageSizeMask) & ~PageSizeMask;
-#if defined(_MSC_VER)
-  auto mem = VirtualAlloc(
-      nullptr, size, MEM_TOP_DOWN | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-#else
-  auto mem = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,
-                  VM_TAG_FOR_SWIFT_METADATA, 0);
-  if (mem == MAP_FAILED)
-    mem = nullptr;
-#endif
-  return mem;
-}
-
-// free memory allocated by swift_allocateMetadataRoundingToPage()
-static void swift_freeMetadata(void *addr, size_t size) {
-#if defined(_MSC_VER)
-  // On success, VirtualFree() returns nonzero, on failure 0 
-  int result = VirtualFree(addr, 0, MEM_RELEASE);
-  if (result == 0)
-    fatalError(/* flags = */ 0, "swift_freePage: VirtualFree() failed");
-#else
-  // On success, munmap() returns 0, on failure -1
-  int result = munmap(addr, size);
-  if (result != 0)
-    fatalError(/* flags = */ 0, "swift_freePage: munmap() failed");
-#endif
-}
-
-void *MetadataAllocator::Allocate(size_t size, size_t /*alignment*/) {
-  const uintptr_t PageSize = SWIFT_LAZY_CONSTANT(swift_pageSize());
-  // If the requested size is a page or larger, map page(s) for it
-  // specifically.
-  if (LLVM_UNLIKELY(size >= PageSize)) {
-    void *mem = swift_allocateMetadataRoundingToPage(size);
-    if (!mem)
-      crash("unable to allocate memory for metadata cache");
-    return mem;
-  }
-
-  uintptr_t curValue = NextValue.load(std::memory_order_relaxed);
-  while (true) {
-    char *next = reinterpret_cast<char*>(curValue);
-    char *end = next + size;
-  
-    // If we wrap over the end of the page, allocate a new page.
-    void *allocation = nullptr;
-    const uintptr_t PageSizeMask = PageSize - 1;
-    if (LLVM_UNLIKELY(((uintptr_t)next & ~PageSizeMask)
-                        != (((uintptr_t)end & ~PageSizeMask)))) {
-      // Allocate a new page if we haven't already.
-      allocation = swift_allocateMetadataRoundingToPage(PageSize);
-
-      if (!allocation)
-        crash("unable to allocate memory for metadata cache");
-
-      next = (char*) allocation;
-      end = next + size;
-    }
-
-    // Swap it into place.
-    if (LLVM_LIKELY(std::atomic_compare_exchange_weak_explicit(
-            &NextValue, &curValue, reinterpret_cast<uintptr_t>(end),
-            std::memory_order_relaxed, std::memory_order_relaxed))) {
-      return next;
-    }
-
-    // If that didn't succeed, and we allocated, free the allocation.
-    // This potentially causes us to perform multiple mmaps under contention,
-    // but it keeps the fast path pristine.
-    if (allocation) {
-      swift_freeMetadata(allocation, PageSize);
-    }
-  }
-}
-
-void MetadataAllocator::Deallocate(const void *ptr, size_t size) {
-  // Borrowed from llvm::BumpPtrAllocator.
-  __asan_poison_memory_region(ptr, size);
-}
-
 namespace {
   struct GenericCacheEntry;
 
@@ -375,7 +280,7 @@ namespace {
 }
 
 /// The uniquing structure for ObjC class-wrapper metadata.
-static ConcurrentMap<ObjCClassCacheEntry, false> ObjCClassWrappers;
+static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 #endif
 
@@ -459,7 +364,7 @@ public:
 } // end anonymous namespace
 
 /// The uniquing structure for function type metadata.
-static ConcurrentMap<FunctionCacheEntry, false> FunctionTypes;
+static SimpleGlobalCache<FunctionCacheEntry> FunctionTypes;
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata1(FunctionTypeFlags flags,
@@ -624,7 +529,7 @@ public:
 }
 
 /// The uniquing structure for tuple type metadata.
-static ConcurrentMap<TupleCacheEntry, false> TupleTypes;
+static SimpleGlobalCache<TupleCacheEntry> TupleTypes;
 
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
@@ -1904,7 +1809,7 @@ namespace {
 }
 
 /// The uniquing structure for metatype type metadata.
-static ConcurrentMap<MetatypeCacheEntry, false> MetatypeTypes;
+static SimpleGlobalCache<MetatypeCacheEntry> MetatypeTypes;
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
@@ -1972,11 +1877,11 @@ public:
 } // end anonymous namespace 
 
 /// The uniquing structure for existential metatype value witness tables.
-static ConcurrentMap<ExistentialMetatypeValueWitnessTableCacheEntry, false>
+static SimpleGlobalCache<ExistentialMetatypeValueWitnessTableCacheEntry>
 ExistentialMetatypeValueWitnessTables;
 
 /// The uniquing structure for existential metatype type metadata.
-static ConcurrentMap<ExistentialMetatypeCacheEntry, false> ExistentialMetatypes;
+static SimpleGlobalCache<ExistentialMetatypeCacheEntry> ExistentialMetatypes;
 
 static const ExtraInhabitantsValueWitnessTable
 ExistentialMetatypeValueWitnesses_1 =
@@ -2154,7 +2059,7 @@ public:
 } // end anonymous namespace
 
 /// The uniquing structure for existential type metadata.
-static ConcurrentMap<ExistentialCacheEntry, false> ExistentialTypes;
+static SimpleGlobalCache<ExistentialCacheEntry> ExistentialTypes;
 
 static const ValueWitnessTable OpaqueExistentialValueWitnesses_0 =
   ValueWitnessTableForBox<OpaqueExistentialBox<0>>::table;
@@ -2162,7 +2067,7 @@ static const ValueWitnessTable OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
 
 /// The uniquing structure for opaque existential value witness tables.
-static ConcurrentMap<OpaqueExistentialValueWitnessTableCacheEntry, false>
+static SimpleGlobalCache<OpaqueExistentialValueWitnessTableCacheEntry>
 OpaqueExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for an opaque existential container with
@@ -2208,7 +2113,7 @@ static const ExtraInhabitantsValueWitnessTable ClassExistentialValueWitnesses_2 
   ValueWitnessTableForBox<ClassExistentialBox<2>>::table;
 
 /// The uniquing structure for class existential value witness tables.
-static ConcurrentMap<ClassExistentialValueWitnessTableCacheEntry, false>
+static SimpleGlobalCache<ClassExistentialValueWitnessTableCacheEntry>
 ClassExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for a class-constrained existential

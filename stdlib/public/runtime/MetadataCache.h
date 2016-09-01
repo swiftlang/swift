@@ -26,37 +26,16 @@
 
 namespace swift {
 
-/// A bump pointer for metadata allocations. Since metadata is (currently)
-/// never released, it does not support deallocation. This allocator by itself
-/// is not thread-safe; in concurrent uses, allocations must be guarded by
-/// a lock, such as the per-metadata-cache lock used to guard metadata
-/// instantiations. All allocations are pointer-aligned.
-class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
-  /// Address of the next available space. The allocator grabs a page at a time,
-  /// so the need for a new page can be determined by page alignment.
-  ///
-  /// Initializing to -1 instead of nullptr ensures that the first allocation
-  /// triggers a page allocation since it will always span a "page" boundary.
-  std::atomic<uintptr_t> NextValue;
-  
-public:
-  constexpr MetadataAllocator() : NextValue(~(uintptr_t)0) {}
+// For now, use malloc and free as our standard allocator for
+// metadata caches.  It might make sense in the future to take
+// advantage of the fact that we know that most allocations here
+// won't ever be deallocated.
+using MetadataAllocator = llvm::MallocAllocator;
 
-  // Don't copy or move, please.
-  MetadataAllocator(const MetadataAllocator &) = delete;
-  MetadataAllocator(MetadataAllocator &&) = delete;
-  MetadataAllocator &operator=(const MetadataAllocator &) = delete;
-  MetadataAllocator &operator=(MetadataAllocator &&) = delete;
-
-  void Reset() {}
-
-  LLVM_ATTRIBUTE_RETURNS_NONNULL
-  void *Allocate(size_t size, size_t alignment);
-
-  void Deallocate(const void *ptr, size_t size);
-
-  void PrintStats() const {}
-};
+/// A typedef for simple global caches.
+template <class EntryTy>
+using SimpleGlobalCache =
+  ConcurrentMap<EntryTy, /*destructor*/ false, MetadataAllocator>;
 
 // A wrapper around a pointer to a metadata cache entry that provides
 // DenseMap semantics that compare values in the key vector for the metadata
