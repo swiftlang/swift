@@ -2032,9 +2032,19 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
   ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
+  Printer.printNewline();
+
+  Accessibility Access = std::min(
+    /* Access of the context */
+    Conformance->getDeclContext()
+      ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
+    /* Access of the protocol */
+    Requirement->getDeclContext()
+      ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
+  if (Access == Accessibility::Public)
+    Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer.printNewline();
     Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
     Printer << "\n";
 
@@ -2045,6 +2055,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.AccessibilityFilter = Accessibility::Private;
+    Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
     if (isa<ClassDecl>(Conformance->getDeclContext())) {
       Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
@@ -2062,7 +2073,6 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.PrintPropertyAccessors = false;
     }
 
-    Printer.printNewline();
     Requirement->print(Printer, Options);
     Printer << "\n";
 

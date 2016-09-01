@@ -209,10 +209,35 @@ Demangle::NodePointer swift::_swift_buildDemanglingForMetadata(const Metadata *t
   }
   case MetadataKind::Tuple: {
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
+    const char *labels = tuple->Labels;
     auto tupleNode = NodeFactory::create(Node::Kind::NonVariadicTuple);
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
-      auto elt = _swift_buildDemanglingForMetadata(tuple->getElement(i).Type);
-      tupleNode->addChild(elt);
+      auto elt = NodeFactory::create(Node::Kind::TupleElement);
+
+      // Add a label child if applicable:
+      if (labels) {
+        // Look for the next space in the labels string.
+        if (const char *space = strchr(labels, ' ')) {
+          // If there is one, and the label isn't empty, add a label child.
+          if (labels != space) {
+            auto eltName =
+              NodeFactory::create(Node::Kind::TupleElementName,
+                                  std::string(labels, space));
+            elt->addChild(std::move(eltName));
+          }
+
+          // Skip past the space.
+          labels = space + 1;
+        }
+      }
+
+      // Add the element type child.
+      auto eltType =
+        _swift_buildDemanglingForMetadata(tuple->getElement(i).Type);
+      elt->addChild(std::move(eltType));
+
+      // Add the completed element to the tuple.
+      tupleNode->addChild(std::move(elt));
     }
     return tupleNode;
   }
