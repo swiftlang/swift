@@ -64,12 +64,6 @@ using namespace swift;
 using namespace metadataimpl;
 
 template <class T>
-static int comparePointers(const T *left, const T *right) {
-  return (uintptr_t(left) == uintptr_t(right) ? 0 :
-          uintptr_t(left) < uintptr_t(right) ? -1 : 1);
-}
-
-template <class T>
 static int compareIntegers(T left, T right) {
   return (left == right ? 0 : left < right ? -1 : 1);
 }
@@ -117,7 +111,7 @@ static void swift_freeMetadata(void *addr, size_t size) {
 #endif
 }
 
-void *MetadataAllocator::alloc(size_t size) {
+void *MetadataAllocator::Allocate(size_t size, size_t /*alignment*/) {
   const uintptr_t PageSize = SWIFT_LAZY_CONSTANT(swift_pageSize());
   // If the requested size is a page or larger, map page(s) for it
   // specifically.
@@ -162,6 +156,11 @@ void *MetadataAllocator::alloc(size_t size) {
       swift_freeMetadata(allocation, PageSize);
     }
   }
+}
+
+void MetadataAllocator::Deallocate(const void *ptr, size_t size) {
+  // Borrowed from llvm::BumpPtrAllocator.
+  __asan_poison_memory_region(ptr, size);
 }
 
 namespace {
@@ -369,6 +368,9 @@ namespace {
     static size_t getExtraAllocationSize(const ClassMetadata *key) {
       return 0;
     }
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
   };
 }
 
@@ -446,6 +448,10 @@ public:
 
   static size_t getExtraAllocationSize(Key key) {
     return key.getFlags().getNumArguments()
+         * sizeof(FunctionTypeMetadata::Argument);
+  }
+  size_t getExtraAllocationSize() const {
+    return Data.Flags.getNumArguments()
          * sizeof(FunctionTypeMetadata::Argument);
   }
 };
@@ -609,6 +615,9 @@ public:
   static size_t getExtraAllocationSize(const Key &key,
                                        const ValueWitnessTable *proposed) {
     return key.NumElements * sizeof(TupleTypeMetadata::Element);
+  }
+  size_t getExtraAllocationSize() const {
+    return Data.NumElements * sizeof(TupleTypeMetadata::Element);
   }
 };
 
@@ -1767,7 +1776,8 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
     auto ivarListSize = sizeof(ClassIvarList) +
                         numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) allocator.alloc(ivarListSize);
+    auto ivars = (ClassIvarList*) allocator.Allocate(ivarListSize,
+                                                     alignof(ClassIvarList));
     memcpy(ivars, dependentIvars, ivarListSize);
     rodata->IvarList = ivars;
 
@@ -1887,6 +1897,9 @@ namespace {
     static size_t getExtraAllocationSize(const Metadata *instanceType) {
       return 0;
     }
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
   };
 }
 
@@ -1929,6 +1942,9 @@ public:
   static size_t getExtraAllocationSize(unsigned numTables) {
     return 0;
   }
+  size_t getExtraAllocationSize() const {
+    return 0;
+  }
 };
 
 class ExistentialMetatypeCacheEntry {
@@ -1946,6 +1962,9 @@ public:
   }
 
   static size_t getExtraAllocationSize(const Metadata *key) {
+    return 0;
+  }
+  size_t getExtraAllocationSize() const {
     return 0;
   }
 };
@@ -2073,6 +2092,9 @@ public:
   static size_t getExtraAllocationSize(Key key) {
     return sizeof(const ProtocolDescriptor *) * key.NumProtocols;
   }
+  size_t getExtraAllocationSize() const {
+    return sizeof(const ProtocolDescriptor *) * Data.Protocols.NumProtocols;
+  }
 };
 
 class OpaqueExistentialValueWitnessTableCacheEntry {
@@ -2097,6 +2119,9 @@ public:
   static size_t getExtraAllocationSize(unsigned numTables) {
     return 0;
   }
+  size_t getExtraAllocationSize() const {
+    return 0;
+  }
 };
 
 class ClassExistentialValueWitnessTableCacheEntry {
@@ -2119,6 +2144,9 @@ public:
   }
 
   static size_t getExtraAllocationSize(unsigned numTables) {
+    return 0;
+  }
+  size_t getExtraAllocationSize() const {
     return 0;
   }
 };

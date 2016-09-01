@@ -59,19 +59,24 @@ struct HashableConformanceEntry {
                          const Metadata *baseTypeThatConformsToHashable) {
     return 0;
   }
+
+  size_t getExtraAllocationSize() const {
+    return 0;
+  }
 };
 } // end unnamed namesapce
 
 // FIXME(performance): consider merging this cache into the regular
 // protocol conformance cache.
-static Lazy<ConcurrentMap<HashableConformanceEntry>> HashableConformances;
+static ConcurrentMap<HashableConformanceEntry, /*Destructor*/ false>
+HashableConformances;
 
 template<bool KnownToConformToHashable>
 LLVM_ATTRIBUTE_ALWAYS_INLINE
 static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
   // Check the cache first.
   if (HashableConformanceEntry *entry =
-          HashableConformances->find(HashableConformanceKey{type})) {
+          HashableConformances.find(HashableConformanceKey{type})) {
     return entry->baseTypeThatConformsToHashable;
   }
   if (!KnownToConformToHashable &&
@@ -92,8 +97,8 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
       break;
     baseTypeThatConformsToHashable = superclass;
   }
-  HashableConformances->getOrInsert(HashableConformanceKey{type},
-                                    baseTypeThatConformsToHashable);
+  HashableConformances.getOrInsert(HashableConformanceKey{type},
+                                   baseTypeThatConformsToHashable);
   return baseTypeThatConformsToHashable;
 }
 

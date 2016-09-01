@@ -31,7 +31,7 @@ namespace swift {
 /// is not thread-safe; in concurrent uses, allocations must be guarded by
 /// a lock, such as the per-metadata-cache lock used to guard metadata
 /// instantiations. All allocations are pointer-aligned.
-class MetadataAllocator {
+class MetadataAllocator : public llvm::AllocatorBase<MetadataAllocator> {
   /// Address of the next available space. The allocator grabs a page at a time,
   /// so the need for a new page can be determined by page alignment.
   ///
@@ -47,8 +47,15 @@ public:
   MetadataAllocator(MetadataAllocator &&) = delete;
   MetadataAllocator &operator=(const MetadataAllocator &) = delete;
   MetadataAllocator &operator=(MetadataAllocator &&) = delete;
-  
-  void *alloc(size_t size);
+
+  void Reset() {}
+
+  LLVM_ATTRIBUTE_RETURNS_NONNULL
+  void *Allocate(size_t size, size_t alignment);
+
+  void Deallocate(const void *ptr, size_t size);
+
+  void PrintStats() const {}
 };
 
 // A wrapper around a pointer to a metadata cache entry that provides
@@ -144,9 +151,10 @@ public:
   static Impl *allocate(MetadataAllocator &allocator,
                         const void * const *arguments,
                         size_t numArguments, size_t payloadSize) {
-    void *buffer = allocator.alloc(sizeof(Impl)  +
-                                   numArguments * sizeof(void*) +
-                                   payloadSize);
+    void *buffer = allocator.Allocate(sizeof(Impl)  +
+                                      numArguments * sizeof(void*) +
+                                      payloadSize,
+                                      alignof(Impl));
     void *resultPtr = (char*)buffer + numArguments * sizeof(void*);
     auto result = new (resultPtr) Impl(numArguments);
 
@@ -237,6 +245,9 @@ template <class ValueTy> class MetadataCache {
     static size_t getExtraAllocationSize(const Key &key) {
       return key.KeyData.size() * sizeof(void*);
     }
+    size_t getExtraAllocationSize() const {
+      return getKeyData().size() * sizeof(void*);
+    }
 
     int compareWithKey(const Key &key) const {
       // Order by hash first, then by the actual key data.
@@ -261,10 +272,7 @@ template <class ValueTy> class MetadataCache {
   };
 
   /// The concurrent map.
-  ConcurrentMap<Entry> Map;
-
-  static_assert(sizeof(Map) == 2 * sizeof(void*),
-                "offset of Head is not at proper offset");
+  ConcurrentMap<Entry, /*Destructor*/ false, MetadataAllocator> Map;
 
   struct ConcurrencyControl {
     Mutex Lock;
@@ -272,12 +280,9 @@ template <class ValueTy> class MetadataCache {
   };
   std::unique_ptr<ConcurrencyControl> Concurrency;
 
-  /// Allocator for entries of this cache.
-  MetadataAllocator Allocator;
-  
 public:
   MetadataCache() : Concurrency(new ConcurrencyControl()) {}
-  ~MetadataCache() {}
+  ~MetadataCache() = default;
 
   /// Caches are not copyable.
   MetadataCache(const MetadataCache &other) = delete;
@@ -286,7 +291,7 @@ public:
   /// Get the allocator for metadata in this cache.
   /// The allocator can only be safely used while the cache is locked during
   /// an addMetadataEntry call.
-  MetadataAllocator &getAllocator() { return Allocator; }
+  MetadataAllocator &getAllocator() { return Map.getAllocator(); }
 
   /// Look up a cached metadata entry. If a cache match exists, return it.
   /// Otherwise, call entryBuilder() and add that to the cache.
