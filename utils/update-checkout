@@ -14,7 +14,9 @@ from __future__ import print_function
 import argparse
 import json
 import os
+import re
 import sys
+
 
 from functools import reduce
 
@@ -32,7 +34,8 @@ sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 
 
-def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
+def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
+                             cross_repos_pr):
     if not os.path.isdir(repo_path):
         return
 
@@ -43,12 +46,12 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         if should_clean:
             shell.call(['git', 'clean', '-fdx'],
                        echo=True)
-            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'clean', '-fdx'],
-                       echo=True)
-            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git', 'reset', '--hard', 'HEAD'],
-                       echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git',
+                        'clean', '-fdx'], echo=True)
+            shell.call(['git', 'submodule', 'foreach', '--recursive', 'git',
+                        'reset', '--hard', 'HEAD'], echo=True)
             status = shell.call(['git', 'reset', '--hard', 'HEAD'],
-                       echo=True)
+                                echo=True)
             if status:
                 print("Please, commit your changes.")
                 print(status)
@@ -73,17 +76,19 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
+        if not cross_repos_pr:
+            shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=True)
 
 
-def update_all_repositories(args, config, scheme_name):
+def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     repo_branch = scheme_name
     for repo_name in config['repos'].keys():
         if repo_name in args.skip_repository_list:
             print("--- Skipping '" + repo_name + "' ---")
             continue
+        repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
         if scheme_name:
             # This loop is only correct, since we know that each alias set has
             # unique contents. This is checked by verify config. Thus the first
@@ -93,12 +98,22 @@ def update_all_repositories(args, config, scheme_name):
                 if scheme_name not in v['aliases']:
                     continue
                 repo_branch = v['repos'][repo_name]
+                remote_repo_id = config['repos'][repo_name]['remote']['id']
+                if remote_repo_id in cross_repos_pr:
+                    pr_id = cross_repos_pr[remote_repo_id]
+                    repo_branch = "ci_pr_{0}".format(pr_id)
+                    with shell.pushd(repo_path, dry_run=False, echo=False):
+                        shell.capture(["git", "branch", "-D", repo_branch],
+                                      echo=True, allow_non_zero_exit=True)
+                        shell.call(["git", "fetch", "origin",
+                                    "pull/{0}/merge:{1}"
+                                    .format(pr_id, repo_branch)], echo=True)
                 break
-
-        update_single_repository(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+        update_single_repository(repo_path,
                                  repo_branch,
                                  args.reset_to_remote,
-                                 args.clean)
+                                 args.clean,
+                                 cross_repos_pr)
 
 
 def obtain_additional_swift_sources(
@@ -217,16 +232,29 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         "--config",
         default=os.path.join(SCRIPT_DIR, "update-checkout-config.json"),
         help="Configuration file to use")
+    parser.add_argument(
+        "--github-comment",
+        help="""Check out related pull requests referenced in the given
+        free-form GitHub-style comment.""",
+        metavar='GITHUB-COMMENT',
+        dest='github_comment')
     args = parser.parse_args()
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh
     skip_history = args.skip_history
     scheme = args.scheme
+    github_comment = args.github_comment
 
     with open(args.config) as f:
         config = json.load(f)
     validate_config(config)
+
+    cross_repos_pr = {}
+    if github_comment:
+        repos_with_pr = re.findall(r'apple/[-a-zA-Z0-9_]+#\d+', github_comment)
+        print("Found related pull requests:", str(repos_with_pr))
+        cross_repos_pr = dict(pr.split('#') for pr in repos_with_pr)
 
     if clone or clone_with_ssh:
         # If branch is None, default to using the default branch alias
@@ -238,7 +266,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
             config, clone_with_ssh, scheme, skip_history,
             args.skip_repository_list)
 
-    update_all_repositories(args, config, scheme)
+    update_all_repositories(args, config, scheme, cross_repos_pr)
 
     return 0
 
