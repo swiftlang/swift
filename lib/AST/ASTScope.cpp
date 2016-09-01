@@ -193,6 +193,12 @@ void ASTScope::expand() const {
       addChild(child);
     break;
 
+  case ASTScopeKind::AbstractFunctionDecl:
+    // Create the child of the function, if any.
+    if (auto child = createIfNeeded(this, abstractFunction))
+      addChild(child);
+    break;
+
   case ASTScopeKind::AbstractFunctionParams:
     // Create a child of the function parameters, which may eventually be
     // the function body.
@@ -531,6 +537,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
                                                       const Decl *decl) {
   while (true) {
     switch (parent->getKind()) {
+    case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
     case ASTScopeKind::TypeOrExtensionBody:
@@ -565,13 +572,14 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
   }
 }
 
-/// Determine whether the given parent is a local declaration or is
-/// directly descended from one.
+/// Determine whether the given parent is the accessor node for an abstract
+/// storage declaration or is directly descended from it.
 static bool parentDirectDescendedFromAbstractStorageDecl(
               const ASTScope *parent,
               const AbstractStorageDecl *decl) {
   while (true) {
-  switch (parent->getKind()) {
+    switch (parent->getKind()) {
+    case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
       // Keep looking.
@@ -602,7 +610,49 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::Closure:
       // Not a direct descendant.
       return false;
+    }
   }
+}
+
+/// Determine whether the given parent is the node for a specific abstract
+/// function declaration or is directly descended from it.
+static bool parentDirectDescendedFromAbstractFunctionDecl(
+              const ASTScope *parent,
+              const AbstractFunctionDecl *decl) {
+  while (true) {
+    switch (parent->getKind()) {
+    case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::GenericParams:
+      // Keep looking.
+      parent = parent->getParent();
+      continue;
+
+    case ASTScopeKind::AbstractFunctionDecl:
+      return (parent->getAbstractFunctionDecl() == decl);
+
+    case ASTScopeKind::Preexpanded:
+    case ASTScopeKind::SourceFile:
+    case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::AfterPatternBinding:
+    case ASTScopeKind::Accessors:
+    case ASTScopeKind::BraceStmt:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::IfStmt:
+    case ASTScopeKind::GuardStmt:
+    case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::ForStmt:
+    case ASTScopeKind::ForStmtInitializer:
+    case ASTScopeKind::Closure:
+      // Not a direct descendant.
+      return false;
+    }
   }
 }
 
@@ -634,9 +684,17 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
       inLocalContext && !isAccessor &&
       !parentDirectDescendedFromLocalDeclaration(parent, decl)) {
     auto scope = new (ctx) ASTScope(ASTScopeKind::LocalDeclaration,
-                                parent);
+                                    parent);
     scope->localDeclaration = decl;
     return scope;
+  }
+
+  // If this is a function declaration for which we have not introduced
+  // an AbstractFunctionDecl scope, add it now.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!parentDirectDescendedFromAbstractFunctionDecl(parent, func)) {
+      return new (ctx) ASTScope(parent, func);
+    }
   }
 
   // Local function to handle generic parameters.
@@ -930,6 +988,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
+  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::BraceStmt:
@@ -1000,6 +1059,7 @@ void ASTScope::enumerateContinuationScopes(
       SWIFT_FALLTHROUGH;
 
     case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
     case ASTScopeKind::AfterPatternBinding:
@@ -1049,6 +1109,9 @@ ASTContext &ASTScope::getASTContext() const {
 
   case ASTScopeKind::GenericParams:
     return genericParams.decl->getASTContext();
+
+  case ASTScopeKind::AbstractFunctionDecl:
+    return abstractFunction->getASTContext();
 
   case ASTScopeKind::AbstractFunctionParams:
     return abstractFunctionParams.decl->getASTContext();
@@ -1112,6 +1175,17 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return SourceRange(genericParams.params->getParams()[genericParams.index]
                          ->getEndLoc(),
                        genericParams.decl->getEndLoc());
+
+  case ASTScopeKind::AbstractFunctionDecl: {
+    // For an accessor, all of the parameters are implicit, so start them at
+    // the start location of the accessor.
+    if (isa<FuncDecl>(abstractFunction) &&
+        cast<FuncDecl>(abstractFunction)->isAccessor())
+      return SourceRange(abstractFunction->getLoc(),
+                         abstractFunction->getEndLoc());
+
+    return abstractFunction->getSourceRange();
+  }
 
   case ASTScopeKind::AbstractFunctionParams: {
     SourceLoc endLoc = abstractFunctionParams.decl->getEndLoc();
@@ -1422,6 +1496,13 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printScopeKind("GenericParams");
     printAddress(genericParams.params);
     out << " param " << genericParams.index;
+    printRange();
+    break;
+
+  case ASTScopeKind::AbstractFunctionDecl:
+    printScopeKind("AbstractFunctionDecl");
+    printAddress(abstractFunction);
+    out << " " << abstractFunction->getFullName();
     printRange();
     break;
 

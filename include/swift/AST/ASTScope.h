@@ -63,6 +63,8 @@ enum class ASTScopeKind : uint8_t {
   TypeOrExtensionBody,
   /// The generic parameters of a declaration.
   GenericParams,
+  /// A function/initializer/deinitializer.
+  AbstractFunctionDecl,
   /// The parameters of a function/initializer/deinitializer.
   AbstractFunctionParams,
   /// The scope introduced by a particular clause in a pattern binding
@@ -147,7 +149,10 @@ class ASTScope {
       unsigned index;
     } genericParams;
 
-    /// An abstract function (init/func/deinit).
+    /// An abstract function, for \c kind == ASTScopeKind::AbstractFunctionDecl.
+    AbstractFunctionDecl *abstractFunction;
+
+    /// An parameter for an abstract function (init/func/deinit).
     ///
     /// For \c kind == ASTScopeKind::AbstractFunctionParams.
     struct {
@@ -260,6 +265,11 @@ class ASTScope {
     this->genericParams.params = genericParams;
     this->genericParams.decl = decl;
     this->genericParams.index = index;
+  }
+
+  ASTScope(const ASTScope *parent, AbstractFunctionDecl *abstractFunction)
+      : ASTScope(ASTScopeKind::AbstractFunctionDecl, parent) {
+    this->abstractFunction = abstractFunction;
   }
 
   ASTScope(const ASTScope *parent, AbstractFunctionDecl *abstractFunction,
@@ -439,6 +449,13 @@ public:
   Decl *getLocalDeclaration() const {
     assert(getKind() == ASTScopeKind::LocalDeclaration);
     return localDeclaration;
+  }
+
+  /// Retrieve the abstract function declaration when
+  /// \c getKind() == ASTScopeKind::AbstractFunctionDecl;
+  AbstractFunctionDecl *getAbstractFunctionDecl() const {
+    assert(getKind() == ASTScopeKind::AbstractFunctionDecl);
+    return abstractFunction;
   }
 
   /// Retrieve the abstract storage declaration when
