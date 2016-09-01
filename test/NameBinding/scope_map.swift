@@ -32,8 +32,8 @@ class ContainsGenerics0 {
 
 typealias GenericAlias0<T> = [T]
 
-#if arch(i386)
-struct i386ArchStruct { }
+#if arch(unknown)
+struct UnknownArchStruct { }
 #else
 struct OtherArchStruct { }
 #endif
@@ -161,6 +161,7 @@ func closures() {
   { a, b in a * b }(3, 4)
 }
 
+{ closures() }()
 
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
@@ -287,16 +288,16 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        |-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
-// CHECK-EXPANDED-NEXT: {{^}}        |-BraceStmt {{.*}} [146:9 - 148:5] expanded
-// CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        |-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [146:9 - 148:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-LocalDeclaration {{.*}} [150:25 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [150:25 - 152:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [154:6 - 154:8] expanded
 
-// CHECK-EXPANDED: {{^}}`-BraceStmt {{.*}} [157:17 - 162:1] expanded
+// CHECK-EXPANDED: {{^}}|-BraceStmt {{.*}} [157:17 - 162:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-Preexpanded {{.*}} [158:10 - 161:19] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    |-Closure {{.*}} [158:10 - 160:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [158:10 - 160:3] expanded
@@ -304,3 +305,7 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [159:12 - 159:22] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [161:10 - 161:19] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [161:10 - 161:19] expanded
+
+// CHECK-EXPANDED: {{^}}`-BraceStmt {{.*}} [164:1 - 164:16] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-Closure {{.*}} [164:1 - 164:14] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [164:1 - 164:14] expanded

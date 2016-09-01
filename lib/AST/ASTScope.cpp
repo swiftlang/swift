@@ -108,6 +108,7 @@ void ASTScope::expand() const {
 
   // Local function to add a child to the list of children.
   bool outOfOrder = false;
+  bool allowOutOfOrder = false;
   bool previouslyEmpty = storedChildren.empty();
   auto addChild = [&](ASTScope *child) {
     assert(child->getParent() == this && "Wrong parent");
@@ -137,8 +138,19 @@ void ASTScope::expand() const {
       // If the previous child does not precede this one, we have an
       // out-of-order list of children.
       // FIXME: Decide whether fixing this up at end is a good interim step.
-      if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End))
+      if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End)) {
         outOfOrder = true;
+
+        // FIXME: Enable this check.
+        if (!allowOutOfOrder && false) {
+          auto &out = verificationError() << "unexpected out-of-order nodes\n";
+          out << "***Child node***\n";
+          child->print(out);
+          out << "***Previous child node***\n";
+          prevChild->print(out);
+          abort();
+        }
+      }
     }
 
     // Add the child.
@@ -387,14 +399,18 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::Accessors: {
-    // Collect all of the explicitly-written accessors.
-    SmallVector<FuncDecl *, 2> accessors;
+    // We allow the accessor nodes to be out-of-order, because the AST
+    // doesn't give us an easy way to visit them in source order.
+    allowOutOfOrder = true;
+
+    // Add children for all of the the explicitly-written accessors.
     auto addAccessor = [&](FuncDecl *accessor) {
       if (!accessor) return;
       if (accessor->isImplicit()) return;
       if (accessor->getStartLoc().isInvalid()) return;
 
-      accessors.push_back(accessor);
+      if (auto accessorChild = createIfNeeded(this, accessor))
+        addChild(accessorChild);
     };
 
     addAccessor(abstractStorageDecl->getGetter());
@@ -407,19 +423,6 @@ void ASTScope::expand() const {
     if (abstractStorageDecl->hasObservers()) {
       addAccessor(abstractStorageDecl->getDidSetFunc());
       addAccessor(abstractStorageDecl->getWillSetFunc());
-    }
-
-    // Sort the accessors by beginning source range.
-    std::sort(accessors.begin(), accessors.end(),
-      [&](FuncDecl *a1, FuncDecl *a2) {
-        return ctx.SourceMgr.isBeforeInBuffer(a1->getStartLoc(),
-                                              a2->getStartLoc());
-      });
-
-    // Add the accessor children.
-    for (auto accessor : accessors) {
-      if (auto accessorChild = createIfNeeded(this, accessor))
-        addChild(accessorChild);
     }
     break;
   }
@@ -444,6 +447,15 @@ void ASTScope::expand() const {
   // files can grow due to the REPL.
   if (kind != ASTScopeKind::SourceFile)
     parentAndExpanded.setInt(true);
+
+  // If needed, sort the children.
+  if (outOfOrder) {
+    std::sort(storedChildren.begin(), storedChildren.end(),
+        [&](ASTScope *s1, ASTScope *s2) {
+          return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
+                                                s2->getSourceRange().Start);
+    });
+  }
 }
 
 bool ASTScope::isExpanded() const {
@@ -644,6 +656,19 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Extension:
     return new (ctx) ASTScope(parent, cast<ExtensionDecl>(decl));
 
+  case DeclKind::TopLevelCode: {
+    // Drop top-level statements containing just an IfConfigStmt.
+    // FIXME: The modeling of IfConfig is weird.
+    auto braceStmt = cast<TopLevelCodeDecl>(decl)->getBody();
+    auto elements = braceStmt->getElements();
+    if (elements.size() == 1 &&
+        elements[0].is<Stmt *>() &&
+        isa<IfConfigStmt>(elements[0].get<Stmt *>()))
+      return nullptr;
+
+    return createIfNeeded(parent, braceStmt);
+  }
+
   case DeclKind::Class:
   case DeclKind::Enum:
   case DeclKind::Struct: {
@@ -735,9 +760,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     return nullptr;
   }
   }
-
-  // FIXME: Handle remaining cases.
-  return nullptr;
 }
 
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
@@ -809,9 +831,6 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
     // Nothing to do for these statements.
     return nullptr;
   }
-
-  // FIXME: Handle remaining cases.
-  return nullptr;
 }
 
 /// Find all of the (non-nested) closures referenced within this expression.
