@@ -192,6 +192,9 @@ def main(builtinParameters = {}):
     parser.add_option("", "--distribute", dest="distribute",
                       help="Distribute testing jobs",
                       action="store_true", default=None)
+    parser.add_option("", "--slave", dest="slave",
+                      help="Run in slave mode for some distributed testing master",
+                      action="store_true", default=None)
     parser.add_option("", "--config-prefix", dest="configPrefix",
                       metavar="NAME", help="Prefix for 'lit' config files",
                       action="store", default=None)
