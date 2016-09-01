@@ -294,8 +294,6 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        |-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
-// CHECK-EXPANDED-NEXT: {{^}}        |-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
-// CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [146:9 - 148:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded

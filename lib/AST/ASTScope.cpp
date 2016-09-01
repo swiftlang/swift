@@ -107,14 +107,14 @@ void ASTScope::expand() const {
 #endif
 
   // Local function to add a child to the list of children.
-  bool outOfOrder = false;
-  bool allowOutOfOrder = false;
   bool previouslyEmpty = storedChildren.empty();
   auto addChild = [&](ASTScope *child) {
     assert(child->getParent() == this && "Wrong parent");
 
-    // Check for containment of the child within the parent.
 #ifndef NDEBUG
+    // Check invariants in asserting builds.
+
+    // Check for containment of the child within the parent.
     if (!sourceMgr.rangeContains(getSourceRange(), child->getSourceRange())) {
       auto &out = verificationError() << "child not contained in its parent\n";
       out << "***Child node***\n";
@@ -123,34 +123,26 @@ void ASTScope::expand() const {
       this->print(out);
       abort();
     }
-#endif
 
-    // If there was a previous child, check it's source
+    // If there was a previous child, check it's source range.
     if (!storedChildren.empty()) {
       auto prevChild = storedChildren.back();
       SourceRange prevChildRange = prevChild->getSourceRange();
       SourceRange childRange = child->getSourceRange();
 
-#ifndef NDEBUG
-      // FIXME: Make sure that the we don't overlap the previous child.
-#endif
-
-      // If the previous child does not precede this one, we have an
-      // out-of-order list of children.
-      // FIXME: Decide whether fixing this up at end is a good interim step.
+      // This new child must come after the previous child.
       if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End)) {
-        outOfOrder = true;
-
-        if (!allowOutOfOrder) {
-          auto &out = verificationError() << "unexpected out-of-order nodes\n";
-          out << "***Child node***\n";
-          child->print(out);
-          out << "***Previous child node***\n";
-          prevChild->print(out);
-          abort();
-        }
+        auto &out = verificationError() << "unexpected out-of-order nodes\n";
+        out << "***Child node***\n";
+        child->print(out);
+        out << "***Previous child node***\n";
+        prevChild->print(out);
+        abort();
       }
+
+      // FIXME: Make sure that the we don't overlap the previous child.
     }
+#endif
 
     // Add the child.
     storedChildren.push_back(child);
@@ -413,18 +405,15 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::Accessors: {
-    // We allow the accessor nodes to be out-of-order, because the AST
-    // doesn't give us an easy way to visit them in source order.
-    allowOutOfOrder = true;
-
     // Add children for all of the the explicitly-written accessors.
+    SmallVector<ASTScope *, 4> accessors;
     auto addAccessor = [&](FuncDecl *accessor) {
       if (!accessor) return;
       if (accessor->isImplicit()) return;
       if (accessor->getStartLoc().isInvalid()) return;
 
       if (auto accessorChild = createIfNeeded(this, accessor))
-        addChild(accessorChild);
+        accessors.push_back(accessorChild);
     };
 
     addAccessor(abstractStorageDecl->getGetter());
@@ -438,6 +427,18 @@ void ASTScope::expand() const {
       addAccessor(abstractStorageDecl->getDidSetFunc());
       addAccessor(abstractStorageDecl->getWillSetFunc());
     }
+
+    // Sort the accessors, because they can come in any order.
+    std::sort(accessors.begin(), accessors.end(),
+      [&](ASTScope *s1, ASTScope *s2) {
+        return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
+                                              s2->getSourceRange().Start);
+    });
+
+    // Add the accessors.
+    for (auto accessor : accessors)
+      addChild(accessor);
+
     break;
   }
 
@@ -461,15 +462,6 @@ void ASTScope::expand() const {
   // files can grow due to the REPL.
   if (kind != ASTScopeKind::SourceFile)
     parentAndExpanded.setInt(true);
-
-  // If needed, sort the children.
-  if (outOfOrder) {
-    std::sort(storedChildren.begin(), storedChildren.end(),
-        [&](ASTScope *s1, ASTScope *s2) {
-          return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
-                                                s2->getSourceRange().Start);
-    });
-  }
 }
 
 bool ASTScope::isExpanded() const {
@@ -927,6 +919,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
+  case ASTScopeKind::Accessors:
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
@@ -951,10 +944,6 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::LocalDeclaration:
     // Local declarations can always have a continuation.
     return true;
-
-  case ASTScopeKind::Accessors:
-    // Local declarations can have a continuation.
-    return abstractStorageDecl->getDeclContext()->isLocalContext();
 
   case ASTScopeKind::ConditionalClause:
     // The last conditional clause of a 'guard' statement can have a
