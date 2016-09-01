@@ -141,8 +141,7 @@ void ASTScope::expand() const {
       if (sourceMgr.isBeforeInBuffer(childRange.Start, prevChildRange.End)) {
         outOfOrder = true;
 
-        // FIXME: Enable this check.
-        if (!allowOutOfOrder && false) {
+        if (!allowOutOfOrder) {
           auto &out = verificationError() << "unexpected out-of-order nodes\n";
           out << "***Child node***\n";
           child->print(out);
@@ -249,7 +248,8 @@ void ASTScope::expand() const {
   case ASTScopeKind::IfStmt:
     // The first conditional clause or, failing that, the 'then' clause.
     if (!ifStmt->getCond().empty()) {
-      addChild(new (ctx) ASTScope(this, ifStmt, 0));
+      addChild(new (ctx) ASTScope(this, ifStmt, 0,
+                                  /*isGuardContinuation=*/false));
     } else {
       if (auto thenChild = createIfNeeded(this, ifStmt->getThenStmt()))
         addChild(thenChild);
@@ -262,10 +262,20 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::ConditionalClause: {
+    // If this is a boolean conditional not in a guard continuation, add a
+    // child for the expression.
+    if (!conditionalClause.isGuardContinuation) {
+      const auto &cond =
+        conditionalClause.stmt->getCond()[conditionalClause.index];
+      if (auto booleanChild = createIfNeeded(this, cond.getBooleanOrNull()))
+        addChild(booleanChild);
+    }
+
     // If there's another conditional clause, add it as the child.
     unsigned nextIndex = conditionalClause.index + 1;
     if (nextIndex < conditionalClause.stmt->getCond().size()) {
-      addChild(new (ctx) ASTScope(this, conditionalClause.stmt, nextIndex));
+      addChild(new (ctx) ASTScope(this, conditionalClause.stmt, nextIndex,
+                                  conditionalClause.isGuardContinuation));
       break;
     }
 
@@ -288,12 +298,16 @@ void ASTScope::expand() const {
 
   case ASTScopeKind::GuardStmt:
     // Add a child to describe the guard condition.
-    addChild(new (ctx) ASTScope(this, guard, 0));
+      addChild(new (ctx) ASTScope(this, guard, 0,
+                                  /*isGuardContinuation=*/false));
 
     // Add a child for the 'guard' body, which always exits.
     if (auto bodyChild = createIfNeeded(this, guard->getBody()))
       addChild(bodyChild);
 
+    // Add a child to describe the guard condition for the continuation.
+    addChild(new (ctx) ASTScope(this, guard, 0,
+                                /*isGuardContinuation=*/true));
     break;
 
   case ASTScopeKind::RepeatWhileStmt:
@@ -793,7 +807,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
       return createIfNeeded(parent, whileStmt->getBody());
 
     // Create a node for the first conditional clause.
-    return new (ctx) ASTScope(parent, whileStmt, 0);
+    return new (ctx) ASTScope(parent, whileStmt, 0,
+                              /*isGuardContinuation=*/false);
   }
 
   case StmtKind::RepeatWhile:
@@ -943,8 +958,8 @@ bool ASTScope::isContinuationScope() const {
 
   case ASTScopeKind::ConditionalClause:
     // The last conditional clause of a 'guard' statement can have a
-    // continuation.
-    return isa<GuardStmt>(conditionalClause.stmt) &&
+    // continuation if it is marked accordingly.
+    return conditionalClause.isGuardContinuation &&
       conditionalClause.index + 1 == conditionalClause.stmt->getCond().size();
   }
 }
@@ -1160,24 +1175,41 @@ SourceRange ASTScope::getSourceRange() const {
     return ifStmt->getSourceRange();
 
   case ASTScopeKind::ConditionalClause: {
+    // For a guard continuation, the scope extends from the end of the 'else'
+    // to the end of the continuation.
+    if (conditionalClause.isGuardContinuation) {
+      // Find the 'guard' parent.
+      const ASTScope *guard = this;
+      do {
+        guard = guard->getParent();
+      } while (guard->getKind() != ASTScopeKind::GuardStmt);
+
+      return SourceRange(guard->guard->getBody()->getEndLoc(),
+                         getParent()->getSourceRange().End);
+    }
+
     // Determine the start location, which is either the beginning of the next
     // conditional or something statement-specific.
     auto conditionals = conditionalClause.stmt->getCond();
     unsigned nextIndex = conditionalClause.index + 1;
     SourceLoc startLoc;
-    if (nextIndex < conditionals.size())
+    if (conditionals[conditionalClause.index].getKind()
+          == StmtConditionElement::CK_PatternBinding &&
+        nextIndex < conditionals.size()) {
       startLoc = conditionals[nextIndex].getStartLoc();
-
-    SourceLoc endLoc;
+    } else if (conditionals[conditionalClause.index].getKind()
+                 != StmtConditionElement::CK_PatternBinding) {
+      startLoc = conditionals[conditionalClause.index].getStartLoc();
+    }
 
     // For 'guard' statements, the conditional clause covers the continuation.
     if (auto guard = dyn_cast<GuardStmt>(conditionalClause.stmt)) {
       // If we didn't have a condition clause to start the new scope, use the
       // end of the guard statement itself.
       if (startLoc.isInvalid())
-        startLoc = guard->getEndLoc();
+        startLoc = guard->getBody()->getStartLoc();
 
-      return SourceRange(startLoc, getParent()->getSourceRange().End);
+      return SourceRange(startLoc, guard->getBody()->getStartLoc());
     }
 
     // For 'if' statements, the conditional clause covers the 'then' branch.
@@ -1196,7 +1228,6 @@ SourceRange ASTScope::getSourceRange() const {
     // the beginning of the body.
     if (startLoc.isInvalid())
       startLoc = whileStmt->getBody()->getStartLoc();
-
     return SourceRange(startLoc, whileStmt->getBody()->getEndLoc());
   }
 
@@ -1386,6 +1417,8 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printScopeKind("ConditionalClause");
     printAddress(conditionalClause.stmt);
     out << " index " << conditionalClause.index;
+    if (conditionalClause.isGuardContinuation)
+      out << " guard-continuation";
     printRange();
     break;
 

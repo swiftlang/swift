@@ -65,7 +65,7 @@ func functionBodies1(a: Int, b: Int?) {
     let c2 = b
   }
 
-  guard let b1 = b, let b2 = b else {
+  guard let b1 = b, { $0 > 5 }(b1), let b2 = b else {
     let c = 5
     return
   }
@@ -223,8 +223,16 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [64:10 - 66:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [65:14 - 66:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                    `-GuardStmt {{.*}} [68:3 - 100:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [68:21 - 100:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [71:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [68:21 - 68:53] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [68:21 - 68:53] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          |-Closure {{.*}} [68:21 - 68:30] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [68:21 - 68:30] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 2 [68:53 - 68:53] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-BraceStmt {{.*}} [68:53 - 71:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      `-ConditionalClause {{.*}} index 0 guard-continuation [71:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 guard-continuation [71:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 2 guard-continuation [71:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          |-ConditionalClause {{.*}} index 0 [73:21 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ConditionalClause {{.*}} index 1 [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [73:32 - 75:3] expanded
@@ -250,8 +258,6 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}                          `-ForStmt {{.*}} [99:3 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ForStmtInitializer {{.*}} [99:17 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [99:36 - 99:38] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [68:37 - 71:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
 
 // CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'StructContainsAbstractStorageDecls' [114:43 - 130:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.subscript@{{.*}}scope_map.swift:115:3 [115:37 - 121:3] expanded

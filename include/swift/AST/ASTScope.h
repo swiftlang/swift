@@ -187,6 +187,10 @@ class ASTScope {
 
       /// The index of the conditional clause.
       unsigned index;
+
+      /// Whether this conditional clause is being used for the 'guard'
+      /// continuation.
+      bool isGuardContinuation;
     } conditionalClause;
 
     /// The 'guard' statement, for \c kind == ASTScopeKind::GuardStmt.
@@ -281,10 +285,11 @@ class ASTScope {
   }
 
   ASTScope(const ASTScope *parent, LabeledConditionalStmt *stmt,
-           unsigned index)
+           unsigned index, bool isGuardContinuation)
       : ASTScope(ASTScopeKind::ConditionalClause, parent) {
     this->conditionalClause.stmt = stmt;
     this->conditionalClause.index = index;
+    this->conditionalClause.isGuardContinuation = isGuardContinuation;
   }
 
   ASTScope(const ASTScope *parent, GuardStmt *guard)
