@@ -75,7 +75,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        #shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
+        # shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=True)
 
@@ -104,8 +104,8 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                         shell.capture(["git", "branch", "-D", repo_branch],
                                       echo=True, allow_non_zero_exit=True)
                         shell.call(["git", "fetch", "origin",
-                                    "pull/{0}/merge:{1}".format(pr_id, repo_branch)],
-                                   echo=True)
+                                    "pull/{0}/merge:{1}"
+                                    .format(pr_id, repo_branch)], echo=True)
                 break
         update_single_repository(repo_path,
                                  repo_branch,
@@ -231,7 +231,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="Configuration file to use")
     parser.add_argument(
         "--github-comment",
-        help='Check out related pull requests referenced in the given free-form GitHub-style comment.',
+        help="""Check out related pull requests referenced in the given
+        free-form GitHub-style comment.""",
         metavar='GITHUB-COMMENT',
         dest='github_comment')
     args = parser.parse_args()
