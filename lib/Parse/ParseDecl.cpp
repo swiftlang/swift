@@ -3417,10 +3417,20 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
   // Otherwise, we have a normal var or subscript declaration, parse the full
   // complement of specifiers, along with their bodies.
 
-  // If the body is completely empty, reject it.  This is at best a getter with
+  // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::computed_property_no_accessors);
+    auto *TheDecl = createAccessorFunc(VarLBLoc, nullptr, TypeLoc(), nullptr,
+                                       SourceLoc(), Flags,
+                                       AccessorKind::IsGetter,
+                                       AddressorKind::NotAddressor, this,
+                                       SourceLoc());
+
+    TheDecl->setBody(BraceStmt::create(Context, LastValidLoc, {},
+                                       Tok.getLoc()));
+    TheDecl->setInvalid();
+    Decls.push_back(TheDecl);
     return true;
   }
 
