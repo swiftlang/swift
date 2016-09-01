@@ -25,37 +25,35 @@
 from __future__ import print_function
 
 import argparse
-import sys
 import lldb
 import subprocess
 
-DYN_LIBS = {}
-BINARY = None
-
 
 def process_ldd(lddoutput):
+    dyn_libs = {}
     for line in lddoutput.splitlines():
         ldd_tokens = line.split()
         if len(ldd_tokens) >= 3:
-            DYN_LIBS[ldd_tokens[0]] = ldd_tokens[2]
+            dyn_libs[ldd_tokens[0]] = ldd_tokens[2]
+    return dyn_libs
 
 
-def create_lldb_target(memmap):
+def create_lldb_target(binary, memmap):
     lldb_debugger = lldb.SBDebugger.Create()
     lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
-        BINARY, lldb.LLDB_ARCH_DEFAULT)
+        binary, lldb.LLDB_ARCH_DEFAULT)
     module = lldb_target.GetModuleAtIndex(0)
     # lldb seems to treat main binary differently, slide offset must be zero
     lldb_target.SetModuleLoadAddress(module, 0)
     for dynlib_path in memmap:
-        if BINARY not in dynlib_path:
+        if binary not in dynlib_path:
             module = lldb_target.AddModule(
                 dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
             lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
     return lldb_target
 
 
-def process_stack(stack):
+def process_stack(binary, dyn_libs, stack):
     if len(stack) == 0:
         return
     memmap = {}
@@ -63,13 +61,12 @@ def process_stack(stack):
     for line in stack:
         stack_tokens = line.split()
         dynlib_fname = stack_tokens[1]
-        if dynlib_fname in DYN_LIBS:
-            dynlib_path = DYN_LIBS[dynlib_fname]
+        if dynlib_fname in dyn_libs:
+            dynlib_path = dyn_libs[dynlib_fname]
+        elif dynlib_fname in binary:
+            dynlib_path = binary
         else:
-            if dynlib_fname in BINARY:
-                dynlib_path = BINARY
-            else:
-                dynlib_path = None
+            dynlib_path = None
 
         if "<unavailable>" in stack_tokens[3]:
             framePC = int(stack_tokens[2], 16)
@@ -77,17 +74,18 @@ def process_stack(stack):
             dynlib_baseaddr = framePC - symbol_offset
             if dynlib_path in memmap:
                 if memmap[dynlib_path] != dynlib_baseaddr:
-                    print("Mismatched base address for: {0:s}, "
-                          "had: {1:x}, now got {2:x}".format(
-                            dynlib_path, memmap[dynlib_path], dynlib_baseaddr))
-                    sys.exit(1)
+                    error_msg = "Mismatched base address for: {0:s}, " \
+                                "had: {1:x}, now got {2:x}"
+                    error_msg = error_msg.format(
+                        dynlib_path, memmap[dynlib_path], dynlib_baseaddr)
+                    raise Exception(error_msg)
             else:
                 memmap[dynlib_path] = dynlib_baseaddr
         else:
             framePC = int(stack_tokens[2], 16) + int(stack_tokens[-1], 10)
         full_stack.append({"line": line, "framePC": framePC})
 
-    lldb_target = create_lldb_target(memmap)
+    lldb_target = create_lldb_target(binary, memmap)
     frame_idx = 0
     for frame in full_stack:
         use_orig_line = True
@@ -118,7 +116,6 @@ def process_stack(stack):
 
 
 def main():
-    global BINARY
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""Symbolicates stack traces in Linux log files.""")
@@ -128,12 +125,12 @@ def main():
         "log", help="Log file containing the stack trace to symbolicate")
     args = parser.parse_args()
 
-    BINARY = args.binary
+    binary = args.binary
     logfile = args.log
 
     lddoutput = subprocess.check_output(
-        ['ldd', BINARY], stderr=subprocess.STDOUT)
-    process_ldd(lddoutput)
+        ['ldd', binary], stderr=subprocess.STDOUT)
+    dyn_libs = process_ldd(lddoutput)
 
     instack = False
     stackidx = 0
@@ -146,12 +143,12 @@ def main():
             else:
                 instack = False
                 stackidx = 0
-                process_stack(stack)
+                process_stack(binary, dyn_libs, stack)
                 stack = []
                 print(line.rstrip())
             if line.startswith("Current stack trace:"):
                 instack = True
-    process_stack(stack)
+    process_stack(binary, dyn_libs, stack)
 
 
 if __name__ == '__main__':
