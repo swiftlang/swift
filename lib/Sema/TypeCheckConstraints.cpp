@@ -1930,7 +1930,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     // If we didn't find one, create it.
     if (!initContext) {
       initContext = Context.createPatternBindingContext(DC);
-      initContext->setBinding(PBD);
+      initContext->setBinding(PBD, patternNumber);
       initContextIsNew = true;
     }
     DC = initContext;

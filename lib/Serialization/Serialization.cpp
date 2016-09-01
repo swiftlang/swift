@@ -1845,11 +1845,13 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
                                 declOrDeclContextID, isDecl);
 }
 
-void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding) {
+void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
+                                                unsigned bindingIndex) {
   using namespace decls_block;
   auto abbrCode = DeclTypeAbbrCodes[PatternBindingInitializerLayout::Code];
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
-                                              abbrCode, addDeclRef(binding));
+                                              abbrCode, addDeclRef(binding),
+                                              bindingIndex);
 }
 
 void
@@ -1896,7 +1898,7 @@ void Serializer::writeLocalDeclContext(const DeclContext *DC) {
 
   case DeclContextKind::Initializer: {
     if (auto PBI = dyn_cast<PatternBindingInitializer>(DC)) {
-      writePatternBindingInitializer(PBI->getBinding());
+      writePatternBindingInitializer(PBI->getBinding(), PBI->getBindingIndex());
     } else if (auto DAI = dyn_cast<DefaultArgumentInitializer>(DC)) {
       writeDefaultArgumentInitializer(DAI->getParent(), DAI->getIndex());
     }
@@ -1928,7 +1930,7 @@ void Serializer::writeLocalDeclContext(const DeclContext *DC) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto PBI = cast<SerializedPatternBindingInitializer>(local);
-      writePatternBindingInitializer(PBI->getBinding());
+      writePatternBindingInitializer(PBI->getBinding(), PBI->getBindingIndex());
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl: {

@@ -494,16 +494,19 @@ public:
 /// deserialization.
 class SerializedLocalDeclContext : public DeclContext {
 private:
-  const LocalDeclContextKind LocalKind;
+  unsigned LocalKind : 3;
+
+protected:
+  unsigned SpareBits : 29;
 
 public:
   SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
                              DeclContext *Parent)
     : DeclContext(DeclContextKind::SerializedLocal, Parent),
-      LocalKind(LocalKind) {}
+      LocalKind(static_cast<unsigned>(LocalKind)) {}
 
   LocalDeclContextKind getLocalDeclContextKind() const {
-    return LocalKind;
+    return static_cast<LocalDeclContextKind>(LocalKind);
   }
 
   static bool classof(const DeclContext *DC) {
