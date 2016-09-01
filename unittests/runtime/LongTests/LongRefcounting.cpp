@@ -73,8 +73,8 @@ static void releaseALot(TestObject *object, size_t &deallocated,
   }
 }
 
-// 32-2 bits of retain count.
-const uint64_t maxRC = (1ULL << (32 - 2)) - 1;
+// 32-3 bits of extra retain count, plus 1 for the implicit retain
+const uint64_t maxRC = 1ULL << (32 - 3);
 
 TEST(LongRefcountingTest, retain_max) {
   size_t deallocated = 0;
@@ -83,12 +83,20 @@ TEST(LongRefcountingTest, retain_max) {
   // RC is 1.
   // Retain to maxRC, release back to 1, then release and verify deallocation.
   retainALot<true>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), maxRC);
   releaseALot<true>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), 1u);
   EXPECT_EQ(0u, deallocated);
   swift_release(object);
   EXPECT_EQ(1u, deallocated);
+}
+
+TEST(LongRefcountingTest, retain_overflow_DeathTest) {
+  size_t deallocated = 0;
+  auto object = allocTestObject(&deallocated, 1);
+
+  // RC is 1. Retain to maxRC, then retain again and verify overflow error.
+  retainALot<true>(object, deallocated, maxRC - 1);
+  EXPECT_EQ(0u, deallocated);
+  ASSERT_DEATH(swift_retain(object), "swift_abortRetainOverflow");
 }
 
 TEST(LongRefcountingTest, nonatomic_retain_max) {
@@ -98,42 +106,19 @@ TEST(LongRefcountingTest, nonatomic_retain_max) {
   // RC is 1.
   // Retain to maxRC, release back to 1, then release and verify deallocation.
   retainALot<false>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), maxRC);
   releaseALot<false>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), 1u);
   EXPECT_EQ(0u, deallocated);
   swift_nonatomic_release(object);
   EXPECT_EQ(1u, deallocated);
 }
 
-TEST(RefcountingTest, retain_overflow) {
+TEST(LongRefcountingTest, nonatomic_retain_overflow_DeathTest) {
   size_t deallocated = 0;
   auto object = allocTestObject(&deallocated, 1);
 
-  // RC is 1. Retain to maxRC, then retain again and verify overflow.
-  retainALot<true>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), maxRC);
-  EXPECT_EQ(0u, deallocated);
-
-  // There is no overflow enforcement in the runtime today.
-  // Instead we check that the retain count wrapped around.
-  swift_retain(object);
-  EXPECT_EQ(swift_retainCount(object), 0u);
-  EXPECT_EQ(0u, deallocated);
-}
-
-TEST(RefcountingTest, nonatomic_retain_overflow) {
-  size_t deallocated = 0;
-  auto object = allocTestObject(&deallocated, 1);
-
-  // RC is 1. Retain to maxRC, then retain again and verify overflow.
+  // RC is 1. Retain to maxRC, then retain again and verify overflow error.
   retainALot<false>(object, deallocated, maxRC - 1);
-  EXPECT_EQ(swift_retainCount(object), maxRC);
   EXPECT_EQ(0u, deallocated);
-
-  // There is no overflow enforcement in the runtime today.
-  // Instead we check that the retain count wrapped around.
-  swift_nonatomic_retain(object);
-  EXPECT_EQ(swift_retainCount(object), 0u);
-  EXPECT_EQ(0u, deallocated);
+  ASSERT_DEATH(swift_nonatomic_retain(object), "swift_abortRetainOverflow");
 }
+
