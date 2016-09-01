@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -23,7 +24,30 @@
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
+#include <algorithm>
 using namespace swift;
+
+ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
+    : ASTScope(ASTScopeKind::Preexpanded, parent) {
+  assert(children.size() > 1 && "Don't use this without multiple nodes");
+
+  // Add child nodes.
+  storedChildren.append(children.begin(), children.end());
+
+  // Note that this node has already been expanded.
+  parentAndExpanded.setInt(true);
+
+  // Register the destructor.
+  ASTContext &ctx = parent->getASTContext();
+  ctx.addDestructorCleanup(storedChildren);
+
+  // Make sure the children were properly sorted.
+  assert(std::is_sorted(children.begin(), children.end(),
+                        [&](ASTScope *s1, ASTScope *s2) {
+    return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
+                                          s2->getSourceRange().Start);
+  }));
+}
 
 /// Determine whether we should completely skip the given element in a
 /// \c BraceStmt.
@@ -123,6 +147,9 @@ void ASTScope::expand() const {
 
   // Expand the children in the current scope.
   switch (kind) {
+  case ASTScopeKind::Preexpanded:
+    llvm_unreachable("Node should be pre-expanded");
+
   case ASTScopeKind::SourceFile: {
     /// Add all of the new declarations to the list of children.
     for (Decl *decl : llvm::makeArrayRef(sourceFile.file->Decls)
@@ -396,6 +423,12 @@ void ASTScope::expand() const {
     }
     break;
   }
+
+  case ASTScopeKind::Closure:
+    // Add the child for a body.
+    if (auto bodyChild = createIfNeeded(this, closure->getBody()))
+      addChild(bodyChild);
+    break;
   }
 
   // Enumerate any continuation scopes associated with this parent.
@@ -479,6 +512,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::LocalDeclaration:
       return (parent->getLocalDeclaration() == decl);
 
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::BraceStmt:
@@ -494,6 +528,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::CaseStmt:
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
+    case ASTScopeKind::Closure:
       // Not a direct descendant.
       return false;
     }
@@ -516,6 +551,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::Accessors:
       return (parent->getAbstractStorageDecl() == decl);
 
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::LocalDeclaration:
@@ -533,6 +569,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::CaseStmt:
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
+    case ASTScopeKind::Closure:
       // Not a direct descendant.
       return false;
   }
@@ -777,9 +814,68 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   return nullptr;
 }
 
+/// Find all of the (non-nested) closures referenced within this expression.
+static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
+  SmallVector<ClosureExpr *, 4> closures;
+  if (!expr) return closures;
+
+  /// AST walker that finds top-level closures in an expression.
+  class ClosureFinder : public ASTWalker {
+    SmallVectorImpl<ClosureExpr *> &closures;
+
+  public:
+    ClosureFinder(SmallVectorImpl<ClosureExpr *> &closures) : closures(closures) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto closure = dyn_cast<ClosureExpr>(E)) {
+        closures.push_back(closure);
+        return { false, E };
+      }
+
+      return { true, E };
+    }
+
+    virtual std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+
+    virtual std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+
+    virtual bool walkToDeclPre(Decl *D) override { return false; }
+
+    virtual bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+
+    virtual bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+
+    virtual bool walkToParameterListPre(ParameterList *PL) override {
+      return false;
+    }
+  };
+
+  expr->walk(ClosureFinder(closures));
+  return closures;
+}
+
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Expr *expr) {
-  // FIXME: Handle expressions.
-  return nullptr;
+  if (!expr) return nullptr;
+
+  // Dig out closure expressions within the given expression.
+  auto closures = findClosures(expr);
+  if (closures.empty())
+    return nullptr;
+
+  ASTContext &ctx = parent->getASTContext();
+  if (closures.size() == 1)
+    return new (ctx) ASTScope(parent, closures[0]);
+
+  // Create the closure scopes for each of the closures.
+  SmallVector<ASTScope *, 4> closureScopes;
+  for (auto closure : closures)
+    closureScopes.push_back(new (ctx) ASTScope(parent, closure));
+
+  return new (ctx) ASTScope(parent, closureScopes);
 }
 
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
@@ -792,6 +888,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
 
 bool ASTScope::isContinuationScope() const {
   switch (getKind()) {
+  case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
@@ -808,6 +905,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
+  case ASTScopeKind::Closure:
     // These node kinds never have a viable continuation.
     return false;
 
@@ -841,6 +939,7 @@ void ASTScope::enumerateContinuationScopes(
   const ASTScope *continuation = getParent();
   while (true) {
     switch (continuation->getKind()) {
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::RepeatWhileStmt:
@@ -852,6 +951,7 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::CaseStmt:
     case ASTScopeKind::ForStmt:
     case ASTScopeKind::ForStmtInitializer:
+    case ASTScopeKind::Closure:
       // These scopes are hard barriers; if we hit one, there is nothing to
       // continue to.
       return;
@@ -921,6 +1021,7 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::AfterPatternBinding:
     return patternBinding.decl->getASTContext();
 
+  case ASTScopeKind::Preexpanded:
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::ConditionalClause:
@@ -934,6 +1035,7 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
+  case ASTScopeKind::Closure:
     return getParent()->getASTContext();
 
   case ASTScopeKind::LocalDeclaration:
@@ -953,6 +1055,10 @@ SourceFile &ASTScope::getSourceFile() const {
 
 SourceRange ASTScope::getSourceRange() const {
   switch (kind) {
+  case ASTScopeKind::Preexpanded:
+    return SourceRange(children().front()->getSourceRange().Start,
+                       children().back()->getSourceRange().End);
+
   case ASTScopeKind::SourceFile:
     if (auto bufferID = sourceFile.file->getBufferID()) {
       auto charRange = getASTContext().SourceMgr.getRangeForBuffer(*bufferID);
@@ -1018,6 +1124,13 @@ SourceRange ASTScope::getSourceRange() const {
   }
 
   case ASTScopeKind::BraceStmt:
+    // The brace statements that represent closures start their scope at the
+    // 'in' keyword, when present.
+    if (getParent()->getKind() == ASTScopeKind::Closure &&
+        getParent()->closure->getInLoc().isValid())
+      return SourceRange(getParent()->closure->getInLoc(),
+                         braceStmt.stmt->getEndLoc());
+
     return braceStmt.stmt->getSourceRange();
 
   case ASTScopeKind::LocalDeclaration:
@@ -1123,15 +1236,20 @@ SourceRange ASTScope::getSourceRange() const {
   case ASTScopeKind::ForStmtInitializer:
     return SourceRange(forStmt->getFirstSemicolonLoc(), forStmt->getEndLoc());
 
-  case ASTScopeKind::Accessors: {
+  case ASTScopeKind::Accessors:
     return abstractStorageDecl->getBracesRange();
-  }
+
+  case ASTScopeKind::Closure:
+    if (closure->getInLoc().isValid())
+      return SourceRange(closure->getInLoc(), closure->getEndLoc());
+
+    return closure->getSourceRange();
   }
 }
 
 void ASTScope::expandAll() const {
-  if (isExpanded()) return;
-  expand();
+  if (!isExpanded())
+    expand();
 
   for (auto child : children())
     child->expandAll();
@@ -1171,6 +1289,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
 
   // Print the scope kind and any salient information.
   switch (kind) {
+  case ASTScopeKind::Preexpanded:
+    printScopeKind("Preexpanded");
+    printAddress(this);
+    printRange();
+    break;
+
   case ASTScopeKind::SourceFile:
     printScopeKind("SourceFile");
     printAddress(sourceFile.file);
@@ -1311,6 +1435,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printAddress(abstractStorageDecl);
     out << " ";
     abstractStorageDecl->dumpRef(out);
+    printRange();
+    break;
+
+  case ASTScopeKind::Closure:
+    printScopeKind("Closure");
+    printAddress(closure);
     printRange();
     break;
   }

@@ -32,6 +32,7 @@ class ASTContext;
 class BraceStmt;
 class CaseStmt;
 class CatchStmt;
+class ClosureExpr;
 class Decl;
 class DoCatchStmt;
 class Expr;
@@ -52,6 +53,10 @@ class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
 enum class ASTScopeKind : uint8_t {
+  /// A pre-expanded scope in which we know a priori the children.
+  ///
+  /// This is a convenience scope that has no direct bearing on the AST.
+  Preexpanded,
   /// A source file, which is the root of a scope.
   SourceFile,
   /// The body of a type or extension thereof.
@@ -95,6 +100,8 @@ enum class ASTScopeKind : uint8_t {
   ForStmtInitializer,
   /// Scope for the accessors of an abstract storage declaration.
   Accessors,
+  /// Scope for a closure.
+  Closure,
 };
 
 class ASTScope {
@@ -213,7 +220,10 @@ class ASTScope {
     /// An abstract storage declaration, for
     /// \c kind == ASTScopeKind::Accessors.
     AbstractStorageDecl *abstractStorageDecl;
-};
+
+    /// The closure, for \c kind == ASTScopeKind::Closure.
+    ClosureExpr *closure;
+  };
 
   /// Child scopes, sorted by source range.
   mutable SmallVector<ASTScope *, 4> storedChildren;
@@ -228,6 +238,9 @@ class ASTScope {
     this->sourceFile.file = sourceFile;
     this->sourceFile.nextElement = nextElement;
   }
+
+  /// Constructor that initializes a preexpanded node.
+  ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children);
 
   ASTScope(const ASTScope *parent, IterableDeclContext *idc)
       : ASTScope(ASTScopeKind::TypeOrExtensionBody, parent) {
@@ -321,6 +334,11 @@ class ASTScope {
   ASTScope(const ASTScope *parent, AbstractStorageDecl *abstractStorageDecl)
       : ASTScope(ASTScopeKind::Accessors, parent) {
     this->abstractStorageDecl = abstractStorageDecl;
+  }
+
+  ASTScope(const ASTScope *parent, ClosureExpr *closure)
+      : ASTScope(ASTScopeKind::Closure, parent) {
+    this->closure = closure;
   }
 
   ~ASTScope();

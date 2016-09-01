@@ -154,6 +154,14 @@ func funcWithComputedProperties(i: Int) {
   do { }
 }
 
+func closures() {
+  { x, y in 
+    return { $0 + $1 }(x, y)
+  }(1, 2) + 
+  { a, b in a * b }(3, 4)
+}
+
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
@@ -273,7 +281,7 @@ func funcWithComputedProperties(i: Int) {
 // CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [138:5 - 138:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [138:12 - 138:14] expanded
 
-// CHECK-EXPANDED: {{^}}`-AbstractFunctionParams {{.*}} funcWithComputedProperties(i:) param 0:0 [142:36 - 155:1] expanded
+// CHECK-EXPANDED: {{^}}|-AbstractFunctionParams {{.*}} funcWithComputedProperties(i:) param 0:0 [142:36 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [142:41 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [143:17 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
@@ -287,3 +295,12 @@ func funcWithComputedProperties(i: Int) {
 // CHECK-EXPANDED-NEXT: {{^}}          `-LocalDeclaration {{.*}} [150:25 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [150:25 - 152:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [154:6 - 154:8] expanded
+
+// CHECK-EXPANDED: {{^}}`-BraceStmt {{.*}} [157:17 - 162:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-Preexpanded {{.*}} [158:10 - 161:19] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    |-Closure {{.*}} [158:10 - 160:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [158:10 - 160:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-Closure {{.*}} [159:12 - 159:22] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [159:12 - 159:22] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [161:10 - 161:19] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [161:10 - 161:19] expanded
