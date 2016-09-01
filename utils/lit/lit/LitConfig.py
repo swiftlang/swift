@@ -21,7 +21,7 @@ class LitConfig(object):
 
     def __init__(self, progname, path, quiet, verbose, succinct,
                  useValgrind, valgrindLeakCheck, valgrindArgs,
-                 noExecute, debug, isWindows,
+                 noExecute, tmp_root, debug, isWindows,
                  params, config_prefix = None,
                  maxIndividualTestTime = 0):
         self.remoteArgs = ['--no-progress-bar', '--slave']
@@ -43,6 +43,7 @@ class LitConfig(object):
         self.valgrindUserArgs = list(valgrindArgs)
         self.remoteArgs += sum((['--vg-arg', x] for x in valgrindArgs), [])
         self.noExecute = noExecute
+        self.tmp_root = tmp_root
         self.debug = debug
         self.remoteArgs += ['--debug'] if debug else []
         self.isWindows = bool(isWindows)
