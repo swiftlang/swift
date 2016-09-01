@@ -34,7 +34,8 @@ sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
 from swift_build_support import shell  # noqa (E402)
 
 
-def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
+def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
+                             cross_repos_pr):
     if not os.path.isdir(repo_path):
         return
 
@@ -75,7 +76,8 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean):
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        # shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
+        if not cross_repos_pr:
+            shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=True)
 
@@ -110,7 +112,8 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
         update_single_repository(repo_path,
                                  repo_branch,
                                  args.reset_to_remote,
-                                 args.clean)
+                                 args.clean,
+                                 cross_repos_pr)
 
 
 def obtain_additional_swift_sources(
