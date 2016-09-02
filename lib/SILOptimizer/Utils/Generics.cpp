@@ -467,8 +467,6 @@ void swift::trySpecializeApplyOfGeneric(
   if (F->isFragile() && RefF->isFragile())
     Fragile = IsFragile;
 
-  return;
-
   ReabstractionInfo ReInfo(RefF, Apply.getSubstitutions());
   if (!ReInfo.getSpecializedType())
     return;
