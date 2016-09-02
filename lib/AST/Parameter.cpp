@@ -18,7 +18,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ExprHandle.h"
 using namespace swift;
 
 /// TODO: unique and reuse the () parameter list in ASTContext, it is common to

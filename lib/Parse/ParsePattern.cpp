@@ -17,7 +17,6 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
@@ -26,11 +25,11 @@ using namespace swift;
 
 /// \brief Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
-static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
-  if (!init || !init->getExpr())
+static DefaultArgumentKind getDefaultArgKind(Expr *init) {
+  if (!init)
     return DefaultArgumentKind::None;
 
-  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init->getExpr());
+  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
     return DefaultArgumentKind::Normal;
 
@@ -58,7 +57,7 @@ void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
 static ParserStatus parseDefaultArgument(Parser &P,
                                    Parser::DefaultArgumentInfo *defaultArgs,
                                    unsigned argIndex,
-                                   ExprHandle *&init,
+                                   Expr *&init,
                                  Parser::ParameterContextKind paramContext) {
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
@@ -119,7 +118,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
   if (initR.isNull())
     return makeParserError();
 
-  init = ExprHandle::get(P.Context, initR.get());
+  init = initR.get();
   return ParserStatus();
 }
 
@@ -352,7 +351,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
         SourceRange defaultArgRange;
-        if (auto init = param.DefaultArg->getExpr())
+        if (auto init = param.DefaultArg)
           defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
 
         diagnose(EqualLoc, diag::parameter_vararg_default)

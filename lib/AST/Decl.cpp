@@ -3823,7 +3823,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // but we don't have that location info.  Extend the back of the range to the
   // location of the default argument, or the typeloc if they are valid.
   if (auto expr = getDefaultValue()) {
-    auto endLoc = expr->getExpr()->getEndLoc();
+    auto endLoc = expr->getEndLoc();
     if (endLoc.isValid())
       return SourceRange(range.Start, endLoc);
   }

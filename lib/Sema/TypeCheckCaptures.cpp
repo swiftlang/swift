@@ -400,7 +400,7 @@ public:
       for (auto *paramList : AFD->getParameterLists())
         for (auto param : *paramList) {
           if (auto E = param->getDefaultValue())
-            E->getExpr()->walk(*this);
+            E->walk(*this);
         }
       return false;
     }

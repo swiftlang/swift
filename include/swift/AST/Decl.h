@@ -21,7 +21,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
@@ -4277,7 +4276,7 @@ class ParamDecl : public VarDecl {
   SourceLoc LetVarInOutLoc;
 
   /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
+  llvm::PointerIntPair<Expr *, 1> DefaultValueAndIsVariadic;
   
   /// True if the type is implicitly specified in the source, but this has an
   /// apparently valid typeRepr.  This is used in accessors, which look like:
@@ -4323,10 +4322,10 @@ public:
     defaultArgumentKind = K;
   }
   
-  void setDefaultValue(ExprHandle *H) {
-    DefaultValueAndIsVariadic.setPointer(H);
+  void setDefaultValue(Expr *E) {
+    DefaultValueAndIsVariadic.setPointer(E);
   }
-  ExprHandle *getDefaultValue() const {
+  Expr *getDefaultValue() const {
     return DefaultValueAndIsVariadic.getPointer();
   }
 

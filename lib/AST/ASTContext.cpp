@@ -22,7 +22,6 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/KnownProtocols.h"
@@ -3661,15 +3660,6 @@ CanType ArchetypeType::getAnyOpened(Type existential) {
   }
   assert(existential->isExistentialType());
   return ArchetypeType::getOpened(existential);
-}
-
-void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
-                            unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
-  return new (Context) ExprHandle(E);
 }
 
 void TypeLoc::setInvalidType(ASTContext &C) {

@@ -55,7 +55,6 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 using namespace swift;
@@ -899,9 +898,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
       
       if (auto *E = P->getDefaultValue()) {
-        auto res = doIt(E->getExpr());
+        auto res = doIt(E);
         if (!res) return true;
-        E->setExpr(res, E->alreadyChecked());
+        P->setDefaultValue(res);
       }
     }
     
