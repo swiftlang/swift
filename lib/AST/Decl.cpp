@@ -918,17 +918,32 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
+SourceRange PatternBindingEntry::getSourceRange() const {
+  SourceLoc endLoc;
+  getPattern()->forEachVariable([&](VarDecl *var) {
+    auto accessorsEndLoc = var->getBracesRange().End;
+    if (accessorsEndLoc.isValid()) endLoc = accessorsEndLoc;
+  });
+
+  // Check the initializer.
+  if (endLoc.isInvalid())
+    endLoc = getOrigInitRange().End;
+
+  // Check the pattern.
+  if (endLoc.isInvalid())
+    endLoc = getPattern()->getEndLoc();
+
+  SourceLoc startLoc = getPattern()->getStartLoc();
+  if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
+
+  return SourceRange(startLoc, endLoc);
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-
-   // Take the init of the last pattern in the list.
-  if (auto init = getPatternList().back().getInit()) {
-    SourceLoc EndLoc = init->getEndLoc();
-    if (EndLoc.isValid())
-      return { startLoc, EndLoc };
-  }
-  // If the last pattern had no init, we take the end of its pattern.
-  return { startLoc, getPatternList().back().getPattern()->getEndLoc() };
+  SourceLoc endLoc = getPatternList().back().getSourceRange().End;
+  if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
+  return { startLoc, endLoc };
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
