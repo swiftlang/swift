@@ -210,6 +210,12 @@ void ASTScope::expand() const {
       addChild(child);
     break;
 
+  case ASTScopeKind::DefaultArgument:
+    // Create a child for the default argument expression.
+    if (auto child = createIfNeeded(this, parameter->getDefaultValue()))
+      addChild(child);
+    break;
+
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
@@ -565,6 +571,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
                                                       const Decl *decl) {
   while (true) {
     switch (parent->getKind()) {
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
@@ -577,8 +584,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
     case ASTScopeKind::LocalDeclaration:
       return (parent->getLocalDeclaration() == decl);
 
-    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
@@ -610,6 +617,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
               const AbstractStorageDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
@@ -620,9 +628,9 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::Accessors:
       return (parent->getAbstractStorageDecl() == decl);
 
-    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
+    case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::LocalDeclaration:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
@@ -655,7 +663,9 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
               const AbstractFunctionDecl *decl) {
   while (true) {
     switch (parent->getKind()) {
+    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::GenericParams:
       // Keep looking.
       parent = parent->getParent();
@@ -664,7 +674,6 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::AbstractFunctionDecl:
       return (parent->getAbstractFunctionDecl() == decl);
 
-    case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::LocalDeclaration:
@@ -836,16 +845,37 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
         findNextParameter(parent->abstractFunctionParams.decl,
                           parent->abstractFunctionParams.listIndex,
                           parent->abstractFunctionParams.paramIndex);
+
     } else if (abstractFunction->getParameterList(0)->size() > 0) {
       nextParameter = std::make_pair(0, 0);
     } else {
       nextParameter = findNextParameter(abstractFunction, 0, 0);
     }
 
-    // If there is another parameter to visit, do so now.
-    if (nextParameter)
-      return new (ctx) ASTScope(parent, abstractFunction, nextParameter->first,
-                                nextParameter->second);
+    if (nextParameter) {
+      // Dig out the actual parameter.
+      ParamDecl *currentParam =
+        abstractFunction->getParameterList(nextParameter->first)
+          ->get(nextParameter->second);
+
+      // Determine whether there is a default argument.
+      ASTScope *defaultArgumentScope = nullptr;
+      if (currentParam->getDefaultValue())
+        defaultArgumentScope = new (ctx) ASTScope(parent, currentParam);
+
+      // If there is another parameter to visit, do so now.
+      ASTScope *afterParamScope = new (ctx) ASTScope(parent, abstractFunction,
+                                                     nextParameter->first,
+                                                     nextParameter->second);
+
+      // If we have a default argument, use a pre-expanded node.
+      if (defaultArgumentScope) {
+        ASTScope *children[2] = { defaultArgumentScope, afterParamScope };
+        return new (ctx) ASTScope(parent, children);
+      }
+
+      return afterParamScope;
+    }
 
 
     // Function body, if present.
@@ -1048,6 +1078,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionParams:
+  case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::Accessors:
@@ -1096,6 +1127,7 @@ void ASTScope::enumerateContinuationScopes(
     switch (continuation->getKind()) {
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::DefaultArgument:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::RepeatWhileStmt:
@@ -1179,6 +1211,9 @@ ASTContext &ASTScope::getASTContext() const {
 
   case ASTScopeKind::AbstractFunctionParams:
     return abstractFunctionParams.decl->getASTContext();
+
+  case ASTScopeKind::DefaultArgument:
+      return parameter->getASTContext();
 
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::PatternInitializer:
@@ -1286,6 +1321,9 @@ SourceRange ASTScope::getSourceRangeImpl() const {
                      ->get(abstractFunctionParams.paramIndex);
     return SourceRange(param->getEndLoc(), endLoc);
   }
+
+  case ASTScopeKind::DefaultArgument:
+    return parameter->getDefaultValue()->getSourceRange();
 
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
@@ -1596,6 +1634,12 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     out << " " << abstractFunctionParams.decl->getFullName()
         << " param " << abstractFunctionParams.listIndex << ":"
         << abstractFunctionParams.paramIndex;
+    printRange();
+    break;
+
+  case ASTScopeKind::DefaultArgument:
+    printScopeKind("DefaultArgument");
+    printAddress(parameter);
     printRange();
     break;
 

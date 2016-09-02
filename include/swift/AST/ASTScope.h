@@ -43,6 +43,7 @@ class GuardStmt;
 class IfStmt;
 class IterableDeclContext;
 class LabeledConditionalStmt;
+class ParamDecl;
 class PatternBindingDecl;
 class RepeatWhileStmt;
 class SourceFile;
@@ -68,6 +69,8 @@ enum class ASTScopeKind : uint8_t {
   AbstractFunctionDecl,
   /// The parameters of a function/initializer/deinitializer.
   AbstractFunctionParams,
+  /// The default argument for a parameter.
+  DefaultArgument,
   /// A specific pattern binding.
   PatternBinding,
   /// The scope introduced for an initializer of a pattern binding.
@@ -172,6 +175,10 @@ class ASTScope {
       /// The parameter index into the current function parameter list.
       unsigned paramIndex;
     } abstractFunctionParams;
+
+    /// The parameter whose default argument is being described, i.e.,
+    /// \c kind == ASTScopeKind::DefaultArgument.
+    ParamDecl *parameter;
 
     /// For \c kind == ASTScopeKind::PatternBinding,
     /// \c kind == ASTScopeKind::AfterPatternBinding, or
@@ -291,6 +298,11 @@ class ASTScope {
     this->abstractFunctionParams.decl = abstractFunction;
     this->abstractFunctionParams.listIndex = listIndex;
     this->abstractFunctionParams.paramIndex = paramIndex;
+  }
+
+  ASTScope(const ASTScope *parent, ParamDecl *param)
+      : ASTScope(ASTScopeKind::DefaultArgument, parent) {
+    this->parameter = param;
   }
 
   ASTScope(ASTScopeKind kind, const ASTScope *parent, PatternBindingDecl *decl,

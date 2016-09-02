@@ -163,6 +163,17 @@ func closures() {
 
 { closures() }()
 
+func defaultArguments(i: Int = 1,
+                      j: Int = { $0 + $1 }(1, 2)) {
+
+  func localWithDefaults(i: Int = 1,
+                         j: Int = { $0 + $1 }(1, 2)) {
+  }
+
+  let a = i + j
+  { $0 }(a)
+}
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
@@ -180,7 +191,8 @@ func closures() {
 // CHECK-EXPANDED-NEXT:   -GenericParams {{.*}} param 1 [22:22 - 23:1] expanded
 // CHECK-EXPANDED-NEXT:   -AbstractFunctionParams {{.*}} genericFunc0(t:u:i:) param 0:0 [22:28 - 23:1] expanded
 // CHECK-EXPANDED-NEXT:     -AbstractFunctionParams {{.*}} genericFunc0(t:u:i:) param 0:1 [22:34 - 23:1] expanded
-// CHECK-EXPANDED-NEXT:       -AbstractFunctionParams {{.*}} genericFunc0(t:u:i:) param 0:2 [22:46 - 23:1] expanded
+// CHECK-EXPANDED:            |-DefaultArgument {{.*}} [22:46 - 22:46] expanded
+// CHECK-EXPANDED:            `-AbstractFunctionParams {{.*}} genericFunc0(t:u:i:) param 0:2 [22:46 - 23:1] expanded
 // CHECK-EXPANDED-NEXT:         -BraceStmt {{.*}} [22:50 - 23:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
 // CHECK-EXPANDED-NEXT:  -AbstractFunctionDecl {{.*}} init(t:u:) [26:3 - 27:3] expanded
@@ -340,10 +352,18 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [161:10 - 161:19] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [161:10 - 161:19] expanded
 
-// CHECK-EXPANDED: `-TopLevelCode {{.*}} [164:1 - 164:16] expanded
+// CHECK-EXPANDED: |-TopLevelCode {{.*}} [164:1 - 164:16] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [164:1 - 164:16] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [164:1 - 164:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [164:1 - 164:14] expanded
+
+// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - 175:1] expanded
+// CHECK-EXPANDED: {{^}}    |-DefaultArgument {{.*}} [166:32 - 166:32] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} defaultArguments(i:j:) param 0:0 [166:32 - 175:1] expanded
+// CHECK-EXPANDED: {{^}}        |-DefaultArgument {{.*}} [167:32 - 167:48] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-Closure {{.*}} [167:32 - 167:42] expanded
+// CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [167:32 - 167:42] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} defaultArguments(i:j:) param 0:1 [167:48 - 175:1] expanded
 
 // RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20 %s 2> %t.searches
 // RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches
