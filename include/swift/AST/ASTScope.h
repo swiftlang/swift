@@ -14,8 +14,8 @@
 // describes the scopes that exist within a Swift AST.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_AST_SCOPE_MAP_H
-#define SWIFT_AST_SCOPE_MAP_H
+#ifndef SWIFT_AST_AST_SCOPE_H
+#define SWIFT_AST_AST_SCOPE_H
 
 #include "swift/AST/ASTNode.h"
 #include "swift/Basic/LLVM.h"
@@ -116,6 +116,32 @@ enum class ASTScopeKind : uint8_t {
   TopLevelCode,
 };
 
+/// Describes a lexical scope within a source file.
+///
+/// Each \c ASTScope is a node within a tree that describes all of the lexical
+/// scopes within a particular source range. The root of this scope tree is
+/// always a \c SourceFile node, and the tree covers the entire source file.
+/// The children of a particular node are the lexical scopes immediately
+/// nested within that node, and have source ranges that are enclosed within
+/// the source range of their parent node. At the leaves are lexical scopes
+/// that cannot be subdivided further.
+///
+/// The tree provides source-location-based query operations, allowing one to
+/// find the innermost scope that contains a given source location. Navigation
+/// to parent nodes from that scope allows one to walk the lexically enclosing
+/// scopes outward to the source file. Given a scope, one can also query the
+/// associated \c DeclContext for additional contextual information.
+///
+/// As an implementation detail, the scope tree is lazily constructed as it is
+/// queried, and only the relevant subtrees (i.e., trees whose source ranges
+/// enclose the queried source location or whose children were explicitly
+/// requested by the client) will be constructed. The \c expandAll() operation
+/// can be used to fully-expand the tree, constructing all of its nodes, but
+/// should only be used for testing or debugging purposes, e.g., via the
+/// frontend option
+/// \code
+/// -dump-scope-maps expanded
+/// \endcode
 class ASTScope {
   /// The kind of scope this represents.
   ASTScopeKind kind;
@@ -547,4 +573,4 @@ public:
 
 }
 
-#endif // SWIFT_BASIC_SOURCE_RANGE_MAP_H
+#endif // SWIFT_AST_AST_SCOPE_H
