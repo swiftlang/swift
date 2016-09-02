@@ -52,6 +52,8 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CompilationRecord.h"
+
 #include <memory>
 
 using namespace swift;
@@ -262,20 +264,21 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *key = cast<yaml::ScalarNode>(i->getKey());
     StringRef keyStr = key->getValue(scratch);
 
-    if (keyStr == "version") {
+    using compilation_record::TopLevelKey;
+    if (keyStr == compilation_record::getName(TopLevelKey::Version)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
       versionValid =
           (value->getValue(scratch) == version::getSwiftFullVersion());
 
-    } else if (keyStr == "options") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
       optionsMatch = (argsHashStr == value->getValue(scratch));
 
-    } else if (keyStr == "build_time") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
       auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
       if (!value)
         return true;
@@ -284,7 +287,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
 
-    } else if (keyStr == "inputs") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
       if (!inputMap)
         return true;
@@ -300,13 +303,9 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!value)
           return true;
 
+        using compilation_record::getInfoStatusForIdentifier;
         auto previousBuildState =
-            llvm::StringSwitch<Optional<InputInfo::Status>>(value->getRawTag())
-              .Case("", InputInfo::UpToDate)
-              .Case("!dirty", InputInfo::NeedsCascadingBuild)
-              .Case("!private", InputInfo::NeedsNonCascadingBuild)
-              .Default(None);
-
+          getInfoStatusForIdentifier(value->getRawTag());
         if (!previousBuildState)
           return true;
 

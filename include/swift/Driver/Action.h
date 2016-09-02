@@ -17,6 +17,8 @@
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/TimeValue.h"
 
 namespace llvm {
