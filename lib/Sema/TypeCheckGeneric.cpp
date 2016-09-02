@@ -553,10 +553,6 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     llvm::errs() << "Canonical generic signature: ";
     sig->getCanonicalSignature()->print(llvm::errs());
     llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature for mangling: ";
-    sig->getCanonicalManglingSignature(*func->getParentModule())
-    ->print(llvm::errs());
-    llvm::errs() << "\n";
   }
 
   func->setGenericSignature(sig);
@@ -764,10 +760,6 @@ GenericSignature *TypeChecker::validateGenericSignature(
     llvm::errs() << "\n";
     llvm::errs() << "Canonical generic signature: ";
     sig->getCanonicalSignature()->print(llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Canonical generic signature for mangling: ";
-    sig->getCanonicalManglingSignature(*dc->getParentModule())
-      ->print(llvm::errs());
     llvm::errs() << "\n";
   }
 
