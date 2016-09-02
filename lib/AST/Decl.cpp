@@ -4583,9 +4583,12 @@ SourceRange FuncDecl::getSourceRange() const {
     if (!B->isImplicit())
       return { StartLoc, B->getEndLoc() };
   }
+
+  if (this->isAccessor())
+    return StartLoc;
+
   if (getBodyResultTypeLoc().hasLocation() &&
-      getBodyResultTypeLoc().getSourceRange().End.isValid() &&
-      !this->isAccessor())
+      getBodyResultTypeLoc().getSourceRange().End.isValid())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
   auto LastParamListEndLoc = getParameterLists().back()->getSourceRange().End;
   if (LastParamListEndLoc.isValid())
