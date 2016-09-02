@@ -179,6 +179,14 @@ struct PatternInitializers {
       (c, d) = (1.5, 2.5)
 }
 
+protocol ProtoWithSubscript {
+  subscript(native: Int) -> Int { get set }
+}
+
+func localPatternsWithSharedType() {
+  let i, j, k: Int
+}
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
@@ -369,6 +377,24 @@ struct PatternInitializers {
 // CHECK-EXPANDED-NEXT: {{^}}          `-Closure {{.*}} [167:32 - 167:42] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [167:32 - 167:42] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} defaultArguments(i:j:) param 0:1 [167:48 - 175:1] expanded
+
+// CHECK-EXPANDED: -Accessors {{.*}} scope_map.(file).ProtoWithSubscript.subscript@{{.*}}scope_map.swift:183:3 [183:33 - 183:43] expanded
+// CHECK-EXPANDED-NEXT:     |-AbstractFunctionDecl {{.*}} _ [183:35 - 183:35] expanded
+// CHECK-EXPANDED-NEXT:       `-AbstractFunctionParams {{.*}} _ param 0:0 [183:35 - 183:35] expanded
+// CHECK-EXPANDED-NEXT:         `-AbstractFunctionParams {{.*}} _ param 1:0 [183:35 - 183:35] expanded
+// CHECK-EXPANDED-NEXT:     `-AbstractFunctionDecl {{.*}} _ [183:39 - 183:39] expanded
+// CHECK-EXPANDED-NEXT:       `-AbstractFunctionParams {{.*}} _ param 0:0 [183:39 - 183:39] expanded
+// CHECK-EXPANDED-NEXT:         `-AbstractFunctionParams {{.*}} _ param 1:0 [183:39 - 183:39] expanded
+// CHECK-EXPANDED-NEXT:           `-AbstractFunctionParams {{.*}} _ param 1:1 [183:39 - 183:39] expanded
+
+// CHECK-EXPANDED: `-AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:  `-BraceStmt {{.*}} [186:36 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:    `-PatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:      `-AfterPatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:        `-PatternBinding {{.*}} entry 1 [187:10 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:          `-AfterPatternBinding {{.*}} entry 1 [187:10 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:            `-PatternBinding {{.*}} entry 2 [187:13 - 188:1] expanded
+// CHECK-EXPANDED-NEXT:              `-AfterPatternBinding {{.*}} entry 2 [187:16 - 188:1] expanded
 
 // RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20,5:18,166:32,179:18 %s 2> %t.searches
 // RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches

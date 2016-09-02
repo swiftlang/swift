@@ -222,7 +222,8 @@ void ASTScope::expand() const {
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
     // Create a child for the initializer, if present.
-    if (patternEntry.getInit())
+    if (patternEntry.getInit() &&
+        patternEntry.getInit()->getSourceRange().isValid())
       addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
                                   patternBinding.decl, patternBinding.entry));
 
@@ -933,6 +934,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
   ASTContext &ctx = parent->getASTContext();
   switch (stmt->getKind()) {
   case StmtKind::Brace:
+    if (stmt->getSourceRange().isInvalid()) return nullptr;
     return new (ctx) ASTScope(parent, cast<BraceStmt>(stmt));
 
   case StmtKind::Return: {
