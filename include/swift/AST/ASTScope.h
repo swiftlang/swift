@@ -68,6 +68,10 @@ enum class ASTScopeKind : uint8_t {
   AbstractFunctionDecl,
   /// The parameters of a function/initializer/deinitializer.
   AbstractFunctionParams,
+  /// A specific pattern binding.
+  PatternBinding,
+  /// The scope introduced for an initializer of a pattern binding.
+  PatternInitializer,
   /// The scope introduced by a particular clause in a pattern binding
   /// declaration.
   AfterPatternBinding,
@@ -169,7 +173,9 @@ class ASTScope {
       unsigned paramIndex;
     } abstractFunctionParams;
 
-    /// For \c kind == ASTScopeKind::AfterPatternBinding.
+    /// For \c kind == ASTScopeKind::PatternBinding,
+    /// \c kind == ASTScopeKind::AfterPatternBinding, or
+    /// \c kind == ASTScopeKind::PatternInitializer.
     struct {
       PatternBindingDecl *decl;
       unsigned entry;
@@ -287,8 +293,12 @@ class ASTScope {
     this->abstractFunctionParams.paramIndex = paramIndex;
   }
 
-  ASTScope(const ASTScope *parent, PatternBindingDecl *decl, unsigned entry)
-      : ASTScope(ASTScopeKind::AfterPatternBinding, parent) {
+  ASTScope(ASTScopeKind kind, const ASTScope *parent, PatternBindingDecl *decl,
+           unsigned entry)
+      : ASTScope(kind, parent) {
+    assert(kind == ASTScopeKind::PatternBinding ||
+           kind == ASTScopeKind::PatternInitializer ||
+           kind == ASTScopeKind::AfterPatternBinding);
     this->patternBinding.decl = decl;
     this->patternBinding.entry = entry;
   }

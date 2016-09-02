@@ -31,8 +31,12 @@ ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
     : ASTScope(ASTScopeKind::Preexpanded, parent) {
   assert(children.size() > 1 && "Don't use this without multiple nodes");
 
-  // Add child nodes.
-  storedChildren.append(children.begin(), children.end());
+  // Add child nodes, reparenting them to this node.
+  storedChildren.reserve(children.size());
+  for (auto child : children ) {
+    child->parentAndExpanded.setPointer(this);
+    storedChildren.push_back(child);
+  }
 
   // Note that this node has already been expanded.
   parentAndExpanded.setInt(true);
@@ -206,22 +210,40 @@ void ASTScope::expand() const {
       addChild(child);
     break;
 
-  case ASTScopeKind::AfterPatternBinding: {
+  case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    // Create a child for the initializer expression, if present.
-    if (auto child = createIfNeeded(this, patternEntry.getInit()))
-      addChild(child);
+    // Create a child for the initializer, if present.
+    if (patternEntry.getInit())
+      addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
+                                  patternBinding.decl, patternBinding.entry));
 
-    // Create children for the variables in the pattern, if needed.
+    // Create children for the accessors of any variables in the pattern that
+    // have them.
     patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-      if (hasAccessors(var)) {
-        if (auto varChild = createIfNeeded(this, var))
-          addChild(varChild);
-      }
+      if (hasAccessors(var))
+        addChild(new (ctx) ASTScope(this, var));
     });
 
+    // If the pattern binding is in a local context, we nest the remaining
+    // pattern bindings.
+    if (patternBinding.decl->getDeclContext()->isLocalContext()) {
+      addChild(new (ctx) ASTScope(ASTScopeKind::AfterPatternBinding, this,
+                                  patternBinding.decl, patternBinding.entry));
+    }
+    break;
+  }
+
+  case ASTScopeKind::PatternInitializer:
+    // Create a child for the initializer expression.
+    if (auto child =
+            createIfNeeded(this,
+                           patternBinding.decl->getInit(patternBinding.entry)))
+      addChild(child);
+    break;
+
+  case ASTScopeKind::AfterPatternBinding: {
     // Create a child for the next pattern binding.
     if (auto child = createIfNeeded(this, patternBinding.decl))
       addChild(child);
@@ -557,6 +579,8 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
 
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::PatternBinding:
+    case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::BraceStmt:
     case ASTScopeKind::ConditionalClause:
@@ -600,6 +624,8 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::PatternBinding:
+    case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::BraceStmt:
     case ASTScopeKind::ConditionalClause:
@@ -642,6 +668,8 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::PatternBinding:
+    case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::Accessors:
     case ASTScopeKind::BraceStmt:
@@ -738,6 +766,10 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     // These declarations do not introduce scopes.
     return nullptr;
 
+  case DeclKind::Var:
+    // Always handled by a pattern-binding declaration.
+    return nullptr;
+
   case DeclKind::Extension:
     return new (ctx) ASTScope(parent, cast<ExtensionDecl>(decl));
 
@@ -821,24 +853,40 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   }
 
   case DeclKind::PatternBinding: {
-    // Only pattern bindings in local scope introduce scopes.
-    if (!inLocalContext) return nullptr;
-
-    // If there are no bindings, we're done.
     auto patternBinding = cast<PatternBindingDecl>(decl);
 
-    // Find the next pattern binding.
-    unsigned entry = (parent->getKind() == ASTScopeKind::AfterPatternBinding &&
-                      parent->patternBinding.decl == decl)
-                       ? parent->patternBinding.entry + 1
-                       : 0;
-    if (entry < patternBinding->getPatternList().size())
-      return new (ctx) ASTScope(parent, patternBinding, entry);
+    // Within a local context, bindings nest.
+    if (inLocalContext) {
+      // Find the next pattern binding.
+      unsigned entry = (parent->getKind() == ASTScopeKind::AfterPatternBinding&&
+                        parent->patternBinding.decl == decl)
+                          ? parent->patternBinding.entry + 1
+                          : 0;
+      if (entry < patternBinding->getPatternList().size())
+        return new (ctx) ASTScope(ASTScopeKind::PatternBinding, parent,
+                                  patternBinding, entry);
 
-    return nullptr;
+      return nullptr;
+    }
+
+    // Elsewhere, explode out the bindings because they're independent.
+
+    // Handle a single binding directly.
+    if (patternBinding->getNumPatternEntries() == 1)
+      return new (ctx) ASTScope(ASTScopeKind::PatternBinding, parent,
+                                patternBinding, 0);
+
+
+    // Pre-expand when there are multiple bindings.
+    SmallVector<ASTScope *, 4> bindings;
+    for (auto entry : range(patternBinding->getNumPatternEntries())) {
+      bindings.push_back(new (ctx) ASTScope(ASTScopeKind::PatternBinding,
+                                            parent, patternBinding, entry));
+    }
+
+    return new (ctx) ASTScope(parent, bindings);
   }
 
-  case DeclKind::Var:
   case DeclKind::Subscript: {
     auto asd = cast<AbstractStorageDecl>(decl);
     if (hasAccessors(asd))
@@ -1000,6 +1048,8 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionParams:
+  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::Accessors:
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
@@ -1046,6 +1096,7 @@ void ASTScope::enumerateContinuationScopes(
     switch (continuation->getKind()) {
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::RepeatWhileStmt:
     case ASTScopeKind::ForEachStmt:
@@ -1074,6 +1125,7 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::AbstractFunctionDecl:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::GenericParams:
+    case ASTScopeKind::PatternBinding:
     case ASTScopeKind::AfterPatternBinding:
     case ASTScopeKind::LocalDeclaration:
     case ASTScopeKind::ConditionalClause:
@@ -1128,6 +1180,8 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::AbstractFunctionParams:
     return abstractFunctionParams.decl->getASTContext();
 
+  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::AfterPatternBinding:
     return patternBinding.decl->getASTContext();
 
@@ -1230,23 +1284,35 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     auto param = abstractFunctionParams.decl->getParameterList(
                    abstractFunctionParams.listIndex)
                      ->get(abstractFunctionParams.paramIndex);
-    // FIXME: getLocForEndOfToken... but I can't use it here.
     return SourceRange(param->getEndLoc(), endLoc);
   }
+
+  case ASTScopeKind::PatternBinding: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
+    SourceRange range = patternEntry.getSourceRange();
+
+    // Local pattern bindings cover the entire binding + continuation.
+    if (patternBinding.decl->getDeclContext()->isLocalContext()) {
+      range.End = getParent()->getSourceRange().End;
+    }
+
+    return range;
+  }
+
+  case ASTScopeKind::PatternInitializer:
+    return patternBinding.decl->getInit(patternBinding.entry)->getSourceRange();
 
   case ASTScopeKind::AfterPatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
-    // The scope of the binding begins after the initializer (if there is one);
-    // other, after the pattern itself.
-    SourceLoc startLoc = patternEntry.getOrigInitRange().End;
-    if (startLoc.isInvalid())
-      startLoc = patternEntry.getPattern()->getSourceRange().End;
+    // The scope of the binding begins at the end of the binding.
+    SourceLoc startLoc = patternEntry.getSourceRange().End;
 
     // And extends to the end of the parent range.
     return SourceRange(startLoc, getParent()->getSourceRange().End);
   }
-
   case ASTScopeKind::BraceStmt:
     // The brace statements that represent closures start their scope at the
     // 'in' keyword, when present.
@@ -1530,6 +1596,20 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     out << " " << abstractFunctionParams.decl->getFullName()
         << " param " << abstractFunctionParams.listIndex << ":"
         << abstractFunctionParams.paramIndex;
+    printRange();
+    break;
+
+  case ASTScopeKind::PatternBinding:
+    printScopeKind("PatternBinding");
+    printAddress(patternBinding.decl);
+    out << " entry " << patternBinding.entry;
+    printRange();
+    break;
+
+  case ASTScopeKind::PatternInitializer:
+    printScopeKind("PatternInitializer");
+    printAddress(patternBinding.decl);
+    out << " entry " << patternBinding.entry;
     printRange();
     break;
 

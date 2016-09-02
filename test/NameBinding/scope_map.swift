@@ -199,23 +199,39 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:1 [41:36 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-BraceStmt {{.*}} [41:39 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      `-PatternBinding {{.*}} entry 0 [42:7 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      |-PatternInitializer {{.*}} entry 0 [42:18 - 42:23] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 0 [42:23 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}        `-PatternBinding {{.*}} entry 1 [43:7 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              |-PatternInitializer {{.*}} entry 1 [43:18 - 43:23] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 1 [43:23 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          `-PatternBinding {{.*}} entry 0 [44:7 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}          |-PatternInitializer {{.*}} entry 0 [44:18 - 44:23] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-AfterPatternBinding {{.*}} entry 0 [44:23 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [45:6 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-PatternBinding {{.*}} entry 0 [46:9 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                |-PatternInitializer {{.*}} entry 0 [46:14 - 46:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [46:14 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-PatternBinding {{.*}} entry 0 [47:9 - 52:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                  |-PatternInitializer {{.*}} entry 0 [47:14 - 47:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [47:14 - 52:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  `-BraceStmt {{.*}} [48:8 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                    `-PatternBinding {{.*}} entry 0 [49:11 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-PatternInitializer {{.*}} entry 0 [49:16 - 49:16] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                    `-AfterPatternBinding {{.*}} entry 0 [49:16 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      `-PatternBinding {{.*}} entry 0 [50:11 - 51:5] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                      |-PatternInitializer {{.*}} entry 0 [50:16 - 50:16] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-AfterPatternBinding {{.*}} entry 0 [50:16 - 51:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            |-BraceStmt {{.*}} [53:6 - 56:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-PatternBinding {{.*}} entry 0 [54:9 - 56:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                |-PatternInitializer {{.*}} entry 0 [54:14 - 54:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [54:14 - 56:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [55:14 - 56:3] expanded
+// CHECK-EXPANDED: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [55:14 - 56:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            `-LocalDeclaration {{.*}} [57:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}              |-AbstractFunctionDecl {{.*}} f(_:) [57:3 - 57:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                `-AbstractFunctionParams {{.*}} f(_:) param 0:0 [57:15 - 57:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  `-BraceStmt {{.*}} [57:27 - 57:38] expanded
-// CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [58:16 - 100:1] expanded
+// CHECK-EXPANDED: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [58:16 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                `-LocalDeclaration {{.*}} [59:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  |-TypeOrExtensionBody {{.*}} 'S7' [59:13 - 59:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  `-LocalDeclaration {{.*}} [60:3 - 100:1] expanded
@@ -223,9 +239,9 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [62:18 - 64:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [62:29 - 64:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          `-BraceStmt {{.*}} [62:29 - 64:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                            `-AfterPatternBinding {{.*}} entry 0 [63:14 - 64:3] expanded
+// CHECK-EXPANDED: {{^}}                                 `-AfterPatternBinding {{.*}} entry 0 [63:14 - 64:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-BraceStmt {{.*}} [64:10 - 66:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [65:14 - 66:3] expanded
+// CHECK-EXPANDED: {{^}}                             `-AfterPatternBinding {{.*}} entry 0 [65:14 - 66:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                    `-GuardStmt {{.*}} [68:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [68:21 - 68:53] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [68:21 - 68:53] expanded
@@ -233,14 +249,14 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [68:21 - 68:30] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 2 [68:53 - 68:53] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      |-BraceStmt {{.*}} [68:53 - 71:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
+// CHECK-EXPANDED: {{^}}                        `-AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      `-ConditionalClause {{.*}} index 0 guard-continuation [71:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 guard-continuation [71:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          `-ConditionalClause {{.*}} index 2 guard-continuation [71:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          |-ConditionalClause {{.*}} index 0 [73:21 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ConditionalClause {{.*}} index 1 [73:32 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [73:32 - 75:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
+// CHECK-EXPANDED: {{^}}                                `-AfterPatternBinding {{.*}} entry 0 [74:13 - 75:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          |-RepeatWhileStmt {{.*}} [77:3 - 77:20] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                            `-BraceStmt {{.*}} [77:10 - 77:12] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                          |-ForEachStmt {{.*}} [79:3 - 81:3] expanded
@@ -287,12 +303,12 @@ func closures() {
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [127:9 - 128:5] expanded
 
 // CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'ClassWithComputedProperties' [132:35 - 140:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.willSetProperty@{{.*}}scope_map.swift:133:7 [133:32 - 135:3] expanded
+// CHECK-EXPANDED: {{^}}  `-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.willSetProperty@{{.*}}scope_map.swift:133:7 [133:32 - 135:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}   `-AbstractFunctionDecl {{.*}} _ [134:5 - 134:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [134:5 - 134:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [134:5 - 134:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [134:13 - 134:15] expanded
-// CHECK-EXPANDED-NEXT: {{^}}  `-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.didSetProperty@{{.*}}scope_map.swift:137:7 [137:31 - 139:3] expanded
+// CHECK-EXPANDED: {{^}}       `-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.didSetProperty@{{.*}}scope_map.swift:137:7 [137:31 - 139:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionDecl {{.*}} _ [138:5 - 138:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [138:5 - 138:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-AbstractFunctionParams {{.*}} _ param 1:0 [138:5 - 138:14] expanded
@@ -300,15 +316,15 @@ func closures() {
 
 // CHECK-EXPANDED: {{^}}  `-AbstractFunctionParams {{.*}} funcWithComputedProperties(i:) param 0:0 [142:36 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [142:41 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [143:17 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
+// CHECK-EXPANDED: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}       |-AbstractFunctionDecl {{.*}} _ [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionDecl {{.*}} _ [146:5 - 148:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [146:9 - 148:5] expanded
-// CHECK-EXPANDED-NEXT: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
+// CHECK-EXPANDED: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [149:3 - 155:1] expanded
+// CHECK-EXPANDED: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
+// CHECK-EXPANDED: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}          `-LocalDeclaration {{.*}} [150:25 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}           |-AbstractFunctionDecl {{.*}} _ [150:25 - 152:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}            `-BraceStmt {{.*}} [150:25 - 152:3] expanded
