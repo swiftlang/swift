@@ -954,8 +954,9 @@ public:
   DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
                                          SILDeclRef Member, SILType MethodTy,
                                          bool Volatile = false) {
-    return insert(new (F.getModule()) DynamicMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+    return insert(DynamicMethodInst::create(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile,
+        &F, OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *
