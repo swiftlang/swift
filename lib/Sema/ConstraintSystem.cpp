@@ -957,15 +957,10 @@ void ConstraintSystem::openGeneric(
        bool skipProtocolSelfConstraint,
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
-  // Use the minimized constraints; we can re-derive solutions for all the
-  // implied constraints.
-  auto minimized =
-    signature->getCanonicalManglingSignature(*DC->getParentModule());
-
   openGeneric(innerDC,
               outerDC,
-              minimized->getGenericParams(),
-              minimized->getRequirements(),
+              signature->getGenericParams(),
+              signature->getRequirements(),
               skipProtocolSelfConstraint,
               locator,
               replacements);

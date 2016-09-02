@@ -160,7 +160,7 @@ protocol P7 : P6 {
 }
 
 // CHECK-LABEL: P7.nestedSameType1()@
-// CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
 extension P7 where AssocP6.Element : P6, 
         AssocP7.AssocP6.Element : P6,
         AssocP6.Element == AssocP7.AssocP6.Element {

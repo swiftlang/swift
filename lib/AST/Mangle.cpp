@@ -361,10 +361,8 @@ void Mangler::bindGenericParameters(CanGenericSignature sig) {
 
 /// Bind the generic parameters from the given context and its parents.
 void Mangler::bindGenericParameters(const DeclContext *DC) {
-  if (auto sig = DC->getGenericSignatureOfContext()) {
-    Mod = DC->getParentModule();
-    bindGenericParameters(sig->getCanonicalManglingSignature(*Mod));
-  }
+  if (auto sig = DC->getGenericSignatureOfContext())
+    bindGenericParameters(sig->getCanonicalSignature());
 }
 
 static OperatorFixity getDeclFixity(const ValueDecl *decl) {
@@ -496,8 +494,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   initialParamDepth = 0;
   CanGenericSignature sig;
   if (auto gft = type->getAs<GenericFunctionType>()) {
-    assert(Mod);
-    sig = gft->getGenericSignature()->getCanonicalManglingSignature(*Mod);
+    sig = gft->getGenericSignature()->getCanonicalSignature();
     CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
@@ -682,8 +679,7 @@ mangle_requirements:
 }
 
 void Mangler::mangleGenericSignature(const GenericSignature *sig) {
-  assert(Mod);
-  auto canSig = sig->getCanonicalManglingSignature(*Mod);
+  auto canSig = sig->getCanonicalSignature();
   CurGenericSignature = canSig;
   mangleGenericSignatureParts(canSig->getGenericParams(), 0,
                               canSig->getRequirements());

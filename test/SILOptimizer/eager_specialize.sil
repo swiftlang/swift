@@ -203,7 +203,7 @@ bb2:                                              // Preds: bb0
 
 // Generic with specialized dispatch. No more [specialize] attribute.
 // 
-// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger, T.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral, T.Stride : SignedNumber, T.Stride.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in T, @in T) -> (@out T, @error Error) {
+// CHECK-LABEL: sil @_TF16eager_specialize9divideNumuRxs13SignedIntegerrFzTx3denx_x : $@convention(thin) <T where T : SignedInteger> (@in T, @in T) -> (@out T, @error Error) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK:   %3 = metatype $@thick T.Type
 // CHECK:   %4 = metatype $@thick Int.Type

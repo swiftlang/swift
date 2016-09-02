@@ -70,7 +70,7 @@ public:
     /// The requirement was part of a protocol requirement on an
     /// associated type.
     ///
-    /// These are dropped by getCanonicalManglingSignature().
+    /// These are dropped when building the GenericSignature.
     Protocol,
 
     /// The requirement is redundant with some other requirement.
@@ -257,15 +257,10 @@ public:
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
-  /// \param buildingCanonicalManglingSignature If true, requirements
-  ///        on associated types are dropped, and types in requirements
-  ///        are canonicalized.
-  ///
   /// \returns a generic signature built from the provided list of
   ///          generic parameter types.
   GenericSignature *
-  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes,
-                      bool buildingCanonicalManglingSignature=false);
+  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
 
   /// \brief Get a generic context based on the complete list of generic
   /// parameter types.

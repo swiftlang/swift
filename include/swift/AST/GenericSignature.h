@@ -210,16 +210,6 @@ public:
   
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
-  
-  /// Canonicalize a generic signature down to its essential requirements,
-  /// for mangling purposes.
-  ///
-  /// TODO: This is what getCanonicalSignature() ought to do, but currently
-  /// does not due to former implementation dependencies on
-  /// 'getAllDependentTypes' order matching 'getAllArchetypes' order of a
-  /// generic param list. Now that 'getAllArchetypes' is gone, we might
-  /// be able to move forward here.
-  CanGenericSignature getCanonicalManglingSignature(ModuleDecl &M) const;
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {

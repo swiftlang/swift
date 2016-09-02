@@ -491,7 +491,7 @@ protocol Buildable {
 func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
   try b.firstStructure.support()
 }
-// CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructure{{.*}} : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error Error {
+// CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructure{{.*}} : $@convention(thin) <B where B : Buildable> (@inout B) -> @error Error {
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
 // CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure

@@ -136,42 +136,6 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
-CanGenericSignature
-GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
-  // Start from the elementwise-canonical signature.
-  auto canonical = getCanonicalSignature();
-  auto &Context = canonical->getASTContext();
-  
-  // See if we cached the mangling signature.
-  auto cached = Context.ManglingSignatures.find({canonical, &M});
-  if (cached != Context.ManglingSignatures.end()) {
-    return cached->second;
-  }
-  
-  // Otherwise, we need to compute it.
-  // Dump the generic signature into an ArchetypeBuilder that will figure out
-  // the minimal set of requirements.
-  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M, 
-                                                                 Context.Diags));
-
-  builder->addGenericSignature(canonical,
-                               /*adoptArchetypes*/ false,
-                               /*treatRequirementsAsExplicit*/ true);
-
-  // Build the minimized signature.
-  auto manglingSig =
-      builder->getGenericSignature(canonical->getGenericParams(),
-                                   /*buildingCanonicalManglingSignature*/ true);
-  
-  CanGenericSignature canSig(manglingSig);
-  
-  // Cache the result.
-  Context.ManglingSignatures.insert({{canonical, &M}, canSig});
-  Context.setArchetypeBuilder(canSig, &M, std::move(builder));
-
-  return canSig;
-}
-
 ASTContext &GenericSignature::getASTContext() const {
   // Canonical signatures store the ASTContext directly.
   if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext *>())

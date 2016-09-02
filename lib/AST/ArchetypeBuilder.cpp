@@ -2020,8 +2020,7 @@ Type ArchetypeBuilder::substDependentType(Type type) {
 /// their associated types.
 static void collectRequirements(ArchetypeBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
-                                SmallVectorImpl<Requirement> &requirements,
-                                bool buildingCanonicalManglingSignature) {
+                                SmallVectorImpl<Requirement> &requirements) {
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
@@ -2030,23 +2029,14 @@ static void collectRequirements(ArchetypeBuilder &builder,
     switch (source.getKind()) {
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
+    case RequirementSource::OuterScope:
       // The requirement was explicit and required, keep it.
       break;
 
     case RequirementSource::Protocol:
-      // We drop these requirements in canonical mangling signatures.
-      if (buildingCanonicalManglingSignature)
-        return;
-      break;
-
     case RequirementSource::Redundant:
       // The requirement was redundant, drop it.
       return;
-
-    case RequirementSource::OuterScope:
-      assert(!buildingCanonicalManglingSignature &&
-             "mangling signature shouldn't have an outer scope");
-      break;
     }
 
     auto depTy = archetype->getDependentType(builder, false);
@@ -2072,22 +2062,15 @@ static void collectRequirements(ArchetypeBuilder &builder,
     if (repTy->is<ErrorType>())
       return;
 
-    if (buildingCanonicalManglingSignature) {
-      depTy = depTy->getCanonicalType();
-      repTy = repTy->getCanonicalType();
-    }
-
     requirements.push_back(Requirement(kind, depTy, repTy));
   });
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature(
-    ArrayRef<GenericTypeParamType *> genericParamTypes,
-    bool buildingCanonicalManglingSignature) {
+    ArrayRef<GenericTypeParamType *> genericParamTypes) {
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
-  collectRequirements(*this, genericParamTypes, requirements,
-                      buildingCanonicalManglingSignature);
+  collectRequirements(*this, genericParamTypes, requirements);
 
   auto sig = GenericSignature::get(genericParamTypes, requirements);
   return sig;
