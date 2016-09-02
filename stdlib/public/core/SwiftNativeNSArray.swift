@@ -171,7 +171,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
-    repeat {
+    while true {
       var buffer: UnsafeBufferPointer<AnyObject>
       
       // If we've already got a buffer of bridged objects, just use it
@@ -206,7 +206,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       defer { _fixLifetime(self) }
       return try body(buffer)
     }
-    while true
   }
 
   /// Returns the number of elements in the array.

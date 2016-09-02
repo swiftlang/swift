@@ -157,6 +157,93 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32):
   return %i : $Int32
 }
 
+// CHECK-LABEL: sil @canonicalize_init_enum_data_addr_diff_basic_blocks
+// CHECK-NOT: init_enum_data_addr
+// CHECK-NOT: inject_enum_addr
+// CHECK: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK-NOT: inject_enum_addr
+// CHECK: return
+sil @canonicalize_init_enum_data_addr_diff_basic_blocks : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  br bb1
+
+bb1:                                              // Preds: bb0
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i : $Int32
+}
+
+// CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr_reach_entry
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: return
+sil @fail_to_canonicalize_init_enum_data_addr_reach_entry : $@convention(thin) (@inout Int32, Builtin.Int32, Builtin.Int1) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
+  %s1 = alloc_stack $Optional<Int32>
+  %i2 = load %0 : $*Int32
+  %en = enum $Optional<Int32>, #Optional.none!enumelt
+  store %en to %s1 : $*Optional<Int32>
+  cond_br %2, bb1, bb2
+
+bb1:
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  store %i to %0 : $*Int32
+  br bb2
+
+bb2:                                              // Preds: bb0 bb1
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i2 : $Int32
+}
+
+// CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr
+// CHECK: init_enum_data_addr
+// CHECK: inject_enum_addr
+// CHECK-NOT: enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: return
+sil @fail_to_canonicalize_init_enum_data_addr : $@convention(thin) (@inout Int32, Builtin.Int32) -> Int32 {
+bb0(%0 : $*Int32, %1 : $Builtin.Int32):
+  %s1 = alloc_stack $Optional<Int32>
+  %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  %v = load %0 : $*Int32
+  store %v to %e1 : $*Int32
+  %i1 = integer_literal $Builtin.Int32, 1
+  %i0 = integer_literal $Builtin.Int1, 0
+  %a = builtin "sadd_with_overflow_Int32"(%1 : $Builtin.Int32, %i1 : $Builtin.Int32, %i0 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %w = tuple_extract %a : $(Builtin.Int32, Builtin.Int1), 0
+  %i = struct $Int32 (%w : $Builtin.Int32)
+  br bb1
+  
+bb1:
+  %o = enum $Optional<Int32>, #Optional.none!enumelt
+  store %o to %s1 : $*Optional<Int32>
+  br bb2
+
+bb2:
+  store %i to %0 : $*Int32
+  inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt.1
+  dealloc_stack %s1 : $*Optional<Int32>
+  return %i : $Int32
+}
+
 // Check the cond_br(select_enum) -> switch_enum conversion.
 //
 // CHECK-LABEL: sil @convert_select_enum_cond_br_to_switch_enum

@@ -539,11 +539,6 @@ public:
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
 
-  /// findExistingInitializerContext - Given that this expression is
-  /// an initializer that belongs in some sort of Initializer
-  /// context, look through it for any existing context object.
-  Initializer *findExistingInitializerContext();
-
   /// Determine whether this expression refers to a type by name.
   ///
   /// This distinguishes static references to types, like Int, from metatype

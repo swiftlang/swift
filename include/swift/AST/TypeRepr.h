@@ -32,7 +32,6 @@ namespace swift {
   class DeclContext;
   class IdentTypeRepr;
   class ValueDecl;
-  class ExprHandle;
   class NamedTypeRepr;
 
 enum class TypeReprKind : uint8_t {

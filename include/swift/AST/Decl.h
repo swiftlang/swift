@@ -21,7 +21,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
@@ -246,8 +245,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
+
+    /// \brief The number of pattern binding declarations.
+    unsigned NumPatternEntries : 16;
   };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 3 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 19 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -1668,9 +1670,14 @@ class PatternBindingEntry {
   // initializer is ASTContext-allocated it is safe.
   llvm::PointerIntPair<Expr *, 2, OptionSet<Flags>> InitCheckedAndRemoved;
 
+  /// The initializer context used for this pattern binding entry.
+  DeclContext *InitContext = nullptr;
+
+  friend class PatternBindingInitializer;
+
 public:
-  PatternBindingEntry(Pattern *P, Expr *E)
-    : ThePattern(P), InitCheckedAndRemoved(E, {}) {}
+  PatternBindingEntry(Pattern *P, Expr *E, DeclContext *InitContext)
+    : ThePattern(P), InitCheckedAndRemoved(E, {}), InitContext(InitContext) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
@@ -1690,6 +1697,12 @@ public:
 
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
+
+  // Retrieve the declaration context for the intializer.
+  DeclContext *getInitContext() const { return InitContext; }
+
+  /// Override the initializer context.
+  void setInitContext(DeclContext *dc) { InitContext = dc; }
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -1711,8 +1724,6 @@ class PatternBindingDecl final : public Decl,
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
-  unsigned numPatternEntries;
-
   friend class Decl;
   
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
@@ -1732,13 +1743,22 @@ public:
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent);
 
+  static PatternBindingDecl *createDeserialized(
+                               ASTContext &Ctx, SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc VarLoc,
+                               unsigned NumPatternEntries,
+                               DeclContext *Parent);
+
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
   }
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
-  unsigned getNumPatternEntries() const { return numPatternEntries; }
+  unsigned getNumPatternEntries() const {
+    return PatternBindingDeclBits.NumPatternEntries;
+  }
   
   ArrayRef<PatternBindingEntry> getPatternList() const {
     return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
@@ -1760,7 +1780,7 @@ public:
     return getPatternList()[i].getPattern();
   }
   
-  void setPattern(unsigned i, Pattern *Pat);
+  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -1810,7 +1830,7 @@ public:
 private:
   MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
     // Pattern entries are tail allocated.
-    return {getTrailingObjects<PatternBindingEntry>(), numPatternEntries};
+    return {getTrailingObjects<PatternBindingEntry>(), getNumPatternEntries()};
   }
 };
   
@@ -4255,8 +4275,13 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc LetVarInOutLoc;
 
+  struct StoredDefaultArgument {
+    Expr *DefaultArg = nullptr;
+    Initializer *InitContext = nullptr;
+  };
+
   /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
+  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
   
   /// True if the type is implicitly specified in the source, but this has an
   /// apparently valid typeRepr.  This is used in accessors, which look like:
@@ -4302,12 +4327,21 @@ public:
     defaultArgumentKind = K;
   }
   
-  void setDefaultValue(ExprHandle *H) {
-    DefaultValueAndIsVariadic.setPointer(H);
+  Expr *getDefaultValue() const {
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->DefaultArg;
+    return nullptr;
   }
-  ExprHandle *getDefaultValue() const {
-    return DefaultValueAndIsVariadic.getPointer();
+
+  void setDefaultValue(Expr *E);
+
+  Initializer *getDefaultArgumentInitContext() const {
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->InitContext;
+    return nullptr;
   }
+
+  void setDefaultArgumentInitContext(Initializer *initContext);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }

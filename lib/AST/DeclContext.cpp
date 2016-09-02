@@ -722,7 +722,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     switch (cast<Initializer>(this)->getInitializerKind()) {
     case InitializerKind::PatternBinding: {
       auto init = cast<PatternBindingInitializer>(this);
-      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      OS << " PatternBinding 0x" << (void*) init->getBinding()
+         << " #" << init->getBindingIndex();
       break;
     }
     case InitializerKind::DefaultArgument: {
@@ -748,7 +749,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto init = cast<SerializedPatternBindingInitializer>(local);
-      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      OS << " PatternBinding 0x" << (void*) init->getBinding()
+         << " #" << init->getBindingIndex();
       break;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:

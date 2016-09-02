@@ -145,36 +145,36 @@ static void destroyGenericBox(HeapObject *o) {
                                             metadata->getAllocAlignMask());
 }
 
-class BoxCacheEntry : public CacheEntry<BoxCacheEntry> {
+class BoxCacheEntry {
 public:
-  FullMetadata<GenericBoxHeapMetadata> Metadata;
+  FullMetadata<GenericBoxHeapMetadata> Data;
 
-  BoxCacheEntry(size_t numArguments)
-    : Metadata{HeapMetadataHeader{{destroyGenericBox}, {nullptr}},
-               GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable, 0,
-                                       nullptr}} {
-    assert(numArguments == 1);
+  BoxCacheEntry(const Metadata *type)
+    : Data{HeapMetadataHeader{{destroyGenericBox}, {/*vwtable*/ nullptr}},
+           GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable,
+                                  GenericBoxHeapMetadata::getHeaderOffset(type),
+                                  type}} {
   }
 
-  size_t getNumArguments() const {
-    return 1;
+  long getKeyIntValueForDump() {
+    return reinterpret_cast<long>(Data.BoxedType);
   }
 
-  static const char *getName() {
-    return "BoxCache";
+  int compareWithKey(const Metadata *type) const {
+    return comparePointers(type, Data.BoxedType);
   }
 
-  FullMetadata<GenericBoxHeapMetadata> *getData() {
-    return &Metadata;
+  static size_t getExtraAllocationSize(const Metadata *key) {
+    return 0;
   }
-  const FullMetadata<GenericBoxHeapMetadata> *getData() const {
-    return &Metadata;
+  size_t getExtraAllocationSize() const {
+    return 0;
   }
 };
 
 } // end anonymous namespace
 
-static Lazy<MetadataCache<BoxCacheEntry>> Boxes;
+static SimpleGlobalCache<BoxCacheEntry> Boxes;
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 BoxPair::Return
@@ -186,20 +186,7 @@ SWIFT_CC(swift) SWIFT_RT_ENTRY_IMPL_VISIBILITY
 extern "C"
 BoxPair::Return SWIFT_RT_ENTRY_IMPL(swift_allocBox)(const Metadata *type) {
   // Get the heap metadata for the box.
-  auto &B = Boxes.get();
-  const void *typeArg = type;
-  auto entry = B.findOrAdd(&typeArg, 1, [&]() -> BoxCacheEntry* {
-    // Create a new entry for the box.
-    auto entry = BoxCacheEntry::allocate(B.getAllocator(), &typeArg, 1, 0);
-
-    auto metadata = entry->getData();
-    metadata->Offset = GenericBoxHeapMetadata::getHeaderOffset(type);
-    metadata->BoxedType = type;
-
-    return entry;
-  });
-
-  auto metadata = entry->getData();
+  auto metadata = &Boxes.getOrInsert(type).first->Data;
 
   // Allocate and project the box.
   auto allocation = SWIFT_RT_ENTRY_CALL(swift_allocObject)(

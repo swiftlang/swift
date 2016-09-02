@@ -36,6 +36,8 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
 
+#include "CompilationRecord.h"
+
 using namespace swift;
 using namespace swift::sys;
 using namespace swift::driver;
@@ -190,27 +192,24 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
   };
 
-  out << "version: \"" << llvm::yaml::escape(version::getSwiftFullVersion())
+  using compilation_record::TopLevelKey;
+  out << compilation_record::getName(TopLevelKey::Version) << ": \""
+      << llvm::yaml::escape(version::getSwiftFullVersion())
       << "\"\n";
-  out << "options: \"" << llvm::yaml::escape(argsHash) << "\"\n";
-  out << "build_time: ";
+  out << compilation_record::getName(TopLevelKey::Options) << ": \""
+      << llvm::yaml::escape(argsHash) << "\"\n";
+  out << compilation_record::getName(TopLevelKey::BuildTime) << ": ";
   writeTimeValue(out, buildTime);
   out << "\n";
-  out << "inputs:\n";
+  out << compilation_record::getName(TopLevelKey::Inputs) << ":\n";
 
   for (auto &entry : inputs) {
     out << "  \"" << llvm::yaml::escape(entry.first->getValue()) << "\": ";
 
-    switch (entry.second.status) {
-    case CompileJobAction::InputInfo::UpToDate:
-      break;
-    case CompileJobAction::InputInfo::NewlyAdded:
-    case CompileJobAction::InputInfo::NeedsCascadingBuild:
-      out << "!dirty ";
-      break;
-    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
-      out << "!private ";
-      break;
+    using compilation_record::getIdentifierForInputInfoStatus;
+    auto Name = getIdentifierForInputInfoStatus(entry.second.status);
+    if (!Name.empty()) {
+      out << Name << " ";
     }
 
     writeTimeValue(out, entry.second.previousModTime);

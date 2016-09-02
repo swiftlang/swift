@@ -924,7 +924,7 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(DeclContext *DC);
+    void setFunctionContext(AbstractFunctionDecl *AFD);
     
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
@@ -970,7 +970,7 @@ public:
     TypeRepr *Type = nullptr;
 
     /// The default argument for this parameter.
-    ExprHandle *DefaultArg = nullptr;
+    Expr *DefaultArg = nullptr;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
