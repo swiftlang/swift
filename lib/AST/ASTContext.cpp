@@ -259,9 +259,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
 
-  /// \brief A cached unused pattern-binding initializer context.
-  PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
-
   /// \brief A cached unused default-argument initializer context.
   DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
 
@@ -1561,22 +1558,6 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
     return;
   }
   getASTContext().Impl.LocalDiscriminators.insert({this, index});
-}
-
-PatternBindingInitializer *
-ASTContext::createPatternBindingContext(DeclContext *parent) {
-  // Check for an existing context we can re-use.
-  if (auto existing = Impl.UnusedPatternBindingContext) {
-    Impl.UnusedPatternBindingContext = nullptr;
-    existing->reset(parent);
-    return existing;
-  }
-
-  return new (*this) PatternBindingInitializer(parent);
-}
-void ASTContext::destroyPatternBindingContext(PatternBindingInitializer *DC) {
-  // There isn't much value in caching more than one of these.
-  Impl.UnusedPatternBindingContext = DC;
 }
 
 DefaultArgumentInitializer *

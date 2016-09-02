@@ -2106,13 +2106,25 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(binding);
 
     auto contextID = addDeclContextRef(binding->getDeclContext());
+    SmallVector<uint64_t, 2> initContextIDs;
+    for (unsigned i : range(binding->getNumPatternEntries())) {
+      auto initContextID =
+        addDeclContextRef(binding->getPatternList()[i].getInitContext());
+      if (!initContextIDs.empty()) {
+        initContextIDs.push_back(initContextID);
+      } else if (initContextID) {
+        initContextIDs.append(i, 0);
+        initContextIDs.push_back(initContextID);
+      }
+    }
 
     unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
     PatternBindingLayout::emitRecord(
         Out, ScratchRecord, abbrCode, contextID, binding->isImplicit(),
         binding->isStatic(),
         uint8_t(getStableStaticSpelling(binding->getStaticSpelling())),
-                                     binding->getNumPatternEntries());
+                                     binding->getNumPatternEntries(),
+        initContextIDs);
 
     for (auto entry : binding->getPatternList()) {
       writePattern(entry.getPattern());

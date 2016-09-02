@@ -3974,10 +3974,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   // so we can build our singular PatternBindingDecl at the end.
   SmallVector<PatternBindingEntry, 4> PBDEntries;
 
-  // The pattern binding initializer contexts, which have to be set up at the
-  // end.
-  SmallVector<PatternBindingInitializer *, 4> PBDInitContexts;
-
   // No matter what error path we take, make sure the
   // PatternBindingDecl/TopLevel code block are added.
   SWIFT_DEFER {
@@ -3992,10 +3988,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                           VarLoc, PBDEntries, CurDeclContext);
 
     // Wire up any initializer contexts we needed.
-    assert(PBDInitContexts.size() == PBDEntries.size());
-    for (unsigned i : indices(PBDInitContexts)) {
-      auto initContext = PBDInitContexts[i];
-      if (initContext) initContext->setBinding(PBD, i);
+    for (unsigned i : indices(PBDEntries)) {
+      if (auto initContext = PBDEntries[i].getInitContext())
+        cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
     }
 
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
@@ -4041,8 +4036,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
-    PBDEntries.push_back({pattern, nullptr});
-    PBDInitContexts.push_back(nullptr);
+    PBDEntries.push_back({pattern, nullptr, nullptr});
 
     Expr *PatternInit = nullptr;
     
@@ -4052,7 +4046,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // into (should we have one).  This happens for properties and global
       // variables in libraries.
       PatternBindingInitializer *initContext = nullptr;
-      bool usedInitContext = false;
 
       // Record the variables that we're trying to initialize.  This allows us
       // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
@@ -4072,7 +4065,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
       if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-        initContext = Context.createPatternBindingContext(CurDeclContext);
+        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set
@@ -4109,21 +4102,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       PatternInit = init.getPtrOrNull();
       PBDEntries.back().setInit(PatternInit);
 
-      // If we allocated an initContext and the expression had a closure in it,
-      // we'll need to keep the initContext around.
-      if (initContext)
-        usedInitContext |= initParser->hasClosures();
-
       // If we set up an initialization context for a property or module-level
-      // global, check to see if we needed it and wind it down.
-      if (initContext) {
-        // If we didn't need the context, "destroy" it, which recycles it for
-        // the next user.
-        if (!usedInitContext)
-          Context.destroyPatternBindingContext(initContext);
-        else
-          PBDInitContexts.back() = initContext;
-      }
+      // global, record it.
+      PBDEntries.back().setInitContext(initContext);
 
       // If we are doing second pass of code completion, we don't want to
       // suddenly cut off parsing and throw away the declaration.
@@ -4158,7 +4139,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         // into (should we have one).  This happens for properties and global
         // variables in libraries.
         PatternBindingInitializer *initContext = nullptr;
-        bool usedInitContext = false;
 
         // Record the variables that we're trying to set up.  This allows us
         // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
@@ -4178,7 +4158,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         // This will be recontextualized to a method we synthesize during
         // type checking.
         if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-          initContext = Context.createPatternBindingContext(CurDeclContext);
+          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
         Optional<ParseFunctionBody> initParser;
         Optional<ContextChange> topLevelParser;
         if (topLevelDecl)
@@ -4188,10 +4168,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
           initParser.emplace(*this, initContext);
 
         auto closure = parseExprClosure();
-        if (initContext) {
-          usedInitContext = true;
-          PBDInitContexts.back() = initContext;
-        }
+        PBDEntries.back().setInitContext(initContext);
 
         if (closure.isParseError())
           return makeParserError();

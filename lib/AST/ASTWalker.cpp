@@ -150,7 +150,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     for (auto entry : PBD->getPatternList()) {
       ++idx;
       if (Pattern *Pat = doIt(entry.getPattern()))
-        PBD->setPattern(idx, Pat);
+        PBD->setPattern(idx, Pat, entry.getInitContext());
       else
         return true;
       if (entry.getInit()) {

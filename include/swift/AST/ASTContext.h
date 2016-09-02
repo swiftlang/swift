@@ -549,13 +549,6 @@ public:
     addCleanup([&object]{ object.~T(); });
   }
 
-  /// Create a context for the initializer of a non-local variable,
-  /// like a global or a field.  To reduce memory usage, if the
-  /// context goes unused, it should be returned to the ASTContext
-  /// with destroyPatternBindingContext.
-  PatternBindingInitializer *createPatternBindingContext(DeclContext *parent);
-  void destroyPatternBindingContext(PatternBindingInitializer *DC);
-
   /// Create a context for the initializer of the nth default argument
   /// of the given function.  To reduce memory usage, if the context
   /// goes unused, it should be returned to the ASTContext with

@@ -1921,23 +1921,15 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // Enter an initializer context if necessary.
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
-  bool initContextIsNew = false;
   if (!DC->isLocalContext()) {
-    // Check for an existing context created by the parser.
     initContext = cast_or_null<PatternBindingInitializer>(
-                              init->findExistingInitializerContext());
-
-    // If we didn't find one, create it.
-    if (!initContext) {
-      initContext = Context.createPatternBindingContext(DC);
-      initContext->setBinding(PBD, patternNumber);
-      initContextIsNew = true;
-    }
-    DC = initContext;
+                    PBD->getPatternList()[patternNumber].getInitContext());
+    if (initContext)
+      DC = initContext;
   }
 
   bool hadError = typeCheckBinding(pattern, init, DC);
-  PBD->setPattern(patternNumber, pattern);
+  PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
 
@@ -1949,14 +1941,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       checkInitializerErrorHandling(initContext, init);
     }
 
-    bool hasClosures =
-      !hadError && contextualizeInitializer(initContext, init);
-
-    // If we created a fresh context and didn't make any autoclosures,
-    // destroy the initializer context so it can be recycled.
-    if (!hasClosures && initContextIsNew) {
-      Context.destroyPatternBindingContext(initContext);
-    }
+    if (!hadError)
+      (void)contextualizeInitializer(initContext, init);
   }
 
   if (hadError) {
