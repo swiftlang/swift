@@ -31,5 +31,5 @@ cd $SWIFT_PATH
 test -e swift/swift-nightly-install || exit 
 rm -rf toolchains/swift-toolchain-$(date "+%u")
 mv toolchains/swift-toolchain toolchains/swift-toolchain-$(date "+%u")
-mv swift/swift-nightly-install toolchains/swift-toolchain
+cp swift/swift-nightly-install toolchains/swift-toolchain
 

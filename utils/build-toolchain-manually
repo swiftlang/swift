@@ -10,18 +10,18 @@ cd $SWIFT_PATH
 #rm -f swift/*.tar.gz
 
 #echo ========== Syncing ==========
-#git multi commit -am "auto commit from build-toolchain-daily"
-#git multi push
-#git multi checkout stable
-#git multi checkout master
-#git multi pull
-#git multi fetch upstream
-#git multi merge upstream/master
-#git multi push
-#git multi checkout develop
-#git multi pull
-#git multi merge master
-#git multi push
+git multi commit -am "auto commit from build-toolchain-daily"
+git multi push
+git multi checkout stable
+git multi checkout master
+git multi pull
+git multi fetch upstream
+git multi merge upstream/master
+git multi push
+git multi checkout develop
+git multi pull
+git multi merge master
+git multi push
 
 echo ========== Running script ==========
 ./swift/utils/build-toolchain local.swift
@@ -31,5 +31,5 @@ cd $SWIFT_PATH
 test -e swift/swift-nightly-install || exit 
 rm -rf toolchains/swift-toolchain-$(date "+%u")
 mv toolchains/swift-toolchain toolchains/swift-toolchain-$(date "+%u")
-mv swift/swift-nightly-install toolchains/swift-toolchain
+cp swift/swift-nightly-install toolchains/swift-toolchain
 
