@@ -241,11 +241,21 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
 // magic allows this to be done as a "toll-free" conversion when an NSError
 // or CFError is used as an Error existential.
 
+@objc protocol _NSError : class {
+  @objc var userInfo: NSDictionary { get }
+}
+
 extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
   public var _userInfo: Any? { return userInfo }
 
+  @nonobjc
+  public var userInfo: [AnyHashable : Any] {
+    let proxy = _unsafeReferenceCast(self, to: _NSError.self)
+    return proxy.userInfo as! [AnyHashable : Any]
+  }
+  
   /// The "embedded" NSError is itself.
   public func _getEmbeddedNSError() -> AnyObject? {
     return self

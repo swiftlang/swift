@@ -474,19 +474,12 @@ extension Array : _ObjectiveCBridgeable {
   internal init(_cocoaArray: NSArray) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Array can be backed by NSArray only when the element type can be bridged verbatim to Objective-C")
-    // FIXME: We would like to call CFArrayCreateCopy() to avoid doing an
-    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
-    // today because CFArrayCreateCopy() copies array contents unconditionally,
-    // resulting in O(n) copies even for immutable arrays.
-    //
-    // <rdar://problem/19773555> CFArrayCreateCopy() is >10x slower than
-    // -[NSArray copyWithZone:]
-    //
-    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
-    // and watchOS.
-    self = Array(
-      _immutableCocoaArray:
-        unsafeBitCast(_cocoaArray.copy() as AnyObject, to: _NSArrayCore.self))
+    self.init()
+    let n = _cocoaArray.count
+    self.reserveCapacity(n)
+    for i in 0..<n {
+      append(_cocoaArray.object(at: i) as! Element)
+    }
   }
 
   @_semantics("convertToObjectiveC")
@@ -567,116 +560,26 @@ extension NSDictionary : ExpressibleByDictionaryLiteral {
   }
 }
 
-extension Dictionary {
-  /// Private initializer used for bridging.
-  ///
-  /// The provided `NSDictionary` will be copied to ensure that the copy can
-  /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionary) {
-    _sanityCheck(
-      _isBridgedVerbatimToObjectiveC(Key.self) &&
-      _isBridgedVerbatimToObjectiveC(Value.self),
-      "Dictionary can be backed by NSDictionary storage only when both key and value are bridged verbatim to Objective-C")
-    // FIXME: We would like to call CFDictionaryCreateCopy() to avoid doing an
-    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
-    // today because CFDictionaryCreateCopy() copies dictionary contents
-    // unconditionally, resulting in O(n) copies even for immutable dictionaries.
-    //
-    // <rdar://problem/20690755> CFDictionaryCreateCopy() does not call copyWithZone:
-    //
-    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
-    // and watchOS.
-    self = Dictionary(
-      _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(with: nil) as AnyObject,
-                      to: _NSDictionary.self))
-  }
-}
-
 // Dictionary<Key, Value> is conditionally bridged to NSDictionary
-extension Dictionary : _ObjectiveCBridgeable {
+extension Dictionary : _CustomObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSDictionary {
     return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject,
                          to: NSDictionary.self)
   }
 
-  public static func _forceBridgeFromObjectiveC(
-    _ d: NSDictionary,
-    result: inout Dictionary?
-  ) {
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
-        d as AnyObject) {
-      result = native
-      return
-    }
-
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d as AnyObject, to: _NSDictionary.self))
-      return
-    }
-
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d.count)
-    d.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
-      let anyObjectKey = anyKey as AnyObject
-      let anyObjectValue = anyValue as AnyObject
-      builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyObjectKey, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyObjectValue, Value.self))
-    })
-    result = builder.take()
+  public static func _bridgedFromNil(_: NSDictionary?) -> Dictionary {
+    return [:]
   }
-
-  public static func _conditionallyBridgeFromObjectiveC(
-    _ x: NSDictionary,
-    result: inout Dictionary?
-  ) -> Bool {
-    let anyDict = x as [NSObject : AnyObject]
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = Swift._dictionaryDownCastConditional(anyDict)
-      return result != nil
+  
+  public static func _bridged<Policy: _BridgePolicy>(
+    from objc: NSDictionary, by policy: Policy.Type
+  ) -> Dictionary? {
+    if let n = Dictionary._bridgeFromObjectiveCAdoptingNativeStorageOf(objc) {
+      return n
     }
-
-    result = Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
-    return result != nil
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    _ d: NSDictionary?
-  ) -> Dictionary {
-    // `nil` has historically been used as a stand-in for an empty
-    // dictionary; map it to an empty dictionary.
-    if _slowPath(d == nil) { return Dictionary() }
-
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
-        d! as AnyObject) {
-      return native
-    }
-
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      return [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d! as AnyObject, to: _NSDictionary.self))
-    }
-
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
-    d!.enumerateKeysAndObjects({
-      (anyKey: Any, anyValue: Any,
-       stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))
-    })
-    return builder.take()
+    return Dictionary(
+      _unsafeReferenceCast(objc, to: _NSDictionary.self), by: policy)
   }
 }
 

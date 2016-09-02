@@ -36,6 +36,39 @@ public protocol _NSFastEnumeration : _ShadowProtocol {
   ) -> Int
 }
 
+extension _NSFastEnumeration {
+  /// Divides the elements into contiguous batches and calls `processBatch` on
+  /// each batch, in order.
+  ///
+  /// To stop processing early, throw an error.
+  func _forEachBatch(
+    _ processBatch: (UnsafeBufferPointer<AnyObject>) throws -> Void 
+  ) rethrows {
+    typealias X = UnsafeRawPointer?
+    typealias Storage = (X, X, X, X, X, X, X, X)
+    
+    var bufferStorage: Storage
+    let bufferCapacity = MemoryLayout<Storage>.size
+                       / MemoryLayout<X>.stride
+
+    try withUnsafePointer(to: &bufferStorage) { p in
+      try p.withMemoryRebound(
+        to: AnyObject.self, capacity: bufferCapacity
+      ) { buffer in
+        var s = _makeSwiftNSFastEnumerationState()
+        var bufferCount = 0
+        repeat {
+          bufferCount = self.countByEnumerating(
+            with: &s, objects: buffer, count: bufferCapacity)
+          try processBatch(
+            UnsafeBufferPointer(start: buffer, count: bufferCount))
+        }
+        while bufferCount != 0
+      }
+    }
+  }
+}
+
 /// A shadow for the `NSEnumerator` class.
 @objc
 public protocol _NSEnumerator : _ShadowProtocol {

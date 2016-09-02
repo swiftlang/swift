@@ -91,6 +91,9 @@ Classes:
   - Selector: 'setUserInfoValueProviderForDomain:provider:'
     SwiftName: setUserInfoValueProvider(forDomain:provider:)
     MethodKind: Class
+  Properties:
+  - Name: userInfo
+    SwiftName: _objc_userInfo
 - Name: NSDictionary
   SwiftBridge: Swift.Dictionary
 - Name: NSSet
