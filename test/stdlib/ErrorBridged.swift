@@ -582,6 +582,32 @@ ErrorBridgingTests.test("Customizing localization/recovery laziness") {
   }
 }
 
+enum DefaultCustomizedError1 : CustomNSError {
+  case bad
+  case worse
+}
+
+enum DefaultCustomizedError2 : Int, CustomNSError {
+  case bad = 7
+  case worse = 13
+}
+
+enum DefaultCustomizedError3 : UInt, CustomNSError {
+  case bad = 9
+  case worse = 115
+
+  static var errorDomain: String {
+    return "customized3"
+  }
+}
+
+ErrorBridgingTests.test("Default-customized via CustomNSError") {
+  expectEqual(1, (DefaultCustomizedError1.worse as NSError).code)
+  expectEqual(13, (DefaultCustomizedError2.worse as NSError).code)
+  expectEqual(115, (DefaultCustomizedError3.worse as NSError).code)
+  expectEqual("customized3", (DefaultCustomizedError3.worse as NSError).domain)
+}
+
 class MyNSError : NSError {  }
 
 ErrorBridgingTests.test("NSError subclass identity") {
