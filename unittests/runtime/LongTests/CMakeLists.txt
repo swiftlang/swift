@@ -25,7 +25,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   add_swift_unittest(SwiftRuntimeLongTests
     LongRefcounting.cpp
-    ../StdLib.cpp
+    ../Stdlib.cpp
     ${PLATFORM_SOURCES}
 
     # The runtime tests link to internal runtime symbols, which aren't exported
