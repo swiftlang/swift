@@ -831,7 +831,7 @@ namespace {
       
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
-        printRec(init->getExpr());
+        printRec(init);
       }
       
       OS << ')';

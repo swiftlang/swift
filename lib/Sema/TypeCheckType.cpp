@@ -22,7 +22,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"

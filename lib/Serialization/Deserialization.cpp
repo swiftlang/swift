@@ -1507,13 +1507,16 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
 
   case decls_block::PATTERN_BINDING_INITIALIZER_CONTEXT: {
     DeclID bindingID;
+    uint32_t bindingIndex;
     decls_block::PatternBindingInitializerLayout::readRecord(scratch,
-                                                             bindingID);
+                                                             bindingID,
+                                                             bindingIndex);
     auto decl = getDecl(bindingID);
     PatternBindingDecl *binding = cast<PatternBindingDecl>(decl);
 
-    declContextOrOffset = new (ctx)
-      SerializedPatternBindingInitializer(binding);
+    if (!declContextOrOffset.isComplete())
+      declContextOrOffset = new (ctx)
+        SerializedPatternBindingInitializer(binding, bindingIndex);
     break;
   }
 
@@ -2693,29 +2696,25 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isStatic;
     uint8_t RawStaticSpelling;
     unsigned numPatterns;
+    ArrayRef<uint64_t> initContextIDs;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
                                                   isImplicit,
                                                   isStatic,
                                                   RawStaticSpelling,
-                                                  numPatterns);
-    SmallVector<PatternBindingEntry, 2> patterns;
-    patterns.reserve(numPatterns);
-    for (unsigned i = 0; i != numPatterns; ++i) {
-      patterns.push_back({ maybeReadPattern(), nullptr });
-      assert(patterns.back().getPattern());
-    }
-
+                                                  numPatterns,
+                                                  initContextIDs);
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
     if (!StaticSpelling.hasValue()) {
       error();
       return nullptr;
     }
 
-    auto binding = PatternBindingDecl::create(ctx, SourceLoc(),
-                                              StaticSpelling.getValue(),
-                                              SourceLoc(), patterns,
-                                              getDeclContext(contextID));
+    auto binding =
+      PatternBindingDecl::createDeserialized(ctx, SourceLoc(),
+                                             StaticSpelling.getValue(),
+                                             SourceLoc(), numPatterns,
+                                             getDeclContext(contextID));
     binding->setEarlyAttrValidation(true);
     declOrOffset = binding;
 
@@ -2723,6 +2722,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       binding->setImplicit();
+
+    for (unsigned i = 0; i != numPatterns; ++i) {
+      auto pattern = maybeReadPattern();
+      assert(pattern);
+      DeclContext *initContext = nullptr;
+      if (!initContextIDs.empty())
+        initContext = getDeclContext(initContextIDs[i]);
+      binding->setPattern(i, pattern, initContext);
+    }
 
     break;
   }

@@ -19,7 +19,6 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1207,46 +1206,25 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
   assert(dc->isLocalContext());
 
   for (auto &param : *params) {
-    unsigned curArgIndex = nextArgIndex++;
+    ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
         param->getType()->is<ErrorType>())
       continue;
     
-    auto defaultValueHandle = param->getDefaultValue();
-    Expr *e = defaultValueHandle->getExpr();
-
-    // Re-use an existing initializer context if possible.
-    auto existingContext = e->findExistingInitializerContext();
-    DefaultArgumentInitializer *initContext;
-    if (existingContext) {
-      initContext = cast<DefaultArgumentInitializer>(existingContext);
-      assert(initContext->getIndex() == curArgIndex);
-      assert(initContext->getParent() == dc);
-
-    // Otherwise, allocate one temporarily.
-    } else {
-      initContext =
-        tc.Context.createDefaultArgumentContext(dc, curArgIndex);
-    }
+    Expr *e = param->getDefaultValue();
+    auto initContext = param->getDefaultArgumentInitContext();
 
     // Type-check the initializer, then flag that we did so.
-    if (tc.typeCheckExpression(e, initContext,
-                               TypeLoc::withoutLoc(param->getType()),
-                               CTP_DefaultParameter))
-      defaultValueHandle->setExpr(defaultValueHandle->getExpr(), true);
-    else
-      defaultValueHandle->setExpr(e, true);
+    if (!tc.typeCheckExpression(e, initContext,
+                                TypeLoc::withoutLoc(param->getType()),
+                                CTP_DefaultParameter))
+      param->setDefaultValue(e);
 
     tc.checkInitializerErrorHandling(initContext, e);
 
     // Walk the checked initializer and contextualize any closures
     // we saw there.
-    bool hasClosures = tc.contextualizeInitializer(initContext, e);
-
-    // If we created a new context and didn't run into any autoclosures
-    // during the walk, give the context back to the ASTContext.
-    if (!hasClosures && !existingContext)
-      tc.Context.destroyDefaultArgumentContext(initContext);
+    (void)tc.contextualizeInitializer(initContext, e);
   }
 }
 

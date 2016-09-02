@@ -17,7 +17,6 @@
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
@@ -26,11 +25,11 @@ using namespace swift;
 
 /// \brief Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
-static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
-  if (!init || !init->getExpr())
+static DefaultArgumentKind getDefaultArgKind(Expr *init) {
+  if (!init)
     return DefaultArgumentKind::None;
 
-  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init->getExpr());
+  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
     return DefaultArgumentKind::Normal;
 
@@ -48,36 +47,31 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
   }
 }
 
-void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
-  assert(DC->isLocalContext());
+void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){
   for (auto context : ParsedContexts) {
-    context->changeFunction(DC);
+    context->changeFunction(AFD);
   }
 }
 
 static ParserStatus parseDefaultArgument(Parser &P,
                                    Parser::DefaultArgumentInfo *defaultArgs,
                                    unsigned argIndex,
-                                   ExprHandle *&init,
+                                   Expr *&init,
                                  Parser::ParameterContextKind paramContext) {
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
   // that declaration.
-  auto initDC =
-    P.Context.createDefaultArgumentContext(P.CurDeclContext, argIndex);
+  auto initDC = new (P.Context) DefaultArgumentInitializer(P.CurDeclContext,
+                                                           argIndex);
   Parser::ParseFunctionBody initScope(P, initDC);
 
   ParserResult<Expr> initR = P.parseExpr(diag::expected_init_value);
 
-  // Give back the default-argument context if we didn't need it.
-  if (!initScope.hasClosures()) {
-    P.Context.destroyDefaultArgumentContext(initDC);
-
-  // Otherwise, record it if we're supposed to accept default
+  // Record the default-argument context if we're supposed to accept default
   // arguments here.
-  } else if (defaultArgs) {
+  if (defaultArgs) {
     defaultArgs->ParsedContexts.push_back(initDC);
   }
 
@@ -119,7 +113,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
   if (initR.isNull())
     return makeParserError();
 
-  init = ExprHandle::get(P.Context, initR.get());
+  init = initR.get();
   return ParserStatus();
 }
 
@@ -352,7 +346,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
         SourceRange defaultArgRange;
-        if (auto init = param.DefaultArg->getExpr())
+        if (auto init = param.DefaultArg)
           defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
 
         diagnose(EqualLoc, diag::parameter_vararg_default)

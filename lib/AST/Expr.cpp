@@ -567,22 +567,6 @@ void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
   this->walk(ChildWalker(callback));
 }
 
-Initializer *Expr::findExistingInitializerContext() {
-  struct FindExistingInitializer : ASTWalker {
-    Initializer *TheInitializer = nullptr;
-    std::pair<bool,Expr*> walkToExprPre(Expr *E) override {
-      assert(!TheInitializer && "continuing to walk after finding context?");
-      if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
-        TheInitializer = cast<Initializer>(closure->getParent());
-        return { false, nullptr };
-      }
-      return { true, E };
-    }
-  } finder;
-  walk(finder);
-  return finder.TheInitializer;
-}
-
 bool Expr::isTypeReference() const {
   // If the result isn't a metatype, there's nothing else to do.
   if (!getType()->is<AnyMetatypeType>())

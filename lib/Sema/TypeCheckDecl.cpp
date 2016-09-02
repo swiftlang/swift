@@ -1018,7 +1018,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     return;
   }
 
-  binding->setPattern(entryNumber, pattern);
+  binding->setPattern(entryNumber, pattern,
+                      binding->getPatternList()[entryNumber].getInitContext());
 
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
