@@ -711,65 +711,23 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,
-                                          ArrayRef<Substitution> Subs,
+                                          ProtocolConformanceRef CRef,
                                           SmallVectorImpl<Substitution> &NewSubs) {
   auto &Module = AI.getModule();
 
-  auto CalleeCanType = F->getLoweredFunctionType();
-
-  ProtocolDecl *proto = nullptr;
-  if (CalleeCanType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod) {
-    proto = CalleeCanType->getDefaultWitnessMethodProtocol(
-        *Module.getSwiftModule());
-  }
-
+  auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
+  auto witnessThunkSig = F->getLoweredFunctionType()->getGenericSignature();
   ArrayRef<Substitution> origSubs = AI.getSubstitutions();
 
-  if (proto != nullptr) {
-    // If the callee is a default witness method thunk, preserve substitutions
-    // from the call site.
-    NewSubs.append(origSubs.begin(), origSubs.end());
-    return;
-  }
-
-  // If the callee is a concrete witness method thunk, apply substitutions
-  // from the conformance, and drop any substitutions derived from the Self
-  // type.
-  NewSubs.append(Subs.begin(), Subs.end());
-
-  if (auto generics = AI.getOrigCalleeType()->getGenericSignature()) {
-    for (auto genericParam : generics->getAllDependentTypes()) {
-      auto origSub = origSubs.front();
-      origSubs = origSubs.slice(1);
-
-      // If the callee is a concrete witness method thunk, we ignore
-      // generic parameters derived from 'self', the generic parameter at
-      // depth 0, index 0.
-      auto type = genericParam->getCanonicalType();
-      while (auto memberType = dyn_cast<DependentMemberType>(type)) {
-        type = memberType.getBase();
-      }
-      auto paramType = cast<GenericTypeParamType>(type);
-      if (paramType->getDepth() == 0) {
-        // There shouldn't be any other parameters at this depth.
-        assert(paramType->getIndex() == 0);
-        continue;
-      }
-
-      // Okay, remember this substitution.
-      NewSubs.push_back(origSub);
-    }
-  }
-
-  assert(origSubs.empty() && "subs not parallel to dependent types");
+  Module.getWitnessMethodSubstitutions(CRef, requirementSig, witnessThunkSig,
+                                       origSubs, NewSubs);
 }
 
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
 static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
-                                           ArrayRef<Substitution> Subs) {
+                                           ProtocolConformanceRef C) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
   auto &Module = AI.getModule();
@@ -781,7 +739,7 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
   // additional generic parameters.
   SmallVector<Substitution, 4> NewSubs;
 
-  getWitnessMethodSubstitutions(AI, F, Subs, NewSubs);
+  getWitnessMethodSubstitutions(AI, F, C, NewSubs);
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
@@ -836,12 +794,11 @@ static ApplySite devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 /// of a function_ref, returning the new apply.
 DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
   SILFunction *F;
-  ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
   auto *WMI = cast<WitnessMethodInst>(AI.getCallee());
 
-  std::tie(F, WT, Subs) =
+  std::tie(F, WT) =
     AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                 WMI->getMember());
 
@@ -855,7 +812,7 @@ DevirtualizationResult swift::tryDevirtualizeWitnessMethod(ApplySite AI) {
       return std::make_pair(nullptr, FullApplySite());
   }
 
-  auto Result = devirtualizeWitnessMethod(AI, F, Subs);
+  auto Result = devirtualizeWitnessMethod(AI, F, WMI->getConformance());
   return std::make_pair(Result.getInstruction(), Result);
 }
 
