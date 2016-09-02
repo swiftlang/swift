@@ -620,7 +620,7 @@ ERROR(expected_type_before_arrow,none,
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
 ERROR(function_type_argument_label,none,
-      "function types cannot have argument label %0; use '_' instead",
+      "function types cannot have argument labels; use '_' before %0",
       (Identifier))
 
 // Enum Types
