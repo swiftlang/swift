@@ -1150,12 +1150,18 @@ void ModuleFile::lookupValue(DeclName name,
     if (iter != TopLevelDecls->end()) {
       if (name.isSimpleName()) {
         for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
+          auto decl = getDecl(item.second);
+          if (!decl)
+            continue;
+          auto VD = cast<ValueDecl>(decl.get());
           results.push_back(VD);
         }
       } else {
         for (auto item : *iter) {
-          auto VD = cast<ValueDecl>(getDecl(item.second));
+          auto decl = getDecl(item.second);
+          if (!decl)
+            continue;
+          auto VD = cast<ValueDecl>(decl.get());
           if (VD->getFullName().matchesRef(name))
             results.push_back(VD);
         }
@@ -1168,7 +1174,10 @@ void ModuleFile::lookupValue(DeclName name,
     auto iter = OperatorMethodDecls->find(name.getBaseName());
     if (iter != OperatorMethodDecls->end()) {
       for (auto item : *iter) {
-        auto VD = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        auto VD = cast<ValueDecl>(decl.get());
         results.push_back(VD);
       }
     }
@@ -1185,7 +1194,10 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  auto decl = getDecl((*iter).first);
+  if (!decl)
+    return nullptr;
+  return cast<TypeDecl>(decl.get());
 }
 
 OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
@@ -1199,8 +1211,12 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
     return nullptr;
 
   for (auto item : *iter) {
-    if (getStableFixity(fixity) == item.first)
-      return cast<OperatorDecl>(getDecl(item.second));
+    if (getStableFixity(fixity) != item.first)
+      continue;
+    auto decl = getDecl(item.second);
+    if (!decl)
+      continue;
+    return cast<OperatorDecl>(decl.get());
   }
 
   // FIXME: operators re-exported from other modules?
@@ -1220,7 +1236,11 @@ PrecedenceGroupDecl *ModuleFile::lookupPrecedenceGroup(Identifier name) {
 
   auto data = *iter;
   assert(data.size() == 1);
-  return cast<PrecedenceGroupDecl>(getDecl(data[0].second));
+  auto decl = getDecl(data[0].second);
+  if (!decl)
+    return nullptr;
+
+  return cast<PrecedenceGroupDecl>(decl.get());
 }
 
 void ModuleFile::getImportedModules(
@@ -1319,16 +1339,24 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
     if (iter == TopLevelDecls->end())
       return;
 
-    for (auto item : *iter)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+    for (auto item : *iter) {
+      auto decl = getDecl(item.second);
+      if (!decl)
+        continue;
+      auto VD = cast<ValueDecl>(decl.get());
+      consumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
+    }
     return;
   }
 
   for (auto entry : TopLevelDecls->data()) {
-    for (auto item : entry)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::VisibleAtTopLevel);
+    for (auto item : entry) {
+      auto decl = getDecl(item.second);
+      if (!decl)
+        continue;
+      auto VD = cast<ValueDecl>(decl.get());
+      consumer.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
+    }
   }
 }
 
@@ -1369,13 +1397,18 @@ void ModuleFile::loadObjCMethods(
       continue;
 
     // If the method isn't defined in the requested class, skip it.
-    Type type = getType(std::get<0>(result));
-    if (type->getClassOrBoundGenericClass() != classDecl)
+    auto type = getType(std::get<0>(result));
+    if (!type)
+      continue;
+    if (type.get()->getClassOrBoundGenericClass() != classDecl)
       continue;
 
     // Deserialize the method and add it to the list.
-    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-                      getDecl(std::get<2>(result)))) {
+    auto decl = getDecl(std::get<2>(result));
+    if (!decl)
+      continue;
+
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl.get())) {
       methods.push_back(func);
     }
   }
@@ -1400,7 +1433,10 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
     // one.
     if (name.isSimpleName()) {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        auto vd = cast<ValueDecl>(decl.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -1410,7 +1446,10 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
       }
     } else {
       for (auto item : *iter) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        auto vd = cast<ValueDecl>(decl.get());
         if (!vd->getFullName().matchesRef(name))
           continue;
         
@@ -1426,7 +1465,10 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
   }
 
   for (auto item : *iter) {
-    auto vd = cast<ValueDecl>(getDecl(item.second));
+    auto decl = getDecl(item.second);
+    if (!decl)
+      continue;
+    auto vd = cast<ValueDecl>(decl.get());
     results.push_back(vd);
   }
 }
@@ -1442,7 +1484,10 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
   if (!accessPath.empty()) {
     for (const auto &list : ClassMembersByName->data()) {
       for (auto item : list) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        auto vd = cast<ValueDecl>(decl.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -1455,9 +1500,13 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
   }
 
   for (const auto &list : ClassMembersByName->data()) {
-    for (auto item : list)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
-                         DeclVisibilityKind::DynamicLookup);
+    for (auto item : list) {
+      auto decl = getDecl(item.second);
+      if (!decl)
+        continue;
+      auto VD = cast<ValueDecl>(decl.get());
+      consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+    }
   }
 }
 
@@ -1474,8 +1523,10 @@ void ModuleFile::lookupObjCMethods(
   auto found = *known;
   for (const auto &result : found) {
     // Deserialize the method and add it to the list.
-    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(
-                      getDecl(std::get<2>(result))))
+    auto decl = getDecl(std::get<2>(result));
+    if (!decl)
+      continue;
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl.get()))
       results.push_back(func);
   }
 }
@@ -1492,29 +1543,45 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
   if (PrecedenceGroupDecls) {
     for (auto entry : PrecedenceGroupDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        results.push_back(decl.get());
+      }
     }
   }
 
   if (OperatorDecls) {
     for (auto entry : OperatorDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        results.push_back(decl.get());
+      }
     }
   }
 
   if (TopLevelDecls) {
     for (auto entry : TopLevelDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        results.push_back(decl.get());
+      }
     }
   }
 
   if (ExtensionDecls) {
     for (auto entry : ExtensionDecls->data()) {
-      for (auto item : entry)
-        results.push_back(getDecl(item.second));
+      for (auto item : entry) {
+        auto decl = getDecl(item.second);
+        if (!decl)
+          continue;
+        results.push_back(decl.get());
+      }
     }
   }
 }
@@ -1526,8 +1593,10 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
     return;
 
   for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
-    auto TD = cast<TypeDecl>(getDecl(DeclID));
+    auto decl = getDecl(entry.first);
+    if (!decl)
+      continue;
+    auto TD = cast<TypeDecl>(decl.get());
     TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
@@ -1695,5 +1764,10 @@ bool SerializedASTFile::hasEntryPoint() const {
 
 ClassDecl *SerializedASTFile::getMainClass() const {
   assert(hasEntryPoint());
-  return cast_or_null<ClassDecl>(File.getDecl(File.Bits.EntryPointDeclID));
+  auto decl = File.getDecl(File.Bits.EntryPointDeclID);
+  if (!decl) {
+    // FIXME: Can we recover from this?
+    return nullptr;
+  }
+  return cast_or_null<ClassDecl>(decl.get());
 }
