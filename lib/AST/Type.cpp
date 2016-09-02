@@ -2961,6 +2961,23 @@ Type Type::subst(Module *module,
   });
 }
 
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    LazyResolver *resolver) {
+  Type derivedType = this;
+
+  while (derivedType) {
+    auto *derivedClass = derivedType->getClassOrBoundGenericClass();
+    assert(derivedClass && "expected a class here");
+
+    if (derivedClass == baseClass)
+      return derivedType;
+
+    derivedType = derivedType->getSuperclass(resolver);
+  }
+
+  llvm_unreachable("no inheritance relationship between given classes");
+}
+
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
@@ -2990,12 +3007,14 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-  while (!baseTy->is<ErrorType>() &&
-         baseTy->getAnyNominal() &&
-         baseTy->getAnyNominal() != ownerNominal) {
-    baseTy = baseTy->getSuperclass(resolver);
-    assert(baseTy && "Couldn't find appropriate context");
+  //
+  // FIXME: Do this in the caller?
+  if (baseTy->getAnyNominal()) {
+    auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
+      baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+
+    assert(ownerNominal == baseTy->getAnyNominal());
   }
 
   // If the base type isn't specialized, there's nothing to substitute.
