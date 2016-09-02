@@ -47,10 +47,9 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   }
 }
 
-void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
-  assert(DC->isLocalContext());
+void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){
   for (auto context : ParsedContexts) {
-    context->changeFunction(DC);
+    context->changeFunction(AFD);
   }
 }
 
@@ -64,19 +63,15 @@ static ParserStatus parseDefaultArgument(Parser &P,
   // Enter a fresh default-argument context with a meaningless parent.
   // We'll change the parent to the function later after we've created
   // that declaration.
-  auto initDC =
-    P.Context.createDefaultArgumentContext(P.CurDeclContext, argIndex);
+  auto initDC = new (P.Context) DefaultArgumentInitializer(P.CurDeclContext,
+                                                           argIndex);
   Parser::ParseFunctionBody initScope(P, initDC);
 
   ParserResult<Expr> initR = P.parseExpr(diag::expected_init_value);
 
-  // Give back the default-argument context if we didn't need it.
-  if (!initScope.hasClosures()) {
-    P.Context.destroyDefaultArgumentContext(initDC);
-
-  // Otherwise, record it if we're supposed to accept default
+  // Record the default-argument context if we're supposed to accept default
   // arguments here.
-  } else if (defaultArgs) {
+  if (defaultArgs) {
     defaultArgs->ParsedContexts.push_back(initDC);
   }
 

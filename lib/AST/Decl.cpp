@@ -3681,7 +3681,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     LetVarInOutLoc(PD->getLetVarInOutLoc()),
-    DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
   typeLoc = PD->getTypeLoc();
@@ -3849,6 +3849,32 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   }
   assert(isa<ErrorType>(T));
   return T;
+}
+
+void ParamDecl::setDefaultValue(Expr *E) {
+  if (!DefaultValueAndIsVariadic.getPointer()) {
+    if (!E) return;
+
+    DefaultValueAndIsVariadic.setPointer(
+      getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  DefaultValueAndIsVariadic.getPointer()->DefaultArg = E;
+}
+
+void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
+  assert(DefaultValueAndIsVariadic.getPointer());
+  DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
+}
+
+void DefaultArgumentInitializer::changeFunction(AbstractFunctionDecl *parent) {
+  assert(parent->isLocalContext());
+  setParent(parent);
+
+  unsigned offset = parent->getDeclContext()->isTypeContext() ? 1 : 0;
+  auto param = parent->getParameterList(offset)->get(getIndex() - offset);
+  if (param->getDefaultValue())
+    param->setDefaultArgumentInitContext(this);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,
