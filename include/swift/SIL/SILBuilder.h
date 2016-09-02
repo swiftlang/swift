@@ -868,6 +868,19 @@ public:
         getSILDebugLocation(Loc), Operand, FieldNo, ResultTy));
   }
 
+  SILValue emitTupleElementAddr(SILLocation Loc,
+                                SILValue Operand,
+                                unsigned FieldNo,
+                                SILType ResultTy) {
+    // Every type is a one-element tuple of that type itself. If we ask for
+    // the first field of the same type as the "tuple", that's a no-op.
+    if (ResultTy == Operand->getType()) {
+      assert(FieldNo == 0 && "asking for a field other than 0 of a scalar?!");
+      return Operand;
+    }
+    return createTupleElementAddr(Loc, Operand, FieldNo, ResultTy);
+  }
+  
   TupleElementAddrInst *
   createTupleElementAddr(SILLocation Loc, SILValue Operand, unsigned FieldNo) {
     return insert(new (F.getModule()) TupleElementAddrInst(

@@ -1589,6 +1589,14 @@ public:
                                                 CanType formalRValueType,
                                                 AccessKind accessKind,
                                                 AccessSemantics semantics);
+  
+  /// Emit a partial application of a function, creating a closure that invokes
+  /// the underlying function with the given arguments forwarded.
+  SILValue emitPartialApply(SILLocation Loc, SILValue Fn,
+                            SILType SubstFnTy,
+                            ArrayRef<Substitution> Subs,
+                            ArrayRef<SILValue> Args,
+                            SILType ClosureTy);
 
   /// Emit an lvalue that directly refers to the given instance variable
   /// (without going through getters or setters).

@@ -742,8 +742,8 @@ Globals
   global ::= 'Mn' nominal-type           // nominal type descriptor
   global ::= 'Mp' protocol               // protocol descriptor
   global ::= 'MR' remote-reflection-record // metadata for remote mirrors
-  global ::= 'PA' .*                     // partial application forwarder
-  global ::= 'PAo' .*                    // ObjC partial application forwarder
+  global ::= 'PA' .*                     // partial application forwarder (old)
+  global ::= 'PAo' .*                    // ObjC partial application forwarder (old)
   global ::= 'w' value-witness-kind type // value witness
   global ::= 'Wa' protocol-conformance   // protocol witness table accessor
   global ::= 'WG' protocol-conformance   // generic protocol witness table
@@ -759,6 +759,8 @@ Globals
   global ::= entity                      // some identifiable thing
   global ::= 'TO' global                 // ObjC-as-swift thunk
   global ::= 'To' global                 // swift-as-ObjC thunk
+  global ::= 'TP' global                 // concrete partial application thunk (new)
+  global ::= 'Tp' index type             // dynamic partial application thunk (new)
   global ::= 'TD' global                 // dynamic dispatch thunk
   global ::= 'Td' global                 // direct method reference thunk
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function

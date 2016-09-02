@@ -21,6 +21,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -434,8 +435,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                              subs,
                                              ParameterConvention::Direct_Owned);
   auto toClosure =
-    B.createPartialApply(loc, functionRef, functionTy,
-                         subs, forwardedArgs, closureTy);
+    emitPartialApply(loc, functionRef, functionTy,
+                     subs, forwardedArgs, closureTy);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
   // Get the lowered AST types:
@@ -846,8 +847,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
     SILGenBuilder::getPartialApplyResultType(toFn->getType(), curriedArgs.size(),
                                              SGM.M, subs,
                                              ParameterConvention::Direct_Owned);
-  SILInstruction *toClosure =
-    B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
+  SILValue toClosure =
+    emitPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)
     toClosure = B.createConvertFunction(vd, toClosure, resultTy);
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
@@ -868,6 +869,305 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
+}
+
+SILValue SILGenFunction::emitPartialApply(SILLocation Loc,
+                                          SILValue Fn,
+                                          SILType SubstTy,
+                                          ArrayRef<Substitution> Subs,
+                                          ArrayRef<SILValue> Args,
+                                          SILType ClosureTy) {
+  auto FnTy = Fn->getType().castTo<SILFunctionType>();
+  auto SubstFnTy = SubstTy.castTo<SILFunctionType>();
+  auto ClosureFnTy = ClosureTy.castTo<SILFunctionType>();
+  
+  // TODO: Fall back to omnipotent partial_apply when staged out.
+  // TODO: Boxes need to be able to hold type context before we can supplant
+  // generic partial applications.
+  if (!SGM.M.getOptions().DisableSILPartialApply
+      || FnTy->getGenericSignature())
+    return B.createPartialApply(Loc, Fn, SubstTy, Subs, Args, ClosureTy);
+
+  // If there's no context to capture, and the function already has a
+  // freestanding convention, just convert to a thick function.
+  if (Args.empty() && Subs.empty())
+    switch (FnTy->getRepresentation()) {
+    case SILFunctionTypeRepresentation::Thin:
+      return B.createThinToThickFunction(Loc, Fn, ClosureTy);
+    case SILFunctionTypeRepresentation::Thick:
+      return Fn;
+    case SILFunctionTypeRepresentation::Method:
+    case SILFunctionTypeRepresentation::ObjCMethod:
+    case SILFunctionTypeRepresentation::Block:
+    case SILFunctionTypeRepresentation::CFunctionPointer:
+    case SILFunctionTypeRepresentation::WitnessMethod:
+      // We still want to thunk to Swift calling convention in these cases.
+      break;
+    }
+
+  // TODO: Check for a single swift-refcountable context argument with
+  // appropriate ownership. We can attach that to a function without a
+  // forwarding thunk.
+
+  // See if we're directly partially applying a static function.
+  SILFunction *appliedStaticFunction = nullptr;
+  if (auto fnRef = dyn_cast<FunctionRefInst>(Fn)) {
+    appliedStaticFunction = fnRef->getReferencedFunction();
+  }
+  
+  // Build a forwarding thunk to unpack the arguments.
+  std::string thunkName;
+  if (appliedStaticFunction) {
+    thunkName += "_TTP";
+    auto fnName = appliedStaticFunction->getName();
+    if (fnName.startswith("_T"))
+      fnName = fnName.slice(2, fnName.size());
+    thunkName += fnName;
+  } else {
+    Mangle::Mangler mangle;
+    mangle.append("_TTp");
+    mangle.mangleNatural(APInt(64, Args.size()));
+    mangle.mangleType(Fn->getType().getSwiftRValueType(), 0);
+    thunkName = mangle.finalize();
+  }
+  
+  // Build a tuple type for the captures.
+  // TODO: Capture boxes don't really have the same reabstraction constraints as
+  // tuples, since the implementation can agree on representation specialization
+  // beyond what a tuple normally can provide. It might be better to cons up a
+  // struct or allow @box to directly hold multiple members instead of a single
+  // member only.
+  assert(SubstFnTy->getParameters().size() >= Args.size()
+         && "fewer params than partial apply args?!");
+  auto appliedParams = SubstFnTy->getParameters().slice(
+                              SubstFnTy->getParameters().size() - Args.size());
+  SmallVector<TupleTypeElt, 4> captureTupleElts;
+  for (auto param : appliedParams) {
+    CanType eltTy;
+    switch (param.getConvention()) {
+    // Inout captures get captured by reference as a pointer.
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+      eltTy = getASTContext().TheRawPointerType;
+      break;
+    
+    // Other captures capture by value.
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+      eltTy = param.getType();
+      break;
+    
+    case ParameterConvention::Direct_Deallocating:
+      llvm_unreachable("shouldn't partial apply a deallocating arg");
+    }
+    captureTupleElts.push_back(TupleTypeElt(eltTy));
+  }
+  
+  // If partially applying a dynamic function, we need to capture the function
+  // pointer too.
+  if (!appliedStaticFunction)
+    captureTupleElts.push_back(TupleTypeElt(FnTy));
+  
+  auto captureTupleTy = TupleType::get(captureTupleElts, getASTContext())
+    ->getCanonicalType();
+  auto captureBoxTy = SILBoxType::get(captureTupleTy, /*immutable*/ true);
+  
+  // The forwarding thunk has the closure type as a thin function with a context
+  // parameter.
+  SmallVector<SILParameterInfo, 4> forwardingThunkParams;
+  forwardingThunkParams.append(ClosureFnTy->getParameters().begin(),
+                               ClosureFnTy->getParameters().end());
+  forwardingThunkParams.push_back(SILParameterInfo(captureBoxTy,
+                                           ClosureFnTy->getCalleeConvention()));
+  auto forwardingThunkTy = SILFunctionType::get(
+                                  ClosureFnTy->getGenericSignature(),
+                                  ClosureFnTy->getExtInfo().withRepresentation(
+                                    SILFunctionTypeRepresentation::Thin),
+                                  ParameterConvention::Direct_Unowned,
+                                  forwardingThunkParams,
+                                  ClosureFnTy->getAllResults(),
+                                  ClosureFnTy->getOptionalErrorResult(),
+                                  getASTContext());
+  
+  SILFunction *thunk = SGM.M.getOrCreateFunction(Loc, thunkName,
+                                                 SILLinkage::Shared,
+                                                 forwardingThunkTy,
+                                                 IsBare, IsNotTransparent,
+                                                 IsNotFragile);
+  // Build the thunk if necessary.
+  if (!thunk->isDefinition()) {
+    SILGenFunction thunkGen(SGM, *thunk);
+    
+    SmallVector<AllocStackInst *, 4> stackSpace;
+    
+    // Forward the indirect returns and unapplied arguments.
+    SmallVector<SILValue, 4> fwdArgs;
+    for (auto indirectRet : ClosureFnTy->getIndirectResults()) {
+      fwdArgs.push_back(new (SGM.M) SILArgument(thunk->begin(),
+                                                indirectRet.getSILType()));
+    }
+    for (auto param : ClosureFnTy->getParameters()) {
+      fwdArgs.push_back(new (SGM.M) SILArgument(thunk->begin(),
+                                                param.getSILType()));
+    }
+    
+    // Unpack the context arguments.
+    auto closureArg = new (SGM.M) SILArgument(thunk->begin(),
+                               SILType::getPrimitiveObjectType(captureBoxTy));
+    auto closureAddr = thunkGen.B.createProjectBox(Loc, closureArg);
+    bool mustGuarantee = false;
+    for (unsigned i : indices(appliedParams)) {
+      auto fieldAddr = thunkGen.B.emitTupleElementAddr(Loc, closureAddr, i,
+                  SILType::getPrimitiveAddressType(appliedParams[i].getType()));
+      switch (auto conv = appliedParams[i].getConvention()) {
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Owned: {
+        auto field = thunkGen.B.createLoad(Loc, fieldAddr);
+        // Call will try to release the value if it's owned.
+        if (conv == ParameterConvention::Direct_Owned)
+          thunkGen.B.emitRetainValueOperation(Loc, field);
+        fwdArgs.push_back(field);
+        mustGuarantee |= conv == ParameterConvention::Direct_Guaranteed;
+        break;
+      }
+      case ParameterConvention::Indirect_In_Guaranteed: {
+        fwdArgs.push_back(fieldAddr);
+        mustGuarantee = true;
+        break;
+      }
+      case ParameterConvention::Indirect_In: {
+        // Caller consumes the argument memory, so we must make a local copy.
+        auto fwdBuf = thunkGen.B.createAllocStack(Loc,
+                                                appliedParams[i].getSILType());
+        thunkGen.B.createCopyAddr(Loc, fieldAddr, fwdBuf, IsNotTake,
+                                  IsInitialization);
+        fwdArgs.push_back(fwdBuf);
+        stackSpace.push_back(fwdBuf);
+        break;
+      }
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_InoutAliasable: {
+        // Passed by reference as a pointer. Cast the pointer back.
+        auto ptrVal = thunkGen.B.createLoad(Loc, fieldAddr);
+        auto addr = thunkGen.B.createPointerToAddress(Loc, ptrVal,
+                                                  appliedParams[i].getSILType(),
+                                                  /*strict*/ true);
+        fwdArgs.push_back(addr);
+        break;
+      }
+      case ParameterConvention::Direct_Deallocating:
+        llvm_unreachable("shouldn't partial apply a deallocating arg");
+      }
+    }
+    assert(fwdArgs.size() == SubstFnTy->getParameters().size()
+                           + SubstFnTy->getIndirectResults().size()
+           && "did not forward all arguments?!");
+    
+    // Get the underlying function to apply.
+    SILValue function;
+    if (appliedStaticFunction) {
+      function = thunkGen.B.createFunctionRef(Loc, appliedStaticFunction);
+    } else {
+      // Get it out of the closure context.
+      auto fieldAddr = thunkGen.B.emitTupleElementAddr(Loc, closureAddr,
+                                        appliedParams.size(),
+                                        SILType::getPrimitiveAddressType(FnTy));
+      function = thunkGen.B.createLoad(Loc, fieldAddr);
+      // If the function consumes itself on call, retain it.
+      switch (FnTy->getCalleeConvention()) {
+      case ParameterConvention::Direct_Unowned:
+        break;
+      case ParameterConvention::Direct_Guaranteed:
+        mustGuarantee = true;
+        break;
+      case ParameterConvention::Direct_Owned:
+        thunkGen.B.emitRetainValueOperation(Loc, function);
+        break;
+      case ParameterConvention::Direct_Deallocating:
+      case ParameterConvention::Indirect_InoutAliasable:
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed:
+        llvm_unreachable("should not be a a callee convention");
+      }
+    }
+    
+    // If we don't have any context arguments that depend on the context object,
+    // release it now. This makes us more likely to be able to tail-call the
+    // underlying function.
+    bool mustRelease =
+      ClosureFnTy->getCalleeConvention() == ParameterConvention::Direct_Owned;
+    if (!mustGuarantee && mustRelease)
+      thunkGen.B.emitReleaseValueOperation(Loc, closureArg);
+    
+    // Invoke the underlying function.
+    // TODO: generics
+    // TODO: errors
+    auto result =
+      thunkGen.B.createApply(Loc, function, fwdArgs, /*nonthrowing*/ false);
+    
+    // Release the context now if we're supposed to and we weren't able to
+    // before the call.
+    if (mustGuarantee && mustRelease)
+      thunkGen.B.emitReleaseValueOperation(Loc, closureArg);
+    
+    for (auto stack : reversed(stackSpace)) {
+      thunkGen.B.createDeallocStack(Loc, stack);
+    }
+    thunkGen.B.createReturn(Loc, result);
+  }
+  
+  // On the caller side, build the closure context.
+  auto contextBox = B.createAllocBox(Loc, captureBoxTy);
+  auto contextAddr = B.createProjectBox(Loc, contextBox);
+  for (unsigned i : indices(appliedParams)) {
+    auto fieldAddr = B.emitTupleElementAddr(Loc, contextAddr, i,
+                  SILType::getPrimitiveAddressType(appliedParams[i].getType()));
+    // The context always has to take ownership of the parameters, regardless of
+    // the callee's parameter conventions per-call. However, `inout` parameters
+    // are captured by-reference.
+    switch (appliedParams[i].getConvention()) {
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+      B.createStore(Loc, Args[i], fieldAddr);
+      break;
+    
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_In:
+      B.createCopyAddr(Loc, Args[i], fieldAddr,
+                       IsTake, IsInitialization);
+      break;
+    
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+      auto ptr = B.createAddressToPointer(Loc, Args[i],
+                                  SILType::getRawPointerType(getASTContext()));
+      B.createStore(Loc, ptr, fieldAddr);
+      break;
+    }
+  }
+  
+  if (!appliedStaticFunction) {
+    auto fnAddr = B.emitTupleElementAddr(Loc, contextAddr,
+                                       appliedParams.size(),
+                                       SILType::getPrimitiveAddressType(FnTy));
+    B.createStore(Loc, Fn, fnAddr);
+  }
+  
+  // Bind the context to the forwarding thunk.
+  // For now, do this with a single-parameter partial_apply. IRGen will lower
+  // this case to essentially a tuple construction. Eventually, maybe we can
+  // reduce thick functions to (ThinFunction, NativeObject) pairs in SIL.
+  auto thunkRef = B.createFunctionRef(Loc, thunk);
+  auto thickFn = B.createPartialApply(Loc, thunkRef, thunk->getLoweredType(),
+                                      {}, (SILValue)contextBox, ClosureTy);
+  return thickFn;
 }
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen)
