@@ -24,6 +24,27 @@
 import SwiftShims
 
 public // @testable
+struct _Hashing {
+  // FIXME(ABI): make this an actual public API.
+  public // SPI
+  static var secretKey: (UInt64, UInt64) {
+    get {
+      // The variable itself is defined in C++ code so that it is initialized
+      // during static construction.  Almost every Swift program uses hash
+      // tables, so initializing the secret key during the startup seems to be
+      // the right trade-off.
+      return (
+        _swift_stdlib_Hashing_secretKey.key0,
+        _swift_stdlib_Hashing_secretKey.key1)
+    }
+    set {
+      (_swift_stdlib_Hashing_secretKey.key0,
+       _swift_stdlib_Hashing_secretKey.key1) = newValue
+    }
+  }
+}
+
+public // @testable
 struct _HashingDetail {
 
   public // @testable
