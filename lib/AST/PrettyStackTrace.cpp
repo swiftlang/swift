@@ -76,11 +76,19 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
     }
   }
 
+  if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    out << "extension to " << extension->getExtendedType() << " in module "
+        << extension->getParentModule()->getName();
+    hasPrintedName = true;
+  }
+
   if (!hasPrintedName)
     out << "declaration " << (const void *)D;
 
-  out << " at ";
-  D->getStartLoc().print(out, Context.SourceMgr);
+  if (D->getStartLoc().isValid()) {
+    out << " at ";
+    D->getStartLoc().print(out, Context.SourceMgr);
+  }
   out << '\n';
 }
 
