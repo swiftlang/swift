@@ -18,7 +18,6 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"

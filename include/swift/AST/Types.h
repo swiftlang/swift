@@ -42,7 +42,6 @@ namespace swift {
   class AssociatedTypeDecl;
   class ASTContext;
   class ClassDecl;
-  class ExprHandle;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class GenericParamList;

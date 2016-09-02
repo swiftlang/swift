@@ -792,11 +792,11 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        unsigned NumPatternEntries,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
-    StaticLoc(StaticLoc), VarLoc(VarLoc),
-    numPatternEntries(NumPatternEntries) {
+    StaticLoc(StaticLoc), VarLoc(VarLoc) {
   PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
   PatternBindingDeclBits.StaticSpelling =
        static_cast<unsigned>(StaticSpelling);
+  PatternBindingDeclBits.NumPatternEntries = NumPatternEntries;
 }
 
 PatternBindingDecl *
@@ -805,9 +805,18 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            SourceLoc VarLoc,
                            Pattern *Pat, Expr *E,
                            DeclContext *Parent) {
-  return create(Ctx, StaticLoc, StaticSpelling, VarLoc,
-                PatternBindingEntry(Pat, E),
-                Parent);
+  DeclContext *BindingInitContext = nullptr;
+  if (!Parent->isLocalContext())
+    BindingInitContext = new (Ctx) PatternBindingInitializer(Parent);
+
+  auto Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc,
+                       PatternBindingEntry(Pat, E, BindingInitContext),
+                       Parent);
+
+  if (BindingInitContext)
+    cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
+
+  return Result;
 }
 
 PatternBindingDecl *
@@ -829,7 +838,31 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
     ++elt;
     auto &newEntry = entries[elt];
     newEntry = pe; // This should take care of initializer with flags
-    PBD->setPattern(elt, pe.getPattern());
+    DeclContext *initContext = pe.getInitContext();
+    if (!initContext && !Parent->isLocalContext()) {
+      auto pbi = new (Ctx) PatternBindingInitializer(Parent);
+      pbi->setBinding(PBD, elt);
+      initContext = pbi;
+    }
+
+    PBD->setPattern(elt, pe.getPattern(), initContext);
+  }
+  return PBD;
+}
+
+PatternBindingDecl *PatternBindingDecl::createDeserialized(
+                      ASTContext &Ctx, SourceLoc StaticLoc,
+                      StaticSpellingKind StaticSpelling,
+                      SourceLoc VarLoc,
+                      unsigned NumPatternEntries,
+                      DeclContext *Parent) {
+  size_t Size = totalSizeToAlloc<PatternBindingEntry>(NumPatternEntries);
+  void *D = allocateMemoryForDecl<PatternBindingDecl>(Ctx, Size,
+                                                      /*ClangNode*/false);
+  auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
+                                          NumPatternEntries, Parent);
+  for (auto &entry : PBD->getMutablePatternList()) {
+    entry = PatternBindingEntry(nullptr, nullptr, nullptr);
   }
   return PBD;
 }
@@ -924,9 +957,11 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
-void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
+void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
+                                    DeclContext *InitContext) {
   auto PatternList = getMutablePatternList();
   PatternList[i].setPattern(P);
+  PatternList[i].setInitContext(InitContext);
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
@@ -3646,7 +3681,7 @@ ParamDecl::ParamDecl(ParamDecl *PD)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     LetVarInOutLoc(PD->getLetVarInOutLoc()),
-    DefaultValueAndIsVariadic(PD->DefaultValueAndIsVariadic),
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
     IsTypeLocImplicit(PD->IsTypeLocImplicit),
     defaultArgumentKind(PD->defaultArgumentKind) {
   typeLoc = PD->getTypeLoc();
@@ -3788,7 +3823,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // but we don't have that location info.  Extend the back of the range to the
   // location of the default argument, or the typeloc if they are valid.
   if (auto expr = getDefaultValue()) {
-    auto endLoc = expr->getExpr()->getEndLoc();
+    auto endLoc = expr->getEndLoc();
     if (endLoc.isValid())
       return SourceRange(range.Start, endLoc);
   }
@@ -3814,6 +3849,32 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   }
   assert(isa<ErrorType>(T));
   return T;
+}
+
+void ParamDecl::setDefaultValue(Expr *E) {
+  if (!DefaultValueAndIsVariadic.getPointer()) {
+    if (!E) return;
+
+    DefaultValueAndIsVariadic.setPointer(
+      getASTContext().Allocate<StoredDefaultArgument>());
+  }
+
+  DefaultValueAndIsVariadic.getPointer()->DefaultArg = E;
+}
+
+void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
+  assert(DefaultValueAndIsVariadic.getPointer());
+  DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
+}
+
+void DefaultArgumentInitializer::changeFunction(AbstractFunctionDecl *parent) {
+  assert(parent->isLocalContext());
+  setParent(parent);
+
+  unsigned offset = parent->getDeclContext()->isTypeContext() ? 1 : 0;
+  auto param = parent->getParameterList(offset)->get(getIndex() - offset);
+  if (param->getDefaultValue())
+    param->setDefaultArgumentInitContext(this);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,

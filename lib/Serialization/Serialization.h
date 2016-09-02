@@ -293,7 +293,8 @@ private:
   void writeLocalDeclContext(const DeclContext *DC);
 
   /// Write the components of a PatternBindingInitializer as a local context.
-  void writePatternBindingInitializer(PatternBindingDecl *binding);
+  void writePatternBindingInitializer(PatternBindingDecl *binding,
+                                      unsigned bindingIndex);
 
   /// Write the components of a DefaultArgumentInitializer as a local context.
   void writeDefaultArgumentInitializer(const DeclContext *parentContext, unsigned index);
