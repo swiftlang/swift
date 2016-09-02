@@ -136,13 +136,13 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   if (foundSymbol) {
     static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
     fprintf(stderr, backtraceEntryFormat, index, libraryName.data(), symbolAddr,
-          symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+            symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
   } else {
     static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx "
                                               "<unavailable> + %td\n";
     fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
-        uintptr_t(framePC),
-        ptrdiff_t(uintptr_t(framePC) - uintptr_t(dlinfo.dli_fbase)));
+            uintptr_t(framePC),
+            ptrdiff_t(uintptr_t(framePC) - uintptr_t(dlinfo.dli_fbase)));
   }
 }
 

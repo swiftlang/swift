@@ -1,2 +1,2 @@
 [flake8]
-filename = *.py,80+-check,Benchmark_Driver,Benchmark_DTrace.in,Benchmark_GuardMalloc.in,Benchmark_RuntimeLeaksRunner.in,build-script,check-incremental,gyb,line-directive,mock-distcc,ns-html2rst,recursive-lipo,rth,run-test,submit-benchmark-results,update-checkout,viewcfg,backtrace-check
+filename = *.py,80+-check,Benchmark_Driver,Benchmark_DTrace.in,Benchmark_GuardMalloc.in,Benchmark_RuntimeLeaksRunner.in,build-script,check-incremental,gyb,line-directive,mock-distcc,ns-html2rst,recursive-lipo,rth,run-test,submit-benchmark-results,update-checkout,viewcfg,backtrace-check,symbolicate-linux-fatal
