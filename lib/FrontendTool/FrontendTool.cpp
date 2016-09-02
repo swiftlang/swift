@@ -809,6 +809,11 @@ static bool performCompile(CompilerInstance &Instance,
             << lineColumn.second << "***\n";
           auto locScope = scope.findInnermostEnclosingScope(loc);
           locScope->print(llvm::errs(), 0, false, false);
+
+          // Dump the AST context, too.
+          if (auto dc = locScope->getDeclContext()) {
+            dc->printContext(llvm::errs());
+          }
         }
 
         llvm::errs() << "***Complete scope map***\n";

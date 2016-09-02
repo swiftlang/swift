@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -1537,6 +1538,71 @@ const ASTScope *ASTScope::findInnermostEnclosingScope(SourceLoc loc) const {
     assert(sourceMgr.rangeContainsTokenLoc(searchNode->getSourceRange(), loc));
     return searchNode;
   };
+}
+
+DeclContext *ASTScope::getDeclContext() const {
+  switch (getKind()) {
+  case ASTScopeKind::SourceFile:
+    return sourceFile.file;
+
+  case ASTScopeKind::TypeOrExtensionBody:
+    if (auto nominal = dyn_cast<NominalTypeDecl>(iterableDeclContext))
+      return nominal;
+
+    return cast<ExtensionDecl>(iterableDeclContext);
+
+  case ASTScopeKind::AbstractFunctionDecl:
+    return abstractFunction;
+
+  case ASTScopeKind::DefaultArgument:
+    return parameter->getDefaultArgumentInitContext();
+
+  case ASTScopeKind::PatternInitializer:
+    return patternBinding.decl->getPatternList()[patternBinding.entry]
+             .getInitContext();
+
+  case ASTScopeKind::Closure:
+    return closure;
+
+  case ASTScopeKind::Accessors:
+    // FIXME: Somewhat odd modeling because Subscripts don't have their
+    // own nodes. Maybe that should.
+    if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
+      return subscript;
+
+    return nullptr;
+
+  case ASTScopeKind::TopLevelCode:
+    return topLevelCode;
+
+  case ASTScopeKind::GenericParams:
+  case ASTScopeKind::AbstractFunctionParams:
+  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::AfterPatternBinding:
+  case ASTScopeKind::Preexpanded:
+  case ASTScopeKind::BraceStmt:
+  case ASTScopeKind::IfStmt:
+  case ASTScopeKind::ConditionalClause:
+  case ASTScopeKind::GuardStmt:
+  case ASTScopeKind::RepeatWhileStmt:
+  case ASTScopeKind::ForEachStmt:
+  case ASTScopeKind::ForEachPattern:
+  case ASTScopeKind::DoCatchStmt:
+  case ASTScopeKind::CatchStmt:
+  case ASTScopeKind::SwitchStmt:
+  case ASTScopeKind::CaseStmt:
+  case ASTScopeKind::ForStmt:
+  case ASTScopeKind::ForStmtInitializer:
+  case ASTScopeKind::LocalDeclaration:
+    return nullptr;
+  }
+}
+
+DeclContext *ASTScope::getInnermostEnclosingDeclContext() const {
+  for (const ASTScope *scope = this; ; scope = scope->getParent()) {
+    if (auto dc = scope->getDeclContext()) return dc;
+  }
+  llvm_unreachable("Top-most scope is a declaration context");
 }
 
 void ASTScope::expandAll() const {

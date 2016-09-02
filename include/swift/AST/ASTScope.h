@@ -502,6 +502,21 @@ public:
   /// Find the innermost enclosing scope that contains this source location.
   const ASTScope *findInnermostEnclosingScope(SourceLoc loc) const;
 
+  /// Retrieve the declaration context directly associated with this scope, or
+  /// NULL if there is no such declaration context.
+  ///
+  /// \seealso getInnermostEnclosingDeclContext().
+  DeclContext *getDeclContext() const;
+
+  /// Retrieve the innermost enclosing declaration context in which this
+  /// scope
+  ///
+  /// This is semantically equivalent to calling \c getDeclContext() on this
+  /// node and each of its parents until we get a non-null result.
+  ///
+  /// \seealso getDeclContext().
+  DeclContext *getInnermostEnclosingDeclContext() const;
+
   /// Expand the entire scope map.
   ///
   /// Normally, the scope map will be expanded only as needed by its queries,
