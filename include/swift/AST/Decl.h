@@ -4275,8 +4275,13 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc LetVarInOutLoc;
 
+  struct StoredDefaultArgument {
+    Expr *DefaultArg = nullptr;
+    Initializer *InitContext = nullptr;
+  };
+
   /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<Expr *, 1> DefaultValueAndIsVariadic;
+  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
   
   /// True if the type is implicitly specified in the source, but this has an
   /// apparently valid typeRepr.  This is used in accessors, which look like:
@@ -4322,12 +4327,21 @@ public:
     defaultArgumentKind = K;
   }
   
-  void setDefaultValue(Expr *E) {
-    DefaultValueAndIsVariadic.setPointer(E);
-  }
   Expr *getDefaultValue() const {
-    return DefaultValueAndIsVariadic.getPointer();
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->DefaultArg;
+    return nullptr;
   }
+
+  void setDefaultValue(Expr *E);
+
+  Initializer *getDefaultArgumentInitContext() const {
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->InitContext;
+    return nullptr;
+  }
+
+  void setDefaultArgumentInitContext(Initializer *initContext);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }

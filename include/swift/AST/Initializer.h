@@ -155,11 +155,8 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent) {
-    assert(parent->isLocalContext());
-    setParent(parent);
-  }
-
+  void changeFunction(AbstractFunctionDecl *parent);
+  
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
       return classof(init);

@@ -90,6 +90,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
 
   // Remap the ParamDecls inside of the ParameterList.
   for (auto &decl : params) {
+    bool hadDefaultArgument =decl->getDefaultValue() != nullptr;
+
     decl = new (C) ParamDecl(decl);
     if (options & Implicit)
       decl->setImplicit();
@@ -101,9 +103,8 @@ ParameterList *ParameterList::clone(const ASTContext &C,
       decl->setName(C.getIdentifier("argument"));
     
     // If we're inheriting a default argument, mark it as such.
-    if (decl->isDefaultArgument() && (options & Inherited)) {
+    if (hadDefaultArgument && (options & Inherited)) {
       decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
-      decl->setDefaultValue(nullptr);
     }
   }
   
