@@ -668,8 +668,25 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   ASTContext &ctx = getASTContext();
 
   // An archetype conforms to a protocol if the protocol is listed in the
-  // archetype's list of conformances.
+  // archetype's list of conformances, or if the archetype has a superclass
+  // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
+
+    // The archetype builder drops conformance requirements that are made
+    // redundant by a superclass requirement, so check for a cocnrete
+    // conformance first, since an abstract conformance might not be
+    // able to be resolved by a substitution that makes the archetype
+    // concrete.
+    if (auto super = archetype->getSuperclass()) {
+      if (auto inheritedConformance = lookupConformance(super, protocol,
+                                                        resolver)) {
+        return ProtocolConformanceRef(
+                 ctx.getInheritedConformance(
+                   type,
+                   inheritedConformance->getConcrete()));
+      }
+    }
+
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
         return ProtocolConformanceRef(protocol);
@@ -682,8 +699,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
         return ProtocolConformanceRef(protocol);
     }
 
-    if (!archetype->getSuperclass())
-      return None;
+    return None;
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -727,21 +743,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
     return None;
   }
 
-  // Check for protocol conformance of archetype via superclass requirement.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = lookupConformance(super, protocol,
-                                                        resolver)) {
-        return ProtocolConformanceRef(
-                 ctx.getInheritedConformance(
-                   type,
-                   inheritedConformance->getConcrete()));
-      }
-
-      return None;
-    }
-  }
-
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
@@ -750,8 +751,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
              ctx.getConformance(type, protocol, protocol->getLoc(), this,
                                 ProtocolConformanceState::Complete));
   }
-  
-  
+
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
