@@ -1175,3 +1175,7 @@ extension UTF16 {
     Builtin.unreachable()
   }
 }
+
+/// A namespace for Unicode utilities.
+internal enum _Unicode {}
+

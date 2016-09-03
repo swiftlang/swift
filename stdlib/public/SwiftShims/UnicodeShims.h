@@ -18,6 +18,7 @@
 #define SWIFT_STDLIB_SHIMS_UNICODESHIMS_H_
 
 #include "SwiftStdint.h"
+#include "SwiftStdbool.h"
 #include "Visibility.h"
 
 #ifdef __cplusplus
@@ -79,13 +80,20 @@ _swift_stdlib_unicode_compare_utf8_utf8(const unsigned char *Left,
                                         __swift_int32_t RightLength);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((__pure__)) __swift_intptr_t
-_swift_stdlib_unicode_hash(const __swift_uint16_t *Str, __swift_int32_t Length);
+void *_swift_stdlib_unicodeCollationIterator_create(
+    const __swift_uint16_t *Str,
+    __swift_uint32_t Length);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__attribute__((__pure__)) __swift_intptr_t
-_swift_stdlib_unicode_hash_ascii(const unsigned char *Str,
-                                 __swift_int32_t Length);
+__swift_int32_t _swift_stdlib_unicodeCollationIterator_next(
+    void *CollationIterator, __swift_bool *HitEnd);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_stdlib_unicodeCollationIterator_delete(
+    void *CollationIterator);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+const __swift_int32_t *_swift_stdlib_unicode_getASCIICollationTable();
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t _swift_stdlib_unicode_strToUpper(
