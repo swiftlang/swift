@@ -29,19 +29,6 @@
 
 #include "../SwiftShims/UnicodeShims.h"
 
-/// Zero weight 0-8, 14-31, 127.
-const int8_t _swift_stdlib_unicode_ascii_collation_table_impl[128] = {
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  3,  4,  5,  0,   0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  12,  16, 28, 38, 29,
-    27, 15, 17, 18, 24, 32, 9,  8,  14, 25, 39, 40, 41, 42, 43,  44, 45, 46, 47,
-    48, 11, 10, 33, 34, 35, 13, 23, 50, 52, 54, 56, 58, 60, 62,  64, 66, 68, 70,
-    72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 19, 26, 20, 31,
-    7,  30, 49, 51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73,  75, 77, 79, 81,
-    83, 85, 87, 89, 91, 93, 95, 97, 99, 21, 36, 22, 37, 0};
-
-const int8_t *_swift_stdlib_unicode_ascii_collation_table =
-    _swift_stdlib_unicode_ascii_collation_table_impl;
-
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   UCollator *root = ucol_open("", &ErrorCode);
