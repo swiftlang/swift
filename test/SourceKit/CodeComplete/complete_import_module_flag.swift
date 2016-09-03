@@ -1,5 +1,5 @@
 // XFAIL: broken_std_regex
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %swift -Xcc -I%S/Inputs -emit-module -o %t/auxiliary_file.swiftmodule %S/Inputs/auxiliary_file.swift
 // RUN: %complete-test -group=none -hide-none -raw -tok=TOP_LEVEL_0 %s -- -import-module auxiliary_file  -I %t -I %S/Inputs | %FileCheck %s
 // RUN: %complete-test -group=none -tok=TOP_LEVEL_0 %s -- -import-module auxiliary_file  -I %t -I %S/Inputs | %FileCheck %s -check-prefix=WITH_HIDING

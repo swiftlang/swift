@@ -41,8 +41,8 @@
 // RUN: %swift_driver -repl -### | %FileCheck -check-prefix=INTEGRATED %s
 // RUN: %swift_driver -### | %FileCheck -check-prefix=INTEGRATED %s
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t/usr/bin/
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/usr/bin)
 // RUN: touch %t/usr/bin/lldb
 // RUN: chmod +x %t/usr/bin/lldb
 // RUN: ln %swift_driver_plain %t/usr/bin/swift
