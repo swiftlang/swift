@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
 // RUN: not %target-swift-frontend -parse -playground %t/main.swift
 

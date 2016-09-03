@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -parse-as-library -primary-file %S/Inputs/objc_multi_file_2.swift %s -verify
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -parse-as-library -primary-file %s %S/Inputs/objc_multi_file_2.swift -verify
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %S/Inputs/objc_multi_file_2.swift -DFAKE_UIIMAGE -o %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -module-name main -primary-file %s -I %t -DIMPORT -verify
 
