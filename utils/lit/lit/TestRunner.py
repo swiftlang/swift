@@ -672,11 +672,16 @@ def parseIntegratedTestScript(test, require_script=True):
 
     return script
 
-def _runShTest(test, litConfig, useExternalSh, script, tmpBase):
+def _runShTest(test, litConfig, useExternalSh, script, tmpBase, host='localhost'):
     # Create the output directory if it does not already exist.
     lit.util.mkdir_p(os.path.dirname(tmpBase))
 
     execdir = os.path.dirname(test.getExecPath())
+
+    if host != 'localhost':
+        prefix = 'ssh -T "%s" cd "%s" && ' % (host, execdir)
+        script = [prefix + x for x in script]
+
     if useExternalSh:
         res = executeScript(test, litConfig, tmpBase, script, execdir)
     else:
@@ -711,7 +716,7 @@ def _runShTest(test, litConfig, useExternalSh, script, tmpBase):
 
 
 def executeShTest(test, litConfig, useExternalSh,
-                  extra_substitutions=[]):
+                  extra_substitutions=[], host='localhost'):
     if test.config.unsupported:
         return (Test.UNSUPPORTED, 'Test is unsupported')
 
@@ -732,7 +737,7 @@ def executeShTest(test, litConfig, useExternalSh,
     if hasattr(test.config, 'test_retry_attempts'):
         attempts += test.config.test_retry_attempts
     for i in range(attempts):
-        res = _runShTest(test, litConfig, useExternalSh, script, tmpBase)
+        res = _runShTest(test, litConfig, useExternalSh, script, tmpBase, host)
         if res.code != Test.FAIL:
             break
     # If we had to run the test more than once, count it as a flaky pass. These

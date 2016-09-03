@@ -10,3 +10,7 @@ class ShTest(FileBasedTest):
     def execute(self, test, litConfig):
         return lit.TestRunner.executeShTest(test, litConfig,
                                             self.execute_external)
+
+    def executeRemotely(self, test, litConfig, host):
+        return lit.TestRunner.executeShTest(
+            test, litConfig, self.execute_external, host=host)

@@ -6,7 +6,12 @@ import lit.Test
 import lit.util
 
 class TestFormat(object):
-    pass
+    def execute(self, test, litConfig):
+        raise NotImplemented
+
+    def executeRemotely(self, test, litConfig, host):
+        # By default, formats don't know how to execute tests remotely
+        return self.execute(test, litConfig)
 
 ###
 

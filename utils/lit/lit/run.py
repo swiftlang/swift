@@ -173,27 +173,6 @@ class Run(object):
         self.tests = tests
         self.remoteArgs = [shellQuote(str(x)) for x in lit_config.remoteArgs]
 
-    def remotely_execute_test(self, test, host):
-        
-        remoteCommand = [
-            'ssh', '-T', host, 
-            'cd', test.suite.getExecPath(''), '&&',
-            'python', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'lit.py')
-        ] + self.remoteArgs + [shellQuote(test.getNameInSuite())]
-
-        remoteTest = subprocess.Popen(
-            remoteCommand, 
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-        output = remoteTest.communicate()[0]
-
-        if remoteTest.returncode == 0:
-            return lit.Test.Result(lit.Test.PASS, output)
-
-        return lit.Test.Result(
-            lit.Test.FAIL, 
-            ' '.join(shellQuote(x) for x in remoteCommand) + '\n' + output)
-
     def execute_test(self, test, host):
         result = None
         start_time = time.time()
@@ -201,7 +180,7 @@ class Run(object):
             if host == 'localhost':
                 result = test.config.test_format.execute(test, self.lit_config)
             else:
-                result = self.remotely_execute_test(test, host)
+                result = test.config.test_format.executeRemotely(test, self.lit_config, host)
 
             # Support deprecated result from execute() which returned the result
             # code and additional output as a tuple.
