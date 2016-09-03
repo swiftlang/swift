@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -import-cf-types %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

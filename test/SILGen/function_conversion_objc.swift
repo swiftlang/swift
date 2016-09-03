@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | %FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -verify | %FileCheck %s
 
 import Foundation
 

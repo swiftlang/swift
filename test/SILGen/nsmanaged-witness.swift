@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | %FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,6 +1,9 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-swift-newtype  %s | %FileCheck %s -check-prefix=CHECK-RAW
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-swift-newtype  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -enable-swift-newtype | %FileCheck %s -check-prefix=CHECK-RAW
+
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-sil %s -enable-swift-newtype | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 

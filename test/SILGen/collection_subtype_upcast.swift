@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 struct S { var x, y: Int }
 
