@@ -31,9 +31,9 @@ public struct G<Container : HasElt> {
 }
 
 // CHECK: @_specialize(S)
-// CHECK: public func getGenericContainer<T where T : HasElt, T.Elt : AnElt>(g: G<T>, e: T.Elt) -> T
+// CHECK: public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
 @_specialize(S)
-public func getGenericContainer<T where T : HasElt, T.Elt : AnElt>(g: G<T>, e: T.Elt) -> T
+public func getGenericContainer<T>(g: G<T>, e: T.Elt) -> T where T : HasElt, T.Elt : AnElt
 
 enum ArithmeticError : Error {
   case DivByZero
