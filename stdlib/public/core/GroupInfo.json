@@ -12,6 +12,7 @@
     "StringBuffer.swift",
     "StringCharacterView.swift",
     "StringCore.swift",
+    "StringHashable.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",

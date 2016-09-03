@@ -114,6 +114,7 @@ set(SWIFTLIB_ESSENTIAL
   StringBridge.swift
   StringBuffer.swift
   StringCore.swift
+  StringHashable.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
