@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
 //
 // Specify explicit target triples for the deployment target to test weak

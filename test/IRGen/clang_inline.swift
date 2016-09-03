@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -sdk %S/Inputs -primary-file %s -emit-ir | %FileCheck %s
 
 // RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule

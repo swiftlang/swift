@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/objc_runtime_visible.m -fmodules -nodefaultlibs -lc -dynamiclib -o %t/libobjc_runtime_visible.dylib -install_name @executable_path/libobjc_runtime_visible.dylib
 // RUN: codesign -f -s - %t/libobjc_runtime_visible.dylib

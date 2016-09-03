@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
 // RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop

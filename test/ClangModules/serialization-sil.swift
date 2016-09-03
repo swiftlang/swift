@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
 // RUN: %target-sil-extract %t/Test.swiftmodule -func=_TF4Test16testPartialApplyFPSo4Test_T_ -o - | %FileCheck %s
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: mkdir -p %t/linker
 // RUN: %target-build-swift -emit-module -c %S/library.swift -o %t/linker/library.o

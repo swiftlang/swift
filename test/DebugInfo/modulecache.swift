@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // Clang-import a module.
 import ClangModule
 
@@ -13,7 +13,7 @@ import ClangModule
 
 // 2. Test that swift is creating clang modules with debug info.
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -c -g -o %t.o -module-cache-path %t -I %S/Inputs
 // RUN: file %t/*/ClangModule-*.pcm | egrep '(Mach-O|ELF)'
 

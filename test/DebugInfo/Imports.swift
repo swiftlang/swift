@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/basic.swiftmodule %S/basic.swift
 
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - | %FileCheck %s

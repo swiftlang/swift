@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %swift -target x86_64-unknown-darwin14 -o %t/mips-template.swiftmodule -parse-stdlib -emit-module -module-name mips %S/../Inputs/empty.swift
 // RUN: %S/Inputs/binary_sub.py x86_64-unknown-darwin14 mips64-unknown-darwin14 < %t/mips-template.swiftmodule > %t/mips.swiftmodule

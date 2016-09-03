@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -import-objc-header %S/Inputs/serialization_loops.h -o %t %S/Inputs/serialization_loops_helper.swift
 // RUN: %target-swift-frontend -emit-module -import-objc-header %S/Inputs/serialization_loops.h -I %t -o %t %S/Inputs/serialization_loops_helper2.swift
 // RUN: %target-swift-frontend -emit-sil -import-objc-header %S/Inputs/serialization_loops.h -I %t -o /dev/null %s

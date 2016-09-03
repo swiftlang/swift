@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 
 // RUN: echo "typealias TestFloat = Float" > %t/float_type.swift

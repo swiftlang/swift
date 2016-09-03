@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -enable-source-import -I %S/Inputs -sdk "" -enable-access-control -verify

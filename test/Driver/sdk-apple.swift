@@ -1,7 +1,7 @@
 // XFAIL: freebsd, linux
 
 // Test SDK detection for immediate mode.
-// RUN: rm -rf %t && mkdir -p %t/usr/bin/
+// RUN: %empty-directory(%t)/usr/bin/
 
 // RUN: cp %S/Inputs/xcrun-bad.sh %t/usr/bin/xcrun
 // RUN: env PATH=%t/usr/bin %swift_driver_plain -deprecated-integrated-repl -### | %FileCheck -check-prefix=NOSDK %s
@@ -21,7 +21,7 @@
 
 // ROOT-SDK: -sdk /{{ |$}}
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/MacOSX10.8.sdk && not %swift_driver -sdk %t/MacOSX10.8.sdk -### 2>&1 | %FileCheck -check-prefix=SDK-TOO-OLD %s
 // RUN: mkdir -p %t/MacOSX10.9.sdk && not %swift_driver -sdk %t/MacOSX10.9.sdk -### 2>&1 | %FileCheck -check-prefix=SDK-TOO-OLD %s
 // RUN: mkdir -p %t/MacOSX10.9.Internal.sdk && not %swift_driver -sdk %t/MacOSX10.9.Internal.sdk -### 2>&1 | %FileCheck -check-prefix=SDK-TOO-OLD %s

@@ -1,7 +1,7 @@
 // Test Objective-C bridging for a non-Foundation type that is
 // otherwise unknown to the compiler.
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // Build the Appliances module
 // RUN: %target-clang -fobjc-arc -I %S/../../Inputs/ObjCBridging %S/../../Inputs/ObjCBridging/Appliances.m -c -o %t/AppliancesObjC.o
