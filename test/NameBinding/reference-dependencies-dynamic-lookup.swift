@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
 // RUN: %lldb-moduleimport-test %t/ASTSection | %FileCheck %s

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: echo '%S/Inputs/filelist-other.swift' >> %t/input.txt
 // RUN: echo '%s' >> %t/input.txt
 // RUN: echo '%S/../Inputs/empty.swift' >> %t/input.txt

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir %t
+// RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-jit-run %s -I %S -enable-source-import | %FileCheck %s
 // REQUIRES: executable_test
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: touch %t/main.swiftmodule %t/main.swiftdoc
 // RUN: chmod -w %t
 

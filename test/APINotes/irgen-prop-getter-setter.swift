@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
 // RUN: %target-swift-frontend %clang-importer-sdk-nosource -I %t %s -emit-ir
