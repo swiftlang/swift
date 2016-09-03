@@ -172,7 +172,7 @@ class ExecuteCommandTimeoutException(Exception):
 # Close extra file handles on UNIX (on Windows this cannot be done while
 # also redirecting input).
 kUseCloseFDs = not (platform.system() == 'Windows')
-def executeCommand(command, cwd=None, env=None, input=None, inputFile = None, timeout=0):
+def executeCommand(command, cwd=None, env=None, input=None, timeout=0):
     """
         Execute command ``command`` (list of arguments or string)
         with
@@ -192,7 +192,7 @@ def executeCommand(command, cwd=None, env=None, input=None, inputFile = None, ti
         is raised.
     """
     p = subprocess.Popen(command, cwd=cwd,
-                         stdin=inputFile or subprocess.PIPE,
+                         stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
                          env=env, close_fds=kUseCloseFDs)

@@ -466,13 +466,14 @@ def executeScript(test, litConfig, tmpBase, commands, cwd, host):
 
     if host == 'localhost':
         command += [script]
-        inputFile = None
+        input = None
     else:
         command = ['ssh', '-T', host]
-        inputFile = open(script)
+        envSetup='\n'.join("%s='%s'" % kv for kv in test.config.environment.items())
+        input = envSetup + '\n' + open(script).read()
 
     try:
-        out, err, exitCode = lit.util.executeCommand(command, cwd=cwd, inputFile=inputFile,
+        out, err, exitCode = lit.util.executeCommand(command, cwd=cwd, input=input,
                                        env=test.config.environment,
                                        timeout=litConfig.maxIndividualTestTime)
         return (out, err, exitCode, None)
