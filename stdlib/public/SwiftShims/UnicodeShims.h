@@ -21,6 +21,10 @@
 #include "SwiftStdbool.h"
 #include "Visibility.h"
 
+#if __has_feature(nullability)
+#pragma clang assume_nonnull begin
+#endif
+
 #ifdef __cplusplus
 namespace swift { extern "C" {
 #endif
@@ -107,6 +111,10 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
+#endif
+
+#if __has_feature(nullability)
+#pragma clang assume_nonnull end
 #endif
 
 #endif
