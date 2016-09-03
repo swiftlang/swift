@@ -1334,16 +1334,19 @@ namespace {
   ///
   /// This class evaluates true if an error occurred.
   class CheckTypeWitnessResult {
-    ProtocolDecl *Proto = nullptr;
+    NominalTypeDecl *Nominal = nullptr;
 
   public:
     CheckTypeWitnessResult() { }
 
-    CheckTypeWitnessResult(ProtocolDecl *proto) : Proto(proto) { }
+    CheckTypeWitnessResult(NominalTypeDecl *nominal) : Nominal(nominal) {
+      assert(isa<ProtocolDecl>(nominal) || isa<ClassDecl>(nominal));
+    }
 
-    ProtocolDecl *getProtocol() const { return Proto; }
+    NominalTypeDecl *getProtocolOrClass() const { return Nominal; }
+    bool isProtocol() const { return isa<ProtocolDecl>(Nominal); }
 
-    explicit operator bool() const { return Proto != nullptr; }
+    explicit operator bool() const { return Nominal != nullptr; }
   };
 
   /// The set of associated types that have been inferred by matching
@@ -2498,7 +2501,10 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
 static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
-  // FIXME: Check class requirement.
+  if (auto superclass = assocType->getSuperclass()) {
+    if (!superclass->isExactSuperclassOf(type, &tc))
+      return superclass->getAnyNominal();
+  }
 
   // Check protocol conformances.
   for (auto reqProto : assocType->getConformingProtocols(&tc)) {
@@ -2524,12 +2530,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // Determine which of the candidates is viable.
   SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
-  SmallVector<std::pair<TypeDecl *, ProtocolDecl *>, 2> nonViable;
+  SmallVector<std::pair<TypeDecl *, NominalTypeDecl *>, 2> nonViable;
   for (auto candidate : candidates) {
     // Check this type against the protocol requirements.
     if (auto checkResult = checkTypeWitness(TC, DC, assocType, 
                                             candidate.second)) {
-      auto reqProto = checkResult.getProtocol();
+      auto reqProto = checkResult.getProtocolOrClass();
       nonViable.push_back({candidate.first, reqProto});
     } else {
       viable.push_back(candidate);
@@ -2575,7 +2581,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
         tc.diagnose(candidate.first,
                     diag::protocol_witness_nonconform_type,
                     candidate.first->getDeclaredType(),
-                    candidate.second->getDeclaredType());
+                    candidate.second->getDeclaredType(),
+                    candidate.second->getDeclaredType()->is<ProtocolType>());
       }
     });
 
@@ -3437,7 +3444,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
                       failedDefaultedWitness,
                       failedDefaultedAssocType->getFullName(),
                       proto->getDeclaredType(),
-                      failedDefaultedResult.getProtocol()->getDeclaredType());
+                      failedDefaultedResult.getProtocolOrClass()->getDeclaredType(),
+                      failedDefaultedResult.isProtocol());
         });
       return;
     }
@@ -3475,7 +3483,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
                         diag::associated_type_deduction_witness_failed,
                         failed.Requirement->getFullName(),
                         failed.TypeWitness,
-                        failed.Result.getProtocol()->getFullName());
+                        failed.Result.getProtocolOrClass()->getFullName(),
+                        failed.Result.isProtocol());
           }
         });
 
@@ -3710,20 +3719,6 @@ void ConformanceChecker::checkConformance() {
   // FIXME: Not really true. We could check witnesses that don't involve the
   // failed associated types.
   if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
-  // Ensure that all of the requirements of the protocol have been satisfied.
-  // Note: the odd check for one generic parameter copes with
-  // protocols nested within other generic contexts, which is ill-formed.
-  SourceLoc noteLoc = Proto->getLoc();
-  if (noteLoc.isInvalid())
-    noteLoc = Loc;
-  if (Proto->getGenericSignature()->getGenericParams().size() != 1 ||
-      TC.checkGenericArguments(DC, Loc, noteLoc, Proto->getDeclaredType(),
-                               Proto->getGenericSignature(),
-                               {Adoptee})) {
     Conformance->setInvalid();
     return;
   }
