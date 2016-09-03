@@ -9,6 +9,7 @@ set(sources
   RefCount.h
   RuntimeShims.h
   RuntimeStubs.h
+  SwiftStdbool.h
   SwiftStddef.h
   SwiftStdint.h
   UnicodeShims.h
