@@ -209,6 +209,56 @@ let incrementalPatterns: [[Int]] = [
   [7, 9],
 ]
 
+func loadUnalignedUInt64LE(
+  from p: UnsafeRawPointer
+) -> UInt64 {
+  return
+    UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) |
+    (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8) |
+    (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16) |
+    (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24) |
+    (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32) |
+    (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40) |
+    (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48) |
+    (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) << 56)
+}
+
+func loadUnalignedUInt32LE(
+  from p: UnsafeRawPointer
+) -> UInt32 {
+  return
+    UInt32(p.load(fromByteOffset: 0, as: UInt8.self)) |
+    (UInt32(p.load(fromByteOffset: 1, as: UInt8.self)) << 8) |
+    (UInt32(p.load(fromByteOffset: 2, as: UInt8.self)) << 16) |
+    (UInt32(p.load(fromByteOffset: 3, as: UInt8.self)) << 24)
+}
+
+func loadUnalignedUIntLE(
+  from p: UnsafeRawPointer
+) -> UInt {
+#if arch(i386) || arch(arm)
+  return UInt(loadUnalignedUInt32LE(from: p))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  return UInt(loadUnalignedUInt64LE(from: p))
+#endif
+}
+
+% for data_type in ['Int', 'Int64', 'Int32']:
+func loadUnaligned${data_type}LE(
+  from p: UnsafeRawPointer
+) -> ${data_type} {
+  return ${data_type}(bitPattern: loadUnalignedU${data_type}LE(from: p))
+}
+% end
+
+% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
+func loadUnaligned${data_type}(
+  from p: UnsafeRawPointer
+) -> ${data_type} {
+  return ${data_type}(littleEndian: loadUnaligned${data_type}LE(from: p))
+}
+% end
+
 % for (Self, tests) in [
 %   ('_SipHash13Context', 'sipHash13Tests'),
 %   ('_SipHash24Context', 'sipHash24Tests')
@@ -224,7 +274,7 @@ SipHashTests.test("${Self}/Oneshot").forEach(in: ${tests}) {
       key: test.key))
 }
 
-SipHashTests.test("${Self}/Incremental")
+SipHashTests.test("${Self}.append(UnsafeRawPointer)")
   .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) {
   test_ in
   let (test, pattern) = test_
@@ -253,7 +303,34 @@ SipHashTests.test("${Self}/Incremental")
     context.finalizeAndReturnHash())
 }
 
-SipHashTests.test("${Self}/Incremental/AppendAfterFinalizing") {
+% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
+SipHashTests.test("${Self}.append(${data_type})").forEach(in: ${tests}) {
+  test in
+
+  var context = ${Self}(key: test.key)
+
+  let chunkSize = MemoryLayout<${data_type}>.size
+
+  var startIndex = 0
+  let endIndex = test.input.count - (test.input.count % chunkSize)
+  while startIndex != endIndex {
+    context.append(
+      loadUnaligned${data_type}(
+        from: Array(
+          test.input[startIndex..<(startIndex+chunkSize)])))
+    startIndex += chunkSize
+  }
+  context.append(
+    Array(test.input.suffix(from: endIndex)),
+    byteCount: test.input.count - endIndex)
+
+  expectEqual(
+    test.output,
+    context.finalizeAndReturnHash())
+}
+% end
+
+SipHashTests.test("${Self}/AppendAfterFinalizing") {
   var context = ${Self}(key: (0, 0))
   _ = context.finalizeAndReturnHash()
   expectCrashLater()

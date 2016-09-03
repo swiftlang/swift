@@ -175,6 +175,14 @@ struct ${Self} {
     hashedByteCount += 8
   }
 
+% for data_type in ['UInt', 'Int', 'UInt64', 'Int64', 'UInt32', 'Int32']:
+  public // @testable
+  mutating func append(_ data: ${data_type}) {
+    var data = data
+    _append_alwaysInline(&data, byteCount: MemoryLayout.size(ofValue: data))
+  }
+% end
+
   public // @testable
   mutating func finalizeAndReturnHash() -> UInt64 {
     return _finalizeAndReturnHash_alwaysInline()
@@ -205,6 +213,15 @@ struct ${Self} {
 
     finalizedHash = v0 ^ v1 ^ v2 ^ v3
     return finalizedHash!
+  }
+
+  internal mutating func _finalizeAndReturnIntHash() -> Int {
+    let hash: UInt64 = finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: hash)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: hash))
+#endif
   }
 
   // FIXME(ABI): Use UnsafeRawBufferPointer.
