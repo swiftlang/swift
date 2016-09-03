@@ -1,5 +1,5 @@
 // REQUIRES: OS=macosx
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: echo 'int abc = 42;' | %clang -x c - -dynamiclib -Xlinker -install_name -Xlinker libabc.dylib -o %t/libabc.dylib
 // RUN: echo 'int test() { extern int abc; return abc; }' | %clang -x c - -L%t -dynamiclib -labc -o %t/libfoo.dylib

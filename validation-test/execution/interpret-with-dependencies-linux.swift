@@ -1,5 +1,5 @@
 // REQUIRES: OS=linux-gnu
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: echo 'int abc = 42;' | %clang -x c - -shared -fPIC -o %t/libabc.so
 // RUN: echo 'int test() { extern int abc; return abc; }' | %clang -x c - -L%t -shared -fPIC -labc -o %t/libfoo.so

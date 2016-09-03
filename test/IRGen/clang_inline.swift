@@ -3,7 +3,7 @@
 // check that the static inline functions in Gizmo.h are correctly emitted as
 // inlineable.
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -Xcc -O3 -emit-ir | %FileCheck %s
 
 // RUN: mkdir -p %t/Empty.framework/Modules/Empty.swiftmodule

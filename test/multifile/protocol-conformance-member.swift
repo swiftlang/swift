@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-library %s %S/Inputs/protocol-conformance-member-helper.swift -o %t/libTest.dylib -module-name Test
 // RUN: llvm-nm %t/libTest.dylib | %FileCheck %s
 

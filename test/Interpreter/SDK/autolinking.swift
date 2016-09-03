@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: echo "int global() { return 42; }" | %clang -dynamiclib -o %t/libLinkMe.dylib -x c -
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name LinkMe -module-link-name LinkMe %S/../../Inputs/empty.swift
 

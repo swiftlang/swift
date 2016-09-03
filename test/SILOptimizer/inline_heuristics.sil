@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION

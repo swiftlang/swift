@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h | %FileCheck %s

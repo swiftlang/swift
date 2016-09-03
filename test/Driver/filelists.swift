@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/a.swift %t/b.swift %t/c.swift
 
 // RUN: (cd %t && %swiftc_driver_plain -driver-use-frontend-path %S/Inputs/filelists/check-filelist-abc.py -emit-module ./a.swift ./b.swift ./c.swift -module-name main -target x86_64-apple-macosx10.9 -driver-use-filelists -output-file-map=%S/Inputs/filelists/output.json 2>&1 | %FileCheck %s)

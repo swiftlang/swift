@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_equatable_hashable_other.swift -verify-ignore-unknown
 
