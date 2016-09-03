@@ -1,4 +1,4 @@
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 %s 2>&1 | %FileCheck %s -check-prefix=BASIC
 // BASIC: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}bindings.swift"], output: {object: "[[OBJECT:.*\.o]]"}

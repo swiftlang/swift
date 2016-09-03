@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -emit-objc-header -o %t %S/Inputs/resolve-cross-language/Base.swift -disable-objc-attr-requires-foundation-module
 // RUN: cp %S/Inputs/resolve-cross-language/Base-module.map %t/module.map

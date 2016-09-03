@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleA.swift
 // RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %S/Inputs/ModuleB.swift
 // RUN: %target-swift-frontend -parse-as-library -I%t %s -Xllvm -sil-disable-pass="SIL Global Optimization" -O -emit-sil | %FileCheck %s
