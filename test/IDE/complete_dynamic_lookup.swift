@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/foo_swift_module.swift
 // RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/AnyObject/bar_swift_module.swift
 // RUN: cp %S/Inputs/AnyObject/baz_clang_module.h %t
