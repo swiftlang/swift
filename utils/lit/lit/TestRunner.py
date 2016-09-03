@@ -431,7 +431,7 @@ def executeScriptInternal(test, litConfig, tmpBase, commands, cwd):
 
     return out, err, exitCode, timeoutInfo
 
-def executeScript(test, litConfig, tmpBase, commands, cwd):
+def executeScript(test, litConfig, tmpBase, commands, cwd, host):
     bashPath = litConfig.getBashPath();
     isWin32CMDEXE = (litConfig.isWindows and not bashPath)
     script = tmpBase + '.script'
@@ -453,19 +453,26 @@ def executeScript(test, litConfig, tmpBase, commands, cwd):
     f.close()
 
     if isWin32CMDEXE:
-        command = ['cmd','/c', script]
+        command = ['cmd','/c']
     else:
         if bashPath:
-            command = [bashPath, script]
+            command = [bashPath]
         else:
-            command = ['/bin/sh', script]
+            command = ['/bin/sh']
         if litConfig.useValgrind:
             # FIXME: Running valgrind on sh is overkill. We probably could just
             # run on clang with no real loss.
             command = litConfig.valgrindArgs + command
 
+    if host == 'localhost':
+        command += [script]
+        inputFile = None
+    else:
+        command = ['ssh', '-T', host]
+        inputFile = open(script)
+
     try:
-        out, err, exitCode = lit.util.executeCommand(command, cwd=cwd,
+        out, err, exitCode = lit.util.executeCommand(command, cwd=cwd, inputFile=inputFile,
                                        env=test.config.environment,
                                        timeout=litConfig.maxIndividualTestTime)
         return (out, err, exitCode, None)
@@ -678,14 +685,10 @@ def _runShTest(test, litConfig, useExternalSh, script, tmpBase, host='localhost'
 
     execdir = os.path.dirname(test.getExecPath())
 
-    if host != 'localhost':
-        prefix = 'ssh -T "%s" cd "%s" && ' % (host, execdir)
-        script = [prefix + x for x in script]
-
     if useExternalSh:
-        res = executeScript(test, litConfig, tmpBase, script, execdir)
+        res = executeScript(test, litConfig, tmpBase, script, execdir, host)
     else:
-        res = executeScriptInternal(test, litConfig, tmpBase, script, execdir)
+        res = executeScriptInternal(test, litConfig, tmpBase, script, execdir, host)
     if isinstance(res, lit.Test.Result):
         return res
 
