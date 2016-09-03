@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend %S/Inputs/placement_module_A.swift -emit-module -parse-as-library -o %t
 // RUN: %target-swift-frontend -I %t %S/Inputs/placement_module_B.swift -emit-module -parse-as-library -o %t
 

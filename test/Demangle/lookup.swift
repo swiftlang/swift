@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: not %target-swift-ide-test -source-filename=%s -print-ast-typechecked -find-mangled=_notASwiftSymbol
 
