@@ -2058,12 +2058,12 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
     Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
     Type SelfType = Adopter->getSelfTypeInContext();
-    if (isa<ClassDecl>(Adopter))
+    if (Adopter->getAsClassOrClassExtensionContext())
       Options.setArchetypeSelfTransform(SelfType, Adopter);
     else
       Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
     Options.CurrentModule = Adopter->getParentModule();
-    if (isa<NominalTypeDecl>(Adopter)) {
+    if (!Adopter->isExtensionContext()) {
       // Create a variable declaration instead of a computed property in nominal
       // types
       Options.PrintPropertyAccessors = false;
