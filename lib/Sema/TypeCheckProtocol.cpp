@@ -3700,6 +3700,35 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   }
 }
 
+static void recordConformanceDependency(DeclContext *DC,
+                                        NominalTypeDecl *Adoptee,
+                                        ProtocolConformance *Conformance,
+                                        bool InExpression) {
+  if (!Conformance)
+    return;
+
+  auto *topLevelContext = DC->getModuleScopeContext();
+  auto *SF = dyn_cast<SourceFile>(topLevelContext);
+  if (!SF)
+    return;
+
+  auto *tracker = SF->getReferencedNameTracker();
+  if (!tracker)
+    return;
+
+  if (SF->getParentModule() !=
+      Conformance->getDeclContext()->getParentModule())
+    return;
+
+  auto &Context = DC->getASTContext();
+
+  // FIXME: 'deinit' is being used as a dummy identifier here. Really we
+  // don't care about /any/ of the type's members, only that it conforms to
+  // the protocol.
+  tracker->addUsedMember({Adoptee, Context.Id_deinit},
+                         DC->isCascadingContextForLookup(InExpression));
+}
+
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
@@ -3714,6 +3743,12 @@ void ConformanceChecker::checkConformance() {
 
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
+
+  // Ensure the conforming type is used.
+  //
+  // FIXME: This feels like the wrong place for this, but if we don't put
+  // it here, extensions don't end up depending on the extended type.
+  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
 
   // If we complain about any associated types, there is no point in continuing.
   // FIXME: Not really true. We could check witnesses that don't involve the
@@ -4156,38 +4191,14 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      SourceLoc ComplainLoc) {
   bool InExpression = options.contains(ConformanceCheckFlags::InExpression);
 
-  const DeclContext *topLevelContext = DC->getModuleScopeContext();
   auto recordDependency = [=](ProtocolConformance *conformance = nullptr) {
-    if (options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
-      return;
-
-    // Record that we depend on the type's conformance.
-    auto *constSF = dyn_cast<SourceFile>(topLevelContext);
-    if (!constSF)
-      return;
-    auto *SF = const_cast<SourceFile *>(constSF);
-
-    auto *tracker = SF->getReferencedNameTracker();
-    if (!tracker)
-      return;
-
-    // We only care about intra-module dependencies.
-    if (conformance)
-      if (SF->getParentModule() !=
-          conformance->getDeclContext()->getParentModule())
-        return;
-
-    if (auto nominal = T->getAnyNominal()) {
-      // FIXME: 'deinit' is being used as a dummy identifier here. Really we
-      // don't care about /any/ of the type's members, only that it conforms to
-      // the protocol.
-      tracker->addUsedMember({nominal, Context.Id_deinit},
-                             DC->isCascadingContextForLookup(InExpression));
-    }
+    if (!options.contains(ConformanceCheckFlags::SuppressDependencyTracking))
+      if (auto nominal = T->getAnyNominal())
+        recordConformanceDependency(DC, nominal, conformance, InExpression);
   };
 
   // Look up conformance in the module.
-  Module *M = topLevelContext->getParentModule();
+  Module *M = DC->getParentModule();
   auto lookupResult = M->lookupConformance(T, Proto, this);
   if (!lookupResult) {
     if (ComplainLoc.isValid())
@@ -4206,7 +4217,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   } else {
     if (Conformance)
       *Conformance = nullptr;
-    recordDependency(nullptr);
+    recordDependency();
   }
 
   // If we're using this conformance, note that.
