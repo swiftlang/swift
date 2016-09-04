@@ -2009,13 +2009,14 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                               TypeChecker &TC) {
   // FIXME: Try an ignore-access lookup?
 
+  DeclContext *Adopter = Conformance->getDeclContext();
+
   SourceLoc FixitLocation;
   SourceLoc TypeLoc;
-  if (auto Extension = dyn_cast<ExtensionDecl>(Conformance->getDeclContext())) {
+  if (auto Extension = dyn_cast<ExtensionDecl>(Adopter)) {
     FixitLocation = Extension->getBraces().Start.getAdvancedLocOrInvalid(1);
     TypeLoc = Extension->getStartLoc();
-  } else if (auto Nominal =
-               dyn_cast<NominalTypeDecl>(Conformance->getDeclContext())) {
+  } else if (auto Nominal = dyn_cast<NominalTypeDecl>(Adopter)) {
     FixitLocation = Nominal->getBraces().Start.getAdvancedLocOrInvalid(1);
     TypeLoc = Nominal->getStartLoc();
   } else {
@@ -2036,7 +2037,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
   Accessibility Access = std::min(
     /* Access of the context */
-    Conformance->getDeclContext()
+    Adopter
       ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
     /* Access of the protocol */
     Requirement->getDeclContext()
@@ -2052,22 +2053,17 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                 MissingTypeWitness->getName())
       .fixItInsert(FixitLocation, FixitStream.str());
   } else {
-
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-    if (isa<ClassDecl>(Conformance->getDeclContext())) {
-      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
-      DeclContext *Adopter = Conformance->getDeclContext();
+    Type SelfType = Adopter->getSelfTypeInContext();
+    if (isa<ClassDecl>(Adopter))
       Options.setArchetypeSelfTransform(SelfType, Adopter);
-    } else {
-      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
-      DeclContext *Adopter = Conformance->getDeclContext();
+    else
       Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
-    }
-    Options.CurrentModule = Conformance->getDeclContext()->getParentModule();
-    if (isa<NominalTypeDecl>(Conformance->getDeclContext())) {
+    Options.CurrentModule = Adopter->getParentModule();
+    if (isa<NominalTypeDecl>(Adopter)) {
       // Create a variable declaration instead of a computed property in nominal
       // types
       Options.PrintPropertyAccessors = false;
