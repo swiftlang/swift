@@ -115,6 +115,7 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringBuffer.swift
+  StringComparable.swift
   StringCore.swift
   StringHashable.swift
   StringInterpolation.swift.gyb
