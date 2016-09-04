@@ -1198,7 +1198,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 public:
   void printPattern(const Pattern *pattern);
 
-  void printGenericParams(GenericParamList *params);
+  void printGenericParams(GenericParamList *params, bool IncludeRequirements);
   void printWhereClause(ArrayRef<RequirementRepr> requirements);
 
 private:
@@ -1211,6 +1211,7 @@ private:
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
                     bool openBracket = true, bool closeBracket = true);
   void printNominalDeclGenericParams(NominalTypeDecl *decl);
+  void printNominalDeclGenericRequirements(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
@@ -1413,7 +1414,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
   }
 }
 
-void PrintAST::printGenericParams(GenericParamList *Params) {
+void PrintAST::printGenericParams(GenericParamList *Params,
+                                  bool IncludeRequirements) {
   if (!Params)
     return;
 
@@ -1448,7 +1450,9 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       printInherited(GP);
       Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
     }
-    printWhereClause(Params->getRequirements());
+    if (IncludeRequirements) {
+      printWhereClause(Params->getRequirements());
+    }
   }
   Printer << ">";
 }
@@ -1986,16 +1990,14 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 }
 
 void PrintAST::printNominalDeclGenericParams(NominalTypeDecl *decl) {
-  if (auto gp = decl->getGenericParams()) {
-    if (!isa<ProtocolDecl>(decl)) {
-      // For a protocol extension, print only the where clause; the
-      // generic parameter list is implicit. For other nominal types,
-      // print the generic parameters.
-      if (decl->getAsProtocolOrProtocolExtensionContext())
-        printWhereClause(gp->getRequirements());
-      else
-        printGenericParams(gp);
-    }
+  if (auto GPs = decl->getGenericParams()) {
+    printGenericParams(GPs, /* IncludeRequirements */false);
+  }
+}
+
+void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
+  if (auto GPs = decl->getGenericParams()) {
+    printWhereClause(GPs->getRequirements());
   }
 }
 
@@ -2344,7 +2346,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     }, [&]{ // Signature
-      printGenericParams(decl->getGenericParams());
+      printGenericParams(decl->getGenericParams(),
+                         /* IncludeRequirements */false);
     });
   bool ShouldPrint = true;
   Type Ty;
@@ -2405,6 +2408,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
         printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2431,6 +2435,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
         printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2458,6 +2463,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       });
 
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
 
   if (Options.TypeDefinitions) {
@@ -2481,8 +2487,6 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
-      }, [&]{ // Signature
-        printNominalDeclGenericParams(decl);
       });
 
     // Figure out whether we need an explicit 'class' in the inheritance.
@@ -2790,7 +2794,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             Printer.printName(decl->getName());
         }, [&] { // Parameters
           if (decl->isGeneric()) {
-            printGenericParams(decl->getGenericParams());
+            printGenericParams(decl->getGenericParams(),
+                               /* IncludeRequirements */false);
           }
 
           printFunctionParameters(decl);
@@ -2812,6 +2817,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(ResultTyLoc);
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+      }
+      if (decl->isGeneric()) {
+        if (auto GPs = decl->getGenericParams()) {
+          printWhereClause(GPs->getRequirements());
+        }
       }
     }
 
@@ -2949,10 +2959,17 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       }
 
       if (decl->isGeneric())
-        printGenericParams(decl->getGenericParams());
+        printGenericParams(decl->getGenericParams(),
+                           /* IncludeRequirements */false);
 
       printFunctionParameters(decl);
     });
+  if (decl->isGeneric()) {
+    if (auto GPs = decl->getGenericParams()) {
+      printWhereClause(GPs->getRequirements());
+    }
+  }
+
 
   if (auto BodyFunc = Options.FunctionBody) {
     Printer << " {";
@@ -3452,7 +3469,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   void printGenericParams(GenericParamList *Params) {
-    PrintAST(Printer, Options).printGenericParams(Params);
+    PrintAST(Printer, Options).printGenericParams(Params,
+                                                  /*IncludeRequirements*/true);
   }
 
   template <typename T>
