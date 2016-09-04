@@ -1607,6 +1607,89 @@ DeclContext *ASTScope::getInnermostEnclosingDeclContext() const {
   llvm_unreachable("Top-most scope is a declaration context");
 }
 
+SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
+  SmallVector<ValueDecl *, 4> result;
+
+  auto handlePattern = [&](const Pattern *pattern) {
+    if (!pattern) return;
+    pattern->forEachVariable([&](VarDecl *var) {
+        result.push_back(var);
+      });
+  };
+
+  switch (getKind()) {
+  case ASTScopeKind::Preexpanded:
+  case ASTScopeKind::SourceFile:
+  case ASTScopeKind::TypeOrExtensionBody:
+  case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::DefaultArgument:
+  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::PatternInitializer:
+  case ASTScopeKind::BraceStmt:
+  case ASTScopeKind::IfStmt:
+  case ASTScopeKind::GuardStmt:
+  case ASTScopeKind::RepeatWhileStmt:
+  case ASTScopeKind::ForEachStmt:
+  case ASTScopeKind::DoCatchStmt:
+  case ASTScopeKind::SwitchStmt:
+  case ASTScopeKind::ForStmt:
+  case ASTScopeKind::Accessors:
+  case ASTScopeKind::TopLevelCode:
+    // No local declarations.
+    break;
+
+  case ASTScopeKind::GenericParams:
+    result.push_back(genericParams.params->getParams()[genericParams.index]);
+    break;
+
+  case ASTScopeKind::AbstractFunctionParams:
+    result.push_back(abstractFunctionParams.decl->getParameterList(
+                         abstractFunctionParams.listIndex)
+                       ->get(abstractFunctionParams.paramIndex));
+    break;
+
+  case ASTScopeKind::AfterPatternBinding:
+    handlePattern(patternBinding.decl->getPattern(patternBinding.entry));
+    break;
+
+  case ASTScopeKind::LocalDeclaration:
+    result.push_back(cast<ValueDecl>(localDeclaration));
+    break;
+
+  case ASTScopeKind::ConditionalClause:
+    handlePattern(conditionalClause.stmt->getCond()[conditionalClause.index]
+                    .getPatternOrNull());
+    break;
+
+  case ASTScopeKind::ForEachPattern:
+    handlePattern(forEach->getPattern());
+    break;
+
+  case ASTScopeKind::CatchStmt:
+    handlePattern(catchStmt->getErrorPattern());
+    break;
+
+  case ASTScopeKind::CaseStmt:
+    for (const auto &item : caseStmt->getCaseLabelItems())
+      handlePattern(item.getPattern());
+    break;
+
+  case ASTScopeKind::ForStmtInitializer:
+    for (auto decl : forStmt->getInitializerVarDecls())
+      result.push_back(cast<ValueDecl>(decl));
+    break;
+
+  case ASTScopeKind::Closure:
+    // Note: Parameters all at once is different from functions, but it's not
+    // relevant because there are no default arguments.
+    for (auto param : *closure->getParameters())
+      result.push_back(param);
+    break;
+  }
+
+  return result;
+}
+
 void ASTScope::expandAll() const {
   if (!isExpanded())
     expand();
