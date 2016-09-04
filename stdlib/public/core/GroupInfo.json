@@ -100,7 +100,7 @@
     "Mirrors.swift",
     "ObjCMirrors.swift",
     "ObjectIdentifier.swift",
-    "Reflection.swift"
+    "ReflectionLegacy.swift"
   ],
   "Math": [
     "SetAlgebra.swift",

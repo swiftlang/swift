@@ -96,7 +96,7 @@ set(SWIFTLIB_ESSENTIAL
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb
-  Reflection.swift
+  ReflectionLegacy.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
