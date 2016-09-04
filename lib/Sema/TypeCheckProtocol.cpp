@@ -2014,10 +2014,10 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
   SourceLoc FixitLocation;
   SourceLoc TypeLoc;
   if (auto Extension = dyn_cast<ExtensionDecl>(Adopter)) {
-    FixitLocation = Extension->getBraces().Start.getAdvancedLocOrInvalid(1);
+    FixitLocation = Extension->getBraces().Start;
     TypeLoc = Extension->getStartLoc();
   } else if (auto Nominal = dyn_cast<NominalTypeDecl>(Adopter)) {
-    FixitLocation = Nominal->getBraces().Start.getAdvancedLocOrInvalid(1);
+    FixitLocation = Nominal->getBraces().Start;
     TypeLoc = Nominal->getStartLoc();
   } else {
     llvm_unreachable("Unknown adopter kind");
@@ -2051,7 +2051,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
     TC.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                 MissingTypeWitness->getName())
-      .fixItInsert(FixitLocation, FixitStream.str());
+      .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.AccessibilityFilter = Accessibility::Private;
@@ -2077,7 +2077,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                             getRequirementKind(Requirement),
                             Requirement->getFullName(),
                             RequirementType)
-      .fixItInsert(FixitLocation, FixitStream.str());
+      .fixItInsertAfter(FixitLocation, FixitStream.str());
   }
 }
 
