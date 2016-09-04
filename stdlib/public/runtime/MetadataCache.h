@@ -279,7 +279,7 @@ public:
 
 #if SWIFT_DEBUG_RUNTIME
     printf("%s(%p): looking for entry with %zu arguments:\n",
-           Entry::getName(), this, numArguments);
+           ValueTy::getName(), this, numArguments);
     for (size_t i = 0; i < numArguments; i++) {
       printf("%s(%p):     %p\n", ValueTy::getName(), this, arguments[i]);
     }
@@ -288,7 +288,7 @@ public:
     Key key(KeyDataRef::forArguments(arguments, numArguments));
 
 #if SWIFT_DEBUG_RUNTIME
-    printf("%s(%p): generated hash %llx\n",
+    printf("%s(%p): generated hash %zu\n",
            ValueTy::getName(), this, key.Hash);
 #endif
 
