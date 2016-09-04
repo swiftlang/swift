@@ -110,6 +110,7 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringBuffer.swift
+  StringComparable.swift
   StringCore.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift

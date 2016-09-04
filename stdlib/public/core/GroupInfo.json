@@ -11,6 +11,7 @@
     "StringBridge.swift",
     "StringBuffer.swift",
     "StringCharacterView.swift",
+    "StringComparable.swift",
     "StringCore.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
