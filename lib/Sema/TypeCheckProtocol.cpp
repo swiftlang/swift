@@ -1416,13 +1416,8 @@ namespace {
     /// \param type The witness type.
     ///
     /// \param typeDecl The decl the witness type came from; can be null.
-    ///
-    /// \param fromDC The DeclContext from which this associated type was
-    /// computed, which may be different from the context associated with the
-    /// protocol conformance.
     void recordTypeWitness(AssociatedTypeDecl *assocType, Type type,
-                           TypeDecl *typeDecl, DeclContext *fromDC,
-                           bool performRedeclarationCheck);
+                           TypeDecl *typeDecl, bool performRedeclarationCheck);
 
     /// Resolve a (non-type) witness via name lookup.
     ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
@@ -1466,6 +1461,8 @@ namespace {
     void diagnoseOrDefer(
            ValueDecl *requirement, bool isError,
            std::function<void(TypeChecker &, NormalProtocolConformance *)> fn);
+
+    void addUsedConformances(ProtocolConformance *conformance);
 
   public:
     /// Emit any diagnostics that have been delayed.
@@ -1893,7 +1890,6 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl,
-                                           DeclContext *fromDC,
                                            bool performRedeclarationCheck) {
 
   // If we already recoded this type witness, there's nothing to do.
@@ -2545,13 +2541,12 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
-    recordTypeWitness(assocType, viable.front().second, viable.front().first,
-                      viable.front().first->getDeclContext(), true);
+    recordTypeWitness(assocType, viable.front().second, viable.front().first, true);
     return ResolveWitnessResult::Success;
   }
 
   // Record an error.
-  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, false);
+  recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, false);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
@@ -3414,8 +3409,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     auto &typeWitnesses = solutions.front().TypeWitnesses;
     for (auto assocType : unresolvedAssocTypes) {
       assert(typeWitnesses.count(assocType) == 1 && "missing witness");
-      recordTypeWitness(assocType, typeWitnesses[assocType].first, nullptr, DC,
-                        true);
+      recordTypeWitness(assocType, typeWitnesses[assocType].first, nullptr, true);
     }
 
     return;
@@ -3427,7 +3421,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // We're going to produce an error below. Mark each unresolved
   // associated type witness as erroneous.
   for (auto assocType : unresolvedAssocTypes) {
-    recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, DC, true);
+    recordTypeWitness(assocType, ErrorType::get(TC.Context), nullptr, true);
   }
 
   // No solutions. Diagnose the first associated type for which we
