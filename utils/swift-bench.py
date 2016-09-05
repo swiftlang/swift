@@ -43,7 +43,8 @@ import sys
 
 
 # This regular expression is looking for Swift functions named `bench_*`
-# that take no arguments and return an Int.  The Swift code for such a function is:
+# that take no arguments and return an Int.  The Swift code for such
+# a function is:
 #
 #     func bench_myname() {
 #         // function body goes here
