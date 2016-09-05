@@ -726,9 +726,9 @@ extension String {
   ///
   /// - Complexity: O(*n*)
   public func lowercased() -> String {
-    if self._core.isASCII {
-      let count = self._core.count
-      let source = self._core.startASCII
+    if let asciiBuffer = self._core.asciiBuffer {
+      let count = asciiBuffer.count
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start
@@ -776,9 +776,9 @@ extension String {
   ///
   /// - Complexity: O(*n*)
   public func uppercased() -> String {
-    if self._core.isASCII {
-      let count = self._core.count
-      let source = self._core.startASCII
+    if let asciiBuffer = self._core.asciiBuffer {
+      let count = asciiBuffer.count
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start

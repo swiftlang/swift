@@ -497,11 +497,13 @@ internal struct _Stdout : TextOutputStream {
   mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if string._core.isASCII {
+    if let asciiBuffer = string._core.asciiBuffer {
       defer { _fixLifetime(string) }
 
-      _swift_stdlib_fwrite_stdout(UnsafePointer(string._core.startASCII),
-                                  string._core.count, 1)
+      _swift_stdlib_fwrite_stdout(
+        UnsafePointer(asciiBuffer.baseAddress!),
+        asciiBuffer.count,
+        1)
       return
     }
 
