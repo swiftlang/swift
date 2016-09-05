@@ -2046,6 +2046,15 @@ Type ArchetypeBuilder::substDependentType(Type type) {
 static void collectRequirements(ArchetypeBuilder &builder,
                                 ArrayRef<GenericTypeParamType *> params,
                                 SmallVectorImpl<Requirement> &requirements) {
+  // Don't emit WitnessMarker requirements for secondary types with
+  // no requirements.
+  auto dropRedundantWitnessMarker = [&]() {
+    if (!requirements.empty() &&
+        requirements.back().getKind() == RequirementKind::WitnessMarker &&
+        !requirements.back().getFirstType()->is<GenericTypeParamType>())
+      requirements.pop_back();
+  };
+
   builder.enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
@@ -2070,6 +2079,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
       return;
 
     if (kind == RequirementKind::WitnessMarker) {
+      dropRedundantWitnessMarker();
       requirements.push_back(Requirement(kind, depTy, Type()));
       return;
     }
@@ -2089,6 +2099,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     requirements.push_back(Requirement(kind, depTy, repTy));
   });
+
+  dropRedundantWitnessMarker();
 }
 
 GenericSignature *ArchetypeBuilder::getGenericSignature() {

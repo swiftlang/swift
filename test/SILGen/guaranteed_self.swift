@@ -417,7 +417,7 @@ func AO_curryThunk<T>(_ ao: AO<T>) -> ((AO<T>) -> (Int) -> ()/*, Int -> ()*/) {
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
 // CHECK: function_ref (extension in guaranteed_self):guaranteed_self.SequenceDefaults._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
-// CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
+// CHECK: apply [[FUN]]<FakeArray>([[ARG0]], [[GUARANTEED_COPY_STACK_SLOT]])
 // CHECK: destroy_addr [[GUARANTEED_COPY_STACK_SLOT]]
 
 class Z {}

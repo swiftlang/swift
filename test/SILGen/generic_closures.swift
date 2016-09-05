@@ -188,7 +188,7 @@ protocol HasClassAssoc { associatedtype Assoc : Class }
 // CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $@callee_owned (@owned T.Assoc) -> @owned T.Assoc):
 // CHECK: [[GENERIC_FN:%.*]] = function_ref @_TFF16generic_closures34captures_class_constrained_genericuRxS_13HasClassAssocrFTx1fFwx5AssocwxS1__T_U_FT_FQQ_5AssocS2_
 // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
-// CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T, T.Assoc>([[ARG2_COPY]])
+// CHECK: [[CONCRETE_FN:%.*]] = partial_apply [[GENERIC_FN]]<T>([[ARG2_COPY]])
 
 func captures_class_constrained_generic<T : HasClassAssoc>(_ x: T, f: @escaping (T.Assoc) -> T.Assoc) {
   let _: () -> (T.Assoc) -> T.Assoc = { f }
