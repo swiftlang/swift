@@ -1,4 +1,5 @@
 set(sources
+  AssertionReporting.h
   CoreFoundationShims.h
   DispatchShims.h
   FoundationShims.h

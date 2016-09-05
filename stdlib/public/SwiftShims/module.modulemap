@@ -1,4 +1,5 @@
 module SwiftShims {
+  header "AssertionReporting.h"
   header "CoreFoundationShims.h"
   header "DispatchShims.h"
   header "FoundationShims.h"
