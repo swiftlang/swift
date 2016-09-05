@@ -45,6 +45,7 @@ namespace {
     TypeChecker &TC;
     ProtocolDecl *Proto;
     Type Adoptee;
+    // The conforming context, either a nominal type or extension.
     DeclContext *DC;
 
     WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
@@ -3729,6 +3730,24 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
+void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
+  auto normalConf = conformance->getRootNormalConformance();
+
+  if (normalConf->isIncomplete())
+    TC.UsedConformances.insert(normalConf);
+
+  // Mark each type witness conformance as used.
+  conformance->forEachTypeWitness(nullptr, [&](AssociatedTypeDecl *assocType,
+                                               Substitution sub,
+                                               TypeDecl *witness) -> bool {
+    for (auto nestedConformance : sub.getConformances())
+      if (nestedConformance.isConcrete())
+        addUsedConformances(nestedConformance.getConcrete());
+
+    return false;
+  });
+}
+
 #pragma mark Protocol conformance checking
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
@@ -3757,6 +3776,9 @@ void ConformanceChecker::checkConformance() {
     Conformance->setInvalid();
     return;
   }
+
+  // Ensure the associated type conformances are used.
+  addUsedConformances(Conformance);
 
   // Check non-type requirements.
   for (auto member : Proto->getMembers()) {
