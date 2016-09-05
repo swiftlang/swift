@@ -4256,6 +4256,10 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+///
+/// These conformances might not appear in any substitution lists produced
+/// by Sema, since bridging is done at the SILGen level, so we have to
+/// force them here to ensure SILGen can find them.
 void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
                                                       Type type) {
   class Walker : public TypeWalker {
@@ -4277,6 +4281,8 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
       if (auto *nominalDecl = ty->getAnyNominal()) {
         (void)TC.conformsToProtocol(ty, Proto, DC, options);
 
+        // Set and Dictionary bridging also requires the conformance
+        // of the key type to Hashable.
         if (nominalDecl == TC.Context.getSetDecl() ||
             nominalDecl == TC.Context.getDictionaryDecl()) {
           auto args = ty->castTo<BoundGenericType>()->getGenericArgs();
