@@ -16,6 +16,10 @@
 #include "SwiftStdint.h"
 #include "Visibility.h"
 
+#if __has_feature(nullability)
+#pragma clang assume_nonnull begin
+#endif
+
 #ifdef __cplusplus
 namespace swift { extern "C" {
 #endif
@@ -66,6 +70,10 @@ void _swift_stdlib_reportUnimplementedInitializer(
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift
+#endif
+
+#if __has_feature(nullability)
+#pragma clang assume_nonnull end
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_ASSERTIONREPORTING_H_
