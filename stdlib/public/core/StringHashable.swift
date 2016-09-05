@@ -48,9 +48,9 @@ extension String : Hashable {
       return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
     }
 #else
-    if self._core.isASCII {
+    if let asciiBuffer = self._core.asciiBuffer {
       return _swift_stdlib_unicode_hash_ascii(
-        _core.startASCII, Int32(_core.count))
+        asciiBuffer.baseAddress!, Int32(asciiBuffer.count))
     } else {
       return _swift_stdlib_unicode_hash(_core.startUTF16, Int32(_core.count))
     }
