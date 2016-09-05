@@ -2053,31 +2053,47 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                 MissingTypeWitness->getName())
       .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
-    PrintOptions Options = PrintOptions::printForDiagnostics();
-    Options.AccessibilityFilter = Accessibility::Private;
-    Options.PrintAccessibility = false;
-    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-    Type SelfType = Adopter->getSelfTypeInContext();
-    if (Adopter->getAsClassOrClassExtensionContext())
-      Options.setArchetypeSelfTransform(SelfType, Adopter);
-    else
-      Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
-    Options.CurrentModule = Adopter->getParentModule();
-    if (!Adopter->isExtensionContext()) {
-      // Create a variable declaration instead of a computed property in nominal
-      // types
-      Options.PrintPropertyAccessors = false;
+    bool AddFixit = true;
+    if (isa<ConstructorDecl>(Requirement)) {
+      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
+        if (!CD->isFinal() && Adopter->isExtensionContext()) {
+          // In this case, user should mark class as 'final' or define 
+          // 'required' intializer directly in the class definition.
+          AddFixit = false;
+        } else if (!CD->isFinal()) {
+          Printer << "required ";
+        } else if (Adopter->isExtensionContext()) {
+          Printer << "convenience ";
+        }
+      }
     }
 
-    Requirement->print(Printer, Options);
-    Printer << "\n";
-
     // Point out the requirement that wasn't met.
-    TC.diagnose(Requirement, diag::no_witnesses,
+    auto diag = TC.diagnose(Requirement, diag::no_witnesses,
                             getRequirementKind(Requirement),
                             Requirement->getFullName(),
-                            RequirementType)
-      .fixItInsertAfter(FixitLocation, FixitStream.str());
+                            RequirementType, AddFixit);
+    if (AddFixit) {
+      PrintOptions Options = PrintOptions::printForDiagnostics();
+      Options.AccessibilityFilter = Accessibility::Private;
+      Options.PrintAccessibility = false;
+      Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+      Type SelfType = Adopter->getSelfTypeInContext();
+      if (Adopter->getAsClassOrClassExtensionContext())
+        Options.setArchetypeSelfTransform(SelfType, Adopter);
+      else
+        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+      Options.CurrentModule = Adopter->getParentModule();
+      if (!Adopter->isExtensionContext()) {
+        // Create a variable declaration instead of a computed property in
+        // nominal types
+        Options.PrintPropertyAccessors = false;
+      }
+      Requirement->print(Printer, Options);
+      Printer << "\n";
+
+      diag.fixItInsertAfter(FixitLocation, FixitStream.str());
+    }
   }
 }
 
@@ -2479,7 +2495,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     tc.diagnose(requirement, diag::no_witnesses,
                 getRequirementKind(requirement),
                 requirement->getName(),
-                reqType);
+                reqType, false);
     });
 
   return ResolveWitnessResult::ExplicitFailed;
