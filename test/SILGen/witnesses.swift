@@ -22,7 +22,7 @@ func archetype_generic_method<T: X>(x: T, y: Loadable) -> Loadable {
 // CHECK:       }
 
 // CHECK-LABEL: sil hidden @_TF9witnesses32archetype_associated_type_method{{.*}} : $@convention(thin) <T where T : WithAssoc> (@in T, @in T.AssocType) -> @out T
-// CHECK:         apply %{{[0-9]+}}<T, T.AssocType>
+// CHECK:         apply %{{[0-9]+}}<T>
 func archetype_associated_type_method<T: WithAssoc>(x: T, y: T.AssocType) -> T {
   return x.useAssocType(x: y)
 }
@@ -425,12 +425,12 @@ struct GenericParameterNameCollision<T: HasAssoc> :
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}foo{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@in T1, @in_guaranteed GenericParameterNameCollision<T>) -> () {
   // CHECK:       bb0(%0 : $*T1, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
+  // CHECK:         apply {{%.*}}<T, T1>
   func foo<U>(_ x: U) {}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionProtocol{{.*}}bar{{.*}} : $@convention(witness_method) <T where T : HasAssoc><T1> (@owned @callee_owned (@in T1) -> @out T.Assoc, @in_guaranteed GenericParameterNameCollision<T>) -> () {
   // CHECK:       bb0(%0 : $@callee_owned (@in T1) -> @out T.Assoc, %1 : $*GenericParameterNameCollision<T>):
-  // CHECK:         apply {{%.*}}<T, T1, T.Assoc>
+  // CHECK:         apply {{%.*}}<T, T1>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }
 
