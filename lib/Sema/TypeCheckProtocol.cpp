@@ -4251,28 +4251,6 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     if (auto sf = DC->getParentSourceFile()) {
       sf->addUsedConformance(normalConf);
     }
-
-    // Hack: If we've used a conformance to the _BridgedStoredNSError
-    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
-    // conformances on the Code associated type witness.
-    if (Proto->isSpecificProtocol(KnownProtocolKind::BridgedStoredNSError)) {
-      if (auto codeType = ProtocolConformance::getTypeWitnessByName(
-                            T, concrete, Context.Id_Code, this)) {
-        if (codeType->getAnyNominal() != T->getAnyNominal()) {
-          if (auto codeProto =
-                     Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)){
-            (void)conformsToProtocol(codeType, codeProto, DC, options, nullptr,
-                                     SourceLoc());
-          }
-
-          if (auto rawProto =
-                     Context.getProtocol(KnownProtocolKind::RawRepresentable)) {
-            (void)conformsToProtocol(codeType, rawProto, DC, options, nullptr,
-                                     SourceLoc());
-          }
-        }
-      }
-    }
   }
   return true;
 }
@@ -4342,32 +4320,44 @@ void TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
+  auto bridgedStoredNSError = Context.getProtocol(
+                                    KnownProtocolKind::BridgedStoredNSError);
+  auto errorCodeProto = Context.getProtocol(
+                              KnownProtocolKind::ErrorCodeProtocol);
+  auto rawProto = Context.getProtocol(
+                        KnownProtocolKind::RawRepresentable);
+
+  if (!bridgedStoredNSError || !errorCodeProto || !rawProto)
+    return;
+
   // _BridgedStoredNSError.
-  if (auto bridgedStoredNSError = Context.getProtocol(
-                                    KnownProtocolKind::BridgedStoredNSError)) {
-    // Force it as "Used", if it conforms
-    if (conformsToProtocol(type, bridgedStoredNSError, dc,
-                           ConformanceCheckFlags::Used))
-      return;
+  ProtocolConformance *conformance = nullptr;
+  if (conformsToProtocol(type, bridgedStoredNSError, dc,
+                         ConformanceCheckFlags::Used,
+                        &conformance) &&
+      conformance) {
+    // Hack: If we've used a conformance to the _BridgedStoredNSError
+    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
+    // conformances on the Code associated type witness.
+    if (auto codeType = ProtocolConformance::getTypeWitnessByName(
+                          type, conformance, Context.Id_Code, this)) {
+      (void)conformsToProtocol(codeType, errorCodeProto, dc,
+                               ConformanceCheckFlags::Used);
+      (void)conformsToProtocol(codeType, rawProto, dc,
+                               ConformanceCheckFlags::Used);
+    }
   }
 
   // _ErrorCodeProtocol.
-  if (auto errorCodeProto = Context.getProtocol(
-                              KnownProtocolKind::ErrorCodeProtocol)) {
-    ProtocolConformance *conformance = nullptr;
-    if (conformsToProtocol(type, errorCodeProto, dc,
-                           (ConformanceCheckFlags::SuppressDependencyTracking|
-                            ConformanceCheckFlags::Used),
-                           &conformance) &&
-        conformance) {
-      if (Type errorType = ProtocolConformance::getTypeWitnessByName(
-            type, conformance, Context.Id_ErrorType, this)) {
-        // Early-exit in case of circularity.
-        if (errorType->getAnyNominal() == type->getAnyNominal()) return;
-
-        useBridgedNSErrorConformances(dc, errorType);
-        return;
-      }
+  if (conformsToProtocol(type, errorCodeProto, dc,
+                         (ConformanceCheckFlags::SuppressDependencyTracking|
+                          ConformanceCheckFlags::Used),
+                         &conformance) &&
+      conformance) {
+    if (Type errorType = ProtocolConformance::getTypeWitnessByName(
+          type, conformance, Context.Id_ErrorType, this)) {
+      (void) conformsToProtocol(errorType, bridgedStoredNSError, dc,
+                                ConformanceCheckFlags::Used);
     }
   }
 }
