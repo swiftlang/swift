@@ -3757,17 +3757,6 @@ public:
     return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
   }
   
-  /// True if this is the 'Self' parameter of a protocol or an associated type
-  /// of 'Self'.
-  bool isSelfDerived() {
-    ArchetypeType *t = getPrimary();
-
-    if (t && t->getSelfProtocol())
-      return true;
-
-    return false;
-  }
-
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }

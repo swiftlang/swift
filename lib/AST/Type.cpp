@@ -2795,13 +2795,6 @@ static Type getMemberForBaseType(Module *module,
     if (archetypeParent->hasNestedType(name))
       return archetypeParent->getNestedTypeValue(name);
 
-    if (auto parent = archetypeParent->getParent()) {
-      // If the archetype doesn't have the requested type and the parent is not
-      // self derived, error out
-      return parent->isSelfDerived() ? parent->getNestedTypeValue(name)
-                                     : ErrorType::get(module->getASTContext());
-    }
-
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
     if (!assocType || !archetypeParent->getSuperclass()) {

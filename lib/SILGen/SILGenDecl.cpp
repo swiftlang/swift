@@ -1701,6 +1701,13 @@ static void addConformanceToSubstitutionMap(SILModule &M,
   });
 }
 
+static bool isSelfDerived(Type selfTy, Type depTy) {
+  while (auto memberTy = depTy->getAs<DependentMemberType>())
+    depTy = memberTy->getBase();
+
+  return depTy->isEqual(selfTy);
+}
+
 /// Substitute the `Self` type from a protocol conformance into a protocol
 /// requirement's type to get the type of the witness.
 static CanAnyFunctionType
@@ -1714,15 +1721,15 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   }
 
   // Build a substitution map to replace `self` and its associated types.
-  auto &C = M.getASTContext();
-  CanType selfParamTy = CanGenericTypeParamType::get(0, 0, C);
-  
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
+      ->getCanonicalType();
+
   TypeSubstitutionMap subs;
-  subs.insert({selfParamTy.getPointer(), conformance->getInterfaceType()
-                                                    ->getCanonicalType()});
+  subs.insert({selfTy.getPointer(), conformance->getInterfaceType()
+                                               ->getCanonicalType()});
   addConformanceToSubstitutionMap(M, subs,
                                   conformance->getGenericEnvironment(),
-                                  selfParamTy, conformance);
+                                  selfTy, conformance);
 
   ArchetypeBuilder builder(*M.getSwiftModule(),
                            M.getASTContext().Diags);
@@ -1743,17 +1750,10 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
     builder.addGenericParameter(param);
   }
 
-  auto rootedInSelf = [&](Type t) -> bool {
-    while (auto dmt = t->getAs<DependentMemberType>()) {
-      t = dmt->getBase();
-    }
-    return t->isEqual(selfParamTy);
-  };
-
   RequirementSource source(RequirementSource::Explicit, SourceLoc());
 
   for (auto &reqt : reqtTy->getRequirements()) {
-    if (rootedInSelf(reqt.getFirstType()))
+    if (isSelfDerived(selfTy, reqt.getFirstType()))
       continue;
 
     switch (reqt.getKind()) {
@@ -1764,7 +1764,7 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
       break;
 
     case RequirementKind::SameType: {
-      if (rootedInSelf(reqt.getSecondType()))
+      if (isSelfDerived(selfTy, reqt.getSecondType()))
         continue;
 
       // Substitute the constrained types.
@@ -1822,6 +1822,9 @@ getSubstitutedGenericEnvironment(SILModule &M,
 
   TypeSubstitutionMap witnessContextParams;
 
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
+      ->getCanonicalType();
+
   // Outer generic parameters come from the generic context of
   // the conformance (which might not be the same as the generic
   // context of the witness, if the witness is defined in a
@@ -1833,9 +1836,8 @@ getSubstitutedGenericEnvironment(SILModule &M,
   // also map to the archetypes of the requirement.
   for (auto pair : reqtEnv->getInterfaceToArchetypeMap()) {
     // Skip the 'Self' parameter and friends.
-    if (auto *archetypeTy = pair.second->getAs<ArchetypeType>())
-      if (archetypeTy->isSelfDerived())
-        continue;
+    if (isSelfDerived(selfTy, pair.first))
+      continue;
 
     auto result = witnessContextParams.insert(pair);
     assert(result.second);
