@@ -35,7 +35,7 @@ from swift_build_support import shell  # noqa (E402)
 
 
 def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
-                             cross_repos_pr):
+                             cross_repo):
     if not os.path.isdir(repo_path):
         return
 
@@ -68,7 +68,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
 
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
-            if reset_to_remote:
+            if reset_to_remote and not cross_repo:
                 shell.call(['git', 'reset', '--hard', "origin/%s" % branch],
                            echo=True)
                 return
@@ -76,7 +76,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
         # Prior to Git 2.6, this is the way to do a "git pull
         # --rebase" that respects rebase.autostash.  See
         # http://stackoverflow.com/a/30209750/125349
-        if not cross_repos_pr:
+        if not cross_repo:
             shell.call(["git", "rebase", "FETCH_HEAD"], echo=True)
         shell.call(["git", "submodule", "update", "--recursive"],
                    echo=True)
@@ -85,6 +85,7 @@ def update_single_repository(repo_path, branch, reset_to_remote, should_clean,
 def update_all_repositories(args, config, scheme_name, cross_repos_pr):
     repo_branch = scheme_name
     for repo_name in config['repos'].keys():
+        cross_repo = False
         if repo_name in args.skip_repository_list:
             print("--- Skipping '" + repo_name + "' ---")
             continue
@@ -100,9 +101,12 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                 repo_branch = v['repos'][repo_name]
                 remote_repo_id = config['repos'][repo_name]['remote']['id']
                 if remote_repo_id in cross_repos_pr:
+                    cross_repo = True
                     pr_id = cross_repos_pr[remote_repo_id]
                     repo_branch = "ci_pr_{0}".format(pr_id)
                     with shell.pushd(repo_path, dry_run=False, echo=False):
+                        shell.call(["git", "checkout", v['repos'][repo_name]],
+                                   echo=True)
                         shell.capture(["git", "branch", "-D", repo_branch],
                                       echo=True, allow_non_zero_exit=True)
                         shell.call(["git", "fetch", "origin",
@@ -113,7 +117,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                                  repo_branch,
                                  args.reset_to_remote,
                                  args.clean,
-                                 cross_repos_pr)
+                                 cross_repo)
 
 
 def obtain_additional_swift_sources(
@@ -255,7 +259,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
-        repos_with_pr = [pr.replace('/pull/','#')for pr in repos_with_pr]
+        repos_with_pr = [pr.replace('/pull/','#') for pr in repos_with_pr]
         cross_repos_pr = dict(pr.split('#') for pr in repos_with_pr)
 
     if clone or clone_with_ssh:
