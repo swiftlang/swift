@@ -900,7 +900,7 @@ matchWitness(TypeChecker &tc,
 static RequirementMatch
 matchWitness(TypeChecker &tc,
              ProtocolDecl *proto,
-             NormalProtocolConformance *conformance,
+             ProtocolConformance *conformance,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
 
@@ -4945,6 +4945,26 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       if ((*conformance)->getWitness(req, this).getDecl() == witness) {
         result.push_back(req);
         if (anySingleRequirement) return result;
+        continue;
+      }
+
+      // If we have an inherited conformance, check whether the potential
+      // witness matches the requirement.
+      // FIXME: for now, don't even try this with generics involved. We
+      // should be tracking how subclasses implement optional requirements,
+      // in which case the getWitness() check above would suffice.
+      if (req->getAttrs().hasAttribute<OptionalAttr>() &&
+          isa<InheritedProtocolConformance>(*conformance)) {
+        auto normal = (*conformance)->getRootNormalConformance();
+        if (!(*conformance)->getDeclContext()->getGenericSignatureOfContext() &&
+            !normal->getDeclContext()->getGenericSignatureOfContext() &&
+            matchWitness(*this, proto, *conformance, witness->getDeclContext(),
+                         req, const_cast<ValueDecl *>(witness)).Kind
+              == MatchKind::ExactMatch) {
+          result.push_back(req);
+          if (anySingleRequirement) return result;
+          continue;
+        }
       }
     }
   }

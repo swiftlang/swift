@@ -2164,7 +2164,7 @@ class SuperclassImplementsProtocol : InferFromProtocol { }
 
 // Note: no inference for subclasses
 class SubclassInfersFromProtocol1 : SuperclassImplementsProtocol {
-  // CHECK: {{^}} func method1(value: Int)
+  // CHECK: {{^}} @objc func method1(value: Int)
   func method1(value: Int) { }
 }
 
@@ -2173,7 +2173,7 @@ class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
 }
 
 extension SubclassInfersFromProtocol2 {
-  // CHECK: {{^}} func method1(value: Int)
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
   func method1(value: Int) { }
 }
 
