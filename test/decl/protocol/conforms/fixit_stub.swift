@@ -3,7 +3,7 @@
 protocol Protocol1 {
   func foo(arg1: Int, arg2: String) -> String // expected-note{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'; do you want to add a stub?}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n}}
   func bar() throws -> String // expected-note{{protocol requires function 'bar()' with type '() throws -> String'; do you want to add a stub?}} {{27-27=\n    func bar() throws -> String {\n        <#code#>\n    \}\n}}
-  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{27-27=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
+  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{27-27=\n    required init(arg: Int) {\n        <#code#>\n    \}\n}}
   var baz: Int { get } // expected-note{{protocol requires property 'baz' with type 'Int'; do you want to add a stub?}} {{27-27=\n    var baz: Int\n}}
   var baz2: Int { get set } // expected-note{{protocol requires property 'baz2' with type 'Int'; do you want to add a stub?}} {{27-27=\n    var baz2: Int\n}}
   subscript(arg: Int) -> String { get } //expected-note{{rotocol requires subscript with type '(Int) -> String'; do you want to add a stub?}} {{27-27=\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n}}
@@ -18,7 +18,7 @@ class Adopter: Protocol1 { // expected-error{{type 'Adopter' does not conform to
 protocol Protocol2 {
   func foo(arg1: Int, arg2: String) -> String // expected-note{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'; do you want to add a stub?}} {{32-32=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n}}
   func bar() throws -> String // expected-note{{protocol requires function 'bar()' with type '() throws -> String'; do you want to add a stub?}} {{32-32=\n    func bar() throws -> String {\n        <#code#>\n    \}\n}}
-  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{32-32=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
+  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'}} {{none}}
   var baz: Int { get } // expected-note{{protocol requires property 'baz' with type 'Int'; do you want to add a stub?}} {{32-32=\n    var baz: Int {\n        <#code#>\n    \}\n}}
   var baz2: Int { get set } // expected-note{{protocol requires property 'baz2' with type 'Int'; do you want to add a stub?}} {{32-32=\n    var baz2: Int {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n}}
   subscript(arg: Int) -> String { get } //expected-note{{rotocol requires subscript with type '(Int) -> String'; do you want to add a stub?}} {{32-32=\n    subscript(arg: Int) -> String {\n        <#code#>\n    \}\n}}
@@ -126,3 +126,21 @@ public class Adopter11: ProtocolWithPrivateAccess3, ProtocolWithPrivateAccess4 {
   // expected-error@-1{{type 'Adopter11' does not conform to protocol 'ProtocolWithPrivateAccess3'}}
   // expected-error@-2{{type 'Adopter11' does not conform to protocol 'ProtocolWithPrivateAccess4'}}
 }
+
+protocol ProtocolRequiresInit1 {
+  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{48-48=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
+}
+final class Adopter12 : ProtocolRequiresInit1 {} //expected-error {{type 'Adopter12' does not conform to protocol 'ProtocolRequiresInit1'}} // expected-note{{candidate}}
+
+protocol ProtocolRequiresInit2 {
+  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{46-46=\n    convenience init(arg: Int) {\n        <#code#>\n    \}\n}}
+}
+final class Adopter13 {} // expected-note{{candidate}}
+extension Adopter13 : ProtocolRequiresInit2 {} //expected-error {{type 'Adopter13' does not conform to protocol 'ProtocolRequiresInit2'}}
+
+protocol ProtocolRequiresInit3 {
+  init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{46-46=\n    init(arg: Int) {\n        <#code#>\n    \}\n}}
+}
+
+struct Adopter14 {} // expected-note{{candidate}}
+extension Adopter14 : ProtocolRequiresInit3 {} //expected-error {{type 'Adopter14' does not conform to protocol 'ProtocolRequiresInit3'}}

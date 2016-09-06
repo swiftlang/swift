@@ -2009,14 +2009,15 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
                               TypeChecker &TC) {
   // FIXME: Try an ignore-access lookup?
 
+  DeclContext *Adopter = Conformance->getDeclContext();
+
   SourceLoc FixitLocation;
   SourceLoc TypeLoc;
-  if (auto Extension = dyn_cast<ExtensionDecl>(Conformance->getDeclContext())) {
-    FixitLocation = Extension->getBraces().Start.getAdvancedLocOrInvalid(1);
+  if (auto Extension = dyn_cast<ExtensionDecl>(Adopter)) {
+    FixitLocation = Extension->getBraces().Start;
     TypeLoc = Extension->getStartLoc();
-  } else if (auto Nominal =
-               dyn_cast<NominalTypeDecl>(Conformance->getDeclContext())) {
-    FixitLocation = Nominal->getBraces().Start.getAdvancedLocOrInvalid(1);
+  } else if (auto Nominal = dyn_cast<NominalTypeDecl>(Adopter)) {
+    FixitLocation = Nominal->getBraces().Start;
     TypeLoc = Nominal->getStartLoc();
   } else {
     llvm_unreachable("Unknown adopter kind");
@@ -2036,7 +2037,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
   Accessibility Access = std::min(
     /* Access of the context */
-    Conformance->getDeclContext()
+    Adopter
       ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
     /* Access of the protocol */
     Requirement->getDeclContext()
@@ -2050,38 +2051,49 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
     TC.diagnose(MissingTypeWitness, diag::no_witnesses_type,
                 MissingTypeWitness->getName())
-      .fixItInsert(FixitLocation, FixitStream.str());
+      .fixItInsertAfter(FixitLocation, FixitStream.str());
   } else {
-
-    PrintOptions Options = PrintOptions::printForDiagnostics();
-    Options.AccessibilityFilter = Accessibility::Private;
-    Options.PrintAccessibility = false;
-    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
-    if (isa<ClassDecl>(Conformance->getDeclContext())) {
-      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
-      DeclContext *Adopter = Conformance->getDeclContext();
-      Options.setArchetypeSelfTransform(SelfType, Adopter);
-    } else {
-      Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
-      DeclContext *Adopter = Conformance->getDeclContext();
-      Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+    bool AddFixit = true;
+    if (isa<ConstructorDecl>(Requirement)) {
+      if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
+        if (!CD->isFinal() && Adopter->isExtensionContext()) {
+          // In this case, user should mark class as 'final' or define 
+          // 'required' intializer directly in the class definition.
+          AddFixit = false;
+        } else if (!CD->isFinal()) {
+          Printer << "required ";
+        } else if (Adopter->isExtensionContext()) {
+          Printer << "convenience ";
+        }
+      }
     }
-    Options.CurrentModule = Conformance->getDeclContext()->getParentModule();
-    if (isa<NominalTypeDecl>(Conformance->getDeclContext())) {
-      // Create a variable declaration instead of a computed property in nominal
-      // types
-      Options.PrintPropertyAccessors = false;
-    }
-
-    Requirement->print(Printer, Options);
-    Printer << "\n";
 
     // Point out the requirement that wasn't met.
-    TC.diagnose(Requirement, diag::no_witnesses,
+    auto diag = TC.diagnose(Requirement, diag::no_witnesses,
                             getRequirementKind(Requirement),
                             Requirement->getFullName(),
-                            RequirementType)
-      .fixItInsert(FixitLocation, FixitStream.str());
+                            RequirementType, AddFixit);
+    if (AddFixit) {
+      PrintOptions Options = PrintOptions::printForDiagnostics();
+      Options.AccessibilityFilter = Accessibility::Private;
+      Options.PrintAccessibility = false;
+      Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+      Type SelfType = Adopter->getSelfTypeInContext();
+      if (Adopter->getAsClassOrClassExtensionContext())
+        Options.setArchetypeSelfTransform(SelfType, Adopter);
+      else
+        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+      Options.CurrentModule = Adopter->getParentModule();
+      if (!Adopter->isExtensionContext()) {
+        // Create a variable declaration instead of a computed property in
+        // nominal types
+        Options.PrintPropertyAccessors = false;
+      }
+      Requirement->print(Printer, Options);
+      Printer << "\n";
+
+      diag.fixItInsertAfter(FixitLocation, FixitStream.str());
+    }
   }
 }
 
@@ -2483,7 +2495,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
     tc.diagnose(requirement, diag::no_witnesses,
                 getRequirementKind(requirement),
                 requirement->getName(),
-                reqType);
+                reqType, false);
     });
 
   return ResolveWitnessResult::ExplicitFailed;
