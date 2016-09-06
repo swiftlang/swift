@@ -541,6 +541,9 @@ public:
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
+    if (Context.LangOpts.EnableASTScopeLookup)
+      return nullptr;
+
     return getScopeInfo().lookupValueName(Name);
   }
 

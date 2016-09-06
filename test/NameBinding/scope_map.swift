@@ -401,9 +401,11 @@ func localPatternsWithSharedType() {
 
 // CHECK-SEARCHES-LABEL: ***Scope at 70:8***
 // CHECK-SEARCHES-NEXT: AfterPatternBinding {{.*}} entry 0 [69:13 - 71:3] expanded
+// CHECK-SEARCHES-NEXT: Local bindings: c
 
 // CHECK-SEARCHES-LABEL: ***Scope at 26:20***
 // CHECK-SEARCHES-NEXT: AbstractFunctionParams {{.*}} init(t:u:) param 1:0 [26:17 - 27:3] expanded
+// CHECK-SEARCHES-NEXT: Local bindings: t
 
 // CHECK-SEARCHES-LABEL: ***Scope at 5:18***
 // CHECK-SEARCHES-NEXT: TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded

@@ -814,6 +814,20 @@ static bool performCompile(CompilerInstance &Instance,
           if (auto dc = locScope->getDeclContext()) {
             dc->printContext(llvm::errs());
           }
+
+          // Grab the local bindings introduced by this scope.
+          auto localBindings = locScope->getLocalBindings();
+          if (!localBindings.empty()) {
+            llvm::errs() << "Local bindings: ";
+            interleave(localBindings.begin(), localBindings.end(),
+                       [&](ValueDecl *value) {
+                         llvm::errs() << value->getFullName();
+                       },
+                       [&]() {
+                         llvm::errs() << " ";
+                       });
+            llvm::errs() << "\n";
+          }
         }
 
         llvm::errs() << "***Complete scope map***\n";

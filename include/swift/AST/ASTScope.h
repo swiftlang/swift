@@ -75,8 +75,9 @@ enum class ASTScopeKind : uint8_t {
   PatternBinding,
   /// The scope introduced for an initializer of a pattern binding.
   PatternInitializer,
-  /// The scope introduced by a particular clause in a pattern binding
-  /// declaration.
+  /// The scope following a particular clause in a pattern binding declaration,
+  /// which is the outermost scope in which the variables introduced by that
+  /// clause will be visible.
   AfterPatternBinding,
   /// The scope introduced by a brace statement.
   BraceStmt,
@@ -542,6 +543,18 @@ public:
   ///
   /// \seealso getDeclContext().
   DeclContext *getInnermostEnclosingDeclContext() const;
+
+  /// Retrueve the declarations whose names are directly bound by this scope.
+  ///
+  /// The declarations bound in this scope aren't available in the immediate
+  /// parent of this scope, but will still be visible in child scopes (unless
+  /// shadowed there).
+  ///
+  /// Note that this routine does not produce bindings for anything that can
+  /// be found via qualified name lookup in a \c DeclContext, such as nominal
+  /// type declarations or extensions thereof, or the source file itself. The
+  /// client can perform such lookups using the result of \c getDeclContext().
+  SmallVector<ValueDecl *, 4> getLocalBindings() const;
 
   /// Expand the entire scope map.
   ///
