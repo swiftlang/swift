@@ -151,6 +151,11 @@ public:
     explicit operator bool() const {
       return message != nullptr;
     }
+
+    friend raw_ostream &operator<<(raw_ostream &os, const ErrorInfo &self) {
+      os << self.message;
+      return os;
+    }
   };
 
   // FIXME: Replace with llvm::Expected post-haste.
@@ -182,22 +187,34 @@ public:
   class Serialized {
   private:
     using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
-
-    using ImplTy = PointerUnion<T, serialization::BitOffset>;
+    using ResultTy = PointerUnion<T, const ErrorInfo *>;
+    using ImplTy = PointerUnion<ResultTy, serialization::BitOffset>;
     ImplTy Value;
 
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
     bool isComplete() const {
-      return Value.template is<T>();
+      return Value.template is<ResultTy>();
+    }
+
+    bool isError() const {
+      assert(isComplete());
+      return Value.template get<ResultTy>().template is<const ErrorInfo *>();
     }
 
     T get() const {
-      return Value.template get<T>();
+      return Value.template get<ResultTy>().template get<T>();
     }
 
-    /*implicit*/ operator T() const {
+    const ErrorInfo &getError() const {
+      return *Value.template get<ResultTy>().template get<const ErrorInfo *>();
+    }
+
+    Expected<T> getAsExpected() const {
+      assert(isComplete());
+      if (isError())
+        return getError();
       return get();
     }
 
@@ -210,9 +227,17 @@ public:
     }
 
     template <typename Derived>
-    Serialized &operator=(Derived deserialized) {
-      assert(!isComplete() || ImplTy(deserialized) == Value);
-      Value = deserialized;
+    typename std::enable_if<std::is_constructible<T, Derived>::value,
+                            Serialized &>::type
+    operator=(Derived deserialized) {
+      assert(!isComplete() || ImplTy(ResultTy(deserialized)) == Value);
+      Value = ResultTy(deserialized);
+      return *this;
+    }
+
+    // Errors can be assigned after the fact, unfortunately.
+    Serialized &operator=(const ErrorInfo *error) {
+      Value = ResultTy(error);
       return *this;
     }
 
@@ -391,6 +416,9 @@ private:
   /// Creates a new AST node to represent a deserialized decl.
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
+
+  /// Moves this error info into the ASTContext, so we can retrieve it later.
+  ErrorInfo *persist(ErrorInfo info);
 
   /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,

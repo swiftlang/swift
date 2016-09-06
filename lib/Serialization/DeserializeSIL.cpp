@@ -157,27 +157,28 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_FUNC_OFFSETS) &&
              "Expect a SIL_FUNC_OFFSETS record.");
-      Funcs.assign(scratch.begin(), scratch.end());
+      Funcs = decltype(Funcs)(scratch.begin(), scratch.end());
     } else if (kind == sil_index_block::SIL_VTABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_VTABLE_OFFSETS) &&
              "Expect a SIL_VTABLE_OFFSETS record.");
-      VTables.assign(scratch.begin(), scratch.end());
+      VTables = decltype(VTables)(scratch.begin(), scratch.end());
     } else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
              "Expect a SIL_GLOBALVAR_OFFSETS record.");
-      GlobalVars.assign(scratch.begin(), scratch.end());
+      GlobalVars = decltype(GlobalVars)(scratch.begin(), scratch.end());
     } else if (kind == sil_index_block::SIL_WITNESS_TABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_WITNESS_TABLE_OFFSETS record.");
-      WitnessTables.assign(scratch.begin(), scratch.end());
+      WitnessTables = decltype(WitnessTables)(scratch.begin(), scratch.end());
     } else if (kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
-      DefaultWitnessTables.assign(scratch.begin(), scratch.end());
+      DefaultWitnessTables =
+          decltype(DefaultWitnessTables)(scratch.begin(), scratch.end());
     }
   }
 }
@@ -1960,7 +1961,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   assert(VId <= GlobalVars.size() && "invalid GlobalVar ID");
   auto &globalVarOrOffset = GlobalVars[VId-1];
   if (globalVarOrOffset.isComplete())
-    return globalVarOrOffset;
+    return globalVarOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
   SILCursor.JumpToBit(globalVarOrOffset);
@@ -2039,7 +2040,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   auto &vTableOrOffset = VTables[VId-1];
 
   if (vTableOrOffset.isComplete())
-    return vTableOrOffset;
+    return vTableOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
   SILCursor.JumpToBit(vTableOrOffset);

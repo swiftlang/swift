@@ -487,15 +487,15 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case index_block::DECL_OFFSETS:
         assert(blobData.empty());
-        Decls.assign(scratch.begin(), scratch.end());
+        Decls = decltype(Decls)(scratch.begin(), scratch.end());
         break;
       case index_block::DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        DeclContexts.assign(scratch.begin(), scratch.end());
+        DeclContexts = decltype(DeclContexts)(scratch.begin(), scratch.end());
         break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
-        Types.assign(scratch.begin(), scratch.end());
+        Types = decltype(Types)(scratch.begin(), scratch.end());
         break;
       case index_block::IDENTIFIER_OFFSETS:
         assert(blobData.empty());
@@ -531,11 +531,13 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        LocalDeclContexts.assign(scratch.begin(), scratch.end());
+        LocalDeclContexts =
+            decltype(LocalDeclContexts)(scratch.begin(), scratch.end());
         break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
-        NormalConformances.assign(scratch.begin(), scratch.end());
+        NormalConformances =
+            decltype(NormalConformances)(scratch.begin(), scratch.end());
         break;
 
       default:
@@ -1753,8 +1755,10 @@ void ModuleFile::verify() const {
 #ifndef NDEBUG
   const auto &Context = getContext();
   for (const Serialized<Decl*> &next : Decls)
-    if (next.isComplete() && swift::shouldVerify(next, Context))
-      swift::verify(next);
+    if (next.isComplete() && !next.isError() &&
+        swift::shouldVerify(next.get(), Context)) {
+      swift::verify(next.get());
+    }
 #endif
 }
 

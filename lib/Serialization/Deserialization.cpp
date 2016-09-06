@@ -58,9 +58,11 @@ namespace {
     }
 
     virtual void print(raw_ostream &os) const override {
-      if (!DeclOrOffset.isComplete()) {
+      if (!DeclOrOffset.isComplete() || DeclOrOffset.isError()) {
         os << "While deserializing decl #" << ID << " ("
            << getRecordKindString(Kind) << ")\n";
+        if (DeclOrOffset.isComplete())
+          os << "\t" << DeclOrOffset.getError() << "\n";
         return;
       }
 
@@ -579,6 +581,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
                              NormalConformanceID conformanceID) {
   auto &conformanceEntry = NormalConformances[conformanceID-1];
   if (conformanceEntry.isComplete()) {
+    // FIXME: Handle errors.
     return conformanceEntry.get();
   }
 
@@ -1558,7 +1561,7 @@ Expected<DeclContext *> ModuleFile::getLocalDeclContext(DeclContextID DCID) {
   auto &declContextOrOffset = LocalDeclContexts[DCID-1];
 
   if (declContextOrOffset.isComplete())
-    return declContextOrOffset.get();
+    return declContextOrOffset.getAsExpected();
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declContextOrOffset);
@@ -1659,7 +1662,7 @@ Expected<DeclContext *> ModuleFile::getDeclContext(DeclContextID DCID) {
   auto &declContextOrOffset = DeclContexts[DCID-1];
 
   if (declContextOrOffset.isComplete())
-    return declContextOrOffset.get();
+    return declContextOrOffset.getAsExpected();
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declContextOrOffset);
@@ -1688,10 +1691,9 @@ Expected<DeclContext *> ModuleFile::getDeclContext(DeclContextID DCID) {
     return getLocalDeclContext(declOrDeclContextId);
 
   auto D = getDecl(declOrDeclContextId);
-  if (!D)
-    return D.takeError();
-
-  if (auto ND = dyn_cast<NominalTypeDecl>(D.get())) {
+  if (!D) {
+    declContextOrOffset = persist(D.takeError());
+  } else if (auto ND = dyn_cast<NominalTypeDecl>(D.get())) {
     declContextOrOffset = ND;
   } else if (auto ED = dyn_cast<ExtensionDecl>(D.get())) {
     declContextOrOffset = ED;
@@ -1705,7 +1707,7 @@ Expected<DeclContext *> ModuleFile::getDeclContext(DeclContextID DCID) {
     llvm_unreachable("Unknown Decl : DeclContext kind");
   }
   
-  return declContextOrOffset.get();
+  return declContextOrOffset.getAsExpected();
 }
 
 Module *ModuleFile::getModule(ModuleID MID) {
@@ -2019,6 +2021,10 @@ T *ModuleFile::createDecl(Args &&... args) {
   return result;
 }
 
+ErrorInfo *ModuleFile::persist(ErrorInfo info) {
+  return getContext().AllocateObjectCopy(std::move(info));
+}
+
 static const uint64_t lazyConformanceContextDataPositionMask = 0xFFFFFFFFFFFF;
 
 /// Decode the context data for lazily-loaded conformances.
@@ -2045,7 +2051,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   auto &declOrOffset = Decls[DID-1];
 
   if (declOrOffset.isComplete())
-    return declOrOffset.get();
+    return declOrOffset.getAsExpected();
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
@@ -2083,9 +2089,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       : moduleFile(moduleFile), declOrOffset(declOrOffset) {}
 
     ~PrivateDiscriminatorRAII() {
-      if (!discriminator.empty() && declOrOffset.isComplete())
+      if (!discriminator.empty() && declOrOffset.isComplete() &&
+          !declOrOffset.isError()) {
         if (auto value = dyn_cast_or_null<ValueDecl>(declOrOffset.get()))
           moduleFile.PrivateDiscriminatorsByValue[value] = discriminator;
+      }
     }
   };
 
@@ -2099,9 +2107,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       : declOrOffset(declOrOffset), discriminator(0) {}
 
     ~LocalDiscriminatorRAII() {
-      if (discriminator != 0 && declOrOffset.isComplete())
+      if (discriminator != 0 && declOrOffset.isComplete() &&
+          !declOrOffset.isError()) {
         if (auto value = dyn_cast<ValueDecl>(declOrOffset.get()))
           value->setLocalDiscriminator(discriminator);
+      }
     }
   };
 
@@ -2380,11 +2390,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto underlyingTL = TypeLoc::withoutLoc(underlyingType.get());
 
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto genericParams = maybeReadGenericParams(DC.get());
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
                                            SourceLoc(), underlyingTL,
@@ -2397,9 +2407,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       auto sigOrError = maybeReadGenericSignature();
       if (!sigOrError) {
-        // FIXME: declOrOffset has already been set. We need to either reset it
-        // or store the error there.
-        return sigOrError.takeError();
+        alias->setInvalid();
+        declOrOffset = persist(sigOrError.takeError());
+        return declOrOffset.getError();
       }
 
       std::tie(sig, env) = sigOrError.get();
@@ -2452,7 +2462,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return DC.takeError();
 
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto genericParam = createDecl<GenericTypeParamDecl>(DC.get(),
                                                          getIdentifier(nameID),
@@ -2466,9 +2476,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto archetypeOrError = getType(archetypeID);
     if (!archetypeOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return archetypeOrError.takeError();
+      genericParam->setInvalid();
+      declOrOffset = persist(archetypeOrError.takeError());
+      return declOrOffset.getError();
     }
 
     genericParam->setArchetype(archetypeOrError.get()->castTo<ArchetypeType>());
@@ -2485,9 +2495,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       loc.setType(typeOrError.get());
     });
     if (error) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return error;
+      genericParam->setInvalid();
+      declOrOffset = persist(error);
+      return declOrOffset.getError();
     }
     genericParam->setInherited(inherited);
     genericParam->setCheckedInheritanceClause();
@@ -2513,7 +2523,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto assocType = createDecl<AssociatedTypeDecl>(DC.get(), SourceLoc(),
                                                     getIdentifier(nameID),
@@ -2523,9 +2533,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto archetypeOrError = getType(archetypeID);
     if (!archetypeOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return archetypeOrError.takeError();
+      assocType->setInvalid();
+      declOrOffset = persist(archetypeOrError.takeError());
+      return declOrOffset.getError();
     }
     assocType->setArchetype(archetypeOrError.get()->castTo<ArchetypeType>());
     assocType->computeType();
@@ -2545,9 +2555,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       loc.setType(typeOrError.get());
     });
     if (error) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return error;
+      assocType->setInvalid();
+      declOrOffset = persist(error);
+      return declOrOffset.getError();
     }
     assocType->setInherited(inherited);
 
@@ -2572,11 +2582,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto genericParams = maybeReadGenericParams(DC.get());
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto theStruct = createDecl<StructDecl>(SourceLoc(), getIdentifier(nameID),
                                             SourceLoc(), None, genericParams,
@@ -2595,9 +2605,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto sigOrError = maybeReadGenericSignature();
     if (!sigOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return sigOrError.takeError();
+      theStruct->setInvalid();
+      declOrOffset = persist(sigOrError.takeError());
+      return declOrOffset.getError();
     }
 
     GenericSignature *sig;
@@ -2642,11 +2652,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!parent)
       return parent.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto *genericParams = maybeReadGenericParams(parent.get());
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     auto genericEnv = readGenericEnvironment(genericParamTypes, DeclTypeCursor);
@@ -2687,9 +2697,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto bodyParams1 = readParameterList();
     if (!bodyParams1) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return bodyParams1.takeError();
+      ctor->setInvalid();
+      declOrOffset = persist(bodyParams1.takeError());
+      return declOrOffset.getError();
     }
     assert(bodyParams0 && bodyParams1 && "missing parameters for constructor");
     bodyParams0->get(0)->setImplicit();  // self is implicit.
@@ -2701,17 +2711,17 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto typeOrError = getType(signatureID);
     if (!typeOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return typeOrError.takeError();
+      ctor->setInvalid();
+      declOrOffset = persist(typeOrError.takeError());
+      return declOrOffset.getError();
     }
     ctor->setType(typeOrError.get());
 
     auto interfaceType = getType(interfaceID);
     if (!interfaceType) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return interfaceType.takeError();
+      ctor->setInvalid();
+      declOrOffset = persist(interfaceType.takeError());
+      return declOrOffset.getError();
     }
     if (interfaceType.get()) {
       if (auto genericFnType=interfaceType.get()->getAs<GenericFunctionType>())
@@ -2776,13 +2786,13 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return DC.takeError();
 
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto type = getType(typeID);
     if (!type)
       return type.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto interfaceType = getType(interfaceTypeID);
     if (!interfaceType)
@@ -2807,10 +2817,10 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                          materializeForSetID, addressorID,
                                          mutableAddressorID,
                                          willSetID, didSetID);
-    if (!storageError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return storageError;
+    if (storageError) {
+      var->setInvalid();
+      declOrOffset = persist(storageError);
+      return declOrOffset.getError();
     }
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -2854,13 +2864,13 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto type = getType(typeID);
     if (!type)
       return type.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto interfaceType = getType(interfaceTypeID);
     if (!interfaceType)
@@ -2912,7 +2922,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
@@ -2931,7 +2941,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto associated = getDecl(associatedDeclID);
     if (!associated)
@@ -2991,17 +3001,17 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     // its generic parameters.
     auto typeOrError = getType(signatureID);
     if (!typeOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return typeOrError.takeError();
+      fn->setInvalid();
+      declOrOffset = persist(typeOrError.takeError());
+      return declOrOffset.getError();
     }
     fn->setType(typeOrError.get());
 
     auto interfaceType = getType(interfaceTypeID);
     if (!interfaceType) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return interfaceType.takeError();
+      fn->setInvalid();
+      declOrOffset = persist(interfaceType.takeError());
+      return declOrOffset.getError();
     }
     if (interfaceType.get()) {
       if (auto genericFnType=interfaceType.get()->getAs<GenericFunctionType>())
@@ -3015,9 +3025,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (unsigned i = 0, e = numParamPatterns; i != e; ++i) {
       auto paramList = readParameterList();
       if (!paramList) {
-        // FIXME: declOrOffset has already been set. We need to either reset it
-        // or store the error there.
-        return paramList.takeError();
+        fn->setInvalid();
+        declOrOffset = persist(paramList.takeError());
+        return declOrOffset.getError();
       }
 
       paramLists.push_back(paramList.get());
@@ -3070,21 +3080,14 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
 
-    SmallVector<std::pair<Pattern *, DeclContext *>, 2> patterns;
+    SmallVector<Pattern *, 2> patterns;
     patterns.reserve(numPatterns);
     for (unsigned i = 0; i != numPatterns; ++i) {
       auto nextPattern = maybeReadPattern();
       if (!nextPattern)
         return nextPattern.takeError();
 
-      DeclContext *initContext = nullptr;
-      if (!initContextIDs.empty()) {
-        auto initContextOrError = getDeclContext(initContextIDs[i]);
-        if (!initContextOrError)
-          return initContextOrError.takeError();
-        initContext = initContextOrError.get();
-      }
-      patterns.push_back({nextPattern.get(), initContext});
+      patterns.push_back(nextPattern.get());
       assert(nextPattern.get());
     }
 
@@ -3107,8 +3110,19 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       binding->setImplicit();
 
-    for (unsigned i = 0; i != numPatterns; ++i)
-      binding->setPattern(i, patterns[i].first, patterns[i].second);
+    for (unsigned i = 0; i != numPatterns; ++i) {
+      DeclContext *initContext = nullptr;
+      if (!initContextIDs.empty()) {
+        auto initContextOrError = getDeclContext(initContextIDs[i]);
+        if (!initContextOrError) {
+          binding->setInvalid();
+          declOrOffset = persist(initContextOrError.takeError());
+          return declOrOffset.getError();
+        }
+        initContext = initContextOrError.get();
+      }
+      binding->setPattern(i, patterns[i], initContext);
+    }
 
     break;
   }
@@ -3131,7 +3145,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto proto = createDecl<ProtocolDecl>(DC.get(), SourceLoc(), SourceLoc(),
                                           getIdentifier(nameID), None);
@@ -3159,9 +3173,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       p = cast<ProtocolDecl>(next.get());
     });
     if (error) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return error;
+      proto->setInvalid();
+      declOrOffset = persist(error);
+      return declOrOffset.getError();
     }
     proto->setInheritedProtocols(protocols);
 
@@ -3172,9 +3186,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto sigOrError = maybeReadGenericSignature();
     if (!sigOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return sigOrError.takeError();
+      proto->setInvalid();
+      declOrOffset = persist(sigOrError.takeError());
+      return declOrOffset.getError();
     }
 
     GenericSignature *sig;
@@ -3341,15 +3355,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
-
-    auto superclassTy = getType(superclassID);
-    if (!superclassTy)
-      return superclassTy.takeError();
+      return declOrOffset.getAsExpected();
 
     auto genericParams = maybeReadGenericParams(DC.get());
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto theClass = createDecl<ClassDecl>(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), None, genericParams,
@@ -3366,15 +3376,23 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
       theClass->setImplicit();
+
+    auto superclassTy = getType(superclassID);
+    if (!superclassTy) {
+      theClass->setInvalid();
+      declOrOffset = persist(superclassTy.takeError());
+      return declOrOffset.getError();
+    }
     theClass->setSuperclass(superclassTy.get());
+
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
 
     auto sigOrError = maybeReadGenericSignature();
     if (!sigOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return sigOrError.takeError();
+      theClass->setInvalid();
+      declOrOffset = persist(sigOrError.takeError());
+      return declOrOffset.getError();
     }
 
     GenericSignature *sig;
@@ -3418,11 +3436,11 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto genericParams = maybeReadGenericParams(DC.get());
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto rawType = getType(rawTypeID);
     if (!rawType)
@@ -3447,9 +3465,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto sigOrError = maybeReadGenericSignature();
     if (!sigOrError) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return sigOrError.takeError();
+      theEnum->setInvalid();
+      declOrOffset = persist(sigOrError.takeError());
+      return declOrOffset.getError();
     }
 
     GenericSignature *sig;
@@ -3490,13 +3508,13 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto argTy = getType(argTypeID);
     if (!argTy)
       return argTy.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto typeOrError = getType(ctorTypeID);
     if (!typeOrError)
@@ -3566,7 +3584,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto elementTy = getType(elemTypeID);
     if (!elementTy)
@@ -3597,9 +3615,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto indices = readParameterList();
     if (!indices) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return indices.takeError();
+      subscript->setInvalid();
+      declOrOffset = persist(indices.takeError());
+      return declOrOffset.getError();
     }
 
     subscript->setIndices(indices.get());
@@ -3610,9 +3628,9 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        addressorID, mutableAddressorID,
                                        willSetID, didSetID);
     if (error) {
-      // FIXME: declOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return error;
+      subscript->setInvalid();
+      declOrOffset = persist(error);
+      return declOrOffset.getError();
     }
 
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
@@ -3658,13 +3676,13 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto baseTy = getType(baseID);
     if (!baseTy)
       return baseTy.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     GenericParamList *genericParams = maybeReadGenericParams(DC.get());
     auto sigOrError = maybeReadGenericSignature();
@@ -3735,7 +3753,7 @@ ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!DC)
       return DC.takeError();
     if (declOrOffset.isComplete())
-      return declOrOffset.get();
+      return declOrOffset.getAsExpected();
 
     auto dtor = createDecl<DestructorDecl>(ctx.Id_deinit, SourceLoc(),
                                            /*selfpat*/nullptr, DC.get());
@@ -3894,7 +3912,7 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
   auto &typeOrOffset = Types[TID-1];
 
   if (typeOrOffset.isComplete())
-    return typeOrOffset.get();
+    return typeOrOffset.getAsExpected();
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(typeOrOffset);
@@ -4182,7 +4200,7 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
 
     // See if we triggered deserialization through our conformances.
     if (typeOrOffset.isComplete())
-      break;
+      return typeOrOffset.getAsExpected();
 
     auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeOrProto,
                                            getIdentifier(nameID), conformances,
@@ -4259,9 +4277,8 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
       nestedTypes.push_back(std::make_pair(getIdentifier(nameID), nestedTy));
     });
     if (error) {
-      // FIXME: typeOrOffset has already been set. We need to either reset it
-      // or store the error there.
-      return error;
+      typeOrOffset = persist(error);
+      return typeOrOffset.getError();
     }
     archetype->setNestedTypes(ctx, nestedTypes);
 
@@ -4296,7 +4313,7 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
 
       // See if we triggered deserialization through our conformances.
       if (typeOrOffset.isComplete())
-        break;
+        return typeOrOffset.getAsExpected();
 
       typeOrOffset =
           cast<GenericTypeParamDecl>(genericParam.get())->getDeclaredType();
@@ -4318,7 +4335,7 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
 
     // See if we triggered deserialization through our conformances.
     if (typeOrOffset.isComplete())
-      break;
+      return typeOrOffset.getAsExpected();
 
     typeOrOffset =
         cast<AssociatedTypeDecl>(assocTypeDecl.get())->getDeclaredType();
@@ -4720,7 +4737,8 @@ Expected<Type> ModuleFile::getType(TypeID TID) {
   }
 
   // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset);
+  assert(!typeOrOffset.isError());
+  DeserializedTypeCallback(typeOrOffset.get());
 
   return typeOrOffset.get();
 }
