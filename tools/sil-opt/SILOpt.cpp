@@ -167,6 +167,9 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
     PM.addPass(Pass);
   }
   PM.run();
+
+  if (Module->getOptions().VerifyAll)
+    Module->verify();
 }
 
 // This function isn't referenced outside its translation unit, but it
