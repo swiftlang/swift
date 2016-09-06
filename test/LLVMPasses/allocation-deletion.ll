@@ -81,4 +81,19 @@ entry:
 ; CHECK-NEXT: ret void
 
 
+; external_dtor_alloc_eliminate -  Make sure we can not eliminate the allocation
+; because we know nothing about the type of the allocation.
+@external_dtor_metadata = external global %swift.heapmetadata, align 8
+define void @external_dtor_alloc_eliminate() nounwind {
+entry:
+  %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* nonnull @external_dtor_metadata, i64 24, i64 8) nounwind
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  ret void
+}
+
+; CHECK: @external_dtor_alloc_eliminate
+; CHECK-NEXT: entry:
+; CHECK-NEXT: swift_allocObject
+; CHECK-NEXT: swift_release
+; CHECK-NEXT: ret void
 
