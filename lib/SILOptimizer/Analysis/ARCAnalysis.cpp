@@ -1301,7 +1301,7 @@ bool EpilogueARCContext::computeEpilogueARC() {
     for (auto I = B->rbegin(), E = B->rend(); I != E; ++I) {
       // This is a transition from 1 to 0 due to an interested instruction.
       if (isInterestedInstruction(&*I)) {
-        EpilogueARCInsts.push_back(&*I);
+        EpilogueARCInsts.insert(&*I);
         break;
       }
       // This is a transition from 1 to 0 due to a blocking instruction.
@@ -1313,7 +1313,7 @@ bool EpilogueARCContext::computeEpilogueARC() {
   return true;
 }
 
-llvm::SmallVector<SILInstruction *, 1>
+llvm::SmallSetVector<SILInstruction *, 1>
 swift::computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
                                       SILValue Arg, SILFunction *F,
                                       PostOrderFunctionInfo *PO, AliasAnalysis *AA,
