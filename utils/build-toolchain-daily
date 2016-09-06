@@ -1,3 +1,2 @@
 #!/bin/bash
-echo it is working
 /home/amr/swift/swift/utils/build-toolchain-manually -c
