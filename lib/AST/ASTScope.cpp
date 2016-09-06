@@ -1568,7 +1568,7 @@ DeclContext *ASTScope::getDeclContext() const {
 
   case ASTScopeKind::Accessors:
     // FIXME: Somewhat odd modeling because Subscripts don't have their
-    // own nodes. Maybe that should.
+    // own nodes. Maybe they should.
     if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
       return subscript;
 

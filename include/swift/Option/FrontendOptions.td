@@ -102,6 +102,9 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
 
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
