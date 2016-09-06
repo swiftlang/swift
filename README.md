@@ -58,7 +58,7 @@ For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloa
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-gnutls-dev postfix
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -70,7 +70,7 @@ compiler for C++14 support and create a symlink:
     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
 
-If you are building in a Virtual Machine, then make sure to setup memory to be at least 4GB and Disk space to be at least 80GB
+If you are building in a Virtual Machine, then make sure to setup memory to be at least 2GB and Disk space to be at least 20GB
 
 ### Getting Sources for Swift and Related Projects
 
