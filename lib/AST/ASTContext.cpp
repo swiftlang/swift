@@ -22,8 +22,8 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
@@ -257,12 +257,6 @@ struct ASTContext::Implementation {
   /// Conformance loaders for declarations that have them.
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
-
-  /// \brief A cached unused pattern-binding initializer context.
-  PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
-
-  /// \brief A cached unused default-argument initializer context.
-  DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
 
   /// Mapping from archetypes with lazily-resolved nested types to the
   /// archetype builder and potential archetype corresponding to that
@@ -801,9 +795,9 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // There must be a generic type with one argument.
   NominalTypeDecl *nominal = (ctx.*getNominal)();
   if (!nominal) return nullptr;
-  auto generics = nominal->getGenericParams();
-  if (!generics) return nullptr;
-  if (generics->size() != 1) return nullptr;
+  auto sig = nominal->getGenericSignature();
+  if (!sig) return nullptr;
+  if (sig->getGenericParams().size() != 1) return nullptr;
 
   // There must be a property named "pointee".
   auto identifier = ctx.getIdentifier("pointee");
@@ -813,7 +807,7 @@ static VarDecl *getPointeeProperty(VarDecl *&cache,
   // The property must have type T.
   VarDecl *property = dyn_cast<VarDecl>(results[0]);
   if (!property) return nullptr;
-  if (!property->getType()->isEqual(generics->getPrimaryArchetypes()[0]))
+  if (!property->getInterfaceType()->isEqual(sig->getGenericParams()[0]))
     return nullptr;
 
   cache = property;
@@ -1560,38 +1554,6 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
     return;
   }
   getASTContext().Impl.LocalDiscriminators.insert({this, index});
-}
-
-PatternBindingInitializer *
-ASTContext::createPatternBindingContext(DeclContext *parent) {
-  // Check for an existing context we can re-use.
-  if (auto existing = Impl.UnusedPatternBindingContext) {
-    Impl.UnusedPatternBindingContext = nullptr;
-    existing->reset(parent);
-    return existing;
-  }
-
-  return new (*this) PatternBindingInitializer(parent);
-}
-void ASTContext::destroyPatternBindingContext(PatternBindingInitializer *DC) {
-  // There isn't much value in caching more than one of these.
-  Impl.UnusedPatternBindingContext = DC;
-}
-
-DefaultArgumentInitializer *
-ASTContext::createDefaultArgumentContext(DeclContext *fn, unsigned index) {
-  // Check for an existing context we can re-use.
-  if (auto existing = Impl.UnusedDefaultArgumentContext) {
-    Impl.UnusedDefaultArgumentContext = nullptr;
-    existing->reset(fn, index);
-    return existing;
-  }
-
-  return new (*this) DefaultArgumentInitializer(fn, index);
-}
-void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
-  // There isn't much value in caching more than one of these.
-  Impl.UnusedDefaultArgumentContext = DC;
 }
 
 NormalProtocolConformance *
@@ -2598,6 +2560,10 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
                                       llvm::raw_ostream &os,
                                       unsigned indent) const {
+  archetype = archetype->getPrimary();
+  if (!archetype)
+    return;
+
   auto knownDC = ArchetypeContexts.find(archetype);
   if (knownDC != ArchetypeContexts.end())
     knownDC->second->printContext(os, indent);
@@ -3677,15 +3643,6 @@ CanType ArchetypeType::getAnyOpened(Type existential) {
   return ArchetypeType::getOpened(existential);
 }
 
-void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
-                            unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
-  return new (Context) ExprHandle(E);
-}
-
 void TypeLoc::setInvalidType(ASTContext &C) {
   TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
 }
@@ -3750,8 +3707,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         bool isKnownCanonical) {
-  if (params.empty() && requirements.empty())
-    return nullptr;
+  assert(!params.empty());
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
@@ -3775,6 +3731,12 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                            isKnownCanonical);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
+}
+
+GenericEnvironment *
+GenericEnvironment::get(ASTContext &ctx,
+                        TypeSubstitutionMap interfaceToArchetypeMap) {
+  return new (ctx) GenericEnvironment(interfaceToArchetypeMap);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
@@ -3995,44 +3957,12 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal->getName() == Id_CGFloat);
 }
 
-Optional<Type>
-ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
-                             LazyResolver *resolver,
-                             Type *bridgedValueType) const {
+Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
+                                  Type *bridgedValueType) const {
   if (type->isBridgeableObjectType()) {
     if (bridgedValueType) *bridgedValueType = type;
 
     return type;
-  }
-
-  // Whitelist certain types even if Foundation is not imported, to ensure
-  // that casts from AnyObject to one of these types are not optimized away.
-  //
-  // Outside of these standard library types to which Foundation
-  // bridges, an _ObjectiveCBridgeable conformance can only be added
-  // in the same module where the Swift type itself is defined, so the
-  // optimizer will be guaranteed to see the conformance if it exists.
-  bool knownBridgedToObjC = false;
-  if (auto ntd = type->getAnyNominal())
-    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
-
-  // TODO: Under id-as-any, container bridging is unconstrained. This check can
-  // go away.
-  if (!LangOpts.EnableIdAsAny) {
-    // If the type is generic, check whether its generic arguments are also
-    // bridged to Objective-C.
-    if (auto bgt = type->getAs<BoundGenericType>()) {
-      for (auto arg : bgt->getGenericArgs()) {
-        if (arg->hasTypeVariable())
-          continue;
-
-        if (!getBridgedToObjC(dc, arg, resolver))
-          return None;
-      }
-    }
-  } else {
-    // Under id-as-any, anything is bridged to objective c.
-    knownBridgedToObjC = true;
   }
 
   if (auto metaTy = type->getAs<MetatypeType>())
@@ -4062,7 +3992,8 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       auto proto = getProtocol(known);
       if (!proto) return None;
 
-      return dc->getParentModule()->lookupConformance(type, proto, resolver);
+      return dc->getParentModule()->lookupConformance(type, proto,
+                                                      getLazyResolver());
     };
 
   // Do we conform to _ObjectiveCBridgeable?
@@ -4076,7 +4007,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     if (conformance->isConcrete()) {
       return ProtocolConformance::getTypeWitnessByName(
                type, conformance->getConcrete(), Id_ObjectiveCType,
-               resolver);
+               getLazyResolver());
     } else {
       return type->castTo<ArchetypeType>()->getNestedType(Id_ObjectiveCType)
         .getValue();
@@ -4094,12 +4025,8 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       return nsErrorDecl->getDeclaredInterfaceType();
   }
 
-
-  // If we haven't imported Foundation but this is a whitelisted type,
-  // behave as above.
-  if (knownBridgedToObjC)
-    return Type();
-  return None;
+  // No special bridging to Objective-C, but this can become an 'Any'.
+  return Type();
 }
 
 std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>

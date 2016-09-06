@@ -16,9 +16,11 @@
 /// `RandomAccessCollection` protocol instead, because it has a more complete
 /// interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public protocol RandomAccessIndexable : BidirectionalIndexable {
+public typealias RandomAccessIndexable = _RandomAccessIndexable
+public protocol _RandomAccessIndexable : _BidirectionalIndexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library.
@@ -45,21 +47,40 @@ public protocol RandomAccessIndexable : BidirectionalIndexable {
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection :
-  RandomAccessIndexable, BidirectionalCollection
+  _RandomAccessIndexable, BidirectionalCollection
 {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : RandomAccessIndexable, BidirectionalCollection
+  associatedtype SubSequence : _RandomAccessIndexable, BidirectionalCollection
     = RandomAccessSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : RandomAccessCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : RandomAccessIndexable, BidirectionalCollection
+  associatedtype Indices : _RandomAccessIndexable, BidirectionalCollection
     = DefaultRandomAccessIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : RandomAccessCollection
+
+  /// The indices that are valid for subscripting the collection, in ascending
+  /// order.
+  ///
+  /// A collection's `indices` property can hold a strong reference to the
+  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// If you mutate the collection while iterating over its indices, a strong
+  /// reference can cause an unexpected copy of the collection. To avoid the
+  /// unexpected copy, use the `index(after:)` method starting with
+  /// `startIndex` to produce indices instead.
+  ///
+  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
+  ///     var i = c.startIndex
+  ///     while i != c.endIndex {
+  ///         c[i] /= 5
+  ///         i = c.index(after: i)
+  ///     }
+  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  var indices: Indices { get }
 }
 
 /// Supply the default "slicing" `subscript` for `RandomAccessCollection`
@@ -102,7 +123,7 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
 // wrong complexity.
 
 /// Default implementation for random access collections.
-extension RandomAccessIndexable {
+extension _RandomAccessIndexable {
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
   ///

@@ -133,6 +133,10 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
+def tools_directory : Separate<["-"], "tools-directory">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Look for external executables (ld, clang, binutils) in <directory>">, MetaVarName<"<directory>">;
+
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
@@ -169,6 +173,9 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
 
 def save_temps : Flag<["-"], "save-temps">, Flags<[NoInteractiveOption]>,
   HelpText<"Save intermediate compilation results">;
+def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Prints the total time it took to execute all compilation tasks">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -233,6 +240,10 @@ def suppress_warnings : Flag<["-"], "suppress-warnings">,
 def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Treat warnings as errors">;
+
+def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Continue building, even after errors are encountered">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
@@ -411,6 +422,11 @@ def dump_parse : Flag<["-"], "dump-parse">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
+  HelpText<"Parse and type-check input file(s) and dump the scope map(s)">,
+  MetaVarName<"<expanded-or-list-of-line:column>">,
+  ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_refinement_contexts :
   Flag<["-"], "dump-type-refinement-contexts">,

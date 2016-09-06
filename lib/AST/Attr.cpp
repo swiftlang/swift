@@ -319,9 +319,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName());
     } else {
-      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-      Printer.printAttrName(getAttrName(), /*needAt=*/true);
-      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
@@ -412,33 +410,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
     Printer.printAttrName("@_swift_native_objc_runtime_base");
     Printer << "(" << attr->BaseClassName.str() << ")";
-    break;
-  }
-
-  case DAK_Swift3Migration: {
-    auto attr = cast<Swift3MigrationAttr>(this);
-    Printer.printAttrName("@swift3_migration");
-    Printer << "(";
-
-    bool printedAny = false;
-    auto printSeparator = [&] {
-      if (printedAny) Printer << ", ";
-      else printedAny = true;
-    };
-
-    if (attr->getRenamed()) {
-      printSeparator();
-      Printer << "renamed: \"" << attr->getRenamed() << "\"";
-    }
-
-    if (!attr->getMessage().empty()) {
-      printSeparator();
-      Printer << "message: \"";
-      Printer << attr->getMessage();
-      Printer << "\"";
-    }
-
-    Printer << ")";
     break;
   }
 
@@ -564,8 +535,6 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DAK_SynthesizedProtocol:
     return "<<synthesized protocol>>";
-  case DAK_Swift3Migration:
-    return "swift3_migration";
   case DAK_Specialize:
     return "_specialize";
   }

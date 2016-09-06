@@ -315,6 +315,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
+  auto languageVersion = swift::version::Version::getCurrentLanguageVersion();
+
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
   invocationArgStrs.insert(
@@ -332,6 +334,11 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
           // Don't emit LLVM IR.
           "-fsyntax-only",
 
+          // Enable block support.
+          "-fblocks",
+
+          languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
+
           "-fretain-comments-from-system-headers",
 
           SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
@@ -341,7 +348,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
       // Darwin uses Objective-C ARC.
-      "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fblocks",
+      "-x", "objective-c", "-std=gnu11", "-fobjc-arc",
 
       // Define macros that Swift bridging headers use.
       "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
@@ -393,7 +400,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     auto V = version::Version::getCurrentCompilerVersion();
     if (!V.empty()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {
-        V.preprocessorDefinition(),
+        V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
+                                 {1000000000, /*ignored*/0, 1000000, 1000, 1}),
       });
     }
   } else {
@@ -2563,6 +2571,11 @@ auto ClangImporter::Implementation::importFullName(
         result.AccessorKind = ImportedAccessorKind::PropertyGetter;
       else if (inference.isSetter())
         result.AccessorKind = ImportedAccessorKind::PropertySetter;
+
+      // Inits are factory. These C functions are neither convenience nor
+      // designated, as they return a fully formed object of that type.
+      if (inference.isInit())
+        result.InitKind = CtorInitializerKind::Factory;
 
       return result;
     }

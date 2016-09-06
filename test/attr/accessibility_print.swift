@@ -122,9 +122,9 @@ public enum DC_PublicEnum {
 private protocol EA_PrivateProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: internal var Bar
+  // CHECK: fileprivate var Bar
   var Bar: Int { get }
-  // CHECK: internal func baz()
+  // CHECK: fileprivate func baz()
   func baz()
 } // CHECK: {{^[}]}}
 

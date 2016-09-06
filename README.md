@@ -25,9 +25,7 @@ modules, eliminating the need for headers and the code duplication they entail.
 To read the documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
 
-`easy_install -U Sphinx==1.3.4`
-
-More recent versions are currently **not supported.**
+`easy_install -U Sphinx`
 
 Once complete, you can build the Swift documentation by changing directory into
 [docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs) directory
@@ -58,7 +56,7 @@ For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloa
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-gnutls-dev postfix
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev postfix
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.

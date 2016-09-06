@@ -241,8 +241,11 @@ private:
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
 
+  /// Writes a generic parameter list.
+  bool writeGenericParams(const GenericParamList *genericParams);
+
   /// Writes a set of generic requirements.
-  void writeRequirements(ArrayRef<Requirement> requirements);
+  void writeGenericRequirements(ArrayRef<Requirement> requirements);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -290,7 +293,8 @@ private:
   void writeLocalDeclContext(const DeclContext *DC);
 
   /// Write the components of a PatternBindingInitializer as a local context.
-  void writePatternBindingInitializer(PatternBindingDecl *binding);
+  void writePatternBindingInitializer(PatternBindingDecl *binding,
+                                      unsigned bindingIndex);
 
   /// Write the components of a DefaultArgumentInitializer as a local context.
   void writeDefaultArgumentInitializer(const DeclContext *parentContext, unsigned index);
@@ -411,9 +415,10 @@ public:
   void writeConformance(ProtocolConformance *conformance,
                         const std::array<unsigned, 256> &abbrCodes);
 
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams,
-                          const std::array<unsigned, 256> &abbrCodes);
+  /// Writes a generic environment.
+  void writeGenericEnvironment(GenericSignature *sig,
+                               GenericEnvironment *env,
+                         const std::array<unsigned, 256> &abbrCodes);
 
 };
 } // end namespace serialization

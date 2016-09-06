@@ -23,6 +23,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -1037,6 +1039,19 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   return addErrorDomain(swiftDecl, clangNamedDecl, importer);
 }
 
+/// Determine whether this is the declaration of Objective-C's 'id' type.
+static bool isObjCId(ASTContext &ctx, const clang::Decl *decl) {
+  if (!ctx.LangOpts.EnableObjCInterop) return false;
+
+  auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
+  if (!typedefDecl) return false;
+
+  if (!typedefDecl->getDeclContext()->getRedeclContext()->isTranslationUnit())
+    return false;
+
+  return typedefDecl->getName() == "id";
+}
+
 namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
@@ -1352,12 +1367,14 @@ namespace {
       // Handle generic types.
       GenericParamList *genericParams = nullptr;
       GenericSignature *genericSig = nullptr;
+      GenericEnvironment *genericEnv = nullptr;
       auto underlyingType = typeDecl->getDeclaredInterfaceType();
 
       if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
         if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
           genericParams = generic->getGenericParams();
           genericSig = generic->getGenericSignature();
+          genericEnv = generic->getGenericEnvironment();
 
           underlyingType = ArchetypeBuilder::mapTypeIntoContext(
               generic, underlyingType);
@@ -1382,6 +1399,7 @@ namespace {
                      genericParams, dc);
       alias->computeType();
       alias->setGenericSignature(genericSig);
+      alias->setGenericEnvironment(genericEnv);
 
       // Record that this is the Swift 2 version of this declaration.
       Impl.ImportedDecls[{decl->getCanonicalDecl(), true}] = alias;
@@ -1532,36 +1550,6 @@ namespace {
 
       Type SwiftType;
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
-        // Ignore the 'id' typedef. We want to bridge the underlying
-        // ObjCId type.
-        //
-        // When we remove the EnableIdAsAny staging flag, the 'id' entry
-        // should be removed from MappedTypes.def, and this conditional should
-        // become unnecessary.
-        if (Name.str() == "id" && Impl.SwiftContext.LangOpts.EnableIdAsAny) {
-          Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
-              MappedTypeNameKind::DoNothing;
-
-          auto DC = Impl.importDeclContextOf(Decl, importedName.EffectiveContext);
-          if (!DC) return nullptr;
-
-          auto loc = Impl.importSourceLoc(Decl->getLocStart());
-          
-          // Leave behind a typealias for 'id' marked unavailable, to instruct
-          // people to use Any instead.
-          auto unavailableAlias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                          Decl, Accessibility::Public, loc, Name, loc,
-                          TypeLoc::withoutLoc(Impl.SwiftContext.TheAnyType),
-                          /*genericparams*/nullptr, DC);
-
-          auto attr = AvailableAttr::createUnconditional(
-                        Impl.SwiftContext, "'id' is not available in Swift; use 'Any'",
-                        "", UnconditionalAvailabilityKind::UnavailableInSwift);
-
-          unavailableAlias->getAttrs().add(attr);
-          return nullptr;
-        }
-      
         bool IsError;
         StringRef StdlibTypeName;
         MappedTypeNameKind NameMapping;
@@ -1714,6 +1702,17 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       /*genericparams*/nullptr, DC);
       Result->computeType();
+
+      // Make Objective-C's 'id' unavailable.
+      ASTContext &ctx = DC->getASTContext();
+      if (isObjCId(ctx, Decl)) {
+        auto attr = AvailableAttr::createUnconditional(
+                      ctx,
+                      "'id' is not available in Swift; use 'Any'", "",
+                      UnconditionalAvailabilityKind::UnavailableInSwift);
+        Result->getAttrs().add(attr);
+      }
+
       return Result;
     }
 
@@ -3139,6 +3138,7 @@ namespace {
       result->setType(fnType);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setBodyResultType(swiftResultTy);
       result->setAccessibility(Accessibility::Public);
@@ -3918,6 +3918,7 @@ namespace {
       result->setType(type);
       result->setInterfaceType(interfaceType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4392,6 +4393,7 @@ namespace {
       result->setInitializerInterfaceType(interfaceInitType);
       result->setInterfaceType(interfaceAllocType);
       result->setGenericSignature(dc->getGenericSignatureOfContext());
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
       result->setType(allocType);
 
@@ -4529,6 +4531,8 @@ namespace {
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
       thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
@@ -4600,6 +4604,8 @@ namespace {
       thunk->setBodyResultType(TupleType::getEmpty(C));
       thunk->setInterfaceType(interfaceType);
       thunk->setGenericSignature(dc->getGenericSignatureOfContext());
+      thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
       thunk->setAccessibility(getOverridableAccessibility(dc));
 
       auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
@@ -5149,25 +5155,24 @@ namespace {
             Impl.importSourceLoc(typeParamList->getRAngleLoc()));
     }
 
-    // Calculate the generic signature for the given imported generic param
-    // list. If there are any errors in doing so, return 'nullptr'.
-    GenericSignature *calculateGenericSignature(GenericParamList *genericParams,
-                                                DeclContext *dc) {
+    // Calculate the generic signature and interface type to archetype mapping
+    // from an imported generic param list.
+    std::pair<GenericSignature *, GenericEnvironment *>
+    calculateGenericSignature(GenericParamList *genericParams,
+                              DeclContext *dc) {
       ArchetypeBuilder builder(*dc->getParentModule(), Impl.SwiftContext.Diags);
+      for (auto param : *genericParams)
+        builder.addGenericParameter(param);
       for (auto param : *genericParams) {
-        if (builder.addGenericParameter(param)) {
-          return nullptr;
-        }
-      }
-      for (auto param : *genericParams) {
-        if (builder.addGenericParameterRequirements(param)) {
-          return nullptr;
-        }
+        bool result = builder.addGenericParameterRequirements(param);
+        assert(!result);
+        (void) result;
       }
       // TODO: any need to infer requirements?
-      if (builder.finalize(genericParams->getSourceRange().Start)) {
-        return nullptr;
-      }
+      bool result = builder.finalize(genericParams->getSourceRange().Start);
+      assert(!result);
+      (void) result;
+
       SmallVector<GenericTypeParamType *, 4> genericParamTypes;
       for (auto param : *genericParams) {
         genericParamTypes.push_back(
@@ -5175,10 +5180,11 @@ namespace {
         auto *archetype = builder.getArchetype(param);
         param->setArchetype(archetype);
       }
-      genericParams->setAllArchetypes(
-          Impl.SwiftContext.AllocateCopy(builder.getAllArchetypes()));
 
-      return builder.getGenericSignature(genericParamTypes);
+      auto *sig = builder.getGenericSignature(genericParamTypes);
+      auto *env = builder.getGenericEnvironment(genericParamTypes);
+
+      return std::make_pair(sig, env);
     }
 
     /// Import members of the given Objective-C container and add them to the
@@ -5516,11 +5522,14 @@ namespace {
         auto genericParams = GenericParamList::create(Impl.SwiftContext,
             SourceLoc(), toGenericParams, SourceLoc());
         result->setGenericParams(genericParams);
-        if (auto sig = calculateGenericSignature(genericParams, result)) {
-          result->setGenericSignature(sig);
-        } else {
-          return nullptr;
-        }
+
+        GenericSignature *sig;
+        GenericEnvironment *env;
+        std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+        result->setGenericSignature(sig);
+        result->setGenericEnvironment(env);
+
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
         for (auto gp : *genericParams) {
@@ -5678,12 +5687,6 @@ namespace {
                                                  Type(result->getDeclaredType()),
                                                  Type(), false);
       selfDecl->setArchetype(selfArchetype);
-
-      // Set AllArchetypes of the protocol. ObjC protocols don't have associated
-      // types so only the Self archetype is present.
-      
-      result->getGenericParams()->setAllArchetypes(
-             Impl.SwiftContext.AllocateCopy(llvm::makeArrayRef(selfArchetype)));
       
       // Set the generic parameters and requirements.
       auto genericParam = selfDecl->getDeclaredType()
@@ -5695,6 +5698,15 @@ namespace {
       };
       auto sig = GenericSignature::get(genericParam, genericRequirements);
       result->setGenericSignature(sig);
+
+      TypeSubstitutionMap interfaceToArchetypeMap;
+
+      auto paramTy = selfDecl->getDeclaredType()->getCanonicalType();
+      interfaceToArchetypeMap[paramTy.getPointer()] = selfArchetype;
+
+      auto *env =
+          GenericEnvironment::get(Impl.SwiftContext, interfaceToArchetypeMap);
+      result->setGenericEnvironment(env);
 
       result->setCircularityCheck(CircularityCheck::Checked);
 
@@ -5827,11 +5839,13 @@ namespace {
         auto genericParams = *gpImportResult;
         if (genericParams) {
           result->setGenericParams(genericParams);
-          if (auto sig = calculateGenericSignature(genericParams, result)) {
-            result->setGenericSignature(sig);
-          } else {
-            return nullptr;
-          }
+
+          GenericSignature *sig;
+          GenericEnvironment *env;
+          std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+
+          result->setGenericSignature(sig);
+          result->setGenericEnvironment(env);
         }
       } else {
         return nullptr;
@@ -6495,6 +6509,9 @@ void ClangImporter::Implementation::importAttributes(
 
 bool ClangImporter::Implementation::isUnavailableInSwift(
     const clang::Decl *decl) {
+  // 'id' is always unavailable in Swift.
+  if (isObjCId(SwiftContext, decl)) return true;
+
   // FIXME: Somewhat duplicated from importAttributes(), but this is a
   // more direct path.
   if (decl->getAvailability() == clang::AR_Unavailable) return true;
@@ -6973,8 +6990,6 @@ ClangImporter::Implementation::importDeclContextOf(
         conformsTo, protoArchetype->getSuperclass(),
         protoArchetype->getIsRecursive());
     extSelf->setArchetype(extSelfArchetype);
-    ext->getGenericParams()->setAllArchetypes(
-        SwiftContext.AllocateCopy(llvm::makeArrayRef(extSelfArchetype)));
 
     auto genericParam =
         extSelf->getDeclaredType()->castTo<GenericTypeParamType>();
@@ -6982,8 +6997,17 @@ ClangImporter::Implementation::importDeclContextOf(
         Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
         Requirement(RequirementKind::Conformance, genericParam,
                     protoDecl->getDeclaredType())};
-    auto sig = GenericSignature::get(genericParam, genericRequirements);
+    auto *sig = GenericSignature::get(genericParam, genericRequirements);
     ext->setGenericSignature(sig);
+
+    TypeSubstitutionMap interfaceToArchetypeMap;
+
+    auto paramTy = extSelf->getDeclaredType()->getCanonicalType();
+    interfaceToArchetypeMap[paramTy.getPointer()] = extSelfArchetype;
+
+    auto *env =
+        GenericEnvironment::get(SwiftContext, interfaceToArchetypeMap);
+    ext->setGenericEnvironment(env);
   }
 
   // Add the extension to the nominal type.

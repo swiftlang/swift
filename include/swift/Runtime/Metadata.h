@@ -134,6 +134,7 @@ using TargetFarRelativeIndirectablePointer
   = typename Runtime::template FarRelativeIndirectablePointer<Pointee,Nullable>;
 
 struct HeapObject;
+struct WeakReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -1568,10 +1569,21 @@ struct TargetClassMetadata : public TargetHeapMetadata<Runtime> {
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
       Description(nullptr), IVarDestroyer(ivarDestroyer) {}
 
-  TargetClassMetadata(const TargetClassMetadata& other): Description(other.getDescription().get()) {
-    memcpy(this, &other, sizeof(*this));
-    setDescription(other.getDescription().get());
-  }
+  // Description's copy ctor is deleted so we have to do this the hard way.
+  TargetClassMetadata(const TargetClassMetadata& other)
+    : TargetHeapMetadata<Runtime>(other),
+      SuperClass(other.SuperClass),
+      CacheData{other.CacheData[0], other.CacheData[1]},
+      Data(other.Data),
+      Flags(other.Flags),
+      InstanceAddressPoint(other.InstanceAddressPoint),
+      InstanceSize(other.InstanceSize),
+      InstanceAlignMask(other.InstanceAlignMask),
+      Reserved(other.Reserved),
+      ClassSize(other.ClassSize),
+      ClassAddressPoint(other.ClassAddressPoint),
+      Description(other.Description.get()),
+      IVarDestroyer(other.IVarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> SuperClass;
@@ -2327,8 +2339,9 @@ using OpaqueExistentialContainer
   = TargetOpaqueExistentialContainer<InProcess>;
 
 /// The basic layout of a class-bounded existential type.
-struct ClassExistentialContainer {
-  void *Value;
+template <typename ContainedValue>
+struct ClassExistentialContainerImpl {
+  ContainedValue Value;
 
   const WitnessTable **getWitnessTables() {
     return reinterpret_cast<const WitnessTable**>(this + 1);
@@ -2337,11 +2350,15 @@ struct ClassExistentialContainer {
     return reinterpret_cast<const WitnessTable* const *>(this + 1);
   }
 
-  void copyTypeInto(ClassExistentialContainer *dest, unsigned numTables) const {
+  void copyTypeInto(ClassExistentialContainerImpl *dest,
+                    unsigned numTables) const {
     for (unsigned i = 0; i != numTables; ++i)
       dest->getWitnessTables()[i] = getWitnessTables()[i];
   }
 };
+using ClassExistentialContainer = ClassExistentialContainerImpl<void *>;
+using WeakClassExistentialContainer =
+  ClassExistentialContainerImpl<WeakReference>;
 
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {

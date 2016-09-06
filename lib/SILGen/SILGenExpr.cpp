@@ -978,21 +978,15 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = cast<BoundGenericStructType>(
                         E->getType()->getCanonicalType());
 
-  bool bridgesToObjC = E->bridgesToObjC();
-  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
-    bridgesToObjC = false;
-
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = bridgesToObjC ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
-                       : SGF.SGM.getDictionaryUpCast(loc);
+    fn = SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = bridgesToObjC ? SGF.SGM.getSetBridgeToObjectiveC(loc)
-                       : SGF.SGM.getSetUpCast(loc);
+    fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
@@ -1000,14 +994,14 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   // This will have been diagnosed by the accessors above.
   if (!fn) return SGF.emitUndefRValue(E, E->getType());
   
-  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fnGenericParams = fn->getGenericParams()->getParams();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
   auto toSubsts = toCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
-  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
-  (void) fnArcheTypes;
+  (void) fnGenericParams;
   
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
@@ -1439,10 +1433,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
                                        unsigned numElements) {
   // Reabstract the base type against the array element type.
-  AbstractionPattern baseAbstraction(
-    arrayTy->getNominalOrBoundGenericNominal()
-           ->getGenericParams()->getPrimaryArchetypes()[0]);
-  
+  auto baseAbstraction = AbstractionPattern::getOpaque();
+
   // Allocate the array.
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
                              SILType::getBuiltinWordType(gen.getASTContext()),

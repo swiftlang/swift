@@ -35,6 +35,7 @@ namespace llvm {
 
 namespace swift {
   class AbstractFunctionDecl;
+  class GenericEnvironment;
   class ASTContext;
   class ASTWalker;
   class CanType;
@@ -284,14 +285,19 @@ public:
   /// type for non-type contexts.
   Type getDeclaredInterfaceType() const;
 
-  /// \brief Retrieve the innermost generic parameters introduced by this
-  /// context or one of its parent contexts, or null if this context is not
-  /// directly dependent on any generic parameters.
+  /// \brief Retrieve the innermost generic parameters of this context or any
+  /// of its parents.
+  ///
+  /// FIXME: Remove this
   GenericParamList *getGenericParamsOfContext() const;
 
-  /// \brief Retrieve the interface generic type parameters and requirements
-  /// exposed by this context.
+  /// \brief Retrieve the innermost generic signature of this context or any
+  /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;
+
+  /// \brief Retrieve the innermost archetypes of this context or any
+  /// of its parents.
+  GenericEnvironment *getGenericEnvironmentOfContext() const;
   
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
@@ -488,16 +494,19 @@ public:
 /// deserialization.
 class SerializedLocalDeclContext : public DeclContext {
 private:
-  const LocalDeclContextKind LocalKind;
+  unsigned LocalKind : 3;
+
+protected:
+  unsigned SpareBits : 29;
 
 public:
   SerializedLocalDeclContext(LocalDeclContextKind LocalKind,
                              DeclContext *Parent)
     : DeclContext(DeclContextKind::SerializedLocal, Parent),
-      LocalKind(LocalKind) {}
+      LocalKind(static_cast<unsigned>(LocalKind)) {}
 
   LocalDeclContextKind getLocalDeclContextKind() const {
-    return LocalKind;
+    return static_cast<LocalDeclContextKind>(LocalKind);
   }
 
   static bool classof(const DeclContext *DC) {

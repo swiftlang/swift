@@ -1127,7 +1127,8 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// NSString.
 static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
                                    Type type) {
-  auto objcType = tc.getBridgedToObjC(dc, type);
+  ASTContext &ctx = tc.Context;
+  auto objcType = ctx.getBridgedToObjC(dc, type);
   if (!objcType)
     return false;
 
@@ -1579,6 +1580,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
     
+    // T -> AnyHashable.
+    if (isAnyHashableType(desugar2)) {
+      // Don't allow this in operator contexts or we'll end up allowing
+      // 'T() == U()' for unrelated T and U that just happen to be Hashable.
+      // We can remove this special case when we implement operator hiding.
+      if (kind != TypeMatchKind::OperatorArgumentConversion) {
+        conversionsOrFixes.push_back(
+                              ConversionRestrictionKind::HashableToAnyHashable);
+      }
+    }
+
     // Metatype to object conversion.
     //
     // Class and protocol metatypes are interoperable with certain Objective-C
@@ -1649,15 +1661,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
         conversionsOrFixes.push_back(
           ConversionRestrictionKind::SetUpcast);
-      // T -> AnyHashable.
-      } else if (isAnyHashableType(desugar2)) {
-        // Don't allow this in operator contexts or we'll end up allowing
-        // 'T() == U()' for unrelated T and U that just happen to be Hashable.
-        // We can remove this special case when we implement operator hiding.
-        if (kind != TypeMatchKind::OperatorArgumentConversion) {
-          conversionsOrFixes.push_back(
-            ConversionRestrictionKind::HashableToAnyHashable);
-        }
       }
     }
   }
@@ -1706,11 +1709,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // NSError and Error.
         if (isBridgeableTargetType) {
           Type bridgedValueType;
-          if (auto bridgedToObjCClass =
-                     TC.Context.getBridgedToObjC(DC, type1, &TC,
-                                                 &bridgedValueType)) {
-            if (*bridgedToObjCClass &&
-                (kind >= TypeMatchKind::ExplicitConversion ||
+          if (TC.Context.getBridgedToObjC(DC, type1, &bridgedValueType)) {
+            if ((kind >= TypeMatchKind::ExplicitConversion ||
                  bridgedValueType->getAnyNominal() !=
                    TC.Context.getErrorDecl()))
               conversionsOrFixes.push_back(
@@ -1722,8 +1722,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Anything can be explicitly converted to AnyObject using the universal
       // bridging conversion.
       if (auto protoType2 = type2->getAs<ProtocolType>()) {
-        if (TC.Context.LangOpts.EnableIdAsAny
-            && TC.Context.LangOpts.EnableObjCInterop
+        if (TC.Context.LangOpts.EnableObjCInterop
             && protoType2->getDecl()
               == TC.Context.getProtocol(KnownProtocolKind::AnyObject)
             && !type1->mayHaveSuperclass()
@@ -2425,8 +2424,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
   }
-  case CheckedCastKind::DictionaryDowncast:
-  case CheckedCastKind::DictionaryDowncastBridged: {
+  case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
     std::tie(fromKeyType, fromValueType) = *isDictionaryType(fromType);
 
@@ -2471,8 +2469,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     }
   }
 
-  case CheckedCastKind::SetDowncast:
-  case CheckedCastKind::SetDowncastBridged: {
+  case CheckedCastKind::SetDowncast: {
     auto fromBaseType = getBaseTypeForSetType(fromType.getPointer());
     auto toBaseType = getBaseTypeForSetType(toType.getPointer());
     // FIXME: Deal with from/to base types that haven't been solved
@@ -2911,7 +2908,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   Type bridgedClass;
   Type bridgedType;
   if (instanceTy->getAnyNominal() == TC.Context.getStringDecl()) {
-    if (Type classType = TC.getBridgedToObjC(DC, instanceTy)) {
+    if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
       bridgedClass = classType;
       bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
     }
@@ -3298,22 +3295,6 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
-  const Constraint &constraint)
-{
-  auto baseTy = simplifyForTypePropertyConstraint(*this,
-                                                  constraint.getFirstType());
-  if (!baseTy)
-    return SolutionKind::Unsolved;
-  
-  if (TC.getBridgedToObjC(DC, baseTy)) {
-    increaseScore(SK_UserConversion);
-    return SolutionKind::Solved;
-  }
-  return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
   // Leave the constraint around if the first variable is still opaque.
   auto baseTy = simplifyForTypePropertyConstraint(*this,
@@ -3531,7 +3512,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
       
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
 
@@ -3830,56 +3810,13 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = getBaseTypeForArrayType(t1);
     Type baseType2 = getBaseTypeForArrayType(t2);
 
-    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
-      increaseScore(SK_CollectionUpcastConversion);
-      return matchTypes(baseType1,
-                        baseType2,
-                        matchKind,
-                        subFlags,
-                        locator.withPathElement(
-                      ConstraintLocator::PathElement::getGenericArgument(0)));
-    }
-
-    // Look through type variables in the first element type; we need to know
-    // it's structure before we can decide whether this can be an array upcast.
-    TypeVariableType *baseTypeVar1;
-    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
-    if (baseTypeVar1) {
-      if (flags & TMF_GenerateConstraints) {
-        addConstraint(
-          Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                       restriction, type1, type2,
-                                       getConstraintLocator(locator)));
-        return SolutionKind::Solved;
-      }
-
-      return SolutionKind::Unsolved;
-    }
-
-    bool isSimpleUpcast = baseType1->isBridgeableObjectType();
-    if (isSimpleUpcast) {
-      increaseScore(SK_CollectionUpcastConversion);
-    } else {
-      // Check whether this is a bridging upcast.
-      Type bridgedType1 = TC.getBridgedToObjC(DC, baseType1);
-      if (!bridgedType1) {
-        // FIXME: Record error.
-        return SolutionKind::Error;
-      }
-
-      // Replace the base type so we perform the appropriate subtype check.
-      baseType1 = bridgedType1;
-      increaseScore(SK_CollectionBridgedConversion);
-    }
-
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-
+    increaseScore(SK_CollectionUpcastConversion);
     return matchTypes(baseType1,
                       baseType2,
-                      TypeMatchKind::Subtype,
+                      matchKind,
                       subFlags,
-                      locator);
+                      locator.withPathElement(
+                    ConstraintLocator::PathElement::getGenericArgument(0)));
   }
 
   // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===> 
@@ -3893,118 +3830,19 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type key2, value2;
     std::tie(key2, value2) = *isDictionaryType(t2);
 
-    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
-      auto subMatchKind = matchKind; // TODO: Restrict this?
-      increaseScore(SK_CollectionUpcastConversion);
-      // The source key and value types must be subtypes of the destination
-      // key and value types, respectively.
-      auto result = matchTypes(key1, key2, subMatchKind, subFlags,
-                               locator.withPathElement(
-                      ConstraintLocator::PathElement::getGenericArgument(0)));
-      if (result == SolutionKind::Error)
-        return result;
-
-      switch (matchTypes(value1, value2, subMatchKind, subFlags,
-                         locator.withPathElement(
-                    ConstraintLocator::PathElement::getGenericArgument(1)))) {
-      case SolutionKind::Solved:
-        return result;
-
-      case SolutionKind::Unsolved:
-        return SolutionKind::Unsolved;
-
-      case SolutionKind::Error:
-        return SolutionKind::Error;
-      }
-    }
-
-    // Look through type variables in the first key and value type; we
-    // need to know their structure before we can decide whether this
-    // can be an upcast.
-    TypeVariableType *keyTypeVar1 = nullptr;
-    TypeVariableType *valueTypeVar1 = nullptr;    
-    key1 = getFixedTypeRecursive(key1, keyTypeVar1, false, false);
-    if (!keyTypeVar1) {
-      value1 = getFixedTypeRecursive(value1, valueTypeVar1, false, false);
-    }
-
-    if (keyTypeVar1 || valueTypeVar1) {
-      if (flags & TMF_GenerateConstraints) {
-        addConstraint(
-          Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                       restriction, type1, type2,
-                                       getConstraintLocator(locator)));
-        return SolutionKind::Solved;
-      }
-
-      return SolutionKind::Unsolved;
-    }
-
-    // If both the first key and value types are bridgeable object
-    // types, this can only be an upcast.
-    bool isUpcast = key1->isBridgeableObjectType() && 
-                    value1->isBridgeableObjectType();
-
-    if (isUpcast) {
-      increaseScore(SK_CollectionUpcastConversion);
-    } else {
-      // This might be a bridged upcast.
-      Type bridgedKey1 = TC.getBridgedToObjC(DC, key1);
-      Type bridgedValue1;
-      if (bridgedKey1) {
-        bridgedValue1 = TC.getBridgedToObjC(DC, value1);
-      }
-
-      // Both the key and value types need to be bridged.
-      if (!bridgedKey1 || !bridgedValue1) {
-        // FIXME: Record failure.
-        return SolutionKind::Error;
-      }
-
-      // Look through the destination key and value types. We need
-      // their structure to determine whether we'll be bridging or
-      // upcasting the key and value.
-      TypeVariableType *keyTypeVar2 = nullptr;
-      TypeVariableType *valueTypeVar2 = nullptr;    
-      key2 = getFixedTypeRecursive(key2, keyTypeVar2, false, false);
-      if (!keyTypeVar2) {
-        value2 = getFixedTypeRecursive(value2, valueTypeVar2, false, false);
-      }
-      
-      // If either the destination key or value type is a type
-      // variable, we can't simplify this now.
-      if (keyTypeVar2 || valueTypeVar2) {
-        if (flags & TMF_GenerateConstraints) {
-          addConstraint(
-            Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                         restriction, type1, type2,
-                                         getConstraintLocator(locator)));
-          return SolutionKind::Solved;
-        }
-        
-        return SolutionKind::Unsolved;
-      }
-
-      // This can be a bridging upcast.
-      if (key2->isBridgeableObjectType())
-        key1 = bridgedKey1;
-      if (value2->isBridgeableObjectType())
-        value1 = bridgedValue1;
-      increaseScore(SK_CollectionBridgedConversion);
-    }
-
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-
+    auto subMatchKind = matchKind; // TODO: Restrict this?
+    increaseScore(SK_CollectionUpcastConversion);
     // The source key and value types must be subtypes of the destination
     // key and value types, respectively.
-    auto result = matchTypes(key1, key2, TypeMatchKind::Subtype, subFlags, 
-                             locator);
+    auto result = matchTypes(key1, key2, subMatchKind, subFlags,
+                             locator.withPathElement(
+                    ConstraintLocator::PathElement::getGenericArgument(0)));
     if (result == SolutionKind::Error)
       return result;
 
-    switch (matchTypes(value1, value2, TypeMatchKind::Subtype, subFlags, 
-                       locator)) {
+    switch (matchTypes(value1, value2, subMatchKind, subFlags,
+                       locator.withPathElement(
+                  ConstraintLocator::PathElement::getGenericArgument(1)))) {
     case SolutionKind::Solved:
       return result;
 
@@ -4024,78 +3862,13 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto t2 = type2->getDesugaredType();
     Type baseType2 = getBaseTypeForSetType(t2);
 
-    if (TC.getLangOpts().EnableExperimentalCollectionCasts) {
-      increaseScore(SK_CollectionUpcastConversion);
-      return matchTypes(baseType1,
-                        baseType2,
-                        matchKind,
-                        subFlags,
-                        locator.withPathElement(
-                      ConstraintLocator::PathElement::getGenericArgument(0)));
-    }
-
-    // Look through type variables in the first base type; we need to know
-    // their structure before we can decide whether this can be an upcast.
-    TypeVariableType *baseTypeVar1 = nullptr;
-    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
-
-    if (baseTypeVar1) {
-      if (flags & TMF_GenerateConstraints) {
-        addConstraint(
-          Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                       restriction, type1, type2,
-                                       getConstraintLocator(locator)));
-        return SolutionKind::Solved;
-      }
-
-      return SolutionKind::Unsolved;
-    }
-
-    // If the first base type is a bridgeable object type, this can only be an
-    // upcast.
-    bool isUpcast = baseType1->isBridgeableObjectType();
-
-    if (isUpcast) {
-      increaseScore(SK_CollectionUpcastConversion);
-    } else {
-      // This might be a bridged upcast.
-      Type bridgedBaseType1 = TC.getBridgedToObjC(DC, baseType1);
-      if (!bridgedBaseType1) {
-        // FIXME: Record failure.
-        return SolutionKind::Error;
-      }
-
-      // Look through the destination base type. We need its structure to
-      // determine whether we'll be bridging or upcasting the base type.
-      TypeVariableType *baseTypeVar2 = nullptr;
-      baseType2 = getFixedTypeRecursive(baseType2, baseTypeVar2, false, false);
-      
-      // If the destination base type is a type variable, we can't simplify
-      // this now.
-      if (baseTypeVar2) {
-        if (flags & TMF_GenerateConstraints) {
-          addConstraint(
-            Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                         restriction, type1, type2,
-                                         getConstraintLocator(locator)));
-          return SolutionKind::Solved;
-        }
-        
-        return SolutionKind::Unsolved;
-      }
-
-      // This can be a bridging upcast.
-      if (baseType2->isBridgeableObjectType())
-        baseType1 = bridgedBaseType1;
-      increaseScore(SK_CollectionBridgedConversion);
-    }
-
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-
-    // The source base type must be a subtype of the destination base type.
-    return matchTypes(baseType1, baseType2, TypeMatchKind::Subtype, subFlags,
-                      locator);
+    increaseScore(SK_CollectionUpcastConversion);
+    return matchTypes(baseType1,
+                      baseType2,
+                      matchKind,
+                      subFlags,
+                      locator.withPathElement(
+                    ConstraintLocator::PathElement::getGenericArgument(0)));
   }
 
   // T1 <c T2 && T2 : Hashable ===> T1 <c AnyHashable
@@ -4133,13 +3906,12 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // T bridges to C and C < U ===> T <c U
   case ConversionRestrictionKind::BridgeToObjC: {
-    auto objcClass = TC.getBridgedToObjC(DC, type1);
+    auto objcClass = TC.Context.getBridgedToObjC(DC, type1);
     // If the type doesn't bridge any other way, we can still go straight to
     // AnyObject by universal bridging.
     if (!objcClass) {
-      assert(TC.Context.LangOpts.EnableIdAsAny
-             && TC.Context.LangOpts.EnableObjCInterop
-             && "should only happen in id-as-any mode");
+      assert(TC.Context.LangOpts.EnableObjCInterop
+             && "should only happen in Objective-C mode");
       objcClass = TC.Context.getProtocol(KnownProtocolKind::AnyObject)
         ->getDeclaredType();
     }
@@ -4150,27 +3922,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    // TODO: Under id-as-any, container bridging is unconstrained. This check
-    // can go away.
-    if (!TC.Context.LangOpts.EnableIdAsAny) {
-      // If the bridged value type is generic, the generic arguments
-      // must be bridged to Objective-C for bridging to succeed.
-      if (auto bgt1 = type1->getAs<BoundGenericType>()) {
-        unsigned argIdx = 0;
-        for (auto arg: bgt1->getGenericArgs()) {
-          addConstraint(
-            Constraint::create(*this,
-                               ConstraintKind::BridgedToObjectiveC,
-                               arg, Type(), DeclName(),
-                               FunctionRefKind::Compound,
-                               getConstraintLocator(
-                                 locator.withPathElement(
-                                   LocatorPathElt::getGenericArgument(
-                                     argIdx++)))));
-        }
-      }
-    }
-    
     return matchTypes(objcClass, type2, TypeMatchKind::Subtype, subFlags,
                       locator);
   }
@@ -4178,8 +3929,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // U bridges to C and T < C ===> T <c U
   case ConversionRestrictionKind::BridgeFromObjC: {
     Type bridgedValueType;
-    auto objcClass = *TC.Context.getBridgedToObjC(DC, type2, &TC,
-                                                  &bridgedValueType);
+    auto objcClass = TC.Context.getBridgedToObjC(DC, type2, &bridgedValueType);
     assert(objcClass && "type is not bridged to Objective-C?");
     addContextualScore();
     increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
@@ -4443,9 +4193,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
   
-  case ConstraintKind::BridgedToObjectiveC:
-    return simplifyBridgedToObjectiveCConstraint(constraint);
-
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);
 

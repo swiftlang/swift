@@ -951,7 +951,19 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
-  InvocationInfo II{"ld"};
+  // Configure the toolchain.
+  // By default, use the system `ld` to link.
+  const char *LD = "ld";
+  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(A->getValue());
+
+    // If there is a 'ld' in the toolchain folder, use that instead.
+    if (auto toolchainLD = llvm::sys::findProgramByName("ld", {toolchainPath})) {
+      LD = context.Args.MakeArgString(toolchainLD.get());
+    }
+  }
+
+  InvocationInfo II = {LD};
   ArgStringList &Arguments = II.Arguments;
 
   if (context.Args.hasArg(options::OPT_driver_use_filelists) ||
@@ -1221,6 +1233,7 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
   case llvm::Triple::x86_64:
   case llvm::Triple::ppc64:
   case llvm::Triple::ppc64le:
+  case llvm::Triple::systemz:
     // BFD linker has issues wrt relocations against protected symbols.
     return "gold";
   default:
@@ -1269,14 +1282,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   case LinkKind::None:
     llvm_unreachable("invalid link kind");
   case LinkKind::Executable:
-    // Default case, nothing extra needed
+    // Default case, nothing extra needed.
     break;
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
   }
 
-  // Select the linker to use
+  // Select the linker to use.
   std::string Linker;
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
@@ -1285,6 +1298,22 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
   if (!Linker.empty()) {
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+  }
+
+  // Configure the toolchain.
+  // By default, use the system clang++ to link.
+  const char * Clang = "clang++";
+  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(A->getValue());
+
+    // If there is a clang in the toolchain folder, use that instead.
+    if (auto toolchainClang = llvm::sys::findProgramByName("clang++", {toolchainPath})) {
+      Clang = context.Args.MakeArgString(toolchainClang.get());
+    }
+
+    // Look for binutils in the toolchain folder.
+    Arguments.push_back("-B");
+    Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
   std::string Target = getTargetForLinker();
@@ -1393,7 +1422,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-o");
   Arguments.push_back(context.Output.getPrimaryOutputFilename().c_str());
 
-  return {"clang++", Arguments};
+  return {Clang, Arguments};
 }
 
 std::string

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s -enable-id-as-any
+// RUN: %target-swift-frontend -parse -verify %s
 // REQUIRES: objc_interop
 
 import Foundation

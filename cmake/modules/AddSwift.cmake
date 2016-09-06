@@ -403,7 +403,7 @@ endfunction()
 #     [LINK_LIBRARIES dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
@@ -447,7 +447,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weakly-linked.
 #
-# COMPONENT_DEPENDS
+# LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
 # C_COMPILE_FLAGS
@@ -493,7 +493,7 @@ function(_add_swift_library_single target name)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
     "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
-    "DEPENDS;LINK_LIBRARIES;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES;FILE_DEPENDS"
+    "DEPENDS;LINK_LIBRARIES;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;LLVM_COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES;FILE_DEPENDS"
     ${ARGN})
 
   set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_UNPARSED_ARGUMENTS})
@@ -599,7 +599,11 @@ function(_add_swift_library_single target name)
   endif()
 
   # Remove the "swift" prefix from the name to determine the module name.
-  string(REPLACE swift "" module_name "${name}")
+  if(SWIFTLIB_IS_STDLIB_CORE)
+    set(module_name "Swift")
+  else()
+    string(REPLACE swift "" module_name "${name}")
+  endif()
   list(FIND SWIFT_API_NOTES_INPUTS "${module_name}" overlay_index)
   if(NOT ${overlay_index} EQUAL -1)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
@@ -641,6 +645,7 @@ function(_add_swift_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       API_NOTES ${SWIFTLIB_SINGLE_API_NOTES}
+      MODULE_NAME ${module_name}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
@@ -888,7 +893,7 @@ function(_add_swift_library_single target name)
 
   if(NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
     # Call llvm_config() only for libraries that are part of the compiler.
-    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_COMPONENT_DEPENDS})
+    swift_common_llvm_config("${target}" ${SWIFTLIB_SINGLE_LLVM_COMPONENT_DEPENDS})
   endif()
 
   # Collect compile and link flags for the static and non-static targets.
@@ -1054,7 +1059,7 @@ endfunction()
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS dep1 ...]
 #     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
-#     [COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
@@ -1113,7 +1118,7 @@ endfunction()
 # FRAMEWORK_DEPENDS_WEAK
 #   System frameworks this library depends on that should be weak-linked
 #
-# COMPONENT_DEPENDS
+# LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
@@ -1171,7 +1176,7 @@ function(add_swift_library name)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_IOS"
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;SWIFT_MODULE_DEPENDS_FREEBSD;SWIFT_MODULE_DEPENDS_LINUX;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS;SWIFT_MODULE_DEPENDS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;SWIFT_MODULE_DEPENDS_FREEBSD;SWIFT_MODULE_DEPENDS_LINUX;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;LLVM_COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INCORPORATE_OBJECT_LIBRARIES"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_UNPARSED_ARGUMENTS})
 
@@ -1369,7 +1374,7 @@ function(add_swift_library name)
           LINK_LIBRARIES ${swiftlib_link_libraries}
           FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
           FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-          COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+          LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
           C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
           SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
@@ -1557,7 +1562,7 @@ function(add_swift_library name)
       LINK_LIBRARIES ${SWIFTLIB_LINK_LIBRARIES}
       FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
       FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-      COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
+      LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
       C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
       SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
@@ -1597,7 +1602,7 @@ function(_add_swift_executable_single name)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     "SDK;ARCHITECTURE"
-    "DEPENDS;COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES"
     ${ARGN})
 
   set(SWIFTEXE_SINGLE_SOURCES ${SWIFTEXE_SINGLE_UNPARSED_ARGUMENTS})
@@ -1675,6 +1680,7 @@ function(_add_swift_executable_single name)
       DEPENDS
         ${SWIFTEXE_SINGLE_DEPENDS}
         ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS}
+      MODULE_NAME ${name}
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
       IS_MAIN)
@@ -1710,7 +1716,7 @@ function(_add_swift_executable_single name)
       LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   target_link_libraries("${name}" ${SWIFTEXE_SINGLE_LINK_LIBRARIES} ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES})
-  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_COMPONENT_DEPENDS})
+  swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_COMPONENT_DEPENDS})
 
   set_target_properties(${name}
       PROPERTIES FOLDER "Swift executables")
@@ -1729,7 +1735,7 @@ function(add_swift_target_executable name)
   cmake_parse_arguments(SWIFTEXE_TARGET
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;BUILD_WITH_STDLIB"
     ""
-    "DEPENDS;COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
     ${ARGN})
 
   set(SWIFTEXE_TARGET_SOURCES ${SWIFTEXE_TARGET_UNPARSED_ARGUMENTS})
@@ -1781,7 +1787,7 @@ function(add_swift_target_executable name)
           ${VARIANT_NAME}
           ${SWIFTEXE_TARGET_SOURCES}
           DEPENDS ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
-          COMPONENT_DEPENDS ${SWIFTEXE_TARGET_COMPONENT_DEPENDS}
+          LLVM_COMPONENT_DEPENDS ${SWIFTEXE_TARGET_LLVM_COMPONENT_DEPENDS}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
           LINK_FAT_LIBRARIES ${SWIFTEXE_TARGET_LINK_FAT_LIBRARIES}
@@ -1797,7 +1803,7 @@ endfunction()
 # Usage:
 #   add_swift_executable(name
 #     [DEPENDS dep1 ...]
-#     [COMPONENT_DEPENDS comp1 ...]
+#     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
 #     [LINK_LIBRARIES target1 ...]
 #     [EXCLUDE_FROM_ALL]
@@ -1811,7 +1817,7 @@ endfunction()
 #   LIBRARIES
 #     Libraries this executable depends on, without variant suffixes.
 #
-#   COMPONENT_DEPENDS
+#   LLVM_COMPONENT_DEPENDS
 #     LLVM components this executable depends on.
 #
 #   FILE_DEPENDS
@@ -1840,7 +1846,7 @@ function(add_swift_executable name)
   cmake_parse_arguments(SWIFTEXE
     "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
     ""
-    "DEPENDS;COMPONENT_DEPENDS;LINK_LIBRARIES"
+    "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES"
     ${ARGN})
 
   translate_flag(${SWIFTEXE_EXCLUDE_FROM_ALL}
@@ -1859,7 +1865,7 @@ function(add_swift_executable name)
       ${name}
       ${SWIFTEXE_SOURCES}
       DEPENDS ${SWIFTEXE_DEPENDS}
-      COMPONENT_DEPENDS ${SWIFTEXE_COMPONENT_DEPENDS}
+      LLVM_COMPONENT_DEPENDS ${SWIFTEXE_LLVM_COMPONENT_DEPENDS}
       LINK_LIBRARIES ${SWIFTEXE_LINK_LIBRARIES}
       SDK ${SWIFT_HOST_VARIANT_SDK}
       ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
@@ -1875,3 +1881,22 @@ endmacro()
 macro(add_swift_lib_subdirectory name)
   add_llvm_subdirectory(SWIFT LIB ${name})
 endmacro()
+
+function(add_swift_host_tool executable)
+  cmake_parse_arguments(
+      ADDSWIFTHOSTTOOL # prefix
+      "" # options
+      "" # single-value args
+      "SWIFT_COMPONENT" # multi-value args
+      ${ARGN})
+
+  # Create the executable rule.
+  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
+
+  # And then create the install rule if we are asked to.
+  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
+    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+      TARGETS ${executable}
+      RUNTIME DESTINATION bin)
+  endif()
+endfunction()

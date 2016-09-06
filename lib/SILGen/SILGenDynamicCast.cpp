@@ -290,11 +290,7 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
                                          SILLocation loc,
                                          Type destType,
                                          SGFContext C,
-                                         bool conditional,
-                                         bool bridgesFromObjC) {
-  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
-    bridgesFromObjC = false;
-
+                                         bool conditional) {
   // Compute substitutions for the intrinsic call.
   auto fromCollection = cast<BoundGenericStructType>(
                           sourceType->getCanonicalType());
@@ -307,21 +303,13 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
     fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
                      : SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = bridgesFromObjC
-           ? (conditional
-                ? SGF.SGM.getDictionaryBridgeFromObjectiveCConditional(loc)
-                : SGF.SGM.getDictionaryBridgeFromObjectiveC(loc))
-           : (conditional
-                ? SGF.SGM.getDictionaryDownCastConditional(loc)
-                : SGF.SGM.getDictionaryDownCast(loc));
+    fn = (conditional
+           ? SGF.SGM.getDictionaryDownCastConditional(loc)
+           : SGF.SGM.getDictionaryDownCast(loc));
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = bridgesFromObjC
-           ? (conditional
-                ? SGF.SGM.getSetBridgeFromObjectiveCConditional(loc)
-                : SGF.SGM.getSetBridgeFromObjectiveC(loc))
-           : (conditional
-                ? SGF.SGM.getSetDownCastConditional(loc)
-                : SGF.SGM.getSetDownCast(loc));
+    fn = (conditional
+           ? SGF.SGM.getSetDownCastConditional(loc)
+           : SGF.SGM.getSetDownCast(loc));
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
@@ -329,14 +317,14 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   // This will have been diagnosed by the accessors above.
   if (!fn) return SGF.emitUndefRValue(loc, destType);
 
-  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fnGenericParams = fn->getGenericSignature()->getGenericParams();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
   auto toSubsts = toCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
-  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
-  (void) fnArcheTypes;
+  (void) fnGenericParams;
 
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
@@ -402,17 +390,11 @@ RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
   // entry points.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged ||
-      castKind == CheckedCastKind::SetDowncast ||
-      castKind == CheckedCastKind::SetDowncastBridged) {
-    bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
-         castKind == CheckedCastKind::SetDowncastBridged);
+      castKind == CheckedCastKind::SetDowncast) {
     ManagedValue operandMV = SGF.emitRValueAsSingleValue(operand);
     return emitCollectionDowncastExpr(SGF, operandMV, operand->getType(), loc,
                                       targetType, C,
-                                      /*conditional=*/false,
-                                      bridgesFromObjC);
+                                      /*conditional=*/false);
   }
 
   CheckedCastEmitter emitter(SGF, loc, operand->getType(),
@@ -438,16 +420,10 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   // entry points.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged ||
-      castKind == CheckedCastKind::SetDowncast ||
-      castKind == CheckedCastKind::SetDowncastBridged) {
-    bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
-         castKind == CheckedCastKind::SetDowncastBridged);
+      castKind == CheckedCastKind::SetDowncast) {
     return emitCollectionDowncastExpr(SGF, operand, operandType, loc,
                                       resultObjectType, C,
-                                      /*conditional=*/true,
-                                      bridgesFromObjC);
+                                      /*conditional=*/true);
   }
 
   operand = adjustForConditionalCheckedCastOperand(loc, operand,
@@ -554,18 +530,12 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
   // Handle collection downcasts separately.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged ||
-      castKind == CheckedCastKind::SetDowncast ||
-      castKind == CheckedCastKind::SetDowncastBridged) {
-    bool bridgesFromObjC
-      = (castKind == CheckedCastKind::DictionaryDowncastBridged ||
-         castKind == CheckedCastKind::SetDowncastBridged);
+      castKind == CheckedCastKind::SetDowncast) {
     ManagedValue operandMV = SGF.emitRValueAsSingleValue(operand);
     ManagedValue optValue = emitCollectionDowncastExpr(
                               SGF, operandMV, operand->getType(), loc,
                               targetType,
-                              SGFContext(), /*conditional=*/true,
-                              bridgesFromObjC)
+                              SGFContext(), /*conditional=*/true)
       .getAsSingleValue(SGF, loc);
 
     // Materialize the input.

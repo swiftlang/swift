@@ -126,36 +126,6 @@ set(SWIFT_ENABLE_LLD_LINKER FALSE CACHE BOOL
 set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
-set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "autolink-driver;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;stdlib;stdlib-experimental;sdk-overlay;editor-integration;tools;testsuite-tools;toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
-
-# Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
-set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
-    "A semicolon-separated list of components to install ${_SWIFT_KNOWN_INSTALL_COMPONENTS}")
-# Components are disjoint set of files that can be installed by Swift.  The
-# components would approximately correspond to packages in a Debian-style Linux
-# packaging.  The following components are defined:
-#
-# * autolink-driver -- the Swift driver support tools
-# * compiler -- the Swift compiler and (on supported platforms) the REPL.
-# * clang-builtin-headers -- install a copy of Clang builtin headers under
-#   'lib/swift/clang'.  This is useful when Swift compiler is installed in
-#   isolation.
-# * clang-resource-dir-symlink -- install a symlink to the Clang resource
-#   directory (which contains builtin headers) under 'lib/swift/clang'.  This is
-#   useful when Clang and Swift are installed side-by-side.
-# * stdlib -- the Swift standard library.
-# * stdlib-experimental -- the Swift standard library module for experimental
-#   APIs.
-# * sdk-overlay -- the Swift SDK overlay.
-# * editor-integration -- scripts for Swift integration in IDEs other than
-#   Xcode;
-# * tools -- tools (other than the compiler) useful for developers writing
-#   Swift code.
-# * testsuite-tools -- extra tools required to run the Swift testsuite.
-# * toolchain-dev-tools -- install development tools useful in a shared toolchain
-# * dev -- headers and libraries required to use Swift compiler as a library.
-
 set(SWIFT_SDKS "" CACHE STRING
     "If non-empty, limits building target binaries only to specified SDKs (despite other SDKs being available)")
 
@@ -357,6 +327,7 @@ set(CMAKE_CXX_ARCHIVE_FINISH "")
 
 include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
+include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
 include(SwiftSource)
@@ -365,7 +336,8 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 
-swift_configure_install_components("${SWIFT_INSTALL_COMPONENTS}")
+# Configure swift include, install, build components.
+swift_configure_components()
 
 if("${CMAKE_VERSION}" VERSION_LESS "3.0")
   set(SWIFT_CMAKE_HAS_GENERATOR_EXPRESSIONS FALSE)

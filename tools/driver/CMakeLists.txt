@@ -1,4 +1,4 @@
-add_swift_executable(swift
+add_swift_host_tool(swift
   api_notes.cpp
   driver.cpp
   autolink_extract_main.cpp
@@ -7,6 +7,9 @@ add_swift_executable(swift
   LINK_LIBRARIES
     swiftDriver
     swiftFrontendTool
+  LLVM_COMPONENT_DEPENDS
+    DebugInfoCodeView
+  SWIFT_COMPONENT compiler
 )
 
 target_link_libraries(swift edit)
@@ -43,9 +46,6 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       LINK_FLAGS " -lobjc -Wl,-force_load,\"${SWIFT_REPL_ARCLITE}\"")
 endif()
 
-swift_install_in_component(compiler
-    TARGETS swift
-    RUNTIME DESTINATION "bin")
 swift_install_in_component(compiler
     FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
     DESTINATION "bin")

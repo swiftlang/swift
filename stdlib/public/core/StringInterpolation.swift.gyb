@@ -34,7 +34,7 @@ for int_ty in all_integer_types(word_bits):
 
 }%
 
-extension String : ExpressibleByStringInterpolation {
+extension String : _ExpressibleByStringInterpolation {
   /// Creates a new string by concatenating the given interpolations.
   ///
   /// Do not call this initializer directly. It is used by the compiler when

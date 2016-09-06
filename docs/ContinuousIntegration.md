@@ -33,12 +33,12 @@ We describe each in detail below:
 
 ### Smoke Testing
 
-        Platform     | Comment
-        ------------ | -------------
-        All supported platforms     | @swift-ci Please smoke test
-        All supported platforms     | @swift-ci Please smoke test and merge
-        OS X platform               | @swift-ci Please smoke test OS X platform
-        Linux platform              | @swift-ci Please smoke test Linux platform
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        All supported platforms     | @swift-ci Please smoke test       		 | Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)
+        All supported platforms     | @swift-ci Please smoke test and merge		 | Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)
+        OS X platform               | @swift-ci Please smoke test OS X platform  | Swift Test OS X Platform (smoke test)
+        Linux platform              | @swift-ci Please smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
 A smoke test on macOS does the following:
 
@@ -64,12 +64,16 @@ A smoke test on Linux does the following:
 
 ### Validation Testing
 
-        Platform     | Comment
-        ------------ | -------------
-        All supported platforms     | @swift-ci Please test
-        All supported platforms     | @swift-ci Please test and merge
-        OS X platform               | @swift-ci Please test OS X platform
-        Linux platform              | @swift-ci Please test Linux platform
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        All supported platforms     | @swift-ci Please test							| Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please clean test					| Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please test and merge				| Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please test OS X platform 			| Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform
+        Linux platform              | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test) <br> Swift Test Linux Platform
+        Linux platform              | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test) <br> Swift Test Linux Platform
 
 The core principles of validation testing is that:
 
@@ -102,15 +106,15 @@ A validation test on Linux does the following:
 
 ### Benchmarking
 
-        Platform       | Comment
-        ------------   | -------------
-        OS X platform  | @swift-ci Please benchmark
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        OS X platform  | @swift-ci Please benchmark | Swift Benchmark on OS X Platform
 
 ### Lint Testing
 
-        Language     | Comment
-        ------------ | -------------
-        Python       | @swift-ci Please Python lint
+        Language     | Comment | Check Status
+        ------------ | ------- | ------------
+        Python       | @swift-ci Please Python lint | Python lint
 
 ## Cross Repository Testing
 
@@ -133,6 +137,7 @@ If everything passes, a .tar.gz package file will be produced in the . directory
 5. Merge all of the pull requests simultaneously.
 
 6. Watch the public incremental build on ci.swift.org to make sure that you did not make any mistakes. It should complete within 30-40 minutes depending on what else was being committed in the mean time.
+
 
 ## ci.swift.org bots
 

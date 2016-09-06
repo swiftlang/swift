@@ -236,7 +236,7 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   array = IGF.Builder.CreateElementBitCast(array, IGF.IGM.TypeMetadataPtrTy);
 
   auto getInContext = [&](CanType type) -> CanType {
-    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type, nullptr)
+    return ArchetypeBuilder::mapTypeIntoContext(typeDecl, type)
              ->getCanonicalType();
   };
 
@@ -2414,8 +2414,10 @@ namespace {
                          NominalTypeDecl::StoredPropertyRange storedProperties){
     SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      types.push_back(FieldTypeInfo(prop->getType()->getCanonicalType(),
-                                    /*indirect*/ false));
+      auto propertyType = prop->getType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(propertyType,
+                                    /*indirect*/ false,
+                                    propertyType->is<WeakStorageType>()));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2431,7 +2433,7 @@ namespace {
       auto caseType = elt.decl->getArgumentType()->getCanonicalType();
       bool isIndirect = elt.decl->isIndirect()
         || elt.decl->getParentEnum()->isIndirect();
-      types.push_back(FieldTypeInfo(caseType, isIndirect));
+      types.push_back(FieldTypeInfo(caseType, isIndirect, /*weak*/ false));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2760,6 +2762,18 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
+  // Bind archetype access paths if the type is generic.
+  if (type->isGenericContext()) {
+    auto declCtxt = type;
+    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
+      auto getInContext = [&](CanType type) -> CanType {
+        return ArchetypeBuilder::mapTypeIntoContext(declCtxt, type)
+            ->getCanonicalType();
+      };
+      bindArchetypeAccessPaths(IGF, generics, getInContext);
+    }
+  }
+
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
@@ -2784,9 +2798,13 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     
     auto metadata = IGF.emitTypeMetadataRef(fieldTy);
 
+    auto fieldTypeInfo = fieldTypes[i];
+
     // Mix in flag bits.
-    if (fieldTypes[i].isIndirect()) {
-      auto flags = FieldType().withIndirect(true);
+    if (fieldTypeInfo.hasFlags()) {
+      auto flags = FieldType()
+        .withIndirect(fieldTypeInfo.isIndirect())
+        .withWeak(fieldTypeInfo.isWeak());
       auto metadataBits = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
       metadataBits = IGF.Builder.CreateOr(metadataBits,
                    llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()));

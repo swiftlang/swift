@@ -49,10 +49,6 @@ llvm::cl::opt<unsigned> SILNumOptPassesToRun(
     "sil-opt-pass-count", llvm::cl::init(UINT_MAX),
     llvm::cl::desc("Stop optimizing after <N> optimization passes"));
 
-llvm::cl::opt<unsigned> SILFunctionPassPipelineLimit("sil-pipeline-limit",
-                                                     llvm::cl::init(10),
-                                                     llvm::cl::desc(""));
-
 llvm::cl::opt<std::string> SILBreakOnFun(
     "sil-break-on-function", llvm::cl::init(""),
     llvm::cl::desc(
@@ -274,110 +270,92 @@ static bool breakBeforeRunning(StringRef fnName, StringRef passName) {
   return fnName == SILBreakOnFun && passName == SILBreakOnPass;
 }
 
-void SILPassManager::runPassesOnFunction(PassList FuncTransforms,
-                                         SILFunction *F,
-                                         bool runToCompletion) {
-
-  const SILOptions &Options = getOptions();
-
-  CompletedPasses &completedPasses = CompletedPassesMap[F];
+void SILPassManager::runPassOnFunction(SILFunctionTransform *SFT,
+                                       SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
 
-  for (auto SFT : FuncTransforms) {
-    PrettyStackTraceSILFunctionTransform X(SFT, NumPassesRun);
-    DebugPrintEnabler DebugPrint(NumPassesRun);
+  PrettyStackTraceSILFunctionTransform X(SFT, NumPassesRun);
+  DebugPrintEnabler DebugPrint(NumPassesRun);
 
-    SFT->injectPassManager(this);
-    SFT->injectFunction(F);
+  SFT->injectPassManager(this);
+  SFT->injectFunction(F);
 
-    // If nothing changed since the last run of this pass, we can skip this
-    // pass.
-    if (completedPasses.test((size_t)SFT->getPassKind()) &&
-        !SILDisableSkippingPasses) {
-      if (SILPrintPassName)
-        llvm::dbgs() << "(Skip) Stage: " << StageName
-                     << " Pass: " << SFT->getName()
-                     << ", Function: " << F->getName() << "\n";
-      continue;
-    }
-
-    if (isDisabled(SFT)) {
-      if (SILPrintPassName)
-        llvm::dbgs() << "(Disabled) Stage: " << StageName
-                     << " Pass: " << SFT->getName()
-                     << ", Function: " << F->getName() << "\n";
-      continue;
-    }
-
-    CurrentPassHasInvalidated = false;
-
+  // If nothing changed since the last run of this pass, we can skip this
+  // pass.
+  CompletedPasses &completedPasses = CompletedPassesMap[F];
+  if (completedPasses.test((size_t)SFT->getPassKind()) &&
+      !SILDisableSkippingPasses) {
     if (SILPrintPassName)
-      llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
+      llvm::dbgs() << "  (Skip) Stage: " << StageName
                    << " Pass: " << SFT->getName()
                    << ", Function: " << F->getName() << "\n";
-
-    if (doPrintBefore(SFT, F)) {
-      llvm::dbgs() << "*** SIL function before " << StageName << " "
-                   << SFT->getName() << " (" << NumOptimizationIterations
-                   << ") ***\n";
-      F->dump(Options.EmitVerboseSIL);
-    }
-
-    llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
-    Mod->registerDeleteNotificationHandler(SFT);
-    if (breakBeforeRunning(F->getName(), SFT->getName()))
-      LLVM_BUILTIN_DEBUGTRAP;
-    SFT->run();
-    assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-    Mod->removeDeleteNotificationHandler(SFT);
-
-    // Did running the transform result in new functions being added
-    // to the top of our worklist?
-    bool newFunctionsAdded = (F != FunctionWorklist.back());
-
-    if (SILPrintPassTime) {
-      auto Delta =
-          llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
-      llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
-                   << ")\n";
-    }
-
-    // If this pass invalidated anything, print and verify.
-    if (doPrintAfter(SFT, F, CurrentPassHasInvalidated && SILPrintAll)) {
-      llvm::dbgs() << "*** SIL function after " << StageName << " "
-                   << SFT->getName() << " (" << NumOptimizationIterations
-                   << ") ***\n";
-      F->dump(Options.EmitVerboseSIL);
-    }
-
-    // Remember if this pass didn't change anything.
-    if (!CurrentPassHasInvalidated)
-      completedPasses.set((size_t)SFT->getPassKind());
-
-    if (Options.VerifyAll &&
-        (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-      F->verify();
-      verifyAnalyses(F);
-    }
-
-    ++NumPassesRun;
-
-    if (!continueTransforming())
-      return;
-
-    if (runToCompletion)
-      continue;
-
-    // If running the transform resulted in new functions on the top
-    // of the worklist, we'll return so that we can begin processing
-    // those new functions.
-    if (shouldRestartPipeline() || newFunctionsAdded)
-      return;
+    return;
   }
+
+  if (isDisabled(SFT)) {
+    if (SILPrintPassName)
+      llvm::dbgs() << "  (Disabled) Stage: " << StageName
+                   << " Pass: " << SFT->getName()
+                   << ", Function: " << F->getName() << "\n";
+    return;
+  }
+
+  CurrentPassHasInvalidated = false;
+
+  if (SILPrintPassName)
+    llvm::dbgs() << "  #" << NumPassesRun << " Stage: " << StageName
+                 << " Pass: " << SFT->getName()
+                 << ", Function: " << F->getName() << "\n";
+
+  if (doPrintBefore(SFT, F)) {
+    llvm::dbgs() << "*** SIL function before " << StageName << " "
+                 << SFT->getName() << " (" << NumOptimizationIterations
+                 << ") ***\n";
+    F->dump(getOptions().EmitVerboseSIL);
+  }
+
+  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
+  Mod->registerDeleteNotificationHandler(SFT);
+  if (breakBeforeRunning(F->getName(), SFT->getName()))
+    LLVM_BUILTIN_DEBUGTRAP;
+  SFT->run();
+  assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+  Mod->removeDeleteNotificationHandler(SFT);
+
+  if (SILPrintPassTime) {
+    auto Delta =
+        llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+    llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F->getName()
+                 << ")\n";
+  }
+
+  // If this pass invalidated anything, print and verify.
+  if (doPrintAfter(SFT, F, CurrentPassHasInvalidated && SILPrintAll)) {
+    llvm::dbgs() << "*** SIL function after " << StageName << " "
+                 << SFT->getName() << " (" << NumOptimizationIterations
+                 << ") ***\n";
+    F->dump(getOptions().EmitVerboseSIL);
+  }
+
+  // Remember if this pass didn't change anything.
+  if (!CurrentPassHasInvalidated)
+    completedPasses.set((size_t)SFT->getPassKind());
+
+  if (getOptions().VerifyAll &&
+      (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+    F->verify();
+    verifyAnalyses(F);
+  }
+
+  ++NumPassesRun;
 }
 
 void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
+
+  if (FuncTransforms.empty())
+    return;
+
   BasicCalleeAnalysis *BCA = getAnalysis<BasicCalleeAnalysis>();
   BottomUpFunctionOrder BottomUpOrder(*Mod, BCA);
   auto BottomUpFunctions = BottomUpOrder.getFunctions();
@@ -395,82 +373,43 @@ void SILPassManager::runFunctionPasses(PassList FuncTransforms) {
       FunctionWorklist.push_back(*I);
   }
 
-  // Used to track how many times a given function has been
-  // (partially) optimized by the function pass pipeline in this
-  // invocation.
-  llvm::DenseMap<SILFunction *, unsigned> CountOptimized;
+  DerivationLevels.clear();
 
-  // Count of how many iterations we've had since any function was
-  // popped off the function worklist. This is used to ensure progress
-  // and eliminate the chance of going into an infinite loop in cases
-  // where (for example) we have recursive type-based specialization
+  // The maximum number of times the pass pipeline can be restarted for a
+  // function. This is used to ensure we are not going into an infinite loop in
+  // cases where (for example) we have recursive type-based specialization
   // happening.
-  unsigned IterationsWithoutProgress = 0;
+  const unsigned MaxNumRestarts = 20;
 
-  // The maximum number of functions we'll optimize without popping
-  // any off the worklist. This is expected to non-zero.
-  const unsigned MaxIterationsWithoutProgress = 20;
+  if (SILPrintPassName)
+    llvm::dbgs() << "Start function passes at stage: " << StageName << "\n";
 
-  // Pop functions off the worklist, and run all function transforms
-  // on each of them.
+  // Run all transforms for all functions, starting at the tail of the worklist.
   while (!FunctionWorklist.empty() && continueTransforming()) {
-    auto *F = FunctionWorklist.back();
+    unsigned TailIdx = FunctionWorklist.size() - 1;
+    unsigned PipelineIdx = FunctionWorklist[TailIdx].PipelineIdx;
+    SILFunction *F = FunctionWorklist[TailIdx].F;
 
-    // If we've done many iterations without progress, pop the current
-    // function and any other function we've run any optimizations on
-    // on from the stack and then continue.
-    if (IterationsWithoutProgress == (MaxIterationsWithoutProgress - 1)) {
-      // Pop the current (potentially not-yet-optimized) function off.
+    if (PipelineIdx >= FuncTransforms.size()) {
+      // All passes did already run for the function. Pop it off the worklist.
       FunctionWorklist.pop_back();
-      IterationsWithoutProgress = 0;
-
-      // Pop any remaining functions that have been optimized (at
-      // least through some portion of the pipeline).
-      while (!FunctionWorklist.empty() &&
-             CountOptimized[FunctionWorklist.back()] > 0)
-        FunctionWorklist.pop_back();
-
       continue;
     }
-
-    if (CountOptimized[F] > SILFunctionPassPipelineLimit) {
-      DEBUG(llvm::dbgs() << "*** Hit limit optimizing: " << F->getName()
-                         << '\n');
-      FunctionWorklist.pop_back();
-      IterationsWithoutProgress = 0;
-      continue;
-    }
-
-    assert(
-        !shouldRestartPipeline() &&
+    assert(!shouldRestartPipeline() &&
         "Did not expect function pipeline set up to restart from beginning!");
 
-    assert(CountOptimized[F] <= SILFunctionPassPipelineLimit &&
-           "Function optimization count exceeds limit!");
-    auto runToCompletion = CountOptimized[F] == SILFunctionPassPipelineLimit;
+    runPassOnFunction(FuncTransforms[PipelineIdx], F);
 
-    runPassesOnFunction(FuncTransforms, F, runToCompletion);
-    ++CountOptimized[F];
-    ++IterationsWithoutProgress;
-
-    if (runToCompletion) {
-      FunctionWorklist.pop_back();
-      IterationsWithoutProgress = 0;
-      clearRestartPipeline();
-      continue;
+    // Note: Don't get entry reference prior to runPassOnFunction().
+    // A pass can push a new function to the worklist which may cause a
+    // reallocation of the buffer and that would invalidate the reference.
+    WorklistEntry &Entry = FunctionWorklist[TailIdx];
+    if (shouldRestartPipeline() && Entry.NumRestarts < MaxNumRestarts) {
+      ++Entry.NumRestarts;
+      Entry.PipelineIdx = 0;
+    } else {
+      ++Entry.PipelineIdx;
     }
-
-
-    // If running the function transforms did not result in new
-    // functions being added to the top of the worklist, then we're
-    // done with this function and can pop it off and continue.
-    // Otherwise, we'll return to this function and reoptimize after
-    // processing the new functions that were added.
-    if (F == FunctionWorklist.back() && !shouldRestartPipeline()) {
-      FunctionWorklist.pop_back();
-      IterationsWithoutProgress = 0;
-    }
-
     clearRestartPipeline();
   }
 }
@@ -613,6 +552,33 @@ SILPassManager::~SILPassManager() {
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
   }
+}
+
+void SILPassManager::addFunctionToWorklist(SILFunction *F,
+                                           SILFunction *DerivedFrom) {
+  assert(F && F->isDefinition() && F->shouldOptimize() &&
+         "Expected optimizable function definition!");
+
+  const int MaxDeriveLevels = 10;
+
+  int NewLevel = 1;
+  if (DerivedFrom) {
+    NewLevel = DerivationLevels[DerivedFrom] + 1;
+    // Limit the number of derivations, i.e. don't allow that a pass specializes
+    // a specialized function which is itself a specialized function, and so on.
+    if (NewLevel >= MaxDeriveLevels)
+      return;
+  }
+  int &StoredLevel = DerivationLevels[F];
+
+  // Only allow a function to be pushed on the worklist a single time
+  // (not counting the initial population of the worklist with the bottom-up
+  // function order).
+  if (StoredLevel > 0)
+    return;
+
+  StoredLevel = NewLevel;
+  FunctionWorklist.push_back(F);
 }
 
 void SILPassManager::restartWithCurrentFunction(SILTransform *T) {
@@ -792,12 +758,13 @@ namespace llvm {
   template <> struct GraphTraits<CallGraph::Node *> {
     typedef CallGraph::Node NodeType;
     typedef CallGraph::child_iterator ChildIteratorType;
+    typedef CallGraph::Node *NodeRef;
 
-    static NodeType *getEntryNode(NodeType *N) { return N; }
-    static inline ChildIteratorType child_begin(NodeType *N) {
+    static NodeRef getEntryNode(NodeRef N) { return N; }
+    static inline ChildIteratorType child_begin(NodeRef N) {
       return N->Children.begin();
     }
-    static inline ChildIteratorType child_end(NodeType *N) {
+    static inline ChildIteratorType child_end(NodeRef N) {
       return N->Children.end();
     }
   };
@@ -805,8 +772,9 @@ namespace llvm {
   template <> struct GraphTraits<CallGraph *>
   : public GraphTraits<CallGraph::Node *> {
     typedef CallGraph *GraphType;
+    typedef CallGraph::Node *NodeRef;
 
-    static NodeType *getEntryNode(GraphType F) { return nullptr; }
+    static NodeRef getEntryNode(GraphType F) { return nullptr; }
 
     typedef CallGraph::iterator nodes_iterator;
     static nodes_iterator nodes_begin(GraphType CG) {

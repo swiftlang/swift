@@ -226,6 +226,7 @@ TEST(Concurrent, ConcurrentMap) {
       return (key == Key ? 0 : (key < Key ? -1 : 1));
     }
     static size_t getExtraAllocationSize(size_t key) { return 0; }
+    size_t getExtraAllocationSize() const { return 0; }
   };
 
   ConcurrentMap<Entry> Map;
@@ -291,7 +292,8 @@ TEST(MetadataTest, getGenericMetadata) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &_TWVBo } },
-  { { { MetadataKind::Class } }, nullptr, 0, ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
+  { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1,
+    ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {

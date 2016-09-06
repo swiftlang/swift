@@ -81,6 +81,12 @@ namespace {
     Normal = false,
     CustomNamesOnly = true,
   };
+
+  /// Whether the type being printed is in function param position.
+  enum IsFunctionParam_t : bool {
+    IsFunctionParam = true,
+    IsNotFunctionParam = false,
+  };
 }
 
 static StringRef getNameForObjC(const ValueDecl *VD,
@@ -361,7 +367,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None);
+      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -542,19 +548,6 @@ private:
 
     os << ";\n";
   }
-  
-  void printSingleFunctionParam(const ParamDecl *param) {
-    // The type name may be multi-part.
-    PrintMultiPartType multiPart(*this);
-    visitPart(param->getType(), OTK_None);
-    auto name = param->getName();
-    if (name.empty())
-      return;
-    
-    os << ' ' << name;
-    if (isClangKeyword(name))
-      os << "_";
-  }
 
   void printAbstractFunctionAsFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
@@ -578,7 +571,8 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 printSingleFunctionParam(param);
+                 print(param->getType(), OTK_None, param->getName(),
+                       IsFunctionParam);
                },
                [&]{ os << ", "; });
     
@@ -1193,7 +1187,7 @@ private:
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&
         !isSwiftNewtype(SD)) {
-      ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
+      ty = ctx.getBridgedToObjC(&M, ty);
     }
     
     assert(ty && "unknown bridged type");
@@ -1437,12 +1431,13 @@ private:
       } else {
         interleave(tupleTy->getElements(),
                    [this](TupleTypeElt elt) {
-                     print(elt.getType(), OTK_None, elt.getName());
+                     print(elt.getType(), OTK_None, elt.getName(),
+                           IsFunctionParam);
                    },
                    [this] { os << ", "; });
       }
     } else {
-      print(paramsTy, OTK_None);
+      print(paramsTy, OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
   }
@@ -1516,8 +1511,15 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
-             Identifier name = Identifier()) {
+             Identifier name = Identifier(),
+             IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
+
+    if (isFuncParam)
+      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+                        ->getAs<AnyFunctionType>())
+        if (fnTy->isNoEscape())
+          os << "SWIFT_NOESCAPE ";
 
     PrintMultiPartType multiPart(*this);
     visitPart(ty, optionalKind);
@@ -1533,10 +1535,12 @@ public:
 class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
   friend TypeVisitor;
 
+  ModuleDecl &M;
   llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
   bool IsWithinConstrainedObjCGeneric = false;
 
-  ReferencedTypeFinder(decltype(Callback) callback) : Callback(callback) {}
+  ReferencedTypeFinder(ModuleDecl &mod, decltype(Callback) callback)
+    : M(mod), Callback(callback) {}
 
   void visitType(TypeBase *base) {
     llvm_unreachable("unhandled type");
@@ -1612,28 +1616,34 @@ class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
 
   /// Returns true if \p archetype has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
-  static bool isConstrainedArchetype(const ArchetypeType *archetype) {
-    if (archetype->getSuperclass())
+  static bool isConstrained(ModuleDecl &mod,
+                            GenericSignature *sig,
+                            GenericTypeParamType *paramTy) {
+    if (sig->getSuperclassBound(paramTy, mod))
       return true;
 
-    if (archetype->getConformsTo().size() > 1)
+    auto conformsTo = sig->getConformsTo(paramTy, mod);
+
+    if (conformsTo.size() > 1)
       return true;
-    if (archetype->getConformsTo().size() == 0)
+    if (conformsTo.size() == 0)
       return false;
 
-    const ProtocolDecl *proto = archetype->getConformsTo().front();
+    const ProtocolDecl *proto = conformsTo.front();
     if (auto knownKind = proto->getKnownProtocolKind())
       return knownKind.getValue() != KnownProtocolKind::AnyObject;
     return true;
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
-    bool isObjCGeneric = boundGeneric->getDecl()->hasClangNode();
+    auto *decl = boundGeneric->getDecl();
+    bool isObjCGeneric = decl->hasClangNode();
+    auto *sig = decl->getGenericSignature();
 
     for_each(boundGeneric->getGenericArgs(),
-             boundGeneric->getDecl()->getGenericParams()->getPrimaryArchetypes(),
-             [&](Type argTy, const ArchetypeType *archetype) {
-      if (isObjCGeneric && isConstrainedArchetype(archetype))
+             sig->getInnermostGenericParams(),
+             [&](Type argTy, GenericTypeParamType *paramTy) {
+      if (isObjCGeneric && isConstrained(M, sig, paramTy))
         IsWithinConstrainedObjCGeneric = true;
       visit(argTy);
       IsWithinConstrainedObjCGeneric = false;
@@ -1652,8 +1662,8 @@ public:
     return IsWithinConstrainedObjCGeneric;
   }
 
-  static void walk(Type ty, decltype(Callback) callback) {
-    ReferencedTypeFinder(callback).visit(ty);
+  static void walk(ModuleDecl &mod, Type ty, decltype(Callback) callback) {
+    ReferencedTypeFinder(mod, callback).visit(ty);
   }
 };
 
@@ -1835,13 +1845,14 @@ public:
       }
 
       bool needsToBeIndividuallyDelayed = false;
-      ReferencedTypeFinder::walk(VD->getType(),
+      ReferencedTypeFinder::walk(M, VD->getType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
         if (TD == container)
           return;
 
-        if (finder.isWithinConstrainedObjCGeneric()) {
+        if (finder.isWithinConstrainedObjCGeneric() &&
+            isa<NominalTypeDecl>(TD)) {
           // We can delay individual members of classes; do so if necessary.
           if (isa<ClassDecl>(container)) {
             if (!tryRequire(TD)) {
@@ -1876,18 +1887,21 @@ public:
           if (!forwardDeclare(CD)) {
             (void)addImport(CD);
           }
-        } else if (auto PD = dyn_cast<ProtocolDecl>(TD))
+        } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
-        else if (addImport(TD))
-          return;
-        else if (auto ED = dyn_cast<EnumDecl>(TD))
-          forwardDeclare(ED);
-        else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))
+        } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
+          (void)addImport(TD);
+          // Just in case, make sure the underlying type is visible too.
           finder.visit(TAD->getUnderlyingType());
-        else if (isa<AbstractTypeParamDecl>(TD))
+        } else if (addImport(TD)) {
+          return;
+        } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
+          forwardDeclare(ED);
+        } else if (isa<AbstractTypeParamDecl>(TD)) {
           llvm_unreachable("should not see type params here");
-        else
+        } else {
           assert(false && "unknown local type decl");
+        }
       });
 
       if (needsToBeIndividuallyDelayed) {
@@ -2091,6 +2105,11 @@ public:
              "__attribute__((objc_method_family(X)))\n"
            "#else\n"
            "# define SWIFT_METHOD_FAMILY(X)\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(noescape)\n"
+           "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
+           "#else\n"
+           "# define SWIFT_NOESCAPE\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"

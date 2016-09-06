@@ -611,15 +611,19 @@ public:
                   Elements.insert(Elements.begin() + (EI + 1), *Log);
                   ++EI;
                 }
-              }
-            } else if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
-              Added<Stmt *> Log = logDeclOrMemberRef(DRE);
-              if (*Log) {
-                Elements.insert(Elements.begin() + (EI + 1), *Log);
-                ++EI;
+                Handled = true;
               }
             }
-            Handled = true;
+            if (!Handled) {
+              if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
+                Added<Stmt *> Log = logDeclOrMemberRef(DRE);
+                if (*Log) {
+                  Elements.insert(Elements.begin() + (EI + 1), *Log);
+                  ++EI;
+                }
+              }
+            }
+            Handled = true; // Never log ()
           }
           if (!Handled) {
             // do the same as for all other expressions

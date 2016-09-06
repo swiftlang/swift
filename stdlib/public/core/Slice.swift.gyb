@@ -90,16 +90,17 @@ def get_slice_doc_comment(Self):
 // that has conditional conformances to `BidirectionalCollection`,
 // `RandomAccessCollection`, `RangeReplaceableCollection`, and
 // `MutableCollection`.
+// rdar://problem/17144340
 
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       Self = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       BaseRequirements = [collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
+%       BaseRequirements = ['_' + collectionForTraversal(Traversal).replace('Collection', 'Indexable')]
 %       if Mutable:
-%         BaseRequirements.append('MutableIndexable')
+%         BaseRequirements.append('_MutableIndexable')
 %       if RangeReplaceable:
-%         BaseRequirements.append('RangeReplaceableIndexable')
+%         BaseRequirements.append('_RangeReplaceableIndexable')
 %       BaseRequirements = ' & '.join(BaseRequirements)
 %       SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 

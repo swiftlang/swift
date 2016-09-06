@@ -18,7 +18,6 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
@@ -1305,9 +1304,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::DictionaryDowncastBridged:
     case CheckedCastKind::SetDowncast:
-    case CheckedCastKind::SetDowncastBridged:
       return coercePatternViaConditionalDowncast(
                *this, P, dc, type,
                subOptions|TR_FromNonInferredPattern);
@@ -1457,8 +1454,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
   case PatternKind::OptionalSome: {
     auto *OP = cast<OptionalSomePattern>(P);
-    auto *enumDecl = type->getEnumOrBoundGenericEnum();
-    if (!enumDecl) {
+    OptionalTypeKind optionalKind;
+    Type elementType = type->getAnyOptionalObjectType(optionalKind);
+
+    if (elementType.isNull()) {
       auto diagID = diag::optional_element_pattern_not_valid_type;
       SourceLoc loc = OP->getQuestionLoc();
       // Produce tailored diagnostic for if/let and other conditions.
@@ -1471,35 +1470,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       return true;
     }
 
-    // If the element decl was not resolved (because it was spelled without a
-    // type as `.Foo`), resolve it now that we have a type.
-    if (!OP->getElementDecl()) {
-      auto *element = lookupEnumMemberElement(*this, dc, type, Context.Id_some,
-                                              OP->getLoc());
-      if (!element) {
-        diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
-                 "Some", type);
-        return true;
-      }
-      OP->setElementDecl(element);
-    }
+    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
+    assert(elementDecl && "missing optional some decl?!");
+    OP->setElementDecl(elementDecl);
 
-    EnumElementDecl *elt = OP->getElementDecl();
-    // Is the enum element actually part of the enum type we're matching?
-    if (elt->getParentEnum() != enumDecl) {
-      diagnose(OP->getLoc(), diag::enum_element_pattern_not_member_of_enum,
-               "Some", type);
-      return true;
-    }
-
-    // Check the subpattern & push the enum element type down onto it.
-    Type elementType;
-    if (elt->hasArgumentType())
-      elementType = type->getTypeOfMember(elt->getModuleContext(),
-                                          elt, this,
-                                          elt->getArgumentInterfaceType());
-    else
-      elementType = TupleType::getEmpty(Context);
     Pattern *sub = OP->getSubPattern();
     if (coercePatternToType(sub, dc, elementType,
                             subOptions|TR_FromNonInferredPattern|TR_EnumPatternPayload,
@@ -1526,8 +1500,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 /// TODO: These diagnostics should be a lot better now that we know this is
 /// all specific to closures.
 ///
-bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
-                                            Type paramListType) {
+bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+                                            AnyFunctionType *FN) {
+  Type paramListType = FN->getInput();
   bool hadError = paramListType->is<ErrorType>();
 
   // Sometimes a scalar type gets applied to a single-argument parameter list.
@@ -1536,7 +1511,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     
     // Check that the type, if explicitly spelled, is ok.
     if (param->getTypeLoc().getTypeRepr()) {
-      hadError |= validateParameterType(param, DC, TypeResolutionOptions(),
+      hadError |= validateParameterType(param, CE, TypeResolutionOptions(),
                                         nullptr, *this);
       
       // Now that we've type checked the explicit argument type, see if it
@@ -1564,6 +1539,22 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
     return hadError;
   };
 
+  // Check if paramListType only contains one single tuple.
+  // If it is, then paramListType would be sugared ParenType
+  // with a single underlying TupleType. In that case, check if
+  // the closure argument is also one to avoid the tuple splat
+  // from happening.
+  if (!hadError && isa<ParenType>(paramListType.getPointer())) {
+    auto underlyingTy = paramListType->getCanonicalType();
+    
+    if (underlyingTy->is<TupleType>()) {
+      if (P->size() == 1) {
+        return handleParameter(P->get(0), underlyingTy);
+      }
+    }
+    
+    //pass
+  }
   
   // The context type must be a tuple.
   TupleType *tupleTy = paramListType->getAs<TupleType>();
@@ -1578,11 +1569,9 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, DeclContext *DC,
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
   if (!hadError && tupleTy->getNumElements() != P->size()) {
-    if (P->size() == 1)
-      return handleParameter(P->get(0), paramListType);
-    
-    diagnose(P->getStartLoc(), diag::tuple_pattern_length_mismatch,
-             paramListType);
+    auto fnType = FunctionType::get(paramListType->getDesugaredType(), FN->getResult());
+    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
+             fnType, tupleTy->getNumElements(), P->size(), (P->size() == 1));
     hadError = true;
   }
 

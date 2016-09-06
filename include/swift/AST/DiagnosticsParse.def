@@ -381,10 +381,15 @@ ERROR(identifier_when_expecting_operator,PointsToFirstBadToken,
 
 WARNING(deprecated_operator_body,PointsToFirstBadToken,
         "operator should no longer be declared with body", ())
+WARNING(deprecated_operator_body_use_group,PointsToFirstBadToken,
+        "operator should no longer be declared with body; "
+        "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
 // PrecedenceGroup
+ERROR(precedencegroup_not_infix,none,
+      "only infix operators may declare a precedence", ())
 ERROR(expected_precedencegroup_name,none,
       "expected identifier after 'precedencegroup'", ())
 ERROR(expected_precedencegroup_lbrace,none,
@@ -617,7 +622,7 @@ ERROR(expected_type_before_arrow,none,
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
 ERROR(function_type_argument_label,none,
-      "function types cannot have argument label %0; use '_' instead",
+      "function types cannot have argument labels; use '_' before %0",
       (Identifier))
 
 // Enum Types
@@ -742,6 +747,9 @@ ERROR(parameter_unnamed,none,
 
 ERROR(parameter_curry_syntax_removed,none,
       "curried function declaration syntax has been removed; use a single parameter list", ())
+
+ERROR(initializer_as_typed_pattern,none,
+      "unexpected initializer in pattern; did you mean to use '='?", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
@@ -1255,16 +1263,6 @@ ERROR(effects_attribute_expect_option,none,
       "expected '%0' option (readnone, readonly, readwrite)", (StringRef))
 ERROR(effects_attribute_unknown_option,none,
       "unknown option '%0' for attribute '%1'", (StringRef, StringRef))
-
-// swift3_migration
-ERROR(attr_swift3_migration_label,none,
-      "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-WARNING(warn_attr_swift3_migration_unknown_label,none,
-        "expected 'renamed' or 'message' in 'swift3_migration' attribute", ())
-ERROR(attr_swift3_migration_expected_rparen,none,
-      "expected ')' after name for 'swift3_migration' attribute", ())
-ERROR(attr_bad_swift_name,none,
-      "ill-formed Swift name '%0'", (StringRef))
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,

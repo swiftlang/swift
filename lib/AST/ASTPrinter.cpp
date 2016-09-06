@@ -21,6 +21,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -924,10 +925,6 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
-// FIXME: We need to undef 'defer' when including Tokens.def. It is restored
-// below.
-#undef defer
-
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   StringRef name;
   switch (keyword) {
@@ -1201,7 +1198,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 public:
   void printPattern(const Pattern *pattern);
 
-  void printGenericParams(GenericParamList *params);
+  void printGenericParams(GenericParamList *params, bool IncludeRequirements);
   void printWhereClause(ArrayRef<RequirementRepr> requirements);
 
 private:
@@ -1214,6 +1211,7 @@ private:
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
                     bool openBracket = true, bool closeBracket = true);
   void printNominalDeclGenericParams(NominalTypeDecl *decl);
+  void printNominalDeclGenericRequirements(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
@@ -1416,7 +1414,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
   }
 }
 
-void PrintAST::printGenericParams(GenericParamList *Params) {
+void PrintAST::printGenericParams(GenericParamList *Params,
+                                  bool IncludeRequirements) {
   if (!Params)
     return;
 
@@ -1451,7 +1450,9 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
       printInherited(GP);
       Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
     }
-    printWhereClause(Params->getRequirements());
+    if (IncludeRequirements) {
+      printWhereClause(Params->getRequirements());
+    }
   }
   Printer << ">";
 }
@@ -1459,6 +1460,25 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
   if (requirements.empty())
     return;
+
+  // FIXME: Type objects do not preserve info to print requirements accurately.
+  // SIL printing cares about semantics so \c PrevPreferTypeRepr is false but
+  // we need to set it to true for printing requirements.
+  struct PrefTypeReprForSILRAII {
+    PrintOptions &Opts;
+    bool PrevPreferTypeRepr;
+    PrefTypeReprForSILRAII(PrintOptions &opts) : Opts(opts) {
+      if (Opts.PrintForSIL) {
+        PrevPreferTypeRepr = Opts.PreferTypeRepr;
+        Opts.PreferTypeRepr = true;
+      }
+    }
+    ~PrefTypeReprForSILRAII() {
+      if (Opts.PrintForSIL) {
+        Opts.PreferTypeRepr = PrevPreferTypeRepr;
+      }
+    }
+  } PrefTypeReprForSILRAII(Options);
 
   std::vector<std::tuple<StringRef, StringRef, RequirementReprKind>> Elements;
   llvm::SmallString<64> Output;
@@ -1970,16 +1990,14 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 }
 
 void PrintAST::printNominalDeclGenericParams(NominalTypeDecl *decl) {
-  if (auto gp = decl->getGenericParams()) {
-    if (!isa<ProtocolDecl>(decl)) {
-      // For a protocol extension, print only the where clause; the
-      // generic parameter list is implicit. For other nominal types,
-      // print the generic parameters.
-      if (decl->getAsProtocolOrProtocolExtensionContext())
-        printWhereClause(gp->getRequirements());
-      else
-        printGenericParams(gp);
-    }
+  if (auto GPs = decl->getGenericParams()) {
+    printGenericParams(GPs, /* IncludeRequirements */false);
+  }
+}
+
+void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
+  if (auto GPs = decl->getGenericParams()) {
+    printWhereClause(GPs->getRequirements());
   }
 }
 
@@ -2328,7 +2346,8 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     }, [&]{ // Signature
-      printGenericParams(decl->getGenericParams());
+      printGenericParams(decl->getGenericParams(),
+                         /* IncludeRequirements */false);
     });
   bool ShouldPrint = true;
   Type Ty;
@@ -2389,6 +2408,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
         printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2415,6 +2435,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
         printNominalDeclGenericParams(decl);
       });
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2442,6 +2463,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       });
 
     printInherited(decl);
+    printNominalDeclGenericRequirements(decl);
   }
 
   if (Options.TypeDefinitions) {
@@ -2465,8 +2487,6 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     recordDeclLoc(decl,
       [&]{
         Printer.printName(decl->getName());
-      }, [&]{ // Signature
-        printNominalDeclGenericParams(decl);
       });
 
     // Figure out whether we need an explicit 'class' in the inheritance.
@@ -2774,7 +2794,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             Printer.printName(decl->getName());
         }, [&] { // Parameters
           if (decl->isGeneric()) {
-            printGenericParams(decl->getGenericParams());
+            printGenericParams(decl->getGenericParams(),
+                               /* IncludeRequirements */false);
           }
 
           printFunctionParameters(decl);
@@ -2796,6 +2817,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
         printTypeLoc(ResultTyLoc);
         Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+      }
+      if (decl->isGeneric()) {
+        if (auto GPs = decl->getGenericParams()) {
+          printWhereClause(GPs->getRequirements());
+        }
       }
     }
 
@@ -2933,10 +2959,17 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
       }
 
       if (decl->isGeneric())
-        printGenericParams(decl->getGenericParams());
+        printGenericParams(decl->getGenericParams(),
+                           /* IncludeRequirements */false);
 
       printFunctionParameters(decl);
     });
+  if (decl->isGeneric()) {
+    if (auto GPs = decl->getGenericParams()) {
+      printWhereClause(GPs->getRequirements());
+    }
+  }
+
 
   if (auto BodyFunc = Options.FunctionBody) {
     Printer << " {";
@@ -3436,7 +3469,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   void printGenericParams(GenericParamList *Params) {
-    PrintAST(Printer, Options).printGenericParams(Params);
+    PrintAST(Printer, Options).printGenericParams(Params,
+                                                  /*IncludeRequirements*/true);
   }
 
   template <typename T>
@@ -3772,40 +3806,45 @@ public:
       return;
 
     if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
-      Printer.printAttrName("@autoclosure");
-      Printer << " ";
+      Printer.printSimpleAttr("@autoclosure") << " ";
     }
     if (inParameterPrinting && !info.isNoEscape() &&
         !Options.excludeAttrKind(TAK_escaping)) {
-      Printer.printAttrName("@escaping");
-      Printer << " ";
+      Printer.printSimpleAttr("@escaping") << " ";
     }
 
     if (Options.PrintFunctionRepresentationAttrs &&
-        !Options.excludeAttrKind(TAK_convention)) {
+        !Options.excludeAttrKind(TAK_convention) &&
+        info.getSILRepresentation() != SILFunctionType::Representation::Thick) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@convention");
+      Printer << "(";
       // TODO: coalesce into a single convention attribute.
       switch (info.getSILRepresentation()) {
       case SILFunctionType::Representation::Thick:
-        break;
+        llvm_unreachable("thick is not printed");
       case SILFunctionType::Representation::Thin:
-        Printer << "@convention(thin) ";
+        Printer << "thin";
         break;
       case SILFunctionType::Representation::Block:
-        Printer << "@convention(block) ";
+        Printer << "block";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        Printer << "@convention(c) ";
+        Printer << "c";
         break;
       case SILFunctionType::Representation::Method:
-        Printer << "@convention(method) ";
+        Printer << "method";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        Printer << "@convention(objc_method) ";
+        Printer << "objc_method";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        Printer << "@convention(witness_method) ";
+        Printer << "witness_method";
         break;
       }
+      Printer << ")";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
     }
   }
 
@@ -3813,34 +3852,43 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (Options.PrintFunctionRepresentationAttrs) {
+    if (Options.PrintFunctionRepresentationAttrs &&
+        !Options.excludeAttrKind(TAK_convention) &&
+        info.getRepresentation() != SILFunctionType::Representation::Thick) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@convention");
+      Printer << "(";
       // TODO: coalesce into a single convention attribute.
       switch (info.getRepresentation()) {
       case SILFunctionType::Representation::Thick:
-        break;
+        llvm_unreachable("thick is not printed");
       case SILFunctionType::Representation::Thin:
-        Printer << "@convention(thin) ";
+        Printer << "thin";
         break;
       case SILFunctionType::Representation::Block:
-        Printer << "@convention(block) ";
+        Printer << "block";
         break;
       case SILFunctionType::Representation::CFunctionPointer:
-        Printer << "@convention(c) ";
+        Printer << "c";
         break;
       case SILFunctionType::Representation::Method:
-        Printer << "@convention(method) ";
+        Printer << "method";
         break;
       case SILFunctionType::Representation::ObjCMethod:
-        Printer << "@convention(objc_method) ";
+        Printer << "objc_method";
         break;
       case SILFunctionType::Representation::WitnessMethod:
-        Printer << "@convention(witness_method) ";
+        Printer << "witness_method";
         break;
       }
+      Printer << ")";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
     }
 
-    if (info.isPseudogeneric())
-      Printer << "@pseudogeneric ";
+    if (info.isPseudogeneric()) {
+      Printer.printSimpleAttr("@pseudogeneric") << " ";
+    }
   }
 
   void visitFunctionType(FunctionType *T) {
@@ -4245,25 +4293,14 @@ public:
     }
   }
 
-  GenericParamList *getGenericParamListAtDepth(unsigned depth) {
-    assert(Options.ContextGenericParams);
-    if (!UnwrappedGenericParams) {
-      std::vector<GenericParamList *> paramLists;
-      for (auto *params = Options.ContextGenericParams;
-           params;
-           params = params->getOuterParameters()) {
-        paramLists.push_back(params);
-      }
-      UnwrappedGenericParams = std::move(paramLists);
-    }
-    return UnwrappedGenericParams->rbegin()[depth];
-  }
-
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     // Substitute a context archetype if we have context generic params.
-    if (Options.ContextGenericParams) {
-      return visit(getGenericParamListAtDepth(T->getDepth())
-                     ->getPrimaryArchetypes()[T->getIndex()]);
+    if (Options.GenericEnv) {
+      auto *paramTy = T->getCanonicalType().getPointer();
+      auto &map = Options.GenericEnv->getInterfaceToArchetypeMap();
+      auto found = map.find(paramTy);
+      if (found != map.end())
+        return visit(found->second);
     }
 
     auto Name = T->getName();
@@ -4379,12 +4416,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "array_downcast";
   case CheckedCastKind::DictionaryDowncast:
     return "dictionary_downcast";
-  case CheckedCastKind::DictionaryDowncastBridged:
-    return "dictionary_downcast_bridged";
   case CheckedCastKind::SetDowncast:
     return "set_downcast";
-  case CheckedCastKind::SetDowncastBridged:
-    return "set_downcast_bridged";
   case CheckedCastKind::BridgeFromObjectiveC:
     return "bridge_from_objc";
   }
@@ -4458,18 +4491,11 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
 void ProtocolConformance::printName(llvm::raw_ostream &os,
                                     const PrintOptions &PO) const {
   if (getKind() == ProtocolConformanceKind::Normal) {
-    if (PO.PrintForSIL) {
-      if (auto genericSig = getGenericSignature()) {
-        StreamPrinter sPrinter(os);
-        TypePrinter typePrinter(sPrinter, PO);
-        typePrinter.printGenericSignature(genericSig->getGenericParams(),
-                                          genericSig->getRequirements());
-        os << ' ';
-      }
-    } else if (auto gp = getGenericParams()) {
-      StreamPrinter SPrinter(os);
-      PrintAST Printer(SPrinter, PO);
-      Printer.printGenericParams(gp);
+    if (auto genericSig = getGenericSignature()) {
+      StreamPrinter sPrinter(os);
+      TypePrinter typePrinter(sPrinter, PO);
+      typePrinter.printGenericSignature(genericSig->getGenericParams(),
+                                        genericSig->getRequirements());
       os << ' ';
     }
   }

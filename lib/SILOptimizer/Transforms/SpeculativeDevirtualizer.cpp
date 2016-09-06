@@ -50,6 +50,7 @@ STATISTIC(NumTargetsPredicted, "Number of monomorphic functions predicted");
 static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   // Clone the Apply.
   Builder.setCurrentDebugScope(AI.getDebugScope());
+  Builder.addOpenedArchetypeOperands(AI.getInstruction());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i)

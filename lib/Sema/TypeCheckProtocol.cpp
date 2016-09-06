@@ -2032,9 +2032,19 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
   std::string FixitString;
   llvm::raw_string_ostream FixitStream(FixitString);
   ExtraIndentStreamPrinter Printer(FixitStream, StubIndent);
+  Printer.printNewline();
+
+  Accessibility Access = std::min(
+    /* Access of the context */
+    Conformance->getDeclContext()
+      ->getAsGenericTypeOrGenericTypeExtensionContext()->getFormalAccess(),
+    /* Access of the protocol */
+    Requirement->getDeclContext()
+      ->getAsProtocolOrProtocolExtensionContext()->getFormalAccess());
+  if (Access == Accessibility::Public)
+    Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer.printNewline();
     Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
     Printer << "\n";
 
@@ -2045,6 +2055,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
     Options.AccessibilityFilter = Accessibility::Private;
+    Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
     if (isa<ClassDecl>(Conformance->getDeclContext())) {
       Type SelfType = Conformance->getDeclContext()->getSelfTypeInContext();
@@ -2062,7 +2073,6 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.PrintPropertyAccessors = false;
     }
 
-    Printer.printNewline();
     Requirement->print(Printer, Options);
     Printer << "\n";
 
@@ -3924,13 +3934,25 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     return;
   }
 
-  // As a special case, diagnose conversion to ExpressibleByNilLiteral, since we
+  // Special case: diagnose conversion to ExpressibleByNilLiteral, since we
   // know this is something involving 'nil'.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ExpressibleByNilLiteral)) {
     TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
     return;
   }
 
+  // Special case: for enums with a raw type, explain that the failing
+  // conformance to RawRepresentable was inferred.
+  if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
+	if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
+		enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
+
+      TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
+                  diag::enum_raw_type_nonconforming_and_nonsynthable,
+                  T, enumDecl->getRawType());
+      return;
+    }
+  }
 
   TC.diagnose(ComplainLoc, diag::type_does_not_conform,
               T, Proto->getDeclaredType());
@@ -4246,13 +4268,25 @@ void TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
       : TC(tc), DC(dc), Proto(proto) { }
 
     virtual Action walkToTypePre(Type ty) {
+      ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
+          | ConformanceCheckFlags::Used
+          | ConformanceCheckFlags::SuppressDependencyTracking;
+
       // If we have a nominal type, "use" its conformance to
       // _ObjectiveCBridgeable if it has one.
-      if (ty->getAnyNominal()) {
-        ConformanceCheckOptions options = ConformanceCheckFlags::InExpression
-            | ConformanceCheckFlags::Used
-            | ConformanceCheckFlags::SuppressDependencyTracking;
+      if (auto *nominalDecl = ty->getAnyNominal()) {
         (void)TC.conformsToProtocol(ty, Proto, DC, options);
+
+        if (nominalDecl == TC.Context.getSetDecl() ||
+            nominalDecl == TC.Context.getDictionaryDecl()) {
+          auto args = ty->castTo<BoundGenericType>()->getGenericArgs();
+          if (!args.empty()) {
+            auto keyType = args[0];
+            auto *hashableProto =
+              TC.Context.getProtocol(KnownProtocolKind::Hashable);
+            (void)TC.conformsToProtocol(keyType, hashableProto, DC, options);
+          }
+        }
       }
 
       return Action::Continue;
@@ -4706,6 +4740,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
              dc->getDeclaredTypeInContext(),
              diag.Protocol->getName());
 
+    // Special case: explain that 'RawRepresentable' conformance
+    // is implied for enums which already declare a raw type.
+    if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
+      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
+          enumDecl->derivesProtocolConformance(diag.Protocol) &&
+          enumDecl->hasRawType()) {
+        diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
+                 diag::enum_declares_rawrep_with_raw_type,
+                 dc->getDeclaredTypeInContext(), enumDecl->getRawType());
+        continue;
+      }
+    }
+
     diagnose(existingDecl, diag::declared_protocol_conformance_here,
              dc->getDeclaredTypeInContext(),
              static_cast<unsigned>(diag.ExistingKind),
@@ -4903,9 +4950,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Hashable:
     return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
     
-  case KnownProtocolKind::Error:
-    return DerivedConformance::deriveError(*this, Decl, TypeDecl, Requirement);
-
   case KnownProtocolKind::BridgedNSError:
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
                                                     Requirement);

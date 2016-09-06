@@ -1,11 +1,7 @@
-add_swift_executable(swift-reflection-dump
+add_swift_host_tool(swift-reflection-dump
   swift-reflection-dump.cpp
   LINK_FAT_LIBRARIES
     swiftReflection
-  COMPONENT_DEPENDS object support
+  LLVM_COMPONENT_DEPENDS object support
+  SWIFT_COMPONENT tools
 )
-
-swift_install_in_component(tools
-    TARGETS swift-reflection-dump
-    RUNTIME DESTINATION bin)
-

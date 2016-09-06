@@ -492,6 +492,7 @@ namespace {
         // FIXME: If we were walking TypeLocs, we could actually get parameter
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
+        // We also lose `noescape`. <https://bugs.swift.org/browse/SR-2529>
         params.push_back(swiftParamTy);
       }
 
@@ -985,11 +986,9 @@ namespace {
 
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
-        if (Impl.SwiftContext.LangOpts.EnableIdAsAny)
-          return {proto->getDeclaredType(),
-                  ImportHint(ImportHint::ObjCBridged,
-                             Impl.SwiftContext.TheAnyType)};
-        return {proto->getDeclaredType(), ImportHint::ObjCPointer};
+        return {proto->getDeclaredType(),
+                ImportHint(ImportHint::ObjCBridged,
+                           Impl.SwiftContext.TheAnyType)};
       }
 
       // Class maps to AnyObject.Type.

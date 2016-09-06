@@ -18,7 +18,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
@@ -283,26 +282,22 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     return Attrs.has(K);
   };
 
-  if (hasAttr(TAK_autoclosure)) {
-    Printer.printAttrName("@autoclosure");
-    Printer << " ";
-  }
-  if (hasAttr(TAK_escaping)) {
-    Printer.printAttrName("@escaping");
-    Printer << " ";
-  }
+  if (hasAttr(TAK_autoclosure))
+    Printer.printSimpleAttr("@autoclosure") << " ";
+  if (hasAttr(TAK_escaping))
+    Printer.printSimpleAttr("@escaping") << " ";
 
-  if (hasAttr(TAK_thin)) {
-    Printer.printAttrName("@thin");
-    Printer << " ";
-  }
-  if (hasAttr(TAK_thick)) {
-    Printer.printAttrName("@thick");
-    Printer << " ";
-  }
+  if (hasAttr(TAK_thin))
+    Printer.printSimpleAttr("@thin") << " ";
+  if (hasAttr(TAK_thick))
+    Printer.printSimpleAttr("@thick") << " ";
+
   if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+    Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
-    Printer << "(" << Attrs.convention.getValue() << ") ";
+    Printer << "(" << Attrs.convention.getValue() << ")";
+    Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+    Printer << " ";
   }
 }
 

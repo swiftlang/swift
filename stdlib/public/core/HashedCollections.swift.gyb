@@ -1278,15 +1278,6 @@ internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) ->
 
 //===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
-func _impossible<T>(_:T.Type) -> T {
-  Builtin.unreachable()
-}
-
-func _unsafeUpcast<T, U>(_ x: T, to: U.Type) -> U {
-  _sanityCheck(x is U)
-  return x as? U ?? _impossible(U.self)
-}
-
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseValue` is a base class or base `@objc`
@@ -1295,7 +1286,7 @@ public func _setUpCast<DerivedValue, BaseValue>(_ source: Set<DerivedValue>)
   -> Set<BaseValue> {
   var builder = _SetBuilder<BaseValue>(count: source.count)
   for x in source {
-    builder.add(member: _unsafeUpcast(x, to: BaseValue.self))
+    builder.add(member: x as! BaseValue)
   }
   return builder.take()
 }
@@ -2220,8 +2211,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
 
   for (k, v) in source {
-    result[_unsafeUpcast(k, to: BaseKey.self)]
-      = _unsafeUpcast(v, to: BaseValue.self)
+    result[k as! BaseKey] = (v as! BaseValue)
   }
   return result
 }

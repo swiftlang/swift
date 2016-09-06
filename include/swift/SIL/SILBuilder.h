@@ -135,6 +135,11 @@ public:
   void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
     this->BB = BB;
     this->InsertPt = InsertPt;
+    if (InsertPt == BB->end())
+      return;
+    // Set the opened archetype context from the instruction.
+    this->getOpenedArchetypes().addOpenedArchetypeOperands(
+        InsertPt->getTypeDependentOperands());
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -175,6 +180,14 @@ public:
 
   SmallVectorImpl<SILInstruction *> *getTrackingList() {
     return InsertedInstrs;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Opened archetypes handling
+  //===--------------------------------------------------------------------===//
+  void addOpenedArchetypeOperands(SILInstruction *I) {
+    getOpenedArchetypes().addOpenedArchetypeOperands(
+        I->getTypeDependentOperands());
   }
 
   //===--------------------------------------------------------------------===//

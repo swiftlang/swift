@@ -3894,7 +3894,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum1X",
     key.offset: 380,
-    key.length: 23,
+    key.length: 31,
     key.typename: "FooEnum1",
     key.nameoffset: 384,
     key.namelength: 9
@@ -3989,7 +3989,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum2X",
     key.offset: 582,
-    key.length: 23,
+    key.length: 31,
     key.typename: "FooEnum2",
     key.nameoffset: 586,
     key.namelength: 9
@@ -4000,7 +4000,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum2Y",
     key.offset: 621,
-    key.length: 23,
+    key.length: 31,
     key.typename: "FooEnum2",
     key.nameoffset: 625,
     key.namelength: 9
@@ -4095,7 +4095,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum3X",
     key.offset: 822,
-    key.length: 23,
+    key.length: 31,
     key.typename: "FooEnum3",
     key.nameoffset: 826,
     key.namelength: 9
@@ -4106,7 +4106,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooEnum3Y",
     key.offset: 861,
-    key.length: 23,
+    key.length: 31,
     key.typename: "FooEnum3",
     key.nameoffset: 865,
     key.namelength: 9
@@ -4239,7 +4239,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "enableMince",
         key.offset: 1258,
-        key.length: 41,
+        key.length: 49,
         key.typename: "FooRuncingOptions",
         key.nameoffset: 1269,
         key.namelength: 11
@@ -4250,7 +4250,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "enableQuince",
         key.offset: 1320,
-        key.length: 42,
+        key.length: 50,
         key.typename: "FooRuncingOptions",
         key.nameoffset: 1331,
         key.namelength: 12
@@ -4750,7 +4750,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "fooProperty1",
         key.offset: 3560,
-        key.length: 23,
+        key.length: 35,
         key.typename: "Int32",
         key.nameoffset: 3564,
         key.namelength: 12,
@@ -4763,7 +4763,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.setter_accessibility: source.lang.swift.accessibility.public,
         key.name: "fooProperty2",
         key.offset: 3608,
-        key.length: 23,
+        key.length: 35,
         key.typename: "Int32",
         key.nameoffset: 3612,
         key.namelength: 12,
@@ -4775,7 +4775,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "fooProperty3",
         key.offset: 3656,
-        key.length: 23,
+        key.length: 31,
         key.typename: "Int32",
         key.nameoffset: 3660,
         key.namelength: 12,
@@ -4963,7 +4963,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
         key.setter_accessibility: source.lang.swift.accessibility.open,
         key.name: "fooProperty3",
         key.offset: 4226,
-        key.length: 23,
+        key.length: 31,
         key.typename: "Int32",
         key.nameoffset: 4230,
         key.namelength: 12
@@ -5052,7 +5052,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_1",
     key.offset: 4606,
-    key.length: 22,
+    key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4610,
     key.namelength: 11
@@ -5063,7 +5063,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_2",
     key.offset: 4644,
-    key.length: 22,
+    key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4648,
     key.namelength: 11
@@ -5074,7 +5074,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_3",
     key.offset: 4682,
-    key.length: 22,
+    key.length: 30,
     key.typename: "Int32",
     key.nameoffset: 4686,
     key.namelength: 11
@@ -5085,7 +5085,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_4",
     key.offset: 4759,
-    key.length: 23,
+    key.length: 31,
     key.typename: "UInt32",
     key.nameoffset: 4763,
     key.namelength: 11
@@ -5096,7 +5096,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_5",
     key.offset: 4798,
-    key.length: 23,
+    key.length: 31,
     key.typename: "UInt64",
     key.nameoffset: 4802,
     key.namelength: 11
@@ -5107,7 +5107,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_REDEF_1",
     key.offset: 4838,
-    key.length: 28,
+    key.length: 36,
     key.typename: "Int32",
     key.nameoffset: 4842,
     key.namelength: 17
@@ -5118,7 +5118,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FOO_MACRO_REDEF_2",
     key.offset: 4883,
-    key.length: 28,
+    key.length: 36,
     key.typename: "Int32",
     key.nameoffset: 4887,
     key.namelength: 17

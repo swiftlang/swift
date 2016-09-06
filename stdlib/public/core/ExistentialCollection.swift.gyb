@@ -200,6 +200,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   end
 
 %   override = 'override' if Kind != 'Sequence' else ''
+  internal ${override} func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+  
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
@@ -209,6 +215,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+  
+  internal ${override} func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -379,11 +391,21 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     -> UnsafeMutablePointer<Element> {
     return _base._copyContents(initializing: ptr)
   }
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
+  }
   internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
   internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
+  }
+  internal override func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.prefix(while: predicate))
   }
   internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
@@ -537,7 +559,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: @escaping () -> Iterator
+  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
@@ -606,12 +628,24 @@ extension Any${Kind} {
     return try _box._forEach(body)
   }
 
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._drop(while: predicate))
+  }
+
   public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
   }
 
   public func dropLast(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropLast(n))
+  }
+
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._prefix(while: predicate))
   }
 
   public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
@@ -765,6 +799,9 @@ protocol _AnyCollectionProtocol : Collection {
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
 
+//  public typealias Indices
+//    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+  
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
   }

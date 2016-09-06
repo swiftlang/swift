@@ -995,10 +995,6 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
   return accessor;
 }
 
-static void bindArchetypeAccessPaths(IRGenFunction &IGF,
-                                     GenericSignature *Generics,
-                                     GetTypeParameterInContextFn getInContext);
-
 namespace {
 
 /// Conformance info for a witness table that can be directly generated.
@@ -1285,7 +1281,7 @@ public:
       auto declCtx = Conformance.getDeclContext();
       if (auto generics = declCtx->getGenericSignatureOfContext()) {
         auto getInContext = [&](CanType type) -> CanType {
-          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type, nullptr)
+          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type)
               ->getCanonicalType();
         };
         bindArchetypeAccessPaths(IGF, generics, getInContext);
@@ -1853,9 +1849,8 @@ void addPotentialArchetypeAccessPath(IRGenFunction &IGF,
                              {srcBaseArchetype, association});
 }
 
-static void bindArchetypeAccessPaths(IRGenFunction &IGF,
-                                     GenericSignature *Generics,
-                                     GetTypeParameterInContextFn getInContext) {
+void irgen::bindArchetypeAccessPaths(IRGenFunction &IGF, GenericSignature *Generics,
+                              GetTypeParameterInContextFn getInContext) {
   // Remember all the extra ways we have of reaching the parameter
   // archetypes due to type equality constraints.
   for (auto reqt : Generics->getRequirements()) {

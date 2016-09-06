@@ -20,7 +20,6 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -706,9 +705,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericSignature *swift::handleSILGenericParams(ASTContext &Ctx,
-                                                GenericParamList *genericParams,
-                                                DeclContext *DC) {
+std::pair<GenericSignature *, GenericEnvironment *>
+swift::handleSILGenericParams(ASTContext &Ctx,
+                              GenericParamList *genericParams,
+                              DeclContext *DC) {
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 

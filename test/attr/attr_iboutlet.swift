@@ -64,6 +64,10 @@ class NonObjC {}
   @IBOutlet var outlet5: AnyObject?
   @IBOutlet var outlet6: AnyObject!
 
+  // Any
+  @IBOutlet var outlet5a: Any?
+  @IBOutlet var outlet6a: Any!
+
   // Protocol types
   @IBOutlet var outlet7: P1 // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type 'P1'}} {{3-13=}}
   @IBOutlet var outlet8: CP1 // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type 'CP1'}} {{3-13=}}

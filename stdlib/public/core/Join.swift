@@ -37,7 +37,7 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   public mutating func next() -> Base.Element.Iterator.Element? {
-    repeat {
+    while true {
       switch _state {
       case .start:
         if let nextSubSequence = _base.next() {
@@ -75,7 +75,6 @@ public struct JoinedIterator<Base : IteratorProtocol> : IteratorProtocol
 
       }
     }
-    while true
   }
 
   internal var _base: Base

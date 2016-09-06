@@ -25,6 +25,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_1 | %FileCheck %s -check-prefix=HAVE_RPAREN_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_2 | %FileCheck %s -check-prefix=HAVE_RPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_COMMA_1 | %FileCheck %s -check-prefix=HAVE_COMMA_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_ALIAS_1 | %FileCheck %s -check-prefix=WITH_ALIAS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_1 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_2 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_3 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_4 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
 
 func freeFunc() {}
 
@@ -236,4 +241,31 @@ func testHaveRParen2() {
 func testHaveComma1() {
   ExplicitConstructors1(#^HAVE_COMMA_1^#,
 // HAVE_COMMA_1-NOT: Decl[Constructor]
+}
+
+class WithAlias1 {
+  init(busted: B) {}
+  init(working: Int) {}
+}
+typealias Alias1 = WithAlias1
+func testWithAlias1() {
+  Alias1#^WITH_ALIAS_1^#
+}
+// WITH_ALIAS_1: Decl[Constructor]/CurrNominal:      ({#working: Int#})[#Alias1#];
+
+struct ClosureInInit1 {
+  struct S{}
+  var prop1: S = {
+    return S(#^CLOSURE_IN_INIT_1^#
+  }
+// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal:      ['('])[#ClosureInInit1.S#];
+  var prop2: S = {
+    return S(#^CLOSURE_IN_INIT_2^#
+  }()
+  var prop3: S = {
+    S(#^CLOSURE_IN_INIT_3^#
+  }
+  var prop3: S = {
+    S(#^CLOSURE_IN_INIT_4^#
+  }()
 }

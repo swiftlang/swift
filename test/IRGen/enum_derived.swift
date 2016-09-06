@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -module-name def_enum -o %t %S/Inputs/def_enum.swift
 // RUN: %target-swift-frontend -I %t -O -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
 // RUN: %target-swift-frontend -I %t -O -primary-file %s -enable-testing -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
@@ -35,9 +35,6 @@ enum E {
 
 extension def_enum.TrafficLight : Error {}
 
-// CHECK-LABEL: define{{( protected)?}} i{{32|64}} @_TFE12enum_derivedO8def_enum12TrafficLightg5_codeSi(i2)
-
-
 extension def_enum.Term : Error {}
 
 // CHECK-NORMAL-LABEL: define hidden i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) #1
@@ -47,5 +44,3 @@ enum Phantom<T> : Int64 {
   case Up
   case Down
 }
-
-extension Phantom : RawRepresentable {}

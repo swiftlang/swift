@@ -28,7 +28,6 @@ syn keyword swiftKeyword
       \ switch
       \ throw
       \ try
-      \ typealias
       \ var
       \ where
       \ while

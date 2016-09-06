@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -Xllvm -sil-disable-pass="External Defs To Decls" -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL

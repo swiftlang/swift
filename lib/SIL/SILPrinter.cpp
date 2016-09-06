@@ -1794,33 +1794,35 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
   
-  auto params = ContextGenericParams;
-  llvm::SmallString<16> disambiguatedNameBuf;
-  unsigned disambiguatedNameCounter = 1;
-  while (params) {
-    for (ArchetypeType *param : params->getPrimaryArchetypes()) {
-      Identifier name = param->getName();
+  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto *env = getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
+      assert(archetypeTy);
+
+      Identifier name = archetypeTy->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << param->getName() << disambiguatedNameCounter++;
+          names << archetypeTy->getName() << disambiguatedNameCounter++;
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != param->getName())
-        Aliases[CanType(param)] = name;
+      if (name != archetypeTy->getName())
+        Aliases[CanType(archetypeTy)] = name;
     }
-    
-    params = params->getOuterParameters();
   }
 
   {
-    PrintOptions withContextGenericParams = PrintOptions::printSIL();
-    withContextGenericParams.ContextGenericParams = ContextGenericParams;
-    withContextGenericParams.AlternativeTypeNames =
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+    withGenericEnvironment.GenericEnv = env;
+    withGenericEnvironment.AlternativeTypeNames =
       Aliases.empty() ? nullptr : &Aliases;
-    LoweredType->print(OS, withContextGenericParams);
+    LoweredType->print(OS, withGenericEnvironment);
   }
   
   if (!isExternalDeclaration()) {

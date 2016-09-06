@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/ExternPrecedences.swift
 
 // RUN: %target-parse-verify-swift -I%t

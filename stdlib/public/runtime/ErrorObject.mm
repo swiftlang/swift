@@ -317,7 +317,7 @@ const HashableWitnessTable *SwiftError::getHashableConformance() const {
   const HashableWitnessTable *expectedWT = nullptr;
   const HashableWitnessTable *wt =
       reinterpret_cast<const HashableWitnessTable *>(
-          swift_conformsToProtocol(type, &_TMps8Hashable));
+          swift_conformsToProtocol(type, &HashableProtocolDescriptor));
   hashableConformance.compare_exchange_strong(
       expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
       std::memory_order_acq_rel);
@@ -394,7 +394,7 @@ extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
 //public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
 SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
 extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
-                           const OpaqueValue *error,
+                           OpaqueValue *error,
                            const Metadata *T,
                            const WitnessTable *Error) {
   typedef SWIFT_CC(swift)
@@ -405,7 +405,10 @@ extern "C" NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
   auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
         reinterpret_cast<GetDefaultFn*>
           (dlsym(RTLD_DEFAULT, "swift_Foundation_getErrorDefaultUserInfo")));
-  if (!foundationGetDefaultUserInfo) { return nullptr; }
+  if (!foundationGetDefaultUserInfo) {
+    T->vw_destroy(error);
+    return nullptr;
+  }
 
   return foundationGetDefaultUserInfo(error, T, Error);
 }

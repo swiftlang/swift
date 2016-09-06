@@ -213,6 +213,7 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
     }
     llvm_unreachable("bad DeclContextKind");
   }
+  llvm_unreachable("unknown parent");
 }
 
 GenericSignature *DeclContext::getGenericSignatureOfContext() const {
@@ -249,6 +250,47 @@ GenericSignature *DeclContext::getGenericSignatureOfContext() const {
       auto ED = cast<ExtensionDecl>(dc);
       if (auto genericSig = ED->getGenericSignature())
         return genericSig;
+      continue;
+    }
+    }
+    llvm_unreachable("bad DeclContextKind");
+  }
+}
+
+GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return nullptr;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SubscriptDecl:
+      // Closures and initializers can't themselves be generic, but they
+      // can occur in generic contexts.
+      continue;
+
+    case DeclContextKind::AbstractFunctionDecl: {
+      auto *AFD = cast<AbstractFunctionDecl>(dc);
+      if (auto genericCtx = AFD->getGenericEnvironment())
+        return genericCtx;
+      continue;
+    }
+
+    case DeclContextKind::GenericTypeDecl: {
+      auto GTD = cast<GenericTypeDecl>(dc);
+      if (auto genericCtx = GTD->getGenericEnvironment())
+        return genericCtx;
+      continue;
+    }
+
+    case DeclContextKind::ExtensionDecl: {
+      auto ED = cast<ExtensionDecl>(dc);
+      if (auto genericCtx = ED->getGenericEnvironment())
+        return genericCtx;
       continue;
     }
     }
@@ -680,7 +722,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     switch (cast<Initializer>(this)->getInitializerKind()) {
     case InitializerKind::PatternBinding: {
       auto init = cast<PatternBindingInitializer>(this);
-      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      OS << " PatternBinding 0x" << (void*) init->getBinding()
+         << " #" << init->getBindingIndex();
       break;
     }
     case InitializerKind::DefaultArgument: {
@@ -706,7 +749,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto init = cast<SerializedPatternBindingInitializer>(local);
-      OS << " PatternBinding 0x" << (void*) init->getBinding();
+      OS << " PatternBinding 0x" << (void*) init->getBinding()
+         << " #" << init->getBindingIndex();
       break;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:

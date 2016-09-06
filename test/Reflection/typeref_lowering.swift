@@ -171,11 +171,11 @@ TGV12TypeLowering3BoxVs5Int16_Vs5Int32_
 
 V12TypeLowering15ReferenceStruct
 // CHECK-64:      (struct TypeLowering.ReferenceStruct)
-// CHECK-64-NEXT: (struct size=72 alignment=8 stride=72 num_extra_inhabitants=[[PTR_XI:2048|2147483647]]
+// CHECK-64-NEXT: (struct size=72 alignment=8 stride=72 num_extra_inhabitants=[[PTR_XI:2048|4096|2147483647]]
 // CHECK-64-NEXT:   (field name=strongRef offset=0
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:   (field name=optionalStrongRef offset=8
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1:2047|2147483646]]
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1:2047|4095|2147483646]]
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=strongRefTuple offset=16
@@ -723,7 +723,7 @@ V12TypeLowering10EnumStruct
 // CHECK-64-NEXT:           (field name=_value offset=0
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0))))))
 // CHECK-64-NEXT:   (field name=optionalOptionalRef offset=64
-// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_2:2147483645|2046]]
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_2:2147483645|2046|4094]]
 // CHECK-64-NEXT:       (field name=some offset=0
 // CHECK-64-NEXT:         (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:           (field name=some offset=0

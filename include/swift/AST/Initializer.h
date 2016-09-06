@@ -80,15 +80,19 @@ public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr) {
+    SpareBits = 0;
   }
  
 
-  void setBinding(PatternBindingDecl *binding) {
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
     setParent(binding->getDeclContext());
     Binding = binding;
+    SpareBits = bindingIndex;
   }
   
   PatternBindingDecl *getBinding() const { return Binding; }
+
+  unsigned getBindingIndex() const { return SpareBits; }
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -108,14 +112,20 @@ class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
   PatternBindingDecl *Binding;
 
 public:
-  SerializedPatternBindingInitializer(PatternBindingDecl *Binding)
+  SerializedPatternBindingInitializer(PatternBindingDecl *Binding,
+                                      unsigned bindingIndex)
     : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
                                  Binding->getDeclContext()),
-      Binding(Binding) {}
+      Binding(Binding) {
+    SpareBits = bindingIndex;
+  }
 
   PatternBindingDecl *getBinding() const {
     return Binding;
   }
+
+  unsigned getBindingIndex() const { return SpareBits; }
+
 
   static bool classof(const DeclContext *DC) {
     if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
@@ -145,11 +155,8 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent) {
-    assert(parent->isLocalContext());
-    setParent(parent);
-  }
-
+  void changeFunction(AbstractFunctionDecl *parent);
+  
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
       return classof(init);

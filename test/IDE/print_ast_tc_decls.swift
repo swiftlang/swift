@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 //
 // Build swift modules this test depends on.
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
@@ -608,7 +608,7 @@ struct d0200_EscapedIdentifiers {
 
   func `func`<`let`: `protocol`, `where`>(
       class: Int, struct: `protocol`, foo: `let`, bar: `where`) where `where` : `protocol` {}
-// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : {{(d0200_EscapedIdentifiers.)?}}`protocol`, `where` where `where` : {{(d0200_EscapedIdentifiers.)?}}`protocol`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`){{$}}
+// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : {{(d0200_EscapedIdentifiers.)?}}`protocol`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `where` : {{(d0200_EscapedIdentifiers.)?}}`protocol`{{$}}
 
   var `var`: `struct` = `struct`()
 // PASS_COMMON-NEXT: {{^}}  var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
@@ -1206,31 +1206,31 @@ struct GenericParams1<
 }
 
 struct GenericParams2<T : FooProtocol> where T : BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams2<T : FooProtocol where T : BarProtocol> {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams2<T : FooProtocol> where T : BarProtocol {{{$}}
 
 struct GenericParams3<T : FooProtocol> where T : BarProtocol, T : QuxProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams3<T : FooProtocol where T : BarProtocol, T : QuxProtocol> {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams3<T : FooProtocol> where T : BarProtocol, T : QuxProtocol {{{$}}
 
 struct GenericParams4<T : QuxProtocol> where T.Qux : FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T : QuxProtocol where T.Qux : FooProtocol> {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}struct GenericParams4<T : QuxProtocol> where T.Qux : FooProtocol {{{$}}
 
 struct GenericParams5<T : QuxProtocol> where T.Qux : FooProtocol & BarProtocol {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : BarProtocol & FooProtocol> {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol> where T.Qux : BarProtocol & FooProtocol {{{$}}
 // FIXME: in protocol compositions protocols are listed in reverse order.
 //
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol where T.Qux : FooProtocol & BarProtocol> {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams5<T : QuxProtocol> where T.Qux : FooProtocol & BarProtocol {{{$}}
 
 struct GenericParams6<T : QuxProtocol, U : QuxProtocol> where T.Qux == U.Qux {}
 // Because of the same type conformance, 'T.Qux' and 'U.Qux' types are
 // identical, so they are printed exactly the same way.  Printing a TypeRepr
 // allows us to recover the original spelling.
 //
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T : QuxProtocol, U : QuxProtocol where T.Qux == T.Qux> {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams6<T : QuxProtocol, U : QuxProtocol> where T.Qux == T.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams6<T : QuxProtocol, U : QuxProtocol> where T.Qux == U.Qux {{{$}}
 
 struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {}
-// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T : QuxProtocol, U : QuxProtocol where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == T.Qux.Qux> {{{$}}
-// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T : QuxProtocol, U : QuxProtocol where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux> {{{$}}
+// PREFER_TYPE_PRINTING: {{^}}struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == T.Qux.Qux {{{$}}
+// PREFER_TYPE_REPR_PRINTING: {{^}}struct GenericParams7<T : QuxProtocol, U : QuxProtocol> where T.Qux : QuxProtocol, U.Qux : QuxProtocol, T.Qux.Qux == U.Qux.Qux {{{$}}
 
 //===---
 //===--- Tupe sugar for library types.

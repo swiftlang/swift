@@ -111,7 +111,7 @@ SwiftValueHeader::getHashableConformance() const {
   const HashableWitnessTable *expectedWT = nullptr;
   const HashableWitnessTable *wt =
       reinterpret_cast<const HashableWitnessTable *>(
-          swift_conformsToProtocol(type, &_TMps8Hashable));
+          swift_conformsToProtocol(type, &HashableProtocolDescriptor));
   hashableConformance.compare_exchange_strong(
       expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
       std::memory_order_acq_rel);
@@ -125,9 +125,9 @@ static constexpr const size_t SwiftValueMinAlignMask
 /* TODO: If we're able to become a SwiftObject subclass in the future,
  * change to this:
 static constexpr const size_t SwiftValueHeaderOffset
-  = sizeof(SwiftObject_s);
+  = sizeof(HeapObject);
 static constexpr const size_t SwiftValueMinAlignMask
-  = alignof(SwiftObject_s) - 1;
+  = alignof(HeapObject) - 1;
  */
 
 static Class _getSwiftValueClass() {
@@ -210,6 +210,49 @@ _SwiftValue *swift::getAsSwiftValue(id object) {
   if (object_getClass(object) == getSwiftValueClass())
     return object;
   return nil;
+}
+
+bool
+swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
+                                  const WitnessTable **tablesBuffer) {
+  Class cls = nullptr;
+
+  // Note that currently we never modify tablesBuffer because
+  // _SwiftValue doesn't conform to any protocols that need witness tables.
+
+  for (size_t i = 0, e = protocols.NumProtocols; i != e; ++i) {
+    auto protocol = protocols[i];
+
+    // _SwiftValue does conform to AnyObject.
+    switch (protocol->Flags.getSpecialProtocol()) {
+    case SpecialProtocol::AnyObject:
+      continue;
+
+    case SpecialProtocol::Error:
+      return false;
+
+    case SpecialProtocol::None:
+      break;
+    }
+
+    // Otherwise, it only conforms to ObjC protocols.  We specifically
+    // don't want to say that _SwiftValue conforms to the Swift protocols
+    // that NSObject conforms to because that would create a situation
+    // where arguably an arbitrary type would conform to those protocols
+    // by way of coercion through _SwiftValue.  Eventually we want to
+    // change _SwiftValue to not be an NSObject subclass at all.
+
+    if (protocol->Flags.getDispatchStrategy() != ProtocolDispatchStrategy::ObjC)
+      return false;
+
+    if (!cls) cls = _getSwiftValueClass();
+
+    // Check whether the class conforms to the protocol.
+    if (![cls conformsToProtocol: (Protocol*) protocol])
+      return false;
+  }
+
+  return true;
 }
 
 @implementation _SwiftValue
@@ -325,6 +368,12 @@ static NSString *getValueDescription(_SwiftValue *self) {
 
 - (const Metadata *)_swiftTypeMetadata {
   return getSwiftValueTypeMetadata(self);
+}
+- (NSString *)_swiftTypeName {
+  TwoWordPair<const char *, uintptr_t> typeName
+    = swift_getTypeName(getSwiftValueTypeMetadata(self), true);
+  
+  return [NSString stringWithUTF8String: typeName.first];
 }
 - (const OpaqueValue *)_swiftValue {
   return getValueFromSwiftValue(self).second;

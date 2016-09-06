@@ -60,6 +60,9 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
 }
 
 /// Determine whether the given type is an opened AnyObject.
+///
+/// This comes up in computeSubstitutions() when accessing
+/// members via dynamic lookup.
 static bool isOpenedAnyObject(Type type) {
   auto archetype = type->getAs<ArchetypeType>();
   if (!archetype)
@@ -79,122 +82,65 @@ Type Solution::computeSubstitutions(
        Type origType, DeclContext *dc,
        Type openedType,
        ConstraintLocator *locator,
-       SmallVectorImpl<Substitution> &substitutions) const {
+       SmallVectorImpl<Substitution> &result) const {
   auto &tc = getConstraintSystem().getTypeChecker();
-  auto &ctx = tc.Context;
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
   assert(openedTypes != OpenedTypes.end() && "Missing opened type information");
-  TypeSubstitutionMap typeSubstitutions;
+  TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
-    typeSubstitutions[opened.first.getPointer()] = getFixedType(opened.second);
+    subs[opened.first.getPointer()] = getFixedType(opened.second);
   }
 
   // Produce the concrete form of the opened type.
   auto type = openedType.transform([&](Type type) -> Type {
-                if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-                  auto archetype = tv->getImpl().getArchetype();
-                  auto simplified = getFixedType(tv);
-                  return SubstitutedType::get(archetype, simplified,
-                                              tc.Context);
-                }
+    if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+      auto archetype = tv->getImpl().getArchetype();
+      auto simplified = getFixedType(tv);
+      return SubstitutedType::get(archetype, simplified,
+                                  tc.Context);
+    }
 
-                return type;
-              });
+    return type;
+  });
 
-  auto currentModule = getConstraintSystem().DC->getParentModule();
-  ArchetypeType *currentArchetype = nullptr;
-  Type currentReplacement;
-  SmallVector<ProtocolConformanceRef, 4> currentConformances;
-
-  ArrayRef<Requirement> requirements;
+  auto mod = getConstraintSystem().DC->getParentModule();
+  GenericSignature *sig;
   if (auto genericFn = origType->getAs<GenericFunctionType>()) {
-    requirements = genericFn->getRequirements();
+    sig = genericFn->getGenericSignature();
   } else {
-    requirements = dc->getGenericSignatureOfContext()->getRequirements();
+    sig = dc->getGenericSignatureOfContext();
   }
 
-  for (const auto &req : requirements) {
-    // Drop requirements for parameters that have been constrained away to
-    // concrete types.
-    auto firstArchetype
-      = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType(), &tc)
-        ->getAs<ArchetypeType>();
-    if (!firstArchetype)
-      continue;
-    
-    switch (req.getKind()) {
-    case RequirementKind::Conformance: {
-      // Get the conformance and record it.
-      auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      assert(firstArchetype == currentArchetype
-             && "Archetype out-of-sync");
-      ProtocolConformance *conformance = nullptr;
-      Type replacement = currentReplacement;
-      bool conforms = tc.conformsToProtocol(
-                        replacement,
-                        protoType->getDecl(),
-                        getConstraintSystem().DC,
-                        (ConformanceCheckFlags::InExpression|
-                         ConformanceCheckFlags::Used),
-                        &conformance);
-      (void)isOpenedAnyObject;
-      assert((conforms ||
-              replacement->is<ErrorType>() ||
-              firstArchetype->getIsRecursive() ||
-              isOpenedAnyObject(replacement) ||
-              replacement->is<GenericTypeParamType>()) &&
-             "Constraint system missed a conformance?");
-      (void)conforms;
+  auto lookupConformanceFn =
+      [&](Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+    ProtocolConformance *conformance = nullptr;
 
-      assert(conformance ||
-             replacement->is<ErrorType>() ||
-             replacement->hasDependentProtocolConformances());
-      currentConformances.push_back(
-                  ProtocolConformanceRef(protoType->getDecl(), conformance));
-      break;
-    }
+    bool conforms = tc.conformsToProtocol(
+                      replacement,
+                      protoType->getDecl(),
+                      getConstraintSystem().DC,
+                      (ConformanceCheckFlags::InExpression|
+                       ConformanceCheckFlags::Used),
+                      &conformance);
+    (void)isOpenedAnyObject;
+    assert((conforms ||
+            replacement->is<ErrorType>() ||
+            isOpenedAnyObject(replacement) ||
+            replacement->is<GenericTypeParamType>()) &&
+           "Constraint system missed a conformance?");
+    (void)conforms;
 
-    case RequirementKind::Superclass:
-      // Superclass requirements aren't recorded in substitutions.
-      break;
+    assert(conformance ||
+           replacement->is<ErrorType>() ||
+           replacement->hasDependentProtocolConformances());
 
-    case RequirementKind::SameType:
-      // Same-type requirements aren't recorded in substitutions.
-      break;
+    return ProtocolConformanceRef(protoType->getDecl(), conformance);
+  };
 
-    case RequirementKind::WitnessMarker:
-      // Flush the current conformances.
-      if (currentArchetype) {
-        substitutions.push_back({
-          currentReplacement,
-          ctx.AllocateCopy(currentConformances)
-        });
-        currentConformances.clear();
-      }
-
-      // Each witness marker starts a new substitution.
-      currentArchetype = firstArchetype;
-      currentReplacement = req.getFirstType().subst(currentModule,
-                                                    typeSubstitutions,
-                                                    None);
-      if (!currentReplacement)
-        currentReplacement = tc.Context.TheErrorType;
-
-      break;
-    }
-  }
-  
-  // Flush the final conformances.
-  if (currentArchetype) {
-    substitutions.push_back({
-      currentReplacement,
-      ctx.AllocateCopy(currentConformances),
-    });
-    currentConformances.clear();
-  }
-
+  sig->getSubstitutions(*mod, subs, lookupConformanceFn, result);
   return type;
 }
 
@@ -2514,8 +2460,6 @@ namespace {
         // in an ambiguity tolerant mode used for diagnostic generation.  Just
         // leave this as whatever type of member reference it already is.
         Type resultTy = simplifyType(expr->getType());
-        assert(resultTy->hasUnresolvedType() &&
-               "Should have a selected member if we got a type");
         expr->setType(resultTy);
         return expr;
       }
@@ -2534,8 +2478,9 @@ namespace {
 
         if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
           auto &tc = cs.getTypeChecker();
-          auto classTy = tc.getBridgedToObjC(cs.DC,
-                                             baseMetaTy->getInstanceType());
+          auto &ctx = tc.Context;
+          auto classTy = ctx.getBridgedToObjC(cs.DC,
+                                              baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
           base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 
@@ -3007,9 +2952,7 @@ namespace {
         break;
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::BridgeFromObjectiveC:
         // Valid checks.
         expr->setCastKind(castKind);
@@ -3034,9 +2977,7 @@ namespace {
       if (fromOptionals.size() != toOptionals.size() ||
           castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncastBridged ||
-          castKind == CheckedCastKind::SetDowncast ||
-          castKind == CheckedCastKind::SetDowncastBridged) {
+          castKind == CheckedCastKind::SetDowncast) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
@@ -3281,9 +3222,7 @@ namespace {
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
@@ -3350,9 +3289,7 @@ namespace {
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         expr->setCastKind(castKind);
@@ -5149,16 +5086,13 @@ buildElementConversion(ExprRewriter &rewriter,
                        ConstraintLocatorBuilder locator,
                        unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
-  auto &ctx = rewriter.cs.getASTContext();
-  if (!ctx.LangOpts.EnableExperimentalCollectionCasts)
-    return {};
-
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
                                   ->getGenericArgs()[typeArgIndex];
   Type destType = destCollectionType->castTo<BoundGenericType>()
                                     ->getGenericArgs()[typeArgIndex];
 
   // Build the conversion.
+  ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
   auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
@@ -5323,11 +5257,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         buildElementConversion(*this, expr->getType(), toType, locator, 0);
 
       // Form the upcast.
-      bool isBridged = !cs.getBaseTypeForArrayType(fromType.getPointer())
-                          ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             {}, conv,
-                                                             isBridged);
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::HashableToAnyHashable: {
@@ -5337,11 +5268,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
       }
 
+      // We want to check conformance on the rvalue, as that's what has
+      // the Hashable conformance
+      expr = tc.coerceToRValue(expr);
+
       // Find the conformance of the source type to Hashable.
       auto hashable = tc.Context.getProtocol(KnownProtocolKind::Hashable);
       ProtocolConformance *conformance;
       bool conforms = tc.conformsToProtocol(expr->getType(), hashable, cs.DC,
-                                            ConformanceCheckFlags::InExpression,
+                                            ConformanceCheckFlags::InExpression |
+                                            ConformanceCheckFlags::Used,
                                             &conformance);
       assert(conforms && "must conform to Hashable");
       (void)conforms;
@@ -5369,11 +5305,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       Type sourceKey, sourceValue;
       std::tie(sourceKey, sourceValue) = *cs.isDictionaryType(expr->getType());
 
-      bool isBridged = !sourceKey->isBridgeableObjectType() ||
-                       !sourceValue->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             keyConv, valueConv,
-                                                             isBridged);
+                                                             keyConv,
+                                                             valueConv);
     }
 
     case ConversionRestrictionKind::SetUpcast: {
@@ -5387,11 +5321,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto conv =
         buildElementConversion(*this, expr->getType(), toType, locator, 0);
 
-      bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
-                          ->isBridgeableObjectType();
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
-                                                             {}, conv,
-                                                             isBridged);
+                                                             {}, conv);
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
@@ -6464,7 +6395,7 @@ namespace {
         // Coerce the pattern, in case we resolved something.
         auto fnType = closure->getType()->castTo<FunctionType>();
         auto *params = closure->getParameters();
-        if (tc.coerceParameterListToType(params, closure, fnType->getInput()))
+        if (tc.coerceParameterListToType(params, closure, fnType))
           return { false, nullptr };
 
         // If this is a single-expression closure, convert the expression
@@ -6694,9 +6625,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::SetDowncastBridged:
       case CheckedCastKind::ValueCast:
       case CheckedCastKind::BridgeFromObjectiveC:
         TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,

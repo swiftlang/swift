@@ -1300,6 +1300,53 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %9999 : $()
 }
 
+
+// CHECK-NEGATIVE-NOT: sil {{.*}}_dont_explode_single_enum
+
+sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
+bb0(%0 : $Optional<(foo, foo)>):
+  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt.1
+  %282 = tuple_extract %281 : $(foo, foo), 0
+  %283 = tuple_extract %281 : $(foo, foo), 1
+  strong_release %283 : $foo
+  return %282 : $foo
+}
+
+
+
+// CHECK-LABEL: sil @call_with_single_enum
+// CHECK: [[F:%[0-9]+]] = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+// CHECK: apply [[F]](%0)
+// CHECK: return
+sil @call_with_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
+bb0(%0 : $Optional<(foo, foo)>):
+  %f = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+  %a = apply %f(%0) : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+  return %a : $foo
+}
+
+
+// Check if externally available functions are optimized.
+
+sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_externally_available
+// CHECK: [[F:%[0-9]+]] = function_ref @_TTSf4d__externally_available_with_dead_arg : $@convention(thin) () -> ()
+// CHECK: apply [[F]]()
+// CHECK: return
+sil @call_externally_available : $@convention(thin) (@guaranteed foo) -> () {
+bb0(%0 : $foo):
+  %f = function_ref @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed foo) -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+
 // We should remove the array semantic from specialized calls.
 
 // CHECK-LABEL: sil [fragile] [thunk] [always_inline] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {

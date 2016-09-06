@@ -198,6 +198,80 @@ internal class InternalSubPrivateSet: Base {
   }
 }
 
+fileprivate class FilePrivateSub: Base {
+  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+    get { return 0 }
+    set {}
+  }
+  private override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+}
+
+fileprivate class FilePrivateSubGood: Base {
+  required init() {} // no-warning
+  override func foo() {}
+  override var bar: Int {
+    get { return 0 }
+    set {}
+  }
+  override subscript () -> () { return () }
+}
+
+fileprivate class FilePrivateSubGood2: Base {
+  fileprivate required init() {} // no-warning
+  fileprivate override func foo() {}
+  fileprivate override var bar: Int {
+    get { return 0 }
+    set {}
+  }
+  fileprivate override subscript () -> () { return () }
+}
+
+fileprivate class FilePrivateSubPrivateSet: Base {
+  required init() {}
+  private(set) override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+    get { return 0 }
+    set {}
+  }
+  private(set) override subscript () -> () { // okay; read-only in base class
+    get { return () }
+    set {}
+  }
+}
+
+private class PrivateSub: Base {
+  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+  private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+    get { return 0 }
+    set {}
+  }
+  private override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as its enclosing type}} {{3-10=fileprivate}}
+}
+
+private class PrivateSubGood: Base {
+  required fileprivate init() {}
+  fileprivate override func foo() {}
+  fileprivate override var bar: Int {
+    get { return 0 }
+    set {}
+  }
+  fileprivate override subscript () -> () { return () }
+}
+
+private class PrivateSubPrivateSet: Base {
+  required fileprivate init() {}
+  fileprivate override func foo() {}
+  private(set) override var bar: Int { // expected-error {{setter of overriding var must be as accessible as its enclosing type}}
+    get { return 0 }
+    set {}
+  }
+  private(set) override subscript () -> () { // okay; read-only in base class
+    get { return () }
+    set {}
+  }
+}
 
 public typealias PublicTA1 = PublicStruct
 public typealias PublicTA2 = InternalStruct // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}

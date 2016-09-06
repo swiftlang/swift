@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -450,7 +449,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       // Skip until we hit the '>'.
       RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     }
-    
+
     auto composition = ProtocolCompositionTypeRepr::create(
       Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
@@ -468,6 +467,16 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       while(++Begin != Protocols.end()) {
         replacement += " & ";
         replacement += extractText(*Begin);
+      }
+
+      // Copy trailing content after '>' to the replacement string.
+      // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
+      StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
+        substr(1);
+      if (!TrailingContent.empty()) {
+        replacement.insert(replacement.begin(), '(');
+        replacement += ")";
+        replacement += TrailingContent;
       }
 
       // Replace 'protocol<T1, T2>' with 'T1 & T2'

@@ -17,6 +17,7 @@
 #include "swift/AST/Substitution.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
@@ -31,23 +32,6 @@ bool Substitution::operator==(const Substitution &other) const {
     Conformance.equals(other.Conformance);
 }
 
-static void
-getSubstitutionMaps(GenericParamList *context,
-                    ArrayRef<Substitution> subs,
-                    TypeSubstitutionMap &typeMap,
-                    ArchetypeConformanceMap &conformanceMap) {
-  for (auto arch : context->getAllNestedArchetypes()) {
-    auto sub = subs.front();
-    subs = subs.slice(1);
-
-    // Save the conformances from the substitution so that we can substitute
-    // them into substitutions that map between archetypes.
-    conformanceMap[arch] = sub.getConformances();
-    typeMap[arch] = sub.getReplacement();
-  }
-  assert(subs.empty() && "did not use all substitutions?!");
-}
-
 Substitution::Substitution(Type Replacement,
                            ArrayRef<ProtocolConformanceRef> Conformance)
   : Replacement(Replacement), Conformance(Conformance)
@@ -58,12 +42,14 @@ Substitution::Substitution(Type Replacement,
 }
 
 Substitution Substitution::subst(Module *module,
-                                 GenericParamList *context,
+                                 GenericSignature *sig,
+                                 GenericEnvironment *env,
                                  ArrayRef<Substitution> subs) const {
   TypeSubstitutionMap subMap;
   ArchetypeConformanceMap conformanceMap;
-  getSubstitutionMaps(context, subs,
-                      subMap, conformanceMap);
+
+  assert(sig && env);
+  env->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
   return subst(module, subs, subMap, conformanceMap);
 }
 
@@ -156,9 +142,4 @@ Substitution Substitution::subst(Module *module,
     substConfs = Conformance;
 
   return Substitution{substReplacement, substConfs};
-}
-
-SubstitutionIterator::SubstitutionIterator(GenericParamList *params,
-                                           ArrayRef<Substitution> subs)
-  : Archetypes(params->getAllArchetypes()), Subs(subs) {
 }

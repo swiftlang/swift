@@ -486,6 +486,9 @@ internal func _product<C1 : Collection, C2 : Collection>(
     return '''    
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
@@ -511,8 +514,8 @@ internal func _product<C1 : Collection, C2 : Collection>(
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable:
-      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping (
+      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,

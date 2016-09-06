@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: swift-3-indexing-model: synchronize Indexable with the actual
+// FIXME: swift-3-indexing-model: synchronize _Indexable with the actual
 // protocol.
 /// A type that supports replacement of an arbitrary subrange of elements with
 /// the elements of another collection.
@@ -23,9 +23,11 @@
 /// `RangeReplaceableCollection` protocol instead, because it has a more
 /// complete interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public protocol RangeReplaceableIndexable : Indexable {
+public typealias RangeReplaceableIndexable = _RangeReplaceableIndexable
+public protocol _RangeReplaceableIndexable : _Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library.
@@ -240,7 +242,7 @@ public protocol RangeReplaceableIndexable : Indexable {
 /// of the protocol's required methods to provide your own custom
 /// implementation.
 public protocol RangeReplaceableCollection
-  : RangeReplaceableIndexable, Collection
+  : _RangeReplaceableIndexable, Collection
 {
   //===--- Fundamental Requirements ---------------------------------------===//
 

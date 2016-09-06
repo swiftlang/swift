@@ -17,9 +17,11 @@
 /// `BidirectionalCollection` protocol instead, because it has a more complete
 /// interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
-public protocol BidirectionalIndexable : Indexable {
+public typealias BidirectionalIndexable = _BidirectionalIndexable
+public protocol _BidirectionalIndexable : _Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library.
@@ -64,7 +66,7 @@ public protocol BidirectionalIndexable : Indexable {
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection
-  : BidirectionalIndexable, Collection {
+  : _BidirectionalIndexable, Collection {
 
 // TODO: swift-3-indexing-model - replaces functionality in BidirectionalIndex
   /// Returns the position immediately before the given index.
@@ -82,18 +84,37 @@ public protocol BidirectionalCollection
 
   /// A sequence that can represent a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : BidirectionalIndexable, Collection
+  associatedtype SubSequence : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
   // FIXME(compiler limitation):
   // associatedtype SubSequence : BidirectionalCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : BidirectionalIndexable, Collection
+  associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
   // FIXME(compiler limitation):
   // associatedtype Indices : BidirectionalCollection
 
+  /// The indices that are valid for subscripting the collection, in ascending
+  /// order.
+  ///
+  /// A collection's `indices` property can hold a strong reference to the
+  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// If you mutate the collection while iterating over its indices, a strong
+  /// reference can cause an unexpected copy of the collection. To avoid the
+  /// unexpected copy, use the `index(after:)` method starting with
+  /// `startIndex` to produce indices instead.
+  ///
+  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
+  ///     var i = c.startIndex
+  ///     while i != c.endIndex {
+  ///         c[i] /= 5
+  ///         i = c.index(after: i)
+  ///     }
+  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  var indices: Indices { get }
+  
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
   ///
@@ -110,7 +131,7 @@ public protocol BidirectionalCollection
 }
 
 /// Default implementation for bidirectional collections.
-extension BidirectionalIndexable {
+extension _BidirectionalIndexable {
 
   @inline(__always)
   public func formIndex(before i: inout Index) {

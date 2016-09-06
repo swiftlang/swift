@@ -22,6 +22,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -49,27 +50,22 @@ static llvm::cl::opt<bool> SkipUnreachableMustBeLastErrors(
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
-/// Returns true if A is an opened existential type, Self, or is equal to an
-/// archetype in F's nested archetype list.
-///
-/// FIXME: Once Self has been removed in favor of opened existential types
-/// everywhere, remove support for self.
+/// Returns true if A is an opened existential type or is equal to an
+/// archetype from F's generic context.
 static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
-  // The only two cases where an archetype is always legal in a function is if
-  // it is self or if it is from an opened existential type. Currently, Self is
-  // being migrated away from in favor of opened existential types, so we should
-  // remove the special case here for Self when that process is completed.
-  //
-  // *NOTE* Associated types of self are not valid here.
-  if (!A->getOpenedExistentialType().isNull() || A->getSelfProtocol())
+  if (!A->getOpenedExistentialType().isNull())
     return true;
 
-  // Ok, we have an archetype, make sure it is in the nested archetypes of our
-  // caller.
-  for (auto Iter : F->getContextGenericParams()->getAllNestedArchetypes())
-    if (A->isEqual(&*Iter))
+  // Find the primary archetype.
+  A = A->getPrimary();
+
+  // Ok, we have a primary archetype, make sure it is in the nested generic
+  // environment of our caller.
+  if (auto *genericEnv = F->getGenericEnvironment())
+    if (genericEnv->getArchetypeToInterfaceMap().count(A))
       return true;
-  return A->getIsRecursive();
+
+  return false;
 }
 
 namespace {
@@ -1757,9 +1753,11 @@ public:
     auto methodTy = constantInfo.SILFnType;
 
     // Map interface types to archetypes.
-    if (auto *params = constantInfo.ContextGenericParams)
-      methodTy = methodTy->substGenericArgs(F.getModule(), M,
-                                            params->getForwardingSubstitutions(C));
+    if (auto *env = constantInfo.GenericEnv) {
+      auto sig = constantInfo.SILFnType->getGenericSignature();
+      auto subs = env->getForwardingSubstitutions(M, sig);
+      methodTy = methodTy->substGenericArgs(F.getModule(), M, subs);
+    }
     assert(!methodTy->isPolymorphic());
 
     // Replace Self parameter with type of 'self' at the call site.
@@ -3306,13 +3304,13 @@ public:
 
     // Make sure that our SILFunction only has context generic params if our
     // SILFunctionType is non-polymorphic.
-    if (F->getContextGenericParams()) {
+    if (F->getGenericEnvironment()) {
       require(FTy->isPolymorphic(),
-              "non-generic function definitions cannot have context "
-              "archetypes");
+              "non-generic function definitions cannot have a "
+              "generic environment");
     } else {
       require(!FTy->isPolymorphic(),
-              "generic function definition must have context archetypes");
+              "generic function definition must have a generic environment");
     }
 
     // Otherwise, verify the body of the function.

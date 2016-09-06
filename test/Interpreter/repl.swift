@@ -4,7 +4,7 @@
 
 :print_decl String
 // CHECK: struct String
-// CHECK: extension String : ExpressibleByStringInterpolation
+// CHECK: extension String : _ExpressibleByStringInterpolation
 
 false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)

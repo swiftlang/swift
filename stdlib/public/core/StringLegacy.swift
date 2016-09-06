@@ -147,15 +147,18 @@ extension String {
     if prefixCount == 0 {
       return true
     }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      if selfCore.isASCII && prefixCore.isASCII {
-        // Prefix longer than self.
-        if prefixCount > selfCore.count {
-          return false
-        }
-        return Int(_swift_stdlib_memcmp(
-          selfCore.startASCII, prefixCore.startASCII, prefixCount)) == 0
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let prefixASCIIBuffer = prefixCore.asciiBuffer {
+      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Prefix is longer than self.
+        return false
       }
+      return Int(_swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.count)) == 0
+    }
+    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
       let rhsStr = _NSContiguousString(prefixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
@@ -202,17 +205,19 @@ extension String {
     if suffixCount == 0 {
       return true
     }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      if selfCore.isASCII && suffixCore.isASCII {
-        // Suffix longer than self.
-        let selfCount = selfCore.count
-        if suffixCount > selfCount {
-          return false
-        }
-        return Int(_swift_stdlib_memcmp(
-                   selfCore.startASCII + (selfCount - suffixCount),
-                   suffixCore.startASCII, suffixCount)) == 0
+    if let selfASCIIBuffer = selfCore.asciiBuffer,
+       let suffixASCIIBuffer = suffixCore.asciiBuffer {
+      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
+        // Suffix is longer than self.
+        return false
       }
+      return Int(_swift_stdlib_memcmp(
+        selfASCIIBuffer.baseAddress!
+          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
+        suffixASCIIBuffer.baseAddress!,
+        suffixASCIIBuffer.count)) == 0
+    }
+    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
       let rhsStr = _NSContiguousString(suffixCore)
       return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {

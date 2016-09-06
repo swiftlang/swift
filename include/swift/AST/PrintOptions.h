@@ -20,7 +20,7 @@
 #include <vector>
 
 namespace swift {
-class GenericParamList;
+class GenericEnvironment;
 class CanType;
 class Decl;
 class ValueDecl;
@@ -336,9 +336,8 @@ struct PrintOptions {
   /// formatting.
   bool PrintOriginalSourceText = false;
 
-  /// \brief Print dependent types as references into this generic parameter
-  /// list.
-  GenericParamList *ContextGenericParams = nullptr;
+  /// \brief Print dependent types as references into this generic environment.
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// \brief Print types with alternative names from their canonical names.
   llvm::DenseMap<CanType, Identifier> *AlternativeTypeNames = nullptr;
@@ -391,7 +390,6 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_Exported);
     result.ExcludeAttrList.push_back(DAK_Inline);
     result.ExcludeAttrList.push_back(DAK_Rethrows);
-    result.ExcludeAttrList.push_back(DAK_Swift3Migration);
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
     result.PrintIfConfig = false;
@@ -448,7 +446,6 @@ struct PrintOptions {
     result.PrintAccessibility = false;
     result.SkipUnavailable = false;
     result.ExcludeAttrList.push_back(DAK_Available);
-    result.ExcludeAttrList.push_back(DAK_Swift3Migration);
     result.ArgAndParamPrinting =
       PrintOptions::ArgAndParamPrintingMode::BothAlways;
     result.PrintDocumentationComments = false;
@@ -493,7 +490,6 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
-    PO.ExcludeAttrList.push_back(DAK_Swift3Migration);
     PO.SkipPrivateStdlibDecls = true;
     PO.ExplodeEnumCaseDecls = true;
     return PO;

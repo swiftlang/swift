@@ -92,11 +92,11 @@ extension TestSuite {
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
     wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -115,6 +115,9 @@ extension TestSuite {
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable {
 
     var testNamePrefix = testNamePrefix
@@ -502,8 +505,8 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
 
 func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   sequence: [Int],
-  equalImpl: ((Int, Int) -> Bool),
-  lessImpl: ((Int, Int) -> Bool),
+  equalImpl: @escaping ((Int, Int) -> Bool),
+  lessImpl: @escaping ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
 %   if predicate:
@@ -683,11 +686,11 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
     wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -705,6 +708,9 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable {
     
     var testNamePrefix = testNamePrefix
@@ -836,11 +842,11 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     makeCollectionOfComparable: @escaping ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
     wrapValueIntoComparable: @escaping (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
+    extractValueFromComparable: @escaping ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -858,6 +864,9 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     CollectionWithComparableElement.Iterator.Element : Comparable,
     CollectionWithComparableElement.SubSequence.Indices.Iterator.Element == CollectionWithComparableElement.Index {
     
@@ -919,8 +928,8 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 
 func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   sequence: [Int],
-  equalImpl: ((Int, Int) -> Bool),
-  lessImpl: ((Int, Int) -> Bool),
+  equalImpl: @escaping ((Int, Int) -> Bool),
+  lessImpl: @escaping ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
 %   if predicate:

@@ -22,7 +22,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -165,12 +164,6 @@ Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
                                   dc);
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
-  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
-    return *bridged;
-  return nullptr;
-}
-
 Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
@@ -184,7 +177,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, valueType);
+  return Context.getBridgedToObjC(dc, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -298,19 +291,12 @@ Type TypeChecker::resolveTypeInContext(
     // extension MyProtocol where Self : YourProtocol { ... }
     if (parentDC->getAsProtocolExtensionContext()) {
       auto ED = cast<ExtensionDecl>(parentDC);
-      if (auto genericParams = ED->getGenericParams()) {
-        for (auto req : genericParams->getTrailingRequirements()) {
-          // We might be resolving 'req.getSubject()' itself.
-          // This whole case feels like a hack -- there should be a
-          // more principled way to represent extensions of protocol
-          // compositions.
-          if (req.getKind() == RequirementReprKind::TypeConstraint) {
-            if (!req.getSubject() ||
-                !req.getSubject()->is<ArchetypeType>() ||
-                !req.getSubject()->castTo<ArchetypeType>()->getSelfProtocol())
-              continue;
-
-            stack.push_back(req.getConstraint());
+      if (auto genericSig = ED->getGenericSignature()) {
+        for (auto req : genericSig->getRequirements()) {
+          if (req.getKind() == RequirementKind::Conformance ||
+              req.getKind() == RequirementKind::Superclass) {
+            if (req.getFirstType()->isEqual(ED->getSelfInterfaceType()))
+              stack.push_back(req.getSecondType());
           }
         }
       }
@@ -1402,6 +1388,43 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   return false;
 }
 
+/// Whether the given DC is a noescape-by-default context, i.e. not a property
+/// setter
+static bool isDefaultNoEscapeContext(const DeclContext *DC) {
+  auto funcDecl = dyn_cast<FuncDecl>(DC);
+  return !funcDecl || !funcDecl->isSetter();
+}
+
+// Hack to apply context-specific @escaping to an AST function type.
+static Type applyNonEscapingFromContext(DeclContext *DC,
+                                        Type ty,
+                                        TypeResolutionOptions options) {
+  // Remember whether this is a function parameter.
+  bool isFunctionParam =
+    options.contains(TR_FunctionInput) ||
+    options.contains(TR_ImmediateFunctionInput);
+
+  bool defaultNoEscape = isFunctionParam && isDefaultNoEscapeContext(DC);
+
+  // Desugar here
+  auto *funcTy = ty->castTo<FunctionType>();
+  auto extInfo = funcTy->getExtInfo();
+  if (defaultNoEscape && !extInfo.isNoEscape()) {
+    extInfo = extInfo.withNoEscape();
+
+    // We lost the sugar to flip the isNoEscape bit.
+    //
+    // FIXME: It would be better to add a new AttributedType sugared type,
+    // which would wrap the NameAliasType or ParenType, and apply the
+    // isNoEscape bit when de-sugaring.
+    // <https://bugs.swift.org/browse/SR-2520>
+    return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
+  }
+
+  // Note: original sugared type
+  return ty;
+}
+
 /// \brief Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(
        DeclContext *DC,
@@ -1431,6 +1454,11 @@ Type TypeChecker::resolveIdentifierType(
     Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
+
+  // Hack to apply context-specific @escaping to a typealias with an underlying
+  // function type.
+  if (result->is<FunctionType>())
+    result = applyNonEscapingFromContext(DC, result, options);
 
   // We allow a type to conform to a protocol that is less available than
   // the type itself. This enables a type to retroactively model or directly
@@ -1637,13 +1665,6 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   return result;
 }
 
-/// Whether the given DC is a noescape-by-default context, i.e. not a property
-/// setter
-static bool isDefaultNoEscapeContext(const DeclContext *DC) {
-  auto funcDecl = dyn_cast<FuncDecl>(DC);
-  return !funcDecl || !funcDecl->isSetter();
-}
-
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
 
@@ -1651,15 +1672,13 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   // error type.
   if (repr->isInvalid()) return ErrorType::get(TC.Context);
 
-  // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TR_FunctionInput) ||
-    options.contains(TR_ImmediateFunctionInput);
-
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
-  if (!isa<InOutTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
-      !isa<AttributedTypeRepr>(repr)) {
+  if (!isa<InOutTypeRepr>(repr) &&
+      !isa<TupleTypeRepr>(repr) &&
+      !isa<AttributedTypeRepr>(repr) &&
+      !isa<FunctionTypeRepr>(repr) &&
+      !isa<IdentTypeRepr>(repr)) {
     options -= TR_ImmediateFunctionInput;
     options -= TR_FunctionInput;
   }
@@ -1686,11 +1705,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Function:
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
-      auto info = AnyFunctionType::ExtInfo().withNoEscape(
-          isFunctionParam &&
-          isDefaultNoEscapeContext(DC));
-      return resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options,
-                                    info);
+      auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
+      if (result && result->is<FunctionType>())
+        return applyNonEscapingFromContext(DC, result, options);
+      return result;
     }
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
 
@@ -1761,8 +1779,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   bool isFunctionParam =
     options.contains(TR_FunctionInput) ||
     options.contains(TR_ImmediateFunctionInput);
-  options -= TR_ImmediateFunctionInput;
-  options -= TR_FunctionInput;
 
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
@@ -1786,7 +1802,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         if (base) {
           Optional<MetatypeRepresentation> storedRepr;
           // The instance type is not a SIL type.
-          auto instanceOptions = options - TR_SILType;
+          auto instanceOptions = options;
+          instanceOptions -= TR_SILType;
+          instanceOptions -= TR_ImmediateFunctionInput;
+          instanceOptions -= TR_FunctionInput;
+
           auto instanceTy = resolveType(base, instanceOptions);
           if (!instanceTy || instanceTy->is<ErrorType>())
             return instanceTy;
@@ -1915,10 +1935,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     if (!ty || ty->is<ErrorType>()) return ty;
-
-    for (auto i : FunctionAttrs)
-      attrs.clearAttribute(i);
-    attrs.convention = None;
   } else if (hasFunctionAttr && fnRepr) {
 
     FunctionType::Representation rep = FunctionType::Representation::Swift;
@@ -1962,29 +1978,50 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
-    bool defaultNoEscape = false;
-    if (isFunctionParam && !attrs.has(TAK_escaping)) {
-      defaultNoEscape = isDefaultNoEscapeContext(DC);
-    }
-
-    if (isFunctionParam && attrs.has(TAK_noescape) &&
-        isDefaultNoEscapeContext(DC)) {
-      // FIXME: diagnostic to tell user this is redundant and drop it
-    }
-
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
-                                  defaultNoEscape | attrs.has(TAK_noescape),
+                                  attrs.has(TAK_noescape),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);
     if (!ty || ty->is<ErrorType>()) return ty;
+  }
 
-    for (auto i : FunctionAttrs)
-      attrs.clearAttribute(i);
-    attrs.convention = None;
-  } else if (hasFunctionAttr) {
+  auto instanceOptions = options;
+  instanceOptions -= TR_ImmediateFunctionInput;
+  instanceOptions -= TR_FunctionInput;
+
+  // If we didn't build the type differently above, we might have
+  // a typealias pointing at a function type with the @escaping
+  // attribute. Resolve the type as if it were in non-parameter
+  // context, and then set isNoEscape if @escaping is not present.
+  if (!ty) ty = resolveType(repr, instanceOptions);
+  if (!ty || ty->is<ErrorType>()) return ty;
+
+  // Handle @escaping
+  if (hasFunctionAttr && ty->is<FunctionType>()) {
+    if (attrs.has(TAK_escaping)) {
+      // The attribute is meaningless except on parameter types.
+      if (!isFunctionParam) {
+        auto &SM = TC.Context.SourceMgr;
+        auto loc = attrs.getLoc(TAK_escaping);
+        auto attrRange = SourceRange(
+          loc.getAdvancedLoc(-1),
+          Lexer::getLocForEndOfToken(SM, loc));
+
+        TC.diagnose(loc, diag::escaping_function_type)
+            .fixItRemove(attrRange);
+      }
+
+      attrs.clearAttribute(TAK_escaping);
+    } else {
+      // No attribute; set the isNoEscape bit if we're in parameter context.
+      ty = applyNonEscapingFromContext(DC, ty, options);
+    }
+  }
+
+  if (hasFunctionAttr && !fnRepr) {
     // @autoclosure usually auto-implies @noescape, don't complain about both
     // of them.
     if (attrs.has(TAK_autoclosure))
@@ -1997,11 +2034,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(i);
       }
     }
-  } 
-
-  // If we didn't build the type differently above, build it normally now.
-  if (!ty) ty = resolveType(repr, options);
-  if (!ty || ty->is<ErrorType>()) return ty;
+  } else if (hasFunctionAttr && fnRepr) {
+    // Remove the function attributes from the set so that we don't diagnose.
+    for (auto i : FunctionAttrs)
+      attrs.clearAttribute(i);
+    attrs.convention = None;
+  }
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
@@ -2056,6 +2094,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
   if (!inputTy || inputTy->is<ErrorType>()) return inputTy;
@@ -2083,11 +2124,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   }
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
-  if (auto genericParams = repr->getGenericParams()) {
+  if (auto genericEnv = repr->getGenericEnvironment()) {
     auto *genericSig = repr->getGenericSignature();
     assert(genericSig != nullptr && "Did not call handleSILGenericParams()?");
-    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, inputTy);
-    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericParams, outputTy);
+    inputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, inputTy);
+    outputTy = ArchetypeBuilder::mapTypeOutOfContext(M, genericEnv, outputTy);
     return GenericFunctionType::get(genericSig, inputTy, outputTy, extInfo);
   }
 
@@ -2120,6 +2161,9 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee) {
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+
   bool hasError = false;
 
   SmallVector<SILParameterInfo, 4> params;
@@ -2173,24 +2217,24 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILParameterInfo, 4> interfaceParams;
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
-  if (auto *genericParams = repr->getGenericParams()) {
+  if (auto *genericEnv = repr->getGenericEnvironment()) {
     genericSig = repr->getGenericSignature()->getCanonicalSignature();
  
     for (auto &param : params) {
       auto transParamType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, param.getType())->getCanonicalType();
+          M, genericEnv, param.getType())->getCanonicalType();
       interfaceParams.push_back(param.getWithType(transParamType));
     }
     for (auto &result : results) {
       auto transResultType =
         ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, result.getType())->getCanonicalType();
+          M, genericEnv, result.getType())->getCanonicalType();
       interfaceResults.push_back(result.getWithType(transResultType));
     }
 
     if (errorResult) {
       auto transErrorResultType = ArchetypeBuilder::mapTypeOutOfContext(
-          M, genericParams, errorResult->getType())->getCanonicalType();
+          M, genericEnv, errorResult->getType())->getCanonicalType();
       interfaceErrorResult =
         errorResult->getWithType(transErrorResultType);
     }
@@ -2448,9 +2492,17 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   
   // If this is the top level of a function input list, peel off the
   // ImmediateFunctionInput marker and install a FunctionInput one instead.
-  auto elementOptions = withoutContext(options);
-  if (options & TR_ImmediateFunctionInput)
-    elementOptions |= TR_FunctionInput;
+  //
+  // If we have a single ParenType though, don't clear these bits; we
+  // still want to parse the type contained therein as if it were in
+  // parameter position, meaning function types are not @escaping by
+  // default.
+  auto elementOptions = options;
+  if (!repr->isParenType()) {
+    elementOptions = withoutContext(elementOptions);
+    if (options & TR_ImmediateFunctionInput)
+      elementOptions |= TR_FunctionInput;
+  }
   
   for (auto tyR : repr->getElements()) {
     NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR);
@@ -2868,13 +2920,12 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
 
   // Determine whether this type is bridged to Objective-C.
   ASTContext &ctx = type->getASTContext();
-  Optional<Type> bridged = ctx.getBridgedToObjC(dc, type,
-                                                ctx.getLazyResolver());
+  Type bridged = ctx.getBridgedToObjC(dc, type);
   if (!bridged)
     return false;
 
   // Check whether we're bridging to a class.
-  auto classDecl = (*bridged)->getClassOrBoundGenericClass();
+  auto classDecl = bridged->getClassOrBoundGenericClass();
   if (!classDecl)
     return false;
 
@@ -2902,6 +2953,13 @@ bool TypeChecker::isRepresentableInObjC(
     return false;
   if (checkObjCInExtensionContext(*this, AFD, Diagnose))
     return false;
+
+  if (AFD->isOperator()) {
+    assert(isa<ProtocolDecl>(AFD->getDeclContext()) &&
+           "all other cases should be caught earlier");
+    diagnose(AFD, diag::objc_operator_proto);
+    return false;
+  }
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {

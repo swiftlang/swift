@@ -1682,9 +1682,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
   auto formalInterfaceType = makeConstantInterfaceType(constant);
-  GenericParamList *contextGenerics, *innerGenerics;
-  std::tie(contextGenerics, innerGenerics)
-    = getConstantContextGenericParams(constant);
+  auto *genericEnv = getConstantGenericEnvironment(constant);
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
@@ -1714,8 +1712,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
     formalInterfaceType,
     loweredInterfaceType,
     silFnType,
-    contextGenerics,
-    innerGenerics,
+    genericEnv
   };
   ConstantTypes[constant] = result;
   return result;
@@ -2091,8 +2088,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   SILConstantInfo overrideInfo;
   overrideInfo.LoweredInterfaceType = overrideLoweredInterfaceTy;
   overrideInfo.SILFnType = fnTy;
-  overrideInfo.ContextGenericParams = derivedInfo.ContextGenericParams;
-  overrideInfo.InnerGenericParams = derivedInfo.InnerGenericParams;
+  overrideInfo.GenericEnv = derivedInfo.GenericEnv;
   ConstantOverrideTypes[{derived, base}] = overrideInfo;
 
   return overrideInfo;
@@ -2105,13 +2101,13 @@ namespace {
       public CanTypeVisitor<SILTypeSubstituter, CanType> {
     SILModule &TheSILModule;
     Module *TheASTModule;
-    TypeSubstitutionMap &Subs;
+    const TypeSubstitutionMap &Subs;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs)
+                       const TypeSubstitutionMap &subs)
       : TheSILModule(silModule), TheASTModule(astModule), Subs(subs)
     {}
 
@@ -2219,19 +2215,19 @@ namespace {
 }
 
 SILType SILType::substType(SILModule &silModule, Module *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy) {
+                           const TypeSubstitutionMap &subs, SILType SrcTy) {
   return SrcTy.subst(silModule, astModule, subs);
 }
 
 SILType SILType::subst(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs) const {
+                       const TypeSubstitutionMap &subs) const {
   SILTypeSubstituter STST(silModule, astModule, subs);
   return STST.subst(*this);
 }
 
 CanSILFunctionType SILType::substFuncType(SILModule &silModule,
                                           Module *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics) {
   SILTypeSubstituter STST(silModule, astModule, subs);

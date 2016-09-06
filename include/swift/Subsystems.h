@@ -43,6 +43,7 @@ namespace swift {
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class FileUnit;
+  class GenericEnvironment;
   class GenericParamList;
   class GenericSignature;
   class IRGenOptions;
@@ -208,9 +209,10 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericSignature *handleSILGenericParams(ASTContext &Ctx,
-                                           GenericParamList *genericParams,
-                                           DeclContext *DC);
+  std::pair<GenericSignature *, GenericEnvironment *>
+  handleSILGenericParams(ASTContext &Ctx,
+                         GenericParamList *genericParams,
+                         DeclContext *DC);
 
   /// Turn the given module into SIL IR.
   ///

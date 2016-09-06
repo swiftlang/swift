@@ -18,7 +18,7 @@ class Sub : FooClassBase {
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth2() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func nonInternalMeth() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth1() -> Any! {|}
-// CHECK1: Decl[Constructor]/Super:            init!() {|}
+// CHECK1: Decl[Constructor]/Super:            override init!() {|}
 // CHECK1: End completions
 
 class Sub : FooClassDerived {

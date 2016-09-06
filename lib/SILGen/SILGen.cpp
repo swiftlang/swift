@@ -575,8 +575,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   assert(F->empty() && "already emitted function?!");
 
-  F->setContextGenericParams(
-                         Types.getConstantInfo(constant).ContextGenericParams);
+  F->setGenericEnvironment(Types.getConstantInfo(constant).GenericEnv);
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -1024,9 +1023,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
   unsigned index = 0;
   for (auto paramList : paramLists) {
     for (auto param : *paramList) {
-      if (auto handle = param->getDefaultValue())
+      if (auto defaultArg = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                handle->getExpr());
+                                defaultArg);
       ++index;
     }
   }

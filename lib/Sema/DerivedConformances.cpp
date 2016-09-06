@@ -53,10 +53,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
-    // Error._code
-    if (name.isSimpleName(ctx.Id_code_))
-      return getRequirement(KnownProtocolKind::Error);
-
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
       return getRequirement(KnownProtocolKind::BridgedNSError);
@@ -152,6 +148,8 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericSignature(sig);
+    getterDecl->setGenericEnvironment(
+        parentDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                              interfaceType,
                                              FunctionType::ExtInfo());

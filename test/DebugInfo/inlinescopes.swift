@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: echo "public var x = Int64()" \
 // RUN:   | %target-swift-frontend -module-name FooBar -emit-module -o %t -
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o %t.ll

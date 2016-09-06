@@ -316,9 +316,8 @@ std::string swift::nameForMetadata(const Metadata *type,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
-extern "C"
 TwoWordPair<const char *, uintptr_t>::Return
-swift_getTypeName(const Metadata *type, bool qualified) {
+swift::swift_getTypeName(const Metadata *type, bool qualified) {
   using Pair = TwoWordPair<const char *, uintptr_t>;
   using Key = llvm::PointerIntPair<const Metadata *, 1, bool>;
 
@@ -893,9 +892,6 @@ extern "C" id swift_stdlib_getErrorEmbeddedNSErrorIndirect(
 /// Nominal type descriptor for Swift.AnyHashable.
 extern "C" const NominalTypeDescriptor _TMnVs11AnyHashable;
 
-/// Protocol descriptor for Swift.Hashable.
-extern "C" const ProtocolDescriptor _TMps8Hashable;
-
 static bool isAnyHashableType(const StructMetadata *type) {
   return type->getDescription() == &_TMnVs11AnyHashable;
 }
@@ -915,7 +911,7 @@ static bool _dynamicCastToAnyHashable(OpaqueValue *destination,
                                       DynamicCastFlags flags) {
   // Look for a conformance to Hashable.
   auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(sourceType, &_TMps8Hashable));
+      swift_conformsToProtocol(sourceType, &HashableProtocolDescriptor));
 
   // If we don't find one, the cast fails.
   if (!hashableConformance) {
@@ -1049,6 +1045,26 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     MetadataKind kind =
         srcDynamicType ? srcDynamicType->getKind() : MetadataKind::Class;
 
+    // A fallback to use if we don't have a more specialized approach
+    // for a non-class type.
+    auto fallbackForNonClass = [&] {
+#if SWIFT_OBJC_INTEROP
+      // If the destination type is a set of protocols that SwiftValue
+      // implements, we're fine.
+      if (findSwiftValueConformances(targetType->Protocols,
+                                     destExistential->getWitnessTables())) {
+        bool consumeValue = dynamicFlags & DynamicCastFlags::TakeOnSuccess;
+        destExistential->Value =
+          bridgeAnythingToSwiftValueObject(srcDynamicValue, srcDynamicType,
+                                           consumeValue);
+        maybeDeallocateSource(true);
+        return true;
+      }
+#endif
+
+      return _fail(src, srcType, targetType, flags);
+    };
+
     // If the source type is a value type, it cannot possibly conform
     // to a class-bounded protocol. 
     switch (kind) {
@@ -1068,14 +1084,15 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       }
 #endif
       // Otherwise, metatypes aren't class objects.
-      return _fail(src, srcType, targetType, flags);
+      return fallbackForNonClass();
     }
     
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
     case MetadataKind::Existential:
-      // Handle these cases below.
+      // Handle the class cases below.  Note that opaque existentials
+      // shouldn't get here because we should have drilled into them above.
       break;
 
     case MetadataKind::Struct:
@@ -1105,7 +1122,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         return success;
       }
 #endif
-      break;
+      SWIFT_FALLTHROUGH;
 
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
@@ -1113,8 +1130,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     case MetadataKind::ErrorObject:
     case MetadataKind::Opaque:
     case MetadataKind::Tuple:
-      // Will never succeed.
-      return _fail(src, srcType, targetType, flags);
+      return fallbackForNonClass();
     }
 
     // Check for protocol conformances and fill in the witness tables. If
@@ -2613,6 +2629,11 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass: {
+      // Casts to AnyHashable.
+      if (isAnyHashableType(targetType)) {
+        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
+      }
+
 #if SWIFT_OBJC_INTEROP
       // If the target type is bridged to Objective-C, try to bridge.
       if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
@@ -2629,10 +2650,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       }
 #endif
 
-      // Casts to AnyHashable.
-      if (isAnyHashableType(targetType)) {
-        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
-      }
       break;
     }
 
@@ -2646,10 +2663,16 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       }
       break;
 
+    case MetadataKind::Optional:
+    case MetadataKind::Enum:
+      // Casts to AnyHashable.
+      if (isAnyHashableType(targetType)) {
+        return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
+      }
+      break;
+
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:

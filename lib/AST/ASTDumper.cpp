@@ -831,7 +831,7 @@ namespace {
       
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
-        printRec(init->getExpr());
+        printRec(init);
       }
       
       OS << ')';
@@ -1936,8 +1936,6 @@ public:
   }
   void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     printCommon(E, "collection_upcast_expr");
-    if (E->bridgesToObjC())
-      OS << " bridges_to_objc";
     OS << '\n';
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {

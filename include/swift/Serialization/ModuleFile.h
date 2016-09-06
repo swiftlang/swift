@@ -426,11 +426,35 @@ private:
   ParameterList *readParameterList();
   
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
-                                                DeclContext *DC,
-                                                llvm::BitstreamCursor &Cursor);
+                                                DeclContext *DC);
+
+  /// Reads a generic param list from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a generic param list, returns null
+  /// without moving the cursor.
+  GenericParamList *maybeReadGenericParams(DeclContext *DC,
+                                     GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+
+  /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  ///
+  /// Also returns the set of generic parameters read, in order, to help with
+  /// forming a GenericSignature.
+  GenericEnvironment *readGenericEnvironment(
+      SmallVectorImpl<GenericTypeParamType *> &paramTypes,
+      llvm::BitstreamCursor &Cursor);
+
+  /// Reads a GenericEnvironment followed by requirements from \c DeclTypeCursor.
+  ///
+  /// Returns the GenericEnvironment and the signature formed from the
+  /// generic parameters of the environment, together with the
+  /// read requirements.
+  ///
+  /// Returns nullptr if there's no generic signature here.
+  std::pair<GenericSignature *, GenericEnvironment *>
+  maybeReadGenericSignature();
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
   ///
@@ -690,14 +714,6 @@ public:
   /// Read the given normal conformance from the current module file.
   NormalProtocolConformance *
   readNormalConformance(serialization::NormalConformanceID id);
-
-  /// Reads a generic param list from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a generic param list, returns null
-  /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                     llvm::BitstreamCursor &Cursor,
-                                     GenericParamList *outerParams = nullptr);
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();

@@ -85,6 +85,8 @@ public class SequenceLog {
   public static var first = TypeIndexed(0)
   public static var dropFirst = TypeIndexed(0)
   public static var dropLast = TypeIndexed(0)
+  public static var dropWhile = TypeIndexed(0)
+  public static var prefixWhile = TypeIndexed(0)
   public static var prefixMaxLength = TypeIndexed(0)
   public static var suffixMaxLength = TypeIndexed(0)
   public static var split = TypeIndexed(0)
@@ -262,10 +264,24 @@ public struct ${Self}<
     Log.dropLast[selfType] += 1
     return base.dropLast(n)
   }
+  
+  public func drop(
+    while predicate: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    Log.dropWhile[selfType] += 1
+    return try base.drop(while: predicate)
+  }
 
   public func prefix(_ maxLength: Int) -> SubSequence {
     Log.prefixMaxLength[selfType] += 1
     return base.prefix(maxLength)
+  }
+  
+  public func prefix(
+    while predicate: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    Log.prefixWhile[selfType] += 1
+    return try base.prefix(while: predicate)
   }
 
   public func suffix(_ maxLength: Int) -> SubSequence {

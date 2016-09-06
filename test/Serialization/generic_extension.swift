@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/generic_extension_1.swift
 // RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s
 
@@ -11,3 +11,9 @@ import generic_extension_1
 ["a", "b", "c"].wobble()
 
 // CHECK: sil @_TFE19generic_extension_1Sa6wobble{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @out Optional<τ_0_0>
+
+func useP<T: P>(_ t: T) -> Int { return t.property }
+
+func testUseP(c: ConformsToP) {
+  _ = useP(c)
+}

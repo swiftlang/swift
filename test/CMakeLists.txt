@@ -91,7 +91,11 @@ if(PYTHONINTERP_FOUND)
     endif()
   endif()
 
-  set(SWIFT_TEST_EXTRA_ARGS)
+  # Incremental mode in lit orders test files by the last modification time
+  # instead of by the path, which is good for CI. In this mode lit also updates
+  # the mtime on the failed tests, which makes them run first on the
+  # consecutive execution, which makes local builds fail faster.
+  set(SWIFT_TEST_EXTRA_ARGS "--incremental")
 
   if(NOT SWIFT_INCLUDE_TOOLS)
     list(APPEND SWIFT_TEST_EXTRA_ARGS

@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 260; // Last change: open
+const uint16_t VERSION_MINOR = 266; // Last change: pattern binding init contexts
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -927,9 +927,9 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCVBR<3>    // numpatterns
-
-    // The pattern trails the record.
+    BCVBR<3>,    // numpatterns
+    BCArray<DeclContextIDField> // init contexts
+    // The patterns and decl-contexts trail the record.
   >;
 
   template <unsigned Code>
@@ -1082,14 +1082,31 @@ namespace decls_block {
   >;
 
   using GenericParamListLayout = BCRecordLayout<
-    GENERIC_PARAM_LIST,
-    BCArray<TypeIDField> // Archetypes
+    GENERIC_PARAM_LIST
     // The actual parameters and requirements trail the record.
   >;
 
   using GenericParamLayout = BCRecordLayout<
     GENERIC_PARAM,
     DeclIDField // Typealias
+  >;
+
+  // Subtlety here: GENERIC_ENVIRONMENT is serialized for both Decls and
+  // SILFunctions.
+  //
+  // For Decls, the interface type is non-canonical, so it points back
+  // to the GenericParamListDecl. This allows us to use the serialized
+  // GENERIC_ENVIRONMENT records to form the GenericSignature, as well.
+  // The type is canonicalized when forming the actual GenericEnvironment
+  // instance.
+  //
+  // For SILFunctions, the interface type below is always canonical,
+  // since SILFunctions never point back to any original
+  // GenericTypeParamDecls.
+  using GenericEnvironmentLayout = BCRecordLayout<
+    GENERIC_ENVIRONMENT,
+    TypeIDField,                 // interface type
+    TypeIDField                  // contextual type
   >;
 
   using GenericRequirementLayout = BCRecordLayout<
@@ -1289,7 +1306,8 @@ namespace decls_block {
 
   using PatternBindingInitializerLayout = BCRecordLayout<
     PATTERN_BINDING_INITIALIZER_CONTEXT,
-    DeclIDField // parent pattern binding decl
+    DeclIDField, // parent pattern binding decl
+    BCVBR<3>     // binding index in the pattern binding decl
   >;
 
   using DefaultArgumentInitializerLayout = BCRecordLayout<
@@ -1355,14 +1373,6 @@ namespace decls_block {
     BCFixed<1>, // implicit name flag
     BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
-  >;
-
-  using Swift3MigrationDeclAttrLayout = BCRecordLayout<
-    Swift3Migration_DECL_ATTR,
-    BCFixed<1>, // implicit flag
-    BCVBR<5>,   // number of bytes in rename string
-    BCVBR<5>,   // number of bytes in message string
-    BCBlob      // rename, followed by message
   >;
 
   using SpecializeDeclAttrLayout = BCRecordLayout<

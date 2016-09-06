@@ -1347,54 +1347,27 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    ExprTypeCheckListener *listener, ConstraintSystem &cs,
                    SmallVectorImpl<Solution> &viable,
                    TypeCheckExprOptions options) {
-
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (preCheckExpression(*this, expr, dc))
     return true;
 
-  if (auto generatedExpr = cs.generateConstraints(expr))
-    expr = generatedExpr;
-  else {
-    return true;
-  }
-
-  // If there is a type that we're expected to convert to, add the conversion
-  // constraint.
-  if (convertType) {
-    auto constraintKind = ConstraintKind::Conversion;
-    if (cs.getContextualTypePurpose() == CTP_CallArgument)
-      constraintKind = ConstraintKind::ArgumentConversion;
-      
-    if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-      convertType = convertType.transform([&](Type type) -> Type {
-        if (type->is<UnresolvedType>())
-          return cs.createTypeVariable(cs.getConstraintLocator(expr), 0);
-        return type;
-      });
-    }
-    
-    cs.addConstraint(constraintKind, expr->getType(), convertType,
-                     cs.getConstraintLocator(expr), /*isFavored*/ true);
-  }
-
-  // Notify the listener that we've built the constraint system.
-  if (listener && listener->builtConstraints(cs, expr)) {
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
-    log << "\n";
-    cs.print(log);
-  }
-
   // Attempt to solve the constraint system.
-  if (cs.solve(viable, allowFreeTypeVariables) ||
-      (viable.size() != 1 &&
-       !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
+  auto solution = cs.solve(expr,
+                           convertType,
+                           listener,
+                           viable,
+                           allowFreeTypeVariables);
+
+  // The constraint system has failed
+  if (solution == ConstraintSystem::SolutionKind::Error)
+    return true;
+
+  // If the system is unsolved or there are multiple solutions present but
+  // type checker options do not allow unresolved types, let's try to salvage
+  if (solution == ConstraintSystem::SolutionKind::Unsolved
+      || (viable.size() != 1 &&
+          !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
     if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
       return true;
 
@@ -1523,6 +1496,24 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
          convertType.getType()->hasUnresolvedType())) {
       convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
+    } else if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+      auto *P = closure->getParameters();
+      
+      if (P->size() == 1 && convertType.getType()->is<FunctionType>()) {
+        auto hintFnType = convertType.getType()->castTo<FunctionType>();
+        auto hintFnInputType = hintFnType->getInput();
+        
+        // Cannot use hintFnInputType->is<TupleType>() since it would desugar ParenType
+        if (isa<TupleType>(hintFnInputType.getPointer())) {
+          TupleType *tupleTy = hintFnInputType->castTo<TupleType>();
+          
+          if (tupleTy->getNumElements() >= 2) {
+            diagnose(P->getStartLoc(), diag::closure_argument_list_single_tuple,
+                     hintFnInputType, P->size(), P->size() > 1);
+            return true;
+          }
+        }
+      }
     }
   }
 
@@ -1930,23 +1921,15 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // Enter an initializer context if necessary.
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
-  bool initContextIsNew = false;
   if (!DC->isLocalContext()) {
-    // Check for an existing context created by the parser.
     initContext = cast_or_null<PatternBindingInitializer>(
-                              init->findExistingInitializerContext());
-
-    // If we didn't find one, create it.
-    if (!initContext) {
-      initContext = Context.createPatternBindingContext(DC);
-      initContext->setBinding(PBD);
-      initContextIsNew = true;
-    }
-    DC = initContext;
+                    PBD->getPatternList()[patternNumber].getInitContext());
+    if (initContext)
+      DC = initContext;
   }
 
   bool hadError = typeCheckBinding(pattern, init, DC);
-  PBD->setPattern(patternNumber, pattern);
+  PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
 
@@ -1958,14 +1941,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       checkInitializerErrorHandling(initContext, init);
     }
 
-    bool hasClosures =
-      !hadError && contextualizeInitializer(initContext, init);
-
-    // If we created a fresh context and didn't make any autoclosures,
-    // destroy the initializer context so it can be recycled.
-    if (!hasClosures && initContextIsNew) {
-      Context.destroyPatternBindingContext(initContext);
-    }
+    if (!hadError)
+      (void)contextualizeInitializer(initContext, init);
   }
 
   if (hadError) {
@@ -2969,27 +2946,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ArrayDowncast;
   }
 
-  if (auto toDict = cs.isDictionaryType(toType)) {
-    if (auto fromDict = cs.isDictionaryType(fromType)) {
-      if (toDict->first->isBridgeableObjectType() &&
-          toDict->second->isBridgeableObjectType() &&
-          fromDict->first->isBridgeableObjectType() &&
-          fromDict->second->isBridgeableObjectType())
-        return CheckedCastKind::DictionaryDowncast;
-      
-      return CheckedCastKind::DictionaryDowncastBridged;
-    }
-  }
+  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType))
+    return CheckedCastKind::DictionaryDowncast;
 
-  if (cs.isSetType(toType) && cs.isSetType(fromType)) {
-    auto toBaseType = cs.getBaseTypeForSetType(toType.getPointer());
-    auto fromBaseType = cs.getBaseTypeForSetType(fromType.getPointer());
-    if (toBaseType->isBridgeableObjectType() &&
-        fromBaseType->isBridgeableObjectType()) {
-      return CheckedCastKind::SetDowncast;
-    }
-    return CheckedCastKind::SetDowncastBridged;
-  }
+  if (cs.isSetType(toType) && cs.isSetType(fromType))
+    return CheckedCastKind::SetDowncast;
 
   if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;

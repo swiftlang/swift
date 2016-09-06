@@ -13,11 +13,15 @@
 #define SWIFT_RUNTIME_CONCURRENTUTILS_H
 #include <iterator>
 #include <atomic>
+#include <functional>
 #include <stdint.h>
+#include "llvm/Support/Allocator.h"
 
 #if defined(__FreeBSD__)
 #include <stdio.h>
 #endif
+
+namespace swift {
 
 /// This is a node in a concurrent linked list.
 template <class ElemTy> struct ConcurrentListNode {
@@ -123,6 +127,104 @@ template <class ElemTy> struct ConcurrentList {
   std::atomic<ConcurrentListNode<ElemTy> *> First;
 };
 
+/// A utility function for ordering two pointers, which is useful
+/// for implementing compareWithKey.
+template <class T>
+static inline int comparePointers(const T *left, const T *right) {
+  return (left == right ? 0 : std::less<const T *>()(left, right) ? -1 : 1);
+}
+
+template <class EntryTy, bool ProvideDestructor, class Allocator>
+class ConcurrentMapBase;
+
+/// The partial specialization of ConcurrentMapBase whose destructor is
+/// trivial.  The other implementation inherits from this, so this is a
+/// base for all ConcurrentMaps.
+template <class EntryTy, class Allocator>
+class ConcurrentMapBase<EntryTy, false, Allocator> : protected Allocator {
+protected:
+  struct Node {
+    std::atomic<Node*> Left;
+    std::atomic<Node*> Right;
+    EntryTy Payload;
+
+    template <class... Args>
+    Node(Args &&... args)
+      : Left(nullptr), Right(nullptr), Payload(std::forward<Args>(args)...) {}
+
+    Node(const Node &) = delete;
+    Node &operator=(const Node &) = delete;
+
+  #ifndef NDEBUG
+    void dump() const {
+      auto L = Left.load(std::memory_order_acquire);
+      auto R = Right.load(std::memory_order_acquire);
+      printf("\"%p\" [ label = \" {<f0> %08lx | {<f1> | <f2>}}\" "
+             "style=\"rounded\" shape=\"record\"];\n",
+             this, (long) Payload.getKeyValueForDump());
+
+      if (L) {
+        L->dump();
+        printf("\"%p\":f1 -> \"%p\":f0;\n", this, L);
+      }
+      if (R) {
+        R->dump();
+        printf("\"%p\":f2 -> \"%p\":f0;\n", this, R);
+      }
+    }
+  #endif
+  };
+
+  std::atomic<Node*> Root;
+
+  constexpr ConcurrentMapBase() : Root(nullptr) {}
+
+  // Implicitly trivial destructor.
+  ~ConcurrentMapBase() = default;
+
+  void destroyNode(Node *node) {
+    assert(node && "destroying null node");
+    auto allocSize = sizeof(Node) + node->Payload.getExtraAllocationSize();
+
+    // Destroy the node's payload.
+    node->~Node();
+
+    // Deallocate the node.
+    this->Deallocate(node, allocSize);
+  }
+};
+
+/// The partial specialization of ConcurrentMapBase which provides a
+/// non-trivial destructor.
+template <class EntryTy, class Allocator>
+class ConcurrentMapBase<EntryTy, true, Allocator>
+    : protected ConcurrentMapBase<EntryTy, false, Allocator> {
+protected:
+  using super = ConcurrentMapBase<EntryTy, false, Allocator>;
+  using Node = typename super::Node;
+
+  constexpr ConcurrentMapBase() {}
+
+  ~ConcurrentMapBase() {
+    destroyTree(this->Root);
+  }
+
+private:
+  void destroyTree(const std::atomic<Node*> &edge) {
+    // This can be a relaxed load because destruction is not allowed to race
+    // with other operations.
+    auto node = edge.load(std::memory_order_relaxed);
+    if (!node) return;
+
+    // Destroy the node's children.
+    destroyTree(node->Left);
+    destroyTree(node->Right);
+
+    // Destroy the node itself.
+    this->destroyNode(node);
+  }
+};
+
 /// A concurrent map that is implemented using a binary tree. It supports
 /// concurrent insertions but does not support removals or rebalancing of
 /// the tree.
@@ -140,49 +242,27 @@ template <class ElemTy> struct ConcurrentList {
 ///   /// where KeyTy is the type of the first argument to getOrInsert and
 ///   /// ArgTys is the type of the remaining arguments.
 ///   static size_t getExtraAllocationSize(KeyTy key, ArgTys...)
-template <class EntryTy> class ConcurrentMap {
-  struct Node {
-    std::atomic<Node*> Left;
-    std::atomic<Node*> Right;
-    EntryTy Payload;
+///
+///   /// Return the amount of extra trailing space that was requested for
+///   /// this entry.  This method is only used to compute the size of the
+///   /// object during node deallocation; it does not need to return a
+///   /// correct value so long as the allocator's Deallocate implementation
+///   /// ignores this argument.
+///   size_t getExtraAllocationSize() const;
+///
+/// If ProvideDestructor is false, the destructor will be trivial.  This
+/// can be appropriate when the object is declared at global scope.
+template <class EntryTy, bool ProvideDestructor = true,
+          class Allocator = llvm::MallocAllocator>
+class ConcurrentMap
+      : private ConcurrentMapBase<EntryTy, ProvideDestructor, Allocator> {
+  using super = ConcurrentMapBase<EntryTy, ProvideDestructor, Allocator>;
 
-    template <class... Args>
-    Node(Args &&... args)
-      : Left(nullptr), Right(nullptr), Payload(std::forward<Args>(args)...) {}
+  using Node = typename super::Node;
 
-    Node(const Node &) = delete;
-    Node &operator=(const Node &) = delete;
-
-    ~Node() {
-      // These can be relaxed accesses because there is no safe way for
-      // another thread to race an access to this node with our destruction
-      // of it.
-      ::delete Left.load(std::memory_order_relaxed);
-      ::delete Right.load(std::memory_order_relaxed);
-    }
-
-#ifndef NDEBUG
-    void dump() const {
-      auto L = Left.load(std::memory_order_acquire);
-      auto R = Right.load(std::memory_order_acquire);
-      printf("\"%p\" [ label = \" {<f0> %08lx | {<f1> | <f2>}}\" "
-             "style=\"rounded\" shape=\"record\"];\n",
-             this, (long) Payload.getKeyValueForDump());
-
-      if (L) {
-        L->dump();
-        printf("\"%p\":f1 -> \"%p\":f0;\n", this, L);
-      }
-      if (R) {
-        R->dump();
-        printf("\"%p\":f2 -> \"%p\":f0;\n", this, R);
-      }
-    }
-#endif
-  };
-
-  /// The root of the tree.
-  std::atomic<Node*> Root;
+  /// Inherited from base class:
+  ///   std::atomic<Node*> Root;
+  using super::Root;
 
   /// This member stores the address of the last node that was found by the
   /// search procedure. We cache the last search to accelerate code that
@@ -190,13 +270,18 @@ template <class EntryTy> class ConcurrentMap {
   std::atomic<Node*> LastSearch;
 
 public:
-  constexpr ConcurrentMap() : Root(nullptr), LastSearch(nullptr) {}
+  constexpr ConcurrentMap() : LastSearch(nullptr) {}
 
   ConcurrentMap(const ConcurrentMap &) = delete;
   ConcurrentMap &operator=(const ConcurrentMap &) = delete;
 
-  ~ConcurrentMap() {
-    ::delete Root.load(std::memory_order_relaxed);
+  // ConcurrentMap<T, false> must have a trivial destructor.
+  ~ConcurrentMap() = default;
+
+public:
+
+  Allocator &getAllocator() {
+    return *this;
   }
 
 #ifndef NDEBUG
@@ -275,7 +360,7 @@ public:
         // If it's equal, we can use this node.
         if (comparisonResult == 0) {
           // Destroy the node we allocated before if we're carrying one around.
-          ::delete newNode;
+          if (newNode) this->destroyNode(newNode);
 
           // Cache and report that we found an existing node.
           LastSearch.store(node, std::memory_order_release);
@@ -291,7 +376,7 @@ public:
       if (!newNode) {
         size_t allocSize =
           sizeof(Node) + EntryTy::getExtraAllocationSize(key, args...);
-        void *memory = ::operator new(allocSize);
+        void *memory = this->Allocate(allocSize, alignof(Node));
         newNode = ::new (memory) Node(key, std::forward<ArgTys>(args)...);
       }
 
@@ -312,5 +397,7 @@ public:
     }
   }
 };
+
+} // end namespace swift
 
 #endif // SWIFT_RUNTIME_CONCURRENTUTILS_H

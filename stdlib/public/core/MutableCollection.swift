@@ -16,9 +16,11 @@
 /// `MutableCollection` protocol instead, because it has a more complete
 /// interface.
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
-public protocol MutableIndexable : Indexable {
+public typealias MutableIndexable = _MutableIndexable
+public protocol _MutableIndexable : _Indexable {
   // FIXME(ABI)(compiler limitation): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
@@ -215,7 +217,7 @@ public protocol MutableIndexable : Indexable {
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : MutableIndexable, Collection {
+public protocol MutableCollection : _MutableIndexable, Collection {
   // FIXME: should be constrained to MutableCollection
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)

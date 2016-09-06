@@ -326,83 +326,6 @@ function is_swift_lto_enabled() {
     fi
 }
 
-# Compute the cmake flags related to disabling llvm tools as a result of our
-# needs for testing LLVM/Swift.
-function compute_cmake_llvm_tool_disable_flags() {
-    if [[ $(false_true "${LLVM_INCLUDE_TESTS}") == "FALSE" ]]; then
-        return
-    fi
-
-    local OUTPUT=()
-    local EXTRA_LLVM_CMAKE_OPTIONS=(
-        # Do not include LLVM tests.
-        -DLLVM_INCLUDE_TESTS:BOOL=NO
-        -DCLANG_INCLUDE_TESTS:BOOL=NO
-    )
-
-    # Disable LLVM Tools that Swift does not use for testing.
-    local LLVM_TOOLS_TO_DISABLE=(
-        BUGPOINT BUGPOINT_PASSES GOLD LLI LLVM_AS_FUZZER LLVM_C_TEST
-        LLVM_CXXDUMP LLVM_DIFF LLVM_DIS LLVM_DWP LLVM_EXTRACT LLVM_GO
-        LLVM_JITLISTENER LLVM_LTO LLVM_MC LLVM_MC_FUZZER LLVM_MCMARKUP
-        LLVM_PDBDUMP LLVM_READOBJ LLVM_RTDYLD LLVM_SHLIB LLVM_SIZE LLVM_SPLIT
-        LLVM_STRESS LLVM_SYMBOLIZER MSBUILD OBJ2YAML OPT SANCOV SANSTATS
-        VERIFY_USELISTORDER XCODE_TOOLCHAIN YAML2OBJ
-    )
-
-    # Disable Clang Tools that Swift does not use for testing.
-    local CLANG_TOOLS_TO_DISABLE=(
-        CLANG_CHECK DIAGTOOL SCAN_BUILD SCAN_VIEW CLANG_FORMAT
-    )
-
-    # If in addition we are asked to not generate targets for swift tests,
-    # then we can disable the building of even more of LLVM.
-    if [[ $(false_true "${SWIFT_INCLUDE_TESTS}") == "TRUE" ]]; then
-        EXTRA_LLVM_CMAKE_OPTIONS+=(
-            # We do not need gtest/FileCheck and friends since we are not
-            # running any tests.
-            -DLLVM_INCLUDE_UTILS:BOOL=NO
-        )
-
-        # Disable the rest of the LLVM tools. We do not need any of them.
-        LLVM_TOOLS_TO_DISABLE+=(
-            DSYMUTIL LLC LLVM_AR LLVM_AS LLVM_BCANALYZER LLVM_COV
-            LLVM_DWARFDUMP LLVM_LINK LLVM_NM LLVM_OBJDUMP LLVM_PROFDATA
-        )
-
-        # Disable the rest of the Clang tools. We do not need them.
-        CLANG_TOOLS_TO_DISABLE+=(
-            ARCMT_TEST C_ARCMT_TEST C_INDEX_TEST
-        )
-
-        # If in addition, we are not building compiler-rt, then we do not
-        # even need to build clang.
-        #
-        # *NOTE* This may change once we start building the standard library
-        # *with the just built clang.
-        if [[ $(true_false "${SKIP_BUILD_COMPILER_RT}") == "TRUE" ]]; then
-            CLANG_TOOLS_TO_DISABLE+=(
-                DRIVER
-            )
-        fi
-    fi
-
-    for arg in "${EXTRA_LLVM_CMAKE_ARGS[@]}"; do
-        OUTPUT+=( ${arg} )
-    done
-    for tool in "${LLVM_TOOLS_TO_DISABLE[@]}"; do
-        OUTPUT+=(
-            -DLLVM_TOOL_${tool}_BUILD:BOOL=NO
-        )
-    done
-    for tool in "${CLANG_TOOLS_TO_DISABLE[@]}"; do
-        OUTPUT+=(
-            -DCLANG_TOOL_${tool}_BUILD:BOOL=NO
-        )
-    done
-    echo "${OUTPUT[@]}"
-}
-
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -2363,7 +2286,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
-                if [[ ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                if [[ "${RECONFIGURE}" || ! -f "${LIBDISPATCH_BUILD_DIR}"/config.status ]]; then
+                    echo "Reconfiguring libdispatch"
                     # First time building; need to run autotools and configure
                     if [[ "$LIBDISPATCH_BUILD_TYPE" == "Release" ]] ; then
                         dispatch_build_variant_arg="release"
@@ -2380,7 +2304,8 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${LIBDISPATCH_SOURCE_DIR}"/configure --with-swift-toolchain="${SWIFT_BUILD_PATH}" \
                             --with-build-variant=$dispatch_build_variant_arg \
                             --prefix="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
-
+                else
+                    echo "Skipping reconfiguration of libdispatch"
                 fi
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
                     call make
@@ -2679,7 +2604,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 echo "--- Running tests for ${product} ---"
                 with_pushd "${LIBDISPATCH_BUILD_DIR}" \
-                    call make check
+                    call env VERBOSE=1 make check
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -2704,7 +2629,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
-        build_cmd=("${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- ${BUILD_ARGS})
+        build_cmd=("${CMAKE}" --build "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"

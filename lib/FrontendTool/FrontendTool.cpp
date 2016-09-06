@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/IRGenOptions.h"
@@ -647,7 +648,8 @@ private:
         Info.ID == diag::any_as_anyobject_fixit.ID ||
         Info.ID == diag::deprecated_protocol_composition.ID ||
         Info.ID == diag::deprecated_protocol_composition_single.ID ||
-        Info.ID == diag::deprecated_any_composition.ID)
+        Info.ID == diag::deprecated_any_composition.ID ||
+        Info.ID == diag::deprecated_operator_body.ID)
       return true;
 
     return false;
@@ -779,6 +781,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
       Action == FrontendOptions::PrintAST ||
+      Action == FrontendOptions::DumpScopeMaps ||
       Action == FrontendOptions::DumpTypeRefinementContexts ||
       Action == FrontendOptions::DumpInterfaceHash) {
     SourceFile *SF = PrimarySourceFile;
@@ -788,7 +791,51 @@ static bool performCompile(CompilerInstance &Instance,
     }
     if (Action == FrontendOptions::PrintAST)
       SF->print(llvm::outs(), PrintOptions::printEverything());
-    else if (Action == FrontendOptions::DumpTypeRefinementContexts)
+    else if (Action == FrontendOptions::DumpScopeMaps) {
+      ASTScope &scope = SF->getScope();
+
+      if (opts.DumpScopeMapLocations.empty()) {
+        scope.expandAll();
+      } else if (auto bufferID = SF->getBufferID()) {
+        SourceManager &sourceMgr = Instance.getSourceMgr();
+        // Probe each of the locations, and dump what we find.
+        for (auto lineColumn : opts.DumpScopeMapLocations) {
+          SourceLoc loc = sourceMgr.getLocForLineCol(*bufferID,
+                                                     lineColumn.first,
+                                                     lineColumn.second);
+          if (loc.isInvalid()) continue;
+
+          llvm::errs() << "***Scope at " << lineColumn.first << ":"
+            << lineColumn.second << "***\n";
+          auto locScope = scope.findInnermostEnclosingScope(loc);
+          locScope->print(llvm::errs(), 0, false, false);
+
+          // Dump the AST context, too.
+          if (auto dc = locScope->getDeclContext()) {
+            dc->printContext(llvm::errs());
+          }
+
+          // Grab the local bindings introduced by this scope.
+          auto localBindings = locScope->getLocalBindings();
+          if (!localBindings.empty()) {
+            llvm::errs() << "Local bindings: ";
+            interleave(localBindings.begin(), localBindings.end(),
+                       [&](ValueDecl *value) {
+                         llvm::errs() << value->getFullName();
+                       },
+                       [&]() {
+                         llvm::errs() << " ";
+                       });
+            llvm::errs() << "\n";
+          }
+        }
+
+        llvm::errs() << "***Complete scope map***\n";
+      }
+
+      // Print the resulting map.
+      scope.print(llvm::errs());
+    } else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else if (Action == FrontendOptions::DumpInterfaceHash)
       SF->dumpInterfaceHash(llvm::errs());

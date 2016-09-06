@@ -28,7 +28,7 @@ struct MyMask : OptionSet {
 }
 
 func supported() -> MyMask {
-  return MyMask.Bingo
+  return MyMask(rawValue: UInt(MyMask.Bingo))
 }
 
 struct MyEventMask2 : OptionSet {
@@ -121,7 +121,7 @@ func baz(x: Int) {
   x += 10
 }
 func foo(y: String, x: inout Int) {
-  
+
 }
 
 struct Test1 : OptionSet {
@@ -262,3 +262,19 @@ func testProtocolCompositionSyntax() {
 
 func disable_unnamed_param_reorder(p: Int, _: String) {}
 disable_unnamed_param_reorder(0, "") // no change.
+
+prefix operator *****
+
+class BoolFoo : Bool {
+  var boolValue: Bool {return false}
+}
+func testBoolValue(a : BoolFoo) {
+  if a.boolValue { }
+  guard a.boolValue {}
+  if (a as BoolFoo).boolValue {}
+}
+
+protocol P1 {}
+protocol P2 {}
+var a : (P1 & P2)?
+var a2 : (P1)= 17 as! P1

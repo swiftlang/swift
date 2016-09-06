@@ -21,7 +21,6 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeAlignments.h"
@@ -29,13 +28,13 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
+  class GenericEnvironment;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -246,8 +245,11 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether 'static' or 'class' was used.
     unsigned StaticSpelling : 2;
+
+    /// \brief The number of pattern binding declarations.
+    unsigned NumPatternEntries : 16;
   };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 3 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 19 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -1049,9 +1051,6 @@ public:
   void printAsWritten(raw_ostream &OS) const;
 };
   
-template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
-class NestedGenericParamListIterator;
-  
 /// GenericParamList - A list of generic parameters that is part of a generic
 /// function or type, along with extra requirements placed on those generic
 /// parameters and types derived from them.
@@ -1063,7 +1062,6 @@ class GenericParamList final :
   unsigned NumParams;
   SourceLoc WhereLoc;
   MutableArrayRef<RequirementRepr> Requirements;
-  ArrayRef<ArchetypeType *> AllArchetypes;
 
   GenericParamList *OuterParameters;
 
@@ -1113,28 +1111,6 @@ public:
                                   MutableArrayRef<RequirementRepr> Requirements,
                                   SourceLoc RAngleLoc);
 
-  /// Create a new generic parameter list with the same parameters and
-  /// requirements as this one, but parented to a different outer parameter
-  /// list.
-  GenericParamList *cloneWithOuterParameters(const ASTContext &Context,
-                                             GenericParamList *Outer) {
-    auto clone = create(Context,
-                        SourceLoc(),
-                        getParams(),
-                        SourceLoc(),
-                        getRequirements(),
-                        SourceLoc());
-    clone->setAllArchetypes(getAllArchetypes());
-    clone->setOuterParameters(Outer);
-    return clone;
-  }
-  
-  /// Create an empty generic parameter list.
-  static GenericParamList *getEmpty(ASTContext &Context) {
-    // TODO: Could probably unique this in the AST context.
-    return create(Context, SourceLoc(), {}, SourceLoc(), {}, SourceLoc());
-  }
-  
   MutableArrayRef<GenericTypeParamDecl *> getParams() {
     return {getTrailingObjects<GenericTypeParamDecl *>(), NumParams};
   }
@@ -1152,12 +1128,6 @@ public:
   const_iterator begin() const { return getParams().begin(); }
   const_iterator end() const { return getParams().end(); }
 
-  /// Get the total number of parameters, including those from parent generic
-  /// parameter lists.
-  unsigned totalSize() const {
-    return NumParams + (OuterParameters ? OuterParameters->totalSize() : 0);
-  }
-  
   /// \brief Retrieve the location of the 'where' keyword, or an invalid
   /// location if 'where' was not present.
   SourceLoc getWhereLoc() const { return WhereLoc; }
@@ -1203,52 +1173,6 @@ public:
   /// main part of a declaration's signature.
   void addTrailingWhereClause(ASTContext &ctx, SourceLoc trailingWhereLoc,
                               ArrayRef<RequirementRepr> trailingRequirements);
-
-  /// \brief Retrieves the list containing all archetypes described by this
-  /// generic parameter clause.
-  ///
-  /// In this list of archetypes, the primary archetypes come first followed by
-  /// any non-primary archetypes (i.e., those archetypes that encode associated
-  /// types of another archetype).
-  ///
-  /// This does not include archetypes from the outer generic parameter list(s).
-  ArrayRef<ArchetypeType *> getAllArchetypes() const { return AllArchetypes; }
-
-  /// \brief Return the number of primary archetypes.
-  unsigned getNumPrimaryArchetypes() const {
-    return size();
-  }
-  
-  /// \brief Retrieves the list containing only the primary archetypes described
-  /// by this generic parameter clause. This excludes archetypes for associated
-  /// types of the primary archetypes.
-  ArrayRef<ArchetypeType *> getPrimaryArchetypes() const {
-    return getAllArchetypes().slice(0, getNumPrimaryArchetypes());
-  }
-  
-  /// \brief Sets all archetypes *without* copying the source array.
-  void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
-    assert(AA.size() >= size()
-           && "allArchetypes is smaller than number of generic params?!");
-    AllArchetypes = AA;
-  }
-
-  using NestedArchetypeIterator
-    = NestedGenericParamListIterator<ArchetypeType*,
-                                     &GenericParamList::getAllArchetypes>;
-  using NestedGenericParamIterator
-    = NestedGenericParamListIterator<GenericTypeParamDecl*,
-                                     &GenericParamList::getParams>;
-  
-  /// \brief Retrieves a list containing all archetypes from this generic
-  /// parameter clause and all outer generic parameter clauses in outer-to-
-  /// inner order.
-  iterator_range<NestedArchetypeIterator> getAllNestedArchetypes() const;
-  
-  /// \brief Retrieves a list containing all generic parameter records from
-  /// this generic parameter clause and all outer generic parameter clauses in
-  /// outer-to-inner order.
-  iterator_range<NestedGenericParamIterator> getNestedGenericParams() const;
   
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
@@ -1303,110 +1227,10 @@ public:
     return depth;
   }
 
-  /// Derive a type substitution map for this generic parameter list from a
-  /// matching substitution vector.
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
-
-  /// Derive the all-archetypes list for the given list of generic
-  /// parameters.
-  static ArrayRef<ArchetypeType*>
-  deriveAllArchetypes(ArrayRef<GenericTypeParamDecl*> params,
-                      SmallVectorImpl<ArchetypeType*> &archetypes);
-
-  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C);
-
-  /// Collect the nested archetypes of an archetype into the given
-  /// collection.
-  ///
-  /// \param known - the set of archetypes already present in `all`
-  /// \param all - the output list of archetypes
-  static void addNestedArchetypes(ArchetypeType *archetype,
-                                  SmallPtrSetImpl<ArchetypeType*> &known,
-                                  SmallVectorImpl<ArchetypeType*> &all);
-  
   void print(raw_ostream &OS);
   void dump();
 };
   
-/// An iterator template for lazily walking a nested generic parameter list.
-template<typename T, ArrayRef<T> (GenericParamList::*accessor)() const>
-class NestedGenericParamListIterator {
-  SmallVector<const GenericParamList*, 2> stack;
-  ArrayRef<T> elements;
-
-  void refreshElements() {
-    while (elements.empty()) {
-      stack.pop_back();
-      if (stack.empty()) break;
-      elements = (stack.back()->*accessor)();
-    }
-  }
-public:
-  // Create a 'begin' iterator for a generic param list.
-  NestedGenericParamListIterator(const GenericParamList *params) {
-    // Walk up to the outermost list to create a stack of lists to walk.
-    while (params) {
-      stack.push_back(params);
-      params = params->getOuterParameters();
-    }
-    // If the stack is empty, be like the 'end' iterator.
-    if (stack.empty())
-      return;
-
-    elements = (stack.back()->*accessor)();
-    refreshElements();
-  }
-  
-  // Create an 'end' iterator.
-  NestedGenericParamListIterator() {}
-  
-  // Iterator dereference.
-  const T &operator*() const {
-    return elements[0];
-  }
-  const T *operator->() const {
-    return &elements[0];
-  }
-  
-  // Iterator advancement.
-  NestedGenericParamListIterator &operator++() {
-    elements = elements.slice(1);
-    refreshElements();
-    return *this;
-  }
-  NestedGenericParamListIterator operator++(int) {
-    auto copy = *this;
-    ++(*this);
-    return copy;
-  }
-  
-  // Ghetto comparison. Only true if end() == end().
-  bool operator==(const NestedGenericParamListIterator &o) const {
-    return stack.empty() && o.stack.empty();
-  }
-  bool operator!=(const NestedGenericParamListIterator &o) const {
-    return !stack.empty() || !o.stack.empty();
-  }
-  
-  // An empty range of nested archetypes.
-  static iterator_range<NestedGenericParamListIterator> emptyRange() {
-    return {{}, {}};
-  }
-};
-  
-using NestedArchetypeIterator = GenericParamList::NestedArchetypeIterator;
-using NestedGenericParamIterator = GenericParamList::NestedGenericParamIterator;
-
-inline iterator_range<NestedArchetypeIterator>
-GenericParamList::getAllNestedArchetypes() const {
-  return {NestedArchetypeIterator(this), NestedArchetypeIterator()};
-}
-  
-inline iterator_range<NestedGenericParamIterator>
-GenericParamList::getNestedGenericParams() const {
-  return {NestedGenericParamIterator(this), NestedGenericParamIterator()};
-}
-
 /// A trailing where clause.
 class alignas(RequirementRepr) TrailingWhereClause final :
     private llvm::TrailingObjects<TrailingWhereClause, RequirementRepr> {
@@ -1575,6 +1399,12 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this extension.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this extension.
+  GenericEnvironment *GenericEnv = nullptr;
+
   MutableArrayRef<TypeLoc> Inherited;
 
   /// The trailing where clause.
@@ -1658,7 +1488,19 @@ public:
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   /// Set the generic signature of this extension.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
+
+  /// Retrieve the generic context for this extension.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this extension.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!GenericEnv && "Already have generic context");
+    GenericEnv = env;
+  }
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -1828,9 +1670,14 @@ class PatternBindingEntry {
   // initializer is ASTContext-allocated it is safe.
   llvm::PointerIntPair<Expr *, 2, OptionSet<Flags>> InitCheckedAndRemoved;
 
+  /// The initializer context used for this pattern binding entry.
+  DeclContext *InitContext = nullptr;
+
+  friend class PatternBindingInitializer;
+
 public:
-  PatternBindingEntry(Pattern *P, Expr *E)
-    : ThePattern(P), InitCheckedAndRemoved(E, {}) {}
+  PatternBindingEntry(Pattern *P, Expr *E, DeclContext *InitContext)
+    : ThePattern(P), InitCheckedAndRemoved(E, {}), InitContext(InitContext) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
@@ -1850,6 +1697,15 @@ public:
 
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
+
+  // Retrieve the declaration context for the intializer.
+  DeclContext *getInitContext() const { return InitContext; }
+
+  /// Override the initializer context.
+  void setInitContext(DeclContext *dc) { InitContext = dc; }
+
+  /// Retrieve the source range covered by this pattern binding.
+  SourceRange getSourceRange() const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -1871,8 +1727,6 @@ class PatternBindingDecl final : public Decl,
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
-  unsigned numPatternEntries;
-
   friend class Decl;
   
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
@@ -1892,13 +1746,22 @@ public:
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent);
 
+  static PatternBindingDecl *createDeserialized(
+                               ASTContext &Ctx, SourceLoc StaticLoc,
+                               StaticSpellingKind StaticSpelling,
+                               SourceLoc VarLoc,
+                               unsigned NumPatternEntries,
+                               DeclContext *Parent);
+
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
   }
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
-  unsigned getNumPatternEntries() const { return numPatternEntries; }
+  unsigned getNumPatternEntries() const {
+    return PatternBindingDeclBits.NumPatternEntries;
+  }
   
   ArrayRef<PatternBindingEntry> getPatternList() const {
     return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
@@ -1920,7 +1783,7 @@ public:
     return getPatternList()[i].getPattern();
   }
   
-  void setPattern(unsigned i, Pattern *Pat);
+  void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -1970,7 +1833,7 @@ public:
 private:
   MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
     // Pattern entries are tail allocated.
-    return {getTrailingObjects<PatternBindingEntry>(), numPatternEntries};
+    return {getTrailingObjects<PatternBindingEntry>(), getNumPatternEntries()};
   }
 };
   
@@ -2409,6 +2272,12 @@ class GenericTypeDecl : public TypeDecl, public DeclContext {
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
 
+  /// \brief The generic context of this type.
+  ///
+  /// This is the mapping between interface types and archetypes for the
+  /// generic parameters of this type.
+  GenericEnvironment *GenericEnv = nullptr;
+
   /// \brief Whether or not the generic signature of the type declaration is
   /// currently being validated.
   // TODO: Merge into GenericSig bits.
@@ -2427,7 +2296,10 @@ public:
   void setGenericParams(GenericParamList *params);
 
   /// Set the generic signature of this type.
-  void setGenericSignature(GenericSignature *sig);
+  void setGenericSignature(GenericSignature *sig) {
+    assert(!GenericSig && "Already have generic signature");
+    GenericSig = sig;
+  }
 
   /// Retrieve the innermost generic parameter types.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const {
@@ -2456,6 +2328,15 @@ public:
   
   bool isValidatingGenericSignature() const {
     return ValidatingGenericSignature;
+  }
+
+  /// Retrieve the generic context for this type.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this type.
+  void setGenericEnvironment(GenericEnvironment *env) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = env;
   }
 
   // Resolve ambiguity due to multiple base classes.
@@ -4397,8 +4278,13 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc LetVarInOutLoc;
 
+  struct StoredDefaultArgument {
+    Expr *DefaultArg = nullptr;
+    Initializer *InitContext = nullptr;
+  };
+
   /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<ExprHandle *, 1, bool> DefaultValueAndIsVariadic;
+  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
   
   /// True if the type is implicitly specified in the source, but this has an
   /// apparently valid typeRepr.  This is used in accessors, which look like:
@@ -4444,12 +4330,21 @@ public:
     defaultArgumentKind = K;
   }
   
-  void setDefaultValue(ExprHandle *H) {
-    DefaultValueAndIsVariadic.setPointer(H);
+  Expr *getDefaultValue() const {
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->DefaultArg;
+    return nullptr;
   }
-  ExprHandle *getDefaultValue() const {
-    return DefaultValueAndIsVariadic.getPointer();
+
+  void setDefaultValue(Expr *E);
+
+  Initializer *getDefaultArgumentInitContext() const {
+    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+      return stored->InitContext;
+    return nullptr;
   }
+
+  void setDefaultArgumentInitContext(Initializer *initContext);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
@@ -4676,6 +4571,7 @@ protected:
 
   GenericParamList *GenericParams;
   GenericSignature *GenericSig;
+  GenericEnvironment *GenericEnv;
 
   CaptureInfo Captures;
 
@@ -4692,7 +4588,7 @@ protected:
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(nullptr), GenericSig(nullptr),
-        ThrowsLoc(ThrowsLoc) {
+        GenericEnv(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
     AbstractFunctionDeclBits.NumParameterLists = NumParameterLists;
@@ -4717,6 +4613,15 @@ public:
   
   GenericSignature *getGenericSignature() const {
     return GenericSig;
+  }
+
+  /// Retrieve the generic context for this function.
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+
+  /// Set the generic context of this function.
+  void setGenericEnvironment(GenericEnvironment *GenericEnv) {
+    assert(!this->GenericEnv && "already have generic context?");
+    this->GenericEnv = GenericEnv;
   }
 
   // Expose our import as member status

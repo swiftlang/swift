@@ -3,6 +3,13 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 Swift 3.0
 ---------
 
+* [SE-0045](https://github.com/apple/swift-evolution/blob/master/proposals/0045-scan-takewhile-dropwhile.md)
+
+  The `Sequence` protocol now includes two new members, `prefix(while:)` and
+  `drop(while:)`.  `prefix(while:)` is used to request the longest subsequence
+  satisfying a predicate.  `drop(while:)` is used to request the subsequence
+  remaining after dropping the longest subsequence satisfying a predicate.
+
 * [SE-0136](https://github.com/apple/swift-evolution/blob/master/proposals/0136-memory-layout-of-values.md) and [SE-0101](https://github.com/apple/swift-evolution/blob/master/proposals/0101-standardizing-sizeof-naming.md)
 
   The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.

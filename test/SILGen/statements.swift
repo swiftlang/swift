@@ -591,45 +591,6 @@ func testRequireOptional2(_ a : String?) -> String {
   return t
 }
 
-enum MyOptional<Wrapped> {
-  case none
-  case some(Wrapped)
-}
-
-// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
-// CHECK: bb0(%0 : $*T, %1 : $*MyOptional<T>):
-// CHECK-NEXT: debug_value_addr %1 : $*MyOptional<T>, let, name "a"
-// CHECK-NEXT: %3 = alloc_stack $T, let, name "t"
-// CHECK-NEXT: %4 = alloc_stack $MyOptional<T>
-// CHECK-NEXT: copy_addr %1 to [initialization] %4 : $*MyOptional<T>
-// CHECK-NEXT: switch_enum_addr %4 : $*MyOptional<T>, case #MyOptional.some!enumelt.1: bb2, default bb1
-func testAddressOnlyEnumInRequire<T>(_ a: MyOptional<T>) -> T {
-  // CHECK:  bb1:
-  // CHECK-NEXT:   dealloc_stack %4
-  // CHECK-NEXT:   dealloc_stack %3
-  // CHECK-NEXT:   br bb3
-  guard let t = a else { abort() }
-
-  // CHECK:    bb2:
-  // CHECK-NEXT:     %10 = unchecked_take_enum_data_addr %4 : $*MyOptional<T>, #MyOptional.some!enumelt.1
-  // CHECK-NEXT:     copy_addr [take] %10 to [initialization] %3 : $*T
-  // CHECK-NEXT:     dealloc_stack %4
-  // CHECK-NEXT:     copy_addr [take] %3 to [initialization] %0 : $*T
-  // CHECK-NEXT:     dealloc_stack %3
-  // CHECK-NEXT:     destroy_addr %1 : $*MyOptional<T>
-  // CHECK-NEXT:     tuple ()
-  // CHECK-NEXT:     return
-
-  // CHECK:    bb3:
-  // CHECK-NEXT:     // function_ref statements.abort () -> Swift.Never
-  // CHECK-NEXT:     %18 = function_ref @_TF10statements5abortFT_Os5Never
-  // CHECK-NEXT:     %19 = apply %18() : $@convention(thin) () -> Never
-  // CHECK-NEXT:     unreachable
-
-  return t
-}
-
-
 
 // CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmission
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block

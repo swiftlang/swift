@@ -17,6 +17,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -491,9 +492,11 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArrayRef<Substitution> subs;
   // Call the initializer.
   ArrayRef<Substitution> forwardingSubs;
-  if (auto *genericParamList = ctor->getGenericParamsOfContext())
-    forwardingSubs =
-        genericParamList->getForwardingSubstitutions(getASTContext());
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+    auto *genericSig = ctor->getGenericSignatureOfContext();
+    forwardingSubs = genericEnv->getForwardingSubstitutions(
+        SGM.SwiftModule, genericSig);
+  }
   std::tie(initVal, initTy, subs)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
@@ -870,9 +873,12 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
         // Get the substitutions for the constructor context.
         ArrayRef<Substitution> subs;
-        auto *genericParams = dc->getGenericParamsOfContext();
-        if (genericParams)
-          subs = genericParams->getForwardingSubstitutions(getASTContext());
+        auto *genericEnv = dc->getGenericEnvironmentOfContext();
+        if (genericEnv) {
+          auto *genericSig = dc->getGenericSignatureOfContext();
+          subs = genericEnv->getForwardingSubstitutions(
+              SGM.SwiftModule, genericSig);
+        }
 
         // Get the type of the initialization result, in terms
         // of the constructor context's archetypes.

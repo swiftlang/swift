@@ -282,9 +282,7 @@ extension String {
     }
 
     internal init(_ _core: _StringCore) {
-      self._offset = 0
-      self._length = _core.count
-      self._core = _core
+      self.init(_core, offset: 0, length: _core.count)
     }
 
     internal init(_ _core: _StringCore, offset: Int, length: Int) {

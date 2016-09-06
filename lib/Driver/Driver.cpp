@@ -52,6 +52,8 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CompilationRecord.h"
+
 #include <memory>
 
 using namespace swift;
@@ -262,20 +264,21 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *key = cast<yaml::ScalarNode>(i->getKey());
     StringRef keyStr = key->getValue(scratch);
 
-    if (keyStr == "version") {
+    using compilation_record::TopLevelKey;
+    if (keyStr == compilation_record::getName(TopLevelKey::Version)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
       versionValid =
           (value->getValue(scratch) == version::getSwiftFullVersion());
 
-    } else if (keyStr == "options") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
       optionsMatch = (argsHashStr == value->getValue(scratch));
 
-    } else if (keyStr == "build_time") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
       auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
       if (!value)
         return true;
@@ -284,7 +287,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
 
-    } else if (keyStr == "inputs") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
       if (!inputMap)
         return true;
@@ -300,13 +303,9 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!value)
           return true;
 
+        using compilation_record::getInfoStatusForIdentifier;
         auto previousBuildState =
-            llvm::StringSwitch<Optional<InputInfo::Status>>(value->getRawTag())
-              .Case("", InputInfo::UpToDate)
-              .Case("!dirty", InputInfo::NeedsCascadingBuild)
-              .Case("!private", InputInfo::NeedsNonCascadingBuild)
-              .Default(None);
-
+          getInfoStatusForIdentifier(value->getRawTag());
         if (!previousBuildState)
           return true;
 
@@ -367,6 +366,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     !ArgList->hasArg(options::OPT_embed_bitcode);
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
+  bool ContinueBuildingAfterErrors =
+    ArgList->hasArg(options::OPT_continue_building_after_errors);
+  bool ShowDriverTimeCompilation =
+    ArgList->hasArg(options::OPT_driver_time_compilation);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -501,15 +504,17 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  DriverSkipExecution,
-                                                 SaveTemps));
+                                                 SaveTemps,
+                                                 ShowDriverTimeCompilation));
 
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
   // For updating code we need to go through all the files and pick up changes,
-  // even if they have compiler errors.
-  // Also for getting bulk fixits.
+  // even if they have compiler errors. Also for getting bulk fixits, or for when
+  // users explicitly request to continue building despite errors.
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
-      OI.ShouldGenerateFixitEdits)
+      OI.ShouldGenerateFixitEdits ||
+      ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions)
@@ -947,6 +952,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_ast:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
       OI.CompilerOutputType = types::TY_Nothing;
       break;

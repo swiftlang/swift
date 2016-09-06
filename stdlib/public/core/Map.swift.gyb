@@ -81,6 +81,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
 // FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
 // collapsed into one `LazyMapCollection` using conditional conformances.
 // Maybe even combined with `LazyMapSequence`.
+// rdar://problem/17144340
 
 % for Traversal in TRAVERSALS:
 %   Self = "LazyMap" + collectionForTraversal(Traversal)

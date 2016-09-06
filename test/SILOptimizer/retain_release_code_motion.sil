@@ -256,6 +256,28 @@ bb3:
   return %5 : $()
 }
 
+final class MyArrayBuffer {
+  @sil_stored var dummyElements: Int32
+  init()
+}
+
+// CHECK-LABEL: sil @builtin_does_not_block_locally_allocated_ref
+// CHECK: builtin
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: strong_release
+// CHECK: return
+sil @builtin_does_not_block_locally_allocated_ref : $@convention(thin) () -> @owned MyArrayBuffer {
+bb0:
+  %3 = integer_literal $Builtin.Word, 3
+  %8 = alloc_ref $MyArrayBuffer
+  %74 = metatype $@thick String.Type
+  %67 = ref_element_addr %8 : $MyArrayBuffer, #MyArrayBuffer.dummyElements
+  %68 = address_to_pointer %67 : $*Int32 to $Builtin.RawPointer
+  strong_retain %8 : $MyArrayBuffer
+  %77 = builtin "destroyArray"<String>(%74 : $@thick String.Type, %68 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  strong_release %8 : $MyArrayBuffer
+  return %8 : $MyArrayBuffer
+}
 // CHECK-LABEL: sil @hoist_release_partially_available_retain
 // CHECK: bb0
 // CHECK: cond_br undef, bb1, bb2

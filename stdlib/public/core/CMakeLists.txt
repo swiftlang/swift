@@ -44,6 +44,8 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  DropWhile.swift.gyb
+  Dump.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -83,16 +85,18 @@ set(SWIFTLIB_ESSENTIAL
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
+  ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb
-  Reflection.swift
+  ReflectionLegacy.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
@@ -111,7 +115,9 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringBuffer.swift
+  StringComparable.swift
   StringCore.swift
+  StringHashable.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb

@@ -17,8 +17,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -558,9 +560,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
   // don't have access to the module. It will have to go away once we're
   // properly differentiating bound generic types based on the protocol
   // conformances visible from a given module.
-  if (!module) {
+  if (!module)
     module = getAnyNominal()->getParentModule();
-  }
 
   // Check the context, introducing the default if needed.
   if (!gpContext)
@@ -569,8 +570,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
   assert(gpContext->getAsNominalTypeOrNominalTypeExtensionContext()
          == getAnyNominal() && "not a valid context");
 
-  auto *genericParams = gpContext->getGenericParamsOfContext();
-  if (!genericParams)
+  auto *genericSig = gpContext->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
     return { };
 
   // If we already have a cached copy of the substitutions, return them.
@@ -588,16 +589,15 @@ TypeBase::gatherAllSubstitutions(Module *module,
   auto *parentDC = gpContext;
   while (parent) {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
-      auto genericParams = parentDC->getGenericParamsOfContext();
+      auto genericSig = parentDC->getGenericSignatureOfContext();
       unsigned index = 0;
 
       assert(boundGeneric->getGenericArgs().size() ==
-             genericParams->getParams().size());
+             genericSig->getInnermostGenericParams().size());
 
       for (Type arg : boundGeneric->getGenericArgs()) {
-        auto gp = genericParams->getParams()[index++];
-        auto archetype = gp->getArchetype();
-        substitutions[archetype] = arg;
+        auto paramTy = genericSig->getInnermostGenericParams()[index++];
+        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
       }
 
       parent = CanType(boundGeneric->getParent());
@@ -616,64 +616,36 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
-  if (auto *outerGenericParams = parentDC->getGenericParamsOfContext()) {
-    for (auto archetype : outerGenericParams->getAllNestedArchetypes())
-      substitutions[archetype] = archetype;
-  }
-
-  // Collect all of the archetypes.
-  SmallVector<ArchetypeType *, 2> allArchetypesList;
-  ArrayRef<ArchetypeType *> allArchetypes = genericParams->getAllArchetypes();
-  if (genericParams->getOuterParameters()) {
-    SmallVector<const GenericParamList *, 2> allGenericParams;
-    unsigned numArchetypes = 0;
-    for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-      allGenericParams.push_back(genericParams);
-      numArchetypes += genericParams->getAllArchetypes().size();
-    }
-    allArchetypesList.reserve(numArchetypes);
-    for (auto gp = allGenericParams.rbegin(), gpEnd = allGenericParams.rend();
-         gp != gpEnd; ++gp) {
-      allArchetypesList.append((*gp)->getAllArchetypes().begin(),
-                               (*gp)->getAllArchetypes().end());
-    }
-    allArchetypes = allArchetypesList;
-  }
-
-  // For each of the archetypes, compute the substitution.
-  bool hasTypeVariables = canon->hasTypeVariable();
-  SmallVector<Substitution, 4> resultSubstitutions;
-  resultSubstitutions.resize(allArchetypes.size());
-  unsigned index = 0;
-  for (auto archetype : allArchetypes) {
-    // Substitute into the type.
-    SubstOptions options;
-    if (hasTypeVariables)
-      options |= SubstFlags::IgnoreMissing;
-    auto type = Type(archetype).subst(module, substitutions, options);
-    if (!type)
-      type = ErrorType::get(module->getASTContext());
-
-    SmallVector<ProtocolConformanceRef, 4> conformances;
-    for (auto proto : archetype->getConformsTo()) {
-      // If the type is a type variable or is dependent, just fill in empty
-      // conformances.
-      if (type->is<TypeVariableType>() || type->isTypeParameter()) {
-        conformances.push_back(ProtocolConformanceRef(proto));
-
-      // Otherwise, find the conformances.
-      } else {
-        if (auto conforms = module->lookupConformance(type, proto, resolver))
-          conformances.push_back(*conforms);
-        else
-          conformances.push_back(ProtocolConformanceRef(proto));
-      }
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
+    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
+      auto result = substitutions.insert(pair);
+      assert(result.second);
     }
 
-    // Record this substitution.
-    resultSubstitutions[index] = {type, ctx.AllocateCopy(conformances)};
-    ++index;
-  }
+  auto lookupConformanceFn =
+      [&](Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+
+    auto *proto = protoType->getDecl();
+
+    // If the type is a type variable or is dependent, just fill in empty
+    // conformances.
+    if (replacement->is<TypeVariableType>() || replacement->isTypeParameter())
+      return ProtocolConformanceRef(proto);
+
+    // Otherwise, find the conformance.
+    auto conforms = module->lookupConformance(replacement, proto, resolver);
+    if (conforms)
+      return *conforms;
+
+    // FIXME: Should we ever end up here?
+    return ProtocolConformanceRef(proto);
+  };
+
+  SmallVector<Substitution, 4> result;
+  genericSig->getSubstitutions(*module, substitutions,
+                               lookupConformanceFn,
+                               result);
 
   // Before recording substitutions, make sure we didn't end up doing it
   // recursively.
@@ -681,7 +653,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
     return *known;
 
   // Copy and record the substitutions.
-  auto permanentSubs = ctx.AllocateCopy(resultSubstitutions,
+  bool hasTypeVariables = canon->hasTypeVariable();
+  auto permanentSubs = ctx.AllocateCopy(result,
                                         hasTypeVariables
                                           ? AllocationArena::ConstraintSolver
                                           : AllocationArena::Permanent);
@@ -1512,6 +1485,11 @@ StringRef SourceFile::getFilename() const {
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
+}
+
+ASTScope &SourceFile::getScope() {
+  if (!Scope) Scope = ASTScope::createRoot(this);
+  return *Scope;
 }
 
 Identifier

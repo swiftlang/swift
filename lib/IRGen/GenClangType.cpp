@@ -493,7 +493,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   // Special case: Uninhabited enums are not @objc, so we don't
   // know what to do below, but we can just convert to 'void'.
-  if (type->isNever())
+  if (type->isUninhabited())
     return Converter.convert(IGM, IGM.Context.TheEmptyTupleType);
 
   assert(type->getDecl()->isObjC() && "not an @objc enum?!");

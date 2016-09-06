@@ -114,7 +114,7 @@ protocol P1 {
   associatedtype T
 }
 
-func genReq<U, V: P1 where V.T == U>(_ u: U, v: V) {}
+func genReq<U, V: P1>(_ u: U, v: V) where V.T == U {}
 
 @objc class C5 {
 
@@ -198,8 +198,16 @@ typealias MyVoid = ()
 
 func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 
+func convention1(_: @convention(thick) ()->()) {}
+func convention2(_: @convention(thin) ()->()) {}
+func convention3(_: @convention(block) ()->()) {}
+func convention4(_: @convention(c) ()->()) {}
+func convention5(_: @convention(method) ()->()) {}
+func convention6(_: @convention(objc_method) ()->()) {}
+func convention7(_: @convention(witness_method) ()->()) {}
+
 // RUN: rm -rf %t.tmp
-// RUN: mkdir %t.tmp
+// RUN: mkdir -p %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
@@ -533,9 +541,9 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK51: <decl.function.method.class><syntaxtype.keyword>final</syntaxtype.keyword> <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
 
 // RUN: %sourcekitd-test -req=cursor -pos=117:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK52
-// CHECK52: source.lang.swift.decl.function.free (117:6-117:51)
+// CHECK52: source.lang.swift.decl.function.free (117:6-117:36)
 // CHECK52: <U, V : P1 where V.T == U> (U, v: V) -> ()
-// CHECK52: &lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr="{{.*}}">P1</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param>.<ref.associatedtype usr="{{.*}}">T</ref.associatedtype> == <ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.generic_type_requirement>&gt;
+// CHECK52: &lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr="{{.*}}">P1</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>u</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>v</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param>.<ref.associatedtype usr="{{.*}}">T</ref.associatedtype> == <ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.generic_type_requirement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=117:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK53
 // CHECK53: source.lang.swift.decl.generic_type_param (117:16-117:17)
@@ -612,10 +620,10 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK70: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=156:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK71
-// CHECK71: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// CHECK71: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=157:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK72
-// CHECK72: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name> <syntaxtype.attribute.name>@escaping</syntaxtype.attribute.name> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// CHECK72: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>paramAutoclosureNoescape3</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>msg</decl.var.parameter.name>: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@escaping</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><ref.struct usr="s:SS">String</ref.struct></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=159:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK73
 // CHECK73: <decl.function.free>
@@ -686,3 +694,12 @@ func rethrowingFunction1(_: (Int) throws -> Void) rethrows -> Void {}
 // CHECK85-NOT: @rethrows
 // CHECK85: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>rethrowingFunction1</decl.name>({{.*}}) <syntaxtype.keyword>rethrows</syntaxtype.keyword></decl.function.free>
 // CHECK85-NOT: @rethrows
+
+// RUN: %sourcekitd-test -req=cursor -pos=201:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=202:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=203:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=204:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=205:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=206:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// RUN: %sourcekitd-test -req=cursor -pos=207:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// CHECK86: <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@convention</syntaxtype.attribute.name>({{[a-z_]*}})</syntaxtype.attribute.builtin>
