@@ -2069,7 +2069,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // A witness to an @objc protocol requirement is implicitly @objc.
   else if (!TC.findWitnessedObjCRequirements(
              VD,
-             /*onlyFirstRequirement=*/true).empty())
+             /*anySingleRequirement=*/true).empty())
     return ObjCReason::WitnessToObjC;
   else if (VD->isInvalid())
     return None;
@@ -2280,8 +2280,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   // requirements for which this declaration is a witness.
   Optional<ObjCSelector> requirementObjCName;
   ValueDecl *firstReq = nullptr;
-  for (auto req : tc.findWitnessedObjCRequirements(decl,
-                                                   /*onlyFirst=*/false)) {
+  for (auto req : tc.findWitnessedObjCRequirements(decl)) {
     // If this is the first requirement, take its name.
     if (!requirementObjCName) {
       requirementObjCName = req->getObjCRuntimeName();

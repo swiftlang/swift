@@ -2117,3 +2117,63 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
 @objc protocol OperatorInProtocol {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
 }
+
+//===--- @objc inference for witnesses
+
+@objc protocol InferFromProtocol {
+  @objc(inferFromProtoMethod1:)
+  optional func method1(value: Int)
+}
+
+// Infer when in the same declaration context.
+// CHECK-LABEL: ClassInfersFromProtocol1
+class ClassInfersFromProtocol1 : InferFromProtocol{
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Infer when in a different declaration context of the same class.
+// CHECK-LABEL: ClassInfersFromProtocol2a
+class ClassInfersFromProtocol2a {
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+extension ClassInfersFromProtocol2a : InferFromProtocol { }
+
+// Infer when in a different declaration context of the same class.
+class ClassInfersFromProtocol2b : InferFromProtocol { }
+
+// CHECK-LABEL: ClassInfersFromProtocol2b
+extension ClassInfersFromProtocol2b {
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Don't infer when there is a signature mismatch.
+// CHECK-LABEL: ClassInfersFromProtocol3
+class ClassInfersFromProtocol3 : InferFromProtocol {
+}
+
+extension ClassInfersFromProtocol3 {
+  // CHECK: {{^}} func method1(value: String)
+  func method1(value: String) { }
+}
+
+class SuperclassImplementsProtocol : InferFromProtocol { }
+
+// Note: no inference for subclasses
+class SubclassInfersFromProtocol1 : SuperclassImplementsProtocol {
+  // CHECK: {{^}} func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Note: no inference for subclasses
+class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
+}
+
+extension SubclassInfersFromProtocol2 {
+  // CHECK: {{^}} func method1(value: Int)
+  func method1(value: Int) { }
+}
+
