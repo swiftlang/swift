@@ -76,7 +76,7 @@ struct S2 : P3 {
     typealias T = cake.S2
 }
 
-func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.Element>(x ix: T1, y iy: T2)
+func genfoo<T1 : Prot, T2 : cake.C1>(x ix: T1, y iy: T2) where T1.Element == Int, T2.Element == T1.Element
 
 
 [
@@ -618,93 +618,93 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     key.length: 2
   },
   {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 775,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 777,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 781,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 785,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 787,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 791,
+    key.length: 2
+  },
+  {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 774,
+    key.offset: 795,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 780,
+    key.offset: 801,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 783,
+    key.offset: 804,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 794,
+    key.offset: 815,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 799,
+    key.offset: 820,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 802,
+    key.offset: 823,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 813,
+    key.offset: 834,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 816,
+    key.offset: 837,
     key.length: 7
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 825,
+    key.offset: 775,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 827,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 825,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 827,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 831,
+    key.offset: 777,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 835,
+    key.offset: 785,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 837,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 835,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 837,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 841,
+    key.offset: 787,
     key.length: 2
   }
 ]
@@ -1119,20 +1119,20 @@ func genfoo<T1 : Prot, T2 : cake.C1 where T1.Element == Int, T2.Element == T1.El
     ],
     key.offset: 738,
     key.length: 106,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T1Mx\"><decl.generic_type_param.name>T1</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:P4cake4Prot\">Prot</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>, <decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T2Mq_\"><decl.generic_type_param.name>T2</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.class usr=\"s:C4cake2C1\">C1</ref.class></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T1.Element == Int</decl.generic_type_requirement>, <decl.generic_type_requirement>T2.Element == T1.Element</decl.generic_type_requirement>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label> <decl.var.parameter.name>ix</decl.var.parameter.name>: <decl.var.parameter.type>T1</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label> <decl.var.parameter.name>iy</decl.var.parameter.name>: <decl.var.parameter.type>T2</decl.var.parameter.type></decl.var.parameter>)</decl.function.free>",
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>genfoo</decl.name>&lt;<decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T1Mx\"><decl.generic_type_param.name>T1</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr=\"s:P4cake4Prot\">Prot</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>, <decl.generic_type_param usr=\"s:tF4cake6genfoou0_RxS_4Prot_CS_2C1wx7ElementzSirFT1xx1yq__T_L_2T2Mq_\"><decl.generic_type_param.name>T2</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.class usr=\"s:C4cake2C1\">C1</ref.class></decl.generic_type_param.constraint></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label> <decl.var.parameter.name>ix</decl.var.parameter.name>: <decl.var.parameter.type>T1</decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label> <decl.var.parameter.name>iy</decl.var.parameter.name>: <decl.var.parameter.type>T2</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T1.Element == Int</decl.generic_type_requirement>, <decl.generic_type_requirement>T2.Element == T1.Element</decl.generic_type_requirement></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "x",
         key.name: "ix",
-        key.offset: 831,
+        key.offset: 781,
         key.length: 2
       },
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "y",
         key.name: "iy",
-        key.offset: 841,
+        key.offset: 791,
         key.length: 2
       }
     ]

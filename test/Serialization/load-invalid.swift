@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 
 // RUN: touch %t/new_module.swiftmodule
 // RUN: %target-swift-frontend %s -parse -I %t -verify -show-diagnostics-after-fatal

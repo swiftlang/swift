@@ -197,7 +197,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA1",
     key.offset: 123,
-    key.length: 37,
+    key.length: 45,
     key.typename: "Int",
     key.nameoffset: 127,
     key.namelength: 28
@@ -208,7 +208,7 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA2",
     key.offset: 176,
-    key.length: 37,
+    key.length: 45,
     key.typename: "Int",
     key.nameoffset: 180,
     key.namelength: 28

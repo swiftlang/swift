@@ -1,6 +1,6 @@
 // XFAIL: linux
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -parse %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -parse -primary-file %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC-YAML %s

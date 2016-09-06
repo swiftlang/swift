@@ -835,7 +835,7 @@ extension Sequence {
   ///     print(shortNames)
   ///     // Prints "["Kim", "Karl"]"
   ///
-  /// - Parameter shouldInclude: A closure that takes an element of the
+  /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `includeElement` allowed.

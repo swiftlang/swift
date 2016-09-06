@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-module -o %t %S/Inputs/def_global.swift
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -I %t %s | %FileCheck %s
 //

@@ -1703,6 +1703,9 @@ public:
 
   /// Override the initializer context.
   void setInitContext(DeclContext *dc) { InitContext = dc; }
+
+  /// Retrieve the source range covered by this pattern binding.
+  SourceRange getSourceRange() const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set

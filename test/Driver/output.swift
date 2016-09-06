@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: mkdir %t/sub
+// RUN: mkdir -p %t/sub
 // RUN: cd %t
 
 // RUN: %target-swift-frontend -emit-bc %s

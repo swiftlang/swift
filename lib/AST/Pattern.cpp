@@ -349,7 +349,7 @@ SourceRange TuplePattern::getSourceRange() const {
 }
 
 SourceRange TypedPattern::getSourceRange() const {
-  if (isImplicit()) {
+  if (isImplicit() || isPropagatedType()) {
     // If a TypedPattern is implicit, then its type is definitely implicit, so
     // we should ignore its location.  On the other hand, the sub-pattern can
     // be explicit or implicit.

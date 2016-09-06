@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -I %t > %t/out.txt
 // RUN: %FileCheck %s < %t/out.txt

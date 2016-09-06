@@ -1080,9 +1080,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // If we have an OptionalEvaluationExpr at the top level, then someone is
   // "optional chaining" and ignoring the result.  Produce a diagnostic if it
   // doesn't make sense to ignore it.
-  if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE))
+  if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE)) {
     if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
       return checkIgnoredExpr(IIO->getSubExpr());
+    if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
+      return checkIgnoredExpr(C);
+  }
 
   // Check if we have a call to a function not marked with
   // '@discardableResult'.
@@ -1379,7 +1382,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       !isKnownEndOfConstructor(body->getElements().back())) {
     SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                  body->getElements().end());
-    Elts.push_back(new (Context) ReturnStmt(SourceLoc(), /*value*/nullptr,
+    Elts.push_back(new (Context) ReturnStmt(body->getRBraceLoc(),
+                                            /*value*/nullptr,
                                             /*implicit*/true));
     body = BraceStmt::create(Context, body->getLBraceLoc(), Elts,
                              body->getRBraceLoc(), body->isImplicit());

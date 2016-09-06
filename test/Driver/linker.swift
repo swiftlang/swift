@@ -48,7 +48,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
 // RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2.0    %s | %FileCheck -check-prefix NO_ARCLITE %s
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
