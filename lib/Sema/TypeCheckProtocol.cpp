@@ -4887,7 +4887,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
 llvm::TinyPtrVector<ValueDecl *>
 TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
-                                           bool onlyFirstRequirement) {
+                                           bool anySingleRequirement) {
   llvm::TinyPtrVector<ValueDecl *> result;
 
   // Types don't infer @objc this way.
@@ -4895,10 +4895,11 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
 
   auto dc = witness->getDeclContext();
   auto name = witness->getFullName();
-  for (auto conformance : dc->getLocalConformances(ConformanceLookupKind::All,
-                                                   nullptr, /*sorted=*/true)) {
+  auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!nominal) return result;
+
+  for (auto proto : nominal->getAllProtocols()) {
     // We only care about Objective-C protocols.
-    auto proto = conformance->getProtocol();
     if (!proto->isObjC()) continue;
 
     for (auto req : proto->lookupDirect(name, true)) {
@@ -4907,16 +4908,41 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
 
       // Skip types.
       if (isa<TypeDecl>(req)) continue;
+      
+      // Dig out the conformance.
+      Optional<ProtocolConformance *> conformance;
+      if (!conformance.hasValue()) {
+        SmallVector<ProtocolConformance *, 2> conformances;
+        nominal->lookupConformance(dc->getParentModule(), proto,
+                                   conformances);
+        if (conformances.size() == 1)
+          conformance = conformances.front();
+        else
+          conformance = nullptr;
+      }
+      if (!*conformance) continue;
 
       // Determine whether the witness for this conformance is in fact
       // our witness.
-      if (conformance->getWitness(req, this).getDecl() == witness) {
+      if ((*conformance)->getWitness(req, this).getDecl() == witness) {
         result.push_back(req);
-        if (onlyFirstRequirement) return result;
+        if (anySingleRequirement) return result;
       }
     }
   }
 
+  // Sort the results.
+  if (result.size() > 2) {
+    std::stable_sort(result.begin(), result.end(),
+                     [&](ValueDecl *lhs, ValueDecl *rhs) {
+                       ProtocolDecl *lhsProto
+                         = cast<ProtocolDecl>(lhs->getDeclContext());
+                       ProtocolDecl *rhsProto
+                         = cast<ProtocolDecl>(rhs->getDeclContext());
+                       return ProtocolType::compareProtocols(&lhsProto,
+                                                             &rhsProto) < 0;
+                     });
+  }
   return result;
 }
 

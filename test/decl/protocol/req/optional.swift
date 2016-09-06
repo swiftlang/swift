@@ -6,11 +6,11 @@
 @objc class ObjCClass { }
 
 @objc protocol P1 {
-  @objc optional func method(_ x: Int) // expected-note 2{{requirement 'method' declared here}}
+  @objc optional func method(_ x: Int) // expected-note {{requirement 'method' declared here}}
 
-  @objc optional var prop: Int { get } // expected-note{{requirement 'prop' declared here}}
+  @objc optional var prop: Int { get }
 
-  @objc optional subscript (i: Int) -> ObjCClass? { get } // expected-note{{requirement 'subscript' declared here}}
+  @objc optional subscript (i: Int) -> ObjCClass? { get }
 }
 
 @objc protocol P2 {
@@ -38,10 +38,6 @@ class C2 : P1 {
     set {}
   }
 }
-
-// -----------------------------------------------------------------------
-// "Near" matches.
-// -----------------------------------------------------------------------
 
 class C3 : P1 {
   func method(_ x: Int) { } 
@@ -71,20 +67,18 @@ extension C4 : P1 {
   }
 }
 
+// -----------------------------------------------------------------------
+// Okay to match via extensions.
+// -----------------------------------------------------------------------
+
 class C5 : P1 { }
 
 extension C5 {
   func method(_ x: Int) { } 
-  // expected-warning@-1{{non-'@objc' method 'method' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   var prop: Int { return 5 }
-  // expected-warning@-1{{non-'@objc' property 'prop' does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-  // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
 
   subscript (i: Int) -> ObjCClass? {
-    // expected-warning@-1{{non-'@objc' subscript does not satisfy optional requirement of '@objc' protocol 'P1'}}{{3-3=@objc }}
-    // expected-note@-2{{add '@nonobjc' to silence this warning}}{{3-3=@nonobjc }}
     get {
       return nil
     }
@@ -92,7 +86,7 @@ extension C5 {
   }
 }
 
-// Note: @nonobjc suppresses warnings
+// Note: @nonobjc suppresses witness match.
 class C6 { }
 
 extension C6 : P1 {
@@ -107,6 +101,10 @@ extension C6 : P1 {
     set {}
   }
 }
+
+// -----------------------------------------------------------------------
+// "Near" matches.
+// -----------------------------------------------------------------------
 
 // Note: warn about selector matches where the Swift names didn't match.
 @objc class C7 : P1 { // expected-note{{class 'C7' declares conformance to protocol 'P1' here}}

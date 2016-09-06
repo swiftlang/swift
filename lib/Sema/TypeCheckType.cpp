@@ -2712,8 +2712,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
     TC.diagnose(overridden, diag::objc_overriding_objc_decl,
                 kind, VD->getOverriddenDecl()->getFullName());
   } else if (Reason == ObjCReason::WitnessToObjC) {
-    auto requirement =
-      TC.findWitnessedObjCRequirements(VD, /*onlyFirst=*/true).front();
+    auto requirement = TC.findWitnessedObjCRequirements(VD).front();
     TC.diagnose(requirement, diag::objc_witness_objc_requirement,
                 VD->getDescriptiveKind(), requirement->getFullName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())

@@ -1592,14 +1592,14 @@ public:
   /// Find the @objc requirement that are witnessed by the given
   /// declaration.
   ///
-  /// \param onlyFirstRequirement If true, only returns the first such
-  /// requirement, rather than all of them.
+  /// \param anySingleRequirement If true, returns at most a single requirement,
+  /// which might be any of the requirements that match.
   ///
   /// \returns the set of requirements to which the given witness is a
   /// witness.
   llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
                                      const ValueDecl *witness,
-                                     bool onlyFirstRequirement);
+                                     bool anySingleRequirement = false);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);
