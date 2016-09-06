@@ -446,10 +446,8 @@ namespace {
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
           archetype = nestedType.getValue()->getAs<ArchetypeType>();
-        } else if (implArchetype->isSelfDerived()) {
-          archetype = implArchetype;
         }
-                                
+
         ConstraintLocator *locator;
         if (archetype) {
           locator = CS.getConstraintLocator(
