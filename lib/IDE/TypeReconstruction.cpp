@@ -1947,39 +1947,6 @@ static void VisitNodeQualifiedArchetype(
   }
 }
 
-static void VisitNodeSelfTypeRef(
-    ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
-    Demangle::NodePointer &cur_node, VisitNodeResult &result,
-    const VisitNodeResult &generic_context) { // set by GenericType case
-  nodes.push_back(cur_node->getFirstChild());
-  VisitNodeResult type_result;
-  VisitNode(ast, nodes, type_result, generic_context);
-  if (type_result.HasSingleType()) {
-    Type supposed_protocol_type(type_result.GetFirstType());
-    ProtocolType *protocol_type = supposed_protocol_type->getAs<ProtocolType>();
-    ProtocolDecl *protocol_decl =
-        protocol_type ? protocol_type->getDecl() : nullptr;
-    if (protocol_decl) {
-      ArchetypeType::AssocTypeOrProtocolType assoc_protocol_type(protocol_decl);
-      if (ast) {
-        CanTypeWrapper<ArchetypeType> self_type = ArchetypeType::getNew(
-            *ast, nullptr, assoc_protocol_type, ast->getIdentifier("Self"),
-            {supposed_protocol_type}, Type(), false);
-        if (self_type.getPointer())
-          result._types.push_back(Type(self_type));
-        else
-          result._error = "referent type cannot be made into an archetype";
-      } else {
-        result._error = "invalid ASTContext";
-      }
-    } else {
-      result._error = "referent type does not resolve to a protocol";
-    }
-  } else {
-    result._error = "couldn't resolve referent type";
-  }
-}
-
 static void VisitNodeTupleElement(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
@@ -2241,10 +2208,6 @@ static void visitNodeImpl(
 
   case Demangle::Node::Kind::QualifiedArchetype:
     VisitNodeQualifiedArchetype(ast, nodes, node, result, genericContext);
-    break;
-
-  case Demangle::Node::Kind::SelfTypeRef:
-    VisitNodeSelfTypeRef(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::TupleElement:

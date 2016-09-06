@@ -1090,16 +1090,7 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
       addSubstitution(archetype);
       return;
     }
-    
-    // associated-type ::= 'Q' protocol-context
-    // Mangle the Self archetype of a protocol.
-    if (auto proto = archetype->getSelfProtocol()) {
-      Buffer << 'P';
-      mangleProtocolName(proto);
-      addSubstitution(archetype);
-      return;
-    }
-    
+
     // archetype ::= 'Q' <index>             # archetype with depth=0, index=N
     // archetype ::= 'Qd' <index> <index>    # archetype with depth=M+1, index=N
     // Mangle generic parameter archetypes.

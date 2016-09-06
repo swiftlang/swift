@@ -1708,13 +1708,6 @@ private:
   }
   
   NodePointer demangleArchetypeType() {
-    auto makeSelfType = [&](NodePointer proto) -> NodePointer {
-      auto selfType = NodeFactory::create(Node::Kind::SelfTypeRef);
-      selfType->addChild(proto);
-      Substitutions.push_back(selfType);
-      return selfType;
-    };
-    
     auto makeAssociatedType = [&](NodePointer root) -> NodePointer {
       NodePointer name = demangleIdentifier();
       if (!name) return nullptr;
@@ -1725,12 +1718,6 @@ private:
       return assocType;
     };
     
-    if (Mangled.nextIf('P')) {
-      NodePointer proto = demangleProtocolName();
-      if (!proto) return nullptr;
-      return makeSelfType(proto);
-    }
-    
     if (Mangled.nextIf('Q')) {
       NodePointer root = demangleArchetypeType();
       if (!root) return nullptr;
@@ -1739,10 +1726,7 @@ private:
     if (Mangled.nextIf('S')) {
       NodePointer sub = demangleSubstitutionIndex();
       if (!sub) return nullptr;
-      if (sub->getKind() == Node::Kind::Protocol)
-        return makeSelfType(sub);
-      else
-        return makeAssociatedType(sub);
+      return makeAssociatedType(sub);
     }
     if (Mangled.nextIf('s')) {
       NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
@@ -2402,7 +2386,6 @@ private:
     case Node::Kind::Protocol:
     case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
-    case Node::Kind::SelfTypeRef:
     case Node::Kind::SILBoxType:
     case Node::Kind::Structure:
     case Node::Kind::TupleElementName:
@@ -3459,10 +3442,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::AssociatedTypeRef:
     print(pointer->getChild(0));
     Printer << '.' << pointer->getChild(1)->getText();
-    return;
-  case Node::Kind::SelfTypeRef:
-    print(pointer->getChild(0));
-    Printer << ".Self";
     return;
   case Node::Kind::ProtocolList: {
     NodePointer type_list = pointer->getChild(0);
