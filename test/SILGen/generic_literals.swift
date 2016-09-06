@@ -11,7 +11,7 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   // CHECK: [[LITVAR:%.*]] = alloc_stack $T.IntegerLiteralType
   // CHECK: [[LIT:%.*]] = apply [[BUILTINCONV]]<T.IntegerLiteralType>([[LITVAR]], [[INTLIT]], [[LITMETA]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[ADDR:%.*]] = alloc_stack $T
-  // CHECK: apply [[TCONV]]<T, T.IntegerLiteralType>([[ADDR]], [[LITVAR]], [[TMETA]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: apply [[TCONV]]<T, T.IntegerLiteralType>([[ADDR]], [[LITVAR]], [[TMETA]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in τ_0_0.IntegerLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 
   x = 17
 }
@@ -27,7 +27,7 @@ func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   // CHECK: [[FLT_VAL:%.*]] = alloc_stack $T.FloatLiteralType
   // CHECK: apply [[BUILTIN_CONV]]<T.FloatLiteralType>([[FLT_VAL]], [[LIT_VALUE]], [[TFLT_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinFloatLiteral> (Builtin.FPIEEE{{64|80}}, @thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[TVAL:%.*]] = alloc_stack $T
-  // CHECK: apply [[CONV]]<T, T.FloatLiteralType>([[TVAL]], [[FLT_VAL]], [[TMETA]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ExpressibleByFloatLiteral, τ_0_0.FloatLiteralType : _ExpressibleByBuiltinFloatLiteral> (@in τ_0_0.FloatLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: apply [[CONV]]<T, T.FloatLiteralType>([[TVAL]], [[FLT_VAL]], [[TMETA]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ExpressibleByFloatLiteral> (@in τ_0_0.FloatLiteralType, @thick τ_0_0.Type) -> @out τ_0_0
 
   x = 2.5
 }

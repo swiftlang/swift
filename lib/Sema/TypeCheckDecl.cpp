@@ -736,7 +736,8 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     revertGenericParamList(genericParams);
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
-    checkGenericParamList(&builder, genericParams, parentSig);
+    checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+                          nullptr);
     parentEnv = finalizeGenericParamList(builder, genericParams,
                                          genericSig, DC);
     parentSig = genericSig;
@@ -4719,7 +4720,8 @@ public:
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
         auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig);
+        auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getParameterLists()) {
@@ -4736,7 +4738,8 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, FD);
+        auto *env = TC.finalizeGenericParamList(builder, gp,
+                                                FD->getGenericSignature(), FD);
         FD->setGenericEnvironment(env);
       }
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -6409,7 +6412,8 @@ public:
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
         auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig);
+        auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getParameterList(1), gp);
@@ -6419,7 +6423,8 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, CD);
+        auto *env = TC.finalizeGenericParamList(builder, gp,
+                                                CD->getGenericSignature(), CD);
         CD->setGenericEnvironment(env);
       }
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -7422,9 +7427,13 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
+  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
+  auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
   GenericSignature *sig = tc.validateGenericSignature(
-      genericParams, ext->getDeclContext(),
-      nullptr, inferExtendedTypeReqs, invalid);
+      genericParams,
+      ext->getDeclContext(),
+      parentSig,
+      inferExtendedTypeReqs, invalid);
   ext->setGenericSignature(sig);
 
   if (invalid) {
@@ -7436,11 +7445,10 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
-  tc.checkGenericParamList(&builder, genericParams, parentSig);
+  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = tc.finalizeGenericParamList(builder, genericParams, nullptr, ext);
+  auto *env = tc.finalizeGenericParamList(builder, genericParams, sig, ext);
   ext->setGenericEnvironment(env);
 
   if (isa<ProtocolDecl>(nominal)) {

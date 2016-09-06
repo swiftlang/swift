@@ -4383,6 +4383,27 @@ void GenericSignature::dump() const {
   llvm::errs() << '\n';
 }
 
+void Requirement::dump() const {
+  switch (getKind()) {
+  case RequirementKind::WitnessMarker:
+    llvm::errs() << "witness_marker: ";
+    break;
+  case RequirementKind::Conformance:
+    llvm::errs() << "conforms_to: ";
+    break;
+  case RequirementKind::Superclass:
+    llvm::errs() << "superclass: ";
+    break;
+  case RequirementKind::SameType:
+    llvm::errs() << "same_type: ";
+    break;
+  }
+
+  if (getFirstType()) llvm::errs() << getFirstType() << " ";
+  if (getSecondType()) llvm::errs() << getSecondType();
+  llvm::errs() << "\n";
+}
+
 std::string GenericSignature::getAsString() const {
   std::string result;
   llvm::raw_string_ostream out(result);

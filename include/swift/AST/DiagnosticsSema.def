@@ -1333,8 +1333,8 @@ NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; do you want to add it?", (Identifier))
 NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
-     "does not conform to %3",
-     (Type, DeclName, Type, Type))
+     "does not %select{inherit from|conform to}4 %3",
+     (Type, DeclName, Type, Type, bool))
 ERROR(associated_type_access,none,
       "associated type in "
       "%select{PRIVATE|a fileprivate|an internal|a public}0 protocol uses "
@@ -1347,8 +1347,8 @@ NOTE(bad_associated_type_deduction,none,
      (DeclName, DeclName))
 NOTE(associated_type_deduction_witness_failed,none,
      "inferred type %1 (by matching requirement %0) is invalid: "
-     "does not conform to %2",
-     (DeclName, Type, DeclName))
+     "does not %select{inherit from|conform to}3 %2",
+     (DeclName, Type, DeclName, bool))
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1406,7 +1406,8 @@ NOTE(protocol_witness_not_objc,none,
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,none,
-     "possibly intended match %0 does not conform to %1", (Type, Type))
+     "possibly intended match %0 does not "
+     "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
 NOTE(protocol_requirement_here,none,
      "requirement %0 declared here", (DeclName))

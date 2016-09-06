@@ -1450,22 +1450,13 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod, Diags);
-  builder->addGenericSignature(sig, /*adoptArchetypes=*/false,
+  builder->addGenericSignature(sig, nullptr,
                                /*treatRequirementsAsExplicit=*/true);
   
   // Store this archetype builder.
   Impl.ArchetypeBuilders[{sig, mod}]
     = std::unique_ptr<ArchetypeBuilder>(builder);
   return builder;
-}
-
-void ASTContext::setArchetypeBuilder(CanGenericSignature sig,
-                                     ModuleDecl *mod,
-                                     std::unique_ptr<ArchetypeBuilder> builder) {
-  if (Impl.ArchetypeBuilders.find({sig, mod})
-        == Impl.ArchetypeBuilders.end()) {
-    Impl.ArchetypeBuilders[{sig, mod}] = move(builder);
-  }
 }
 
 Module *
@@ -3708,6 +3699,11 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         bool isKnownCanonical) {
   assert(!params.empty());
+
+#ifndef NDEBUG
+  for (auto req : requirements)
+    assert(req.getFirstType()->isTypeParameter());
+#endif
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;

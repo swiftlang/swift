@@ -13,7 +13,6 @@
 #ifndef SIL_TypeLowering_h
 #define SIL_TypeLowering_h
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/AbstractionPattern.h"
