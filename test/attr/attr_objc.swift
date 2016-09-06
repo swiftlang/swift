@@ -11,7 +11,9 @@ struct PlainStruct {}
 enum PlainEnum {}
 protocol PlainProtocol {} // expected-note {{protocol 'PlainProtocol' declared here}}
 
-enum ErrorEnum : Error { }
+enum ErrorEnum : Error {
+  case failed
+}
 
 @objc class Class_ObjC1 {}
 
@@ -2011,6 +2013,24 @@ class ClassThrows1 {
   // CHECK: @objc init(degrees: Double) throws
   // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
+
+  // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> NSRange
+  func methodReturnsBridgedValueType() throws -> NSRange { return NSRange() }
+
+  @objc func methodReturnsBridgedValueType2() throws -> NSRange {
+    return NSRange()
+  }
+  // expected-error@-3{{throwing method cannot be marked @objc because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
+
+  // CHECK: {{^}} @objc func methodReturnsError() throws -> Error
+  func methodReturnsError() throws -> Error { return ErrorEnum.failed }
+
+  // CHECK: @objc func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int)
+  func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
+    func add(x: Int) -> (Int) -> Int { 
+      return { x + $0 }
+    }
+  }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"

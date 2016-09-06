@@ -2909,30 +2909,18 @@ bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
 
 /// Determines whether the given type is bridged to an Objective-C class type.
 static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
-  // Simple case: bridgeable object types.
-  if (type->isBridgeableObjectType())
-    return true;
-  
-  // Any bridges to AnyObject.
-  if (type->isAny())
-    return true;
-
-  // Determine whether this type is bridged to Objective-C.
-  ASTContext &ctx = type->getASTContext();
-  Type bridged = ctx.getBridgedToObjC(dc, type);
-  if (!bridged)
+  switch (type->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, dc)
+            .first) {
+  case ForeignRepresentableKind::Trivial:
+  case ForeignRepresentableKind::None:
     return false;
 
-  // Check whether we're bridging to a class.
-  auto classDecl = bridged->getClassOrBoundGenericClass();
-  if (!classDecl)
-    return false;
-
-  // Allow anything that isn't bridged to NSNumber.
-  // FIXME: This feels like a hack, but we don't have the right predicate
-  // anywhere.
-  return classDecl->getName().str()
-            != ctx.getSwiftName(KnownFoundationEntity::NSNumber);
+  case ForeignRepresentableKind::Object:
+  case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::BridgedError:
+  case ForeignRepresentableKind::StaticBridged:
+    return true;
+  }
 }
 
 bool TypeChecker::isRepresentableInObjC(
