@@ -39,6 +39,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -1124,6 +1125,16 @@ bool IRGenModule::finalize() {
 /// IRGenModule.
 void IRGenModule::emitLazyPrivateDefinitions() {
   emitLazyObjCProtocolDefinitions();
+}
+
+llvm::MDNode *IRGenModule::createProfileWeights(uint64_t TrueCount,
+                                                uint64_t FalseCount) const {
+  uint64_t MaxWeight = std::max(TrueCount, FalseCount);
+  uint64_t Scale = (MaxWeight > UINT32_MAX) ? UINT32_MAX : 1;
+  uint32_t ScaledTrueCount = (TrueCount / Scale) + 1;
+  uint32_t ScaledFalseCount = (FalseCount / Scale) + 1;
+  llvm::MDBuilder MDHelper(getLLVMContext());
+  return MDHelper.createBranchWeights(ScaledTrueCount, ScaledFalseCount);
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

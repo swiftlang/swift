@@ -3062,7 +3062,14 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
   addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
 
-  Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
+  llvm::MDNode *Weights = nullptr;
+  auto TrueBBCount = i->getTrueBBCount();
+  auto FalseBBCount = i->getFalseBBCount();
+  if (TrueBBCount || FalseBBCount)
+    Weights = IGM.createProfileWeights(TrueBBCount ? TrueBBCount.getValue() : 0,
+        FalseBBCount ? FalseBBCount.getValue() : 0);
+
+  Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb, Weights);
 }
 
 void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
