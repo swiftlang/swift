@@ -1,9 +1,10 @@
 #!/bin/bash
 
-echo ========== Setup ===========
 SWIFT_PATH=/home/amr/swift
 PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 cd $SWIFT_PATH
+
+echo ========== Cleaning ===========
 rm -rf build
 mkdir -p build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
 cp $SWIFT_PATH/toolchains/swift-preview/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
@@ -31,5 +32,5 @@ cd $SWIFT_PATH
 test -e swift/swift-nightly-install || exit 
 rm -rf toolchains/swift-toolchain-$(date "+%u")
 mv toolchains/swift-toolchain toolchains/swift-toolchain-$(date "+%u")
-cp swift/swift-nightly-install toolchains/swift-toolchain
+cp -r swift/swift-nightly-install toolchains/swift-toolchain
 
