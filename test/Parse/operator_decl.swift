@@ -13,6 +13,11 @@ prefix operator // expected-error {{expected operator name in operator declarati
 ;
 prefix operator %%+
 
+prefix operator ??
+postfix operator ?? // expected-error {{expected operator name in operator declaration}}
+prefix operator !!
+postfix operator !! // expected-error {{expected operator name in operator declaration}}
+
 infix operator +++=
 infix operator *** : A
 infix operator --- : ;

@@ -5468,11 +5468,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc NameLoc = consumeToken();
 
   ParserResult<OperatorDecl> Result;
-  if (Attributes.hasAttribute<PrefixAttr>())
+  if (Attributes.hasAttribute<PrefixAttr>()) {
     Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else if (Attributes.hasAttribute<PostfixAttr>())
+  } else if (Attributes.hasAttribute<PostfixAttr>()) {
+    if (!Name.empty() && (Name.get()[0] == '?' || Name.get()[0] == '!'))
+      diagnose(NameLoc, diag::expected_operator_name_after_operator);
     Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else {
+  } else {
     if (!Attributes.hasAttribute<InfixAttr>())
       diagnose(OperatorLoc, diag::operator_decl_no_fixity);
     Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes);
