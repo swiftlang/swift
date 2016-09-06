@@ -23,6 +23,7 @@ from swift_build_support.tar import tar
 
 class TarTestCase(unittest.TestCase):
     def setUp(self):
+        _, self.tmppath = tempfile.mkstemp()
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
         self.stdout = StringIO()
@@ -33,12 +34,12 @@ class TarTestCase(unittest.TestCase):
     def tearDown(self):
         sys.stdout = self._orig_stdout
         sys.stderr = self._orig_stderr
+        os.remove(self.tmppath)
 
     def test_tar_this_file_succeeds(self):
         # `tar` complains about absolute paths, so use a relative path here.
         source = os.path.relpath(__file__)
-        _, destination = tempfile.mkstemp()
-        tar(source=source, destination=destination)
+        tar(source=source, destination=self.tmppath)
 
         if platform.system() == "Darwin":
             expect = "+ tar -c -z -f {dest} {source}\n"
@@ -47,7 +48,7 @@ class TarTestCase(unittest.TestCase):
 
         self.assertEqual(self.stdout.getvalue(), "")
         self.assertEqual(self.stderr.getvalue(),
-                         expect.format(dest=destination, source=source))
+                         expect.format(dest=self.tmppath, source=source))
 
     def test_tar_nonexistent_file_raises(self):
         with self.assertRaises(SystemExit):
