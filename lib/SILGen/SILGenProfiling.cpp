@@ -290,6 +290,7 @@ private:
 
   /// \brief Create a counter expression for \c Node and add it to the map.
   CounterExpr &assignCounter(ASTNode Node, CounterExpr &&Expr) {
+    assert(Node && "Assigning counter expression to non-existent AST node");
     CounterExpr &Result = createCounter(std::move(Expr));
     CounterMap[Node] = &Result;
     return Result;
@@ -491,8 +492,9 @@ public:
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
       assignCounter(IS, CounterExpr::Zero());
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
-      assignCounter(IS->getElseStmt(),
-                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      if (IS->getElseStmt())
+        assignCounter(IS->getElseStmt(),
+                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
       assignCounter(GS->getBody());
