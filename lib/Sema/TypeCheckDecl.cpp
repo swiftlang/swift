@@ -5532,59 +5532,87 @@ public:
         }
       }
 
-      auto overriddenAccess = matchDecl->getFormalAccess();
-
       // Check that the override has the required accessibility.
       // Overrides have to be at least as accessible as what they
       // override, except:
       //   - they don't have to be more accessible than their class and
       //   - a final method may be public instead of open.
-      // FIXME: Copied from TypeCheckProtocol.cpp.
-      Accessibility requiredAccess =
-        std::min(classDecl->getFormalAccess(), overriddenAccess);
-      if (requiredAccess == Accessibility::Open && decl->isFinal())
-        requiredAccess = Accessibility::Public;
-
-      bool shouldDiagnose = false;
-      bool shouldDiagnoseSetter = false;
-      if (requiredAccess > Accessibility::Private &&
-          !isa<ConstructorDecl>(decl)) {
-        shouldDiagnose = (decl->getFormalAccess() < requiredAccess);
-
-        if (!shouldDiagnose && matchDecl->isSettable(classDecl)) {
-          auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-          if (matchASD->isSetterAccessibleFrom(classDecl)) {
-            auto ASD = cast<AbstractStorageDecl>(decl);
-            const DeclContext *accessDC = nullptr;
-            if (requiredAccess == Accessibility::Internal)
-              accessDC = classDecl->getParentModule();
-            shouldDiagnoseSetter = ASD->isSettable(accessDC) &&
-                                   !ASD->isSetterAccessibleFrom(accessDC);
-          }
-        }
-      }
-      if (shouldDiagnose || shouldDiagnoseSetter) {
-        bool overriddenForcesAccess = (requiredAccess == overriddenAccess);
-        {
-          auto diag = TC.diagnose(decl, diag::override_not_accessible,
-                                  shouldDiagnoseSetter,
-                                  decl->getDescriptiveKind(),
-                                  overriddenForcesAccess);
-          fixItAccessibility(diag, decl, requiredAccess, shouldDiagnoseSetter);
-        }
-        TC.diagnose(matchDecl, diag::overridden_here);
-      }
-
-      // Diagnose attempts to override a non-open method from outside its
+      // Also diagnose attempts to override a non-open method from outside its
       // defining module.  This is not required for constructors, which are
       // never really "overridden" in the intended sense here, because of
       // course derived classes will change how the class is initialized.
-      if (matchDecl->getFormalAccess(decl->getDeclContext())
-            < Accessibility::Open &&
+      Accessibility matchAccess =
+          matchDecl->getFormalAccess(decl->getDeclContext());
+      if (matchAccess < Accessibility::Open &&
           matchDecl->getModuleContext() != decl->getModuleContext() &&
           !isa<ConstructorDecl>(decl)) {
         TC.diagnose(decl, diag::override_of_non_open,
                     decl->getDescriptiveKind());
+
+      } else if (matchAccess == Accessibility::Open &&
+                 classDecl->getFormalAccess(decl->getDeclContext()) ==
+                   Accessibility::Open &&
+                 decl->getFormalAccess() != Accessibility::Open &&
+                 !decl->isFinal()) {
+        {
+          auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                  /*setter*/false,
+                                  decl->getDescriptiveKind(),
+                                  /*fromOverridden*/true);
+          fixItAccessibility(diag, decl, Accessibility::Open);
+        }
+        TC.diagnose(matchDecl, diag::overridden_here);
+
+      } else {
+        auto matchAccessScope =
+            matchDecl->getFormalAccessScope(decl->getDeclContext());
+        const DeclContext *requiredAccessScope =
+            classDecl->getFormalAccessScope(decl->getDeclContext());
+
+        // FIXME: This is the same operation as
+        // TypeAccessScopeChecker::intersectAccess.
+        if (!requiredAccessScope) {
+          requiredAccessScope = matchAccessScope;
+        } else if (matchAccessScope) {
+          if (matchAccessScope->isChildContextOf(requiredAccessScope)) {
+            requiredAccessScope = matchAccessScope;
+          } else {
+            assert(requiredAccessScope == matchAccessScope ||
+                   requiredAccessScope->isChildContextOf(matchAccessScope));
+          }
+        }
+
+        bool shouldDiagnose = false;
+        bool shouldDiagnoseSetter = false;
+        if (!isa<ConstructorDecl>(decl)) {
+          shouldDiagnose = !decl->isAccessibleFrom(requiredAccessScope);
+
+          if (!shouldDiagnose && matchDecl->isSettable(decl->getDeclContext())){
+            auto matchASD = cast<AbstractStorageDecl>(matchDecl);
+            if (matchASD->isSetterAccessibleFrom(decl->getDeclContext())) {
+              const auto *ASD = cast<AbstractStorageDecl>(decl);
+              shouldDiagnoseSetter =
+                  ASD->isSettable(requiredAccessScope) &&
+                  !ASD->isSetterAccessibleFrom(requiredAccessScope);
+            }
+          }
+        }
+        if (shouldDiagnose || shouldDiagnoseSetter) {
+          bool overriddenForcesAccess =
+              (requiredAccessScope == matchAccessScope &&
+               matchAccess != Accessibility::Open);
+          Accessibility requiredAccess =
+              accessibilityFromScopeForDiagnostics(requiredAccessScope);
+          {
+            auto diag = TC.diagnose(decl, diag::override_not_accessible,
+                                    shouldDiagnoseSetter,
+                                    decl->getDescriptiveKind(),
+                                    overriddenForcesAccess);
+            fixItAccessibility(diag, decl, requiredAccess,
+                               shouldDiagnoseSetter);
+          }
+          TC.diagnose(matchDecl, diag::overridden_here);
+        }
       }
 
       bool mayHaveMismatchedOptionals =
@@ -6498,11 +6526,14 @@ public:
 
     if (CD->isRequired() && ContextTy) {
       if (auto nominal = ContextTy->getAnyNominal()) {
-        if (CD->getFormalAccess() <
-            std::min(nominal->getFormalAccess(), Accessibility::Public)) {
+        auto requiredAccess = std::min(nominal->getFormalAccess(),
+                                       Accessibility::Public);
+        if (requiredAccess == Accessibility::Private)
+          requiredAccess = Accessibility::FilePrivate;
+        if (CD->getFormalAccess() < requiredAccess) {
           auto diag = TC.diagnose(CD,
                                   diag::required_initializer_not_accessible);
-          fixItAccessibility(diag, CD, nominal->getFormalAccess());
+          fixItAccessibility(diag, CD, requiredAccess);
         }
       }
     }
