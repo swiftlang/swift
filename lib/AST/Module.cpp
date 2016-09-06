@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1484,6 +1485,11 @@ StringRef SourceFile::getFilename() const {
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
+}
+
+ASTScope &SourceFile::getScope() {
+  if (!Scope) Scope = ASTScope::createRoot(this);
+  return *Scope;
 }
 
 Identifier

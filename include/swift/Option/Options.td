@@ -423,6 +423,11 @@ def dump_parse : Flag<["-"], "dump-parse">,
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_scope_maps : Separate<["-"], "dump-scope-maps">,
+  HelpText<"Parse and type-check input file(s) and dump the scope map(s)">,
+  MetaVarName<"<expanded-or-list-of-line:column>">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_type_refinement_contexts :
   Flag<["-"], "dump-type-refinement-contexts">,
   HelpText<"Type-check input file(s) and dump type refinement contexts(s)">,
