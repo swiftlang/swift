@@ -1277,10 +1277,9 @@ SILInstruction *SILCombiner::visitWitnessMethodInst(WitnessMethodInst *WMI) {
   // Many cases are handled by the inliner/devirtualizer, but certain
   // special cases are not covered there, e.g. partial_apply(witness_method)
   SILFunction *F;
-  ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
-  std::tie(F, WT, Subs) =
+  std::tie(F, WT) =
       WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                     WMI->getMember());
 

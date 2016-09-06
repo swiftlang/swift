@@ -502,8 +502,31 @@ public:
   SILWitnessTable *
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
+  /// Compute substitutions for making a direct call to a SIL function with
+  /// @convention(witness_method) convention.
+  ///
+  /// Such functions have a substituted generic signature where the
+  /// abstract `Self` parameter from the original type of the protocol
+  /// requirement is replaced by a concrete type.
+  ///
+  /// Thus, the original substitutions of the apply instruction that
+  /// are written in terms of the requirement's generic signature need
+  /// to be remapped to substitutions suitable for the witness signature.
+  ///
+  /// \param conformanceRef The (possibly-specialized) conformance
+  /// \param requirementSig The generic signature of the requirement
+  /// \param witnessThunkSig The generic signature of the witness method
+  /// \param origSubs The substitutions from the call instruction
+  /// \param newSubs New substitutions are stored here
+  void getWitnessMethodSubstitutions(
+      ProtocolConformanceRef conformanceRef,
+      GenericSignature *requirementSig,
+      GenericSignature *witnessThunkSig,
+      ArrayRef<Substitution> origSubs,
+      SmallVectorImpl<Substitution> &newSubs);
+
   /// Attempt to lookup \p Member in the witness table for \p C.
-  std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
+  std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                SILDeclRef Requirement);
 

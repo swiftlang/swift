@@ -195,13 +195,8 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
 void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
   if (!Generics) return;
 
-  // Note that the canonical mangling signature will sometimes use
-  // different dependent type from Generics, apparently for no good
-  // reason.
-  auto minimized = Generics->getCanonicalManglingSignature(M);
-
   // Make a first pass to get all the type metadata.
-  for (auto &reqt : minimized->getRequirements()) {
+  for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
         // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -220,7 +215,7 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
   }
 
   // Make a second pass for all the protocol conformances.
-  for (auto &reqt : minimized->getRequirements()) {
+  for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
         // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -258,9 +253,6 @@ void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCa
 }
 
 void PolymorphicConvention::initGenerics() {
-  // The canonical mangling signature removes dependent types that are
-  // equal to concrete types, but isn't necessarily parallel with
-  // substitutions.
   Generics = FnType->getGenericSignature();
 }
 

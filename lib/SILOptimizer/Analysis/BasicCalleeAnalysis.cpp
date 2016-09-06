@@ -137,11 +137,10 @@ void CalleeCache::computeMethodCallees() {
 SILFunction *
 CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
   SILFunction *CalleeFn;
-  ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
   // Attempt to find a specific callee for the given conformance and member.
-  std::tie(CalleeFn, WT, Subs) = WMI->getModule().lookUpFunctionInWitnessTable(
+  std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
       WMI->getConformance(), WMI->getMember());
 
   return CalleeFn;

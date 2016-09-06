@@ -2961,6 +2961,23 @@ Type Type::subst(Module *module,
   });
 }
 
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    LazyResolver *resolver) {
+  Type derivedType = this;
+
+  while (derivedType) {
+    auto *derivedClass = derivedType->getClassOrBoundGenericClass();
+    assert(derivedClass && "expected a class here");
+
+    if (derivedClass == baseClass)
+      return derivedType;
+
+    derivedType = derivedType->getSuperclass(resolver);
+  }
+
+  llvm_unreachable("no inheritance relationship between given classes");
+}
+
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
 
   // Ignore lvalues in the base type.
@@ -2990,12 +3007,14 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-  while (!baseTy->is<ErrorType>() &&
-         baseTy->getAnyNominal() &&
-         baseTy->getAnyNominal() != ownerNominal) {
-    baseTy = baseTy->getSuperclass(resolver);
-    assert(baseTy && "Couldn't find appropriate context");
+  //
+  // FIXME: Do this in the caller?
+  if (baseTy->getAnyNominal()) {
+    auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
+      baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+
+    assert(ownerNominal == baseTy->getAnyNominal());
   }
 
   // If the base type isn't specialized, there's nothing to substitute.
@@ -3442,23 +3461,27 @@ case TypeKind::Id:
       if (!firstType)
         return Type();
 
+      if (firstType.getPointer() != req.getFirstType().getPointer())
+        anyChanges = true;
+
       Type secondType = req.getSecondType();
       if (secondType) {
         secondType = secondType.transform(fn);
         if (!secondType)
           return Type();
+
+        if (secondType.getPointer() != req.getSecondType().getPointer())
+          anyChanges = true;
       }
 
-      if (firstType->hasTypeParameter() ||
-          (secondType && secondType->hasTypeParameter())) {
-        if (firstType.getPointer() != req.getFirstType().getPointer() ||
-            secondType.getPointer() != req.getSecondType().getPointer())
-          anyChanges = true;
+      if (!firstType->isTypeParameter()) {
+        if (!secondType || !secondType->isTypeParameter())
+          continue;
+        std::swap(firstType, secondType);
+      }
 
-        requirements.push_back(Requirement(req.getKind(), firstType,
-                                           secondType));
-      } else
-        anyChanges = true;
+      requirements.push_back(Requirement(req.getKind(), firstType,
+                                         secondType));
     }
     
     // Transform input type.

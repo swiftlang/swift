@@ -69,7 +69,7 @@ ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions(
     ModuleDecl *M, GenericSignature *sig) const {
   auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
     return ProtocolConformanceRef(protoType->getDecl());
   };

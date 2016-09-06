@@ -19,11 +19,11 @@ func bar() {
   // CHECK: apply [[ZIM_DFLT]]<Int, Int>
   Zim.zim()
   // CHECK: [[ZANG_DFLT_0:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_0]]<Int, Int, Double, Double>
+  // CHECK: apply [[ZANG_DFLT_0]]<Int, Double, Int, Double>
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, Double>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double, Int, Double>
   Zim.zang()
   // CHECK: [[ZANG_DFLT_1:%.*]] = function_ref @_TIZFV25default_arguments_generic3Zim4zang
-  // CHECK: apply [[ZANG_DFLT_1]]<Int, Int, Double, Double>
+  // CHECK: apply [[ZANG_DFLT_1]]<Int, Double, Int, Double>
   Zim.zang(22)
 }

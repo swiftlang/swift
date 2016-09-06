@@ -74,6 +74,8 @@ public:
   Type getSecondType() const {
     return SecondType;
   }
+
+  void dump() const;
 };
 
 } // end namespace swift

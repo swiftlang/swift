@@ -12,6 +12,8 @@
 
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -643,9 +645,6 @@ SerializedSILLoader *SILModule::getSILLoader() {
 
 static ArrayRef<Substitution>
 getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
-  if (CRef.isAbstract())
-    return {};
-  
   auto C = CRef.getConcrete();
 
   // Walk down to the base NormalProtocolConformance.
@@ -683,10 +682,56 @@ getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
   return Subs;
 }
 
+void SILModule::getWitnessMethodSubstitutions(
+    ProtocolConformanceRef conformanceRef,
+    GenericSignature *requirementSig,
+    GenericSignature *witnessThunkSig,
+    ArrayRef<Substitution> origSubs,
+    SmallVectorImpl<Substitution> &newSubs) {
+
+  if (witnessThunkSig == nullptr)
+    return;
+
+  auto *M = getSwiftModule();
+
+  assert(!conformanceRef.isAbstract());
+
+  auto conformance = conformanceRef.getConcrete();
+
+  // Otherwise, we need to build new caller-side substitutions
+  // written in terms of the witness thunk's generic signature,
+  // mapping to the archetypes of the caller.
+  TypeSubstitutionMap subMap;
+  TypeConformanceMap conformanceMap;
+
+  // Take apart caller-side substitutions.
+  //
+  // Note that the Self-derived archetypes appearing on the left
+  // hand side of the map do not end up being used.
+  requirementSig->getSubstitutionMap(origSubs, subMap, conformanceMap);
+
+  // Take apart substitutions from the conforming type.
+  //
+  // If `Self` maps to a bound generic type, this gives us the
+  // substitutions for the concrete type's generic parameters.
+  auto witnessSubs = getSubstitutionsForProtocolConformance(conformanceRef);
+
+  if (!witnessSubs.empty()) {
+    auto *rootConformance = conformance->getRootNormalConformance();
+    auto *witnessSig = rootConformance->getGenericSignature();
+
+    witnessSig->getSubstitutionMap(witnessSubs, subMap, conformanceMap);
+  }
+
+  // Now, apply both sets of substitutions computed above to the
+  // forwarding substitutions of the witness thunk.
+  witnessThunkSig->getSubstitutions(*M, subMap, conformanceMap, newSubs);
+}
+
 /// \brief Given a conformance \p C and a protocol requirement \p Requirement,
 /// search the witness table for the conformance and return the witness thunk
-/// for the requirement, together with any substitutions for the conformance.
-std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
+/// for the requirement.
+std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Requirement) {
   // Look up the witness table associated with our protocol conformance from the
@@ -697,7 +742,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!Ret) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C.dump(); Requirement.dump());
-    return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+    return std::make_pair(nullptr, nullptr);
   }
 
   // Okay, we found the correct witness table. Now look for the method.
@@ -711,11 +756,10 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     if (MethodEntry.Requirement != Requirement)
       continue;
 
-    return std::make_tuple(MethodEntry.Witness, Ret,
-                           getSubstitutionsForProtocolConformance(C));
+    return std::make_pair(MethodEntry.Witness, Ret);
   }
 
-  return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+  return std::make_pair(nullptr, nullptr);
 }
 
 /// \brief Given a protocol \p Protocol and a requirement \p Requirement,

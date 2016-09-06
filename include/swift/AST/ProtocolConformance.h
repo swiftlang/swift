@@ -296,7 +296,6 @@ private:
   /// applies to the substituted type.
   ProtocolConformance *subst(ModuleDecl *module,
                              Type substType,
-                             ArrayRef<Substitution> subs,
                              TypeSubstitutionMap &subMap,
                              ArchetypeConformanceMap &conformanceMap);
 };

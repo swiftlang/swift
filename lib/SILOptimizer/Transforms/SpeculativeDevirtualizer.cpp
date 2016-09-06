@@ -330,7 +330,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isNominalTypeWithUnboundGenericParameters(SubType, AI.getModule()))
+  if (SubType.getSwiftRValueType()->hasArchetype())
     return false;
 
   auto &M = CMI->getModule();
