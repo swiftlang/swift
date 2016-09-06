@@ -388,6 +388,8 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
 // PrecedenceGroup
+ERROR(precedencegroup_not_infix,none,
+      "only infix operators may declare a precedence", ())
 ERROR(expected_precedencegroup_name,none,
       "expected identifier after 'precedencegroup'", ())
 ERROR(expected_precedencegroup_lbrace,none,

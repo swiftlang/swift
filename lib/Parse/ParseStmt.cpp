@@ -860,7 +860,7 @@ namespace {
     Expr *Guard = nullptr;
   };
   
-  /// Contexts in which a guarded pattern can appears.
+  /// Contexts in which a guarded pattern can appear.
   enum class GuardedPatternContext {
     Case,
     Catch,
