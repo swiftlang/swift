@@ -92,6 +92,10 @@ public func createTemporaryFile(
   return fileName
 }
 
+public func removeFile(_ fileName: String) -> Bool {
+  return remove(fileName) == 0
+}
+
 public final class Box<T> {
   public init(_ value: T) { self.value = value }
   public var value: T

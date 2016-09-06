@@ -52,15 +52,26 @@ let temporaryFileContents =
   "sed do eiusmod tempor incididunt ut labore et dolore magna\n" +
   "aliqua.\n"
 
+var temporaryFileNames: [String] = []
+
 func createNSStringTemporaryFile()
   -> (existingPath: String, nonExistentPath: String) {
   let existingPath =
     createTemporaryFile("NSStringAPIs.", ".txt", temporaryFileContents)
   let nonExistentPath = existingPath + "-NoNeXiStEnT"
+  temporaryFileNames.append(existingPath)
+  temporaryFileNames.append(nonExistentPath)
   return (existingPath, nonExistentPath)
 }
 
 var NSStringAPIs = TestSuite("NSStringAPIs")
+
+NSStringAPIs.tearDown {
+  for fileName in temporaryFileNames {
+    _ = removeFile(fileName)
+  }
+  temporaryFileNames = []
+}
 
 NSStringAPIs.test("Encodings") {
   let availableEncodings: [String.Encoding] = String.availableStringEncodings
