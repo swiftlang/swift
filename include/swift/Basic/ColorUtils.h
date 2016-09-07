@@ -22,6 +22,8 @@
 
 namespace swift {
 
+/// RAII class for setting a color for a raw_ostream and resetting when it goes
+/// out-of-scope.
 class OSColor {
   llvm::raw_ostream &OS;
   bool HasColors;
