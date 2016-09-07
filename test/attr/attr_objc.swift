@@ -2011,6 +2011,12 @@ class ClassThrows1 {
   // CHECK: @objc init(degrees: Double) throws
   // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
+
+  // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> Int
+  func methodReturnsBridgedValueType() throws -> Int { return 0 }
+
+  @objc func methodReturnsBridgedValueType2() throws -> Int { return 0 }
+  // expected-error@-1{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
