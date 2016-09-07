@@ -375,6 +375,7 @@ function set_build_options_for_host() {
     llvm_cmake_options=()
     swift_cmake_options=()
     cmark_cmake_options=()
+    lldb_cmake_options=()
     swiftpm_bootstrap_options=()
     SWIFT_HOST_VARIANT=
     SWIFT_HOST_VARIANT_SDK=
@@ -705,6 +706,9 @@ function set_build_options_for_host() {
         )
         swift_cmake_options+=(
             -DSWIFT_HOST_TRIPLE:STRING="${SWIFT_HOST_TRIPLE}"
+        )
+        lldb_cmake_options+=(
+            -DLLVM_HOST_TRIPLE:STRING="${SWIFT_HOST_TRIPLE}"
         )
     fi
     swift_cmake_options+=(
@@ -2066,6 +2070,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 swift_build_dir=$(build_directory ${host} swift)
 
                 # Add any lldb extra cmake arguments here.
+
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    "${lldb_cmake_options[@]}"
+                    )
+
                 if [ ! -z "${LLDB_EXTRA_CMAKE_ARGS}" ]; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2089,6 +2099,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2097,7 +2108,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_PATH_TO_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
@@ -2107,6 +2117,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2115,7 +2126,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_PATH_TO_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
@@ -2125,6 +2135,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                            -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2133,7 +2144,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
                             -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
                             -DLLDB_PATH_TO_CMARK_BUILD:PATH="${cmark_build_dir}"
-                            -DLLDB_PATH_TO_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             -DLLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                             -DLLDB_ALLOW_STATIC_BINDINGS=1
@@ -2149,7 +2159,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
                             LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
                             LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
-                            LLDB_PATH_TO_SWIFTC="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                             LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
                             LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
                             SYMROOT="${lldb_build_dir}"
