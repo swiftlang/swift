@@ -8,3 +8,11 @@ func functionParamScopes(x: Int, y: Int = x) -> Int {
   return x + y
 }
 
+// Name binding in instance methods.
+class C1 {
+	var x = 0
+
+  var hashValue: Int {
+    return x
+  }
+}
