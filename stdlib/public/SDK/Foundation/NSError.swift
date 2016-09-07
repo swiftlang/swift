@@ -287,7 +287,7 @@ public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
 extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
-  public var _userInfo: Any? { return userInfo }
+  public var _userInfo: AnyObject? { return userInfo as NSDictionary }
 
   /// The "embedded" NSError is itself.
   public func _getEmbeddedNSError() -> AnyObject? {
@@ -304,8 +304,8 @@ extension CFError : Error {
     return CFErrorGetCode(self)
   }
 
-  public var _userInfo: Any? {
-    return CFErrorCopyUserInfo(self) as Any
+  public var _userInfo: AnyObject? {
+    return CFErrorCopyUserInfo(self) as AnyObject
   }
 
   /// The "embedded" NSError is itself.
