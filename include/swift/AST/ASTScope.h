@@ -71,6 +71,8 @@ enum class ASTScopeKind : uint8_t {
   AbstractFunctionParams,
   /// The default argument for a parameter.
   DefaultArgument,
+  /// The body of a function.
+  AbstractFunctionBody,
   /// A specific pattern binding.
   PatternBinding,
   /// The scope introduced for an initializer of a pattern binding.
@@ -186,7 +188,8 @@ class ASTScope {
       unsigned index;
     } genericParams;
 
-    /// An abstract function, for \c kind == ASTScopeKind::AbstractFunctionDecl.
+    /// An abstract function, for \c kind == ASTScopeKind::AbstractFunctionDecl
+    /// or \c kind == ASTScopeKind::AbstractFunctionBody.
     AbstractFunctionDecl *abstractFunction;
 
     /// An parameter for an abstract function (init/func/deinit).
@@ -314,8 +317,11 @@ class ASTScope {
     this->genericParams.index = index;
   }
 
-  ASTScope(const ASTScope *parent, AbstractFunctionDecl *abstractFunction)
-      : ASTScope(ASTScopeKind::AbstractFunctionDecl, parent) {
+  ASTScope(ASTScopeKind kind, const ASTScope *parent,
+           AbstractFunctionDecl *abstractFunction)
+      : ASTScope(kind, parent) {
+    assert(kind == ASTScopeKind::AbstractFunctionDecl ||
+           kind == ASTScopeKind::AbstractFunctionBody);
     this->abstractFunction = abstractFunction;
   }
 
@@ -513,9 +519,11 @@ public:
   }
 
   /// Retrieve the abstract function declaration when
-  /// \c getKind() == ASTScopeKind::AbstractFunctionDecl;
+  /// \c getKind() == ASTScopeKind::AbstractFunctionDecl or
+  /// \c getKind() == ASTScopeKind::AbstractFunctionBody;
   AbstractFunctionDecl *getAbstractFunctionDecl() const {
-    assert(getKind() == ASTScopeKind::AbstractFunctionDecl);
+    assert(getKind() == ASTScopeKind::AbstractFunctionDecl ||
+           getKind() == ASTScopeKind::AbstractFunctionBody);
     return abstractFunction;
   }
 

@@ -217,6 +217,12 @@ void ASTScope::expand() const {
       addChild(child);
     break;
 
+  case ASTScopeKind::AbstractFunctionBody:
+    // Create a child for the actual body.
+    if (auto child = createIfNeeded(this, abstractFunction->getBody()))
+      addChild(child);
+    break;
+
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
@@ -588,6 +594,7 @@ static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
 
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
@@ -633,6 +640,7 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::LocalDeclaration:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
@@ -668,6 +676,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::GenericParams:
       // Keep looking.
       parent = parent->getParent();
@@ -741,7 +750,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   // an AbstractFunctionDecl scope, add it now.
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (!parentDirectDescendedFromAbstractFunctionDecl(parent, func)) {
-      return new (ctx) ASTScope(parent, func);
+      return new (ctx) ASTScope(ASTScopeKind::AbstractFunctionDecl, parent,
+                                func);
     }
   }
 
@@ -879,9 +889,11 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
       return afterParamScope;
     }
 
-
     // Function body, if present.
-    return createIfNeeded(parent, abstractFunction->getBody());
+    if (abstractFunction->hasBody())
+      return new (ctx) ASTScope(ASTScopeKind::AbstractFunctionBody, parent,
+                                abstractFunction);
+    return nullptr;
   }
 
   case DeclKind::PatternBinding: {
@@ -1082,6 +1094,7 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::DefaultArgument:
+  case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::Accessors:
@@ -1131,6 +1144,7 @@ void ASTScope::enumerateContinuationScopes(
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::SourceFile:
     case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::IfStmt:
     case ASTScopeKind::RepeatWhileStmt:
@@ -1210,6 +1224,7 @@ ASTContext &ASTScope::getASTContext() const {
     return genericParams.decl->getASTContext();
 
   case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::AbstractFunctionBody:
     return abstractFunction->getASTContext();
 
   case ASTScopeKind::AbstractFunctionParams:
@@ -1327,6 +1342,9 @@ SourceRange ASTScope::getSourceRangeImpl() const {
 
   case ASTScopeKind::DefaultArgument:
     return parameter->getDefaultValue()->getSourceRange();
+
+  case ASTScopeKind::AbstractFunctionBody:
+    return abstractFunction->getBodySourceRange();
 
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
@@ -1596,6 +1614,7 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::LocalDeclaration:
+  case ASTScopeKind::AbstractFunctionBody:
     return nullptr;
   }
 }
@@ -1623,6 +1642,7 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::DefaultArgument:
+  case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::BraceStmt:
@@ -1791,6 +1811,13 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::DefaultArgument:
     printScopeKind("DefaultArgument");
     printAddress(parameter);
+    printRange();
+    break;
+
+  case ASTScopeKind::AbstractFunctionBody:
+    printScopeKind("AbstractFunctionBody");
+    printAddress(abstractFunction);
+    out << " " << abstractFunction->getFullName();
     printRange();
     break;
 
