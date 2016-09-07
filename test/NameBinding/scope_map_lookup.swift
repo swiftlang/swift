@@ -16,3 +16,18 @@ class C1 {
     return x
   }
 }
+
+// Protocols involving 'Self'.
+protocol P1 {
+  associatedtype A = Self
+}
+
+// Extensions.
+protocol P2 {
+}
+
+extension P2 {
+  func getSelf() -> Self {
+    return self
+  }
+}

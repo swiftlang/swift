@@ -389,6 +389,10 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   extendedNominal->addExtension(ED);
 }
 
+void TypeChecker::bindExtension(ExtensionDecl *ext) {
+  ::bindExtensionDecl(ext, *this);
+}
+
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;

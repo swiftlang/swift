@@ -3527,6 +3527,10 @@ public:
   /// FIXME: protocol extensions will introduce a where clause here as well.
   GenericParamList *createGenericParams(DeclContext *dc);
 
+  /// Create the generic parameters of this protocol if the haven't been
+  /// created yet.
+  void createGenericParamsIfMissing();
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;

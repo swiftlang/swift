@@ -89,6 +89,9 @@ public:
   /// Resolve the inherited protocols of a given protocol.
   virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
 
+  /// Bind an extension to its extended type.
+  virtual void bindExtension(ExtensionDecl *ext) = 0;
+
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
@@ -154,6 +157,10 @@ public:
 
   void resolveInheritedProtocols(ProtocolDecl *protocol) override {
     Principal.resolveInheritedProtocols(protocol);
+  }
+
+  void bindExtension(ExtensionDecl *ext) override {
+    Principal.bindExtension(ext);
   }
 
   void resolveExtension(ExtensionDecl *ext) override {

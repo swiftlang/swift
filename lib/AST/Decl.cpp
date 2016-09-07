@@ -2028,9 +2028,8 @@ void NominalTypeDecl::computeType() {
   //
   // If this protocol has been deserialized, it already has generic parameters.
   // Don't add them again.
-  if (!getGenericParams())
-    if (auto proto = dyn_cast<ProtocolDecl>(this))
-      setGenericParams(proto->createGenericParams(proto));
+  if (auto proto = dyn_cast<ProtocolDecl>(this))
+    proto->createGenericParamsIfMissing();
 
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
@@ -2940,6 +2939,11 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
   return result;
+}
+
+void ProtocolDecl::createGenericParamsIfMissing() {
+  if (!getGenericParams())
+    setGenericParams(createGenericParams(this));
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is
