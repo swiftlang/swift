@@ -80,7 +80,7 @@ struct ASTNodeBase {};
     SmallVector<ScopeLike, 4> Scopes;
 
     /// The set of primary archetypes that are currently available.
-    SmallPtrSet<ArchetypeType *, 4> ActiveArchetypes;
+    SmallVector<GenericEnvironment *, 2> GenericEnv;
 
     /// \brief The stack of optional evaluations active at this point.
     SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
@@ -104,12 +104,6 @@ struct ASTNodeBase {};
     /// Collect all of the archetypes in this declaration context and its
     /// parents.
     void collectAllArchetypes(DeclContext *dc) {
-      for (auto genericParams = dc->getGenericParamsOfContext();
-           genericParams;
-           genericParams = genericParams->getOuterParameters()) {
-        for (auto *param : genericParams->getParams())
-          ActiveArchetypes.insert(param->getArchetype());
-      }
     }
 
     Verifier(PointerUnion<Module *, SourceFile *> M, DeclContext *DC)
@@ -120,7 +114,7 @@ struct ASTNodeBase {};
         HadError(Ctx.hadError())
     {
       Scopes.push_back(DC);
-      collectAllArchetypes(DC);
+      GenericEnv.push_back(DC->getGenericEnvironmentOfContext());
     }
 
   public:
@@ -447,23 +441,18 @@ struct ASTNodeBase {};
             return false;
           }
 
+          // Otherwise, the archetype needs to be from this scope.
+          if (GenericEnv.empty()) {
+            Out << "AST verification error: archetype outside of generic "
+                   "context: " << archetype->getString() << "\n";
+            return true;
+          }
+
           // Get the primary archetype.
           auto *parent = archetype->getPrimary();
 
-          // Otherwise, the archetype needs to be from this scope.
-          if (ActiveArchetypes.count(parent) == 0) {
-            // FIXME: Make an exception for serialized extensions, which don't
-            // currently have the correct archetypes.
-            if (auto activeScope = Scopes.back().dyn_cast<DeclContext *>()) {
-              do {
-                if (isa<ExtensionDecl>(activeScope) &&
-                    isa<LoadedFile>(activeScope->getModuleScopeContext())) {
-                  return false;
-                }
-                activeScope = activeScope->getParent();
-              } while (!activeScope->isModuleScopeContext());
-            }
-
+          auto &map = GenericEnv.back()->getArchetypeToInterfaceMap();
+          if (map.find(parent) == map.end()) {
             Out << "AST verification error: archetype "
                 << archetype->getString() << " not allowed in this context\n";
 
@@ -508,63 +497,18 @@ struct ASTNodeBase {};
 
     // Specialized verifiers.
 
-    /// Retrieve the generic parameters of the specified declaration context,
-    /// without looking into its parent contexts.
-    static GenericParamList *getImmediateGenericParams(DeclContext *dc) {
-      switch (dc->getContextKind()) {
-      case DeclContextKind::Module:
-      case DeclContextKind::FileUnit:
-      case DeclContextKind::TopLevelCodeDecl:
-      case DeclContextKind::Initializer:
-      case DeclContextKind::AbstractClosureExpr:
-      case DeclContextKind::SerializedLocal:
-      case DeclContextKind::SubscriptDecl:
-        return nullptr;
-
-      case DeclContextKind::AbstractFunctionDecl:
-        return cast<AbstractFunctionDecl>(dc)->getGenericParams();
-
-      case DeclContextKind::GenericTypeDecl:
-        return cast<GenericTypeDecl>(dc)->getGenericParams();
-
-      case DeclContextKind::ExtensionDecl:
-        return cast<ExtensionDecl>(dc)->getGenericParams();
-      }
-      llvm_unreachable("bad DeclContextKind");
-    }
-
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-
-      // Add any archetypes from this scope into the set of active archetypes.
-      if (auto genericParams = getImmediateGenericParams(scope))
-        for (auto *param : genericParams->getParams())
-          if (auto *archetype = param->getArchetype())
-            ActiveArchetypes.insert(archetype);
+      GenericEnv.push_back(scope->getGenericEnvironmentOfContext());
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-
-      // Remove archetypes from this scope from the set of active archetypes.
-      if (auto genericParams
-            = getImmediateGenericParams(Scopes.back().get<DeclContext*>())) {
-        for (auto *param : genericParams->getParams()) {
-          auto *archetype = param->getArchetype();
-          if (archetype == nullptr)
-            continue;
-
-          if (!ActiveArchetypes.erase(archetype)) {
-            llvm::errs() << "archetype " << archetype
-                         << " not introduced by scope?\n";
-            abort();
-          }
-        }
-      }
-
+      assert(GenericEnv.back() == scope->getGenericEnvironmentOfContext());
       Scopes.pop_back();
+      GenericEnv.pop_back();
     }
     void popScope(BraceStmt *scope) {
       assert(Scopes.back().get<BraceStmt*>() == scope);
@@ -2155,22 +2099,19 @@ struct ASTNodeBase {};
         }
       }
 
-      // If this function is generic or is within a generic type, it should
+      // If this function is generic or is within a generic context, it should
       // have an interface type.
-      if ((AFD->getGenericParams() ||
-           (AFD->getDeclContext()->isTypeContext() &&
-            AFD->getDeclContext()->getGenericParamsOfContext()))
-          && !AFD->getInterfaceType()->is<GenericFunctionType>()) {
-        Out << "Missing interface type for generic function\n";
+      if (AFD->isGenericContext() !=
+          AFD->getInterfaceType()->is<GenericFunctionType>()) {
+        Out << "Functions in generic context must have an interface type\n";
         AFD->dump(Out);
         abort();
       }
 
       // If the function has a generic interface type, it should also have a
       // generic signature.
-      if (AFD->getInterfaceType()->is<GenericFunctionType>() !=
-          (AFD->getGenericSignature() != nullptr)) {
-        Out << "Missing generic signature for generic function\n";
+      if (AFD->isGenericContext() != AFD->isValidGenericContext()) {
+        Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
       }

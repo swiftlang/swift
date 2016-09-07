@@ -26,6 +26,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -298,7 +299,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
 
   // Establish a default generic type resolver.
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -738,9 +739,9 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
     checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
                           nullptr);
-    parentEnv = finalizeGenericParamList(builder, genericParams,
-                                         genericSig, DC);
     parentSig = genericSig;
+    parentEnv = builder.getGenericEnvironment(genericSig->getGenericParams());
+    finalizeGenericParamList(genericParams, parentSig, parentEnv, DC);
   }
 
   return std::make_pair(parentSig, parentEnv);
@@ -969,7 +970,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       current->setInvalid();
       if (current->hasType())
-        current->overwriteType(ErrorType::get(tc.Context));
+	current->overwriteType(ErrorType::get(tc.Context));
       break;
     }
   }
@@ -2805,7 +2806,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     // TODO: Handle non-protocol constraints ('class', base class)
     auto propTy = decl->getType();
     SmallVector<ProtocolConformanceRef, 4> valueConformances;
-    for (auto proto : assocTy->getConformingProtocols(&TC)) {
+    for (auto proto : assocTy->getConformingProtocols()) {
       ProtocolConformance *valueConformance = nullptr;
       bool conforms = TC.conformsToProtocol(propTy, proto, dc,
                                             ConformanceCheckFlags::Used,
@@ -3788,7 +3789,6 @@ public:
 
       if (!assocType->isInvalid()) {
         assocType->setInvalid();
-        assocType->overwriteType(ErrorType::get(TC.Context));
         TC.diagnose(assocType->getLoc(), diag::circular_type_alias, assocType->getName());
       }
       return;
@@ -4738,9 +4738,11 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp,
-                                                FD->getGenericSignature(), FD);
+        auto *sig = FD->getGenericSignature();
+        auto *env = builder.getGenericEnvironment(sig->getGenericParams());
         FD->setGenericEnvironment(env);
+
+        TC.finalizeGenericParamList(gp, sig, env, FD);
       }
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(FD)) {
@@ -4759,7 +4761,7 @@ public:
     }
 
     // Type check the parameters and return type again, now with archetypes.
-    GenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(FD->getGenericEnvironment());
     if (semaFuncDecl(FD, &resolver))
       return;
 
@@ -6431,9 +6433,11 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp,
-                                                CD->getGenericSignature(), CD);
+        auto *sig = CD->getGenericSignature();
+        auto *env = builder.getGenericEnvironment(sig->getGenericParams());
         CD->setGenericEnvironment(env);
+
+        TC.finalizeGenericParamList(gp, sig, env, CD);
       }
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
       if (TC.validateGenericFuncSignature(CD)) {
@@ -6449,7 +6453,7 @@ public:
     }
 
     // Type check the constructor parameters.
-    GenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(CD->getGenericEnvironment());
     if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInterfaceType(ErrorType::get(TC.Context));
@@ -6599,7 +6603,7 @@ public:
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
-    GenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(DD->getGenericEnvironment());
     if (semaFuncParamPatterns(DD, &resolver)) {
       DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInterfaceType(ErrorType::get(TC.Context));
@@ -6917,8 +6921,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       D->setInvalid();
       break;
     }
-      
-    if (!resolveTypeParams || typeParam->getArchetype()) {
+
+    DeclContext *DC = typeParam->getDeclContext();
+
+    if (!resolveTypeParams || DC->isValidGenericContext()) {
       if (assocType) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
 
@@ -6930,7 +6936,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     }
     
     // FIXME: Avoid full check in these cases?
-    DeclContext *DC = typeParam->getDeclContext();
     switch (DC->getContextKind()) {
     case DeclContextKind::SerializedLocal:
     case DeclContextKind::Module:
@@ -7004,9 +7009,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto gp = typeAlias->getGenericParams()) {
       gp->setOuterParameters(
                      typeAlias->getDeclContext()->getGenericParamsOfContext());
-
-      validateGenericTypeSignature(typeAlias);
     }
+
+    validateGenericTypeSignature(typeAlias);
     
     // Otherwise, perform the heavy lifting now.
     typeCheckDecl(typeAlias, true);
@@ -7025,9 +7030,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (auto gp = nominal->getGenericParams()) {
       gp->setOuterParameters(
         nominal->getDeclContext()->getGenericParamsOfContext());
-
-      validateGenericTypeSignature(nominal);
     }
+
+    validateGenericTypeSignature(nominal);
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);
@@ -7086,21 +7091,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // Set the underlying type of each of the associated types to the
     // appropriate archetype.
-    auto selfDecl = proto->getProtocolSelf();
-    ArchetypeType *selfArchetype = selfDecl->getArchetype();
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        TypeLoc underlyingTy;
-        ArchetypeType *archetype = selfArchetype;
-        archetype = selfArchetype->getNestedType(assocType->getName())
-          .getAsArchetype();
-        if (!archetype)
-          assocType->overwriteType(ErrorType::get(D->getASTContext()));
-        else {
-          assocType->setArchetype(archetype);
-          if (!assocType->hasType())
-            assocType->computeType();
-        }
+        if (!assocType->hasType())
+          assocType->computeType();
       }
     }
 
@@ -7458,8 +7452,10 @@ static Type checkExtensionGenericParams(
   tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = tc.finalizeGenericParamList(builder, genericParams, sig, ext);
+  auto *env = builder.getGenericEnvironment(sig->getGenericParams());
   ext->setGenericEnvironment(env);
+
+  tc.finalizeGenericParamList(genericParams, sig, env, ext);
 
   if (isa<ProtocolDecl>(nominal)) {
     // Retain type sugar if it's there.
@@ -7471,8 +7467,8 @@ static Type checkExtensionGenericParams(
 
   // Compute the final extended type.
   SmallVector<Type, 2> genericArgs;
-  for (auto gp : *genericParams) {
-    genericArgs.push_back(gp->getArchetype());
+  for (auto gp : sig->getInnermostGenericParams()) {
+    genericArgs.push_back(env->mapTypeIntoContext(gp));
   }
   Type resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
   return resultType->isEqual(type) ? type : resultType;

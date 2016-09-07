@@ -349,10 +349,8 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
           auto p1 = params1[i];
           auto p2 = params2[i];
           
-          int np1 = static_cast<int>
-          (p1->getArchetype()->getConformsTo().size());
-          int np2 = static_cast<int>
-          (p2->getArchetype()->getConformsTo().size());
+          int np1 = static_cast<int>(p1->getConformingProtocols().size());
+          int np2 = static_cast<int>(p2->getConformingProtocols().size());
           int aDelta = np1 - np2;
           
           if (aDelta)

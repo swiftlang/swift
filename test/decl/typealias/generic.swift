@@ -230,3 +230,27 @@ extension C<T> {}  // expected-error {{use of undeclared type 'T'}}
 extension C<Int> {}  // expected-error {{constrained extension must be declared on the unspecialized generic type 'MyType' with constraints specified by a 'where' clause}}
 
 
+//
+// Generic typealiases in protocols
+//
+
+/* FIXME
+
+protocol P {
+  associatedtype A
+  typealias G1<T> = MyType<Self, T>
+  typealias G2<T> = MyType<T, A>
+}
+
+struct S : P {
+  typealias A = Float
+}
+
+func takesMyType(x: MyType<S, Int>) {}
+
+func takesMyType(y: MyType<Int, Float>) {}
+
+func f(x: S.G1<Int>, y: S.G2<Int>) {
+  takesMyType(x: x)
+  takesMyType(y: y)
+} */

@@ -103,7 +103,7 @@ void IterativeTypeChecker::processResolveInheritedClauseEntry(
 
   // Validate the type of this inherited clause entry.
   // FIXME: Recursion into existing type checker.
-  PartialGenericTypeToArchetypeResolver resolver(TC);
+  PartialGenericTypeToArchetypeResolver resolver;
   if (TC.validateType(*inherited, dc, options, &resolver)) {
     inherited->setInvalidType(getASTContext());
   }
@@ -286,7 +286,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
 
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
     // FIXME: Deal with these.
-    return typeParam->getArchetype();
+    return typeParam->getDeclContext()->isValidGenericContext();
   }
 
   // Module types are always fully resolved.

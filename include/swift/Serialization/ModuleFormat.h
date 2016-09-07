@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 266; // Last change: pattern binding init contexts
+const uint16_t VERSION_MINOR = 267; // Last change: remove archetype from type params
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -768,7 +768,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCVBR<4>,    // depth
     BCVBR<4>,    // index
-    TypeIDField, // archetype type
     BCArray<TypeIDField> // inherited types
   >;
 
@@ -776,7 +775,6 @@ namespace decls_block {
     ASSOCIATED_TYPE_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    TypeIDField,       // archetype type
     TypeIDField,       // default definition
     BCFixed<1>,        // implicit flag
     BCArray<TypeIDField> // inherited types
