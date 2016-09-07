@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
@@ -6504,13 +6505,19 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+// FIXME: Instead of doing this, we should store the decl in the type
+// variable, or in the locator.
 static bool hasArchetype(const GenericTypeDecl *generic,
-                         const ArchetypeType *archetype) {
-  return std::any_of(generic->getInnermostGenericParamTypes().begin(),
-                     generic->getInnermostGenericParamTypes().end(),
-                     [archetype](const GenericTypeParamType *genericParamTy) {
-    return genericParamTy->getDecl()->getArchetype() == archetype;
-  });
+                         ArchetypeType *archetype) {
+  assert(!archetype->getOpenedExistentialType() &&
+         !archetype->getParent());
+
+  auto genericEnv = generic->getGenericEnvironment();
+  if (!genericEnv)
+    return false;
+
+  auto &map = genericEnv->getArchetypeToInterfaceMap();
+  return map.find(archetype) != map.end();
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
@@ -6523,9 +6530,9 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     struct FindGenericTypeDecl : public ASTWalker {
       const GenericTypeDecl *FoundDecl = nullptr;
       const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-      const ArchetypeType *Archetype;
+      ArchetypeType *Archetype;
 
-      FindGenericTypeDecl(const ArchetypeType *Archetype)
+      FindGenericTypeDecl(ArchetypeType *Archetype)
           : Archetype(Archetype) {}
       
       bool walkToTypeReprPre(TypeRepr *T) override {

@@ -65,6 +65,14 @@ Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
   return type;
 }
 
+Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
+  auto canTy = type->getCanonicalType();
+  auto found = InterfaceToArchetypeMap.find(canTy.getPointer());
+  assert(found != InterfaceToArchetypeMap.end() &&
+         "missing generic parameter");
+  return found->second;
+}
+
 ArrayRef<Substitution>
 GenericEnvironment::getForwardingSubstitutions(
     ModuleDecl *M, GenericSignature *sig) const {

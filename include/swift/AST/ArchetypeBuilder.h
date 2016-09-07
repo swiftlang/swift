@@ -325,10 +325,6 @@ public:
   /// structurally with their corresponding archetypes and resolve dependent
   /// member types to the appropriate associated types.
   Type substDependentType(Type type);
-  
-  /// \brief Retrieve the archetype that corresponds to the given generic
-  /// parameter.
-  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);

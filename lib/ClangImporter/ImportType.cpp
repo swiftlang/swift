@@ -22,6 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
@@ -557,34 +558,38 @@ namespace {
       if (auto *objcTypeParamDecl =
             dyn_cast<clang::ObjCTypeParamDecl>(type->getDecl())) {
         const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-        GenericParamList *genericParams = nullptr;
+        GenericSignature *genericSig = nullptr;
+        GenericEnvironment *genericEnv = nullptr;
         if (auto *category =
               dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
           auto ext = cast_or_null<ExtensionDecl>(Impl.importDecl(category,
                                                                  false));
           if (!ext)
             return Type();
-          genericParams = ext->getGenericParams();
+          genericSig = ext->getGenericSignature();
+          genericEnv = ext->getGenericEnvironment();
         } else if (auto *interface =
             dyn_cast<clang::ObjCInterfaceDecl>(typeParamContext)) {
           auto cls = cast_or_null<ClassDecl>(Impl.importDecl(interface,
                                                              false));
           if (!cls)
             return Type();
-          genericParams = cls->getGenericParams();
+          genericSig = cls->getGenericSignature();
+          genericEnv = cls->getGenericEnvironment();
         }
         unsigned index = objcTypeParamDecl->getIndex();
         // Pull the generic param decl out of the imported class.
-        if (!genericParams) {
+        if (!genericSig) {
           // The ObjC type param didn't get imported, possibly because it was
           // suppressed. Treat it as a typedef.
           return Visit(objcTypeParamDecl->getUnderlyingType());
         }
-        if (index > genericParams->size()) {
+        if (index > genericSig->getGenericParams().size()) {
           return Type();
         }
-        GenericTypeParamDecl *paramDecl = genericParams->getParams()[index];
-        return { paramDecl->getArchetype(), ImportHint::ObjCPointer };
+        auto *paramDecl = genericSig->getGenericParams()[index];
+        return { genericEnv->mapTypeIntoContext(paramDecl),
+                 ImportHint::ObjCPointer };
       }
 
       // Import the underlying declaration.
@@ -841,8 +846,7 @@ namespace {
             } else if (typeParam->getSuperclass()) {
               importedTypeArg = typeParam->getSuperclass();
             } else {
-              auto protocols =
-                typeParam->getConformingProtocols(Impl.getTypeResolver());
+              auto protocols = typeParam->getConformingProtocols();
               assert(!protocols.empty() &&
                   "objc imported type param should have either superclass or "
                   "protocol requirement");
@@ -853,8 +857,6 @@ namespace {
               importedTypeArg = ProtocolCompositionType::get(
                   Impl.SwiftContext, protocolTypes);
             }
-            importedTypeArg = SubstitutedType::get(
-                typeParam->getArchetype(), importedTypeArg, Impl.SwiftContext);
             importedTypeArgs.push_back(importedTypeArg);
           }
           assert(importedTypeArgs.size() == typeParamCount);
