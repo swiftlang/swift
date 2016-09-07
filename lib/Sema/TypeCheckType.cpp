@@ -2010,7 +2010,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           loc.getAdvancedLoc(-1),
           Lexer::getLocForEndOfToken(SM, loc));
 
-        TC.diagnose(loc, diag::escaping_function_type)
+        TC.diagnose(loc, diag::escaping_non_function_parameter)
             .fixItRemove(attrRange);
       }
 
