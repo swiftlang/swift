@@ -671,7 +671,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
     auto *Term = IEAI->getParent()->getTerminator();
     if (isa<CondBranchInst>(Term) || isa<SwitchValueInst>(Term)) {
-      auto BeforeTerm = prev(prev(IEAI->getParent()->end()));
+      auto BeforeTerm = std::prev(std::prev(IEAI->getParent()->end()));
       auto *SEAI = dyn_cast<SelectEnumAddrInst>(BeforeTerm);
       if (!SEAI)
         return nullptr;
