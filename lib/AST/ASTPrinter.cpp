@@ -2631,6 +2631,7 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
       case DefaultArgumentKind::DSOHandle:
+      case DefaultArgumentKind::Nil:
         Printer.printKeyword(defaultArgStr);
         break;
       default:
