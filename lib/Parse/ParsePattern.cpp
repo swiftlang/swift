@@ -29,22 +29,41 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   if (!init)
     return DefaultArgumentKind::None;
 
-  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
-  if (!magic)
-    return DefaultArgumentKind::Normal;
-
-  switch (magic->getKind()) {
-  case MagicIdentifierLiteralExpr::Column:
-    return DefaultArgumentKind::Column;
-  case MagicIdentifierLiteralExpr::File:
-    return DefaultArgumentKind::File;
-  case MagicIdentifierLiteralExpr::Line:
-    return DefaultArgumentKind::Line;
-  case MagicIdentifierLiteralExpr::Function:
-    return DefaultArgumentKind::Function;
-  case MagicIdentifierLiteralExpr::DSOHandle:
-    return DefaultArgumentKind::DSOHandle;
+  // #file, #line, etc.
+  if (auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init)) {
+    switch (magic->getKind()) {
+    case MagicIdentifierLiteralExpr::Column:
+      return DefaultArgumentKind::Column;
+    case MagicIdentifierLiteralExpr::File:
+      return DefaultArgumentKind::File;
+    case MagicIdentifierLiteralExpr::Line:
+      return DefaultArgumentKind::Line;
+    case MagicIdentifierLiteralExpr::Function:
+      return DefaultArgumentKind::Function;
+    case MagicIdentifierLiteralExpr::DSOHandle:
+      return DefaultArgumentKind::DSOHandle;
+    }
   }
+
+  // Nil literal, nil.
+  if (isa<NilLiteralExpr>(init))
+    return DefaultArgumentKind::Nil;
+
+  // Empty array literals, [].
+  if (auto arrayExpr = dyn_cast<ArrayExpr>(init)) {
+    if (arrayExpr->getElements().empty())
+      return DefaultArgumentKind::EmptyArray;
+    return DefaultArgumentKind::Normal;
+  }
+
+  // Empty dictionary literals, [:].
+  else if (auto dictionaryExpr = dyn_cast<DictionaryExpr>(init)) {
+    if (dictionaryExpr->getElements().empty())
+      return DefaultArgumentKind::EmptyDictionary;
+    return DefaultArgumentKind::Normal;
+  }
+
+  return DefaultArgumentKind::Normal;
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(AbstractFunctionDecl *AFD){
