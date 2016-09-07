@@ -3613,14 +3613,25 @@ public:
 /// constant referring to some Objective-C method, performs dynamic method
 /// lookup to extract the implementation of that method. This method lookup
 /// can fail at run-time
-class DynamicMethodInst
-  : public UnaryInstructionBase<ValueKind::DynamicMethodInst, MethodInst>
+class DynamicMethodInst final
+  : public UnaryInstructionWithOpenArchetypesBase<
+                                   ValueKind::DynamicMethodInst,
+                                   DynamicMethodInst,
+                                   MethodInst,
+                                   true>
 {
   friend class SILBuilder;
 
   DynamicMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    SILDeclRef Member, SILType Ty, bool Volatile = false)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty, Member, Volatile) {}
+                    ArrayRef<SILValue> TypeDependentOperands,
+                    SILDeclRef Member, SILType Ty, bool Volatile)
+      : UnaryInstructionWithOpenArchetypesBase(DebugLoc, Operand,
+                               TypeDependentOperands, Ty, Member, Volatile) {}
+
+  static DynamicMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILDeclRef Member, SILType Ty, bool Volatile, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes);
 };
 
 /// Given the address of an existential, "opens" the

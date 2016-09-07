@@ -698,18 +698,16 @@ public:
     return fnTy->substGenericArgs(F.getModule(), M, subs);
   }
 
-  /// Check that for each opened archetype in substitutions, there is an
-  /// opened archetype operand.
-  void checkApplySubstitutionsOpenedArchetypes(SILInstruction *AI,
-                                               ArrayRef<Substitution> Subs) {
-    // If we have a substitution whose replacement type is an archetype, make
-    // sure that the replacement archetype is in the context generic params of
-    // the caller function.
+  /// Check that for each opened archetype in substitutions
+  /// or the calle type, there is a type dependent operand.
+  void checkApplyTypeDependentArguments(ApplySite AS) {
+    SILInstruction *AI = AS.getInstruction();
+
     llvm::DenseSet<CanType> FoundOpenedArchetypes;
-    for (auto &Sub : Subs) {
-      Sub.getReplacement().visit([&](Type Ty) {
-        if (!Ty->isOpenedExistential())
-          return;
+
+    // Function to collect opened archetypes in FoundOpenedArchetypes.
+    auto HandleType = [&](Type Ty) {
+      if (Ty->isOpenedExistential()) {
         auto *A = Ty->getAs<ArchetypeType>();
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
@@ -718,35 +716,42 @@ public:
         // Also check that they are properly tracked inside the current
         // function.
         auto Def =
-            OpenedArchetypes.getOpenedArchetypeDef(Ty.getCanonicalTypeOrNull());
+          OpenedArchetypes.getOpenedArchetypeDef(Ty.getCanonicalTypeOrNull());
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
-                    Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
+                Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
-      });
+      }
+    };
+
+    // Search for opened archetypes.
+    for (auto &Sub : AS.getSubstitutions()) {
+      Sub.getReplacement().visit(HandleType);
     }
+    AS.getSubstCalleeType().visit(HandleType);
 
     require(FoundOpenedArchetypes.size() ==
                 AI->getOpenedArchetypeOperands().size(),
-            "Number of opened archetypes in the substitutions list should "
-            "match the number of opened archetype operands");
+            "Number of opened archetypes in the substitutions "
+            "list should match the number of type dependent operands");
 
     for (auto &Op : AI->getOpenedArchetypeOperands()) {
       auto V = Op.get();
       require(isa<SILInstruction>(V),
-             "opened archetype operand should refer to a SIL instruction");
+              "opened archetype operand should refer to a SIL instruction");
       auto Archetype = getOpenedArchetypeOf(cast<SILInstruction>(V));
-      require(Archetype, "opened archetype operand should define an opened archetype");
+      require(Archetype,
+              "opened archetype operand should define an opened archetype");
       require(FoundOpenedArchetypes.count(Archetype),
-              "opened archetype operand does not correspond to any opened archetype from "
-              "the substitutions list");
+              "opened archetype operand does not correspond to any opened "
+              "archetype from the substitutions list");
     }
   }
 
   void checkFullApplySite(FullApplySite site) {
-    checkApplySubstitutionsOpenedArchetypes(site.getInstruction(),
-                                            site.getSubstitutions());
+    checkApplyTypeDependentArguments(site);
+
     // Then make sure that we have a type that can be substituted for the
     // callee.
     auto substTy = checkApplySubstitutions(site.getSubstitutions(),
@@ -866,7 +871,7 @@ public:
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
 
-    checkApplySubstitutionsOpenedArchetypes(PAI, PAI->getSubstitutions());
+    checkApplyTypeDependentArguments(PAI);
 
     auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
                                         PAI->getCallee()->getType());
@@ -1429,9 +1434,10 @@ public:
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
             "metatype instruction must be of metatype type");
-    require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
+    auto MetaTy = MI->getType().castTo<MetatypeType>();
+    require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
-    verifyOpenedArchetype(MI, MI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
@@ -1703,7 +1709,7 @@ public:
     auto lookupType = AMI->getLookupType();
     if (getOpenedArchetype(lookupType)) {
       require(AMI->getOpenedArchetypeOperands().size() == 1,
-              "Must have an opened existential operand");
+              "Must have a type dependent operand for the opened archetype");
       verifyOpenedArchetype(AMI, lookupType);
     } else {
       require(AMI->getOpenedArchetypeOperands().empty(),
@@ -1793,6 +1799,7 @@ public:
               .getSwiftRValueType()
               ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
             "result must be of the method's type");
+    verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
   }
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
@@ -2075,18 +2082,18 @@ public:
     SILType resultType = I->getType();
     require(resultType.is<ExistentialMetatypeType>(),
             "init_existential_metatype result must be an existential metatype");
+    auto MetaTy = resultType.castTo<ExistentialMetatypeType>();
     require(resultType.isObject(),
             "init_existential_metatype result must not be an address");
-    require(resultType.castTo<ExistentialMetatypeType>()->hasRepresentation(),
+    require(MetaTy->hasRepresentation(),
             "init_existential_metatype result must have a representation");
-    require(resultType.castTo<ExistentialMetatypeType>()->getRepresentation()
+    require(MetaTy->getRepresentation()
               == operandType.castTo<MetatypeType>()->getRepresentation(),
             "init_existential_metatype result must match representation of "
             "operand");
 
     checkExistentialProtocolConformances(resultType, I->getConformances());
-    verifyOpenedArchetype(
-        I, getOpenedArchetypeOf(I->getType().getSwiftRValueType()));
+    verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
 
   void checkExistentialProtocolConformances(SILType resultType,
@@ -2172,9 +2179,7 @@ public:
   void verifyOpenedArchetype(SILInstruction *I, CanType Ty) {
     if (!Ty)
       return;
-    // Check for each referenced opened archetype from Ty
-    // that the instruction contains an opened archetype operand
-    // for it.
+    // Check the type and all of its contained types.
     Ty.visit([&](Type t) {
       if (!t->isOpenedExistential())
         return;
