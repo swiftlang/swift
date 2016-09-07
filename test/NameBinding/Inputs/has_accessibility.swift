@@ -39,3 +39,4 @@ public protocol HasDefaultImplementation {}
 extension HasDefaultImplementation {
   internal func foo() {}
 }
+internal class InternalBase {}

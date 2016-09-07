@@ -167,5 +167,9 @@ public protocol Fooable {
 #if !ACCESS_DISABLED
 internal struct FooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'FooImpl' does not conform to protocol 'Fooable'}}
 public struct PublicFooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'PublicFooImpl' does not conform to protocol 'Fooable'}}
-#endif
 // TESTABLE-NOT: method 'foo()'
+
+internal class TestableSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
+public class TestablePublicSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
+// TESTABLE-NOT: undeclared type 'InternalBase'
+#endif
