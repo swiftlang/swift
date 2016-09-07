@@ -34,3 +34,9 @@ public struct StructWithPrivateSetter {
   public private(set) var x = 0
   public init() {}
 }
+
+public protocol HasDefaultImplementation {}
+extension HasDefaultImplementation {
+  internal func foo() {}
+}
+internal class InternalBase {}

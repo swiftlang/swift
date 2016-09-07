@@ -22,7 +22,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1418,6 +1417,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     // FIXME: It would be better to add a new AttributedType sugared type,
     // which would wrap the NameAliasType or ParenType, and apply the
     // isNoEscape bit when de-sugaring.
+    // <https://bugs.swift.org/browse/SR-2520>
     return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
   }
 
@@ -2712,8 +2712,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
     TC.diagnose(overridden, diag::objc_overriding_objc_decl,
                 kind, VD->getOverriddenDecl()->getFullName());
   } else if (Reason == ObjCReason::WitnessToObjC) {
-    auto requirement =
-      TC.findWitnessedObjCRequirements(VD, /*onlyFirst=*/true).front();
+    auto requirement = TC.findWitnessedObjCRequirements(VD).front();
     TC.diagnose(requirement, diag::objc_witness_objc_requirement,
                 VD->getDescriptiveKind(), requirement->getFullName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
@@ -2910,30 +2909,18 @@ bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
 
 /// Determines whether the given type is bridged to an Objective-C class type.
 static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
-  // Simple case: bridgeable object types.
-  if (type->isBridgeableObjectType())
-    return true;
-  
-  // Any bridges to AnyObject.
-  if (type->isAny())
-    return true;
-
-  // Determine whether this type is bridged to Objective-C.
-  ASTContext &ctx = type->getASTContext();
-  Type bridged = ctx.getBridgedToObjC(dc, type);
-  if (!bridged)
+  switch (type->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, dc)
+            .first) {
+  case ForeignRepresentableKind::Trivial:
+  case ForeignRepresentableKind::None:
     return false;
 
-  // Check whether we're bridging to a class.
-  auto classDecl = bridged->getClassOrBoundGenericClass();
-  if (!classDecl)
-    return false;
-
-  // Allow anything that isn't bridged to NSNumber.
-  // FIXME: This feels like a hack, but we don't have the right predicate
-  // anywhere.
-  return classDecl->getName().str()
-            != ctx.getSwiftName(KnownFoundationEntity::NSNumber);
+  case ForeignRepresentableKind::Object:
+  case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::BridgedError:
+  case ForeignRepresentableKind::StaticBridged:
+    return true;
+  }
 }
 
 bool TypeChecker::isRepresentableInObjC(

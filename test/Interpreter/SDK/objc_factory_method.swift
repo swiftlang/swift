@@ -1,4 +1,4 @@
-// RUN: rm -rf %t  &&  mkdir %t
+// RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift -module-name FactoryTest %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test

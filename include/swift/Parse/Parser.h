@@ -541,6 +541,9 @@ public:
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
+    if (Context.LangOpts.EnableASTScopeLookup)
+      return nullptr;
+
     return getScopeInfo().lookupValueName(Name);
   }
 
@@ -825,18 +828,10 @@ public:
 
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
-  ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                                     Identifier Name,
-                                                     SourceLoc NameLoc,
-                                                     DeclAttributes &Attrs);
-  ParserResult<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                                      Identifier Name,
-                                                      SourceLoc NameLoc,
-                                                      DeclAttributes &Attrs);
-  ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                                    Identifier Name,
-                                                    SourceLoc NameLoc,
-                                                    DeclAttributes &Attrs);
+  ParserResult<OperatorDecl> parseDeclOperatorImpl(SourceLoc OperatorLoc,
+                                                   Identifier Name,
+                                                   SourceLoc NameLoc,
+                                                   DeclAttributes &Attrs);
 
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
@@ -924,7 +919,7 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(DeclContext *DC);
+    void setFunctionContext(AbstractFunctionDecl *AFD);
     
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
@@ -970,7 +965,7 @@ public:
     TypeRepr *Type = nullptr;
 
     /// The default argument for this parameter.
-    ExprHandle *DefaultArg = nullptr;
+    Expr *DefaultArg = nullptr;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;

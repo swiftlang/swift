@@ -373,7 +373,7 @@ static NSString *_getClassDescription(Class cls) {
 
 #endif
 
-/// Decide dynamically whether the given object uses native Swift
+/// Decide dynamically whether the given class uses native Swift
 /// reference-counting.
 bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #if SWIFT_OBJC_INTEROP
@@ -384,13 +384,21 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 #endif
 }
 
-// version for SwiftShims
+/// Decide dynamically whether the given type metadata uses native Swift
+/// reference-counting.  The metadata is known to correspond to a class
+/// type, but note that does not imply being known to be a ClassMetadata
+/// due to the existence of ObjCClassWrapper.
 SWIFT_RUNTIME_EXPORT
 extern "C"
 bool
-swift_objc_class_usesNativeSwiftReferenceCounting(const void *theClass) {
+swift_objc_class_usesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
-  return usesNativeSwiftReferenceCounting((const ClassMetadata *)theClass);
+  // If this is ObjC wrapper metadata, the class is definitely not using
+  // Swift ref-counting.
+  if (isa<ObjCClassWrapperMetadata>(theClass)) return false;
+
+  // Otherwise, it's class metadata.
+  return usesNativeSwiftReferenceCounting(cast<ClassMetadata>(theClass));
 #else
   return true;
 #endif

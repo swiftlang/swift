@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 264; // Last change: remove AllArchetypes
+const uint16_t VERSION_MINOR = 266; // Last change: pattern binding init contexts
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -927,9 +927,9 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCVBR<3>    // numpatterns
-
-    // The pattern trails the record.
+    BCVBR<3>,    // numpatterns
+    BCArray<DeclContextIDField> // init contexts
+    // The patterns and decl-contexts trail the record.
   >;
 
   template <unsigned Code>
@@ -1306,7 +1306,8 @@ namespace decls_block {
 
   using PatternBindingInitializerLayout = BCRecordLayout<
     PATTERN_BINDING_INITIALIZER_CONTEXT,
-    DeclIDField // parent pattern binding decl
+    DeclIDField, // parent pattern binding decl
+    BCVBR<3>     // binding index in the pattern binding decl
   >;
 
   using DefaultArgumentInitializerLayout = BCRecordLayout<

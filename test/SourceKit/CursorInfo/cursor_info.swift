@@ -115,7 +115,7 @@ protocol P1 {
   associatedtype T
 }
 
-func genReq<U, V: P1 where V.T == U>(_ u: U, v: V) {}
+func genReq<U, V: P1>(_ u: U, v: V) where V.T == U {}
 
 @objc class C5 {
 
@@ -208,7 +208,7 @@ func convention6(_: @convention(objc_method) ()->()) {}
 func convention7(_: @convention(witness_method) ()->()) {}
 
 // RUN: rm -rf %t.tmp
-// RUN: mkdir %t.tmp
+// RUN: mkdir -p %t.tmp
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
@@ -542,9 +542,9 @@ func convention7(_: @convention(witness_method) ()->()) {}
 // CHECK51: <decl.function.method.class><syntaxtype.keyword>final</syntaxtype.keyword> <syntaxtype.keyword>class</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword>
 
 // RUN: %sourcekitd-test -req=cursor -pos=117:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK52
-// CHECK52: source.lang.swift.decl.function.free (117:6-117:51)
+// CHECK52: source.lang.swift.decl.function.free (117:6-117:36)
 // CHECK52: <U, V : P1 where V.T == U> (U, v: V) -> ()
-// CHECK52: &lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr="{{.*}}">P1</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param>.<ref.associatedtype usr="{{.*}}">T</ref.associatedtype> == <ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.generic_type_requirement>&gt;
+// CHECK52: &lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>V</decl.generic_type_param.name> : <decl.generic_type_param.constraint><ref.protocol usr="{{.*}}">P1</ref.protocol></decl.generic_type_param.constraint></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>u</decl.var.parameter.name>: <decl.var.parameter.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>v</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="{{.*}}">V</ref.generic_type_param>.<ref.associatedtype usr="{{.*}}">T</ref.associatedtype> == <ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></decl.generic_type_requirement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=117:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK53
 // CHECK53: source.lang.swift.decl.generic_type_param (117:16-117:17)

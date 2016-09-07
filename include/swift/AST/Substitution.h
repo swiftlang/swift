@@ -71,13 +71,12 @@ public:
                      GenericEnvironment *env,
                      ArrayRef<Substitution> subs) const;
 
-private:
-  friend class ProtocolConformance;
-  
   Substitution subst(ModuleDecl *module,
-                     ArrayRef<Substitution> subs,
                      TypeSubstitutionMap &subMap,
                      ArchetypeConformanceMap &conformanceMap) const;
+
+private:
+  friend class ProtocolConformance;
 };
 
 void dump(const ArrayRef<Substitution> &subs);

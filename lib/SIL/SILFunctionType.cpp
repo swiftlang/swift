@@ -737,6 +737,12 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator())
   if (auto function = constant->getAnyFunctionRef()) {
+    auto getCanonicalType = [&](Type t) -> CanType {
+      if (genericSig)
+        return genericSig->getCanonicalTypeInContext(t, *M.getSwiftModule());
+      return t->getCanonicalType();
+    };
+
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
     
@@ -745,22 +751,21 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
         auto selfMetatype = MetatypeType::get(
             loweredCaptures.getDynamicSelfType()->getSelfType(),
-            MetatypeRepresentation::Thick)
-                ->getCanonicalType();
-        SILParameterInfo param(selfMetatype, convention);
+            MetatypeRepresentation::Thick);
+        auto canSelfMetatype = getCanonicalType(selfMetatype);
+        SILParameterInfo param(canSelfMetatype, convention);
         inputs.push_back(param);
 
         continue;
       }
 
       auto *VD = capture.getDecl();
-      auto type = VD->getType()->getCanonicalType();
-      
-      type = ArchetypeBuilder::mapTypeOutOfContext(
-          function->getAsDeclContext(), type)->getCanonicalType();
-      
+      auto type = ArchetypeBuilder::mapTypeOutOfContext(
+          function->getAsDeclContext(), VD->getType());
+      auto canType = getCanonicalType(type);
+
       auto &loweredTL = Types.getTypeLowering(
-                                    AbstractionPattern(genericSig, type), type);
+                              AbstractionPattern(genericSig, canType), canType);
       auto loweredTy = loweredTL.getLoweredType();
       switch (Types.getDeclCaptureKind(capture)) {
       case CaptureKind::None:

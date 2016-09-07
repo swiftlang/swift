@@ -388,6 +388,8 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
 // PrecedenceGroup
+ERROR(precedencegroup_not_infix,none,
+      "only infix operators may declare a precedence", ())
 ERROR(expected_precedencegroup_name,none,
       "expected identifier after 'precedencegroup'", ())
 ERROR(expected_precedencegroup_lbrace,none,
@@ -620,7 +622,7 @@ ERROR(expected_type_before_arrow,none,
 ERROR(expected_type_after_arrow,none,
       "expected type after '->'", ())
 ERROR(function_type_argument_label,none,
-      "function types cannot have argument label %0; use '_' instead",
+      "function types cannot have argument labels; use '_' before %0",
       (Identifier))
 
 // Enum Types

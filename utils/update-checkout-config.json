@@ -7,7 +7,7 @@
         "clang": {
             "remote": { "id": "apple/swift-clang" } },
         "swift": {
-            "remote": { "id": "apple/swift-swift" } },
+            "remote": { "id": "apple/swift" } },
         "lldb": {
             "remote": { "id": "apple/swift-lldb" } },
         "cmark": {
@@ -63,8 +63,8 @@
                 "swift-corelibs-xctest": "master-next",
                 "swift-corelibs-foundation": "master-next",
                 "swift-corelibs-libdispatch": "master-next",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master"
+                "swift-integration-tests": "master-next",
+                "swift-xcode-playground-support": "master-next"
             }
         },
         "upstream": {

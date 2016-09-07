@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
 // RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -I %t %s -o %t/a.out

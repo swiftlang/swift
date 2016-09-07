@@ -49,6 +49,9 @@ func recover_colon_arrow_1() : Int { } // expected-error {{expected '->' after f
 func recover_colon_arrow_2() : { }     // expected-error {{expected '->' after function parameter tuple}} {{30-31=->}} expected-error {{expected type for function result}}
 func recover_colon_arrow_3 : Int { }   // expected-error {{expected '->' after function parameter tuple}} {{28-29=->}} expected-error {{expected '(' in argument list of function declaration}}
 func recover_colon_arrow_4 : { }       // expected-error {{expected '->' after function parameter tuple}} {{28-29=->}} expected-error {{expected '(' in argument list of function declaration}} expected-error {{expected type for function result}}
+func recover_colon_arrow_5():Int { }   // expected-error {{expected '->' after function parameter tuple}} {{29-30= -> }}
+func recover_colon_arrow_6(): Int { }  // expected-error {{expected '->' after function parameter tuple}} {{29-30= ->}}
+func recover_colon_arrow_7() :Int { }  // expected-error {{expected '->' after function parameter tuple}} {{30-31=-> }}
 
 //===--- Check that we recover if the function does not have a body, but the
 //===--- context requires the function to have a body.

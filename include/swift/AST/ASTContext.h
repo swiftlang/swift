@@ -230,10 +230,6 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
-  
-  /// Cache for generic mangling signatures.
-  llvm::DenseMap<std::pair<GenericSignature*, ModuleDecl*>,
-                 CanGenericSignature> ManglingSignatures;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -549,21 +545,6 @@ public:
     addCleanup([&object]{ object.~T(); });
   }
 
-  /// Create a context for the initializer of a non-local variable,
-  /// like a global or a field.  To reduce memory usage, if the
-  /// context goes unused, it should be returned to the ASTContext
-  /// with destroyPatternBindingContext.
-  PatternBindingInitializer *createPatternBindingContext(DeclContext *parent);
-  void destroyPatternBindingContext(PatternBindingInitializer *DC);
-
-  /// Create a context for the initializer of the nth default argument
-  /// of the given function.  To reduce memory usage, if the context
-  /// goes unused, it should be returned to the ASTContext with
-  /// destroyDefaultArgumentContext.
-  DefaultArgumentInitializer *createDefaultArgumentContext(DeclContext *fn,
-                                                           unsigned index);
-  void destroyDefaultArgumentContext(DefaultArgumentInitializer *DC);
-
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -852,12 +833,6 @@ public:
   /// canonical generic signature and module.
   ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
-
-  /// Set the stored archetype builder for the given canonical generic
-  /// signature and module.
-  void setArchetypeBuilder(CanGenericSignature sig,
-                           ModuleDecl *mod,
-                           std::unique_ptr<ArchetypeBuilder> builder);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

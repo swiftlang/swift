@@ -105,6 +105,26 @@ static CharSourceRange toCharSourceRange(SourceManager &SM, SourceLoc Start,
   return CharSourceRange(SM, Start, End);
 }
 
+/// \brief Extract a character at \p Loc. If \p Loc is the end of the buffer,
+/// return '\f'.
+static char extractCharAfter(SourceManager &SM, SourceLoc Loc) {
+  auto chars = SM.extractText({Loc, 1});
+  return chars.empty() ? '\f' : chars[0];
+}
+
+/// \brief Extract a character immediately before \p Loc. If \p Loc is the
+/// start of the buffer, return '\f'.
+static char extractCharBefore(SourceManager &SM, SourceLoc Loc) {
+  // We have to be careful not to go off the front of the buffer.
+  auto bufferID = SM.findBufferContainingLoc(Loc);
+  auto bufferRange = SM.getRangeForBuffer(bufferID);
+  if (bufferRange.getStart() == Loc)
+    return '\f';
+  auto chars = SM.extractText({Loc.getAdvancedLoc(-1), 1}, bufferID);
+  assert(!chars.empty() && "Couldn't extractText with valid range");
+  return chars[0];
+}
+
 InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && R.isValid())
@@ -147,23 +167,10 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // space around its hole.  Specifically, check to see there is whitespace
   // before and after the end of range.  If so, nuke the space afterward to keep
   // things consistent.
-  if (SM.extractText({charRange.getEnd(), 1}) == " ") {
-    // Check before the string, we have to be careful not to go off the front of
-    // the buffer.
-    auto bufferRange =
-      SM.getRangeForBuffer(SM.findBufferContainingLoc(charRange.getStart()));
-    bool ShouldRemove = false;
-    if (bufferRange.getStart() == charRange.getStart())
-      ShouldRemove = true;
-    else {
-      auto beforeChars =
-        SM.extractText({charRange.getStart().getAdvancedLoc(-1), 1});
-      ShouldRemove = !beforeChars.empty() && isspace(beforeChars[0]);
-    }
-    if (ShouldRemove) {
-      charRange = CharSourceRange(charRange.getStart(),
-                                  charRange.getByteLength()+1);
-    }
+  if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
+      isspace(extractCharBefore(SM, charRange.getStart()))) {
+    charRange = CharSourceRange(charRange.getStart(),
+                                charRange.getByteLength()+1);
   }
   Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}));
   return *this;
@@ -176,9 +183,23 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     return fixItRemove(R);
 
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine && R.isValid())
-    Engine->getActiveDiagnostic().addFixIt(
-        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, R), Str));
+  if (R.isInvalid() || !Engine) return *this;
+
+  auto &SM = Engine->SourceMgr;
+  auto charRange = toCharSourceRange(SM, R);
+
+  // If we're replacing with something that wants spaces around it, do a bit of
+  // extra work so that we don't suggest extra spaces.
+  if (Str.back() == ' ') {
+    if (isspace(extractCharAfter(SM, charRange.getEnd())))
+      Str = Str.drop_back();
+  }
+  if (!Str.empty() && Str.front() == ' ') {
+    if (isspace(extractCharBefore(SM, charRange.getStart())))
+      Str = Str.drop_front();
+  }
+
+  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, Str));
   return *this;
 }
 

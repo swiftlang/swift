@@ -52,7 +52,7 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
         llvm::outs() << *Arg;
 
         // Find the retain instructions for the argument.
-        llvm::SmallVector<SILInstruction *, 1> RelInsts = 
+        llvm::SmallSetVector<SILInstruction *, 1> RelInsts = 
           computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Release,
                                          Arg, &F, PO, AA, RCFI);
         for (auto I : RelInsts) {
@@ -60,7 +60,7 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
         }
 
         // Find the release instructions for the argument.
-        llvm::SmallVector<SILInstruction *, 1> RetInsts = 
+        llvm::SmallSetVector<SILInstruction *, 1> RetInsts = 
           computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
                                          Arg, &F, PO, AA, RCFI);
         for (auto I : RetInsts) {

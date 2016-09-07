@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_transparent.swift
 // RUN: llvm-bcanalyzer %t/def_transparent.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL

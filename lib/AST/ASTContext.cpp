@@ -22,7 +22,6 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/KnownProtocols.h"
@@ -258,12 +257,6 @@ struct ASTContext::Implementation {
   /// Conformance loaders for declarations that have them.
   llvm::DenseMap<Decl *, std::pair<LazyMemberLoader *, uint64_t>>
     ConformanceLoaders;
-
-  /// \brief A cached unused pattern-binding initializer context.
-  PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
-
-  /// \brief A cached unused default-argument initializer context.
-  DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
 
   /// Mapping from archetypes with lazily-resolved nested types to the
   /// archetype builder and potential archetype corresponding to that
@@ -1457,22 +1450,13 @@ ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
 
   // Create a new archetype builder with the given signature.
   auto builder = new ArchetypeBuilder(*mod, Diags);
-  builder->addGenericSignature(sig, /*adoptArchetypes=*/false,
+  builder->addGenericSignature(sig, nullptr,
                                /*treatRequirementsAsExplicit=*/true);
   
   // Store this archetype builder.
   Impl.ArchetypeBuilders[{sig, mod}]
     = std::unique_ptr<ArchetypeBuilder>(builder);
   return builder;
-}
-
-void ASTContext::setArchetypeBuilder(CanGenericSignature sig,
-                                     ModuleDecl *mod,
-                                     std::unique_ptr<ArchetypeBuilder> builder) {
-  if (Impl.ArchetypeBuilders.find({sig, mod})
-        == Impl.ArchetypeBuilders.end()) {
-    Impl.ArchetypeBuilders[{sig, mod}] = move(builder);
-  }
 }
 
 Module *
@@ -1561,38 +1545,6 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
     return;
   }
   getASTContext().Impl.LocalDiscriminators.insert({this, index});
-}
-
-PatternBindingInitializer *
-ASTContext::createPatternBindingContext(DeclContext *parent) {
-  // Check for an existing context we can re-use.
-  if (auto existing = Impl.UnusedPatternBindingContext) {
-    Impl.UnusedPatternBindingContext = nullptr;
-    existing->reset(parent);
-    return existing;
-  }
-
-  return new (*this) PatternBindingInitializer(parent);
-}
-void ASTContext::destroyPatternBindingContext(PatternBindingInitializer *DC) {
-  // There isn't much value in caching more than one of these.
-  Impl.UnusedPatternBindingContext = DC;
-}
-
-DefaultArgumentInitializer *
-ASTContext::createDefaultArgumentContext(DeclContext *fn, unsigned index) {
-  // Check for an existing context we can re-use.
-  if (auto existing = Impl.UnusedDefaultArgumentContext) {
-    Impl.UnusedDefaultArgumentContext = nullptr;
-    existing->reset(fn, index);
-    return existing;
-  }
-
-  return new (*this) DefaultArgumentInitializer(fn, index);
-}
-void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
-  // There isn't much value in caching more than one of these.
-  Impl.UnusedDefaultArgumentContext = DC;
 }
 
 NormalProtocolConformance *
@@ -3682,15 +3634,6 @@ CanType ArchetypeType::getAnyOpened(Type existential) {
   return ArchetypeType::getOpened(existential);
 }
 
-void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
-                            unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-ExprHandle *ExprHandle::get(ASTContext &Context, Expr *E) {
-  return new (Context) ExprHandle(E);
-}
-
 void TypeLoc::setInvalidType(ASTContext &C) {
   TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
 }
@@ -3756,6 +3699,11 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         bool isKnownCanonical) {
   assert(!params.empty());
+
+#ifndef NDEBUG
+  for (auto req : requirements)
+    assert(req.getFirstType()->isTypeParameter());
+#endif
 
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;

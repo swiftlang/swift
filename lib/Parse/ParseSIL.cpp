@@ -1466,9 +1466,11 @@ static bool allowAbstractConformance(Parser &P, Type subReplacement,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl in GenericParamList.
 static bool getConformancesForSubstitution(Parser &P,
-              ArchetypeType *subArchetype, Type subReplacement, SourceLoc loc,
+              ArrayRef<ProtocolDecl *> protocols,
+              Type subReplacement,
+              SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
-  for (auto proto : subArchetype->getConformsTo()) {
+  for (auto proto : protocols) {
     // Try looking up a concrete conformance.
     if (auto conformance =
           getConformanceOfReplacement(P, subReplacement, proto)) {
@@ -1508,17 +1510,20 @@ bool getApplySubstitutionsFromParsed(
 
   auto loc = params->getRAngleLoc();
 
-  // Map from interface types to archetypes
-  TypeSubstitutionMap map = env->getInterfaceToArchetypeMap();
+  // Collect conformance requirements in a convenient form.
+  llvm::DenseMap<TypeBase *, SmallVector<ProtocolDecl *, 2>> conformsTo;
+  for (auto reqt : sig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      auto canTy = reqt.getFirstType()->getCanonicalType();
+      auto nominal = reqt.getSecondType()->getAnyNominal();
+      conformsTo[canTy.getPointer()].push_back(cast<ProtocolDecl>(nominal));
+    }
+  }
 
-  auto *mod = SP.SILMod.getSwiftModule();
-
-  // The replacement is for the corresponding archetype by ordering.
+  // The replacement is for the corresponding dependent type by ordering.
   for (auto depTy : sig->getAllDependentTypes()) {
 
-    // Map the interface type to a context type.
-    auto contextTy = depTy.subst(mod, map, SubstOptions());
-    auto *archetype = contextTy->castTo<ArchetypeType>();
+    auto canTy = depTy->getCanonicalType().getPointer();
 
     if (parses.empty()) {
       SP.P.diagnose(loc, diag::sil_missing_substitutions);
@@ -1528,7 +1533,7 @@ bool getApplySubstitutionsFromParsed(
     parses = parses.slice(1);
 
     SmallVector<ProtocolConformanceRef, 2> conformances;
-    if (getConformancesForSubstitution(SP.P, archetype,
+    if (getConformancesForSubstitution(SP.P, conformsTo[canTy],
                                        parsed.replacement,
                                        parsed.loc, conformances))
       return true;

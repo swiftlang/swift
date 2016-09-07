@@ -193,11 +193,10 @@ How to specify files:
             if len(old_files) != len(new_files):
                 sys.exit("number of new files must be the same of old files")
 
-            old_files.sort
-            new_files.sort
+            old_files.sort()
+            new_files.sort()
 
-            for idx, old_file in enumerate(old_files):
-                new_file = new_files[idx]
+            for old_file, new_file in zip(old_files, new_files):
                 compare_sizes_of_file([old_file], [new_file],
                                       parsed_arguments.all_sections,
                                       parsed_arguments.list_categories)

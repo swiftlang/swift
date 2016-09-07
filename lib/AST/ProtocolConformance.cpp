@@ -448,7 +448,6 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
                                       Type substType,
-                                      ArrayRef<Substitution> subs,
                                       TypeSubstitutionMap &subMap,
                                       ArchetypeConformanceMap &conformanceMap) {
   if (getType()->isEqual(substType))
@@ -476,7 +475,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType, subs, subMap,
+      newBase = inheritedConformance->subst(module, substType, subMap,
                                             conformanceMap);
     } else {
       newBase = inheritedConformance;
@@ -491,7 +490,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subs, subMap, conformanceMap));
+      newSubs.push_back(sub.subst(module, subMap, conformanceMap));
     
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
     
@@ -531,7 +530,7 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     env->getSubstitutionMap(conformingModule, sig, subs,
                             subMap, conformanceMap);
 
-    auto r = inherited->subst(conformingModule, getType(), subs,
+    auto r = inherited->subst(conformingModule, getType(),
                               subMap, conformanceMap);
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");

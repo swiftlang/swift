@@ -420,7 +420,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubEnum1X",
     key.offset: 248,
-    key.length: 29,
+    key.length: 37,
     key.typename: "FooSubEnum1",
     key.nameoffset: 252,
     key.namelength: 12
@@ -431,7 +431,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubEnum1Y",
     key.offset: 293,
-    key.length: 29,
+    key.length: 37,
     key.typename: "FooSubEnum1",
     key.nameoffset: 297,
     key.namelength: 12
@@ -442,7 +442,7 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
     key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubUnnamedEnumeratorA1",
     key.offset: 339,
-    key.length: 34,
+    key.length: 42,
     key.typename: "Int",
     key.nameoffset: 343,
     key.namelength: 25

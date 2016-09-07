@@ -333,9 +333,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       if (!Tok.is(tok::equal))
         return false;
 
-      bool wantSpace = (Tok.getRange().getEnd() == peekToken().getLoc());
       diagnose(Tok.getLoc(), diag::replace_equal_with_colon_for_value)
-        .fixItReplace(Tok.getLoc(), wantSpace ? ": " : ":");
+        .fixItReplace(Tok.getLoc(), ": ");
     }
     return true;
   };
@@ -1410,11 +1409,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        StringRef replacement = " @escaping ";
-        if (autoclosureEscapingParenRange.End.getAdvancedLoc(1) != Tok.getLoc())
-          replacement = replacement.drop_back();
         diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
-            .fixItReplace(autoclosureEscapingParenRange, replacement);
+            .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
     } else if (Attributes.has(TAK_noescape)) {
@@ -2839,7 +2835,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // It is a common mistake to write "typealias A : Int" instead of = Int.
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
-          .fixItReplace(Tok.getLoc(), "=");
+          .fixItReplace(Tok.getLoc(), " = ");
       consumeToken(tok::colon);
     } else {
       consumeToken(tok::equal);
@@ -3421,10 +3417,19 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
   // Otherwise, we have a normal var or subscript declaration, parse the full
   // complement of specifiers, along with their bodies.
 
-  // If the body is completely empty, reject it.  This is at best a getter with
+  // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::computed_property_no_accessors);
+    auto *TheDecl = createAccessorFunc(VarLBLoc, nullptr, TypeLoc(), nullptr,
+                                       SourceLoc(), Flags,
+                                       AccessorKind::IsGetter,
+                                       AddressorKind::NotAddressor, this,
+                                       SourceLoc());
+
+    TheDecl->setBody(BraceStmt::create(Context, VarLBLoc, {}, Tok.getLoc()));
+    TheDecl->setInvalid();
+    Decls.push_back(TheDecl);
     return true;
   }
 
@@ -3960,12 +3965,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }
 
-  // If we're not in a local context, we'll need a context to parse initializers
-  // into (should we have one).  This happens for properties and global
-  // variables in libraries.
-  PatternBindingInitializer *initContext = nullptr;
-  bool usedInitContext = false;
-  
   bool HasAccessors = false;  // Syntactically has accessor {}'s.
   ParserStatus Status;
 
@@ -3987,13 +3986,17 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // pattern/initializer pairs.
     auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
                                           VarLoc, PBDEntries, CurDeclContext);
-    
+
+    // Wire up any initializer contexts we needed.
+    for (unsigned i : indices(PBDEntries)) {
+      if (auto initContext = PBDEntries[i].getInitContext())
+        cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
+    }
+
     // If we're setting up a TopLevelCodeDecl, configure it by setting up the
     // body that holds PBD and we're done.  The TopLevelCodeDecl is already set
     // up in Decls to be returned to caller.
     if (topLevelDecl) {
-      assert(!initContext &&
-             "Shouldn't need an initcontext: TopLevelCode is a local context!");
       PBD->setDeclContext(topLevelDecl);
       auto range = PBD->getSourceRange();
       topLevelDecl->setBody(BraceStmt::create(Context, range.Start,
@@ -4001,18 +4004,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       Decls.insert(Decls.begin()+NumDeclsInResult, topLevelDecl);
       return;
     }
-    
-    // If we set up an initialization context for a property or module-level
-    // global, check to see if we needed it and wind it down.
-    if (initContext) {
-      // If we didn't need the context, "destroy" it, which recycles it for
-      // the next user.
-      if (!usedInitContext)
-        Context.destroyPatternBindingContext(initContext);
-      else
-        initContext->setBinding(PBD);
-    }
-    
+
     // Otherwise return the PBD in "Decls" to the caller.  We add it at a
     // specific spot to get it in before any accessors, which SILGen seems to
     // want.
@@ -4044,12 +4036,17 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
-    PBDEntries.push_back({pattern, nullptr});
-    
+    PBDEntries.push_back({pattern, nullptr, nullptr});
+
     Expr *PatternInit = nullptr;
     
     // Parse an initializer if present.
     if (Tok.is(tok::equal)) {
+      // If we're not in a local context, we'll need a context to parse initializers
+      // into (should we have one).  This happens for properties and global
+      // variables in libraries.
+      PatternBindingInitializer *initContext = nullptr;
+
       // Record the variables that we're trying to initialize.  This allows us
       // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
       // decl (even though names aren't injected into scope when the initializer
@@ -4068,7 +4065,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // for the PBD we'll eventually create.  This allows us to have reasonable
       // DeclContexts for any closures that may live inside of initializers.
       if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-        initContext = Context.createPatternBindingContext(CurDeclContext);
+        initContext = new (Context) PatternBindingInitializer(CurDeclContext);
 
       // If we're using a local context (either a TopLevelCodeDecl or a
       // PatternBindingContext) install it now so that CurDeclContext is set
@@ -4105,11 +4102,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       PatternInit = init.getPtrOrNull();
       PBDEntries.back().setInit(PatternInit);
 
-      // If we allocated an initContext and the expression had a closure in it,
-      // we'll need to keep the initContext around.
-      if (initContext)
-        usedInitContext |= initParser->hasClosures();
-      
+      // If we set up an initialization context for a property or module-level
+      // global, record it.
+      PBDEntries.back().setInitContext(initContext);
+
       // If we are doing second pass of code completion, we don't want to
       // suddenly cut off parsing and throw away the declaration.
       if (init.hasCodeCompletion() && isCodeCompletionFirstPass()) {
@@ -4139,6 +4135,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // FIXME: Handle generalized parameters.
       Expr *paramExpr = nullptr;
       if (Tok.is(tok::l_brace)) {
+        // If we're not in a local context, we'll need a context to parse initializers
+        // into (should we have one).  This happens for properties and global
+        // variables in libraries.
+        PatternBindingInitializer *initContext = nullptr;
+
         // Record the variables that we're trying to set up.  This allows us
         // to cleanly reject "var x = x" when "x" isn't bound to an enclosing
         // decl (even though names aren't injected into scope when the parameter
@@ -4157,7 +4158,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         // This will be recontextualized to a method we synthesize during
         // type checking.
         if (!CurDeclContext->isLocalContext() && !topLevelDecl && !initContext)
-          initContext = Context.createPatternBindingContext(CurDeclContext);
+          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
         Optional<ParseFunctionBody> initParser;
         Optional<ContextChange> topLevelParser;
         if (topLevelDecl)
@@ -4167,7 +4168,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
           initParser.emplace(*this, initContext);
 
         auto closure = parseExprClosure();
-        usedInitContext = true;
+        PBDEntries.back().setInitContext(initContext);
+
         if (closure.isParseError())
           return makeParserError();
         if (closure.hasCodeCompletion())
@@ -5464,17 +5466,8 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
-
-  ParserResult<OperatorDecl> Result;
-  if (Attributes.hasAttribute<PrefixAttr>())
-    Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else if (Attributes.hasAttribute<PostfixAttr>())
-    Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else {
-    if (!Attributes.hasAttribute<InfixAttr>())
-      diagnose(OperatorLoc, diag::operator_decl_no_fixity);
-    Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  }
+  
+  auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
 
   if (!DCC.movedToTopLevel() && !AllowTopLevel) {
     diagnose(OperatorLoc, diag::operator_decl_inner_scope);
@@ -5485,55 +5478,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserResult<OperatorDecl>
-Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
+Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                 SourceLoc NameLoc, DeclAttributes &Attributes) {
-  SourceLoc lBraceLoc;
-  if (consumeIf(tok::l_brace, lBraceLoc)) {
-    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            NameLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    }
-
-    skipUntilDeclRBrace();
-    (void) consumeIf(tok::r_brace);
-  }
+  bool isPrefix = Attributes.hasAttribute<PrefixAttr>();
+  bool isInfix = Attributes.hasAttribute<InfixAttr>();
+  bool isPostfix = Attributes.hasAttribute<PostfixAttr>();
   
-  auto *Res = new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
-                                               Name, NameLoc);
-  Res->getAttrs() = Attributes;
-  return makeParserResult(Res);
-}
-
-ParserResult<OperatorDecl>
-Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                 Identifier Name, SourceLoc NameLoc,
-                                 DeclAttributes &Attributes) {
-  SourceLoc lBraceLoc;
-  if (consumeIf(tok::l_brace, lBraceLoc)) {
-    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            NameLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    }
-
-    skipUntilDeclRBrace();
-    (void) consumeIf(tok::r_brace);
-  }
-
-  auto Res = new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
-                                               Name, NameLoc);
-  Res->getAttrs() = Attributes;
-  return makeParserResult(Res);
-}
-
-ParserResult<OperatorDecl>
-Parser::parseDeclInfixOperator(SourceLoc operatorLoc, Identifier name,
-                               SourceLoc nameLoc, DeclAttributes &attributes) {
+  // Parse (or diagnose) a specified precedence group.
   SourceLoc colonLoc;
   Identifier precedenceGroupName;
   SourceLoc precedenceGroupNameLoc;
@@ -5541,33 +5492,54 @@ Parser::parseDeclInfixOperator(SourceLoc operatorLoc, Identifier name,
     if (Tok.is(tok::identifier)) {
       precedenceGroupName = Context.getIdentifier(Tok.getText());
       precedenceGroupNameLoc = consumeToken(tok::identifier);
+      
+      if (isPrefix || isPostfix)
+        diagnose(colonLoc, diag::precedencegroup_not_infix)
+          .fixItRemove({colonLoc, precedenceGroupNameLoc});
     }
   }
-
+  
+  // Diagnose deprecated operator body syntax `operator + { ... }`.
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLoc = precedenceGroupNameLoc;
-      if (lastGoodLoc.isInvalid())
-        lastGoodLoc = nameLoc;
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            lastGoodLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      diagnose(lBraceLoc, diag::deprecated_operator_body)
-        .fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    } else {
+    if (isInfix && !Tok.is(tok::r_brace)) {
       diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
+    } else {
+      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+      if (Tok.is(tok::r_brace)) {
+        SourceLoc lastGoodLoc = precedenceGroupNameLoc;
+        if (lastGoodLoc.isInvalid())
+          lastGoodLoc = NameLoc;
+        SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
+                                                              lastGoodLoc);
+        SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+        Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
+      }
     }
 
     skipUntilDeclRBrace();
     (void) consumeIf(tok::r_brace);
   }
-
-  auto res = new (Context) InfixOperatorDecl(CurDeclContext, operatorLoc,
-                                             name, nameLoc, colonLoc,
-                                             precedenceGroupName,
-                                             precedenceGroupNameLoc);
-  res->getAttrs() = attributes;
+  
+  
+  OperatorDecl *res;
+  if (Attributes.hasAttribute<PrefixAttr>())
+    res = new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
+                                           Name, NameLoc);
+  else if (Attributes.hasAttribute<PostfixAttr>())
+    res = new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                            Name, NameLoc);
+  else {
+    if (!Attributes.hasAttribute<InfixAttr>())
+      diagnose(OperatorLoc, diag::operator_decl_no_fixity);
+    
+    res = new (Context) InfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                          Name, NameLoc, colonLoc,
+                                          precedenceGroupName,
+                                          precedenceGroupNameLoc);
+  }
+  
+  res->getAttrs() = Attributes;
   return makeParserResult(res);
 }
 

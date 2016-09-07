@@ -137,7 +137,7 @@ struct ResultDescriptor {
   /// If non-null, this is the release in the return block of the callee, which
   /// is associated with this parameter if it is @owned. If the parameter is not
   /// @owned or we could not find such a release in the callee, this is null.
-  RetainList CalleeRetain;
+  llvm::SmallSetVector<SILInstruction *, 1> CalleeRetain;
 
   /// This is owned to guaranteed.
   bool OwnedToGuaranteed;

@@ -11,7 +11,9 @@ struct PlainStruct {}
 enum PlainEnum {}
 protocol PlainProtocol {} // expected-note {{protocol 'PlainProtocol' declared here}}
 
-enum ErrorEnum : Error { }
+enum ErrorEnum : Error {
+  case failed
+}
 
 @objc class Class_ObjC1 {}
 
@@ -2011,6 +2013,24 @@ class ClassThrows1 {
   // CHECK: @objc init(degrees: Double) throws
   // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
+
+  // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> NSRange
+  func methodReturnsBridgedValueType() throws -> NSRange { return NSRange() }
+
+  @objc func methodReturnsBridgedValueType2() throws -> NSRange {
+    return NSRange()
+  }
+  // expected-error@-3{{throwing method cannot be marked @objc because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
+
+  // CHECK: {{^}} @objc func methodReturnsError() throws -> Error
+  func methodReturnsError() throws -> Error { return ErrorEnum.failed }
+
+  // CHECK: @objc func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int)
+  func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
+    func add(x: Int) -> (Int) -> Int { 
+      return { x + $0 }
+    }
+  }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
@@ -2116,4 +2136,62 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
 
 @objc protocol OperatorInProtocol {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
+}
+
+//===--- @objc inference for witnesses
+
+@objc protocol InferFromProtocol {
+  @objc(inferFromProtoMethod1:)
+  optional func method1(value: Int)
+}
+
+// Infer when in the same declaration context.
+// CHECK-LABEL: ClassInfersFromProtocol1
+class ClassInfersFromProtocol1 : InferFromProtocol{
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Infer when in a different declaration context of the same class.
+// CHECK-LABEL: ClassInfersFromProtocol2a
+class ClassInfersFromProtocol2a {
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+extension ClassInfersFromProtocol2a : InferFromProtocol { }
+
+// Infer when in a different declaration context of the same class.
+class ClassInfersFromProtocol2b : InferFromProtocol { }
+
+// CHECK-LABEL: ClassInfersFromProtocol2b
+extension ClassInfersFromProtocol2b {
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Don't infer when there is a signature mismatch.
+// CHECK-LABEL: ClassInfersFromProtocol3
+class ClassInfersFromProtocol3 : InferFromProtocol {
+}
+
+extension ClassInfersFromProtocol3 {
+  // CHECK: {{^}} func method1(value: String)
+  func method1(value: String) { }
+}
+
+// Inference for subclasses.
+class SuperclassImplementsProtocol : InferFromProtocol { }
+
+class SubclassInfersFromProtocol1 : SuperclassImplementsProtocol {
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
+}
+
+extension SubclassInfersFromProtocol2 {
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
+  func method1(value: Int) { }
 }

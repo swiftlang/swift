@@ -141,6 +141,9 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
+    /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    bool EnableASTScopeLookup = false;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a

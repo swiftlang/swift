@@ -518,6 +518,7 @@ namespace {
     
 
     void handleStoreUse(unsigned UseID);
+    void handleLoadUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -807,15 +808,16 @@ void LifetimeChecker::doIt() {
       handleStoreUse(i);
       break;
 
-    case DIUseKind::IndirectIn:
-    case DIUseKind::Load: {
+    case DIUseKind::IndirectIn: {
       bool IsSuperInitComplete, FailedSelfUse;
       // If the value is not definitively initialized, emit an error.
       if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
         handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
       break;
     }
-
+    case DIUseKind::Load:
+      handleLoadUse(i);
+      break;
     case DIUseKind::InOutUse:
       handleInOutUse(Use);
       break;
@@ -855,6 +857,55 @@ void LifetimeChecker::doIt() {
     handleConditionalDestroys(ControlVariable);
 }
 
+void LifetimeChecker::handleLoadUse(unsigned UseID) {
+  DIMemoryUse &Use = Uses[UseID];
+  SILInstruction *LoadInst = Use.Inst;
+
+  bool IsSuperInitComplete, FailedSelfUse;
+  // If the value is not definitively initialized, emit an error.
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
+    return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
+
+  // If this is an OpenExistentialAddrInst in preparation for applying
+  // a witness method, analyze its use to make sure, that no mutation of
+  // lvalue let constants occurs.
+  auto* OEAI = dyn_cast<OpenExistentialAddrInst>(LoadInst);
+  if (OEAI != nullptr && TheMemory.isElementLetProperty(Use.FirstElement)) {
+    for (auto OEAUse : OEAI->getUses()) {
+      auto* AI = dyn_cast<ApplyInst>(OEAUse->getUser());
+
+      if (AI == nullptr)
+        // User is not an ApplyInst
+        continue;
+
+      unsigned OperandNumber = OEAUse->getOperandNumber();
+      if (OperandNumber < 1 || OperandNumber > AI->getNumCallArguments())
+        // Not used as a call argument
+        continue;
+
+      unsigned ArgumentNumber = OperandNumber - 1;
+
+      CanSILFunctionType calleeType = AI->getSubstCalleeType();
+      SILParameterInfo parameterInfo = calleeType->getParameters()[ArgumentNumber];
+
+      if (!parameterInfo.isIndirectMutating() ||
+          parameterInfo.getType().isAnyClassReferenceType())
+        continue;
+
+      if (!shouldEmitError(LoadInst))
+        continue;
+
+      std::string PropertyName;
+      auto *VD = TheMemory.getPathStringToElement(Use.FirstElement, PropertyName);
+      diagnose(Module, LoadInst->getLoc(),
+               diag::mutating_protocol_witness_method_on_let_constant, PropertyName);
+
+      if (auto *Var = dyn_cast<VarDecl>(VD)) {
+        Var->emitLetToVarNoteIfSimple(nullptr);
+      }
+    }
+  }
+}
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
@@ -1937,7 +1988,10 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
   B.setCurrentDebugScope(TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
-  auto *ControlVariableBox = B.createAllocStack(Loc, IVType);
+  // Use an empty location for the alloc_stack. If Loc is variable declaration
+  // the alloc_stack would look like the storage of that variable.
+  auto *ControlVariableBox =
+      B.createAllocStack(RegularLocation(SourceLoc()), IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.

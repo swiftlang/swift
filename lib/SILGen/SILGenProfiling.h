@@ -57,7 +57,7 @@ public:
 
 private:
   /// Map counters to ASTNodes and set them up for profiling the given function.
-  void assignRegionCounters(AbstractFunctionDecl *Root);
+  void assignRegionCounters(Decl *Root);
 
   friend struct ProfilerRAII;
 };
@@ -67,7 +67,7 @@ struct ProfilerRAII {
   SILGenModule &SGM;
   std::unique_ptr<SILGenProfiling> PreviousProfiler;
 
-  ProfilerRAII(SILGenModule &SGM, AbstractFunctionDecl *D);
+  ProfilerRAII(SILGenModule &SGM, Decl *D);
   ~ProfilerRAII();
 };
 

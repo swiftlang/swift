@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_objc.swift -disable-objc-attr-requires-foundation-module
 // RUN: llvm-bcanalyzer %t/def_objc.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL

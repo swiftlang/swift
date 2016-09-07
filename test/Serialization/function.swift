@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift
 // RUN: llvm-bcanalyzer %t/def_func.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -I %t %s | %FileCheck %s -check-prefix=SIL
@@ -81,7 +81,7 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrapped{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value : Equatable, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrapped{{.*}} : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 _ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())
 

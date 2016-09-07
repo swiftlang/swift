@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift -module-name new_module
 // RUN: not %target-swift-frontend %s -parse -I %t -show-diagnostics-after-fatal 2>&1 | %FileCheck %s
 

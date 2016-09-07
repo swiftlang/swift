@@ -142,6 +142,9 @@ public:
     DumpAST, ///< Parse, type-check, and dump AST
     PrintAST, ///< Parse, type-check, and pretty-print AST
 
+    /// Parse and dump scope map.
+    DumpScopeMaps,
+
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
@@ -250,6 +253,10 @@ public:
 
   /// Indicates a debug crash mode for the frontend.
   DebugCrashMode CrashMode = DebugCrashMode::None;
+
+  /// Line and column for each of the locations to be probed by
+  /// -dump-scope-maps.
+  SmallVector<std::pair<unsigned, unsigned>, 2> DumpScopeMapLocations;
 
   /// Indicates whether the RequestedAction has output.
   bool actionHasOutput() const;

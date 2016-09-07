@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -enable-testing -o %t %S/Inputs/complete_testable_helper.swift
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL -I %t > %t.txt

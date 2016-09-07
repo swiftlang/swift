@@ -447,7 +447,7 @@ private:
   RCIdentityFunctionInfo *RCFI;
 
   /// The epilogue retains or releases.
-  llvm::SmallVector<SILInstruction *, 1> EpilogueARCInsts; 
+  llvm::SmallSetVector<SILInstruction *, 1> EpilogueARCInsts; 
 
   /// All the retain/release block state for all the basic blocks in the function. 
   llvm::DenseMap<SILBasicBlock *, EpilogueARCBlockState *> EpilogueARCBlockStates;
@@ -507,7 +507,7 @@ public:
 
   /// Reset the epilogue arc instructions. 
   void resetEpilogueARCInsts() { EpilogueARCInsts.clear(); }
-  llvm::SmallVector<SILInstruction *, 1> getEpilogueARCInsts() {
+  llvm::SmallSetVector<SILInstruction *, 1> getEpilogueARCInsts() {
     return EpilogueARCInsts;
   }
 
@@ -577,7 +577,7 @@ public:
 /// empty set if no epilogue ARC instructions can be found.
 ///
 /// NOTE: This function assumes Arg is has @owned semantic.
-llvm::SmallVector<SILInstruction *, 1> 
+llvm::SmallSetVector<SILInstruction *, 1> 
 computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
                                SILValue Arg, SILFunction *F,
                                PostOrderFunctionInfo *PO, AliasAnalysis *AA,

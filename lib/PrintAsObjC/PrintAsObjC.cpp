@@ -81,6 +81,12 @@ namespace {
     Normal = false,
     CustomNamesOnly = true,
   };
+
+  /// Whether the type being printed is in function param position.
+  enum IsFunctionParam_t : bool {
+    IsFunctionParam = true,
+    IsNotFunctionParam = false,
+  };
 }
 
 static StringRef getNameForObjC(const ValueDecl *VD,
@@ -361,7 +367,7 @@ private:
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
-      print(param->getType(), OTK_None);
+      print(param->getType(), OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
 
@@ -542,19 +548,6 @@ private:
 
     os << ";\n";
   }
-  
-  void printSingleFunctionParam(const ParamDecl *param) {
-    // The type name may be multi-part.
-    PrintMultiPartType multiPart(*this);
-    visitPart(param->getType(), OTK_None);
-    auto name = param->getName();
-    if (name.empty())
-      return;
-    
-    os << ' ' << name;
-    if (isClangKeyword(name))
-      os << "_";
-  }
 
   void printAbstractFunctionAsFunction(FuncDecl *FD) {
     printDocumentationComment(FD);
@@ -578,7 +571,8 @@ private:
     auto params = FD->getParameterLists().back();
     interleave(*params,
                [&](const ParamDecl *param) {
-                 printSingleFunctionParam(param);
+                 print(param->getType(), OTK_None, param->getName(),
+                       IsFunctionParam);
                },
                [&]{ os << ", "; });
     
@@ -1437,12 +1431,13 @@ private:
       } else {
         interleave(tupleTy->getElements(),
                    [this](TupleTypeElt elt) {
-                     print(elt.getType(), OTK_None, elt.getName());
+                     print(elt.getType(), OTK_None, elt.getName(),
+                           IsFunctionParam);
                    },
                    [this] { os << ", "; });
       }
     } else {
-      print(paramsTy, OTK_None);
+      print(paramsTy, OTK_None, Identifier(), IsFunctionParam);
     }
     os << ")";
   }
@@ -1516,8 +1511,15 @@ private:
   /// visitPart().
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
-             Identifier name = Identifier()) {
+             Identifier name = Identifier(),
+             IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
+
+    if (isFuncParam)
+      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+                        ->getAs<AnyFunctionType>())
+        if (fnTy->isNoEscape())
+          os << "SWIFT_NOESCAPE ";
 
     PrintMultiPartType multiPart(*this);
     visitPart(ty, optionalKind);
@@ -2103,6 +2105,11 @@ public:
              "__attribute__((objc_method_family(X)))\n"
            "#else\n"
            "# define SWIFT_METHOD_FAMILY(X)\n"
+           "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(noescape)\n"
+           "# define SWIFT_NOESCAPE __attribute__((noescape))\n"
+           "#else\n"
+           "# define SWIFT_NOESCAPE\n"
            "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"

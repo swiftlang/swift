@@ -1231,7 +1231,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // the last use is part of the frontier.
       SILInstruction *LastUser = findLastUserInBlock(BB);
       if (!isa<TermInst>(LastUser)) {
-        Fr.push_back(&*next(LastUser->getIterator()));
+        Fr.push_back(&*std::next(LastUser->getIterator()));
         continue;
       }
       // In case the last user is a TermInst we add all successor blocks to the

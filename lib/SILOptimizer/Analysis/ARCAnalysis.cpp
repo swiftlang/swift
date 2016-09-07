@@ -790,6 +790,11 @@ collectMatchingReleases(SILBasicBlock *BB) {
   for (auto II = std::next(BB->rbegin()), IE = BB->rend(); II != IE; ++II) {
     // If we do not have a release_value or strong_release. We can continue
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {
+
+      // We cannot match a final release if it is followed by a dealloc_ref.
+      if (isa<DeallocRefInst>(*II))
+        break;
+
       // We do not know what this instruction is, do a simple check to make sure
       // that it does not decrement the reference count of any of its operand. 
       //
@@ -1296,7 +1301,7 @@ bool EpilogueARCContext::computeEpilogueARC() {
     for (auto I = B->rbegin(), E = B->rend(); I != E; ++I) {
       // This is a transition from 1 to 0 due to an interested instruction.
       if (isInterestedInstruction(&*I)) {
-        EpilogueARCInsts.push_back(&*I);
+        EpilogueARCInsts.insert(&*I);
         break;
       }
       // This is a transition from 1 to 0 due to a blocking instruction.
@@ -1308,7 +1313,7 @@ bool EpilogueARCContext::computeEpilogueARC() {
   return true;
 }
 
-llvm::SmallVector<SILInstruction *, 1>
+llvm::SmallSetVector<SILInstruction *, 1>
 swift::computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind Kind,
                                       SILValue Arg, SILFunction *F,
                                       PostOrderFunctionInfo *PO, AliasAnalysis *AA,

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -62,5 +62,11 @@ func foo() {
   x += 1              // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 }
 
-main()
-foo()
+// rdar://problem/27874041 - top level code decls get no coverage
+var g1 : Int32 = 0   // CHECK-COV: |{{.*}}[[@LINE]]
+repeat {             // CHECK-COV: 1|{{.*}}[[@LINE]]
+  g1 += 1            // CHECK-COV: 1|{{.*}}[[@LINE]]
+} while g1 == 0      // CHECK-COV: 1|{{.*}}[[@LINE]]
+
+main() // CHECK-COV: 1{{.*}}[[@LINE]]
+foo()  // CHECK-COV: 1{{.*}}[[@LINE]]

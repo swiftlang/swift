@@ -14,7 +14,7 @@ public class C1 : Prot {
   public subscript(index i: Float) -> Int { return 0 }
 }
 
-public func genfoo<T1 : Prot, T2 : C1 where T1.Element == Int, T2.Element == T1.Element>(x ix: T1, y iy: T2) {}
+public func genfoo<T1 : Prot, T2 : C1>(x ix: T1, y iy: T2) where T1.Element == Int, T2.Element == T1.Element {}
 
 public extension Prot where Self.Element == Int {
   final func extfoo() {}

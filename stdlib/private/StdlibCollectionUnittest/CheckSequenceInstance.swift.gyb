@@ -81,8 +81,8 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, ${trace})
 
-  // Check that _copyContents does the right thing if we can do so
-  // without destroying the sequence.
+  // Test `_copyContents(initializing:)` if we can do so without destroying the
+  // sequence.
   _ = sequence._preprocessingPass { () -> Void in
     var count = 0
     for _ in sequence { count += 1 }
@@ -96,6 +96,13 @@ public func checkSequence<
     }
     buf.deinitialize(count: end - buf)
     buf.deallocate(capacity: count)
+  }
+
+  // Test `_copyToContiguousArray()` if we can do so
+  // without destroying the sequence.
+  _ = sequence._preprocessingPass { () -> Void in
+    let copy = sequence._copyToContiguousArray()
+    expectEqualSequence(expected, copy, ${trace}, sameValue: sameValue)
   }
 }
 
