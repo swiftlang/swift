@@ -636,6 +636,19 @@ public:
   /// a type's subclass.
   bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
 
+  /// \brief Get the substituted base class type, starting from a base class
+  /// declaration and a substituted derived class type.
+  ///
+  /// For example, given the following declarations:
+  ///
+  /// class A<T, U> {}
+  /// class B<V> : A<Int, V> {}
+  /// class C<X, Y> : B<Y> {}
+  ///
+  /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
+  /// `A<Int, NSObject>`.
+  Type getSuperclassForDecl(const ClassDecl *classDecl, LazyResolver *resolver);
+
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///

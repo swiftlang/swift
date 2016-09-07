@@ -69,6 +69,8 @@ public:
 
   ArrayRef<Substitution>
   getForwardingSubstitutions(ModuleDecl *M, GenericSignature *sig) const;
+
+  void dump() const;
 };
   
 } // end namespace swift

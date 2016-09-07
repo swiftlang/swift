@@ -7,7 +7,7 @@
         "clang": {
             "remote": { "id": "apple/swift-clang" } },
         "swift": {
-            "remote": { "id": "apple/swift-swift" } },
+            "remote": { "id": "apple/swift" } },
         "lldb": {
             "remote": { "id": "apple/swift-lldb" } },
         "cmark": {

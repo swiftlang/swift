@@ -110,6 +110,7 @@ extension String {
 #if _runtime(_ObjC)
     // We only want to perform this optimization on objc runtimes. Elsewhere,
     // we will make it follow the unicode collation algorithm even for ASCII.
+    // This is consistent with Foundation, but incorrect as defined by Unicode.
     if _core.isASCII && rhs._core.isASCII {
       return _compareASCII(rhs)
     }
@@ -120,6 +121,10 @@ extension String {
 
 extension String : Equatable {
   public static func == (lhs: String, rhs: String) -> Bool {
+#if _runtime(_ObjC)
+    // We only want to perform this optimization on objc runtimes. Elsewhere,
+    // we will make it follow the unicode collation algorithm even for ASCII.
+    // This is consistent with Foundation, but incorrect as defined by Unicode.
     if lhs._core.isASCII && rhs._core.isASCII {
       if lhs._core.count != rhs._core.count {
         return false
@@ -128,6 +133,7 @@ extension String : Equatable {
         lhs._core.startASCII, rhs._core.startASCII,
         rhs._core.count) == 0
     }
+#endif
     return lhs._compareString(rhs) == 0
   }
 }

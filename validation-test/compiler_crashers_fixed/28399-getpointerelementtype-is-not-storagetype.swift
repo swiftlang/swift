@@ -5,13 +5,15 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-{
-extension{
-protocol A{{
+// RUN: %target-swift-frontend %s -emit-ir
+protocol A{associatedtype B
 }
-typealias e struct b{func a{
-enum b{
-let f=F
-class b:A class A:b
+struct C<T:A>{
+}
+protocol E{associatedtype F
+func g<T where F==T.B>(_:C<T>)
+}
+struct H:E{
+typealias F = Void
+func g<T where F==T.B>(_:C<T>){}
+}

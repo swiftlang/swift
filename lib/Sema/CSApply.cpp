@@ -114,7 +114,7 @@ Type Solution::computeSubstitutions(
   }
 
   auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
     ProtocolConformance *conformance = nullptr;
 

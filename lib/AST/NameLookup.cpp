@@ -404,6 +404,7 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::PatternBinding:
   case ASTScopeKind::PatternInitializer:
@@ -477,6 +478,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   
     // Walk scopes outward from the innermost scope until we find something.
     bool lookupInNominalIsStatic = true;
+    ParamDecl *selfDecl = nullptr;
     bool withinDefaultArgument = false;
     for (auto currentScope = lookupScope; currentScope;
          currentScope = currentScope->getParent()) {
@@ -489,6 +491,15 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // If we found anything, we're done.
       if (!Results.empty())
         return;
+
+      // When we are in the body of a method, get the 'self' declaration.
+      if (currentScope->getKind() == ASTScopeKind::AbstractFunctionBody &&
+          currentScope->getAbstractFunctionDecl()->getDeclContext()
+            ->isTypeContext()) {
+        selfDecl =
+          currentScope->getAbstractFunctionDecl()->getImplicitSelfDecl();
+        continue;
+      }
 
       // If there is a declaration context associated with this scope, we might
       // want to look in it.
@@ -590,8 +601,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
+        ValueDecl *baseDecl = nominal;
+        if (selfDecl) baseDecl = selfDecl;
         for (auto result : lookup) {
-          Results.push_back(UnqualifiedLookupResult(nominal, result));
+          Results.push_back(UnqualifiedLookupResult(baseDecl, result));
         }
 
         if (!Results.empty()) {
@@ -614,6 +627,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
           }
         }
+
+        // Forget the 'self' declaration.
+        selfDecl = nullptr;
       }
     }
   } else {

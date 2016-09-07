@@ -20,6 +20,50 @@ func _stdlib_NSStringHashValue(_ str: AnyObject, _ isASCII: Bool) -> Int
 func _stdlib_NSStringHashValuePointer(_ str: OpaquePointer, _ isASCII: Bool) -> Int
 #endif
 
+extension _Unicode {
+  internal static func hashASCII(
+    _ string: UnsafeBufferPointer<UInt8>
+  ) -> Int {
+    let collationTable = _swift_stdlib_unicode_getASCIICollationTable()
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for c in string {
+      _precondition(c <= 127)
+      let element = collationTable[Int(c)]
+      // Ignore zero valued collation elements. They don't participate in the
+      // ordering relation.
+      if element != 0 {
+        hasher.append(element)
+      }
+    }
+    return hasher._finalizeAndReturnIntHash()
+  }
+
+  internal static func hashUTF16(
+    _ string: UnsafeBufferPointer<UInt16>
+  ) -> Int {
+    let collationIterator = _swift_stdlib_unicodeCollationIterator_create(
+      string.baseAddress!,
+      UInt32(string.count))
+    defer { _swift_stdlib_unicodeCollationIterator_delete(collationIterator) }
+
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    while true {
+      var hitEnd = false
+      let element =
+        _swift_stdlib_unicodeCollationIterator_next(collationIterator, &hitEnd)
+      if hitEnd {
+        break
+      }
+      // Ignore zero valued collation elements. They don't participate in the
+      // ordering relation.
+      if element != 0 {
+        hasher.append(element)
+      }
+    }
+    return hasher._finalizeAndReturnIntHash()
+  }
+}
+
 extension String : Hashable {
   /// The string's hash value.
   ///
@@ -49,10 +93,12 @@ extension String : Hashable {
     }
 #else
     if let asciiBuffer = self._core.asciiBuffer {
-      return _swift_stdlib_unicode_hash_ascii(
-        asciiBuffer.baseAddress!, Int32(asciiBuffer.count))
+      return _Unicode.hashASCII(UnsafeBufferPointer(
+        start: asciiBuffer.baseAddress!,
+        count: asciiBuffer.count))
     } else {
-      return _swift_stdlib_unicode_hash(_core.startUTF16, Int32(_core.count))
+      return _Unicode.hashUTF16(
+        UnsafeBufferPointer(start: _core.startUTF16, count: _core.count))
     }
 #endif
   }

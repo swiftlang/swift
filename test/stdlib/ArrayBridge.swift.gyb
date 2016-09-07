@@ -470,4 +470,16 @@ tests.test("testMutableArray") {
   expectEqualSequence(aCopy, a)
 }
 
+tests.test("rdar://problem/27905230") {
+  let dict = RDar27905230.mutableDictionaryOfMutableLists()!
+  let arr = dict["list"]!
+  expectEqual(arr[0] as! NSNull, NSNull())
+  expectEqual(arr[1] as! String, "")
+  expectEqual(arr[2] as! Int, 1)
+  expectEqual(arr[3] as! Bool, true)
+  expectEqual((arr[4] as! NSValue).rangeValue.location, 0)
+  expectEqual((arr[4] as! NSValue).rangeValue.length, 1)
+  expectEqual(arr[5] as! Date, Date(timeIntervalSince1970: 0))
+}
+
 runAllTests()

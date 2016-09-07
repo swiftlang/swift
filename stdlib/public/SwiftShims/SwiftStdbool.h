@@ -1,4 +1,4 @@
-//===--- ArrayBridge.h ------------------------------------------*- C++ -*-===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,14 +9,15 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#import <Foundation/Foundation.h>
 
-id arrayAsID(NSArray* a);
-NSArray* idAsArray(id a);
+#ifndef SWIFT_STDLIB_SHIMS_SWIFTSTDBOOL_H_
+#define SWIFT_STDLIB_SHIMS_SWIFTSTDBOOL_H_
 
-void testSubclass(id thunks);
-void testBridgeableValue(id thunks);
+#ifdef __cplusplus
+typedef bool __swift_bool;
+#else
+typedef _Bool __swift_bool;
+#endif
 
-@interface RDar27905230 : NSObject
-+ (NSDictionary<NSString *, NSArray<id> *> *)mutableDictionaryOfMutableLists;
-@end
+#endif
+

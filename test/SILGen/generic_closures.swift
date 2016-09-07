@@ -294,3 +294,21 @@ func mixed_generic_nongeneric_nesting<T>(t: T) {
 // CHECK-LABEL: sil shared @_TFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_ : $@convention(thin) <T> () -> ()
 // CHECK-LABEL: sil shared @_TFFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_L_6middleu__rFT1uqd___T_ : $@convention(thin) <T><U> (@in U) -> ()
 // CHECK-LABEL: sil shared @_TFFFF16generic_closures32mixed_generic_nongeneric_nestingurFT1tx_T_L_5outerurFT_T_L_6middleu__rFT1uqd___T_L_5inneru__rfT_qd__ : $@convention(thin) <T><U> (@owned @box U) -> @out U
+
+protocol Doge {
+  associatedtype Nose : NoseProtocol
+}
+
+protocol NoseProtocol {
+  associatedtype Squeegee
+}
+
+protocol Doggo {}
+
+struct DogSnacks<A : Doggo> {}
+
+func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo)
+    where Roo == Daisy.Nose.Squeegee {
+  var s = DogSnacks<Daisy.Nose.Squeegee>()
+  _ = { _ = s }
+}
