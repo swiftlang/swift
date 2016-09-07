@@ -901,8 +901,6 @@ ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
       "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
-ERROR(invalid_infix_on_func,none,
-      "'infix' modifier is not required or allowed on func declarations", ())
 ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,none,
