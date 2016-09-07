@@ -1960,7 +1960,8 @@ public func checkEquatable<Instances : Collection>(
   _checkEquatableImpl(
     Array(instances),
     oracle: { oracle(indices[$0], indices[$1]) },
-    allowBrokenTransitivity: allowBrokenTransitivity)
+    allowBrokenTransitivity: allowBrokenTransitivity,
+    ${trace})
 }
 
 internal func _checkEquatableImpl<Instance : Equatable>(
@@ -1985,18 +1986,23 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let predictedXY = oracle(i, j)
       expectEqual(
         predictedXY, oracle(j, i),
-        "bad oracle: broken symmetry between indices \(i), \(j)")
+        "bad oracle: broken symmetry between indices \(i), \(j)",
+        stackTrace: ${stackTrace})
 
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        (predictedXY
+           ? "expected equal, found not equal\n"
+           : "expected not equal, found equal\n") +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       if !allowBrokenTransitivity {
@@ -2010,7 +2016,8 @@ internal func _checkEquatableImpl<Instance : Equatable>(
           for k in transitivityScoreboard[i].value {
             expectTrue(
               oracle(j, k),
-              "bad oracle: broken transitivity at indices \(i), \(j), \(k)")
+              "bad oracle: broken transitivity at indices \(i), \(j), \(k)",
+              stackTrace: ${stackTrace})
               // No need to check equality between actual values, we will check
               // them with the checks above.
           }
@@ -2147,11 +2154,28 @@ public func checkComparable<Instances : Collection>(
   for i in instances.indices {
     let x = instances[i]
 
-    expectFalse(x < x, ${trace})
-    expectFalse(x > x, ${trace})
-    expectTrue(x <= x, ${trace})
-    expectTrue(x >= x, ${trace})
-    
+    expectFalse(
+      x < x,
+      "found 'x < x'\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectFalse(
+      x > x,
+      "found 'x > x'\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectTrue(x <= x,
+      "found 'x <= x' to be false\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectTrue(x >= x,
+      "found 'x >= x' to be false\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
     for j in instances.indices where i != j {
       let y = instances[j]
       
@@ -2163,11 +2187,30 @@ public func checkComparable<Instances : Collection>(
         + "(\(String(reflecting: i)), \(String(reflecting: j)))",
         stackTrace: ${stackTrace})
       
-      expectEqual(expected.isLT(), x < y, ${trace})
-      expectEqual(expected.isLE(), x <= y, ${trace})
-      expectEqual(expected.isGE(), x >= y, ${trace})
-      expectEqual(expected.isGT(), x > y, ${trace})
-      
+      expectEqual(expected.isLT(), x < y,
+        "x < y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isLE(), x <= y,
+        "x <= y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isGE(), x >= y,
+        "x >= y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isGT(), x > y,
+        "x > y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
       for k in instances.indices {
         let expected2 = oracle(j, k)
         if expected == expected2 {
