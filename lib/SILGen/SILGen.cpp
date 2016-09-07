@@ -1180,6 +1180,9 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
 
+  ProfilerRAII Profiler(*this, td);
+  TopLevelSGF->emitProfilerIncrement(td->getBody());
+ 
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
       if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
