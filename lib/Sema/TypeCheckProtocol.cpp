@@ -4853,6 +4853,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
     // We only care about Objective-C protocols.
     if (!proto->isObjC()) continue;
 
+    Optional<ProtocolConformance *> conformance;
     for (auto req : proto->lookupDirect(name, true)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
@@ -4861,7 +4862,6 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       if (isa<TypeDecl>(req)) continue;
       
       // Dig out the conformance.
-      Optional<ProtocolConformance *> conformance;
       if (!conformance.hasValue()) {
         SmallVector<ProtocolConformance *, 2> conformances;
         nominal->lookupConformance(dc->getParentModule(), proto,
