@@ -5574,17 +5574,8 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
-
-  ParserResult<OperatorDecl> Result;
-  if (Attributes.hasAttribute<PrefixAttr>())
-    Result = parseDeclPrefixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else if (Attributes.hasAttribute<PostfixAttr>())
-    Result = parseDeclPostfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  else {
-    if (!Attributes.hasAttribute<InfixAttr>())
-      diagnose(OperatorLoc, diag::operator_decl_no_fixity);
-    Result = parseDeclInfixOperator(OperatorLoc, Name, NameLoc, Attributes);
-  }
+  
+  auto Result = parseDeclOperatorImpl(OperatorLoc, Name, NameLoc, Attributes);
 
   if (!DCC.movedToTopLevel() && !AllowTopLevel) {
     diagnose(OperatorLoc, diag::operator_decl_inner_scope);
@@ -5595,55 +5586,13 @@ Parser::parseDeclOperator(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserResult<OperatorDecl>
-Parser::parseDeclPrefixOperator(SourceLoc OperatorLoc, Identifier Name,
+Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                 SourceLoc NameLoc, DeclAttributes &Attributes) {
-  SourceLoc lBraceLoc;
-  if (consumeIf(tok::l_brace, lBraceLoc)) {
-    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            NameLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    }
-
-    skipUntilDeclRBrace();
-    (void) consumeIf(tok::r_brace);
-  }
+  bool isPrefix = Attributes.hasAttribute<PrefixAttr>();
+  bool isInfix = Attributes.hasAttribute<InfixAttr>();
+  bool isPostfix = Attributes.hasAttribute<PostfixAttr>();
   
-  auto *Res = new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
-                                               Name, NameLoc);
-  Res->getAttrs() = Attributes;
-  return makeParserResult(Res);
-}
-
-ParserResult<OperatorDecl>
-Parser::parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                 Identifier Name, SourceLoc NameLoc,
-                                 DeclAttributes &Attributes) {
-  SourceLoc lBraceLoc;
-  if (consumeIf(tok::l_brace, lBraceLoc)) {
-    auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            NameLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    }
-
-    skipUntilDeclRBrace();
-    (void) consumeIf(tok::r_brace);
-  }
-
-  auto Res = new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
-                                               Name, NameLoc);
-  Res->getAttrs() = Attributes;
-  return makeParserResult(Res);
-}
-
-ParserResult<OperatorDecl>
-Parser::parseDeclInfixOperator(SourceLoc operatorLoc, Identifier name,
-                               SourceLoc nameLoc, DeclAttributes &attributes) {
+  // Parse (or diagnose) a specified precedence group.
   SourceLoc colonLoc;
   Identifier precedenceGroupName;
   SourceLoc precedenceGroupNameLoc;
@@ -5651,33 +5600,54 @@ Parser::parseDeclInfixOperator(SourceLoc operatorLoc, Identifier name,
     if (Tok.is(tok::identifier)) {
       precedenceGroupName = Context.getIdentifier(Tok.getText());
       precedenceGroupNameLoc = consumeToken(tok::identifier);
+      
+      if (isPrefix || isPostfix)
+        diagnose(colonLoc, diag::precedencegroup_not_infix)
+          .fixItRemove({colonLoc, precedenceGroupNameLoc});
     }
   }
-
+  
+  // Diagnose deprecated operator body syntax `operator + { ... }`.
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
-    if (Tok.is(tok::r_brace)) {
-      SourceLoc lastGoodLoc = precedenceGroupNameLoc;
-      if (lastGoodLoc.isInvalid())
-        lastGoodLoc = nameLoc;
-      SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
-                                                            lastGoodLoc);
-      SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
-      diagnose(lBraceLoc, diag::deprecated_operator_body)
-        .fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
-    } else {
+    if (isInfix && !Tok.is(tok::r_brace)) {
       diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
+    } else {
+      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
+      if (Tok.is(tok::r_brace)) {
+        SourceLoc lastGoodLoc = precedenceGroupNameLoc;
+        if (lastGoodLoc.isInvalid())
+          lastGoodLoc = NameLoc;
+        SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
+                                                              lastGoodLoc);
+        SourceLoc rBraceEnd = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+        Diag.fixItRemoveChars(lastGoodLocEnd, rBraceEnd);
+      }
     }
 
     skipUntilDeclRBrace();
     (void) consumeIf(tok::r_brace);
   }
-
-  auto res = new (Context) InfixOperatorDecl(CurDeclContext, operatorLoc,
-                                             name, nameLoc, colonLoc,
-                                             precedenceGroupName,
-                                             precedenceGroupNameLoc);
-  res->getAttrs() = attributes;
+  
+  
+  OperatorDecl *res;
+  if (Attributes.hasAttribute<PrefixAttr>())
+    res = new (Context) PrefixOperatorDecl(CurDeclContext, OperatorLoc,
+                                           Name, NameLoc);
+  else if (Attributes.hasAttribute<PostfixAttr>())
+    res = new (Context) PostfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                            Name, NameLoc);
+  else {
+    if (!Attributes.hasAttribute<InfixAttr>())
+      diagnose(OperatorLoc, diag::operator_decl_no_fixity);
+    
+    res = new (Context) InfixOperatorDecl(CurDeclContext, OperatorLoc,
+                                          Name, NameLoc, colonLoc,
+                                          precedenceGroupName,
+                                          precedenceGroupNameLoc);
+  }
+  
+  res->getAttrs() = Attributes;
   return makeParserResult(res);
 }
 
