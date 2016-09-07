@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_COLOR_UTILS_H
-#define SWIFT_COLOR_UTILS_H
+#ifndef SWIFT_BASIC_COLORUTILS_H
+#define SWIFT_BASIC_COLORUTILS_H
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -42,4 +42,4 @@ public:
 
 } // namespace swift
 
-#endif // SWIFT_COLOR_UTILS_H
+#endif // SWIFT_BASIC_COLORUTILS_H
