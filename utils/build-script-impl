@@ -1240,15 +1240,15 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
-# Checks if a given product is enabled (i.e. part of $PRODUCS array)
+# Checks if a given product is enabled (i.e. part of $PRODUCTS array)
 function contains_product() {
   local current_product
   for current_product in "$PRODUCTS"; do
     if [[ "$current_product" == "$1" ]]; then
-      return 1
+      return 0
     fi
   done
-  return 0
+  return 1
 }
 
 
