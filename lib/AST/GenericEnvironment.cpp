@@ -98,8 +98,39 @@ getSubstitutionMap(ModuleDecl *mod,
 
     // Record the replacement type and its conformances.
     subsMap[archetype] = sub.getReplacement();
-    conformanceMap[archetype] = sub.getConformances();
+    conformanceMap.addArchetypeConformances(archetype, sub.getConformances());
   }
-  
+
+  for (auto reqt : sig->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType()->getAs<DependentMemberType>();
+    auto second = reqt.getSecondType()->getAs<DependentMemberType>();
+
+    if (!first || !second)
+      continue;
+
+    auto archetype = mapTypeIntoContext(mod, first)->getAs<ArchetypeType>();
+    if (!archetype)
+      continue;
+
+    auto firstBase = first->getBase();
+    auto secondBase = second->getBase();
+
+    auto firstBaseArchetype = mapTypeIntoContext(mod, firstBase)->getAs<ArchetypeType>();
+    auto secondBaseArchetype = mapTypeIntoContext(mod, secondBase)->getAs<ArchetypeType>();
+
+    if (!firstBaseArchetype || !secondBaseArchetype)
+      continue;
+
+    if (archetype->getParent() != firstBaseArchetype)
+      conformanceMap.addArchetypeParent(archetype, firstBaseArchetype,
+                                        first->getAssocType());
+    if (archetype->getParent() != secondBaseArchetype)
+      conformanceMap.addArchetypeParent(archetype, secondBaseArchetype,
+                                        second->getAssocType());
+  }
+
   assert(subs.empty() && "did not use all substitutions?!");
 }
