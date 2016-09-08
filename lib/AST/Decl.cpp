@@ -919,15 +919,23 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
 }
 
 SourceRange PatternBindingEntry::getSourceRange() const {
+  ASTContext *ctx = nullptr;
+
   SourceLoc endLoc;
   getPattern()->forEachVariable([&](VarDecl *var) {
     auto accessorsEndLoc = var->getBracesRange().End;
-    if (accessorsEndLoc.isValid()) endLoc = accessorsEndLoc;
+    if (accessorsEndLoc.isValid()) {
+      endLoc = accessorsEndLoc;
+      if (!ctx) ctx = &var->getASTContext();
+    }
   });
 
   // Check the initializer.
-  if (endLoc.isInvalid())
-    endLoc = getOrigInitRange().End;
+  SourceLoc initEndLoc = getOrigInitRange().End;
+  if (initEndLoc.isValid() &&
+      (endLoc.isInvalid() ||
+       (ctx && ctx->SourceMgr.isBeforeInBuffer(endLoc, initEndLoc))))
+    endLoc = initEndLoc;
 
   // Check the pattern.
   if (endLoc.isInvalid())

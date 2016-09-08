@@ -235,17 +235,34 @@ void ASTScope::expand() const {
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
     // Create a child for the initializer, if present.
+    ASTScope *initChild = nullptr;
     if (patternEntry.getInit() &&
-        patternEntry.getInit()->getSourceRange().isValid())
-      addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
-                                  patternBinding.decl, patternBinding.entry));
+        patternEntry.getInit()->getSourceRange().isValid()) {
+      initChild = new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
+                                     patternBinding.decl, patternBinding.entry);
+    }
 
     // Create children for the accessors of any variables in the pattern that
     // have them.
     patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-      if (hasAccessors(var))
+      if (hasAccessors(var)) {
+        // If there is an initializer child that precedes this node (the
+        // normal case), add teh initializer child first.
+        if (initChild &&
+            ctx.SourceMgr.isBeforeInBuffer(
+              patternBinding.decl->getInit(patternBinding.entry)->getEndLoc(),
+                                 var->getBracesRange().Start)) {
+          addChild(initChild);
+          initChild = nullptr;
+        }
+
         addChild(new (ctx) ASTScope(this, var));
+      }
     });
+
+    // If an initializer child remains, add it now.
+    if (initChild)
+      addChild(initChild);
 
     // If the pattern binding is in a local context, we nest the remaining
     // pattern bindings.
