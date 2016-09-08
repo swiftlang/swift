@@ -90,7 +90,7 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   case AbstractStorageDecl::ComputedWithMutableAddress:
   case AbstractStorageDecl::InheritedWithObservers:
   case AbstractStorageDecl::StoredWithObservers:
-    return true;
+    return asd->getBracesRange().isValid();
 
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
@@ -1754,7 +1754,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::LocalDeclaration:
-    result.push_back(cast<ValueDecl>(localDeclaration));
+    if (auto value = dyn_cast<ValueDecl>(localDeclaration))
+      result.push_back(value);
     break;
 
   case ASTScopeKind::ConditionalClause:
@@ -1776,8 +1777,10 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::ForStmtInitializer:
-    for (auto decl : forStmt->getInitializerVarDecls())
-      result.push_back(cast<ValueDecl>(decl));
+    for (auto decl : forStmt->getInitializerVarDecls()) {
+      if (auto value = dyn_cast<ValueDecl>(decl))
+        result.push_back(value);
+    }
     break;
 
   case ASTScopeKind::PatternInitializer:

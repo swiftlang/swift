@@ -3832,38 +3832,41 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
 
 /// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
-  SourceRange range;
-  
   SourceLoc APINameLoc = getArgumentNameLoc();
   SourceLoc nameLoc = getNameLoc();
-  
-  if (APINameLoc.isValid() && nameLoc.isInvalid())
-    range = APINameLoc;
-  else if (APINameLoc.isInvalid() && nameLoc.isValid())
-    range = nameLoc;
-  else
-    range = SourceRange(APINameLoc, nameLoc);
-  
-  if (range.isInvalid()) return range;
-  
+
+  SourceLoc startLoc;
+  if (APINameLoc.isValid())
+    startLoc = APINameLoc;
+  else if (nameLoc.isValid())
+    startLoc = nameLoc;
+  else {
+    startLoc = getTypeLoc().getSourceRange().Start;
+  }
+  if (startLoc.isInvalid())
+    return SourceRange();
+
   // It would be nice to extend the front of the range to show where inout is,
   // but we don't have that location info.  Extend the back of the range to the
   // location of the default argument, or the typeloc if they are valid.
   if (auto expr = getDefaultValue()) {
     auto endLoc = expr->getEndLoc();
     if (endLoc.isValid())
-      return SourceRange(range.Start, endLoc);
+      return SourceRange(startLoc, endLoc);
   }
   
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeLoc().getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
     if (endLoc.isValid() && !isTypeLocImplicit())
-      return SourceRange(range.Start, endLoc);
+      return SourceRange(startLoc, endLoc);
   }
-  
-  // Otherwise, just return the info we have about the parameter.
-  return range;
+
+  // The name has a location we can use.
+  if (nameLoc.isValid())
+    return SourceRange(startLoc, nameLoc);
+
+  return startLoc;
 }
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {

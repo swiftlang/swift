@@ -2017,11 +2017,10 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
     return makeParserCodeCompletionResult<CatchStmt>();
   }
 
-  SourceLoc startOfBody = Tok.getLoc();
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
   status |= bodyResult;
   if (bodyResult.isNull()) {
-    bodyResult = makeParserErrorResult(BraceStmt::create(Context, startOfBody,
+    bodyResult = makeParserErrorResult(BraceStmt::create(Context, PreviousLoc,
                                                          {}, PreviousLoc,
                                                          /*implicit=*/ true));
   }
@@ -2330,7 +2329,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
+        Body, BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
       Status,
