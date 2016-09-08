@@ -2263,8 +2263,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 FOUNDATION_SFLAGS="SWIFTCFLAGS=${SWIFTCFLAGS}"
                 FOUNDATION_LDFLAGS="LDFLAGS=${LDFLAGS}"
                 if [[ "${ANDROID_NDK}" != "" ]]; then
-                    FOUNDATION_CFLAGS="CFLAGS=-DDEPLOYMENT_TARGET_ANDROID --sysroot=${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm -I${ANDROID_ICU_UC}/include -I\${SDKROOT}/lib/swift"
-                    FOUNDATION_SFLAGS="SWIFTCFLAGS=-DDEPLOYMENT_TARGET_ANDROID -I${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm/usr/include"
+                    FOUNDATION_CFLAGS="CFLAGS=-DDEPLOYMENT_TARGET_ANDROID -DDEPLOYMENT_ENABLE_LIBDISPATCH --sysroot=${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm -I${ANDROID_ICU_UC}/include -I\${SDKROOT}/lib/swift"
+                    FOUNDATION_SFLAGS="SWIFTCFLAGS=-DDEPLOYMENT_TARGET_ANDROID -DDEPLOYMENT_ENABLE_LIBDISPATCH -I${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm/usr/include"
                     FOUNDATION_LDFLAGS="LDFLAGS=-fuse-ld=gold --sysroot=${ANDROID_NDK}/platforms/android-21/arch-arm -L${ANDROID_NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x -L${ANDROID_ICU_UC} -L\${SDKROOT}/lib/swift/android -ldispatch"
                     FOUNDATION_BUILD_ARGS+=(
                         "--target=armv7-none-linux-androideabi"
