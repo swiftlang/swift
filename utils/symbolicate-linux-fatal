@@ -26,7 +26,6 @@ from __future__ import print_function
 
 import argparse
 import subprocess
-import sys
 
 import lldb
 
@@ -127,14 +126,11 @@ def main():
     parser.add_argument(
         "binary", help="Executable which produced the log file")
     parser.add_argument(
-        "log", help="Log file containing the stack trace to symbolicate")
+        "log", type=argparse.FileType("rU"),
+        help="Log file containing the stack trace to symbolicate")
     args = parser.parse_args()
 
     binary = args.binary
-    if args.log == "-":
-        logfile = sys.stdin
-    else:
-        logfile = open(args.log, 'rU')
 
     lddoutput = subprocess.check_output(
         ['ldd', binary], stderr=subprocess.STDOUT)
@@ -143,7 +139,7 @@ def main():
     instack = False
     stackidx = 0
     stack = []
-    for line in logfile:
+    for line in args.log:
         if instack and line.startswith(str(stackidx)):
             stack.append(line)
             stackidx = stackidx + 1
