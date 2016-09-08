@@ -288,22 +288,23 @@ getSubstitutionsForCallee(SILModule &M,
   if (auto metatypeType = dyn_cast<MetatypeType>(derivedClass))
     derivedClass = CanType(metatypeType->getInstanceType());
 
-  auto *Module = M.getSwiftModule();
-
   SubstitutionMap subMap;
 
-  if (auto derivedCalleeSig = AI.getOrigCalleeType()->getGenericSignature()) {
-    auto *derivedClassDecl = derivedClass->getClassOrBoundGenericClass();
-    assert(derivedClassDecl && "self is not a class type");
+  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature()) {
+    auto calleeSelfType = AI.getSubstCalleeType()->getSelfParameter().getType();
+    if (auto metatypeType = dyn_cast<MetatypeType>(calleeSelfType))
+      calleeSelfType = CanType(metatypeType->getInstanceType());
+    auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+    assert(calleeClassDecl && "self is not a class type");
 
-    auto derivedSubs = AI.getSubstitutions();
+    auto origSubs = AI.getSubstitutions();
 
     // Decompose the original substitution using the derived method signature.
-    derivedCalleeSig->getSubstitutionMap(derivedSubs, subMap);
+    origCalleeSig->getSubstitutionMap(origSubs, subMap);
 
     // Drop any generic parameters that come from the derived class, leaving
     // only generic parameters of the method itself.
-    if (auto derivedClassSig = derivedClassDecl->getGenericSignatureOfContext()) {
+    if (auto derivedClassSig = calleeClassDecl->getGenericSignatureOfContext()) {
       for (auto depTy : derivedClassSig->getAllDependentTypes()) {
         subMap.removeType(depTy->getCanonicalType());
       }
@@ -324,7 +325,8 @@ getSubstitutionsForCallee(SILModule &M,
     // parameter.
     auto baseClass = derivedClass->getSuperclassForDecl(baseClassDecl, nullptr)
         ->getCanonicalType();
-    auto baseClassSubs = baseClass->gatherAllSubstitutions(Module, nullptr);
+    auto baseClassSubs = baseClass->gatherAllSubstitutions(
+        M.getSwiftModule(), nullptr);
 
     // Decompose the base class substitutions, adding them to the same
     // substitution maps as above.
@@ -333,7 +335,7 @@ getSubstitutionsForCallee(SILModule &M,
 
   // Build the new substitutions using the base method signature.
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
-  baseCalleeSig->getSubstitutions(*Module, subMap, newSubs);
+  baseCalleeSig->getSubstitutions(*M.getSwiftModule(), subMap, newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,

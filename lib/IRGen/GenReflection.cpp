@@ -677,10 +677,7 @@ public:
 
       auto SubstType =
         Caller.mapTypeOutOfContext(
-            GenericParam.subst(
-                IGM.getSILModule().getSwiftModule(),
-                SubstMap.getMap(),
-                None));
+            GenericParam.subst(SubstMap, None));
       SourceMap.push_back({SubstType->getCanonicalType(), Src});
     });
 

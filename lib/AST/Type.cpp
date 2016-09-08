@@ -1683,7 +1683,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *sig = classDecl->getGenericSignatureOfContext();
   auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
 
-  return superclassTy.subst(module, subs.getMap(), None);
+  return superclassTy.subst(subs, None);
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -2768,14 +2768,14 @@ PolymorphicFunctionType::getGenericParameters() const {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
+GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   auto params = getGenericParams();
   (void)params;
   
   auto subs = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(M, subs.getMap(), SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(M, subs.getMap(), SubstFlags::IgnoreMissing);
+  Type input = getInput().subst(subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 

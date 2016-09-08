@@ -4567,7 +4567,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto substFormalType = origFormalType;
   if (!subs.empty()) {
     auto genericFnType = cast<GenericFunctionType>(substFormalType);
-    auto applied = genericFnType->substGenericArgs(SGM.SwiftModule, subs);
+    auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
   }
 
@@ -4629,7 +4629,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   auto subs = init.getSubstitutions();
   if (!subs.empty()) {
     auto genericFnType = cast<GenericFunctionType>(substFormalType);
-    auto applied = genericFnType->substGenericArgs(SGF.SGM.SwiftModule, subs);
+    auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
   }
 
@@ -4941,7 +4941,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   CanAnyFunctionType substAccessorType = constantInfo.FormalInterfaceType;
   if (!substitutions.empty()) {
     auto genericFn = cast<GenericFunctionType>(substAccessorType);
-    auto substFn = genericFn->substGenericArgs(gen.SGM.SwiftModule, substitutions);
+    auto substFn = genericFn->substGenericArgs(substitutions);
     substAccessorType = cast<FunctionType>(substFn->getCanonicalType());
   }
 

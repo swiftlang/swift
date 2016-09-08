@@ -54,7 +54,7 @@ Substitution Substitution::subst(Module *module,
 Substitution Substitution::subst(Module *module,
                                  const SubstitutionMap &subMap) const {
   // Substitute the replacement.
-  Type substReplacement = Replacement.subst(module, subMap.getMap(), None);
+  Type substReplacement = Replacement.subst(subMap, None);
   assert(substReplacement && "substitution replacement failed");
 
   if (substReplacement->isEqual(Replacement))

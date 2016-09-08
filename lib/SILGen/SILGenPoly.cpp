@@ -2686,10 +2686,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
-            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+            ->substGenericArgs(subs)->getCanonicalType());
     outputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(outputSubstType)
-            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+            ->substGenericArgs(subs)->getCanonicalType());
   }
 
   // Emit the indirect return and arguments.
@@ -2856,7 +2856,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
       cast<GenericFunctionType>(witnessSubstTy)
-        ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
+        ->substGenericArgs(witnessSubs)
         ->getCanonicalType());
   }
   CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())

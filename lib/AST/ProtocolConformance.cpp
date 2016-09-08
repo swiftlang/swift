@@ -360,9 +360,6 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto *genericEnv = GenericConformance->getGenericEnvironment();
   auto *genericSig = GenericConformance->getGenericSignature();
 
-  // FIXME: We could have a new version of Type::subst() that
-  // takes a conformanceMap in addition to a substitutionMap,
-  // but for now this is ignored below
   auto substitutionMap = genericEnv->getSubstitutionMap(
       conformingModule, genericSig, GenericSubstitutions);
 
@@ -374,9 +371,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(conformingModule,
-                                            substitutionMap.getMap(),
-                                            None);
+    = genericWitness.getReplacement().subst(substitutionMap, None);
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
@@ -385,6 +380,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Gather the conformances for the type witness. These should never fail.
+  // FIXME: We should just be able to use the SubstitutionMap from above,
+  // but we have no way to force inherited conformances to be filled in
+  // through that mechanism.
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,

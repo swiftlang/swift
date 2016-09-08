@@ -1162,13 +1162,11 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstStorageInterfaceTy = StorageTy.subst(VD->getModuleContext(),
-                                        interfaceMap.getMap(), SubstOptions());
+  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap, SubstOptions());
   assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
 
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstStorageContextTy = StorageTy.subst(VD->getModuleContext(),
-                                               contextMap.getMap(), SubstOptions());
+  auto SubstStorageContextTy = StorageTy.subst(contextMap, SubstOptions());
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
   auto DC = VD->getDeclContext();
@@ -1313,15 +1311,11 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   GenericEnvironment *genericEnv = nullptr;
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstInterfaceTy = ParameterTy.subst(VD->getModuleContext(),
-                                            interfaceMap.getMap(),
-                                            SubstOptions());
+  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap, SubstOptions());
   assert(SubstInterfaceTy && "storage type substitution failed?!");
   
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstContextTy = ParameterTy.subst(VD->getModuleContext(),
-                                                 contextMap.getMap(),
-                                                 SubstOptions());
+  auto SubstContextTy = ParameterTy.subst(contextMap, SubstOptions());
   assert(SubstContextTy && "storage type substitution failed?!");
 
   auto SubstBodyResultTy = SubstContextTy->castTo<AnyFunctionType>()
@@ -1371,13 +1365,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   for (unsigned i : indices(*DeclaredParams)) {
     auto declaredParam = DeclaredParams->get(i);
     auto declaredParamTy = declaredParam->getInterfaceType();
-    auto interfaceTy = declaredParamTy.subst(DC->getParentModule(),
-                                             interfaceMap.getMap(),
-                                             SubstOptions());
+    auto interfaceTy = declaredParamTy.subst(interfaceMap, SubstOptions());
     assert(interfaceTy);
-    auto contextTy = declaredParamTy.subst(DC->getParentModule(),
-                                           contextMap.getMap(),
-                                           SubstOptions());
+    auto contextTy = declaredParamTy.subst(contextMap, SubstOptions());
     assert(contextTy);
 
     SmallString<64> ParamNameBuf;
@@ -2105,8 +2095,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
         // Apply the superclass substitutions to produce a contextual
         // type in terms of the derived class archetypes.
-        auto paramSubstTy = paramTy.subst(moduleDecl, subsMap.getMap(),
-                                          SubstOptions());
+        auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
         decl->overwriteType(paramSubstTy);
 
         // Map it to an interface type in terms of the derived class
