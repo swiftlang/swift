@@ -1240,6 +1240,18 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
+# Checks if a given product is enabled (i.e. part of $PRODUCS array)
+function contains_product() {
+  local current_product
+  for current_product in "$PRODUCTS"; do
+    if [[ "$current_product" == "$1" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+
 # get_host_specific_variable(host, name)
 #
 # Get the value of a host-specific variable expected to have been passed by the
@@ -2036,6 +2048,15 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DSWIFT_PRIMARY_VARIANT_SDK:STRING="${SWIFT_PRIMARY_VARIANT_SDK}"
                         -DSWIFT_PRIMARY_VARIANT_ARCH:STRING="${SWIFT_PRIMARY_VARIANT_ARCH}"
+                    )
+                fi
+
+                if contains_product "lldb" ; then
+                    lldb_build_dir=$(build_directory ${host} lldb)
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLDB_ENABLE:BOOL=TRUE
+                        -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
                 fi
 
