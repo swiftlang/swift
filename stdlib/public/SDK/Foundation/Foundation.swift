@@ -498,10 +498,6 @@ extension Array : _ObjectiveCBridgeable {
     _ source: NSArray,
     result: inout Array?
   ) {
-    _precondition(
-      Swift._isBridgedToObjectiveC(Element.self),
-      "array element type is not bridged to Objective-C")
-
     // If we have the appropriate native storage already, just adopt it.
     if let native =
         Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source) {
