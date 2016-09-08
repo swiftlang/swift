@@ -21,7 +21,7 @@ Swift 3.0
   been renamed `MemoryLayout.size(ofValue:)`, `MemoryLayout.stride(ofValue:)`,
   and `MemoryLayout.alignment(ofValue:)`.
 
-* [SE-125](https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
+* [SE-0125](https://github.com/apple/swift-evolution/blob/master/proposals/0125-remove-nonobjectivecbase.md)
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
   have been removed. The function `isKnownUniquelyReferenced()` should be called
@@ -53,7 +53,7 @@ Swift 3.0
 
   ```
 
-* [SE-124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
+* [SE-0124](https://github.com/apple/swift-evolution/blob/master/proposals/0124-bitpattern-label-for-int-initializer-objectidentfier.md)
 
   The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
   to be spelled with an explicit `bitPattern` label.
@@ -70,7 +70,7 @@ Swift 3.0
   let i = Int(bitPattern: x)
   ```
 
-* [SE-120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
+* [SE-0120](https://github.com/apple/swift-evolution/blob/master/proposals/0120-revise-partition-method.md)
 
   The collection methods `partition()` and `partition(isOrderedBefore:)` have
   been removed from Swift. They were replaced by the method `partition(by:)`
@@ -88,7 +88,7 @@ Swift 3.0
   }) ?? c.startIndex
   ```
 
-* [SE-103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
+* [SE-0103](https://github.com/apple/swift-evolution/blob/master/proposals/0103-make-noescape-default.md)
 
   Closure parameters are non-escaping by default, rather than explicitly being
   annotated `@noescape`. Use `@escaping` to say that a closure parameter may
@@ -433,8 +433,8 @@ Swift 3.0
     ```
 
 * [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md)
-  "Move 'where' clause to end of declaration" is implemented, allowing you to 
-  write 'where' clauses after the signature for a declaration, but before its
+  "Move `where` clause to end of declaration" is implemented, allowing you to 
+  write `where` clauses after the signature for a declaration, but before its
   body.  For example, before:
 
     ```swift
