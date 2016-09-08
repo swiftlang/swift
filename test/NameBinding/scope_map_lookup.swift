@@ -16,3 +16,27 @@ class C1 {
     return x
   }
 }
+
+// Protocols involving 'Self'.
+protocol P1 {
+  associatedtype A = Self
+}
+
+// Extensions.
+protocol P2 {
+}
+
+extension P2 {
+  func getSelf() -> Self {
+    return self
+  }
+}
+
+// Lazy properties
+class LazyProperties {
+  init() {
+    lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
+    localvar += 1
+    _ = localvar
+  }
+}

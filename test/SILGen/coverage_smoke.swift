@@ -62,5 +62,11 @@ func foo() {
   x += 1              // CHECK-COV: 1|{{.*}}[[@LINE]]
 }
 
-main()
-foo()
+// rdar://problem/27874041 - top level code decls get no coverage
+var g1 : Int32 = 0   // CHECK-COV: |{{.*}}[[@LINE]]
+repeat {             // CHECK-COV: 1|{{.*}}[[@LINE]]
+  g1 += 1            // CHECK-COV: 1|{{.*}}[[@LINE]]
+} while g1 == 0      // CHECK-COV: 1|{{.*}}[[@LINE]]
+
+main() // CHECK-COV: 1{{.*}}[[@LINE]]
+foo()  // CHECK-COV: 1{{.*}}[[@LINE]]

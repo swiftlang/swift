@@ -919,15 +919,23 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
 }
 
 SourceRange PatternBindingEntry::getSourceRange() const {
+  ASTContext *ctx = nullptr;
+
   SourceLoc endLoc;
   getPattern()->forEachVariable([&](VarDecl *var) {
     auto accessorsEndLoc = var->getBracesRange().End;
-    if (accessorsEndLoc.isValid()) endLoc = accessorsEndLoc;
+    if (accessorsEndLoc.isValid()) {
+      endLoc = accessorsEndLoc;
+      if (!ctx) ctx = &var->getASTContext();
+    }
   });
 
   // Check the initializer.
-  if (endLoc.isInvalid())
-    endLoc = getOrigInitRange().End;
+  SourceLoc initEndLoc = getOrigInitRange().End;
+  if (initEndLoc.isValid() &&
+      (endLoc.isInvalid() ||
+       (ctx && ctx->SourceMgr.isBeforeInBuffer(endLoc, initEndLoc))))
+    endLoc = initEndLoc;
 
   // Check the pattern.
   if (endLoc.isInvalid())
@@ -2028,9 +2036,8 @@ void NominalTypeDecl::computeType() {
   //
   // If this protocol has been deserialized, it already has generic parameters.
   // Don't add them again.
-  if (!getGenericParams())
-    if (auto proto = dyn_cast<ProtocolDecl>(this))
-      setGenericParams(proto->createGenericParams(proto));
+  if (auto proto = dyn_cast<ProtocolDecl>(this))
+    proto->createGenericParamsIfMissing();
 
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
@@ -2940,6 +2947,11 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
   return result;
+}
+
+void ProtocolDecl::createGenericParamsIfMissing() {
+  if (!getGenericParams())
+    setGenericParams(createGenericParams(this));
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is

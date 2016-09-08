@@ -420,6 +420,7 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::TopLevelCode:
     llvm_unreachable("no local declarations?");
 
+  case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
     return DeclVisibilityKind::GenericParameter;
 

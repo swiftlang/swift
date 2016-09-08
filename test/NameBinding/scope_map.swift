@@ -193,6 +193,7 @@ func localPatternsWithSharedType() {
 // CHECK-EXPANDED: SourceFile{{.*}}scope_map.swift{{.*}}expanded
 // CHECK-EXPANDED-NEXT: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
 // CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
+// CHECK-EXPANDED-NEXT: -ExtensionGenericParams {{.*}} extension of 'S0' [8:14 - 9:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} extension of 'S0' [8:14 - 9:1] expanded
 // CHECK-EXPANDED-NEXT: |-TypeOrExtensionBody {{.*}} 'C0' [11:10 - 12:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'E0' [14:9 - 17:1] expanded

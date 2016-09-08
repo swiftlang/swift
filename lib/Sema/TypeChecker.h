@@ -975,6 +975,8 @@ public:
     validateDecl(VD, true);
   }
 
+  virtual void bindExtension(ExtensionDecl *ext) override;
+
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
     checkInheritanceClause(ext);
