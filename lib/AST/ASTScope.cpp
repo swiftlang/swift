@@ -1329,7 +1329,11 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return SourceRange(charRange.getStart(), charRange.getEnd());
     }
 
-    return SourceRange();
+    if (sourceFile.file->Decls.empty()) return SourceRange();
+
+    // Use the source ranges of the declarations in the file.
+    return SourceRange(sourceFile.file->Decls.front()->getStartLoc(),
+                       sourceFile.file->Decls.back()->getEndLoc());
 
   case ASTScopeKind::ExtensionGenericParams: {
     // The generic parameters of an extension are available from the trailing
@@ -1840,6 +1844,11 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   // Print the source location of the node.
   auto printRange = [&]() {
     auto range = getSourceRange();
+    if (range.isInvalid()) {
+      out << " [invalid source range]";
+      return;
+    }
+
     auto startLineAndCol = sourceMgr.getLineAndColumn(range.Start);
     auto endLineAndCol = sourceMgr.getLineAndColumn(range.End);
 
