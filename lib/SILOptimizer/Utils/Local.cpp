@@ -321,7 +321,7 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
+bool swift::hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are dependent.
   for (auto &entry : SubsMap)
     if (entry.second->getCanonicalType()->hasArchetype())
@@ -338,7 +338,7 @@ bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
   return false;
 }
 
-bool swift::hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap) {
+bool swift::hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are refer to dynamic self.
   for (auto &entry : SubsMap)
     if (entry.second->getCanonicalType()->hasDynamicSelfType())

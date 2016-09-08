@@ -39,6 +39,7 @@ add_swift_library(swiftAST STATIC
   Stmt.cpp
   SourceEntityWalker.cpp
   Substitution.cpp
+  SubstitutionMap.cpp
   Type.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp

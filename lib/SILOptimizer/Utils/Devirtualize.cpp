@@ -290,8 +290,7 @@ getSubstitutionsForCallee(SILModule &M,
 
   auto *Module = M.getSwiftModule();
 
-  TypeSubstitutionMap subMap;
-  TypeConformanceMap conformanceMap;
+  SubstitutionMap subMap;
 
   if (auto derivedCalleeSig = AI.getOrigCalleeType()->getGenericSignature()) {
     auto *derivedClassDecl = derivedClass->getClassOrBoundGenericClass();
@@ -300,15 +299,13 @@ getSubstitutionsForCallee(SILModule &M,
     auto derivedSubs = AI.getSubstitutions();
 
     // Decompose the original substitution using the derived method signature.
-    derivedCalleeSig->getSubstitutionMap(derivedSubs, subMap, conformanceMap);
+    derivedCalleeSig->getSubstitutionMap(derivedSubs, subMap);
 
     // Drop any generic parameters that come from the derived class, leaving
     // only generic parameters of the method itself.
     if (auto derivedClassSig = derivedClassDecl->getGenericSignatureOfContext()) {
       for (auto depTy : derivedClassSig->getAllDependentTypes()) {
-        auto canTy = depTy->getCanonicalType().getPointer();
-        subMap.erase(canTy);
-        conformanceMap.erase(canTy);
+        subMap.removeType(depTy->getCanonicalType());
       }
     }
   }
@@ -331,12 +328,12 @@ getSubstitutionsForCallee(SILModule &M,
 
     // Decompose the base class substitutions, adding them to the same
     // substitution maps as above.
-    baseClassSig->getSubstitutionMap(baseClassSubs, subMap, conformanceMap);
+    baseClassSig->getSubstitutionMap(baseClassSubs, subMap);
   }
 
   // Build the new substitutions using the base method signature.
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
-  baseCalleeSig->getSubstitutions(*Module, subMap, conformanceMap, newSubs);
+  baseCalleeSig->getSubstitutions(*Module, subMap, newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
@@ -666,14 +663,26 @@ static void getWitnessMethodSubstitutions(
   // Otherwise, we need to build new caller-side substitutions
   // written in terms of the witness thunk's generic signature,
   // mapping to the archetypes of the caller.
-  TypeSubstitutionMap subMap;
-  TypeConformanceMap conformanceMap;
+  SubstitutionMap subMap;
 
   // Take apart caller-side substitutions.
   //
-  // Note that the Self-derived archetypes appearing on the left
-  // hand side of the map do not end up being used.
-  requirementSig->getSubstitutionMap(origSubs, subMap, conformanceMap);
+  // Note that the Self-derived dependent types appearing on the left
+  // hand side of the map are dropped.
+  requirementSig->getSubstitutionMap(origSubs, subMap);
+
+  auto selfParamTy = conformance->getProtocol()->getSelfInterfaceType();
+  auto rootedInSelf = [&](Type t) -> bool {
+    while (auto dmt = t->getAs<DependentMemberType>()) {
+      t = dmt->getBase();
+    }
+    return t->isEqual(selfParamTy);
+  };
+
+  for (auto depTy : requirementSig->getAllDependentTypes()) {
+    if (rootedInSelf(depTy))
+      subMap.removeType(depTy->getCanonicalType());
+  }
 
   // Take apart substitutions from the conforming type.
   //
@@ -685,13 +694,13 @@ static void getWitnessMethodSubstitutions(
     auto *rootConformance = conformance->getRootNormalConformance();
     auto *witnessSig = rootConformance->getGenericSignature();
 
-    witnessSig->getSubstitutionMap(witnessSubs, subMap, conformanceMap);
+    witnessSig->getSubstitutionMap(witnessSubs, subMap);
   }
 
   // Now, apply both sets of substitutions computed above to the
   // forwarding substitutions of the witness thunk.
   witnessThunkSig->getSubstitutions(*M.getSwiftModule(),
-                                    subMap, conformanceMap, newSubs);
+                                    subMap, newSubs);
 }
 
 static void getWitnessMethodSubstitutions(ApplySite AI, SILFunction *F,

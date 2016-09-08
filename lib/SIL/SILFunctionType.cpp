@@ -2251,8 +2251,8 @@ SILFunctionType::substGenericArgs(SILModule &silModule, Module *astModule,
   }
 
   assert(isPolymorphic());
-  TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
-  SILTypeSubstituter substituter(silModule, astModule, map);
+  auto map = GenericSig->getSubstitutionMap(subs);
+  SILTypeSubstituter substituter(silModule, astModule, map.getMap());
 
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true);
