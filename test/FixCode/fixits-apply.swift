@@ -270,8 +270,3 @@ func testBoolValue(a : BoolFoo) {
   guard a {}
   if a as BoolFoo {}
 }
-
-protocol P1 {}
-protocol P2 {}
-var a : protocol<P1, P2>?
-var a2 : protocol<P1>= 17

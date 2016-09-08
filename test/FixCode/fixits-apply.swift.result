@@ -273,8 +273,3 @@ func testBoolValue(a : BoolFoo) {
   guard a.boolValue {}
   if (a as BoolFoo).boolValue {}
 }
-
-protocol P1 {}
-protocol P2 {}
-var a : (P1 & P2)?
-var a2 : (P1)= 17 as! P1
