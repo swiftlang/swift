@@ -30,7 +30,8 @@ extension Hive {
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
     // CHECK: store [[NEW_SELF:%[0-9]+]] to [[SELF_ADDR]]
-    // CHECK: strong_release [[OLD_SELF]] : $Hive
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
+    // CHECK: dealloc_partial_ref [[OLD_SELF]] : $Hive, [[METATYPE]] : $@thick Hive.Type
     // CHECK: dealloc_stack [[SELF_ADDR]]
     // CHECK: return [[NEW_SELF]]
     self.init(queen: other)
