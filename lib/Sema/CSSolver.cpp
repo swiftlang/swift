@@ -20,8 +20,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
-#include <stack>
-#include <queue>
 using namespace swift;
 using namespace constraints;
 
@@ -1459,23 +1457,21 @@ void ConstraintSystem::shrink(Expr *expr) {
     // The primary constraint system.
     ConstraintSystem &CS;
 
-    // All of the sub-expressions of certain type (binary/unary/calls) in
-    // depth-first order.
-    std::queue<Candidate> &SubExprs;
+    // All of the sub-expressions which are suitable to be solved
+    // separately from the main system e.g. binary expressions, collections,
+    // function calls, coercions etc.
+    llvm::SmallVector<Candidate, 4> Candidates;
 
     // Counts the number of overload sets present in the tree so far.
     // Note that the traversal is depth-first.
-    std::stack<std::pair<ApplyExpr *, unsigned>,
-               llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4>>
-      ApplyExprs;
+    llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4> ApplyExprs;
 
     // A collection of original domains of all of the expressions,
     // so they can be restored in case of failure.
     DomainMap &Domains;
 
-    ExprCollector(Expr *expr, ConstraintSystem &cs,
-                  std::queue<Candidate> &container, DomainMap &domains)
-        : PrimaryExpr(expr), CS(cs), SubExprs(container), Domains(domains) {}
+    ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
+        : PrimaryExpr(expr), CS(cs), Domains(domains) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // A dictionary expression is just a set of tuples; try to solve ones
@@ -1500,7 +1496,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
           // Make each of the dictionary elements an independent dictionary,
           // such makes it easy to type-check everything separately.
-          SubExprs.push(Candidate(CS, dict, isPrimaryExpr));
+          Candidates.push_back(Candidate(CS, dict, isPrimaryExpr));
         }
 
         // Don't try to walk into the dictionary.
@@ -1510,7 +1506,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       // Consider all of the collections to be candidates,
       // FIXME: try to split collections into parts for simplified solving.
       if (isa<CollectionExpr>(expr)) {
-        SubExprs.push(Candidate(CS, expr, false));
+        Candidates.push_back(Candidate(CS, expr, false));
         return {false, expr};
       }
 
@@ -1536,7 +1532,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto func = applyExpr->getFn();
         // Let's record this function application for post-processing
         // as well as if it contains overload set, see walkToExprPost.
-        ApplyExprs.push({ applyExpr, isa<OverloadSetRefExpr>(func) });
+        ApplyExprs.push_back({applyExpr, isa<OverloadSetRefExpr>(func)});
       }
 
       return { true, expr };
@@ -1546,9 +1542,9 @@ void ConstraintSystem::shrink(Expr *expr) {
       // If there are sub-expressions to consider and
       // contextual type is involved, let's add top-most expression
       // to the queue just to make sure that we didn't miss any solutions.
-      if (expr == PrimaryExpr && !SubExprs.empty()) {
+      if (expr == PrimaryExpr && !Candidates.empty()) {
         if (!CS.getContextualType().isNull()) {
-          SubExprs.push(Candidate(CS, expr, true));
+          Candidates.push_back(Candidate(CS, expr, true));
           return expr;
         }
       }
@@ -1559,17 +1555,17 @@ void ConstraintSystem::shrink(Expr *expr) {
       unsigned numOverloadSets = 0;
       // Let's count how many overload sets do we have.
       while (!ApplyExprs.empty()) {
-        auto application = ApplyExprs.top();
+        auto &application = ApplyExprs.back();
         auto applyExpr = application.first;
 
         // Add overload sets tracked by current expression.
         numOverloadSets += application.second;
-        ApplyExprs.pop();
+        ApplyExprs.pop_back();
 
         // We've found the current expression, so record the number of
         // overloads.
         if (expr == applyExpr) {
-          ApplyExprs.push({ applyExpr, numOverloadSets });
+          ApplyExprs.push_back({applyExpr, numOverloadSets});
           break;
         }
       }
@@ -1578,22 +1574,19 @@ void ConstraintSystem::shrink(Expr *expr) {
       // there is no point of solving this expression,
       // because we won't be able to reduce its domain.
       if (numOverloadSets > 1)
-        SubExprs.push(Candidate(CS, expr, expr == PrimaryExpr));
+        Candidates.push_back(Candidate(CS, expr, expr == PrimaryExpr));
 
       return expr;
     }
   };
 
-  std::queue<Candidate> expressions;
-  ExprCollector collector(expr, *this, expressions, domains);
+  ExprCollector collector(expr, *this, domains);
 
   // Collect all of the binary/unary and call sub-expressions
   // so we can start solving them separately.
   expr->walk(collector);
 
-  while (!expressions.empty()) {
-    auto &candidate = expressions.front();
-
+  for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
     // might require manual salvaging.
@@ -1613,8 +1606,6 @@ void ConstraintSystem::shrink(Expr *expr) {
         return childExpr;
       });
     }
-
-    expressions.pop();
   }
 }
 
