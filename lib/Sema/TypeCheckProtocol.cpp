@@ -1235,14 +1235,31 @@ checkWitnessAccessibility(const DeclContext *&requiredAccessScope,
     }
   }
 
-  if (!witness->isAccessibleFrom(requiredAccessScope))
-    return true;
+  const DeclContext *actualScopeToCheck = requiredAccessScope;
+  if (!witness->isAccessibleFrom(actualScopeToCheck)) {
+    // Special case: if we have `@testable import` of the witness's module,
+    // allow the witness to match if it would have matched for just this file.
+    // That is, if '@testable' allows us to see the witness here, it should
+    // allow us to see it anywhere, because any other client could also add
+    // their own `@testable import`.
+    if (auto parentFile = dyn_cast<SourceFile>(DC->getModuleScopeContext())) {
+      const Module *witnessModule = witness->getModuleContext();
+      if (parentFile->getParentModule() != witnessModule &&
+          parentFile->hasTestableImport(witnessModule) &&
+          witness->isAccessibleFrom(parentFile)) {
+        actualScopeToCheck = parentFile;
+      }
+    }
+
+    if (actualScopeToCheck == requiredAccessScope)
+      return true;
+  }
 
   if (requirement->isSettable(DC)) {
     *isSetter = true;
 
     auto ASD = cast<AbstractStorageDecl>(witness);
-    if (!ASD->isSetterAccessibleFrom(requiredAccessScope))
+    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck))
       return true;
   }
 
