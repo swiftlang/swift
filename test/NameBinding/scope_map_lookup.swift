@@ -39,4 +39,16 @@ class LazyProperties {
     localvar += 1
     _ = localvar
   }
+
+  var value: Int = 17
+
+  lazy var prop1: Int = value
+
+  lazy var prop2: Int = { value + 1 }()
+
+  lazy var prop3: Int = { [weak self] in self.value + 1 }()
+
+  lazy var prop4: Int = self.value
+
+  lazy var prop5: Int = { self.value + 1 }()
 }
