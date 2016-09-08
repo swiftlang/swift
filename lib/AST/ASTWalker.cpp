@@ -799,14 +799,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitDefaultValueExpr(DefaultValueExpr *E) {
-    Expr *sub = doIt(E->getSubExpr());
-    if (!sub) return nullptr;
-
-    E->setSubExpr(sub);
-    return E;
-  }
-  
   Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     Pattern *sub = doIt(E->getSubPattern());
     if (!sub) return nullptr;

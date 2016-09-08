@@ -2211,11 +2211,6 @@ public:
     printRec(E->getElseExpr());
     OS << ')';
   }
-  void visitDefaultValueExpr(DefaultValueExpr *E) {
-    printCommon(E, "default_value_expr") << ' ';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitAssignExpr(AssignExpr *E) {
     OS.indent(Indent) << "(assign_expr\n";
     printRec(E->getDest());

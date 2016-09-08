@@ -2814,10 +2814,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
     Expr *visitApplyExpr(ApplyExpr *expr) {
       return finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
@@ -6382,10 +6378,6 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For a default-value expression, do nothing.
-      if (isa<DefaultValueExpr>(expr))
-        return { false, expr };
-
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
