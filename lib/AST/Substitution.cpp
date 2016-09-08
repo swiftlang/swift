@@ -24,6 +24,84 @@
 
 using namespace swift;
 
+Optional<ProtocolConformanceRef> ArchetypeConformanceMap::
+lookupArchetypeConformance(ProtocolDecl *proto,
+                           ArrayRef<ProtocolConformanceRef> conformances) const {
+  for (ProtocolConformanceRef found : conformances) {
+    auto foundProto = found.getRequirement();
+    if (foundProto == proto) {
+      return found;
+    } else if (foundProto->inheritsFrom(proto)) {
+      if (found.isConcrete()) {
+        return ProtocolConformanceRef(
+          found.getConcrete()->getInheritedConformance(proto));
+      }
+
+      return found;
+    }
+  }
+
+  return None;
+}
+
+Optional<ProtocolConformanceRef> ArchetypeConformanceMap::
+lookupArchetypeConformance(ArchetypeType *replacement,
+                           ProtocolDecl *proto) const {
+  // Check for conformances for the type that apply to the original
+  // substituted archetype.
+  auto foundReplacement = map.find(replacement);
+  if (foundReplacement != map.end()) {
+    auto substReplacement = foundReplacement->second;
+    if (auto conformance = lookupArchetypeConformance(proto, substReplacement))
+      return conformance;
+  }
+
+  // Check if we have substitutions from one of our parent archetypes.
+  auto foundParents = parents.find(replacement);
+  if (foundParents == parents.end())
+    return None;
+
+  for (auto parent : foundParents->second) {
+    auto *parentProto = parent.second->getProtocol();
+    auto conformance =
+        lookupArchetypeConformance(parent.first, parentProto);
+
+    if (conformance) {
+      if (!conformance->isConcrete())
+        return ProtocolConformanceRef(proto);
+
+      auto sub = conformance->getConcrete()->getTypeWitnessSubstAndDecl(
+          parent.second, nullptr).first;
+
+      if (auto result = lookupArchetypeConformance(proto, sub.getConformances()))
+        return result;
+    }
+  }
+
+  return None;
+}
+
+void ArchetypeConformanceMap::
+addArchetypeConformances(ArchetypeType *replacement,
+                         ArrayRef<ProtocolConformanceRef> conformances) {
+  assert(replacement);
+
+  auto result = map.insert(std::make_pair(replacement, conformances));
+  assert(result.second);
+  (void) result;
+
+  if (auto *parent = replacement->getParent())
+    addArchetypeParent(replacement, parent, replacement->getAssocType());
+}
+
+void ArchetypeConformanceMap::
+addArchetypeParent(ArchetypeType *replacement,
+                   ArchetypeType *parent,
+                   AssociatedTypeDecl *assocType) {
+  assert(replacement && parent && assocType);
+  parents[replacement].push_back(std::make_pair(parent, assocType));
+}
+
 bool Substitution::operator==(const Substitution &other) const {
   // The archetypes may be missing, but we can compare them directly
   // because archetypes are always canonical.
@@ -51,60 +129,6 @@ Substitution Substitution::subst(Module *module,
   assert(sig && env);
   env->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
   return subst(module, subMap, conformanceMap);
-}
-
-static Optional<ProtocolConformanceRef>
-lookupArchetypeConformance(ProtocolDecl *proto,
-                           ArrayRef<ProtocolConformanceRef> conformances) {
-  for (ProtocolConformanceRef found : conformances) {
-    auto foundProto = found.getRequirement();
-    if (foundProto == proto) {
-      return found;
-    } else if (foundProto->inheritsFrom(proto)) {
-      if (found.isConcrete()) {
-        return ProtocolConformanceRef(
-          found.getConcrete()->getInheritedConformance(proto));
-      }
-
-      return found;
-    }
-  }
-
-  return None;
-}
-
-static Optional<ProtocolConformanceRef>
-lookupArchetypeConformance(ArchetypeType *replacement,
-                           ProtocolDecl *proto,
-                           ArchetypeConformanceMap &conformanceMap) {
-  // Check for conformances for the type that apply to the original
-  // substituted archetype.
-  auto it = conformanceMap.find(replacement);
-  if (it != conformanceMap.end()) {
-    if (auto conformance = lookupArchetypeConformance(proto, it->second)) {
-      return conformance;
-    }
-  }
-
-  // Check if we have substitutions for the parent.
-  if (auto *parent = replacement->getParent()) {
-    auto *assocType = replacement->getAssocType();
-    auto *parentProto = assocType->getProtocol();
-    auto conformance =
-        lookupArchetypeConformance(parent, parentProto, conformanceMap);
-
-    if (conformance) {
-      if (!conformance->isConcrete())
-        return ProtocolConformanceRef(proto);
-
-      auto sub = conformance->getConcrete()->getTypeWitnessSubstAndDecl(
-          assocType, nullptr).first;
-
-      return lookupArchetypeConformance(proto, sub.getConformances());
-    }
-  }
-
-  return None;
 }
 
 Substitution Substitution::subst(Module *module,
@@ -143,8 +167,8 @@ Substitution Substitution::subst(Module *module,
 
     // If the original type was an archetype, check the conformance map.
     if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-      conformance = lookupArchetypeConformance(replacementArch, proto,
-                                               conformanceMap);
+      conformance = conformanceMap.lookupArchetypeConformance(
+          replacementArch, proto);
     }
 
     // If that didn't find anything, we can still synthesize AnyObject
