@@ -236,8 +236,8 @@ void ASTScope::expand() const {
 
     // Create a child for the initializer, if present.
     ASTScope *initChild = nullptr;
-    if (patternEntry.getInit() &&
-        patternEntry.getInit()->getSourceRange().isValid()) {
+    if (patternEntry.getInitAsWritten() &&
+        patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
       initChild = new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
                                      patternBinding.decl, patternBinding.entry);
     }
@@ -250,7 +250,7 @@ void ASTScope::expand() const {
         // normal case), add teh initializer child first.
         if (initChild &&
             ctx.SourceMgr.isBeforeInBuffer(
-              patternBinding.decl->getInit(patternBinding.entry)->getEndLoc(),
+                                 patternEntry.getInitAsWritten()->getEndLoc(),
                                  var->getBracesRange().Start)) {
           addChild(initChild);
           initChild = nullptr;
@@ -273,13 +273,15 @@ void ASTScope::expand() const {
     break;
   }
 
-  case ASTScopeKind::PatternInitializer:
+  case ASTScopeKind::PatternInitializer: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
     // Create a child for the initializer expression.
-    if (auto child =
-            createIfNeeded(this,
-                           patternBinding.decl->getInit(patternBinding.entry)))
+    if (auto child = createIfNeeded(this, patternEntry.getInitAsWritten()))
       addChild(child);
     break;
+  }
 
   case ASTScopeKind::AfterPatternBinding: {
     // Create a child for the next pattern binding.
@@ -1416,8 +1418,12 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return range;
   }
 
-  case ASTScopeKind::PatternInitializer:
-    return patternBinding.decl->getInit(patternBinding.entry)->getSourceRange();
+  case ASTScopeKind::PatternInitializer: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
+    return patternEntry.getInitAsWritten()->getSourceRange();
+  }
 
   case ASTScopeKind::AfterPatternBinding: {
     const auto &patternEntry =
@@ -1701,7 +1707,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
@@ -1769,6 +1774,26 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::ForStmtInitializer:
     for (auto decl : forStmt->getInitializerVarDecls())
       result.push_back(cast<ValueDecl>(decl));
+    break;
+
+  case ASTScopeKind::PatternInitializer:
+    // 'self' is available within the pattern initializer of a 'lazy' variable.
+    if (auto singleVar = patternBinding.decl->getSingleVar()) {
+      if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
+          singleVar->getDeclContext()->isTypeContext()) {
+        // If there is no getter (yet), add them.
+        if (!singleVar->getGetter()) {
+          ASTContext &ctx = singleVar->getASTContext();
+          if (auto resolver = ctx.getLazyResolver())
+            resolver->introduceLazyVarAccessors(singleVar);
+        }
+
+        // Add the getter's 'self'.
+        if (auto getter = singleVar->getGetter())
+          if (auto self = getter->getImplicitSelfDecl())
+            result.push_back(self);
+      }
+    }
     break;
 
   case ASTScopeKind::Closure:

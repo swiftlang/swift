@@ -34,6 +34,7 @@ class ProtocolDecl;
 class Substitution;
 class TypeDecl;
 class ValueDecl;
+class VarDecl;
 
 /// Abstract interface used to lazily resolve aspects of the AST, such as the
 /// types of declarations or protocol conformance structures.
@@ -91,6 +92,9 @@ public:
 
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
+
+  /// Introduce the accessors for a 'lazy' variable.
+  virtual void introduceLazyVarAccessors(VarDecl *var) = 0;
 
   /// Resolve the type of an extension.
   ///
@@ -161,6 +165,10 @@ public:
 
   void bindExtension(ExtensionDecl *ext) override {
     Principal.bindExtension(ext);
+  }
+
+  void introduceLazyVarAccessors(VarDecl *var) override {
+    Principal.introduceLazyVarAccessors(var);
   }
 
   void resolveExtension(ExtensionDecl *ext) override {
