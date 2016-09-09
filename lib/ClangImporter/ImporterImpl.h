@@ -333,10 +333,6 @@ public:
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
 
-  /// A mapping from module names to the prefixes placed on global names
-  /// in that module, e.g., the Foundation module uses the "NS" prefix.
-  llvm::StringMap<std::string> ModulePrefixes;
-
   /// \brief Provide a single extension point for any given type per clang
   /// submodule
   llvm::DenseMap<std::pair<NominalTypeDecl *, const clang::Module *>,
@@ -363,8 +359,9 @@ public:
 
   /// Determine whether the given class method should be imported as
   /// an initializer.
-  FactoryAsInitKind getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
-                                     const clang::ObjCMethodDecl *method);
+  static FactoryAsInitKind
+  getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
+                   const clang::ObjCMethodDecl *method);
 
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
@@ -415,7 +412,7 @@ public:
 
   /// Determine whether this method is an Objective-C "init" method
   /// that will be imported as a Swift initializer.
-  bool isInitMethod(const clang::ObjCMethodDecl *method);
+  static bool isInitMethod(const clang::ObjCMethodDecl *method);
 
   /// Determine whether this Objective-C method should be imported as
   /// an initializer.
@@ -427,9 +424,9 @@ public:
   ///  \param kind Will be set to the kind of initializer being
   ///  imported. Note that this does not distinguish designated
   ///  vs. convenience; both will be classified as "designated".
-  bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
-                                 unsigned &prefixLength,
-                                 CtorInitializerKind &kind);
+  static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
+                                        unsigned &prefixLength,
+                                        CtorInitializerKind &kind);
 
 private:
   /// \brief Generation number that is used for crude versioning.
@@ -717,7 +714,7 @@ public:
   /// Returns \c None if \p D is not a redeclarable type declaration.
   /// Returns null if \p D is a redeclarable type, but it does not have a
   /// definition yet.
-  Optional<const clang::Decl *>
+  static Optional<const clang::Decl *>
   getDefinitionForClangTypeDecl(const clang::Decl *D);
 
   /// Returns the module \p D comes from, or \c None if \p D does not have
@@ -843,9 +840,8 @@ public:
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
 
   /// Find the swift_newtype attribute on the given typedef, if present.
-  clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(
-      const clang::TypedefNameDecl *decl,
-      bool useSwift2Name);
+  static clang::SwiftNewtypeAttr *
+  getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl, bool useSwift2Name);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
@@ -1154,9 +1150,9 @@ public:
 
   /// Retrieve a bit vector containing the non-null argument
   /// annotations for the given declaration.
-  llvm::SmallBitVector getNonNullArgs(
-                         const clang::Decl *decl,
-                         ArrayRef<const clang::ParmVarDecl *> params);
+  static llvm::SmallBitVector
+  getNonNullArgs(const clang::Decl *decl,
+                 ArrayRef<const clang::ParmVarDecl *> params);
 
   /// \brief Import the type of an Objective-C method.
   ///
@@ -1332,9 +1328,9 @@ public:
 
   // If this decl is associated with a swift_newtype (and we're honoring
   // swift_newtype), return it, otherwise null
-  clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
-                                           clang::Sema &clangSema,
-                                           bool useSwift2Name);
+  static clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
+                                                  clang::Sema &clangSema,
+                                                  bool useSwift2Name);
 
   /// Whether the passed type is NSString *
   static bool isNSString(const clang::Type *);

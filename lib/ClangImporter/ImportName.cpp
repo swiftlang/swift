@@ -405,38 +405,6 @@ considerErrorImport(ClangImporter::Implementation &importer,
   return None;
 }
 
-// Determine whether we should strip the module prefix from a global-scope
-// entity in the given module and with the given base name.
-static unsigned stripModulePrefixLength(
-                  const llvm::StringMap<std::string> &modulePrefixes,
-                  StringRef moduleName,
-                  StringRef baseName) {
-  // Do we have a module prefix for this module?
-  auto prefixPos = modulePrefixes.find(moduleName);
-  if (prefixPos == modulePrefixes.end()) return 0;
-
-  // Is the prefix actually there?
-  if (!baseName.startswith(prefixPos->second)) return 0;
-
-  // Check whether this is a known Foundation entity that conflicts with the
-  // standard library.
-  if (auto known = getKnownFoundationEntity(baseName))
-    return 0;
-
-  // If the character following the prefix is a '_', eat that, too.
-  unsigned prefixLen = prefixPos->second.size();
-  if (prefixLen < baseName.size() && baseName[prefixLen] == '_')
-    ++prefixLen;
-
-  // Make sure we're left with an identifier.
-  if (prefixLen == baseName.size() ||
-      !Lexer::isIdentifier(baseName.substr(prefixLen)))
-    return 0;
-
-  // We can strip the module prefix.
-  return prefixLen;
-}
-
 /// Determine whether we should lowercase the first word of the given value
 /// name.
 static bool shouldLowercaseValueName(StringRef name) {
@@ -1473,12 +1441,6 @@ auto ClangImporter::Implementation::importFullName(
         moduleName = module->getTopLevelModuleName();
       else
         moduleName = owningD->getASTContext().getLangOpts().CurrentModule;
-      if (unsigned prefixLen = stripModulePrefixLength(ModulePrefixes,
-                                                       moduleName, baseName)) {
-        // Strip off the prefix.
-        baseName = baseName.substr(prefixLen);
-        strippedPrefix = true;
-      }
     }
 
     // Objective-C properties.
