@@ -2053,6 +2053,9 @@ ERROR(enumstruct_convenience_init,none,
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))
+ERROR(cfclass_convenience_init,none,
+      "convenience initializers are not supported in extensions of CF types",
+      ())
 
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
