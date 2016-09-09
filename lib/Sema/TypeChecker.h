@@ -405,10 +405,11 @@ inline TypeResolutionOptions operator|(TypeResolutionFlags lhs,
 
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
-withoutContext(TypeResolutionOptions options) {
+withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_EnumCase;
+  if (!preserveSIL) options -= TR_SILType;
   return options;
 }
 
@@ -806,8 +807,7 @@ public:
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
   /// diagnostics.
-  /// \param isGenericSignature True if we are looking only in the generic
-  /// signature of the context.
+  /// \param options The type resolution context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -816,7 +816,7 @@ public:
   /// \see applyUnboundGenericArguments
   Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
-                             bool isGenericSignature,
+                             TypeResolutionOptions options,
                              GenericTypeResolver *resolver);
 
   /// Apply generic arguments to the given type.
@@ -990,6 +990,9 @@ public:
   resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
     handleExternalDecl(nominal);
   }
+
+  /// Introduce the accessors for a 'lazy' variable.
+  void introduceLazyVarAccessors(VarDecl *var) override;
 
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);

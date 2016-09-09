@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_SUBSTITUTION_H
 #define SWIFT_AST_SUBSTITUTION_H
 
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -26,33 +27,7 @@ namespace llvm {
 }
 
 namespace swift {
-  class ArchetypeType;
   class GenericEnvironment;
-  class ProtocolConformanceRef;
-
-/// Data structure type used internally by Substitution::subst to track
-/// conformances applied to archetypes.
-class ArchetypeConformanceMap {
-  using ParentType = std::pair<ArchetypeType *, AssociatedTypeDecl *>;
-
-  llvm::DenseMap<ArchetypeType *, ArrayRef<ProtocolConformanceRef>> map;
-  llvm::DenseMap<ArchetypeType *, SmallVector<ParentType, 1>> parents;
-
-  Optional<ProtocolConformanceRef>
-  lookupArchetypeConformance(ProtocolDecl *proto,
-                             ArrayRef<ProtocolConformanceRef> conformances) const;
-
-public:
-  Optional<ProtocolConformanceRef>
-  lookupArchetypeConformance(ArchetypeType *replacement,
-                             ProtocolDecl *proto) const;
-
-  void addArchetypeConformances(ArchetypeType *replacement,
-                                ArrayRef<ProtocolConformanceRef> conformances);
-
-  void addArchetypeParent(ArchetypeType *replacement, ArchetypeType *parent,
-                          AssociatedTypeDecl *assocType);
-};
 
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
@@ -92,8 +67,7 @@ public:
                      ArrayRef<Substitution> subs) const;
 
   Substitution subst(ModuleDecl *module,
-                     TypeSubstitutionMap &subMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
+                     const SubstitutionMap &subMap) const;
 
 private:
   friend class ProtocolConformance;

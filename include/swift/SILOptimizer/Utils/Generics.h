@@ -138,7 +138,7 @@ class GenericFuncSpecializer {
   IsFragile_t Fragile;
   const ReabstractionInfo &ReInfo;
 
-  TypeSubstitutionMap ContextSubs;
+  SubstitutionMap ContextSubs;
   std::string ClonedName;
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,

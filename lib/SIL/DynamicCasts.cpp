@@ -945,11 +945,10 @@ namespace {
     };
 
     Target prepareForEmitSome(Target target, EmitSomeState &state) {
-      OptionalTypeKind optKind;
-      auto objectType = target.FormalType.getAnyOptionalObjectType(optKind);
+      auto objectType = target.FormalType.getAnyOptionalObjectType();
       assert(objectType && "emitting Some into non-optional type");
 
-      auto someDecl = Ctx.getOptionalSomeDecl(optKind);
+      auto someDecl = Ctx.getOptionalSomeDecl();
       state.SomeDecl = someDecl;
 
       SILType loweredObjectType =
@@ -981,12 +980,7 @@ namespace {
     }
 
     Source emitNone(Target target) {
-      OptionalTypeKind optKind;
-      auto objectType = target.FormalType.getAnyOptionalObjectType(optKind);
-      assert(objectType && "emitting None into non-optional type");
-      (void) objectType;
-
-      auto noneDecl = Ctx.getOptionalNoneDecl(optKind);
+      auto noneDecl = Ctx.getOptionalNoneDecl();
       
       if (target.isAddress()) {
         B.createInjectEnumAddr(Loc, target.Address, noneDecl);

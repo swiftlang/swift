@@ -2480,7 +2480,7 @@ public:
   /// function type and return the resulting non-generic type.
   ///
   /// The order of Substitutions must match the order of generic parameters.
-  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Substitution> subs);
+  FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),

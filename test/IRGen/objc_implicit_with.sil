@@ -27,7 +27,7 @@ bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
   return %3 : $SwiftGizmo
 }
 
-sil @_TToFC18objc_implicit_with10SwiftGizmocfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
+sil @_TToFC18objc_implicit_with10SwiftGizmocfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }

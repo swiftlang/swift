@@ -426,8 +426,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       else
         I = ApplyBlock->end();
 
-      TypeSubstitutionMap ContextSubs;
-      ArchetypeConformanceMap ConformanceMap;
+      SubstitutionMap ContextSubs;
 
       std::vector<Substitution> ApplySubs(InnerAI.getSubstitutions());
 
@@ -440,8 +439,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         auto sig = CalleeFunction->getLoweredFunctionType()
             ->getGenericSignature();
         params->getSubstitutionMap(F->getModule().getSwiftModule(),
-                                   sig, ApplySubs,
-                                   ContextSubs, ConformanceMap);
+                                   sig, ApplySubs, ContextSubs);
       }
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*F);

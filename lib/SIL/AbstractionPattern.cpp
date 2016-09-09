@@ -90,6 +90,11 @@ AbstractionPattern TypeConverter::getAbstractionPattern(EnumElementDecl *decl) {
   assert(decl->hasArgumentType());
   assert(!decl->hasClangNode());
 
+  // This cannot be implemented correctly for Optional.Some.
+  assert(decl->getParentEnum()->classifyAsOptionalType() == OTK_None &&
+         "Optional.Some does not have a unique abstraction pattern because "
+         "optionals are re-abstracted");
+
   CanGenericSignature genericSig;
   if (auto sig = decl->getParentEnum()->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
@@ -717,10 +722,48 @@ AbstractionPattern AbstractionPattern::getFunctionInputType() const {
   llvm_unreachable("bad kind");
 }
 
+static CanType getAnyOptionalObjectType(CanType type) {
+  auto objectType = type.getAnyOptionalObjectType();
+  assert(objectType && "type was not optional");
+  return objectType;
+}
+
 AbstractionPattern AbstractionPattern::getAnyOptionalObjectType() const {
-  // Currently, the abstraction pattern corresponding to an optional object
-  // is always opaque.  Eventually we'll allow optionals to carry abstraction.
-  return getOpaque();
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ClangFunctionParamTupleType:
+  case Kind::ObjCMethodParamTupleType:
+  case Kind::ObjCMethodFormalParamTupleType:
+  case Kind::ObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::Tuple:
+  case Kind::CFunctionAsMethodFormalParamTupleType:
+    llvm_unreachable("pattern for function or tuple cannot be for optional");
+
+  case Kind::Opaque:
+    return *this;
+
+  case Kind::Type:
+    if (isTypeParameter())
+      return AbstractionPattern::getOpaque();
+    return AbstractionPattern(getGenericSignature(),
+                              ::getAnyOptionalObjectType(getType()));
+
+  case Kind::Discard:
+    return AbstractionPattern::getDiscard(getGenericSignature(),
+                                        ::getAnyOptionalObjectType(getType()));
+
+  case Kind::ClangType:
+    // This is not reflected in clang types.
+    return AbstractionPattern(getGenericSignature(),
+                              ::getAnyOptionalObjectType(getType()),
+                              getClangType());
+  }
+  llvm_unreachable("bad kind");
 }
 
 AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {

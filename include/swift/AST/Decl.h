@@ -1687,6 +1687,10 @@ public:
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
+
+  /// Retrieve the initializer as it was written in the source.
+  Expr *getInitAsWritten() const { return InitCheckedAndRemoved.getPointer(); }
+
   bool isInitializerChecked() const {
     return InitCheckedAndRemoved.getInt().contains(Flags::Checked);
   }

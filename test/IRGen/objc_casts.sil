@@ -48,9 +48,9 @@ bb0(%metatype : $@thick T.Type):
 // CHECK-NEXT:  [[T2:%.*]] = call %objc_class* @rt_swift_getInitializedObjCClass(%objc_class* [[T2a]])
 // CHECK-NEXT:  [[T3:%.*]] = bitcast %objc_class* [[T2]] to i8*
 // CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]])
-sil hidden @opt_metatype_to_objc_class : $@convention(thin) <T> (Optional<T.Type>) -> () {
-bb0(%metatype : $Optional<T.Type>):
-  %result = unconditional_checked_cast %metatype : $Optional<T.Type> to $Foo
+sil hidden @opt_metatype_to_objc_class : $@convention(thin) <T> (Optional<@thick T.Type>) -> () {
+bb0(%metatype : $Optional<@thick T.Type>):
+  %result = unconditional_checked_cast %metatype : $Optional<@thick T.Type> to $Foo
   %tuple = tuple ()
   return %tuple : $()
 }

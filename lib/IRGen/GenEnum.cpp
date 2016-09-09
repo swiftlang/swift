@@ -5041,8 +5041,7 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
 
 const EnumImplStrategy &
 irgen::getEnumImplStrategy(IRGenModule &IGM, CanType ty) {
-  // Nominal types are always preserved through SIL lowering.
-  return getEnumImplStrategy(IGM, SILType::getPrimitiveAddressType(ty));
+  return getEnumImplStrategy(IGM, IGM.getLoweredType(ty));
 }
 
 TypeInfo *

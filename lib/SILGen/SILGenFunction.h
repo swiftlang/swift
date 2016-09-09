@@ -804,11 +804,9 @@ public:
                               SGFContext C);
 
   ManagedValue emitInjectOptional(SILLocation loc,
-                                  ManagedValue v,
-                                  CanType inputFormalType,
-                                  CanType substFormalType,
                                   const TypeLowering &expectedTL,
-                                  SGFContext ctxt);
+                                  SGFContext ctxt,
+                       llvm::function_ref<ManagedValue(SGFContext)> generator);
 
   /// Initialize a memory location with an optional value.
   ///

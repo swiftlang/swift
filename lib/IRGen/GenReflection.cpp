@@ -676,7 +676,8 @@ public:
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
       auto SubstType =
-        Caller.mapTypeOutOfContext(SubstMap[GenericParam.getPointer()]);
+        Caller.mapTypeOutOfContext(
+            GenericParam.subst(SubstMap, None));
       SourceMap.push_back({SubstType->getCanonicalType(), Src});
     });
 

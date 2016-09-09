@@ -68,19 +68,19 @@ func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {
   // CHECK: unchecked_trivial_bit_cast
   _ = dynamic?.selector
 
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.voidReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.voidPointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.opaquePointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.pointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.constPointerReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.selectorReturning
-  // CHECK: unchecked_bitwise_cast {{%.*}} : $ImplicitlyUnwrappedOptional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
+  // CHECK: unchecked_bitwise_cast {{%.*}} : $Optional<{{.*}} -> {{.*}}> to $Optional<{{.*}} -> {{.*}}>
   _ = dynamic?.objectReturning
 
   // CHECK: enum $Optional<()>, #Optional.some!enumelt.1, {{%.*}} : $()
