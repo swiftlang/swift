@@ -254,6 +254,9 @@ func testSubscript1(_ s2 : SubscriptTest2) {
   
   
   let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  // rdar://problem/27449208
+  let v: (Int?, [Int]?) = (nil [17]) // expected-error {{cannot subscript a nil literal value}}
 }
 
 // sr-114 & rdar://22007370
