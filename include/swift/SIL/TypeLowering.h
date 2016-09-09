@@ -522,8 +522,6 @@ class TypeConverter {
 
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
-  const TypeLowering &getTypeLoweringForLoweredFunctionType(TypeKey key);
-  const TypeLowering &getTypeLoweringForUncachedLoweredFunctionType(TypeKey key);
 
 public:
   SILModule &M;
@@ -786,7 +784,7 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(CanType type1, CanType type2);
+  ABIDifference checkForABIDifferences(SILType type1, SILType type2);
 
   /// \brief Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
@@ -800,6 +798,9 @@ public:
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
 private:
+  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
+                               unsigned uncurryLevel);
+
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);

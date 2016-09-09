@@ -109,7 +109,7 @@ func convOptionalTrivial(_ t1: @escaping (Trivial?) -> Trivial) {
 // CHECK:         partial_apply
   let _: (Trivial) -> Trivial? = t1
 
-// CHECK:         function_ref @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dGSQS0___dGSqS0___
+// CHECK:         function_ref @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dGSqS0___dGSqS0___
 // CHECK:         partial_apply
   let _: (Trivial!) -> Trivial? = t1
 }
@@ -120,9 +120,8 @@ func convOptionalTrivial(_ t1: @escaping (Trivial?) -> Trivial) {
 // CHECK-NEXT:    enum $Optional<Trivial>
 // CHECK-NEXT:    return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dGSQS0___dGSqS0___ : $@convention(thin) (ImplicitlyUnwrappedOptional<Trivial>, @owned @callee_owned (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
-// CHECK:         unchecked_trivial_bit_cast %0 : $ImplicitlyUnwrappedOptional<Trivial> to $Optional<Trivial>
-// CHECK-NEXT:    apply %1(%2)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV19function_conversion7Trivial__dS0__XFo_dGSqS0___dGSqS0___ : $@convention(thin) (Optional<Trivial>, @owned @callee_owned (Optional<Trivial>) -> Trivial) -> Optional<Trivial>
+// CHECK:         apply %1(%0)
 // CHECK-NEXT:    enum $Optional<Trivial>
 // CHECK-NEXT:    return
 
@@ -132,14 +131,13 @@ func convOptionalLoadable(_ l1: @escaping (Loadable?) -> Loadable) {
 // CHECK:         partial_apply
   let _: (Loadable) -> Loadable? = l1
 
-// CHECK:         function_ref @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSQS0___oGSqS0___
+// CHECK:         function_ref @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSqS0___oGSqS0___
 // CHECK:         partial_apply
   let _: (Loadable!) -> Loadable? = l1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSQS0___oGSqS0___ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Loadable>, @owned @callee_owned (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
-// CHECK:         unchecked_bitwise_cast %0 : $ImplicitlyUnwrappedOptional<Loadable> to $Optional<Loadable>
-// CHECK-NEXT:    apply %1(%2)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSqS0___oGSqS0___ : $@convention(thin) (@owned Optional<Loadable>, @owned @callee_owned (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
+// CHECK:         apply %1(%0)
 // CHECK-NEXT:    enum $Optional<Loadable>
 // CHECK-NEXT:    return
 
@@ -149,7 +147,7 @@ func convOptionalAddrOnly(_ a1: @escaping (AddrOnly?) -> AddrOnly) {
 // CHECK:         partial_apply
   let _: (AddrOnly?) -> AddrOnly? = a1
 
-// CHECK:         function_ref @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSQS0___iGSqS0___
+// CHECK:         function_ref @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSqS0___iGSqS0___
 // CHECK:         partial_apply
   let _: (AddrOnly!) -> AddrOnly? = a1
 }
@@ -162,20 +160,6 @@ func convOptionalAddrOnly(_ a1: @escaping (AddrOnly?) -> AddrOnly) {
 // CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
 // CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
-// CHECK-NEXT:    return
-
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iGSqV19function_conversion8AddrOnly__iS0__XFo_iGSQS0___iGSqS0___ : $@convention(thin) (@in ImplicitlyUnwrappedOptional<AddrOnly>, @owned @callee_owned (@in Optional<AddrOnly>) -> @out AddrOnly) -> @out Optional<AddrOnly>
-// CHECK:         alloc_stack $Optional<AddrOnly>
-// CHECK-NEXT:    unchecked_addr_cast %1 : $*ImplicitlyUnwrappedOptional<AddrOnly> to $*Optional<AddrOnly>
-// CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*Optional<AddrOnly>
-// CHECK-NEXT:    alloc_stack $AddrOnly
-// CHECK-NEXT:    apply %2(%6, %3)
-// CHECK-NEXT:    init_enum_data_addr %0 : $*Optional<AddrOnly>
-// CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}} : $*AddrOnly
-// CHECK-NEXT:    inject_enum_addr %0 : $*Optional<AddrOnly>
-// CHECK-NEXT:    tuple ()
-// CHECK-NEXT:    dealloc_stack {{.*}} : $*AddrOnly
-// CHECK-NEXT:    dealloc_stack {{.*}} : $*Optional<AddrOnly>
 // CHECK-NEXT:    return
 
 // ==== Existentials
@@ -246,49 +230,48 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 
 // CHECK-LABEL: sil hidden @_TF19function_conversion23convExistentialMetatypeFFGSqPMPS_1Q__MVS_7TrivialT_
 func convExistentialMetatype(_ em: @escaping (Q.Type?) -> Trivial.Type) {
-// CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__
+// CHECK:         function_ref @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__
 // CHECK:         partial_apply
   let _: (Trivial.Type) -> P.Type = em
 
-// CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dGSqMS1___dXPMTPS_1P__
+// CHECK:         function_ref @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dGSqXMtS1___dXPMTPS_1P__
 // CHECK:         partial_apply
   let _: (Trivial.Type?) -> P.Type = em
 
-// CHECK:         function_ref @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXPMTPS_1P__dXPMTPS2___
+// CHECK:         function_ref @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXPMTPS_1P__dXPMTPS2___
 // CHECK:         partial_apply
   let _: (P.Type) -> P.Type = em
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__ : $@convention(thin) (@thin Trivial.Type, @owned @callee_owned (Optional<Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXMtS1__dXPMTPS_1P__ : $@convention(thin) (@thin Trivial.Type, @owned @callee_owned (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
 // CHECK:         metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype %2 : $@thick Trivial.Type, $@thick Q.Type
-// CHECK-NEXT:    enum $Optional<Q.Type>
+// CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
 // CHECK-NEXT:    return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dGSqMS1___dXPMTPS_1P__ : $@convention(thin) (Optional<Trivial.Type>, @owned @callee_owned (Optional<Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
-// CHECK:         select_enum %0 : $Optional<Trivial.Type>
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dGSqXMtS1___dXPMTPS_1P__ : $@convention(thin) (Optional<@thin Trivial.Type>, @owned @callee_owned (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
+// CHECK:         select_enum %0 : $Optional<@thin Trivial.Type>
 // CHECK-NEXT:    cond_br
 // CHECK: bb1:
-// CHECK-NEXT:    unchecked_enum_data %0 : $Optional<Trivial.Type>
-// CHECK-NEXT:    metatype $@thin Trivial.Type
+// CHECK-NEXT:    unchecked_enum_data %0 : $Optional<@thin Trivial.Type>
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick Q.Type
-// CHECK-NEXT:    enum $Optional<Q.Type>
+// CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK: bb2:
-// CHECK-NEXT:    enum $Optional<Q.Type>
+// CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK: bb3({{.*}}):
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
 // CHECK-NEXT:    return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqPMP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXPMTPS_1P__dXPMTPS2___ : $@convention(thin) (@thick P.Type, @owned @callee_owned (Optional<Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqXPMTP19function_conversion1Q___dXMtVS_7Trivial_XFo_dXPMTPS_1P__dXPMTPS2___ : $@convention(thin) (@thick P.Type, @owned @callee_owned (Optional<@thick Q.Type>) -> @thin Trivial.Type) -> @thick P.Type
 // CHECK:         open_existential_metatype %0 : $@thick P.Type to $@thick (@opened({{.*}}) P).Type
 // CHECK-NEXT:    init_existential_metatype %2 : $@thick (@opened({{.*}}) P).Type, $@thick Q.Type
-// CHECK-NEXT:    enum $Optional<Q.Type>
+// CHECK-NEXT:    enum $Optional<@thick Q.Type>
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    metatype $@thick Trivial.Type
 // CHECK-NEXT:    init_existential_metatype {{.*}} : $@thick Trivial.Type, $@thick P.Type
@@ -309,11 +292,11 @@ func convUpcastMetatype(_ c4: @escaping (Parent.Type, Trivial?) -> Child.Type,
 // CHECK:         partial_apply
   let _: (Child.Type, Trivial) -> Parent.Type = c4
 
-// CHECK:         function_ref @_TTRXFo_dGSqMC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dXMTS2_dS1__dXMTS0__
+// CHECK:         function_ref @_TTRXFo_dGSqXMTC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dXMTS2_dS1__dXMTS0__
 // CHECK:         partial_apply
   let _: (Child.Type, Trivial) -> Parent.Type = c5
 
-// CHECK:         function_ref @_TTRXFo_dGSqMC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dGSqMS2__dS1__dGSqMS0___
+// CHECK:         function_ref @_TTRXFo_dGSqXMTC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dGSqXMTS2__dS1__dGSqXMTS0___
 // CHECK:         partial_apply
   let _: (Child.Type?, Trivial) -> Parent.Type? = c5
 }
@@ -324,18 +307,18 @@ func convUpcastMetatype(_ c4: @escaping (Parent.Type, Trivial?) -> Child.Type,
 // CHECK:         upcast {{.*}} : $@thick Child.Type to $@thick Parent.Type
 // CHECK:         return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqMC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dXMTS2_dS1__dXMTS0__ : $@convention(thin) (@thick Child.Type, Trivial, @owned @callee_owned (Optional<Parent.Type>, Optional<Trivial>) -> @thick Child.Type) -> @thick Parent.Type
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqXMTC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dXMTS2_dS1__dXMTS0__ : $@convention(thin) (@thick Child.Type, Trivial, @owned @callee_owned (Optional<@thick Parent.Type>, Optional<Trivial>) -> @thick Child.Type) -> @thick Parent.Type
 // CHECK:         upcast %0 : $@thick Child.Type to $@thick Parent.Type
-// CHECK:         enum $Optional<Parent.Type>
+// CHECK:         enum $Optional<@thick Parent.Type>
 // CHECK:         apply
 // CHECK:         upcast {{.*}} : $@thick Child.Type to $@thick Parent.Type
 // CHECK:         return
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqMC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dGSqMS2__dS1__dGSqMS0___ : $@convention(thin) (Optional<Child.Type>, Trivial, @owned @callee_owned (Optional<Parent.Type>, Optional<Trivial>) -> @thick Child.Type) -> Optional<Parent.Type>
-// CHECK:         unchecked_trivial_bit_cast %0 : $Optional<Child.Type> to $Optional<Parent.Type>
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqXMTC19function_conversion6Parent_dGSqVS_7Trivial__dXMTCS_5Child_XFo_dGSqXMTS2__dS1__dGSqXMTS0___ : $@convention(thin) (Optional<@thick Child.Type>, Trivial, @owned @callee_owned (Optional<@thick Parent.Type>, Optional<Trivial>) -> @thick Child.Type) -> Optional<@thick Parent.Type>
+// CHECK:         unchecked_trivial_bit_cast %0 : $Optional<@thick Child.Type> to $Optional<@thick Parent.Type>
 // CHECK:         apply
 // CHECK:         upcast {{.*}} : $@thick Child.Type to $@thick Parent.Type
-// CHECK:         enum $Optional<Parent.Type>
+// CHECK:         enum $Optional<@thick Parent.Type>
 // CHECK:         return
 
 // ==== Function to existential -- make sure we maximally abstract it
@@ -420,11 +403,6 @@ func convTupleScalar(_ f1: @escaping (Q) -> (),
   let _: (P) -> () = f2
   let _: (Int, Int) -> () = f3
 }
-
-// CHECK-LABEL: sil hidden @_TF19function_conversion21convTupleScalarOpaqueurFFtGSax__T_GSqFtGSax__T__
-// CHECK:         function_ref @_TTRGrXFo_oGSax___XFo_itGSax___iT__
-
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFo_oGSax___XFo_itGSax___iT__ : $@convention(thin) <T> (@in (T...), @owned @callee_owned (@owned Array<T>) -> ()) -> @out ()
 
 func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {
   return f

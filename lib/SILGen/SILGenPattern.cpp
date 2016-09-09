@@ -1544,6 +1544,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   struct CaseInfo {
+    EnumElementDecl *FormalElement;
     Pattern *FirstMatcher;
     bool Irrefutable = false;
     SmallVector<SpecializedRow, 2> SpecializedRows;
@@ -1566,16 +1567,17 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // Create destination blocks for all the cases.
     llvm::DenseMap<EnumElementDecl*, unsigned> caseToIndex;
     for (auto &row : rows) {    
-      EnumElementDecl *elt;
+      EnumElementDecl *formalElt;
       Pattern *subPattern = nullptr;
       if (auto eep = dyn_cast<EnumElementPattern>(row.Pattern)) {
-        elt = eep->getElementDecl();
+        formalElt = eep->getElementDecl();
         subPattern = eep->getSubPattern();
       } else {
         auto *osp = cast<OptionalSomePattern>(row.Pattern);
-        elt = osp->getElementDecl();
+        formalElt = osp->getElementDecl();
         subPattern = osp->getSubPattern();
       }
+      auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
 
       unsigned index = caseInfos.size();
       auto insertionResult = caseToIndex.insert({elt, index});
@@ -1585,6 +1587,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
         curBB = SGF.createBasicBlock(curBB);
         caseBBs.push_back({elt, curBB});
         caseInfos.resize(caseInfos.size() + 1);
+        caseInfos.back().FormalElement = formalElt;
         caseInfos.back().FirstMatcher = row.Pattern;
       }
       assert(caseToIndex[elt] == index);
@@ -1612,6 +1615,12 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     // switch is not exhaustive.
     bool exhaustive = false;
     auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+
+    // The SIL values will range over Optional, so count against
+    // Optional's cases.
+    if (enumDecl == SGF.getASTContext().getImplicitlyUnwrappedOptionalDecl()) {
+      enumDecl = SGF.getASTContext().getOptionalDecl();
+    }
 
     // FIXME: Get expansion from SILFunction
     if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
@@ -1675,6 +1684,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
     auto &specializedRows = caseInfo.SpecializedRows;
 
     EnumElementDecl *elt = caseBBs[i].first;
+    EnumElementDecl *formalElt = caseInfos[i].FormalElement;
     SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
 
@@ -1787,13 +1797,17 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
       CanType substEltTy =
         sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    elt, nullptr,
-                                    elt->getArgumentInterfaceType())
+                                    formalElt, nullptr,
+                                    formalElt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
+      AbstractionPattern origEltTy =
+        (elt->getParentEnum()->classifyAsOptionalType()
+           ? AbstractionPattern(substEltTy)
+           : SGF.SGM.M.Types.getAbstractionPattern(elt));
+
       eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
-                            SGF.SGM.M.Types.getAbstractionPattern(elt),
-                            substEltTy);
+                                         origEltTy, substEltTy);
     }
 
     const FailureHandler *innerFailure = &outerFailure;

@@ -280,9 +280,8 @@ bool SILType::canUnsafeCastValue(SILType fromType, SILType toType,
 // TODO: handle casting to a loadable existential by generating
 // init_existential_ref. Until then, only promote to a heap object dest.
 bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
-  OptionalTypeKind otk;
-  auto fromTy = unwrapAnyOptionalType(operTy, M, otk);
-  auto toTy = unwrapAnyOptionalType(resultTy, M, otk);
+  auto fromTy = operTy.unwrapAnyOptionalType();
+  auto toTy = resultTy.unwrapAnyOptionalType();
   return (fromTy.isHeapObjectReferenceType() || fromTy.isClassExistentialType())
     && toTy.isHeapObjectReferenceType();
 }
@@ -309,6 +308,12 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasArgumentType());
+
+  if (auto objectType = getSwiftRValueType().getAnyOptionalObjectType()) {
+    assert(elt == M.getASTContext().getOptionalSomeDecl());
+    return SILType(objectType, getCategory());
+  }
+
   auto substEltTy =
     getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
                                           elt, nullptr,
@@ -434,23 +439,20 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
   return false;
 }
 
-OptionalTypeKind SILType::getOptionalTypeKind() const {
-  OptionalTypeKind result;
-  getSwiftRValueType()->getAnyOptionalObjectType(result);
-  return result;
-}
-
-SILType SILType::getAnyOptionalObjectType(SILModule &M,
-                                          OptionalTypeKind &OTK) const {
-  if (auto objectTy = getSwiftRValueType()->getAnyOptionalObjectType(OTK)) {
-    auto loweredTy
-      = M.Types.getLoweredType(AbstractionPattern::getOpaque(), objectTy);
-    
-    return SILType(loweredTy.getSwiftRValueType(), getCategory());
+SILType SILType::getAnyOptionalObjectType() const {
+  if (auto objectTy = getSwiftRValueType().getAnyOptionalObjectType()) {
+    return SILType(objectTy, getCategory());
   }
 
-  OTK = OTK_None;
   return SILType();
+}
+
+SILType SILType::unwrapAnyOptionalType() const {
+  if (auto objectTy = getAnyOptionalObjectType()) {
+    return objectTy;
+  }
+
+  return *this;
 }
 
 /// True if the given type value is nonnull, and the represented type is NSError
