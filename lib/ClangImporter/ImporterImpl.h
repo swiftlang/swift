@@ -694,7 +694,7 @@ public:
   ///
   /// The returned module may be null (but not \c None) if \p D comes from
   /// an imported header.
-  Optional<clang::Module *>
+  static Optional<clang::Module *>
   getClangSubmoduleForDecl(const clang::Decl *D,
                            bool allowForwardDeclaration = false);
 
