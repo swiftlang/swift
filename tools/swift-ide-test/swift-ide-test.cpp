@@ -299,11 +299,6 @@ InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-HonorSwiftNewtypeAttr("enable-swift-newtype",
-                      llvm::cl::desc("Enable swift_newtype import"),
-                      llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -2792,8 +2787,6 @@ int main(int argc, char *argv[]) {
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=
     options::InferImportAsMember;
-  InitInvok.getClangImporterOptions().HonorSwiftNewtypeAttr |=
-    options::HonorSwiftNewtypeAttr;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

@@ -724,7 +724,7 @@ clang::TypedefNameDecl *ClangImporter::Implementation::findSwiftNewtype(
     const clang::NamedDecl *decl, clang::Sema &clangSema, bool useSwift2Name) {
   // If we aren't honoring the swift_newtype attribute, don't even
   // bother looking. Similarly for swift2 names
-  if (!HonorSwiftNewtypeAttr || useSwift2Name)
+  if (useSwift2Name)
     return nullptr;
 
   auto varDecl = dyn_cast<clang::VarDecl>(decl);

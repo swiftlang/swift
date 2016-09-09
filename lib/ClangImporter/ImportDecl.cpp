@@ -6240,11 +6240,6 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 clang::SwiftNewtypeAttr *ClangImporter::Implementation::getSwiftNewtypeAttr(
     const clang::TypedefNameDecl *decl,
     bool useSwift2Name) {
-  // If we aren't honoring the swift_newtype attribute, don't even
-  // bother looking.
-  if (!HonorSwiftNewtypeAttr)
-    return nullptr;
-
   // If we're determining the Swift 2 name, don't honor this attribute.
   if (useSwift2Name)
     return nullptr;

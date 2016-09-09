@@ -1264,7 +1264,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     ImportForwardDeclarations(opts.ImportForwardDeclarations),
     InferImportAsMember(opts.InferImportAsMember),
     DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-    HonorSwiftNewtypeAttr(opts.HonorSwiftNewtypeAttr),
     BridgingHeaderLookupTable(nullptr)
 {
   // Add filters to determine if a Clang availability attribute
@@ -2905,8 +2904,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.InferImportAsMember,
-                            Impl.HonorSwiftNewtypeAttr);
+                            Impl.InferImportAsMember);
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
