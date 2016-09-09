@@ -489,7 +489,7 @@ public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
 @_transparent
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* MemoryLayout<Pointee>.stride)._builtinWordValue))
+    lhs._rawValue, rhs._builtinWordValue, Pointee.self))
 }
 
 @_transparent
