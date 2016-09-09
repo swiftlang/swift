@@ -53,6 +53,7 @@ set(swift_runtime_sources
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
+    RefCount.cpp
     ReflectionNative.cpp
     RuntimeEntrySymbols.cpp
     SwiftObjectNative.cpp)
