@@ -895,12 +895,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   return { getterDecl, setterDecl };
 }
 
-namespace {
-  using ImportedName = ClangImporter::Implementation::ImportedName;
-  using ImportNameFlags = ClangImporter::Implementation::ImportNameFlags;
-  using ImportNameOptions = ClangImporter::Implementation::ImportNameOptions;
-}
-
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
 static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
@@ -3170,9 +3164,6 @@ namespace {
       if (knownProperty != Impl.FunctionsAsProperties.end())
         return knownProperty->second;
 
-      typedef ClangImporter::Implementation::ImportedAccessorKind
-        ImportedAccessorKind;
-
       // Determine whether we have the getter or setter.
       const clang::FunctionDecl *getter = nullptr;
       ImportedName getterName;
@@ -3342,9 +3333,6 @@ namespace {
       auto importedName = importFullName(decl, swift3Name);
       if (!importedName)
         return nullptr;
-
-      typedef ClangImporter::Implementation::ImportedAccessorKind
-        ImportedAccessorKind;
 
       AbstractStorageDecl *owningStorage;
       switch (importedName.AccessorKind) {

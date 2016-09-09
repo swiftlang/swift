@@ -1717,7 +1717,7 @@ static OptionalTypeKind getResultOptionality(
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
-static Optional<ClangImporter::Implementation::ImportedErrorInfo>
+static Optional<ImportedErrorInfo>
 considerErrorImport(ClangImporter::Implementation &importer,
                     const clang::ObjCMethodDecl *clangDecl,
                     StringRef &baseName,
@@ -1810,7 +1810,7 @@ considerErrorImport(ClangImporter::Implementation &importer,
     }
 
     bool replaceParamWithVoid = !adjustName && !expectsToRemoveError;
-    ClangImporter::Implementation::ImportedErrorInfo errorInfo {
+    ImportedErrorInfo errorInfo {
       *errorKind, isErrorOwned, index, replaceParamWithVoid
     };
     return errorInfo;
@@ -1909,14 +1909,10 @@ Identifier ClangImporter::Implementation::importMacroName(
   return SwiftContext.getIdentifier(name);
 }
 
-namespace {
-  typedef ClangImporter::Implementation::ImportedName ImportedName;
-}
-
 /// Will recursively print out the fully qualified context for the given name.
 /// Ends with a trailing "."
 static void
-printFullContextPrefix(ClangImporter::Implementation::ImportedName name,
+printFullContextPrefix(ImportedName name,
                        llvm::raw_ostream &os,
                        ClangImporter::Implementation &Impl) {
   const clang::NamedDecl *newDeclContextNamed = nullptr;

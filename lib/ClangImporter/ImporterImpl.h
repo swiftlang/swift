@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "ImportEnumInfo.h"
+#include "ImportName.h"
 #include "SwiftLookupTable.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -782,126 +783,16 @@ public:
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
-  /// Information about imported error parameters.
-  struct ImportedErrorInfo {
-    ForeignErrorConvention::Kind Kind;
-    ForeignErrorConvention::IsOwned_t IsOwned;
-
-    /// The index of the error parameter.
-    unsigned ParamIndex;
-
-    /// Whether the parameter is being replaced with "void"
-    /// (vs. removed).
-    bool ReplaceParamWithVoid;
-  };
-
-  /// The kind of accessor that an entity will be imported as.
-  enum class ImportedAccessorKind {
-    None = 0,
-    PropertyGetter,
-    PropertySetter,
-    SubscriptGetter,
-    SubscriptSetter,
-  };
-
-  /// Describes a name that was imported from Clang.
-  struct ImportedName {
-    /// The imported name.
-    DeclName Imported;
-
-    /// Whether this name was explicitly specified via a Clang
-    /// swift_name attribute.
-    bool HasCustomName = false;
-
-    /// Whether this was one of a special class of Objective-C
-    /// initializers for which we drop the variadic argument rather
-    /// than refuse to import the initializer.
-    bool DroppedVariadic = false;
-
-    /// Whether this is a global being imported as a member
-    bool ImportAsMember = false;
-
-    /// What kind of accessor this name refers to, if any.
-    ImportedAccessorKind AccessorKind = ImportedAccessorKind::None;
-
-    /// For an initializer, the kind of initializer to import.
-    CtorInitializerKind InitKind = CtorInitializerKind::Designated;
-
-    /// The context into which this declaration will be imported.
-    ///
-    /// When the context into which the declaration will be imported
-    /// matches a Clang declaration context (the common case), the
-    /// result will be expressed as a declaration context. Otherwise,
-    /// if the Clang type is not itself a declaration context (for
-    /// example, a typedef that comes into Swift as a strong type),
-    /// the type declaration will be provided.
-    EffectiveClangContext EffectiveContext;
-
-    /// For names that map Objective-C error handling conventions into
-    /// throwing Swift methods, describes how the mapping is performed.
-    Optional<ImportedErrorInfo> ErrorInfo;
-
-    /// For a declaration name that makes the declaration into an
-    /// instance member, the index of the "Self" parameter.
-    Optional<unsigned> SelfIndex = None;
-
-    /// Produce just the imported name, for clients that don't care
-    /// about the details.
-    operator DeclName() const { return Imported; }
-
-    /// Whether any name was imported.
-    explicit operator bool() const { return static_cast<bool>(Imported); }
-
-    /// Whether this declaration is a property accessor (getter or setter).
-    bool isPropertyAccessor() const {
-      switch (AccessorKind) {
-      case ImportedAccessorKind::None:
-      case ImportedAccessorKind::SubscriptGetter:
-      case ImportedAccessorKind::SubscriptSetter:
-        return false;
-
-      case ImportedAccessorKind::PropertyGetter:
-      case ImportedAccessorKind::PropertySetter:
-        return true;
-      }
-    }
-
-    /// Whether this declaration is a subscript accessor (getter or setter).
-    bool isSubscriptAccessor() const {
-      switch (AccessorKind) {
-      case ImportedAccessorKind::None:
-      case ImportedAccessorKind::PropertyGetter:
-      case ImportedAccessorKind::PropertySetter:
-        return false;
-
-      case ImportedAccessorKind::SubscriptGetter:
-      case ImportedAccessorKind::SubscriptSetter:
-        return true;
-      }
-    }
-
-  };
-
-  /// Flags that control the import of names in importFullName.
-  enum class ImportNameFlags {
-    /// Suppress the factory-method-as-initializer transformation.
-    SuppressFactoryMethodAsInit = 0x01,
-    /// Produce the Swift 2 name of the given entity.
-    Swift2Name = 0x02,
-  };
-
-  /// Options that control the import of names in importFullName.
-  typedef OptionSet<ImportNameFlags> ImportNameOptions;
-
   /// Imports the full name of the given Clang declaration into Swift.
   ///
   /// Note that this may result in a name very different from the Clang name,
   /// so it should not be used when referencing Clang symbols.
   ///
   /// \param D The Clang declaration whose name should be imported.
-  ImportedName importFullName(const clang::NamedDecl *D,
-                              ImportNameOptions options = None,
-                              clang::Sema *clangSemaOverride = nullptr);
+  importer::ImportedName
+  importFullName(const clang::NamedDecl *D,
+                 importer::ImportNameOptions options = None,
+                 clang::Sema *clangSemaOverride = nullptr);
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
@@ -910,7 +801,8 @@ public:
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
-  void printSwiftName(ImportedName, bool fullyQualified, llvm::raw_ostream &os);
+  void printSwiftName(importer::ImportedName, bool fullyQualified,
+                      llvm::raw_ostream &os);
 
   /// Retrieve the property type as determined by the given accessor.
   static clang::QualType
@@ -1298,7 +1190,7 @@ public:
                         bool isVariadic, bool isNoReturn,
                         bool isFromSystemModule,
                         ParameterList **bodyParams,
-                        ImportedName importedName,
+                        importer::ImportedName importedName,
                         DeclName &name,
                         Optional<ForeignErrorConvention> &errorConvention,
                         SpecialMethodKind kind);
