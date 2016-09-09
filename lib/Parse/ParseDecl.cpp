@@ -3421,15 +3421,6 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, ParameterList *Indices,
   // an implicit fallthrough off the end.
   if (Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::computed_property_no_accessors);
-    auto *TheDecl = createAccessorFunc(VarLBLoc, nullptr, TypeLoc(), nullptr,
-                                       SourceLoc(), Flags,
-                                       AccessorKind::IsGetter,
-                                       AddressorKind::NotAddressor, this,
-                                       SourceLoc());
-
-    TheDecl->setBody(BraceStmt::create(Context, VarLBLoc, {}, Tok.getLoc()));
-    TheDecl->setInvalid();
-    Decls.push_back(TheDecl);
     return true;
   }
 

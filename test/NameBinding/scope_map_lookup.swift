@@ -52,3 +52,28 @@ class LazyProperties {
 
   lazy var prop5: Int = { self.value + 1 }()
 }
+
+// Protocol extensions.
+// Extending via a superclass constraint.
+class Superclass {
+  func foo() { }
+  static func bar() { }
+
+  typealias Foo = Int
+}
+
+protocol PConstrained4 { }
+
+extension PConstrained4 where Self : Superclass {
+  final func testFoo() -> Foo {
+    foo()
+    self.foo()
+
+    return Foo(5)
+  }
+
+  final static func testBar() {
+    bar()
+    self.bar()
+  }
+}

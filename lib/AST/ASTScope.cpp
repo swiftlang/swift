@@ -90,7 +90,7 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   case AbstractStorageDecl::ComputedWithMutableAddress:
   case AbstractStorageDecl::InheritedWithObservers:
   case AbstractStorageDecl::StoredWithObservers:
-    return true;
+    return asd->getBracesRange().isValid();
 
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
@@ -1329,7 +1329,11 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return SourceRange(charRange.getStart(), charRange.getEnd());
     }
 
-    return SourceRange();
+    if (sourceFile.file->Decls.empty()) return SourceRange();
+
+    // Use the source ranges of the declarations in the file.
+    return SourceRange(sourceFile.file->Decls.front()->getStartLoc(),
+                       sourceFile.file->Decls.back()->getEndLoc());
 
   case ASTScopeKind::ExtensionGenericParams: {
     // The generic parameters of an extension are available from the trailing
@@ -1750,7 +1754,8 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::LocalDeclaration:
-    result.push_back(cast<ValueDecl>(localDeclaration));
+    if (auto value = dyn_cast<ValueDecl>(localDeclaration))
+      result.push_back(value);
     break;
 
   case ASTScopeKind::ConditionalClause:
@@ -1772,8 +1777,10 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     break;
 
   case ASTScopeKind::ForStmtInitializer:
-    for (auto decl : forStmt->getInitializerVarDecls())
-      result.push_back(cast<ValueDecl>(decl));
+    for (auto decl : forStmt->getInitializerVarDecls()) {
+      if (auto value = dyn_cast<ValueDecl>(decl))
+        result.push_back(value);
+    }
     break;
 
   case ASTScopeKind::PatternInitializer:
@@ -1840,6 +1847,11 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   // Print the source location of the node.
   auto printRange = [&]() {
     auto range = getSourceRange();
+    if (range.isInvalid()) {
+      out << " [invalid source range]";
+      return;
+    }
+
     auto startLineAndCol = sourceMgr.getLineAndColumn(range.Start);
     auto endLineAndCol = sourceMgr.getLineAndColumn(range.End);
 
