@@ -124,6 +124,8 @@ private:
 public:
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name);
+  Address createAlloca(llvm::Type *ty, llvm::Value *ArraySize, Alignment align,
+                       const llvm::Twine &name);
   Address createFixedSizeBufferAlloca(const llvm::Twine &name);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
