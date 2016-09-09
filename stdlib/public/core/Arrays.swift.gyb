@@ -954,12 +954,9 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
   if count > 0 {
     // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
-    let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
-      _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
-      minimumCapacity: count)
+    let bufferObject = Builtin.allocWithTailElems_1(_ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
 
-    let (array, ptr) = Array<Element>._adoptStorage(
-      bufferObject.buffer, count: count)
+    let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
   }
   // For an empty array no buffer allocation is needed.
@@ -1110,16 +1107,12 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @_versioned
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
-    _ storage: AnyObject, count: Int
+    _ storage: _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
-    
-    _sanityCheck(
-      storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
     
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count,
-      storage: unsafeDowncast(
-        storage, to: _ContiguousArrayStorage<Element>.self))
+      storage: storage)
     
     return (
       Array(
