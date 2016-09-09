@@ -3479,12 +3479,6 @@ namespace {
     importObjCGenericParams(const clang::ObjCInterfaceDecl *decl,
                             DeclContext *dc);
 
-    // Calculate the generic signature and interface type to archetype mapping
-    // from an imported generic param list.
-    std::pair<GenericSignature *, GenericEnvironment *>
-    calculateGenericSignature(GenericParamList *genericParams,
-                              DeclContext *dc);
-
     /// Import members of the given Objective-C container and add them to the
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
@@ -3561,7 +3555,7 @@ namespace {
 
         GenericSignature *sig;
         GenericEnvironment *env;
-        std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+        std::tie(sig, env) = Impl.buildGenericSignature(genericParams, result);
 
         result->setGenericSignature(sig);
         result->setGenericEnvironment(env);
@@ -3714,36 +3708,6 @@ namespace {
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), useSwift2Name}] = result;
 
-      // Create the archetype for the implicit 'Self'.
-      auto selfId = Impl.SwiftContext.Id_Self;
-      auto selfDecl = result->getProtocolSelf();
-      ArchetypeType *selfArchetype =
-                           ArchetypeType::getNew(Impl.SwiftContext, nullptr,
-                                                 result, selfId,
-                                                 Type(result->getDeclaredType()),
-                                                 Type(), false);
-      selfDecl->setArchetype(selfArchetype);
-
-      // Set the generic parameters and requirements.
-      auto genericParam = selfDecl->getDeclaredType()
-                            ->castTo<GenericTypeParamType>();
-      Requirement genericRequirements[2] = {
-        Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
-        Requirement(RequirementKind::Conformance, genericParam,
-                    result->getDeclaredType())
-      };
-      auto sig = GenericSignature::get(genericParam, genericRequirements);
-      result->setGenericSignature(sig);
-
-      TypeSubstitutionMap interfaceToArchetypeMap;
-
-      auto paramTy = selfDecl->getDeclaredType()->getCanonicalType();
-      interfaceToArchetypeMap[paramTy.getPointer()] = selfArchetype;
-
-      auto *env =
-          GenericEnvironment::get(Impl.SwiftContext, interfaceToArchetypeMap);
-      result->setGenericEnvironment(env);
-
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
@@ -3752,6 +3716,13 @@ namespace {
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
+
+      GenericSignature *sig;
+      GenericEnvironment *env;
+      std::tie(sig, env) = Impl.buildGenericSignature(result->getGenericParams(), dc);
+
+      result->setGenericSignature(sig);
+      result->setGenericEnvironment(env);
 
       result->setMemberLoader(&Impl, 0);
 
@@ -3878,7 +3849,7 @@ namespace {
 
           GenericSignature *sig;
           GenericEnvironment *env;
-          std::tie(sig, env) = calculateGenericSignature(genericParams, result);
+          std::tie(sig, env) = Impl.buildGenericSignature(genericParams, dc);
 
           result->setGenericSignature(sig);
           result->setGenericEnvironment(env);
@@ -5960,36 +5931,6 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       genericParams, Impl.importSourceLoc(typeParamList->getRAngleLoc()));
 }
 
-std::pair<GenericSignature *, GenericEnvironment *>
-SwiftDeclConverter::calculateGenericSignature(GenericParamList *genericParams,
-                                              DeclContext *dc) {
-  ArchetypeBuilder builder(*dc->getParentModule(), Impl.SwiftContext.Diags);
-  for (auto param : *genericParams)
-    builder.addGenericParameter(param);
-  for (auto param : *genericParams) {
-    bool result = builder.addGenericParameterRequirements(param);
-    assert(!result);
-    (void)result;
-  }
-  // TODO: any need to infer requirements?
-  bool result = builder.finalize(genericParams->getSourceRange().Start);
-  assert(!result);
-  (void)result;
-
-  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
-  for (auto param : *genericParams) {
-    genericParamTypes.push_back(
-        param->getDeclaredType()->castTo<GenericTypeParamType>());
-    auto *archetype = builder.getArchetype(param);
-    param->setArchetype(archetype);
-  }
-
-  auto *sig = builder.getGenericSignature(genericParamTypes);
-  auto *env = builder.getGenericEnvironment(genericParamTypes);
-
-  return std::make_pair(sig, env);
-}
-
 void SwiftDeclConverter::importObjCMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *swiftContext,
     llvm::SmallPtrSet<Decl *, 4> &knownMembers,
@@ -6896,6 +6837,39 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
+// Calculate the generic signature and interface type to archetype mapping
+// from an imported generic param list.
+std::pair<GenericSignature *, GenericEnvironment *>
+ClangImporter::Implementation::
+buildGenericSignature(GenericParamList *genericParams,
+                      DeclContext *dc) {
+  ArchetypeBuilder builder(*dc->getParentModule(), SwiftContext.Diags);
+  for (auto param : *genericParams)
+    builder.addGenericParameter(param);
+  for (auto param : *genericParams) {
+    bool result = builder.addGenericParameterRequirements(param);
+    assert(!result);
+    (void) result;
+  }
+  // TODO: any need to infer requirements?
+  bool result = builder.finalize(genericParams->getSourceRange().Start);
+  assert(!result);
+  (void) result;
+
+  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
+  for (auto param : *genericParams) {
+    genericParamTypes.push_back(
+        param->getDeclaredType()->castTo<GenericTypeParamType>());
+    auto *archetype = builder.getArchetype(param);
+    param->setArchetype(archetype);
+  }
+
+  auto *sig = builder.getGenericSignature(genericParamTypes);
+  auto *env = builder.getGenericEnvironment(genericParamTypes);
+
+  return std::make_pair(sig, env);
+}
+
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *decl,
@@ -6982,35 +6956,12 @@ ClangImporter::Implementation::importDeclContextOf(
 
   if (auto protoDecl = ext->getAsProtocolExtensionContext()) {
     ext->setGenericParams(protoDecl->createGenericParams(ext));
-    auto protoArchetype = protoDecl->getProtocolSelf()->getArchetype();
-    auto extSelf = ext->getProtocolSelf();
 
-    SmallVector<ProtocolDecl *, 4> conformsTo(
-        protoArchetype->getConformsTo().begin(),
-        protoArchetype->getConformsTo().end());
-    ArchetypeType *extSelfArchetype = ArchetypeType::getNew(
-        SwiftContext, protoArchetype->getParent(),
-        protoArchetype->getAssocTypeOrProtocol(), protoArchetype->getName(),
-        conformsTo, protoArchetype->getSuperclass(),
-        protoArchetype->getIsRecursive());
-    extSelf->setArchetype(extSelfArchetype);
+    GenericSignature *sig;
+    GenericEnvironment *env;
+    std::tie(sig, env) = buildGenericSignature(ext->getGenericParams(), ext);
 
-    auto genericParam =
-        extSelf->getDeclaredType()->castTo<GenericTypeParamType>();
-    Requirement genericRequirements[2] = {
-        Requirement(RequirementKind::WitnessMarker, genericParam, Type()),
-        Requirement(RequirementKind::Conformance, genericParam,
-                    protoDecl->getDeclaredType())};
-    auto *sig = GenericSignature::get(genericParam, genericRequirements);
     ext->setGenericSignature(sig);
-
-    TypeSubstitutionMap interfaceToArchetypeMap;
-
-    auto paramTy = extSelf->getDeclaredType()->getCanonicalType();
-    interfaceToArchetypeMap[paramTy.getPointer()] = extSelfArchetype;
-
-    auto *env =
-        GenericEnvironment::get(SwiftContext, interfaceToArchetypeMap);
     ext->setGenericEnvironment(env);
   }
 
