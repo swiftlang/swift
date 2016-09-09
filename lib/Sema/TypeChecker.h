@@ -1980,6 +1980,23 @@ public:
                                               ConstructorDecl *ctorDecl,
                                               bool SuppressDiagnostics);
 
+  /// Builds a string representing a "default" generic argument list for
+  /// \p typeDecl. In general, this means taking the bound of each generic
+  /// parameter. The \p getPreferredType callback can be used to provide a
+  /// different type from the bound.
+  ///
+  /// It may not always be possible to find a single appropriate type for a
+  /// particular parameter (say, if it has two bounds). In this case, an
+  /// Xcode-style placeholder will be used instead.
+  ///
+  /// Returns true if the arguments list could be constructed, false if for
+  /// some reason it could not.
+  bool getDefaultGenericArgumentsString(
+      SmallVectorImpl<char> &buf,
+      const GenericTypeDecl *typeDecl,
+      llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType =
+          [](const GenericTypeParamDecl *) { return Type(); });
+
   /// Attempt to omit needless words from the name of the given declaration.
   Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
