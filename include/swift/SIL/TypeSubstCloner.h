@@ -55,7 +55,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  TypeSubstitutionMap &ContextSubs,
+                  const SubstitutionMap &ContextSubs,
                   ArrayRef<Substitution> ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   bool Inlining = false)
@@ -68,7 +68,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  TypeSubstitutionMap &ContextSubs,
+                  const SubstitutionMap &ContextSubs,
                   ArrayRef<Substitution> ApplySubs,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
@@ -81,11 +81,12 @@ public:
 
 protected:
   SILType remapType(SILType Ty) {
-    return SILType::substType(Original.getModule(), SwiftMod, SubsMap, Ty);
+    return SILType::substType(Original.getModule(), SwiftMod,
+                              SubsMap.getMap(), Ty);
   }
 
   CanType remapASTType(CanType ty) {
-    return ty.subst(SwiftMod, SubsMap, None)->getCanonicalType();
+    return ty.subst(SubsMap, None)->getCanonicalType();
   }
 
   Substitution remapSubstitution(Substitution sub) {
@@ -288,7 +289,7 @@ protected:
   /// The Swift module that the cloned function belongs to.
   Module *SwiftMod;
   /// The substitutions list for the specialization.
-  TypeSubstitutionMap &SubsMap;
+  const SubstitutionMap &SubsMap;
   /// The original function to specialize.
   SILFunction &Original;
   /// The substitutions used at the call site.

@@ -80,13 +80,20 @@ GenericEnvironment::getForwardingSubstitutions(
   return sig->getASTContext().AllocateCopy(result);
 }
 
+SubstitutionMap GenericEnvironment::
+getSubstitutionMap(ModuleDecl *mod,
+                   GenericSignature *sig,
+                   ArrayRef<Substitution> subs) const {
+  SubstitutionMap result;
+  getSubstitutionMap(mod, sig, subs, result);
+  return result;
+}
+
 void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
                    GenericSignature *sig,
                    ArrayRef<Substitution> subs,
-                   TypeSubstitutionMap &subsMap,
-                   ArchetypeConformanceMap &conformanceMap) const {
-
+                   SubstitutionMap &result) const {
   for (auto depTy : sig->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
@@ -97,8 +104,8 @@ getSubstitutionMap(ModuleDecl *mod,
     subs = subs.slice(1);
 
     // Record the replacement type and its conformances.
-    subsMap[archetype] = sub.getReplacement();
-    conformanceMap.addArchetypeConformances(archetype, sub.getConformances());
+    result.addSubstitution(CanType(archetype), sub.getReplacement());
+    result.addConformances(CanType(archetype), sub.getConformances());
   }
 
   for (auto reqt : sig->getRequirements()) {
@@ -125,11 +132,13 @@ getSubstitutionMap(ModuleDecl *mod,
       continue;
 
     if (archetype->getParent() != firstBaseArchetype)
-      conformanceMap.addArchetypeParent(archetype, firstBaseArchetype,
-                                        first->getAssocType());
+      result.addParent(CanType(archetype),
+                       CanType(firstBaseArchetype),
+                       first->getAssocType());
     if (archetype->getParent() != secondBaseArchetype)
-      conformanceMap.addArchetypeParent(archetype, secondBaseArchetype,
-                                        second->getAssocType());
+      result.addParent(CanType(archetype),
+                       CanType(secondBaseArchetype),
+                       second->getAssocType());
   }
 
   assert(subs.empty() && "did not use all substitutions?!");

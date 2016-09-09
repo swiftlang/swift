@@ -145,36 +145,31 @@ ASTContext &GenericSignature::getASTContext() const {
   return getASTContext(getGenericParams(), getRequirements());
 }
 
-TypeSubstitutionMap
+SubstitutionMap
 GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs) const {
-  TypeSubstitutionMap subMap;
-  TypeConformanceMap conformanceMap;
-
-  getSubstitutionMap(subs, subMap, conformanceMap);
-
-  return subMap;
+  SubstitutionMap result;
+  getSubstitutionMap(subs, result);
+  return result;
 }
 
-void GenericSignature::
-getSubstitutionMap(ArrayRef<Substitution> subs,
-                   TypeSubstitutionMap &subMap,
-                   TypeConformanceMap &conformanceMap) const {
-
+void
+GenericSignature::getSubstitutionMap(ArrayRef<Substitution> subs,
+                                     SubstitutionMap &result) const {
   // An empty parameter list gives an empty map.
-  if (subs.empty()) {
+  if (subs.empty())
     assert(getGenericParams().empty());
-    return;
-  }
 
   for (auto depTy : getAllDependentTypes()) {
     auto sub = subs.front();
     subs = subs.slice(1);
 
-    auto canTy = depTy->getCanonicalType().getPointer();
-    subMap[canTy] = sub.getReplacement();
-    conformanceMap[canTy] = sub.getConformances();
+    auto canTy = depTy->getCanonicalType();
+    result.addSubstitution(canTy, sub.getReplacement());
+    result.addConformances(canTy, sub.getConformances());
   }
-  
+
+  // TODO: same-type constraints
+
   assert(subs.empty() && "did not use all substitutions?!");
 }
 
@@ -237,75 +232,17 @@ getSubstitutions(ModuleDecl &mod,
   }
 }
 
-static Optional<ProtocolConformanceRef>
-lookupDependentConformance(ProtocolDecl *proto,
-                           ArrayRef<ProtocolConformanceRef> conformances) {
-  for (ProtocolConformanceRef found : conformances) {
-    auto foundProto = found.getRequirement();
-    if (foundProto == proto) {
-      return found;
-    } else if (foundProto->inheritsFrom(proto)) {
-      if (found.isConcrete()) {
-        return ProtocolConformanceRef(
-          found.getConcrete()->getInheritedConformance(proto));
-      }
-
-      return found;
-    }
-  }
-
-  return None;
-}
-
-static Optional<ProtocolConformanceRef>
-lookupDependentConformance(CanType original,
-                           ProtocolDecl *proto,
-                           const TypeConformanceMap &conformanceMap) {
-  // Check for conformances for the type that apply to the original type.
-  auto it = conformanceMap.find(original.getPointer());
-  if (it != conformanceMap.end()) {
-    if (auto conformance = lookupDependentConformance(proto, it->second)) {
-      return conformance;
-    }
-  }
-
-  // Check if we have substitutions for the parent.
-  if (auto memberTy = dyn_cast<DependentMemberType>(original)) {
-    if (auto parent = memberTy->getBase()) {
-      auto *assocType = memberTy->getAssocType();
-      auto *parentProto = assocType->getProtocol();
-      auto conformance = lookupDependentConformance(
-          parent->getCanonicalType(), parentProto, conformanceMap);
-
-      if (conformance) {
-        if (!conformance->isConcrete())
-          return ProtocolConformanceRef(proto);
-
-        auto sub = conformance->getConcrete()->getTypeWitnessSubstAndDecl(
-            assocType, nullptr).first;
-
-        return lookupDependentConformance(proto, sub.getConformances());
-      }
-    }
-  }
-
-  return None;
-}
-
 void GenericSignature::
 getSubstitutions(ModuleDecl &mod,
-                 const TypeSubstitutionMap &subMap,
-                 const TypeConformanceMap &conformanceMap,
+                 const SubstitutionMap &subMap,
                  SmallVectorImpl<Substitution> &result) const {
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
-    return *lookupDependentConformance(original,
-                                       protoType->getDecl(),
-                                       conformanceMap);
+    return *subMap.lookupConformance(original, protoType->getDecl());
   };
 
-  getSubstitutions(mod, subMap, lookupConformanceFn, result);
+  getSubstitutions(mod, subMap.getMap(), lookupConformanceFn, result);
 }
 
 bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {

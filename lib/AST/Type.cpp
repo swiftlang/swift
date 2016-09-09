@@ -1683,7 +1683,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *sig = classDecl->getGenericSignatureOfContext();
   auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
 
-  return superclassTy.subst(module, subs, None);
+  return superclassTy.subst(subs, None);
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -2768,26 +2768,29 @@ PolymorphicFunctionType::getGenericParameters() const {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
+GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   auto params = getGenericParams();
   (void)params;
   
-  TypeSubstitutionMap subs
-    = getGenericSignature()->getSubstitutionMap(args);
+  auto subs = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
+  Type input = getInput().subst(subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
-static Type getMemberForBaseType(Module *module,
+using ConformanceSource =
+    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *>;
+
+static Type getMemberForBaseType(ConformanceSource conformances,
+                                 Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
                                  Identifier name,
                                  SubstOptions options) {
   // Error recovery path.
   if (substBase->isOpenedExistential())
-    return ErrorType::get(module->getASTContext());
+    return ErrorType::get(substBase->getASTContext());
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -2799,14 +2802,14 @@ static Type getMemberForBaseType(Module *module,
       // If the archetype doesn't have the requested type and the parent is not
       // self derived, error out
       return parent->isSelfDerived() ? parent->getNestedTypeValue(name)
-                                     : ErrorType::get(module->getASTContext());
+                                     : ErrorType::get(substBase->getASTContext());
     }
 
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
     if (!assocType || !archetypeParent->getSuperclass()) {
       // else just error out
-      return ErrorType::get(module->getASTContext());
+      return ErrorType::get(substBase->getASTContext());
     }
   }
 
@@ -2840,7 +2843,15 @@ static Type getMemberForBaseType(Module *module,
   if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
-    auto conformance = module->lookupConformance(substBase, proto, resolver);
+    Optional<ProtocolConformanceRef> conformance;
+    if (conformances.is<ModuleDecl *>()) {
+      conformance = conformances.get<ModuleDecl *>()->lookupConformance(
+          substBase, proto, resolver);
+    } else {
+      conformance = conformances.get<const SubstitutionMap *>()->lookupConformance(
+          origBase->getCanonicalType(), proto);
+    }
+
     if (!conformance)
       return Type();
 
@@ -2860,36 +2871,38 @@ static Type getMemberForBaseType(Module *module,
 
   // FIXME: This is a fallback. We want the above, conformance-based
   // result to be the only viable path.
-  if (resolver) {
-    if (Type memberType = resolver->resolveMemberType(module, substBase, name)){
-      return memberType;
-    }
+  if (resolver && conformances.is<ModuleDecl *>()) {
+    return resolver->resolveMemberType(
+        conformances.get<ModuleDecl *>(), substBase, name);
   }
 
   return Type();
 }
 
-Type DependentMemberType::substBaseType(Module *module,
+Type DependentMemberType::substBaseType(ModuleDecl *module,
                                         Type substBase,
                                         LazyResolver *resolver) {
   if (substBase.getPointer() == getBase().getPointer() &&
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(module, substBase, getAssocType(), getName(),
+  return getMemberForBaseType(module, Type(), substBase,
+                              getAssocType(), getName(),
                               None);
 }
 
-Type Type::subst(Module *module,
-                 const TypeSubstitutionMap &substitutions,
-                 SubstOptions options) const {
+static Type substType(
+    Type derivedType,
+    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
+    const TypeSubstitutionMap &substitutions,
+    SubstOptions options) {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
   auto failed = [&](Type t){
     return options.contains(SubstFlags::IgnoreMissing) ? t : Type();
   };
-  
-  return transform([&](Type type) -> Type {
+
+  return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
@@ -2906,14 +2919,16 @@ Type Type::subst(Module *module,
         substitutions.find(depMemTy->getCanonicalType().getPointer());
       if (known != substitutions.end() && known->second) {
         return SubstitutedType::get(type, known->second,
-                                    module->getASTContext());
+                                    type->getASTContext());
       }
     
-      auto newBase = depMemTy->getBase().subst(module, substitutions, options);
+      auto newBase = substType(depMemTy->getBase(), conformances,
+                               substitutions, options);
       if (!newBase)
         return failed(type);
       
-      if (Type r = getMemberForBaseType(module, newBase,
+      if (Type r = getMemberForBaseType(conformances,
+                                        depMemTy->getBase(), newBase,
                                         depMemTy->getAssocType(),
                                         depMemTy->getName(), options))
         return r;
@@ -2930,7 +2945,7 @@ Type Type::subst(Module *module,
     auto known = substitutions.find(key);
     if (known != substitutions.end() && known->second)
       return SubstitutedType::get(type, known->second,
-                                  module->getASTContext());
+                                  type->getASTContext());
 
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
@@ -2939,7 +2954,7 @@ Type Type::subst(Module *module,
       return type;
 
     // Substitute into the parent type.
-    Type substParent = Type(parent).subst(module, substitutions, options);
+    Type substParent = substType(parent, conformances, substitutions, options);
     if (!substParent)
       return Type();
 
@@ -2954,11 +2969,23 @@ Type Type::subst(Module *module,
     }
     
     
-    if (Type r = getMemberForBaseType(module, substParent, assocType,
-                                      substOrig->getName(), options))
+    if (Type r = getMemberForBaseType(conformances, parent, substParent,
+                                      assocType, substOrig->getName(),
+                                      options))
       return r;
     return failed(type);
   });
+}
+
+Type Type::subst(Module *module,
+                 const TypeSubstitutionMap &substitutions,
+                 SubstOptions options) const {
+  return substType(*this, module, substitutions, options);
+}
+
+Type Type::subst(const SubstitutionMap &substitutions,
+                 SubstOptions options) const {
+  return substType(*this, &substitutions, substitutions.getMap(), options);
 }
 
 Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,

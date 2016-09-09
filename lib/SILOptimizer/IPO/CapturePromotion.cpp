@@ -192,8 +192,8 @@ public:
 
   ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                 StringRef ClonedName,
-                TypeSubstitutionMap &InterfaceSubs,
-                TypeSubstitutionMap &ContextSubs,
+                SubstitutionMap &InterfaceSubs,
+                SubstitutionMap &ContextSubs,
                 ArrayRef<Substitution> ApplySubs,
                 IndicesSet &PromotableIndices);
 
@@ -215,7 +215,7 @@ protected:
 private:
   static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
                                  StringRef ClonedName,
-                                 TypeSubstitutionMap &InterfaceSubs,
+                                 SubstitutionMap &InterfaceSubs,
                                  IndicesSet &PromotableIndices);
 
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
@@ -310,8 +310,8 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 
 ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                              StringRef ClonedName,
-                             TypeSubstitutionMap &InterfaceSubs,
-                             TypeSubstitutionMap &ContextSubs,
+                             SubstitutionMap &InterfaceSubs,
+                             SubstitutionMap &ContextSubs,
                              ArrayRef<Substitution> ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
@@ -414,7 +414,7 @@ static std::string getSpecializedName(SILFunction *F,
 SILFunction*
 ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                           StringRef ClonedName,
-                          TypeSubstitutionMap &InterfaceSubs,
+                          SubstitutionMap &InterfaceSubs,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
 
@@ -435,7 +435,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
-  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,
+  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs.getMap(), ClonedTy,
                                         /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
@@ -861,9 +861,8 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   SILFunction *F = PAI->getFunction();
 
   // Create the substitution maps.
-  TypeSubstitutionMap InterfaceSubs;
-  TypeSubstitutionMap ContextSubs;
-  ArchetypeConformanceMap ConformanceMap;
+  SubstitutionMap InterfaceSubs;
+  SubstitutionMap ContextSubs;
 
   ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
   auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
@@ -871,9 +870,9 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   if (!ApplySubs.empty()) {
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-    genericParams->getSubstitutionMap(F->getModule().getSwiftModule(),
-                                      genericSig, ApplySubs,
-                                      ContextSubs, ConformanceMap);
+    ContextSubs = genericParams->getSubstitutionMap(
+        F->getModule().getSwiftModule(),
+        genericSig, ApplySubs);
   } else {
     assert(!genericSig && "Function type has Unexpected generic signature!");
     assert(!genericParams &&
