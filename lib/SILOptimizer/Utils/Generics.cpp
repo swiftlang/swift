@@ -188,13 +188,6 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
-  if (auto *env = GenericFunc->getGenericEnvironment()) {
-    auto sig = GenericFunc->getLoweredFunctionType()->getGenericSignature();
-
-    env->getSubstitutionMap(M.getSwiftModule(), sig,
-                            ParamSubs, ContextSubs);
-  }
-
   Mangle::Mangler Mangler;
   GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
                                               ParamSubs, Fragile);
@@ -234,7 +227,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
 
   // Create a new function.
   SILFunction * SpecializedF =
-    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo, ContextSubs,
+    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo,
                                  ParamSubs, ClonedName);
 
   // Check if this specialization should be linked for prespecialization.
