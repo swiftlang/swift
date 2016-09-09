@@ -89,7 +89,6 @@ func misuseEscaping(_ a: (@escaping (Int) -> Int, Int)) {} // expected-error{{@e
 func misuseEscaping(_ a: [@escaping (Int) -> Int]) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-37=}}
 func misuseEscaping(_ a: [@escaping (Int) -> Int]?) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-37=}}
 func misuseEscaping(_ a: [Int : @escaping (Int) -> Int]) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{33-43=}}
-  // expected-error@-1{{@escaping attribute may only be used in function parameter position}} {{33-43=}}
 func misuseEscaping(_ a: GenericStruct<@escaping (Int) -> Int>) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{40-50=}}
 
 func takesEscapingGeneric<T>(_ fn: @escaping () -> T) {}
