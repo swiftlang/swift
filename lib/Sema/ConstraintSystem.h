@@ -1024,15 +1024,17 @@ private:
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
-    bool IsPrimary;
-
-    ConstraintSystem &CS;
     TypeChecker &TC;
     DeclContext *DC;
 
+    // Contextual Information.
+    Type CT;
+    ContextualTypePurpose CTP;
+
   public:
-    Candidate(ConstraintSystem &cs, Expr *expr, bool primaryExpr)
-        : E(expr), IsPrimary(primaryExpr), CS(cs), TC(cs.TC), DC(cs.DC) {}
+    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
+              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
+        : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
 
     /// \brief Return underlaying expression.
     Expr *getExpr() const { return E; }
