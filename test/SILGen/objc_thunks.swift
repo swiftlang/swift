@@ -262,8 +262,8 @@ class Hoozit : Gizmo {
   // CHECK: [[PB:%.*]] = project_box [[SELF_BOX]]
   // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] [[PB]]
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
-  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
-  // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
+  // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
   // CHECK: unchecked_ref_cast
   // CHECK: return
@@ -340,9 +340,9 @@ class Wotsit<T> : Gizmo {
   // Ivar destroyer
   // CHECK: sil hidden @_TToF{{.*}}WotsitE
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT_GSQGS0_x__ : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned ImplicitlyUnwrappedOptional<Wotsit<T>>
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT_GSQGS0_x__ : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned ImplicitlyUnwrappedOptional<Wotsit<T>>
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6WotsitcfT7bellsOnSi_GSQGS0_x__ : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 }
 
 // CHECK-NOT: sil hidden [thunk] @_TToF{{.*}}Wotsit{{.*}}
@@ -451,12 +451,12 @@ class DesignatedOverrides : Gizmo {
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridesc{{.*}}
   // CHECK-NOT: return
   // CHECK: function_ref @_TIvC11objc_thunks19DesignatedOverrides1iSii : $@convention(thin) () -> Int
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo! , $@convention(objc_method) (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> () -> Gizmo! , $@convention(objc_method) (@owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks19DesignatedOverridesc{{.*}}
   // CHECK: function_ref @_TIvC11objc_thunks19DesignatedOverrides1iSii : $@convention(thin) () -> Int
-  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK: return
 }
 
@@ -464,19 +464,5 @@ class DesignatedOverrides : Gizmo {
 
 func registerAnsible() {
   // CHECK: function_ref @_TFF11objc_thunks15registerAnsibleFT_T_U_FGSqFT_T__T_
-  // CHECK: function_ref @_TTRXFo_oGSqFT_T____XFdCb_dGSqbT_T____
   Ansible.anseAsync({ completion in completion!() })
 }
-
-// FIXME: would be nice if we didn't need to re-abstract as much here.
-
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqFT_T____XFdCb_dGSqbT_T____ : $@convention(c) @pseudogeneric (@inout_aliasable @block_storage @callee_owned (@owned Optional<() -> ()>) -> (), Optional<@convention(block) () -> ()>) -> ()
-// CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
-// CHECK: select_enum [[HEAP_BLOCK_IUO]]
-// CHECK: bb1:
-// CHECK: [[HEAP_BLOCK:%.*]] = unchecked_enum_data [[HEAP_BLOCK_IUO]]
-// CHECK: [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb___XFo___
-// CHECK: [[BRIDGED_BLOCK:%.*]] = partial_apply [[BLOCK_THUNK]]([[HEAP_BLOCK]])
-// CHECK: [[REABS_THUNK:%.*]] = function_ref @_TTRXFo___XFo_iT__iT__
-// CHECK: [[REABS_BLOCK:%.*]] = partial_apply [[REABS_THUNK]]([[BRIDGED_BLOCK]])
-// CHECK: [[REABS_BLOCK_IUO:%.*]] = enum $Optional<() -> ()>, {{.*}} [[REABS_BLOCK]]

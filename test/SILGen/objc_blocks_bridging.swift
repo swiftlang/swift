@@ -52,9 +52,8 @@ import Foundation
   // TODO: redundant reabstractions here
   // CHECK:         [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[BLOCK_THUNK]]([[BLOCK]])
-  // CHECK:         [[REABSTRACT_THUNK:%.*]] = function_ref @_TTRXFo_oSS_oSS_XFo_iSS_iSS_
-  // CHECK:         [[REABSTRACT:%.*]] = partial_apply [[REABSTRACT_THUNK]]([[BRIDGED]])
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@convention(method) (@owned Optional<(String) -> String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
+  // CHECK:         enum $Optional<@callee_owned (@owned String) -> @owned String>, #Optional.some!enumelt.1, [[BRIDGED]]
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo7optFunc{{.*}} : $@convention(method) (@owned Optional<@callee_owned (@owned String) -> @owned String>, @owned String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
   dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
     return f?(x)
@@ -95,7 +94,7 @@ func callBlocks(_ x: Foo,
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: enum $Optional<@convention(block) (NSString) -> NSString>, #Optional.some!enumelt.1, [[G_BLOCK]]
+  // CHECK: enum $Optional<@convention(block) (NSString) -> @autoreleased NSString>, #Optional.some!enumelt.1, [[G_BLOCK]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }

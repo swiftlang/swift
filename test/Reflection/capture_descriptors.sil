@@ -93,17 +93,16 @@ bb0(%t: $*T):
 sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
 bb0:
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<(A) -> B>
+  %t = alloc_stack $Optional<@callee_owned (@in A) -> @out B>
   %c = partial_apply %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<(A) -> B>
+  dealloc_stack %t : $*Optional<@callee_owned (@in A) -> @out B>
   return %c : $@callee_owned () -> ()
 }
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)))
+// CHECK-NEXT:     (tuple)))
 // CHECK-NEXT: - Metadata sources:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function

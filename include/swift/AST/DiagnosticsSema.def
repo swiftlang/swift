@@ -2713,6 +2713,8 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
+ERROR(illegal_sil_type,none,
+      "type %0 is not a legal SIL value type", (Type))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,

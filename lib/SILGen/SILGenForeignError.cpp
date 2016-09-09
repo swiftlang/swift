@@ -46,16 +46,14 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
 
   // If the pointer itself is optional, we need to branch based on
   // whether it's really there.
-  OptionalTypeKind errorPtrOptKind;
   if (SILType errorPtrObjectTy =
-        foreignErrorSlot->getType()
-                        .getAnyOptionalObjectType(gen.SGM.M, errorPtrOptKind)) {
+        foreignErrorSlot->getType().getAnyOptionalObjectType()) {
     SILBasicBlock *contBB = gen.createBasicBlock();
     SILBasicBlock *noSlotBB = gen.createBasicBlock();
     SILBasicBlock *hasSlotBB = gen.createBasicBlock();
     gen.B.createSwitchEnum(loc, foreignErrorSlot, nullptr,
-                 { { ctx.getOptionalSomeDecl(errorPtrOptKind), hasSlotBB },
-                   { ctx.getOptionalNoneDecl(errorPtrOptKind), noSlotBB } });
+                 { { ctx.getOptionalSomeDecl(), hasSlotBB },
+                   { ctx.getOptionalNoneDecl(), noSlotBB } });
 
     // If we have the slot, emit a store to it.
     gen.B.emitBlock(hasSlotBB);
@@ -134,9 +132,7 @@ namespace {
                          CanType bridgedErrorProto) const override {
       bool errorShouldBeOptional = false;
       CanType bridgedErrorObjectType = bridgedErrorProto;
-      OptionalTypeKind optErrorKind;
-      if (auto objectType =
-            bridgedErrorProto.getAnyOptionalObjectType(optErrorKind)) {
+      if (auto objectType = bridgedErrorProto.getAnyOptionalObjectType()) {
         bridgedErrorObjectType = objectType;
         errorShouldBeOptional = true;
       }
@@ -148,7 +144,7 @@ namespace {
       // Inject into an optional if necessary.
       if (errorShouldBeOptional) {
         bridgedError =
-          gen.B.createOptionalSome(loc, bridgedError, optErrorKind,
+          gen.B.createOptionalSome(loc, bridgedError,
                                    gen.getLoweredType(bridgedErrorProto));
       }
 
@@ -233,16 +229,14 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
   // If an error is signalled by a nil result, inject a non-nil result.
   case ForeignErrorConvention::NilResult: {
-    OptionalTypeKind optKind;
     auto bridgedObjectType =
-      bridgedType.getSwiftRValueType().getAnyOptionalObjectType(optKind);
+      bridgedType.getSwiftRValueType().getAnyOptionalObjectType();
     ManagedValue bridgedResult =
       emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
                                repr, bridgedObjectType);
 
     auto someResult =
-      B.createOptionalSome(loc, bridgedResult.forward(*this), optKind,
-                           bridgedType);
+      B.createOptionalSome(loc, bridgedResult.forward(*this), bridgedType);
     return someResult;
   }
 
@@ -357,9 +351,8 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   // Take local ownership of the optional result value.
   SILValue optionalResult = origResult.forward(gen);
 
-  OptionalTypeKind optKind;
   SILType resultObjectType =
-    optionalResult->getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
+    optionalResult->getType().getAnyOptionalObjectType();
 
   ASTContext &ctx = gen.getASTContext();
 
@@ -367,7 +360,7 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   if (suppressErrorCheck) {
     SILValue objectResult =
       gen.B.createUncheckedEnumData(loc, optionalResult,
-                                    ctx.getOptionalSomeDecl(optKind));
+                                    ctx.getOptionalSomeDecl());
     return gen.emitManagedRValueWithCleanup(objectResult);
   }
 
@@ -375,8 +368,8 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalResult, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(optKind), contBB },
-                           { ctx.getOptionalNoneDecl(optKind), errorBB } });
+                         { { ctx.getOptionalSomeDecl(), contBB },
+                           { ctx.getOptionalNoneDecl(), errorBB } });
 
   // Emit the error block.
   gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
@@ -397,17 +390,14 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   SILValue optionalError = gen.B.createLoad(loc, errorSlot.getValue());
 
-  OptionalTypeKind optKind;
-  optionalError->getType().getAnyOptionalObjectType(gen.SGM.M, optKind);
-
   ASTContext &ctx = gen.getASTContext();
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,
-                         { { ctx.getOptionalSomeDecl(optKind), errorBB },
-                           { ctx.getOptionalNoneDecl(optKind), contBB } });
+                         { { ctx.getOptionalSomeDecl(), errorBB },
+                           { ctx.getOptionalNoneDecl(), contBB } });
 
   // Emit the error block.  Just be lazy and reload the error there.
   gen.emitForeignErrorBlock(loc, errorBB, errorSlot);

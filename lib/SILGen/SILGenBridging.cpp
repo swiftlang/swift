@@ -498,9 +498,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   }
   
   // Check if we need to wrap the bridged result in an optional.
-  OptionalTypeKind OTK;
-  if (SILType bridgedObjectType =
-        bridgedTy.getAnyOptionalObjectType(gen.SGM.M, OTK)) {
+  if (SILType bridgedObjectType = bridgedTy.getAnyOptionalObjectType()) {
     auto bridgedPayload
       = emitNativeToCBridgedNonoptionalValue(gen, loc, v, bridgedObjectType);
     

@@ -500,16 +500,34 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 }
 
 static bool isLegalSILType(CanType type) {
+  // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
+
+  // Function types must be lowered.
   if (isa<AnyFunctionType>(type)) return false;
+
+  // Metatypes must have a representation.
   if (auto meta = dyn_cast<AnyMetatypeType>(type))
     return meta->hasRepresentation();
+
+  // Tuples are legal if all their elements are legal.
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
       if (!isLegalSILType(eltType)) return false;
     }
     return true;
   }
+
+  // Optionals are legal if their object type is legal and they're Optional.
+  OptionalTypeKind optKind;
+  if (auto objectType = type.getAnyOptionalObjectType(optKind)) {
+    return (optKind == OTK_Optional && isLegalSILType(objectType));
+  }
+
+  // Reference storage types are legal if their object type is legal.
+  if (auto refType = dyn_cast<ReferenceStorageType>(type))
+    return isLegalSILType(refType.getReferentType());
+
   return true;
 }
 

@@ -741,10 +741,13 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
                                       ElementDecl, nullptr,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
+
+  AbstractionPattern origEltTy =
+    (ElementDecl == SGF.getASTContext().getOptionalSomeDecl()
+       ? AbstractionPattern(substEltTy)
+       : SGF.SGM.M.Types.getAbstractionPattern(ElementDecl));
   
-  eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
-                    SGF.SGM.M.Types.getAbstractionPattern(ElementDecl),
-                    substEltTy);
+  eltMV = SGF.emitOrigToSubstValue(loc, eltMV, origEltTy, substEltTy);
 
   // Pass the +1 value down into the sub initialization.
   subInit->copyOrInitValueInto(SGF, loc, eltMV, /*is an init*/true);

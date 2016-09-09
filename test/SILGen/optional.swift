@@ -4,19 +4,16 @@ func testCall(_ f: (() -> ())?) {
   f?()
 }
 // CHECK:    sil hidden @{{.*}}testCall{{.*}}
-// CHECK:    bb0([[T0:%.*]] : $Optional<() -> ()>):
+// CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> ()>):
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK-NEXT: cond_br [[T1]], bb1, bb3
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 
 // CHECK: bb1:
-// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<() -> ()>, #Optional.some!enumelt.1
-//   ...unnecessarily reabstract back to () -> ()...
-// CHECK:      [[T0:%.*]] = function_ref @_TTRXFo_iT__iT__XFo___ : $@convention(thin) (@owned @callee_owned (@in ()) -> @out ()) -> ()
-// CHECK-NEXT: [[FN1:%.*]] = partial_apply [[T0]]([[FN0]])
+// CHECK-NEXT: [[FN0:%.*]] = unchecked_enum_data %0 : $Optional<@callee_owned () -> ()>, #Optional.some!enumelt.1
 //   .... then call it
-// CHECK-NEXT: apply [[FN1]]()
+// CHECK-NEXT: apply [[FN0]]()
 // CHECK:      br bb2(
 //   (first nothing block)
 // CHECK:    bb3:
@@ -27,9 +24,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
   var x = f?()
 }
-// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<() -> T>) -> ()
-// CHECK:    bb0([[T0:%.*]] : $Optional<() -> T>):
-// CHECK: [[F:%.*]] = alloc_box $Optional<() -> T>, var, name "f"
+// CHECK-LABEL: sil hidden @{{.*}}testAddrOnlyCallResult{{.*}} : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> ()
+// CHECK:    bb0([[T0:%.*]] : $Optional<@callee_owned () -> @out T>):
+// CHECK: [[F:%.*]] = alloc_box $Optional<@callee_owned () -> @out T>, var, name "f"
 // CHECK-NEXT: [[PBF:%.*]] = project_box [[F]]
 // CHECK: store [[T0]] to [[PBF]]
 // CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<T>, var, name "x"
@@ -44,10 +41,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: [[T0:%.*]] = load [[T1]]
 // CHECK-NEXT: strong_retain
 //   ...evaluate the rest of the suffix...
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (@owned @callee_owned (@in ()) -> @out τ_0_0) -> @out τ_0_0
-// CHECK-NEXT: [[T1:%.*]] = partial_apply [[THUNK]]<T>([[T0]])
-// CHECK-NEXT: apply [[T1]]([[TEMP]])
+// CHECK-NEXT: apply [[T0]]([[TEMP]])
 //   ...and coerce to T?
 // CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}some
 // CHECK-NEXT: br bb2

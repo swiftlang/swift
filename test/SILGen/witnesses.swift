@@ -339,7 +339,7 @@ protocol IUOFailableRequirement {
 struct NonFailableModel: FailableRequirement, NonFailableRefinement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_19FailableRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableModel.Type) -> @out Optional<NonFailableModel>
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_21NonFailableRefinementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableModel.Type) -> @out NonFailableModel
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableModel.Type) -> @out ImplicitlyUnwrappedOptional<NonFailableModel>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16NonFailableModelS_22IUOFailableRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableModel.Type) -> @out Optional<NonFailableModel>
   init(foo: Int) {}
 }
 
@@ -347,11 +347,10 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_19FailableRequirementS_FS1_C{{.*}}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_C{{.*}}
-  // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*Optional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: [[FN:%.*]] = function_ref @_TFV9witnesses13FailableModelC{{.*}}
   // CHECK: [[INNER:%.*]] = apply [[FN]](
-  // CHECK: [[OUTER:%.*]] = unchecked_trivial_bit_cast [[INNER]] : $Optional<FailableModel> to $ImplicitlyUnwrappedOptional<FailableModel>
-  // CHECK: store [[OUTER]] to %0
+  // CHECK: store [[INNER]] to %0
   // CHECK: return
   init?(foo: Int) {}
 }
@@ -360,8 +359,8 @@ struct IUOFailableModel : NonFailableRefinement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16IUOFailableModelS_21NonFailableRefinementS_FS1_C{{.*}}
   // CHECK: bb0([[SELF:%[0-9]+]] : $*IUOFailableModel, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick IUOFailableModel.Type):
   // CHECK:   [[META:%[0-9]+]] = metatype $@thin IUOFailableModel.Type
-  // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
-  // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> ImplicitlyUnwrappedOptional<IUOFailableModel>
+  // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFV9witnesses16IUOFailableModelC{{.*}} : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
+  // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[FOO]], [[META]]) : $@convention(method) (Int, @thin IUOFailableModel.Type) -> Optional<IUOFailableModel>
   // CHECK:   [[RESULT:%[0-9]+]] = unchecked_enum_data [[IUO_RESULT]]
   // CHECK:   store [[RESULT]] to [[SELF]] : $*IUOFailableModel
   // CHECK:   return
@@ -383,7 +382,7 @@ protocol IUOFailableClassRequirement: class {
 final class NonFailableClassModel: FailableClassRequirement, NonFailableClassRefinement, IUOFailableClassRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_24FailableClassRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_26NonFailableClassRefinementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableClassModel.Type) -> @owned NonFailableClassModel
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableClassModel.Type) -> @owned ImplicitlyUnwrappedOptional<NonFailableClassModel>
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21NonFailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}} : $@convention(witness_method) (Int, @thick NonFailableClassModel.Type) -> @owned Optional<NonFailableClassModel>
   init(foo: Int) {}
 }
 
@@ -393,8 +392,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_C{{.*}}
   // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses18FailableClassModelC{{.*}}
   // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
-  // CHECK: [[OUTER:%.*]] = unchecked_ref_cast [[INNER]] : $Optional<FailableClassModel> to $ImplicitlyUnwrappedOptional<FailableClassModel>
-  // CHECK: return [[OUTER]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
+  // CHECK: return [[INNER]] : $Optional<FailableClassModel>
   init?(foo: Int) {}
 }
 
@@ -409,8 +407,7 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_C{{.*}}
   // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses21IUOFailableClassModelC{{.*}}
   // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
-  // CHECK: [[OUTER:%.*]] = unchecked_ref_cast [[INNER]] : $ImplicitlyUnwrappedOptional<IUOFailableClassModel> to $Optional<IUOFailableClassModel>
-  // CHECK: return [[OUTER]] : $Optional<IUOFailableClassModel>
+  // CHECK: return [[INNER]] : $Optional<IUOFailableClassModel>
 }
 
 protocol HasAssoc {

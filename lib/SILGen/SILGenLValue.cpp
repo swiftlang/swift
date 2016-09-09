@@ -391,12 +391,7 @@ static ManagedValue getAddressOfOptionalValue(SILGenFunction &gen,
                                               ManagedValue optAddr,
                                         const LValueTypeData &valueTypeData) {
   // Project out the 'Some' payload.
-  OptionalTypeKind otk;
-  auto valueTy
-    = optAddr.getType().getSwiftRValueType().getAnyOptionalObjectType(otk);
-  assert(valueTy && "base was not optional?"); (void) valueTy;
-
-  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl();
 
   // If the base is +1, we want to forward the cleanup.
   bool hadCleanup = optAddr.hasCleanup();
@@ -1966,14 +1961,11 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &gen,
                           const LValueTypeData &baseTypeData) {
-  OptionalTypeKind otk;
-  CanType objectTy = baseTypeData.SubstFormalType.getAnyOptionalObjectType(otk);
-  assert(objectTy);
-  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl();
   
   return {
-    gen.SGM.M.Types.getAbstractionPattern(someDecl),
-    objectTy,
+    baseTypeData.OrigFormalType.getAnyOptionalObjectType(),
+    baseTypeData.SubstFormalType.getAnyOptionalObjectType(),
     baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
   };
 }
