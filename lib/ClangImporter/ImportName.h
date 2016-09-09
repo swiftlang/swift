@@ -1,4 +1,4 @@
-//===--- ImporterName.h - Imported Swift names for Clang decls --*- C++ -*-===//
+//===--- ImportName.h - Imported Swift names for Clang decls --*- C++ ---*-===//
 //
 // This source file is part of the Swift.org open source project
 //
