@@ -305,6 +305,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
 static bool isTypedAccessOracle(SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::RefElementAddrInst:
+  case ValueKind::RefTailAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::TupleElementAddrInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:

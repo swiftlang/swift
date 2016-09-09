@@ -178,6 +178,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::TupleElementAddrInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::RefElementAddrInst:
+  case ValueKind::RefTailAddrInst:
   case ValueKind::UncheckedEnumDataInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
