@@ -667,6 +667,12 @@ extension Any${Kind} {
       whereSeparator: isSeparator)
   }
 
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    return _box.__customContainsEquatableElement(element)
+  }
+
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
