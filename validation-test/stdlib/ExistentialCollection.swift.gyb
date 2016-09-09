@@ -135,7 +135,7 @@ tests.test("AnySequence.init(() -> Generator)") {
 %     MinimalBase = 'Minimal' + collectionForTraversal(Traversal)
 %   end
 
-tests.test("${TestedType}: dispatch to wrapped") {
+tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
   typealias Base = ${LoggingWrapper}<${MinimalBase}<OpaqueValue<Int>>>
   typealias Log = SequenceLog
   let base = Base(wrapping:
@@ -206,7 +206,7 @@ tests.test("${TestedType}: dispatch to wrapped") {
 }
 
 %   if Traversal != 'Sequence':
-tests.test("${TestedType}: dispatch to wrapped") {
+tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
   typealias Base = ${LoggingWrapper}<${MinimalBase}<OpaqueValue<Int>>>
   typealias Log = CollectionLog
   let base = Base(wrapping:
