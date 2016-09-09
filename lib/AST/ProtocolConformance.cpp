@@ -360,19 +360,8 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   auto *genericEnv = GenericConformance->getGenericEnvironment();
   auto *genericSig = GenericConformance->getGenericSignature();
 
-  TypeSubstitutionMap substitutionMap;
-
-  // FIXME: We could have a new version of Type::subst() that
-  // takes a conformanceMap in addition to a substitutionMap,
-  // but for now this is ignored below
-  ArchetypeConformanceMap conformanceMap;
-
-  // Compute a context type substitution map from the
-  // substitution array stored in this conformance
-  genericEnv->getSubstitutionMap(conformingModule, genericSig,
-                                 GenericSubstitutions,
-                                 substitutionMap,
-                                 conformanceMap);
+  auto substitutionMap = genericEnv->getSubstitutionMap(
+      conformingModule, genericSig, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
@@ -382,8 +371,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(conformingModule, substitutionMap,
-                                            None);
+    = genericWitness.getReplacement().subst(substitutionMap, None);
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
@@ -392,6 +380,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Gather the conformances for the type witness. These should never fail.
+  // FIXME: We should just be able to use the SubstitutionMap from above,
+  // but we have no way to force inherited conformances to be filled in
+  // through that mechanism.
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
@@ -448,10 +439,9 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
                                       Type substType,
-                                      TypeSubstitutionMap &subMap,
-                                      ArchetypeConformanceMap &conformanceMap) {
+                                      const SubstitutionMap &subMap) const {
   if (getType()->isEqual(substType))
-    return this;
+    return const_cast<ProtocolConformance *>(this);
   
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
@@ -462,12 +452,13 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
       return module->getASTContext()
-        .getSpecializedConformance(substType, this,
+        .getSpecializedConformance(substType,
+                           const_cast<ProtocolConformance *>(this),
                            substType->gatherAllSubstitutions(module, nullptr));
     }
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
-    return this;
+    return const_cast<ProtocolConformance *>(this);
       
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
@@ -475,8 +466,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType, subMap,
-                                            conformanceMap);
+      newBase = inheritedConformance->subst(module, substType, subMap);
     } else {
       newBase = inheritedConformance;
     }
@@ -490,7 +480,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subMap, conformanceMap));
+      newSubs.push_back(sub.subst(module, subMap));
     
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
     
@@ -515,10 +505,6 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     assert(inherited->getType()->isEqual(spec->getGenericConformance()->getType())
            && "inherited conformance doesn't match type?!");
     
-    // Fill in the substitution and conformance maps.
-    TypeSubstitutionMap subMap;
-    ArchetypeConformanceMap conformanceMap;
-
     auto subs = spec->getGenericSubstitutions();
 
     auto *conformingDC = spec->getDeclContext();
@@ -527,11 +513,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     auto *sig = conformingDC->getGenericSignatureOfContext();
     auto *env = conformingDC->getGenericEnvironmentOfContext();
 
-    env->getSubstitutionMap(conformingModule, sig, subs,
-                            subMap, conformanceMap);
+    auto subMap = env->getSubstitutionMap(conformingModule, sig, subs);
 
-    auto r = inherited->subst(conformingModule, getType(),
-                              subMap, conformanceMap);
+    auto r = inherited->subst(conformingModule, getType(), subMap);
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;

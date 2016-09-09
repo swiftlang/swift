@@ -411,9 +411,8 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
                                             CheckedCastKind castKind,
                                             SGFContext C) {
   // Drill into the result type.
-  OptionalTypeKind optKind;
   CanType resultObjectType =
-    optTargetType->getCanonicalType().getAnyOptionalObjectType(optKind);
+    optTargetType->getCanonicalType().getAnyOptionalObjectType();
   assert(resultObjectType);
 
   // Handle collection downcasts directly; they have specific library
@@ -430,16 +429,8 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
                                                operandType->getCanonicalType(),
                                                    resultObjectType, SGF);
 
-  auto someDecl = SGF.getASTContext().getOptionalSomeDecl(optKind);
+  auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
   auto &resultTL = SGF.getTypeLowering(optTargetType);
-
-  // Optional<T> currently fully abstracts its object.
-  auto abstraction = SGF.SGM.Types.getMostGeneralAbstraction();
-  auto &abstractResultObjectTL =
-    SGF.getTypeLowering(abstraction, resultObjectType);
-  auto &resultObjectTL = SGF.getTypeLowering(resultObjectType);
-  bool hasAbstraction =
-    (resultObjectTL.getLoweredType() != abstractResultObjectTL.getLoweredType());
 
   // Set up a result buffer if desirable/required.
   SILValue resultBuffer;
@@ -447,16 +438,14 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   Optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
   if (resultTL.isAddressOnly() ||
-      (!hasAbstraction && C.getEmitInto() &&
-       C.getEmitInto()->getAddressOrNull())) {
-    resultBuffer = SGF.getBufferForExprResult(loc, resultTL.getLoweredType(), C);
+      (C.getEmitInto() && C.getEmitInto()->getAddressOrNull())) {
+    SILType resultTy = resultTL.getLoweredType();
+    resultBuffer = SGF.getBufferForExprResult(loc, resultTy, C);
     resultObjectBuffer =
       SGF.B.createInitEnumDataAddr(loc, resultBuffer, someDecl,
-                     abstractResultObjectTL.getLoweredType().getAddressType());
+                    resultTy.getAnyOptionalObjectType().getAddressType());
     resultObjectTemp.emplace(resultObjectBuffer, CleanupHandle::invalid());
-
-    if (!hasAbstraction)
-      resultObjectCtx = SGFContext(&resultObjectTemp.getValue());
+    resultObjectCtx = SGFContext(&resultObjectTemp.getValue());
   }
 
   // Prepare a jump destination here.
@@ -470,9 +459,6 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
       // If we're not emitting into a temporary, just wrap up the result
       // in Some and go to the continuation block.
       if (!resultObjectTemp) {
-        if (hasAbstraction)
-          objectValue = SGF.emitSubstToOrigValue(loc, objectValue, abstraction,
-                                                 resultObjectType);
         auto some = SGF.B.createEnum(loc, objectValue.forward(SGF),
                                      someDecl, resultTL.getLoweredType());
         SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, { some });
@@ -480,11 +466,6 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
       }
 
       // Otherwise, make sure the value is in the context.
-      if (!objectValue.isInContext() && hasAbstraction) {
-        objectValue = SGF.emitSubstToOrigValue(loc, objectValue, abstraction,
-                                               resultObjectType,
-                                   SGFContext(&resultObjectTemp.getValue()));
-      }
       if (!objectValue.isInContext()) {
         objectValue.forwardInto(SGF, loc, resultObjectBuffer);
       }
@@ -493,7 +474,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
     },
     // The failure path.
     [&] {
-      auto noneDecl = SGF.getASTContext().getOptionalNoneDecl(optKind);
+      auto noneDecl = SGF.getASTContext().getOptionalNoneDecl();
 
       // If we're not emitting into a temporary, just wrap up the result
       // in None and go to the continuation block.

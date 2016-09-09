@@ -80,13 +80,20 @@ GenericEnvironment::getForwardingSubstitutions(
   return sig->getASTContext().AllocateCopy(result);
 }
 
+SubstitutionMap GenericEnvironment::
+getSubstitutionMap(ModuleDecl *mod,
+                   GenericSignature *sig,
+                   ArrayRef<Substitution> subs) const {
+  SubstitutionMap result;
+  getSubstitutionMap(mod, sig, subs, result);
+  return result;
+}
+
 void GenericEnvironment::
 getSubstitutionMap(ModuleDecl *mod,
                    GenericSignature *sig,
                    ArrayRef<Substitution> subs,
-                   TypeSubstitutionMap &subsMap,
-                   ArchetypeConformanceMap &conformanceMap) const {
-
+                   SubstitutionMap &result) const {
   for (auto depTy : sig->getAllDependentTypes()) {
 
     // Map the interface type to a context type.
@@ -97,9 +104,42 @@ getSubstitutionMap(ModuleDecl *mod,
     subs = subs.slice(1);
 
     // Record the replacement type and its conformances.
-    subsMap[archetype] = sub.getReplacement();
-    conformanceMap[archetype] = sub.getConformances();
+    result.addSubstitution(CanType(archetype), sub.getReplacement());
+    result.addConformances(CanType(archetype), sub.getConformances());
   }
-  
+
+  for (auto reqt : sig->getRequirements()) {
+    if (reqt.getKind() != RequirementKind::SameType)
+      continue;
+
+    auto first = reqt.getFirstType()->getAs<DependentMemberType>();
+    auto second = reqt.getSecondType()->getAs<DependentMemberType>();
+
+    if (!first || !second)
+      continue;
+
+    auto archetype = mapTypeIntoContext(mod, first)->getAs<ArchetypeType>();
+    if (!archetype)
+      continue;
+
+    auto firstBase = first->getBase();
+    auto secondBase = second->getBase();
+
+    auto firstBaseArchetype = mapTypeIntoContext(mod, firstBase)->getAs<ArchetypeType>();
+    auto secondBaseArchetype = mapTypeIntoContext(mod, secondBase)->getAs<ArchetypeType>();
+
+    if (!firstBaseArchetype || !secondBaseArchetype)
+      continue;
+
+    if (archetype->getParent() != firstBaseArchetype)
+      result.addParent(CanType(archetype),
+                       CanType(firstBaseArchetype),
+                       first->getAssocType());
+    if (archetype->getParent() != secondBaseArchetype)
+      result.addParent(CanType(archetype),
+                       CanType(secondBaseArchetype),
+                       second->getAssocType());
+  }
+
   assert(subs.empty() && "did not use all substitutions?!");
 }

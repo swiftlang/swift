@@ -1889,6 +1889,8 @@ ERROR(noescape_conflicts_escaping_autoclosure,none,
 
 ERROR(escaping_function_type,none,
       "@escaping may only be applied to parameters of function type", ())
+ERROR(escaping_non_function_parameter,none,
+      "@escaping attribute may only be used in function parameter position", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
@@ -2711,6 +2713,8 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
+ERROR(illegal_sil_type,none,
+      "type %0 is not a legal SIL value type", (Type))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,

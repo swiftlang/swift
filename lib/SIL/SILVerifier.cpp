@@ -179,11 +179,7 @@ public:
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
     
-    auto objectTy = value->getType();
-    OptionalTypeKind otk;
-    if (auto optObjTy = objectTy.getAnyOptionalObjectType(F.getModule(), otk)) {
-      objectTy = optObjTy;
-    }
+    auto objectTy = value->getType().unwrapAnyOptionalType();
     
     require(objectTy.isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
@@ -237,8 +233,7 @@ public:
     auto getAnyOptionalObjectTypeInContext = [&](CanGenericSignature sig,
                                                  SILType type) {
       Lowering::GenericContextScope context(F.getModule().Types, sig);
-      OptionalTypeKind _;
-      return type.getAnyOptionalObjectType(F.getModule(), _);
+      return type.getAnyOptionalObjectType();
     };
 
     // TODO: More sophisticated param and return ABI compatibility rules could
@@ -576,13 +571,41 @@ public:
     }
   }
 
-  /// Check that the given type is a legal SIL value.
+  /// Check that the given type is a legal SIL value type.
   void checkLegalType(SILFunction *F, SILType type, SILInstruction *I) {
-    auto rvalueType = type.getSwiftRValueType();
+    checkLegalSILType(F, type.getSwiftRValueType(), I);
+  }
+
+  /// Check that the given type is a legal SIL value type.
+  void checkLegalSILType(SILFunction *F, CanType rvalueType, SILInstruction *I) {
+    // These types should have been removed by lowering.
     require(!isa<LValueType>(rvalueType),
             "l-value types are not legal in SIL");
     require(!isa<AnyFunctionType>(rvalueType),
             "AST function types are not legal in SIL");
+
+    // Tuples should have had their element lowered.
+    if (auto tuple = dyn_cast<TupleType>(rvalueType)) {
+      for (auto eltTy : tuple.getElementTypes()) {
+        checkLegalSILType(F, eltTy, I);
+      }
+      return;
+    }
+
+    // Optionals should have had their objects lowered.
+    OptionalTypeKind optKind;
+    if (auto objectType = rvalueType.getAnyOptionalObjectType(optKind)) {
+      require(optKind == OTK_Optional,
+              "ImplicitlyUnwrappedOptional is not legal in SIL values");
+      return checkLegalSILType(F, objectType, I);
+    }
+
+    // Metatypes should have explicit representations.
+    if (auto metatype = dyn_cast<AnyMetatypeType>(rvalueType)) {
+      require(metatype->hasRepresentation(),
+              "metatypes in SIL must have a representation");;
+      // fallthrough for archetype check
+    }
 
     rvalueType.visit([&](Type t) {
       auto *A = dyn_cast<ArchetypeType>(t.getPointer());

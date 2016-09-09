@@ -138,7 +138,7 @@ void replaceDeadApply(ApplySite Old, ValueBase *New);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that is an unbound generic type.
-bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
+bool hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap);
 
 /// Return true if the substitution list contains a substitution
 /// that is an unbound generic.
@@ -146,7 +146,7 @@ bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap);
+bool hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap);
 
 /// \brief Return true if the substitution list contains a
 /// substitution that refers to the dynamic Self type.

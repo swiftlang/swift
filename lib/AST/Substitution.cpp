@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -45,73 +46,15 @@ Substitution Substitution::subst(Module *module,
                                  GenericSignature *sig,
                                  GenericEnvironment *env,
                                  ArrayRef<Substitution> subs) const {
-  TypeSubstitutionMap subMap;
-  ArchetypeConformanceMap conformanceMap;
-
   assert(sig && env);
-  env->getSubstitutionMap(module, sig, subs, subMap, conformanceMap);
-  return subst(module, subMap, conformanceMap);
-}
-
-static Optional<ProtocolConformanceRef>
-lookupArchetypeConformance(ProtocolDecl *proto,
-                           ArrayRef<ProtocolConformanceRef> conformances) {
-  for (ProtocolConformanceRef found : conformances) {
-    auto foundProto = found.getRequirement();
-    if (foundProto == proto) {
-      return found;
-    } else if (foundProto->inheritsFrom(proto)) {
-      if (found.isConcrete()) {
-        return ProtocolConformanceRef(
-          found.getConcrete()->getInheritedConformance(proto));
-      }
-
-      return found;
-    }
-  }
-
-  return None;
-}
-
-static Optional<ProtocolConformanceRef>
-lookupArchetypeConformance(ArchetypeType *replacement,
-                           ProtocolDecl *proto,
-                           ArchetypeConformanceMap &conformanceMap) {
-  // Check for conformances for the type that apply to the original
-  // substituted archetype.
-  auto it = conformanceMap.find(replacement);
-  if (it != conformanceMap.end()) {
-    if (auto conformance = lookupArchetypeConformance(proto, it->second)) {
-      return conformance;
-    }
-  }
-
-  // Check if we have substitutions for the parent.
-  if (auto *parent = replacement->getParent()) {
-    auto *assocType = replacement->getAssocType();
-    auto *parentProto = assocType->getProtocol();
-    auto conformance =
-        lookupArchetypeConformance(parent, parentProto, conformanceMap);
-
-    if (conformance) {
-      if (!conformance->isConcrete())
-        return ProtocolConformanceRef(proto);
-
-      auto sub = conformance->getConcrete()->getTypeWitnessSubstAndDecl(
-          assocType, nullptr).first;
-
-      return lookupArchetypeConformance(proto, sub.getConformances());
-    }
-  }
-
-  return None;
+  auto subMap = env->getSubstitutionMap(module, sig, subs);
+  return subst(module, subMap);
 }
 
 Substitution Substitution::subst(Module *module,
-                                 TypeSubstitutionMap &subMap,
-                                 ArchetypeConformanceMap &conformanceMap) const {
+                                 const SubstitutionMap &subMap) const {
   // Substitute the replacement.
-  Type substReplacement = Replacement.subst(module, subMap, None);
+  Type substReplacement = Replacement.subst(subMap, None);
   assert(substReplacement && "substitution replacement failed");
 
   if (substReplacement->isEqual(Replacement))
@@ -129,8 +72,7 @@ Substitution Substitution::subst(Module *module,
     // If we have a concrete conformance, we need to substitute the
     // conformance to apply to the new type.
     if (c.isConcrete()) {
-      auto substC = c.getConcrete()->subst(module, substReplacement,
-                                           subMap, conformanceMap);
+      auto substC = c.getConcrete()->subst(module, substReplacement, subMap);
       substConformances.push_back(ProtocolConformanceRef(substC));
       if (c != substConformances.back())
         conformancesChanged = true;
@@ -143,8 +85,7 @@ Substitution Substitution::subst(Module *module,
 
     // If the original type was an archetype, check the conformance map.
     if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-      conformance = lookupArchetypeConformance(replacementArch, proto,
-                                               conformanceMap);
+      conformance = subMap.lookupConformance(CanType(replacementArch), proto);
     }
 
     // If that didn't find anything, we can still synthesize AnyObject

@@ -321,7 +321,7 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap) {
+bool swift::hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are dependent.
   for (auto &entry : SubsMap)
     if (entry.second->getCanonicalType()->hasArchetype())
@@ -338,7 +338,7 @@ bool swift::hasUnboundGenericTypes(ArrayRef<Substitution> Subs) {
   return false;
 }
 
-bool swift::hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap) {
+bool swift::hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap) {
   // Check whether any of the substitutions are refer to dynamic self.
   for (auto &entry : SubsMap)
     if (entry.second->getCanonicalType()->hasDynamicSelfType())
@@ -527,14 +527,12 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
   }
 
   auto &M = B->getModule();
-  OptionalTypeKind SrcOTK;
-  OptionalTypeKind DestOTK;
 
   // Check if src and dest types are optional.
   auto OptionalSrcTy = SrcTy.getSwiftRValueType()
-                            .getAnyOptionalObjectType(SrcOTK);
+                            .getAnyOptionalObjectType();
   auto OptionalDestTy = DestTy.getSwiftRValueType()
-                              .getAnyOptionalObjectType(DestOTK);
+                              .getAnyOptionalObjectType();
 
   // If both types are classes and dest is the superclass of src,
   // simply perform an upcast.
@@ -576,7 +574,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
           OptionalDestLoweredTy, CheckOnly);
 
     // Unwrap the original optional value.
-    auto *SomeDecl = B->getASTContext().getOptionalSomeDecl(SrcOTK);
+    auto *SomeDecl = B->getASTContext().getOptionalSomeDecl();
     auto *NoneBB = B->getFunction().createBasicBlock();
     auto *SomeBB = B->getFunction().createBasicBlock();
     auto *CurBB = B->getInsertionPoint()->getParent();
@@ -599,8 +597,7 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
                                      OptionalSrcLoweredTy,
                                      OptionalDestLoweredTy).getValue();
     // Wrap into optional.
-    CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue,
-                                        DestOTK, DestTy);
+    CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue, DestTy);
     B->createBranch(Loc, ContBB, {CastedValue});
 
     // Handle the None case.
@@ -615,8 +612,8 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy = OptionalType::get(DestOTK,
-        SrcTy.getSwiftRValueType()).getCanonicalTypeOrNull();
+    auto OptionalSrcCanTy =
+      OptionalType::get(SrcTy.getSwiftRValueType())->getCanonicalType();
     auto LoweredOptionalSrcType = M.Types.getLoweredType(OptionalSrcCanTy);
     if (CheckOnly)
       return castValueToABICompatibleType(B, Loc, Value,
@@ -625,7 +622,6 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
     // Wrap the source value into an optional first.
     SILValue WrappedValue = B->createOptionalSome(Loc, Value,
-                                                  DestOTK,
                                                   LoweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(B, Loc, WrappedValue,

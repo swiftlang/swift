@@ -70,6 +70,12 @@ func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
 }
 
+let foo: @escaping (Int) -> Int // expected-error{{@escaping attribute may only be used in function parameter position}} {{10-20=}}
+
+func misuseEscaping(_ a: @escaping Int) {} // expected-error{{@escaping attribute only applies to function types}}
+func misuseEscaping(_ a: (@escaping Int)?) {} // expected-error{{@escaping attribute only applies to function types}}
+func misuseEscaping(_ a: (@escaping (Int) -> Int)?) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-37=}}
+func misuseEscaping(_ a: (@escaping (Int) -> Int, Int)) {} // expected-error{{@escaping attribute may only be used in function parameter position}} {{27-37=}}
 
 func takesEscapingGeneric<T>(_ fn: @escaping () -> T) {}
 func callEscapingGeneric<T>(_ fn: () -> T) { // expected-note {{parameter 'fn' is implicitly non-escaping}} {{35-35=@escaping }}

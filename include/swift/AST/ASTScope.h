@@ -61,6 +61,8 @@ enum class ASTScopeKind : uint8_t {
   Preexpanded,
   /// A source file, which is the root of a scope.
   SourceFile,
+  /// The generic parameters of an extension declaration.
+  ExtensionGenericParams,
   /// The body of a type or extension thereof.
   TypeOrExtensionBody,
   /// The generic parameters of a declaration.
@@ -170,8 +172,12 @@ class ASTScope {
       mutable unsigned nextElement;
     } sourceFile;
 
+    /// An extension declaration, for
+    /// \c kind == ASTScopeKind::ExtensionGenericParams.
+    ExtensionDecl *extension;
+
     /// An iterable declaration context, which covers nominal type declarations
-    /// and extensions.
+    /// and extension bodies.
     ///
     /// For \c kind == ASTScopeKind::TypeOrExtensionBody.
     IterableDeclContext *iterableDeclContext;
@@ -303,6 +309,11 @@ class ASTScope {
 
   /// Constructor that initializes a preexpanded node.
   ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children);
+
+  ASTScope(const ASTScope *parent, ExtensionDecl *extension)
+      : ASTScope(ASTScopeKind::ExtensionGenericParams, parent) {
+    this->extension = extension;
+  }
 
   ASTScope(const ASTScope *parent, IterableDeclContext *idc)
       : ASTScope(ASTScopeKind::TypeOrExtensionBody, parent) {

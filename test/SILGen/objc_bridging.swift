@@ -20,8 +20,8 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK:  [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]],
-// CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:  [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
+// CHECK:  [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NATIVE]]
+// CHECK:  [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $Optional<String>
 // CHECK:  return [[NATIVE]] 
 // CHECK:}
 
@@ -40,8 +40,8 @@ func getUppercaseString(_ s: NSString) -> String {
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NATIVE]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $Optional<String>
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 
@@ -54,14 +54,14 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK: bb0({{%.*}} : $Foo, {{%.*}} : $String):
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[F:%.*]] : {{.*}}, #Foo.setFoo!1.foreign
 // CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NV]]
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
 
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
+// CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK:   bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], %0)
 // CHECK:   release_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -159,8 +159,8 @@ func callBar() -> String {
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NATIVE]]
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $ImplicitlyUnwrappedOptional<String>
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NATIVE]]
+// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data {{.*}} : $Optional<String>
 // CHECK:   return [[NATIVE]]
 // CHECK: }
 
@@ -173,13 +173,13 @@ func callSetBar(_ s: String) {
 // CHECK: bb0({{%.*}} : $String):
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   [[NV:%.*]] = load
-// CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[NV]]
+// CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
 // CHECK:   select_enum [[OPT_NATIVE]]
 // CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[NATIVE]])
-// CHECK:    = enum $ImplicitlyUnwrappedOptional<NSString>, #ImplicitlyUnwrappedOptional.some!enumelt.1, [[BRIDGED]]
-// CHECK: bb3([[OPT_BRIDGED:%.*]] : $ImplicitlyUnwrappedOptional<NSString>):
+// CHECK:    = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
+// CHECK: bb3([[OPT_BRIDGED:%.*]] : $Optional<NSString>):
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   release_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -371,7 +371,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
 
 // CHECK-LABEL: sil hidden @_TF13objc_bridging15bridgeCFunction
 func bridgeCFunction() -> (String!) -> (String!) {
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFSC18NSStringFromStringFGSQSS_GSQSS_ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<String>) -> @owned ImplicitlyUnwrappedOptional<String>
+  // CHECK: [[THUNK:%.*]] = function_ref @_TTOFSC18NSStringFromStringFGSQSS_GSQSS_ : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]
   return NSStringFromString

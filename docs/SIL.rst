@@ -347,9 +347,14 @@ A type ``T`` is a *legal SIL type* if:
 - it is a function type which satisfies the constraints (below) on
   function types in SIL,
 
+- it is a metatype type which describes its representation,
+
 - it is a tuple type whose element types are legal SIL types,
 
-- it is a legal Swift type that is not a function, tuple, or l-value type, or
+- it is ``Optional<U>``, where ``U`` is a legal SIL type,
+
+- it is a legal Swift type that is not a function, tuple, optional,
+  metatype, or l-value type, or
 
 - it is a ``@box`` containing a legal SIL type.
 
@@ -393,6 +398,22 @@ on the heap. The type ``@box T`` is a reference-counted type that references
 a box containing a mutable value of type ``T``. Boxes always use Swift-native
 reference counting, so they can be queried for uniqueness and cast to the
 ``Builtin.NativeObject`` type.
+
+Metatype Types
+``````````````
+
+A concrete or existential metatype in SIL must describe its representation.
+This can be:
+
+- ``@thin``, meaning that it requires no storage and thus necessarily
+  represents an exact type (only allowed for concrete metatypes);
+
+- ``@thick``, meaning that it stores a reference to a type or (if a
+  concrete class) a subclass of that type; or
+
+- ``@objc``, meaning that it stores a reference to a class type (or a
+  subclass thereof) using an Objective-C class object representation
+  rather than the native Swift type-object representation.
 
 Function Types
 ``````````````

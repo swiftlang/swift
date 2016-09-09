@@ -407,7 +407,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
@@ -420,11 +419,13 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::TopLevelCode:
     llvm_unreachable("no local declarations?");
 
+  case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
     return DeclVisibilityKind::GenericParameter;
 
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::Closure:
+  case ASTScopeKind::PatternInitializer:  // lazy var 'self'
     return DeclVisibilityKind::FunctionParameter;
 
   case ASTScopeKind::AfterPatternBinding:
@@ -483,7 +484,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     for (auto currentScope = lookupScope; currentScope;
          currentScope = currentScope->getParent()) {
       // Perform local lookup within this scope.
-      for (auto local : currentScope->getLocalBindings()) {
+      auto localBindings = currentScope->getLocalBindings();
+      for (auto local : localBindings) {
         Consumer.foundDecl(local,
                            getLocalDeclVisibilityKind(currentScope));
       }
@@ -513,10 +515,31 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Pattern binding initializers are only interesting insofar as they
         // affect lookup in an enclosing nominal type or extension thereof.
         if (auto *bindingInit = dyn_cast<PatternBindingInitializer>(dc)) {
-          if (auto binding = bindingInit->getBinding())
+          if (auto binding = bindingInit->getBinding()) {
             lookupInNominalIsStatic = binding->isStatic();
           
-          // FIXME: Look for 'self' for a lazy variable initializer.
+            // Look for 'self' for a lazy variable initializer.
+            if (auto singleVar = binding->getSingleVar())
+              // We only care about lazy variables.
+              if (singleVar->getAttrs().hasAttribute<LazyAttr>()) {
+
+              // 'self' will be listed in the local bindings.
+              for (auto local : localBindings) {
+                auto param = dyn_cast<ParamDecl>(local);
+                if (!param) continue;
+
+
+                // If we have a variable that's the implicit self of its enclosing
+                // context, mark it as 'self'.
+                if (auto func = dyn_cast<FuncDecl>(param->getDeclContext())) {
+                  if (param == func->getImplicitSelfDecl()) {
+                    selfDecl = param;
+                    break;
+                  }
+                }
+              }
+            }
+          }
           continue;
         }
 
@@ -575,7 +598,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
-        auto lookupType = dc->getDeclaredTypeInContext();
+        Type lookupType;
+
+        if (dc->getAsProtocolOrProtocolExtensionContext())
+          lookupType = dc->getSelfTypeInContext();
+        else
+          lookupType = dc->getDeclaredTypeInContext();
         if (!lookupType || lookupType->is<ErrorType>()) continue;
 
         // If we're performing a static lookup, use the metatype.

@@ -18,6 +18,7 @@
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 
 namespace swift {
 
@@ -60,12 +61,17 @@ public:
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except
   /// with contextual types instead of interface types.
+  SubstitutionMap
+  getSubstitutionMap(ModuleDecl *mod,
+                     GenericSignature *sig,
+                     ArrayRef<Substitution> subs) const;
+
+  /// Same as above, but updates an existing map.
   void
   getSubstitutionMap(ModuleDecl *mod,
                      GenericSignature *sig,
                      ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subsMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
+                     SubstitutionMap &subMap) const;
 
   ArrayRef<Substitution>
   getForwardingSubstitutions(ModuleDecl *M, GenericSignature *sig) const;

@@ -733,16 +733,14 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(sourceType.isObject());
   assert(targetType.isObject());
 
-  OptionalTypeKind optKind;
-  if (auto sourceOptObjectType =
-        sourceType.getAnyOptionalObjectType(IGF.getSILModule(), optKind)) {
+  if (auto sourceOptObjectType = sourceType.getAnyOptionalObjectType()) {
 
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
     // for the particular case of an optional class-reference or metatype
     // value.
     Explosion optValue;
-    auto someDecl = IGF.IGM.Context.getOptionalSomeDecl(optKind);
+    auto someDecl = IGF.IGM.Context.getOptionalSomeDecl();
     emitProjectLoadableEnum(IGF, sourceType, value, someDecl, optValue);
 
     assert(value.empty());

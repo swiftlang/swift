@@ -122,7 +122,7 @@ bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFC12objc_dealloc10SwiftGizmocfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo! {
+sil @_TToFC12objc_dealloc10SwiftGizmocfT7bellsOnSi_GSQS0__ : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }

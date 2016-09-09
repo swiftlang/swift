@@ -145,10 +145,12 @@ private:
       WitnessStorage->getInterfaceType()->getCanonicalType();
     if (isa<SubscriptDecl>(WitnessStorage))
       witnessIfaceType = cast<FunctionType>(witnessIfaceType).getResult();
-    SubstStorageType = getSubstWitnessInterfaceType(witnessIfaceType);
+    SubstStorageType = getSubstWitnessInterfaceType(
+                                witnessIfaceType.getReferenceStorageReferent());
 
     WitnessStoragePattern =
-      SGM.Types.getAbstractionPattern(WitnessStorage);
+      SGM.Types.getAbstractionPattern(WitnessStorage)
+               .getReferenceStorageReferentType();
     WitnessStorageType =
       SGM.Types.getLoweredType(WitnessStoragePattern, SubstStorageType)
                .getObjectType();
@@ -190,7 +192,8 @@ public:
     // Determine the desired abstraction pattern of the storage type
     // in the requirement and the witness.
     emitter.RequirementStoragePattern =
-        SGM.Types.getAbstractionPattern(emitter.RequirementStorage);
+        SGM.Types.getAbstractionPattern(emitter.RequirementStorage)
+                 .getReferenceStorageReferentType();
     emitter.RequirementStorageType =
         SGM.Types.getLoweredType(emitter.RequirementStoragePattern,
                                  emitter.SubstStorageType)
@@ -383,7 +386,6 @@ public:
   CanType getSubstWitnessInterfaceType(CanType type) {
     return SubstSelfType->getTypeOfMember(SGM.SwiftModule, type,
                                           WitnessStorage->getDeclContext())
-                        ->getReferenceStorageReferent()
                         ->getCanonicalType();
   }
 

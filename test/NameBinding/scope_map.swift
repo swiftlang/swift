@@ -187,12 +187,19 @@ func localPatternsWithSharedType() {
   let i, j, k: Int
 }
 
+class LazyProperties {
+  var value: Int = 17
+
+  lazy var prop: Int = self.value
+}
+
 // RUN: not %target-swift-frontend -dump-scope-maps expanded %s 2> %t.expanded
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 // CHECK-EXPANDED: SourceFile{{.*}}scope_map.swift{{.*}}expanded
 // CHECK-EXPANDED-NEXT: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
 // CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
+// CHECK-EXPANDED-NEXT: -ExtensionGenericParams {{.*}} extension of 'S0' [8:14 - 9:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} extension of 'S0' [8:14 - 9:1] expanded
 // CHECK-EXPANDED-NEXT: |-TypeOrExtensionBody {{.*}} 'C0' [11:10 - 12:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'E0' [14:9 - 17:1] expanded
@@ -396,7 +403,7 @@ func localPatternsWithSharedType() {
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionParams {{.*}} _ param 1:0 [183:39 - 183:39] expanded
 // CHECK-EXPANDED-NEXT:           `-AbstractFunctionParams {{.*}} _ param 1:1 [183:39 - 183:39] expanded
 
-// CHECK-EXPANDED: `-AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] expanded
+// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] expanded
 // CHECK-EXPANDED:  `-BraceStmt {{.*}} [186:36 - 188:1] expanded
 // CHECK-EXPANDED-NEXT:    `-PatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
 // CHECK-EXPANDED-NEXT:      `-AfterPatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
@@ -405,7 +412,7 @@ func localPatternsWithSharedType() {
 // CHECK-EXPANDED-NEXT:            `-PatternBinding {{.*}} entry 2 [187:13 - 188:1] expanded
 // CHECK-EXPANDED-NEXT:              `-AfterPatternBinding {{.*}} entry 2 [187:16 - 188:1] expanded
 
-// RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20,5:18,166:32,179:18 %s 2> %t.searches
+// RUN: not %target-swift-frontend -dump-scope-maps 70:8,26:20,5:18,166:32,179:18,193:26 %s 2> %t.searches
 // RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches
 
 // CHECK-SEARCHES-LABEL: ***Scope at 70:8***
@@ -437,6 +444,14 @@ func localPatternsWithSharedType() {
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=PatternInitializers
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #1
 
+// CHECK-SEARCHES-LABEL: ***Scope at 193:26***
+// CHECK-SEARCHES-NEXT: PatternInitializer {{.*}} entry 0 [193:24 - 193:29] expanded
+// CHECK-SEARCHES-NEXT: name=scope_map
+// CHECK-SEARCHES-NEXT:   FileUnit file="{{.*}}scope_map.swift"
+// CHECK-SEARCHES-NEXT:     ClassDecl name=LazyProperties
+// CHECK-SEARCHES-NEXT:       Initializer PatternBinding {{.*}} #0
+// CHECK-SEARCHES-NEXT: Local bindings: self
+
 // CHECK-SEARCHES-LABEL: ***Complete scope map***
 // CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - {{.*}}:1] expanded
 // CHECK-SEARCHES: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
@@ -460,4 +475,10 @@ func localPatternsWithSharedType() {
 // CHECK-SEARCHES:    |-PatternBinding {{.*}} entry 0 [178:7 - 178:21] unexpanded
 // CHECK-SEARCHES:    `-PatternBinding {{.*}} entry 1 [179:7 - 179:25] expanded
 // CHECK-SEARCHES:      `-PatternInitializer {{.*}} entry 1 [179:16 - 179:25] expanded
+// CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'LazyProperties' [190:22 - 194:1] expanded
+// CHECK-SEARCHES-NEXT:   |-PatternBinding {{.*}} entry 0 [191:7 - 191:20] unexpanded
+// CHECK-SEARCHES-NEXT:   `-PatternBinding {{.*}} entry 0 [193:12 - 193:29] expanded
+// CHECK-SEARCHES-NEXT:     |-Accessors {{.*}} scope_map.(file).LazyProperties.prop@{{.*}}scope_map.swift:193:12 [193:12 - 193:12] unexpanded
+// CHECK-SEARCHES-NEXT:     `-PatternInitializer {{.*}} entry 0 [193:24 - 193:29] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}

@@ -26,10 +26,10 @@
 namespace swift {
 
 class ArchetypeBuilder;
+class ProtocolConformanceRef;
 class ProtocolType;
-
-using TypeConformanceMap
-  = llvm::DenseMap<TypeBase *, ArrayRef<ProtocolConformanceRef>>;
+class Substitution;
+class SubstitutionMap;
 
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
@@ -170,14 +170,11 @@ public:
 
   /// Build an interface type substitution map from a vector of Substitutions
   /// that correspond to the generic parameters in this generic signature.
-  /// The order of primary archetypes in the substitution vector must match
-  /// the order of generic parameters in getGenericParams().
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
+  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
 
-  /// Variant of the above that also returns conformances.
-  void getSubstitutionMap(ArrayRef<Substitution> subs,
-                          TypeSubstitutionMap &subMap,
-                          TypeConformanceMap &conformanceMap) const;
+  /// Same as above, but updates an existing map.
+  void getSubstitutionMap(ArrayRef<Substitution> args,
+                          SubstitutionMap &subMap) const;
 
   using LookupConformanceFn =
       llvm::function_ref<ProtocolConformanceRef(CanType, Type, ProtocolType *)>;
@@ -192,8 +189,7 @@ public:
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
   void getSubstitutions(ModuleDecl &mod,
-                        const TypeSubstitutionMap &subMap,
-                        const TypeConformanceMap &conformanceMap,
+                        const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
   /// Return a range that iterates through first all of the generic parameters

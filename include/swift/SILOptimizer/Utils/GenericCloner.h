@@ -41,7 +41,7 @@ public:
   GenericCloner(SILFunction *F,
                 IsFragile_t Fragile,
                 const ReabstractionInfo &ReInfo,
-                TypeSubstitutionMap &ContextSubs,
+                SubstitutionMap &ContextSubs,
                 ArrayRef<Substitution> ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
@@ -56,7 +56,7 @@ public:
   cloneFunction(SILFunction *F,
                 IsFragile_t Fragile,
                 const ReabstractionInfo &ReInfo,
-                TypeSubstitutionMap &ContextSubs,
+                SubstitutionMap &ContextSubs,
                 ArrayRef<Substitution> ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {

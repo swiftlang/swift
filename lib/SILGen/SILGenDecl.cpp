@@ -741,10 +741,13 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
                                       ElementDecl, nullptr,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
+
+  AbstractionPattern origEltTy =
+    (ElementDecl == SGF.getASTContext().getOptionalSomeDecl()
+       ? AbstractionPattern(substEltTy)
+       : SGF.SGM.M.Types.getAbstractionPattern(ElementDecl));
   
-  eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
-                    SGF.SGM.M.Types.getAbstractionPattern(ElementDecl),
-                    substEltTy);
+  eltMV = SGF.emitOrigToSubstValue(loc, eltMV, origEltTy, substEltTy);
 
   // Pass the +1 value down into the sub initialization.
   subInit->copyOrInitValueInto(SGF, loc, eltMV, /*is an init*/true);
@@ -1675,32 +1678,6 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
   return false;
 }
 
-static void addConformanceToSubstitutionMap(SILModule &M,
-                                TypeSubstitutionMap &subs,
-                                GenericEnvironment *genericEnv,
-                                CanType base,
-                                const ProtocolConformance *conformance) {
-  conformance->forEachTypeWitness(nullptr, [&](AssociatedTypeDecl *assocTy,
-                                               Substitution sub,
-                                               TypeDecl *) -> bool {
-    auto depTy =
-      CanDependentMemberType::get(base, assocTy, M.getASTContext());
-    auto replacement = sub.getReplacement()->getCanonicalType();
-    replacement = ArchetypeBuilder::mapTypeOutOfContext(M.getSwiftModule(),
-                                                        genericEnv,
-                                                        replacement)
-      ->getCanonicalType();
-    subs.insert({depTy.getPointer(), replacement});
-    for (auto conformance : sub.getConformances()) {
-      if (conformance.isAbstract())
-        continue;
-      addConformanceToSubstitutionMap(M, subs, genericEnv,
-                                      depTy, conformance.getConcrete());
-    }
-    return false;
-  });
-}
-
 /// Substitute the `Self` type from a protocol conformance into a protocol
 /// requirement's type to get the type of the witness.
 static CanAnyFunctionType
@@ -1716,16 +1693,25 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   // Build a substitution map to replace `self` and its associated types.
   auto &C = M.getASTContext();
   CanType selfParamTy = CanGenericTypeParamType::get(0, 0, C);
-  
-  TypeSubstitutionMap subs;
-  subs.insert({selfParamTy.getPointer(), conformance->getInterfaceType()
-                                                    ->getCanonicalType()});
-  addConformanceToSubstitutionMap(M, subs,
-                                  conformance->getGenericEnvironment(),
-                                  selfParamTy, conformance);
 
-  ArchetypeBuilder builder(*M.getSwiftModule(),
-                           M.getASTContext().Diags);
+  Type concreteTy = conformance->getInterfaceType();
+
+  SubstitutionMap subs;
+  subs.addSubstitution(selfParamTy, concreteTy);
+
+  // FIXME: conformance substitutions should be in terms of interface types
+  auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
+                                                         nullptr, nullptr);
+  auto specialized = conformance;
+  if (conformance->getGenericSignature())
+    specialized = C.getSpecializedConformance(
+        concreteTy, conformance, concreteSubs);
+
+  SmallVector<ProtocolConformanceRef, 1> conformances;
+  conformances.push_back(ProtocolConformanceRef(specialized));
+  subs.addConformances(selfParamTy, C.AllocateCopy(conformances));
+
+  ArchetypeBuilder builder(*M.getSwiftModule(), C.Diags);
 
   SmallVector<GenericTypeParamType*, 4> allParams;
 
@@ -1768,10 +1754,10 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
         continue;
 
       // Substitute the constrained types.
-      auto first = reqt.getFirstType().subst(M.getSwiftModule(), subs,
-                                             SubstFlags::IgnoreMissing);
-      auto second = reqt.getSecondType().subst(M.getSwiftModule(), subs,
-                                               SubstFlags::IgnoreMissing);
+      auto first = reqt.getFirstType().subst(subs, SubstFlags::IgnoreMissing)
+          ->getCanonicalType();
+      auto second = reqt.getSecondType().subst(subs, SubstFlags::IgnoreMissing)
+          ->getCanonicalType();
 
       if (!first->isTypeParameter()) {
         assert(second->isTypeParameter());
@@ -1786,11 +1772,9 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   }
 
   // Substitute away `Self` in parameter and result types.
-  auto input = reqtTy->getInput().subst(M.getSwiftModule(), subs,
-                                        SubstFlags::IgnoreMissing)
+  auto input = reqtTy->getInput().subst(subs, SubstFlags::IgnoreMissing)
     ->getCanonicalType();
-  auto result = reqtTy->getResult().subst(M.getSwiftModule(), subs,
-                                          SubstFlags::IgnoreMissing)
+  auto result = reqtTy->getResult().subst(subs, SubstFlags::IgnoreMissing)
     ->getCanonicalType();
 
   // The result might be fully concrete, if the witness had no generic
