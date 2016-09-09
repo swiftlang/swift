@@ -2437,6 +2437,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     // Check the requirements on the generic arguments.
     auto unboundTy = dictDecl->getDeclaredType();
     TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
+    args[0].setType(keyTy, true);
+    args[1].setType(valueTy, true);
 
     if (!TC.applyUnboundGenericArguments(
             unboundTy, dictDecl, repr->getStartLoc(), DC, args,
