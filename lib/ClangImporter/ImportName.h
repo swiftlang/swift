@@ -14,9 +14,6 @@
 // ClangImporter.
 //
 //===----------------------------------------------------------------------===//
-
-// ... include
-
 #ifndef SWIFT_IMPORT_NAME_H
 #define SWIFT_IMPORT_NAME_H
 
