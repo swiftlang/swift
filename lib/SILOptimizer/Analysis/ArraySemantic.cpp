@@ -90,8 +90,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
         return false;
 
       StringRef AllocFuncName = AllocFn->getName();
-      if (AllocFuncName != "swift_bufferAllocate" &&
-          AllocFuncName != "swift_bufferAllocateOnStack")
+      if (AllocFuncName != "swift_bufferAllocate")
         return false;
 
       if (!hasOneNonDebugUse(AllocBufferAI))
