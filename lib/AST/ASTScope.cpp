@@ -1439,6 +1439,13 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return cast<NominalTypeDecl>(iterableDeclContext)->getBraces();
 
   case ASTScopeKind::GenericParams:
+    // A protocol's generic parameter list is not written in source, and
+    // is visible from the start of the body.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(genericParams.decl)) {
+      return SourceRange(protoDecl->getBraces().Start,
+                         protoDecl->getEndLoc());
+    }
+
     // Explicitly-written generic parameters are in scope following their
     // definition.
     return SourceRange(genericParams.params->getParams()[genericParams.index]
