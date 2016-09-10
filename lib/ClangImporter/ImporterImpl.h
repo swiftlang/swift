@@ -717,13 +717,6 @@ public:
   /// or a null type if the DeclContext does not have a corresponding type.
   static clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
-  /// Determine whether this typedef is a CF type.
-  static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-  /// Determine the imported CF type for the given typedef-name, or the empty
-  /// string if this is not an imported CF type name.
-  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
-
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
   static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,

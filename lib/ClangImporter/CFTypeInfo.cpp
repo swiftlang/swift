@@ -101,14 +101,14 @@ CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
   return forInvalid();
 }
 
-bool ClangImporter::Implementation::isCFTypeDecl(
+bool importer::isCFTypeDecl(
        const clang::TypedefNameDecl *Decl) {
   if (CFPointeeInfo::classifyTypedef(Decl))
     return true;
   return false;
 }
 
-StringRef ClangImporter::Implementation::getCFTypeName(
+StringRef importer::getCFTypeName(
             const clang::TypedefNameDecl *decl) {
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();

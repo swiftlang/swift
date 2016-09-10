@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CFTypeInfo.h"
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Strings.h"
@@ -573,7 +574,7 @@ namespace {
       ImportHint hint = ImportHint::None;
 
       if (Impl.getSwiftNewtypeAttr(type->getDecl(), /*useSwift2Name=*/false)) {
-        if (ClangImporter::Implementation::isCFTypeDecl(type->getDecl()))
+        if (isCFTypeDecl(type->getDecl()))
           hint = ImportHint::SwiftNewtypeFromCFPointer;
         else
           hint = ImportHint::SwiftNewtype;
