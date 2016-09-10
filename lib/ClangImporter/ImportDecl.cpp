@@ -1046,6 +1046,42 @@ static bool isObjCId(ASTContext &ctx, const clang::Decl *decl) {
   return typedefDecl->getName() == "id";
 }
 
+/// Retrieve the property type as determined by the given accessor.
+static clang::QualType
+getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
+                        Optional<unsigned> selfIndex) {
+  // Simple case: the property type of the getter is in the return
+  // type.
+  if (!isSetter) return accessor->getReturnType();
+
+  // For the setter, first check that we have the right number of
+  // parameters.
+  unsigned numExpectedParams = selfIndex ? 2 : 1;
+  if (accessor->getNumParams() != numExpectedParams)
+    return clang::QualType();
+
+  // Dig out the parameter for the value.
+  unsigned valueIdx = selfIndex ? (1 - *selfIndex) : 0;
+  auto param = accessor->getParamDecl(valueIdx);
+  return param->getType();
+}
+
+/// Whether we should suppress importing the Objective-C generic type params
+/// of this class as Swift generic type params.
+static bool
+shouldSuppressGenericParamsImport(const clang::ObjCInterfaceDecl *decl) {
+  while (decl) {
+    StringRef name = decl->getName();
+    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
+        name == "NSOrderedSet" || name == "NSEnumerator" ||
+        name == "NSMeasurement") {
+      return true;
+    }
+    decl = decl->getSuperClass();
+  }
+  return false;
+}
+
 namespace {
   /// \brief Convert Clang declarations into the corresponding Swift
   /// declarations.
@@ -3238,16 +3274,14 @@ namespace {
 
       // Retrieve the type of the property that is implied by the getter.
       auto propertyType =
-        ClangImporter::Implementation::getAccessorPropertyType(
-          getter, false, getterName.SelfIndex);
+          getAccessorPropertyType(getter, false, getterName.SelfIndex);
       if (propertyType.isNull()) return nullptr;
 
       // If there is a setter, check that the property it implies
       // matches that of the getter.
       if (setter) {
         auto setterPropertyType =
-          ClangImporter::Implementation::getAccessorPropertyType(
-            setter, true, setterName.SelfIndex);
+            getAccessorPropertyType(setter, true, setterName.SelfIndex);
         if (setterPropertyType.isNull()) return nullptr;
 
         // If the inferred property types don't match up, we can't
@@ -5079,7 +5113,7 @@ namespace {
       if (!typeParamList) {
         return nullptr;
       }
-      if (Impl.shouldSuppressGenericParamsImport(decl)) {
+      if (shouldSuppressGenericParamsImport(decl)) {
         return nullptr;
       }
       assert(typeParamList->size() > 0);
@@ -7338,22 +7372,3 @@ ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
   return Impl.importFullName(enumConstant).Imported.getBaseName();
 }
 
-clang::QualType ClangImporter::Implementation::getAccessorPropertyType(
-                  const clang::FunctionDecl *accessor,
-                  bool isSetter,
-                  Optional<unsigned> selfIndex) {
-  // Simple case: the property type of the getter is in the return
-  // type.
-  if (!isSetter) return accessor->getReturnType();
-
-  // For the setter, first check that we have the right number of
-  // parameters.
-  unsigned numExpectedParams = selfIndex ? 2 : 1;
-  if (accessor->getNumParams() != numExpectedParams)
-    return clang::QualType();
-
-  // Dig out the parameter for the value.
-  unsigned valueIdx = selfIndex ? (1 - *selfIndex) : 0;
-  auto param = accessor->getParamDecl(valueIdx);
-  return param->getType();
-}
