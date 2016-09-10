@@ -908,10 +908,6 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "'%0' requires a function with one argument", (StringRef))
 
-ERROR(inout_cant_be_variadic,none,
-      "inout arguments cannot be variadic", ())
-ERROR(inout_only_parameter,none,
-      "'inout' is only valid in parameter lists", ())
 ERROR(var_parameter_not_allowed,none,
       "parameters may not have the 'var' specifier", ())
 
@@ -1841,10 +1837,12 @@ ERROR(property_behavior_invalid_parameter,none,
 // Type Check Attributes
 //------------------------------------------------------------------------------
 
-ERROR(attr_only_only_one_decl_kind,none,
+ERROR(attr_only_one_decl_kind,none,
       "%0 may only be used on '%1' declarations", (DeclAttribute,StringRef))
-ERROR(attr_only_only_on_parameters,none,
+ERROR(attr_only_on_parameters,none,
       "%0 may only be used on parameters", (StringRef))
+ERROR(attr_not_on_variadic_parameters,none,
+      "%0 may not be used on variadic parameters", (StringRef))
 
 
 ERROR(override_final,none,

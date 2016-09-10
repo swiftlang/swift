@@ -44,9 +44,9 @@ var h10 : Int?.Type?.Type
 
 var i = Int?(42)
 
-var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' is only valid in parameter lists}}
+var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' may only be used on parameters}}
 
-func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' is only valid in parameter lists}}
+func bad_io2(_ a: (inout Int, Int)) {}    // expected-error {{'inout' may only be used on parameters}}
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
 func test_array_construct<T>(_: T) {
@@ -148,12 +148,12 @@ let dictWithTuple = [String: (age:Int, count:Int)]()
 let bb2 = [Int!](repeating: nil, count: 2)
 
 // <rdar://problem/21560309> inout allowed on function return type
-func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' is only valid in parameter lists}}
+func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' may only be used on parameters}}
 r21560309 { x in x }
 
 // <rdar://problem/21949448> Accepts-invalid: 'inout' shouldn't be allowed on stored properties
 class r21949448 {
-  var myArray: inout [Int] = []   // expected-error {{'inout' is only valid in parameter lists}}
+  var myArray: inout [Int] = []   // expected-error {{'inout' may only be used on parameters}}
 }
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
