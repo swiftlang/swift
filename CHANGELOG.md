@@ -1,7 +1,8 @@
 CHANGELOG
 =========
 
-Note: This is in reverse chronological order, so newer entries are added to the top.
+<details>
+<summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
 | Contents               |
 | :--------------------- |
@@ -13,6 +14,8 @@ Note: This is in reverse chronological order, so newer entries are added to the 
 | [Swift 1.2](#swift-12) |
 | [Swift 1.1](#swift-11) |
 | [Swift 1.0](#swift-10) |
+
+</details>
 
 Swift 3.1
 ---------
