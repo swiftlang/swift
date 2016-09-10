@@ -738,9 +738,14 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
     return ty->is<ErrorType>();
-  
+
+  // If the element is a variadic parameter, resolve the parameter type as if
+  // it were in non-parameter position, since we want functions to be
+  // @escaping in this case.
+  auto elementOptions = (decl->isVariadic() ? options
+                                            : (options | TR_FunctionInput));
   bool hadError = TC.validateType(decl->getTypeLoc(), DC,
-                                  options|TR_FunctionInput, resolver);
+                                  elementOptions, resolver);
   
   Type Ty = decl->getTypeLoc().getType();
   if (decl->isVariadic() && !hadError) {
