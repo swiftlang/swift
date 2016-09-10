@@ -629,21 +629,22 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
       // Currently it only works if all the generic arguments have a super type,
       // or it requires a class, in which case it infers 'AnyObject'.
       auto inferGenericArgs = [](GenericTypeDecl *genericD)->std::string {
-        GenericParamList *genParamList = genericD->getGenericParams();
-        if (!genParamList)
+        auto *mod = genericD->getParentModule();
+        auto *genericSig = genericD->getGenericSignature();
+        if (!genericSig)
           return std::string();
-        auto params= genParamList->getParams();
+
+        auto params = genericSig->getInnermostGenericParams();
         if (params.empty())
           return std::string();
         std::string argsToAdd = "<";
         for (unsigned i = 0, e = params.size(); i != e; ++i) {
           auto param = params[i];
-          auto archTy = param->getArchetype();
-          if (!archTy)
-            return std::string();
-          if (auto superTy = archTy->getSuperclass()) {
+          if (auto superTy = genericSig->getSuperclassBound(param, *mod)) {
+            if (superTy->hasTypeParameter())
+              return std::string(); // give up
             argsToAdd += superTy.getString();
-          } else if (archTy->requiresClass()) {
+          } else if (genericSig->requiresClass(param, *mod)) {
             argsToAdd += "AnyObject";
           } else {
             return std::string(); // give up.

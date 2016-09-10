@@ -466,7 +466,7 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
     // in the TypeRepr.  Because of this, Sema isn't able to rebuild it in
     // terms of interface types.  When interface types prevail, this should be
     // removed.  Until then, we hack the mapping here.
-    return ArchetypeBuilder::mapTypeOutOfContext(fn, resultType);
+    return ArchetypeBuilder::mapTypeOutOfContext(fn->getDeclContext(), resultType);
   }
 
   return resultType;
@@ -474,10 +474,6 @@ static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
 
 GenericEnvironment *
 TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
-  // If there aren't any generic parameters at this level, we're done.
-  if (!DC->isInnermostContextGeneric())
-    return nullptr;
-
   GenericParamList *genericParams = DC->getGenericParamsOfContext();
   GenericSignature *genericSig = DC->getGenericSignatureOfContext();
 
@@ -488,19 +484,23 @@ TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
   auto parentSig = parentDC->getGenericSignatureOfContext();
   auto parentEnv = parentDC->getGenericEnvironmentOfContext();
 
+  assert(parentSig != nullptr || DC->isInnermostContextGeneric());
+
   if (parentSig != nullptr)
     builder.addGenericSignature(parentSig, parentEnv);
 
-  // Visit each of the generic parameters.
-  for (auto param : *genericParams)
-    builder.addGenericParameter(param);
+  if (DC->isInnermostContextGeneric()) {
+    // Visit each of the generic parameters.
+    for (auto param : *genericParams)
+      builder.addGenericParameter(param);
+
+    for (auto GP : *genericParams)
+      GP->setArchetype(builder.getArchetype(GP));
+  }
 
   // Wire up the archetypes.
   auto genericEnv = builder.getGenericEnvironment(
       genericSig->getGenericParams());
-
-  for (auto GP : *genericParams)
-    GP->setArchetype(builder.getArchetype(GP));
 
   return genericEnv;
 }
@@ -626,7 +626,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func) {
         initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
       }
     } else {
-      argTy = paramLists[e - i - 1]->getInterfaceType(func);
+      argTy = paramLists[e - i - 1]->getInterfaceType(func->getDeclContext());
 
       if (initFuncTy)
         initArgTy = argTy;
