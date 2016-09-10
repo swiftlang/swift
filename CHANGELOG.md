@@ -3,16 +3,16 @@ CHANGELOG
 
 Note: This is in reverse chronological order, so newer entries are added to the top.
 
-Contents:
-
-* [Swift 3.1](#swift-31)
-* [Swift 3.0](#swift-30)
-* [Swift 2.2](#swift-22)
-* [Swift 2.1](#swift-21)
-* [Swift 2.0](#swift-20)
-* [Swift 1.2](#swift-12)
-* [Swift 1.1](#swift-11)
-* [Swift 1.0](#swift-10)
+| Contents               |
+| :--------------------- |
+| [Swift 3.1](#swift-31) |
+| [Swift 3.0](#swift-30) |
+| [Swift 2.2](#swift-22) |
+| [Swift 2.1](#swift-21) |
+| [Swift 2.0](#swift-20) |
+| [Swift 1.2](#swift-12) |
+| [Swift 1.1](#swift-11) |
+| [Swift 1.0](#swift-10) |
 
 Swift 3.1
 ---------
