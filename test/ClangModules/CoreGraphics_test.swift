@@ -82,18 +82,9 @@ public func testColorRenames(color: CGColor,
 // CHECK:   %{{.*}} = {{.*}} call %struct.CGColorSpace* @CGColorSpaceCreateWithName(%struct.__CFString* %{{.*}})
 
   let _ = color.converted(to: colorSpace, intent: intent, options: nil)
-// CHECK:   %{{.*}} = {{.*}} call %struct.CGColor* @CGColorCreateCopyByMatchingToColorSpace(%struct.CGColorSpace* %{{.*}}, i32 %{{.*}}, %struct.CGColor* %{{.*}}, %struct.__CFDictionary* null)
+// CHECK:   %{{.*}} = {{.*}} call %struct.CGColor* @CGColorCreateCopyByMatchingToColorSpace(%struct.CGColorSpace* nonnull %{{.*}}, i32 %{{.*}}, %struct.CGColor* %{{.*}}, %struct.__CFDictionary* null)
 //
 // CHECK:   ret void
-}
-
-// Test factory-ness of inferred imports
-extension CGMutablePath {
-  // CHECK-LABEL: define %{{.*}}CGMutablePath* {{.*}}CGMutablePath{{.*}}(i1{{.*}})
-  public convenience init(p: Bool) {
-    self.init()
-    // CHECK: tail call %struct.CGPath* @CGPathCreateMutable()
-  }
 }
 
 // CHECK-LABEL: define void {{.*}}testRenames{{.*}} {

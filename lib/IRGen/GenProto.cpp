@@ -1541,7 +1541,8 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   // Store the fetched result back to the cache.
   // We need to transitively ensure that any stores initializing the result
   // that are visible to us are visible to callers.
-  IGF.Builder.CreateStore(fetchedResult, cache)->setOrdering(llvm::Release);
+  IGF.Builder.CreateStore(fetchedResult, cache)->setOrdering(
+    llvm::AtomicOrdering::Release);
 
   auto fetchedResultBB = IGF.Builder.GetInsertBlock();
   IGF.Builder.CreateBr(contBB);

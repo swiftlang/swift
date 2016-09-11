@@ -13,6 +13,26 @@ import ObjectiveC
 
 var AssertionsTestSuite = TestSuite("Assertions")
 
+AssertionsTestSuite.test("expectNil(_: T?)") {
+  let none: OpaqueValue<Int>? = nil
+  expectNil(none)
+
+  let some: OpaqueValue<Int>? = OpaqueValue(42)
+  expectFailure {
+    expectNil(some)
+  }
+}
+
+AssertionsTestSuite.test("expectNotNil(_: T?)") {
+  let none: OpaqueValue<Int>? = nil
+  expectFailure {
+    expectNotNil(none)
+  }
+
+  let some: OpaqueValue<Int>? = OpaqueValue(42)
+  expectNotNil(some)
+}
+
 AssertionsTestSuite.test("expectTrapping(_: Bound, in: RangeProtocol)") {
   _setTrappingExpectationFailedCallback() {}
   defer {

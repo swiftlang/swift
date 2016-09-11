@@ -16,6 +16,7 @@ add_swift_library(swiftClangImporter STATIC
   ImportDecl.cpp
   ImportEnumInfo.cpp
   ImportMacro.cpp
+  ImportName.cpp
   ImportType.cpp
   SwiftLookupTable.cpp
   LINK_LIBRARIES

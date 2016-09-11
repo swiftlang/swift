@@ -388,17 +388,17 @@ class TestData : TestDataSuper {
 
         do {
             let found = helloWorld.range(of: goodbye)
-            expectEmpty(found)
+            expectNil(found)
         }
 
         do {
             let found = helloWorld.range(of: goodbye, options: .anchored)
-            expectEmpty(found)
+            expectNil(found)
         }
 
         do {
             let found = helloWorld.range(of: hello, in: 7..<helloWorld.count)
-            expectEmpty(found)
+            expectNil(found)
         }
     }
     

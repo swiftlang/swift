@@ -35,7 +35,7 @@ class TestURL : TestURLSuper {
             if let isVolume = resourceValues.isVolume {
                 expectTrue(isVolume)
             }
-            expectNotEmpty(resourceValues.name)
+            expectNotNil(resourceValues.name)
         } catch {
             expectTrue(false, "Should not have thrown")
         }
@@ -56,7 +56,7 @@ class TestURL : TestURLSuper {
         // Modify an existing resource values
         do {
             var resourceValues = try file.resourceValues(forKeys: [.nameKey])
-            expectNotEmpty(resourceValues.name)
+            expectNotNil(resourceValues.name)
             expectEqual(resourceValues.name!, name)
             
             let newName = "goodbye cruel " + UUID().uuidString
@@ -81,7 +81,7 @@ class TestURL : TestURLSuper {
 
         do {
             var resourceValues = try file.resourceValues(forKeys: [.labelNumberKey])
-            expectNotEmpty(resourceValues.labelNumber)
+            expectNotNil(resourceValues.labelNumber)
             
             // set label number
             resourceValues.labelNumber = 1
@@ -89,7 +89,7 @@ class TestURL : TestURLSuper {
             
             // get label number
             let _ = try file.resourceValues(forKeys: [.labelNumberKey])
-            expectNotEmpty(resourceValues.labelNumber)
+            expectNotNil(resourceValues.labelNumber)
             expectEqual(resourceValues.labelNumber!, 1)
         } catch (let e as NSError) {
             expectTrue(false, "Unable to load or set resources \(e)")
@@ -104,7 +104,7 @@ class TestURL : TestURLSuper {
             
             try file.setResourceValues(resourceValues)
             let resourceValues2 = try file.resourceValues(forKeys: [.labelNumberKey])
-            expectNotEmpty(resourceValues2.labelNumber)
+            expectNotNil(resourceValues2.labelNumber)
             expectEqual(resourceValues2.labelNumber!, 2)
         } catch (let e as NSError) {
             expectTrue(false, "Unable to load or set resources \(e)")
@@ -124,27 +124,27 @@ class TestURL : TestURLSuper {
         // Not meant to be a test of all URL components functionality, just some basic bridging stuff
         let s = "http://www.apple.com/us/search/ipad?src=globalnav"
         let components = URLComponents(string: s)!
-        expectNotEmpty(components)
+        expectNotNil(components)
         
-        expectNotEmpty(components.host)
+        expectNotNil(components.host)
         expectEqual("www.apple.com", components.host)
         
         
         if #available(OSX 10.11, iOS 9.0, *) {
             let rangeOfHost = components.rangeOfHost!
-            expectNotEmpty(rangeOfHost)
+            expectNotNil(rangeOfHost)
             expectEqual(s[rangeOfHost], "www.apple.com")
         }
         
         if #available(OSX 10.10, iOS 8.0, *) {
             let qi = components.queryItems!
-            expectNotEmpty(qi)
+            expectNotNil(qi)
             
             expectEqual(1, qi.count)
             let first = qi[0]
             
             expectEqual("src", first.name)
-            expectNotEmpty(first.value)
+            expectNotNil(first.value)
             expectEqual("globalnav", first.value)
         }
     }

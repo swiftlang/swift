@@ -34,6 +34,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -708,7 +709,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;
   if (inputIsLLVMIr) {
-    auto &LLVMContext = llvm::getGlobalContext();
+    auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
     assert(Invocation.getInputFilenames().size() == 1 &&
@@ -1075,7 +1076,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = llvm::getGlobalContext();
+  auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
     performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
                         opts.getSingleOutputFilename(), LLVMContext);

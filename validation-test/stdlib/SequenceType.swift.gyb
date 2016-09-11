@@ -74,10 +74,10 @@ SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -106,10 +106,10 @@ SequenceTypeTests.test("${algorithmKind}/Predicate") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -939,16 +939,6 @@ SequenceTypeTests.test("forEach/dispatch") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   tester.forEach { print($0) }
   expectCustomizable(tester, tester.log.forEach)
-}
-
-//===----------------------------------------------------------------------===//
-// first()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("first/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first { $0.value == 1 }
-  expectCustomizable(tester, tester.log.first)
 }
 
 //===----------------------------------------------------------------------===//

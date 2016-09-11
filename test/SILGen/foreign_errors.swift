@@ -240,7 +240,7 @@ func testPreservedResultBridged() throws -> Int {
 
 // CHECK-LABEL: sil hidden @_TF14foreign_errors26testPreservedResultBridgedFzT_Si
 // CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
-// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounceWord!1.foreign : (ErrorProne.Type) -> () throws -> Int , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounceWord!1.foreign : (ErrorProne.Type) -> () throws -> Int , $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
@@ -258,7 +258,7 @@ func testPreservedResultInverted() throws {
 
 // CHECK-LABEL: sil hidden @_TF14foreign_errors27testPreservedResultInvertedFzT_T_
 // CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
-// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.once!1.foreign : (ErrorProne.Type) -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.once!1.foreign : (ErrorProne.Type) -> () throws -> () , $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]

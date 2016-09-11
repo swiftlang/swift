@@ -232,7 +232,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   // If we're generating a profile, add the lowering pass now.
   if (Opts.GenerateProfile)
-    ModulePasses.add(createInstrProfilingPass());
+    ModulePasses.add(createInstrProfilingLegacyPass());
 
   PMBuilder.populateModulePassManager(ModulePasses);
 
@@ -308,17 +308,20 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
     return true;
 
   auto BinaryOwner = object::createBinary(OutputFilename);
-  if (!BinaryOwner)
+  if (!BinaryOwner) {
+    consumeError(BinaryOwner.takeError());
     return true;
+  }
   auto *ObjectFile = dyn_cast<object::ObjectFile>(BinaryOwner->getBinary());
   if (!ObjectFile)
     return true;
 
-  const char *HashSectionName = HashGlobal->getSection();
+  StringRef HashSectionName = HashGlobal->getSection();
   // Strip the segment name. For mach-o the GlobalVariable's section name format
   // is <segment>,<section>.
-  if (const char *Comma = ::strchr(HashSectionName, ','))
-    HashSectionName = Comma + 1;
+  size_t Comma = HashSectionName.find_last_of(',');
+  if (Comma != StringRef::npos)
+    HashSectionName = HashSectionName.substr(Comma + 1);
 
   // Search for the section which holds the hash.
   for (auto &Section : ObjectFile->sections()) {

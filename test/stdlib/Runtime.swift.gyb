@@ -239,32 +239,32 @@ Runtime.test("dynamicCasting with as") {
 
   expectTrue(((someP1Ref as AnyObject) as! P1).success)
 
-  expectEmpty((someNotP1Value as? P1))
-  expectEmpty((someNotP1Ref as? P1))
+  expectNil((someNotP1Value as? P1))
+  expectNil((someNotP1Ref as? P1))
 
   expectTrue(((someP1Value as Q1) as? P1)!.success)
   expectTrue(((someP1Value2 as Q1) as? P1)!.success)
-  expectEmpty(((someNotP1Value as Q1) as? P1))
+  expectNil(((someNotP1Value as Q1) as? P1))
   expectEqual("10 20 30 40", ((someP2Value as Q1) as? P2)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Q1) as? P2)!.description)
   expectTrue(((someP1Ref as Q1) as? P1)!.success)
   expectTrue(((someP1Ref2 as Q1) as? P1)!.success)
-  expectEmpty(((someNotP1Ref as Q1) as? P1))
+  expectNil(((someNotP1Ref as Q1) as? P1))
 
   expectTrue(((someP1Value as Any) as? P1)!.success)
   expectTrue(((someP1Value2 as Any) as? P1)!.success)
-  expectEmpty(((someNotP1Value as Any) as? P1))
+  expectNil(((someNotP1Value as Any) as? P1))
   expectEqual("10 20 30 40", ((someP2Value as Any) as? P2)!.description)
   expectEqual("10 20 30 40 50 60 70 80",
     ((someP2Value2 as Any) as? P2)!.description)
   expectTrue(((someP1Ref as Any) as? P1)!.success)
   expectTrue(((someP1Ref2 as Any) as? P1)!.success)
-  expectEmpty(((someNotP1Ref as Any) as? P1))
+  expectNil(((someNotP1Ref as Any) as? P1))
 
   expectTrue(((someP1Ref as AnyObject) as? P1)!.success)
   expectTrue(((someP1Ref2 as AnyObject) as? P1)!.success)
-  expectEmpty(((someNotP1Ref as AnyObject) as? P1))
+  expectNil(((someNotP1Ref as AnyObject) as? P1))
 
   let doesThrow: (Int) throws -> Int = { $0 }
   let doesNotThrow: (String) -> String = { $0 }

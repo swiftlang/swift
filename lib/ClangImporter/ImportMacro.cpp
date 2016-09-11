@@ -29,6 +29,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
+using namespace importer;
 
 Optional<clang::Module *>
 ClangImporter::Implementation::getClangSubmoduleForMacro(

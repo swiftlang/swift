@@ -238,10 +238,6 @@ def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
 
-def enable_swift_newtype :
-  Flag<["-"], "enable-swift-newtype">,
-  HelpText<"Enable the swift_newtype attribute">;
-
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,
   HelpText<"Warns when type-checking a function takes longer than <n> ms">;
