@@ -34,5 +34,6 @@ add_swift_library(swiftSIL STATIC
   TypeLowering.cpp
   LINK_LIBRARIES
     swiftSerialization
-    swiftSema)
+    swiftSema
+)
 

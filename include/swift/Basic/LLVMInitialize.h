@@ -30,7 +30,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #define INITIALIZE_LLVM(argc, argv) \
-  llvm::sys::PrintStackTraceOnErrorSignal(); \
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]); \
   llvm::PrettyStackTraceProgram _INITIALIZE_LLVM_STACKTRACE(argc, argv); \
   llvm::llvm_shutdown_obj _INITIALIZE_LLVM_SHUTDOWN_OBJ; \
   llvm::InitializeAllTargets(); \

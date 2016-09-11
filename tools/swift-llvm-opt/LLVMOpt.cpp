@@ -24,6 +24,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/LLVMPasses/PassesFwd.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -132,9 +133,9 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
     return nullptr;
   }
 
-  return TheTarget->createTargetMachine(TheTriple.getTriple(), CPUStr,
-                                        FeaturesStr, Options, RelocModel,
-                                        CMModel, GetCodeGenOptLevel());
+  return TheTarget->createTargetMachine(
+      TheTriple.getTriple(), CPUStr, FeaturesStr, Options,
+      Optional<Reloc::Model>(RelocModel), CMModel, GetCodeGenOptLevel());
 }
 
 static void dumpOutput(llvm::Module &M, llvm::raw_ostream &os) {
@@ -223,7 +224,7 @@ int main(int argc, char **argv) {
   // supported.
   initializeCodeGenPreparePass(Registry);
   initializeAtomicExpandPass(Registry);
-  initializeRewriteSymbolsPass(Registry);
+  initializeRewriteSymbolsLegacyPassPass(Registry);
   initializeWinEHPreparePass(Registry);
   initializeDwarfEHPreparePass(Registry);
   initializeSjLjEHPreparePass(Registry);
@@ -246,7 +247,7 @@ int main(int argc, char **argv) {
 
   // Load the input module...
   std::unique_ptr<Module> M =
-      parseIRFile(InputFilename, Err, getGlobalContext());
+      parseIRFile(InputFilename, Err, getGlobalLLVMContext());
 
   if (!M) {
     Err.print(argv[0], errs());

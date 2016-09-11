@@ -1147,7 +1147,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // code in emitInPlaceTypeMetadataAccessFunctionBody.
   if (!isLoadFrom(directResult, cache)) {
     IGF.Builder.CreateStore(directResult, cache)
-      ->setAtomic(llvm::Release);
+      ->setAtomic(llvm::AtomicOrdering::Release);
   }
 
   IGF.Builder.CreateBr(contBB);
@@ -1244,7 +1244,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   // Store back to the cache variable.
   IGF.Builder.CreateStore(relocatedMetadata,
                           Address(cacheVariable, IGM.getPointerAlignment()))
-    ->setAtomic(llvm::Release);
+    ->setAtomic(llvm::AtomicOrdering::Release);
 
   IGF.Builder.CreateRetVoid();
   return fn;

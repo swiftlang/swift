@@ -59,13 +59,13 @@ int apinotes_main(ArrayRef<const char *> Args) {
   OutputFilename("o", cl::desc("Output file name"), cl::cat(APINotesCategory));
 
   // Hide unrelated options.
-  StringMap<cl::Option*> &Options = cl::getRegisteredOptions();
-  for (StringMap<cl::Option *>::iterator I = Options.begin(),
-                                         E = Options.end();
-                                         I != E; ++I) {
-    if (I->second->Category != &APINotesCategory &&
-        I->first() != "help" && I->first() != "version")
-      I->second->setHiddenFlag(cl::ReallyHidden);
+  StringMap<cl::Option *> &Options =
+      cl::getRegisteredOptions(*cl::TopLevelSubCommand);
+  for (auto &Option : Options) {
+    if (Option.second->Category != &APINotesCategory &&
+        Option.first() != "help" && Option.first() != "version") {
+      Option.second->setHiddenFlag(cl::ReallyHidden);
+    }
   }
 
   cl::ParseCommandLineOptions(Args.size(),

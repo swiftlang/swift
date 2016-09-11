@@ -7,6 +7,8 @@
 // RUN: %swift-format -line-range 12:18 %s >%t.response
 // RUN: diff -u %s.lines.response %t.response
 
+// REQUIRES: SR-XXXX
+
 import Foundation
 
 func collatz(n: Int) {

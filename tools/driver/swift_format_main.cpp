@@ -220,8 +220,20 @@ public:
 
         Output.replace(Offset, Length, Formatted);
         Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));
-        Replacements.insert(
+
+        // TODO: Replacements::add returns a failure when there is a conflict in
+        // between the replacement we are adding and the replacements that have
+        // already been added or if the added replacement's file path is
+        // different from the filepath of the existing replacements. We should
+        // add a first class diagnostic for this. For now, due to time
+        // constraints, on failure, we just log a message to std::err and return
+        // true.
+        llvm::Error Error = Replacements.add(
             clang::tooling::Replacement(Filename, Offset, Length, Formatted));
+        if (!Error) {
+          llvm::errs() << "Error! Invalid replacement!\n";
+          return true;
+        }
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

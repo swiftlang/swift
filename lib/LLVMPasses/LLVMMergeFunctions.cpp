@@ -358,6 +358,7 @@ private:
   int cmpAttrs(const AttributeSet L, const AttributeSet R) const;
   int cmpRangeMetadata(const MDNode* L, const MDNode* R) const;
   int cmpOperandBundlesSchema(const Instruction *L, const Instruction *R) const;
+  int cmpOrdering(llvm::AtomicOrdering L, llvm::AtomicOrdering R) const;
 
   // The two functions undergoing comparison.
   const Function *FnL, *FnR;
@@ -521,6 +522,13 @@ int FunctionComparator::cmpOperandBundlesSchema(const Instruction *L,
   }
 
   return 0;
+}
+
+int FunctionComparator::cmpOrdering(llvm::AtomicOrdering L,
+                                    llvm::AtomicOrdering R) const {
+  if (L == R)
+    return 0;
+  return isAtLeastOrStrongerThan(L, R) ? 1 : -1;
 }
 
 /// Constants comparison:
@@ -872,7 +880,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
             cmpNumbers(LI->getAlignment(), cast<LoadInst>(R)->getAlignment()))
       return Res;
     if (int Res =
-            cmpNumbers(LI->getOrdering(), cast<LoadInst>(R)->getOrdering()))
+            cmpOrdering(LI->getOrdering(), cast<LoadInst>(R)->getOrdering()))
       return Res;
     if (int Res =
             cmpNumbers(LI->getSynchScope(), cast<LoadInst>(R)->getSynchScope()))
@@ -888,7 +896,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
             cmpNumbers(SI->getAlignment(), cast<StoreInst>(R)->getAlignment()))
       return Res;
     if (int Res =
-            cmpNumbers(SI->getOrdering(), cast<StoreInst>(R)->getOrdering()))
+            cmpOrdering(SI->getOrdering(), cast<StoreInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(SI->getSynchScope(), cast<StoreInst>(R)->getSynchScope());
   }
@@ -942,7 +950,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
   }
   if (const FenceInst *FI = dyn_cast<FenceInst>(L)) {
     if (int Res =
-            cmpNumbers(FI->getOrdering(), cast<FenceInst>(R)->getOrdering()))
+            cmpOrdering(FI->getOrdering(), cast<FenceInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(FI->getSynchScope(), cast<FenceInst>(R)->getSynchScope());
   }
@@ -954,11 +962,11 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res = cmpNumbers(CXI->isWeak(),
                              cast<AtomicCmpXchgInst>(R)->isWeak()))
       return Res;
-    if (int Res = cmpNumbers(CXI->getSuccessOrdering(),
-                             cast<AtomicCmpXchgInst>(R)->getSuccessOrdering()))
+    if (int Res = cmpOrdering(CXI->getSuccessOrdering(),
+                              cast<AtomicCmpXchgInst>(R)->getSuccessOrdering()))
       return Res;
-    if (int Res = cmpNumbers(CXI->getFailureOrdering(),
-                             cast<AtomicCmpXchgInst>(R)->getFailureOrdering()))
+    if (int Res = cmpOrdering(CXI->getFailureOrdering(),
+                              cast<AtomicCmpXchgInst>(R)->getFailureOrdering()))
       return Res;
     return cmpNumbers(CXI->getSynchScope(),
                       cast<AtomicCmpXchgInst>(R)->getSynchScope());
@@ -970,8 +978,8 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res = cmpNumbers(RMWI->isVolatile(),
                              cast<AtomicRMWInst>(R)->isVolatile()))
       return Res;
-    if (int Res = cmpNumbers(RMWI->getOrdering(),
-                             cast<AtomicRMWInst>(R)->getOrdering()))
+    if (int Res = cmpOrdering(RMWI->getOrdering(),
+                              cast<AtomicRMWInst>(R)->getOrdering()))
       return Res;
     return cmpNumbers(RMWI->getSynchScope(),
                       cast<AtomicRMWInst>(R)->getSynchScope());

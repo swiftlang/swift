@@ -1769,7 +1769,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       llvm::GlobalValue::PrivateLinkage,
                                       global,
                                       llvm::Twine("got.") + globalName);
-  gotEquivalent->setUnnamedAddr(true);
+  gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   return gotEquivalent;
 }
 
@@ -2905,7 +2905,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     // FIXME: Clear unnamed_addr if the global will be relative referenced
     // to work around an ld64 bug. rdar://problem/22674524
     if (willBeRelativelyAddressed)
-      entry.first->setUnnamedAddr(false);
+      entry.first->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
     return entry.second;
   }
 
@@ -2941,7 +2941,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
-  global->setUnnamedAddr(true);
+  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   // Drill down to make an i16*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
