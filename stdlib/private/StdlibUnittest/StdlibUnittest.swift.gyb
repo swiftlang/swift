@@ -522,17 +522,6 @@ public func expectFalse(_ actual: Bool, ${TRACE}) {
   }
 }
 
-@available(*, deprecated, renamed: "expectNil")
-public func expectEmpty<T>(_ value: T?, ${TRACE}) {
-  expectNil(value, ${trace})
-}
-
-@available(*, deprecated, renamed: "expectNotNil")
-@discardableResult
-public func expectNotEmpty<T>(_ value: T?, ${TRACE}) -> T? {
-  return expectNotNil(value, ${trace})
-}
-
 public func expectNil<T>(_ value: T?, ${TRACE}) {
   if value != nil {
     expectationFailure(
