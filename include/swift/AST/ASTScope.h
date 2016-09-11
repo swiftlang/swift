@@ -51,6 +51,7 @@ class Stmt;
 class StmtConditionElement;
 class SwitchStmt;
 class TopLevelCodeDecl;
+class TypeDecl;
 class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
@@ -61,6 +62,8 @@ enum class ASTScopeKind : uint8_t {
   Preexpanded,
   /// A source file, which is the root of a scope.
   SourceFile,
+  /// The declaration of a type.
+  TypeDecl,
   /// The generic parameters of an extension declaration.
   ExtensionGenericParams,
   /// The body of a type or extension thereof.
@@ -85,8 +88,6 @@ enum class ASTScopeKind : uint8_t {
   AfterPatternBinding,
   /// The scope introduced by a brace statement.
   BraceStmt,
-  /// The scope introduced by a local declaration.
-  LocalDeclaration,
   /// Node describing an "if" statement.
   IfStmt,
   /// The scope introduced by a conditional clause in an if/guard/while
@@ -178,6 +179,9 @@ class ASTScope {
       mutable unsigned nextElement;
     } sourceFile;
 
+    /// A type declaration, for \c kind == ASTScopeKind::TypeDecl.
+    TypeDecl *typeDecl;
+
     /// An extension declaration, for
     /// \c kind == ASTScopeKind::ExtensionGenericParams.
     ExtensionDecl *extension;
@@ -237,11 +241,6 @@ class ASTScope {
       /// The next element in the brace statement that should be expanded.
       mutable unsigned nextElement;
     } braceStmt;
-
-    /// The declaration introduced within a local scope.
-    ///
-    /// For \c kind == ASTScopeKind::LocalDeclaration.
-    Decl *localDeclaration;
 
     /// The 'if' statement, for \c kind == ASTScopeKind::IfStmt.
     IfStmt *ifStmt;
@@ -353,6 +352,11 @@ class ASTScope {
 
   /// Constructor that initializes a preexpanded node.
   ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children);
+
+  ASTScope(const ASTScope *parent, TypeDecl *typeDecl)
+      : ASTScope(ASTScopeKind::TypeDecl, parent) {
+    this->typeDecl = typeDecl;
+  }
 
   ASTScope(const ASTScope *parent, ExtensionDecl *extension)
       : ASTScope(ASTScopeKind::ExtensionGenericParams, parent) {
@@ -570,11 +574,10 @@ public:
     return range;
   }
 
-  /// Retrieve the local declatation when
-  /// \c getKind() == ASTScopeKind::LocalDeclaration.
-  Decl *getLocalDeclaration() const {
-    assert(getKind() == ASTScopeKind::LocalDeclaration);
-    return localDeclaration;
+  /// Retrieve the type declaration when \c getKind() == ASTScopeKind::TypeDecl.
+  TypeDecl *getTypeDecl() const {
+    assert(getKind() == ASTScopeKind::TypeDecl);
+    return typeDecl;
   }
 
   /// Retrieve the abstract function declaration when
