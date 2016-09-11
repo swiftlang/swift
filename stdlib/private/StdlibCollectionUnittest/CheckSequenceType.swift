@@ -1930,7 +1930,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     if wasInvoked {
       expectOptionalEqual(42, result?.value)
     } else {
-      expectEmpty(result)
+      expectNil(result)
     }
   }
 
@@ -1948,7 +1948,7 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
     } catch {
       caughtError = error
     }
-    expectEmpty(result)
+    expectNil(result)
     if wasInvoked {
       expectOptionalEqual(TestError.error2, caughtError as? TestError)
     }

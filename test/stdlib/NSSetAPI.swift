@@ -85,10 +85,10 @@ NSIndexSetAPI.test("Sequence") {
   // expectEqual(Optional<Int>.some(1), iter.next())
   // expectEqual(Optional<Int>.none, iter.next())
   expectOptionalEqual(1, iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
   let empty = NSIndexSet(indexesIn: NSMakeRange(1, 0))
   var emptyGen = empty.makeIterator()
-  expectEmpty(emptyGen.next())
+  expectNil(emptyGen.next())
 }
 
 runAllTests()

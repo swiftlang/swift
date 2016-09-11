@@ -18,7 +18,7 @@ NSStringTests.test("NSString bridges to String with custom AnyHashable")
   .forEach(in: ["", "a", "abc", "a\u{0301}", "\u{e1}"]) {
   input in
   let s = input._bridgeToObjectiveC()
-  expectNotEmpty(s._toCustomAnyHashable())
+  expectNotNil(s._toCustomAnyHashable())
   expectEqual(String.self, type(of: AnyHashable(s).base))
 }
 

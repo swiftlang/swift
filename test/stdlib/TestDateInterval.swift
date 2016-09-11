@@ -106,11 +106,11 @@ class TestDateInterval : TestDateIntervalSuper {
             let testInterval3 = DateInterval(start: start3, end: end3)
             
             let intersection1 = testInterval2.intersection(with: testInterval1)
-            expectNotEmpty(intersection1)
+            expectNotNil(intersection1)
             expectEqual(testInterval3, intersection1)
             
             let intersection2 = testInterval1.intersection(with: testInterval2)
-            expectNotEmpty(intersection2)
+            expectNotNil(intersection2)
             expectEqual(intersection1, intersection2)
         }
     }

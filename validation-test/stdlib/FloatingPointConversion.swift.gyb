@@ -88,12 +88,12 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion")
   input in
   let result = ${Self}(exactly: input)
 %   if OtherSignificandBits <= SelfSignificandBits:
-  if let result = expectNotEmpty(result) {
+  if let result = expectNotNil(result) {
     // FIXME: we should have a stronger postcondition here.
     expectEqual(input, ${OtherFloat}(result))
   }
 %   else:
-  expectEmpty(result)
+  expectNil(result)
 %   end
 }
 
@@ -102,7 +102,7 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}Conversion/AlwaysSuc
   expectEqual(-1.0 as ${Self},   ${Self}(exactly: -1.0 as ${OtherFloat}))
   expectEqual( ${Self}.infinity, ${Self}(exactly:  ${OtherFloat}.infinity))
   expectEqual(-${Self}.infinity, ${Self}(exactly: -${OtherFloat}.infinity))
-  expectEmpty(${Self}(exactly: ${OtherFloat}.nan))
+  expectNil(${Self}(exactly: ${OtherFloat}.nan))
 }
 
 %   if OtherFloat == 'Float80':

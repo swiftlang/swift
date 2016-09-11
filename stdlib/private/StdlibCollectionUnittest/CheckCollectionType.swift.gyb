@@ -890,7 +890,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.first
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[0],
@@ -1175,7 +1175,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popFirst())
+      expectNil(slice.popFirst())
     }
 
     //===------------------------------------------------------------------===//
@@ -1225,7 +1225,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.last
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[test.count - 1],
@@ -1382,7 +1382,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popLast())
+      expectNil(slice.popLast())
     }
 
 
@@ -1690,7 +1690,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       }
     }
@@ -1731,7 +1731,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       } else {
         expectCrashLater()

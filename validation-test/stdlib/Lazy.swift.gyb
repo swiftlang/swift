@@ -307,7 +307,7 @@ LazyTestSuite.test("EmptyCollection/index(_:offsetBy:limitedBy:)/NoTrap")
   if offset == 0 {
     expectOptionalEqual(c.startIndex, result)
   } else {
-    expectEmpty(result)
+    expectNil(result)
   }
 }
 
@@ -368,7 +368,7 @@ LazyTestSuite.test("first") {
 }
 
 LazyTestSuite.test("first empty") {
-  expectEmpty((7..<7).lazy.first)
+  expectNil((7..<7).lazy.first)
 }
 
 LazyTestSuite.test("last") {
@@ -376,7 +376,7 @@ LazyTestSuite.test("last") {
 }
 
 LazyTestSuite.test("last empty") {
-  expectEmpty((7..<7).lazy.last)
+  expectNil((7..<7).lazy.last)
 }
 
 //===----------------------------------------------------------------------===//

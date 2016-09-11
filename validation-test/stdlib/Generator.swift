@@ -14,7 +14,7 @@ tests.test("Range") {
   var maybe_one = w.next()
   expectType(Optional<Int>.self, &maybe_one)
   expectEqual(1, maybe_one)
-  expectEmpty(w.next())
+  expectNil(w.next())
 }
 
 tests.test("RangeIteratorConformsToSequence") {

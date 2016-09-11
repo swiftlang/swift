@@ -526,7 +526,7 @@ import SlurpFastEnumeration
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEmpty(state.mutationsPtr)
+    expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -545,7 +545,7 @@ import SlurpFastEnumeration
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEmpty(state.mutationsPtr)
+    expectNotNil(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }
@@ -568,7 +568,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEmpty(state.mutationsPtr)
+    expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -778,7 +778,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEmpty(state.mutationsPtr)
+    expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
       break
     }
@@ -797,7 +797,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
       with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
-    expectNotEmpty(state.mutationsPtr)
+    expectNotNil(state.mutationsPtr)
     expectEqual(0, returnedCount)
   }
 }

@@ -128,11 +128,11 @@ class TestDate : TestDateSuper {
         // Make sure the optional init stuff works
         let dc = DateComponents()
         
-        expectEmpty(dc.year)
+        expectNil(dc.year)
         
         let dc2 = DateComponents(year: 1999)
         
-        expectEmpty(dc2.day)
+        expectNil(dc2.day)
         expectEqual(1999, dc2.year)
     }
 

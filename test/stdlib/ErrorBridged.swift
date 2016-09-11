@@ -157,7 +157,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
 
     let urlError = eURL as! URLError
     expectOptionalEqual(testURL, urlError.failingURL)
-    expectEmpty(urlError.failureURLPeerTrust)
+    expectNil(urlError.failureURLPeerTrust)
 
     // CoreLocation error domain
     let nsCL = NSError(domain: kCLErrorDomain,
@@ -467,10 +467,10 @@ class RecoveryDelegate {
 func testCustomizedError(error: Error, nsError: NSError) {
   // LocalizedError
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
-    expectEmpty(nsError.userInfo[NSLocalizedDescriptionKey as NSObject])
-    expectEmpty(nsError.userInfo[NSLocalizedFailureReasonErrorKey as NSObject])
-    expectEmpty(nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey as NSObject])
-    expectEmpty(nsError.userInfo[NSHelpAnchorErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSLocalizedDescriptionKey as NSObject])
+    expectNil(nsError.userInfo[NSLocalizedFailureReasonErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSLocalizedRecoverySuggestionErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSHelpAnchorErrorKey as NSObject])
   } else {
     expectOptionalEqual("something went horribly wrong",
       nsError.userInfo[NSLocalizedDescriptionKey as NSObject] as? String)
@@ -489,7 +489,7 @@ func testCustomizedError(error: Error, nsError: NSError) {
 
   // RecoverableError
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
-    expectEmpty(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject])
   } else {
     expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
       nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject] as? [String])
@@ -500,7 +500,7 @@ func testCustomizedError(error: Error, nsError: NSError) {
   // Directly recover.
   let attempter: AnyObject
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
-    expectEmpty(nsError.userInfo[NSRecoveryAttempterErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSRecoveryAttempterErrorKey as NSObject])
     attempter = nsError.recoveryAttempter! as AnyObject
   } else {
     attempter = nsError.userInfo[NSRecoveryAttempterErrorKey as NSObject]! as AnyObject
@@ -560,7 +560,7 @@ ErrorBridgingTests.test("Customizing localization/recovery laziness") {
 
   // RecoverableError
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
-    expectEmpty(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject])
+    expectNil(nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject])
   } else {
     expectOptionalEqual(["Delete 'throw'", "Disable the test" ],
       nsError.userInfo[NSLocalizedRecoveryOptionsErrorKey as NSObject] as? [String])
