@@ -55,6 +55,7 @@
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Object/ObjectFile.h"
@@ -159,7 +160,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
     PMBuilder.OptLevel = 0;
     if (!Opts.DisableLLVMOptzns)
       PMBuilder.Inliner =
-        llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
+          llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/ false);
   }
 
   PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
