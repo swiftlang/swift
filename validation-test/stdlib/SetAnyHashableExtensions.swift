@@ -47,9 +47,9 @@ SetTests.test("index<Hashable>(of:)") {
   expectEqual(AnyHashable(2020), s[s.index(of: 2020)!])
   expectEqual(AnyHashable(3030.0), s[s.index(of: 3030.0)!])
 
-  expectEmpty(s.index(of: 1010.0))
-  expectEmpty(s.index(of: 2020.0))
-  expectEmpty(s.index(of: 3030))
+  expectNil(s.index(of: 1010.0))
+  expectNil(s.index(of: 2020.0))
+  expectNil(s.index(of: 3030))
 }
 
 SetTests.test("insert<Hashable>(_:)") {
@@ -148,9 +148,9 @@ SetTests.test("update<Hashable>(with:)") {
     expectEqual(1, old.identity)
   }
 
-  expectEmpty(s.update(with: MinimalHashableClass(1010, identity: 2)))
-  expectEmpty(s.update(with: MinimalHashableClass(2020, identity: 2)))
-  expectEmpty(s.update(with: MinimalHashableValue(3030, identity: 2)))
+  expectNil(s.update(with: MinimalHashableClass(1010, identity: 2)))
+  expectNil(s.update(with: MinimalHashableClass(2020, identity: 2)))
+  expectNil(s.update(with: MinimalHashableValue(3030, identity: 2)))
 
   let expected: Set<AnyHashable> = [
     AnyHashable(MinimalHashableValue(1010, identity: 2)),
@@ -188,9 +188,9 @@ SetTests.test("remove<Hashable>(_:)") {
     AnyHashable(MinimalHashableClass(3030, identity: 1)),
   ]
 
-  expectEmpty(s.remove(MinimalHashableClass(1010)))
-  expectEmpty(s.remove(MinimalHashableClass(2020)))
-  expectEmpty(s.remove(MinimalHashableValue(3030)))
+  expectNil(s.remove(MinimalHashableClass(1010)))
+  expectNil(s.remove(MinimalHashableClass(2020)))
+  expectNil(s.remove(MinimalHashableValue(3030)))
 
   expectEqual(3, s.count)
 

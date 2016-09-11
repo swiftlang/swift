@@ -400,8 +400,8 @@ tests.test("BidirectionalCollection") {
   let bc1 = AnyBidirectionalCollection(s0)
   let fc3 = AnyCollection(bc1)
   expectTrue(storesSameUnderlyingCollection(fc3, bc1))
-  expectEmpty(AnyRandomAccessCollection(bc1))
-  expectEmpty(AnyRandomAccessCollection(fc3))
+  expectNil(AnyRandomAccessCollection(bc1))
+  expectNil(AnyRandomAccessCollection(fc3))
 }
 
 tests.test("RandomAccessCollection") {

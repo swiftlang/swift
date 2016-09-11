@@ -284,7 +284,7 @@ tests.test("Another/${Any}") {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  expectEmpty(subclassAsAnyArray as? [Barable & Bazable])
+  expectNil(subclassAsAnyArray as? [Barable & Bazable])
 }
 
 //===--- Explicitly Bridged -----------------------------------------------===//
@@ -393,7 +393,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   }
 
   // Downcast of Cocoa array to an array of strings (which should fail)
-  expectEmpty(wrappedCocoaBridgeableValues as? [String])
+  expectNil(wrappedCocoaBridgeableValues as? [String])
 
   // Downcast from an implicitly unwrapped optional array of Anys.
   var wrappedCocoaBridgeableValuesIUO: [${Any}]! = wrappedCocoaBridgeableValues
@@ -403,7 +403,7 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   // Downcast from a nil implicitly unwrapped optional array of Anys.
   wrappedCocoaBridgeableValuesIUO = nil
-  expectEmpty(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
+  expectNil(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
 
   // Downcast from an optional array of Anys.
   var wrappedCocoaBridgeableValuesOpt: [${Any}]? = wrappedCocoaBridgeableValues
@@ -413,7 +413,7 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   // Downcast from a nil optional array of Anys.
   wrappedCocoaBridgeableValuesOpt = nil
-  expectEmpty(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
+  expectNil(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
 }
 % end
 

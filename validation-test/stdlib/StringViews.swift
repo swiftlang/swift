@@ -660,13 +660,13 @@ tests.test("UTF8 indexes") {
             // We only have well-formed UTF16 in this string, so the
             // successor points to a trailing surrogate of a pair and
             // thus shouldn't convert to a UTF8 position
-            expectEmpty(u16.index(after: u16i0a).samePosition(in: u8))
+            expectNil(u16.index(after: u16i0a).samePosition(in: u8))
           }
           
           dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
         }
         else {
-          expectEmpty(u8i0a.samePosition(in: u16))
+          expectNil(u8i0a.samePosition(in: u16))
         }
         u8i0a = u8.index(u8i0a, offsetBy: 1)
       }
@@ -708,7 +708,7 @@ tests.test("UTF16->String") {
           continue
         }
       }
-      expectEmpty(String(v[i..<j]))
+      expectNil(String(v[i..<j]))
     }
   }
 }
@@ -724,7 +724,7 @@ tests.test("UTF8->String") {
           continue
         }
       }
-      expectEmpty(String(v[i..<j]))
+      expectNil(String(v[i..<j]))
     }
   }
 }

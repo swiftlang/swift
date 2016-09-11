@@ -465,7 +465,7 @@ CStringTests.test("String.init(validatingUTF8:)") {
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEmpty(String(validatingUTF8: bindAsCChar(s)))
+    expectNil(String(validatingUTF8: bindAsCChar(s)))
     dealloc()
   }
 }
@@ -501,7 +501,7 @@ CStringTests.test("String.decodeCString") {
   do {
     let s = getNullUTF8()
     let result = String.decodeCString(s, as: UTF8.self)
-    expectEmpty(result)
+    expectNil(result)
   }
   do { // repairing
     let (s, dealloc) = getIllFormedUTF8String1()
@@ -518,7 +518,7 @@ CStringTests.test("String.decodeCString") {
     let (s, dealloc) = getIllFormedUTF8String1()
     let result = String.decodeCString(
       s, as: UTF8.self, repairingInvalidCodeUnits: false)
-    expectEmpty(result)
+    expectNil(result)
     dealloc()
   }
 }

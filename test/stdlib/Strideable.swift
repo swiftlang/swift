@@ -216,7 +216,7 @@ func strideIteratorTest<
      expectNotEmpty(i.next())
   }
   for _ in 0..<10 {
-    expectEmpty(i.next())
+    expectNil(i.next())
   }
 }
 

@@ -461,7 +461,7 @@ NSStringAPIs.test("components(separatedBy:) (String)") {
 }
 
 NSStringAPIs.test("cString(usingEncoding:)") {
-  expectEmpty("абв".cString(using: .ascii))
+  expectNil("абв".cString(using: .ascii))
 
   let expectedBytes: [UInt8] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
   var expectedStr: [CChar] = expectedBytes.map { CChar(bitPattern: $0) }
@@ -470,7 +470,7 @@ NSStringAPIs.test("cString(usingEncoding:)") {
 }
 
 NSStringAPIs.test("data(usingEncoding:allowLossyConversion:)") {
-  expectEmpty("あいう".data(using: .ascii, allowLossyConversion: false))
+  expectNil("あいう".data(using: .ascii, allowLossyConversion: false))
 
   do {
     let data = "あいう".data(using: .utf8)!
@@ -485,7 +485,7 @@ NSStringAPIs.test("init(data:encoding:)") {
   let bytes: [UInt8] = [0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86]
   let data = Data(bytes: bytes)
   
-  expectEmpty(String(data: data, encoding: .nonLossyASCII))
+  expectNil(String(data: data, encoding: .nonLossyASCII))
   
   expectEqualSequence(
     "あいう".characters, 
@@ -568,7 +568,7 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
       (substring_: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, stop: inout Bool)
     in
-      expectEmpty(substring_)
+      expectNil(substring_)
       let substring = s[substringRange]
       substrings.append(substring)
       expectEqual(substring, s[enclosingRange])
@@ -762,7 +762,7 @@ NSStringAPIs.test("init(bytes:encoding:)") {
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String(bytes: bytes, length: bytes.count,
+  expectNil(String(bytes: bytes, length: bytes.count,
       encoding: .ascii))
   */
 
@@ -780,7 +780,7 @@ NSStringAPIs.test("init(bytesNoCopy:length:encoding:freeWhenDone:)") {
   FIXME: Test disabled because the NSString documentation is unclear about
   what should actually happen in this case.
 
-  expectEmpty(String(bytesNoCopy: &bytes, length: bytes.count,
+  expectNil(String(bytesNoCopy: &bytes, length: bytes.count,
       encoding: .ascii, freeWhenDone: false))
   */
 
@@ -1073,7 +1073,7 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
       expectEqual(s.index(s.startIndex, offsetBy: 5), r.upperBound)
     }
     do {
-      expectEmpty("клмн".rangeOfCharacter(from: charset))
+      expectNil("клмн".rangeOfCharacter(from: charset))
     }
     do {
       let s = "абвклмнабвклмн"
@@ -1093,11 +1093,11 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
 
   do {
     let charset = CharacterSet(charactersIn: "\u{305f}\u{3099}")
-    expectEmpty("\u{3060}".rangeOfCharacter(from: charset))
+    expectNil("\u{3060}".rangeOfCharacter(from: charset))
   }
   do {
     let charset = CharacterSet(charactersIn: "\u{3060}")
-    expectEmpty("\u{305f}\u{3099}".rangeOfCharacter(from: charset))
+    expectNil("\u{305f}\u{3099}".rangeOfCharacter(from: charset))
   }
 
   do {
@@ -1108,7 +1108,7 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
           s[s.rangeOfCharacter(from: charset)!])
     }
     do {
-      expectEmpty("abc\u{1F601}".rangeOfCharacter(from: charset))
+      expectNil("abc\u{1F601}".rangeOfCharacter(from: charset))
     }
   }
 }
@@ -1147,13 +1147,13 @@ func toIntRange(
 NSStringAPIs.test("range(of:options:range:locale:)") {
   do {
     let s = ""
-    expectEmpty(s.range(of: ""))
-    expectEmpty(s.range(of: "abc"))
+    expectNil(s.range(of: ""))
+    expectNil(s.range(of: "abc"))
   }
   do {
     let s = "abc"
-    expectEmpty(s.range(of: ""))
-    expectEmpty(s.range(of: "def"))
+    expectNil(s.range(of: ""))
+    expectNil(s.range(of: "def"))
     expectOptionalEqual(0..<3, toIntRange(s, s.range(of: "abc")))
   }
   do {
@@ -1161,8 +1161,8 @@ NSStringAPIs.test("range(of:options:range:locale:)") {
     expectOptionalEqual(2..<3, toIntRange(s, s.range(of: "す\u{3099}")))
     expectOptionalEqual(2..<3, toIntRange(s, s.range(of: "\u{305a}")))
 
-    expectEmpty(s.range(of: "\u{3099}す"))
-    expectEmpty(s.range(of: "す"))
+    expectNil(s.range(of: "\u{3099}す"))
+    expectNil(s.range(of: "す"))
 
     // Note: here `rangeOf` API produces indexes that don't point between
     // grapheme cluster boundaries -- these cannot be created with public
@@ -1177,8 +1177,8 @@ NSStringAPIs.test("range(of:options:range:locale:)") {
     expectOptionalEqual(0..<1, toIntRange(s, s.range(of: "а\u{0301}")))
     expectOptionalEqual(1..<2, toIntRange(s, s.range(of: "б\u{0301}")))
 
-    expectEmpty(s.range(of: "б"))
-    expectEmpty(s.range(of: "\u{0301}б"))
+    expectNil(s.range(of: "б"))
+    expectNil(s.range(of: "\u{0301}б"))
 
     // FIXME: Again, indexes that don't correspond to grapheme
     // cluster boundaries.
@@ -1279,10 +1279,10 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
         string, string.localizedStandardRange(of: substring))
     }
     withOverriddenLocaleCurrentLocale("en") { () -> Void in
-      expectEmpty(rangeOf("", ""))
-      expectEmpty(rangeOf("", "a"))
-      expectEmpty(rangeOf("a", ""))
-      expectEmpty(rangeOf("a", "b"))
+      expectNil(rangeOf("", ""))
+      expectNil(rangeOf("", "a"))
+      expectNil(rangeOf("a", ""))
+      expectNil(rangeOf("a", "b"))
       expectEqual(0..<1, rangeOf("a", "a"))
       expectEqual(0..<1, rangeOf("a", "A"))
       expectEqual(0..<1, rangeOf("A", "a"))
@@ -1295,7 +1295,7 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
         expectEqual(
           "\u{0301}", s[s.localizedStandardRange(of: "\u{0301}")!])
       }
-      expectEmpty(rangeOf("a", "\u{0301}"))
+      expectNil(rangeOf("a", "\u{0301}"))
 
       expectEqual(0..<1, rangeOf("i", "I"))
       expectEqual(0..<1, rangeOf("I", "i"))
@@ -1327,7 +1327,7 @@ func getHomeDir() -> String {
 }
 
 NSStringAPIs.test("addingPercentEscapes(using:)") {
-  expectEmpty(
+  expectNil(
     "abcd абвг".addingPercentEscapes(
       using: .ascii))
   expectOptionalEqual("abcd%20%D0%B0%D0%B1%D0%B2%D0%B3",
@@ -1407,7 +1407,7 @@ NSStringAPIs.test("removingPercentEncoding/OSX 10.9")
 }
 
 NSStringAPIs.test("removingPercentEncoding") {
-  expectEmpty("%".removingPercentEncoding)
+  expectNil("%".removingPercentEncoding)
   expectOptionalEqual(
     "abcd абвг",
     "ab%63d %D0%B0%D0%B1%D0%B2%D0%B3".removingPercentEncoding)
@@ -1555,10 +1555,10 @@ NSStringAPIs.test("replacingPercentEscapes(using:)") {
     "%61%62%63%64%20%D0%B0%D0%B1%D0%B2%D0%B3"
       .replacingPercentEscapes(using: .utf8))
 
-  expectEmpty("%ED%B0".replacingPercentEscapes(
+  expectNil("%ED%B0".replacingPercentEscapes(
     using: .utf8))
 
-  expectEmpty("%zz".replacingPercentEscapes(
+  expectNil("%zz".replacingPercentEscapes(
     using: .utf8))
 }
 
@@ -1569,7 +1569,7 @@ NSStringAPIs.test("replacingPercentEscapes(using:)/rdar18029471")
       "replacingPercentEscapesUsingEncoding: does not return nil " +
       "when a byte sequence is not legal in ASCII"))
   .code {
-  expectEmpty(
+  expectNil(
     "abcd%FF".replacingPercentEscapes(
       using: .ascii))
 }

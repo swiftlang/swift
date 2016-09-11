@@ -288,12 +288,12 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
 
 ${SelfName}TestSuite.test("nilBaseAddress") {
   let emptyBuffer = ${SelfType}(start: nil, count: 0)
-  expectEmpty(emptyBuffer.baseAddress)
+  expectNil(emptyBuffer.baseAddress)
   expectEqual(0, emptyBuffer.count)
   expectTrue(emptyBuffer.startIndex == emptyBuffer.endIndex)
 
   var iter = emptyBuffer.makeIterator()
-  expectEmpty(iter.next())
+  expectNil(iter.next())
 
   expectEqualSequence([], emptyBuffer)
 }
@@ -308,7 +308,7 @@ ${SelfName}TestSuite.test("nonNilButEmpty") {
   expectTrue(emptyBuffer.startIndex == emptyBuffer.endIndex)
 
   var iter = emptyBuffer.makeIterator()
-  expectEmpty(iter.next())
+  expectNil(iter.next())
 
   expectEqualSequence([], emptyBuffer)
 }
@@ -334,7 +334,7 @@ ${SelfName}TestSuite.test("nonNilNonEmpty") {
   expectEqual(1.0, iter.next())
   expectEqual(0.0, iter.next())
   expectEqual(1.0, iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
 
   expectEqualSequence([1.0, 0.0, 1.0], buffer)
 

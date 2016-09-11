@@ -357,7 +357,7 @@ if #available(iOS 8.0, *) {
       expectNotEmpty(unarchivedPlaneGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedPlaneGeometry)
 
-      expectEmpty(unarchivedPlaneNode_nil)
+      expectNil(unarchivedPlaneNode_nil)
     }
 
     do {
@@ -369,7 +369,7 @@ if #available(iOS 8.0, *) {
       expectNotEmpty(unarchivedBoxGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedBoxGeometry)
 
-      expectEmpty(unarchivedBoxGeometry_nil)
+      expectNil(unarchivedBoxGeometry_nil)
     }
 
     do {
@@ -381,7 +381,7 @@ if #available(iOS 8.0, *) {
       expectNotEmpty(unarchivedBoxNode)
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
-      expectEmpty(unarchivedBoxNode_nil)
+      expectNil(unarchivedBoxNode_nil)
     }
   }
 

@@ -155,7 +155,7 @@ ClassProperties.test("inheritance/generic") {
 
 ClassProperties.test("optionalProp") {
   let noProp: ProtoWithClassProperty.Type = ClassWithClassProperty.self
-  expectEmpty(noProp.optionalClassProp)
+  expectNil(noProp.optionalClassProp)
 
   let hasProp: ProtoWithClassProperty.Type = Subclass.self
   expectNotEmpty(hasProp.optionalClassProp)
@@ -178,11 +178,11 @@ class NamingConflictSubclass : PropertyNamingConflict {
 ClassProperties.test("namingConflict") {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop.map { $0 as AnyObject })
-  expectEmpty(type(of: obj).prop)
-  expectEmpty(PropertyNamingConflict.prop)
+  expectNil(type(of: obj).prop)
+  expectNil(PropertyNamingConflict.prop)
 
   let sub = NamingConflictSubclass()
-  expectEmpty(sub.prop)
+  expectNil(sub.prop)
   expectNotEmpty(type(of: sub).prop)
   expectNotEmpty(NamingConflictSubclass.prop)
 }
@@ -201,10 +201,10 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
 ClassProperties.test("namingConflict/protocol") {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp.map { $0 as AnyObject })
-  expectEmpty(type(of: obj).protoProp)
+  expectNil(type(of: obj).protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
-  expectEmpty(type.protoProp)
+  expectNil(type.protoProp)
 }
 
 runAllTests()

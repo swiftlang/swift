@@ -274,7 +274,7 @@ FoundationTestSuite.test("NSKeyedUnarchiver/decodeObjectOfClass(_:forKey:)") {
   var KU = NSKeyedUnarchiver(forReadingWith: data as Data)
 
   var missing = KU.decodeObject(of: NSPredicate.self, forKey: "Not there")
-  expectEmpty(missing)
+  expectNil(missing)
   expectType((NSPredicate?).self, &missing)
 
   var decoded = KU.decodeObject(of: NSPredicate.self, forKey: KEY)
@@ -282,7 +282,7 @@ FoundationTestSuite.test("NSKeyedUnarchiver/decodeObjectOfClass(_:forKey:)") {
   expectType((NSPredicate?).self, &decoded)
 
   var wrongType = KU.decodeObject(of: DateFormatter.self, forKey: KEY)
-  expectEmpty(missing)
+  expectNil(missing)
 
   KU.finishDecoding()
 }
