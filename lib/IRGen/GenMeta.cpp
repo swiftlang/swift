@@ -1222,7 +1222,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   auto fnTy = llvm::FunctionType::get(IGM.VoidTy, {IGM.Int8PtrTy},
                                       /*variadic*/ false);
   llvm::Function *fn = llvm::Function::Create(fnTy,
-                                       llvm::GlobalValue::PrivateLinkage,
+                                       llvm::GlobalValue::InternalLinkage,
                                        Twine("initialize_metadata_")
                                            + type->getDecl()->getName().str(),
                                        &IGM.Module);
@@ -2392,7 +2392,7 @@ namespace {
     auto fnTy = llvm::FunctionType::get(metadataArrayPtrTy,
                                         IGM.TypeMetadataPtrTy,
                                         /*vararg*/ false);
-    auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
+    auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::InternalLinkage,
                                      llvm::Twine("get_field_types_")
                                        + type->getName().str(),
                                      IGM.getModule());
@@ -2925,7 +2925,7 @@ namespace {
       auto ty = llvm::FunctionType::get(IGM.TypeMetadataPtrTy,
                                         argTys, /*isVarArg*/ false);
       llvm::Function *f = llvm::Function::Create(ty,
-                                           llvm::GlobalValue::PrivateLinkage,
+                                           llvm::GlobalValue::InternalLinkage,
                                            llvm::Twine("create_generic_metadata_")
                                                + Target->getName().str(),
                                            &IGM.Module);
@@ -5295,7 +5295,7 @@ namespace {
       auto fnTy = llvm::FunctionType::get(IGM.VoidTy, {IGM.TypeMetadataPtrTy},
                                           /*variadic*/ false);
       llvm::Function *fn = llvm::Function::Create(fnTy,
-                                           llvm::GlobalValue::PrivateLinkage,
+                                           llvm::GlobalValue::InternalLinkage,
                                            Twine("initialize_metadata_")
                                              + type->getDecl()->getName().str(),
                                            &IGM.Module);
