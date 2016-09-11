@@ -18,13 +18,13 @@ if [ ${PARAM} = "x-u" ] ; then
 echo ========== Syncing ==========
 git multi commit -am "auto commit from build-toolchain-daily"
 git multi pull
-#git multi push
+git multi push
 git multi checkout stable
 git multi checkout master
 git multi pull
 git multi fetch upstream
 git multi merge upstream/master
-#git multi push
+git multi push
 git multi checkout develop
 git multi pull
 git multi merge master
