@@ -275,35 +275,17 @@ public:
   
 } // end swift namespace
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILWitnessTable
-//===----------------------------------------------------------------------===//
-
 namespace llvm {
-  
-template <>
-struct ilist_traits<::swift::SILWitnessTable> :
-public ilist_default_traits<::swift::SILWitnessTable> {
-  typedef ::swift::SILWitnessTable SILWitnessTable;
+template <> struct ilist_node_traits<swift::SILWitnessTable> {
+  static swift::SILWitnessTable *createNode(const swift::SILWitnessTable &);
+  static void deleteNode(swift::SILWitnessTable *WT) { WT->~SILWitnessTable(); }
 
-private:
-  mutable ilist_half_node<SILWitnessTable> Sentinel;
-
-public:
-  SILWitnessTable *createSentinel() const {
-    return static_cast<SILWitnessTable*>(&Sentinel);
-  }
-  void destroySentinel(SILWitnessTable *) const {}
-
-  SILWitnessTable *provideInitialHead() const { return createSentinel(); }
-  SILWitnessTable *ensureHead(SILWitnessTable*) const { return createSentinel(); }
-  static void noteHead(SILWitnessTable*, SILWitnessTable*) {}
-  static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }
-  
-private:
-  void createNode(const SILWitnessTable &);
+  void addNodeToList(swift::SILWitnessTable *) {}
+  void removeNodeFromList(swift::SILWitnessTable *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILWitnessTable> &,
+                             ilist_iterator<swift::SILWitnessTable>,
+                             ilist_iterator<swift::SILWitnessTable>) {}
 };
-
-} // end llvm namespace
+}
 
 #endif

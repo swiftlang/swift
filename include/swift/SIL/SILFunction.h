@@ -59,8 +59,8 @@ public:
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
-class SILFunction
-  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
+class SILFunction : public llvm::ilist_node<SILFunction>,
+                    public SILAllocated<SILFunction> {
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
@@ -741,35 +741,17 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 
 } // end swift namespace
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILFunction
-//===----------------------------------------------------------------------===//
-
 namespace llvm {
+template <> struct ilist_node_traits<swift::SILFunction> {
+  static swift::SILFunction *createNode(const swift::SILFunction &);
+  static void deleteNode(swift::SILFunction *F) { F->~SILFunction(); }
 
-template <>
-struct ilist_traits<::swift::SILFunction> :
-public ilist_default_traits<::swift::SILFunction> {
-  typedef ::swift::SILFunction SILFunction;
-
-private:
-  mutable ilist_half_node<SILFunction> Sentinel;
-
-public:
-  SILFunction *createSentinel() const {
-    return static_cast<SILFunction*>(&Sentinel);
-  }
-  void destroySentinel(SILFunction *) const {}
-
-  SILFunction *provideInitialHead() const { return createSentinel(); }
-  SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
-  static void noteHead(SILFunction*, SILFunction*) {}
-  static void deleteNode(SILFunction *V) { V->~SILFunction(); }
-
-private:
-  void createNode(const SILFunction &);
+  void addNodeToList(swift::SILFunction *) {}
+  void removeNodeFromList(swift::SILFunction *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILFunction> &,
+                             ilist_iterator<swift::SILFunction>,
+                             ilist_iterator<swift::SILFunction>) {}
 };
-
-} // end llvm namespace
+}
 
 #endif

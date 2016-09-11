@@ -22,7 +22,6 @@
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/Coverage/CoverageMapping.h"
 
@@ -133,34 +132,16 @@ public:
 } // end swift namespace
 
 namespace llvm {
+template <> struct ilist_node_traits<swift::SILCoverageMap> {
+  static swift::SILCoverageMap *createNode(const swift::SILCoverageMap &);
+  static void deleteNode(swift::SILCoverageMap *M) { M->~SILCoverageMap(); }
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILCoverageMap
-//===----------------------------------------------------------------------===//
-
-template <>
-struct ilist_traits<::swift::SILCoverageMap> :
-public ilist_default_traits<::swift::SILCoverageMap> {
-  typedef ::swift::SILCoverageMap SILCoverageMap;
-
-private:
-  mutable ilist_half_node<SILCoverageMap> Sentinel;
-
-public:
-  SILCoverageMap *createSentinel() const {
-    return static_cast<SILCoverageMap*>(&Sentinel);
-  }
-  void destroySentinel(SILCoverageMap *) const {}
-
-  SILCoverageMap *provideInitialHead() const { return createSentinel(); }
-  SILCoverageMap *ensureHead(SILCoverageMap*) const { return createSentinel(); }
-  static void noteHead(SILCoverageMap*, SILCoverageMap*) {}
-  static void deleteNode(SILCoverageMap *VT) { VT->~SILCoverageMap(); }
-
-private:
-  void createNode(const SILCoverageMap &);
+  void addNodeToList(swift::SILCoverageMap *) {}
+  void removeNodeFromList(swift::SILCoverageMap *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILCoverageMap> &,
+                             ilist_iterator<swift::SILCoverageMap>,
+                             ilist_iterator<swift::SILCoverageMap>) {}
 };
-
-} // end llvm namespace
+}
 
 #endif // SWIFT_SIL_SILCOVERAGEMAP_H

@@ -24,13 +24,18 @@ namespace swift {
 class SILFunction;
 class SILArgument;
 
-class SILBasicBlock :
-public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
+class SILBasicBlock
+    : public llvm::ilist_node_with_parent<SILBasicBlock, SILFunction>,
+      public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
   friend class SILFunction;
+
 public:
   using InstListType = llvm::iplist<SILInstruction>;
+
 private:
+  friend struct llvm::ilist_node_traits<SILBasicBlock>;
+
   /// A backreference to the containing SILFunction.
   SILFunction *Parent;
 
@@ -45,8 +50,6 @@ private:
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
 
-  friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
-  friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(0) {}
   void operator=(const SILBasicBlock &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -311,48 +314,22 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end swift namespace
 
 namespace llvm {
-
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILBasicBlock
-//===----------------------------------------------------------------------===//
-
 template <>
-struct ilist_traits<::swift::SILBasicBlock> :
-public ilist_default_traits<::swift::SILBasicBlock> {
-  using SelfTy = ilist_traits<::swift::SILBasicBlock>;
-  using SILBasicBlock = ::swift::SILBasicBlock;
-  using SILFunction = ::swift::SILFunction;
-  using FunctionPtrTy = ::swift::NullablePtr<SILFunction>;
-
+struct ilist_node_traits<swift::SILBasicBlock> {
 private:
-  friend class ::swift::SILFunction;
-  mutable ilist_half_node<SILBasicBlock> Sentinel;
-
-  SILFunction *Parent;
+  friend class swift::SILFunction;
+  swift::SILFunction *Parent;
 
 public:
+  static swift::SILBasicBlock *createNode(const swift::SILBasicBlock &);
+  static void deleteNode(swift::SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
-  SILBasicBlock *createSentinel() const {
-    return static_cast<SILBasicBlock*>(&Sentinel);
-  }
-  void destroySentinel(SILBasicBlock *) const {}
-
-  SILBasicBlock *provideInitialHead() const { return createSentinel(); }
-  SILBasicBlock *ensureHead(SILBasicBlock*) const { return createSentinel(); }
-  static void noteHead(SILBasicBlock*, SILBasicBlock*) {}
-  static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
-
-  void addNodeToList(SILBasicBlock *BB) {
-  }
-
-  void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
-                             ilist_iterator<SILBasicBlock> First,
-                             ilist_iterator<SILBasicBlock> Last);
-
-private:
-  static void createNode(const SILBasicBlock &);
+  void addNodeToList(swift::SILBasicBlock *) {}
+  void removeNodeFromList(swift::SILBasicBlock *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILBasicBlock> &,
+                             ilist_iterator<swift::SILBasicBlock>,
+                             ilist_iterator<swift::SILBasicBlock>);
 };
-
-} // end llvm namespace
+}
 
 #endif

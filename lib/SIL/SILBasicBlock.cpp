@@ -169,27 +169,26 @@ void SILBasicBlock::moveAfter(SILBasicBlock *After) {
 }
 
 void
-llvm::ilist_traits<swift::SILBasicBlock>::
-transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
+llvm::ilist_node_traits<SILBasicBlock>::
+transferNodesFromList(llvm::ilist_node_traits<SILBasicBlock> &SrcTraits,
                       llvm::ilist_iterator<SILBasicBlock> First,
                       llvm::ilist_iterator<SILBasicBlock> Last) {
   assert(&Parent->getModule() == &SrcTraits.Parent->getModule() &&
-         "Module mismatch!");
+         "module mismatch");
 
   // If we are asked to splice into the same function, don't update parent
   // pointers.
   if (Parent == SrcTraits.Parent)
     return;
 
-  ScopeCloner ScopeCloner(*Parent);
+  ScopeCloner SC(*Parent);
   SILBuilder B(*Parent);
 
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
-    for (auto &II : *First)
-      II.setDebugScope(B,
-                       ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+    for (auto &I : *First)
+      I.setDebugScope(B, SC.getOrCreateClonedScope(I.getDebugScope()));
   }
 }
 

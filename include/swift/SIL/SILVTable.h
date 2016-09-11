@@ -103,35 +103,17 @@ public:
 
 } // end swift namespace
 
-//===----------------------------------------------------------------------===//
-// ilist_traits for SILVTable
-//===----------------------------------------------------------------------===//
-
 namespace llvm {
+template <> struct ilist_node_traits<swift::SILVTable> {
+  static swift::SILVTable *createNode(const swift::SILVTable &);
+  static void deleteNode(swift::SILVTable *VT) { VT->~SILVTable(); }
 
-template <>
-struct ilist_traits<::swift::SILVTable> :
-public ilist_default_traits<::swift::SILVTable> {
-  typedef ::swift::SILVTable SILVTable;
-
-private:
-  mutable ilist_half_node<SILVTable> Sentinel;
-
-public:
-  SILVTable *createSentinel() const {
-    return static_cast<SILVTable*>(&Sentinel);
-  }
-  void destroySentinel(SILVTable *) const {}
-
-  SILVTable *provideInitialHead() const { return createSentinel(); }
-  SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
-  static void noteHead(SILVTable*, SILVTable*) {}
-  static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
-
-private:
-  void createNode(const SILVTable &);
+  void addNodeToList(swift::SILVTable *) {}
+  void removeNodeFromList(swift::SILVTable *) {}
+  void transferNodesFromList(ilist_node_traits<swift::SILVTable> &,
+                             ilist_iterator<swift::SILVTable>,
+                             ilist_iterator<swift::SILVTable>) {}
 };
-
-} // end llvm namespace
+}
 
 #endif

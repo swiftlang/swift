@@ -579,28 +579,4 @@ public:
 
 } } // end namespace swift::constraints
 
-namespace llvm {
-
-/// Specialization of \c ilist_traits for constraints.
-template<>
-struct ilist_traits<swift::constraints::Constraint>
-         : public ilist_default_traits<swift::constraints::Constraint> {
-  typedef swift::constraints::Constraint Element;
-
-  static Element *createNode(const Element &V) = delete;
-  static void deleteNode(Element *V) { /* never deleted */ }
-
-  Element *createSentinel() const { return static_cast<Element *>(&Sentinel); }
-  static void destroySentinel(Element *) {}
-
-  Element *provideInitialHead() const { return createSentinel(); }
-  Element *ensureHead(Element *) const { return createSentinel(); }
-  static void noteHead(Element *, Element *) {}
-
-private:
-  mutable ilist_half_node<Element> Sentinel;
-};
-
-} // end namespace llvm
-
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_H
