@@ -155,8 +155,14 @@ class ASTScope {
   /// whether the children of this node have already been expanded.
   mutable llvm::PointerIntPair<const ASTScope *, 1, bool> parentAndExpanded;
 
-  /// The cached source range.
-  mutable SourceRange CachedSourceRange;
+  /// The scope from which the continuation child nodes will be populated.
+  ///
+  /// The bit indicates whether the continuation is currently active. When set,
+  /// the pointer will be non-null and refers to the scope from which this
+  /// node will draw additional children. When clear, there is no active
+  /// continuation, but the pointer may still point to
+  mutable llvm::PointerIntPair<const ASTScope *, 1, bool> continuation
+    = { nullptr, false };
 
   /// Union describing the various kinds of AST nodes that can introduce
   /// scopes.
@@ -295,6 +301,44 @@ class ASTScope {
 
   /// Child scopes, sorted by source range.
   mutable SmallVector<ASTScope *, 4> storedChildren;
+
+  /// Retrieve the active continuation.
+  const ASTScope *getActiveContinuation() const {
+    if (!continuation.getInt()) return nullptr;
+    assert(continuation.getPointer() != nullptr);
+    return continuation.getPointer();
+  }
+
+  /// Retrieve the next active continuation, i.e., the active continuation's
+  /// active continuation.
+  const ASTScope *getNextActiveContinuation() const {
+    if (auto active = getActiveContinuation()) {
+      if (active != this) return active->getActiveContinuation();
+    }
+
+    return nullptr;
+  }
+
+  /// Retrieve the historical continuation (which might also be active).
+  const ASTScope *getHistoricalContinuation() const {
+    return continuation.getPointer();
+  }
+
+  /// Set the active continuation.
+  void setActiveContinuation(const ASTScope *newContinuation) const {
+    // If we're clearing out the continuation, just clear the bit.
+    if (!newContinuation) {
+      if (getActiveContinuation()) continuation.setInt(false);
+      return;
+    }
+
+    // If we're setting the active continuation, make sure we're not losing
+    // historical information.
+    assert((!continuation.getPointer() ||
+            continuation.getPointer() == newContinuation) &&
+           "Erasing continuation history");
+    continuation.setPointerAndInt(newContinuation, true);
+  }
 
   /// Constructor that only initializes the kind and parent, leaving the
   /// pieces to be initialized by the caller.
@@ -474,18 +518,18 @@ class ASTScope {
   /// introduced by this AST node.
   static ASTScope *createIfNeeded(const ASTScope *parent, ASTNode node);
 
-  /// Determine whether this is a scope from which we can perform a
-  /// continuation.
-  bool isContinuationScope() const;
+  /// Determine whether this scope can steal a continuation from its parent,
+  /// because (e.g.) it introduces some name binding that should be visible
+  /// in the continuation.
+  bool canStealContinuation() const;
 
-  /// Enumerate the continuation scopes for the given parent,
+  /// Enumerate the continuation child scopes for the given scope.
   ///
-  /// Statements, such as 'guard' and local declarations, introduce scopes
-  /// that extend to the end of an enclosing brace-stmt. This
-  /// operation finds each of the "continuation" scopes in the nearest
-  /// enclosing brace statement.
+  /// \param addChild Function that will be invoked to add the continuation
+  /// child. This function should return true if the child steals the
+  /// continuation, which terminates the enumeration.
   void enumerateContinuationScopes(
-         llvm::function_ref<void(ASTScope *)> fn) const;
+         llvm::function_ref<bool(ASTScope *)> addChild) const;
 
   /// Compute the source range of this scope.
   SourceRange getSourceRangeImpl() const;
@@ -515,11 +559,15 @@ public:
 
   /// Determine the source range covered by this scope.
   SourceRange getSourceRange() const {
-    if (CachedSourceRange.isInvalid() ||
-        getKind() == ASTScopeKind::SourceFile) {
-      CachedSourceRange = getSourceRangeImpl();
+    SourceRange range = getSourceRangeImpl();
+
+    // If there was ever a continuation, use it's end range.
+    if (auto historical = getHistoricalContinuation()) {
+      if (historical != this)
+        range.End = historical->getSourceRange().End;
     }
-    return CachedSourceRange;
+
+    return range;
   }
 
   /// Retrieve the local declatation when
