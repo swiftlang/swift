@@ -1892,6 +1892,9 @@ ERROR(escaping_function_type,none,
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 
+NOTE(escaping_optional_type_argument, none,
+     "closure is already escaping in optional type argument", ())
+
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
       "@NSManaged only allowed on an instance property or method", ())
@@ -2053,6 +2056,9 @@ ERROR(enumstruct_convenience_init,none,
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))
+ERROR(cfclass_convenience_init,none,
+      "convenience initializers are not supported in extensions of CF types",
+      ())
 
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "

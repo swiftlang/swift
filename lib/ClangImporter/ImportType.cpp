@@ -2174,9 +2174,9 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
 /// Adjust the result type of a throwing function based on the
 /// imported error information.
-static Type adjustResultTypeForThrowingFunction(
-              const ClangImporter::Implementation::ImportedErrorInfo &errorInfo,
-              Type resultTy) {
+static Type
+adjustResultTypeForThrowingFunction(const ImportedErrorInfo &errorInfo,
+                                    Type resultTy) {
   switch (errorInfo.Kind) {
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
@@ -2197,9 +2197,8 @@ static Type adjustResultTypeForThrowingFunction(
 /// Produce the foreign error convention from the imported error info,
 /// error parameter type, and original result type.
 static ForeignErrorConvention
-getForeignErrorInfo(
-    const ClangImporter::Implementation::ImportedErrorInfo &errorInfo,
-    CanType errorParamTy, CanType origResultTy) {
+getForeignErrorInfo(const ImportedErrorInfo &errorInfo, CanType errorParamTy,
+                    CanType origResultTy) {
   assert(errorParamTy && "not fully initialized!");
   using FEC = ForeignErrorConvention;
   auto ReplaceParamWithVoid = errorInfo.ReplaceParamWithVoid
