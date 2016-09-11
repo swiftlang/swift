@@ -375,6 +375,9 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether this is the type of an editor placeholder.
   TR_EditorPlaceholder = 0x200000,
+
+  /// Whether we are in a type argument for an optional
+  TR_ImmediateOptionalTypeArgument = 0x400000,
 };
 
 /// Option set describing how type resolution should work.
@@ -391,6 +394,7 @@ withoutContext(TypeResolutionOptions options) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_EnumCase;
+  options -= TR_ImmediateOptionalTypeArgument;
   return options;
 }
 

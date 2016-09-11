@@ -2010,8 +2010,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           loc.getAdvancedLoc(-1),
           Lexer::getLocForEndOfToken(SM, loc));
 
-        TC.diagnose(loc, diag::escaping_function_type)
+        TC.diagnose(loc, diag::escaping_non_function_parameter)
             .fixItRemove(attrRange);
+
+        // Try to find a helpful note based on how the type is being used
+        if (options.contains(TR_ImmediateOptionalTypeArgument)) {
+          TC.diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+        }
       }
 
       attrs.clearAttribute(TAK_escaping);
@@ -2432,6 +2437,8 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     // Check the requirements on the generic arguments.
     auto unboundTy = dictDecl->getDeclaredType();
     TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
+    args[0].setType(keyTy, true);
+    args[1].setType(valueTy, true);
 
     if (!TC.applyUnboundGenericArguments(
             unboundTy, dictDecl, repr->getStartLoc(), DC, args,
@@ -2452,9 +2459,12 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
 Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
                                        TypeResolutionOptions options) {
+  auto elementOptions = withoutContext(options);
+  elementOptions |= TR_ImmediateOptionalTypeArgument;
+
   // The T in T? is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
+  Type baseTy = resolveType(repr->getBase(), elementOptions);
   if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
 
   auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
@@ -2466,9 +2476,12 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
 Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
+  auto elementOptions = withoutContext(options);
+  elementOptions |= TR_ImmediateOptionalTypeArgument;
+
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
+  Type baseTy = resolveType(repr->getBase(), elementOptions);
   if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
 
   auto uncheckedOptionalTy =

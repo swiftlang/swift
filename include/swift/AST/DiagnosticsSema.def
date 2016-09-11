@@ -1879,6 +1879,11 @@ ERROR(noescape_conflicts_escaping_autoclosure,none,
 
 ERROR(escaping_function_type,none,
       "@escaping may only be applied to parameters of function type", ())
+ERROR(escaping_non_function_parameter,none,
+      "@escaping attribute may only be used in function parameter position", ())
+
+NOTE(escaping_optional_type_argument, none,
+     "closure is already escaping in optional type argument", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,

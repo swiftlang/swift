@@ -271,7 +271,7 @@ func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // ex
 typealias CompletionHandlerNE = @noescape (_ success: Bool) -> () // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
 
 // Explicit @escaping is not allowed here
-typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{@escaping may only be applied to parameters of function type}}
+typealias CompletionHandlerE = @escaping (_ success: Bool) -> () // expected-error{{@escaping attribute may only be used in function parameter position}} {{32-42=}}
 
 // No @escaping -- it's implicit from context
 typealias CompletionHandler = (_ success: Bool) -> ()
