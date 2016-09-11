@@ -522,17 +522,28 @@ public func expectFalse(_ actual: Bool, ${TRACE}) {
   }
 }
 
+@available(*, deprecated, renamed: "expectNil")
 public func expectEmpty<T>(_ value: T?, ${TRACE}) {
+  expectNil(value, ${trace})
+}
+
+@available(*, deprecated, renamed: "expectNotNil")
+@discardableResult
+public func expectNotEmpty<T>(_ value: T?, ${TRACE}) -> T? {
+  return expectNotNil(value, ${trace})
+}
+
+public func expectNil<T>(_ value: T?, ${TRACE}) {
   if value != nil {
     expectationFailure(
-      "expected optional to be empty\nactual: \"\(value)\"", trace: ${trace})
+      "expected optional to be nil\nactual: \"\(value)\"", trace: ${trace})
   }
 }
 
 @discardableResult
-public func expectNotEmpty<T>(_ value: T?, ${TRACE}) -> T? {
+public func expectNotNil<T>(_ value: T?, ${TRACE}) -> T? {
   if value == nil {
-    expectationFailure("expected optional to be non-empty", trace: ${trace})
+    expectationFailure("expected optional to be non-nil", trace: ${trace})
   }
   return value
 }
