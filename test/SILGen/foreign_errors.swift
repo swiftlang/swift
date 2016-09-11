@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %build-clang-importer-objc-overlays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -31,10 +33,12 @@ func test0() throws {
   // CHECK: assign [[T1]] to [[ERR_TEMP0]]
 
   //   Pull out the boolean value and compare it to zero.
-  // CHECK: [[FN:%.*]] = function_ref @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb
-  // CHECK: [[BOOL:%.*]] = apply [[FN]]([[RESULT]])
-  // CHECK: [[BIT:%.*]] = struct_extract [[BOOL]]
-  // CHECK: cond_br [[BIT]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[BOOL_OR_INT:%.*]] = struct_extract [[RESULT]]
+  // CHECK: [[RAW_VALUE:%.*]] = struct_extract [[BOOL_OR_INT]]
+  //   On some platforms RAW_VALUE will be compared against 0; on others it's
+  //   already an i1 (bool) and those instructions will be skipped. Just do a
+  //   looser check.
+  // CHECK: cond_br {{%.+}}, [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
   try ErrorProne.fail()
 
   //   Normal path: fall out and return.
@@ -228,4 +232,40 @@ func testPreservedResult() throws -> CInt {
 // CHECK: [[NORMAL_BB]]:
 // CHECK-NOT: release
 // CHECK:   return [[RESULT]]
+// CHECK: [[ERROR_BB]]
+
+func testPreservedResultBridged() throws -> Int {
+  return try ErrorProne.ounceWord()
+}
+
+// CHECK-LABEL: sil hidden @_TF14foreign_errors26testPreservedResultBridgedFzT_Si
+// CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounceWord!1.foreign : (ErrorProne.Type) -> () throws -> Int , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int
+// CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:   [[RESULT:%.*]] = apply [[T1]](
+// CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
+// CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
+// CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int{{.*}}"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
+// CHECK:   cond_br [[T2]], [[NORMAL_BB:bb[0-9]+]], [[ERROR_BB:bb[0-9]+]]
+// CHECK: [[NORMAL_BB]]:
+// CHECK-NOT: release
+// CHECK:   return [[RESULT]]
+// CHECK: [[ERROR_BB]]
+
+func testPreservedResultInverted() throws {
+  try ErrorProne.once()
+}
+
+// CHECK-LABEL: sil hidden @_TF14foreign_errors27testPreservedResultInvertedFzT_T_
+// CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.once!1.foreign : (ErrorProne.Type) -> () throws -> () , $@convention(objc_method) (ImplicitlyUnwrappedOptional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:   [[RESULT:%.*]] = apply [[T1]](
+// CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
+// CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
+// CHECK:   [[T2:%.*]] = builtin "cmp_ne_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
+// CHECK:   cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
+// CHECK: [[NORMAL_BB]]:
+// CHECK-NOT: release
+// CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]
