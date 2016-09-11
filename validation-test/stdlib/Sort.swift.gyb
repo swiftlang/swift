@@ -35,7 +35,7 @@ func expectSortedCollection(_ sortedAry: [Int], _ originalAry: [Int]) {
   }
   // Now check if sets of elements are the same in both arrays.
   for (key, value) in sortedVals {
-    expectNotEmpty(originalVals[key])
+    expectNotNil(originalVals[key])
     expectEqual(originalVals[key]!, value)
   }
 

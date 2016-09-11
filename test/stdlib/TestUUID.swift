@@ -80,7 +80,7 @@ class TestUUID : TestUUIDSuper {
         let valFromStr = UUID(uuidString: ref.uuidString)
         expectEqual(ref.uuidString, valFromRef.uuidString)
         expectEqual(ref.uuidString, valFromBytes.uuidString)
-        expectNotEmpty(valFromStr)
+        expectNotNil(valFromStr)
         expectEqual(ref.uuidString, valFromStr!.uuidString)
     }
     

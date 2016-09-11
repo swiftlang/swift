@@ -158,15 +158,15 @@ ClassProperties.test("optionalProp") {
   expectNil(noProp.optionalClassProp)
 
   let hasProp: ProtoWithClassProperty.Type = Subclass.self
-  expectNotEmpty(hasProp.optionalClassProp)
+  expectNotNil(hasProp.optionalClassProp)
   expectEqual(true, hasProp.optionalClassProp!)
 
   let hasOwnProp: ProtoWithClassProperty.Type = SwiftClass.self
-  expectNotEmpty(hasOwnProp.optionalClassProp)
+  expectNotNil(hasOwnProp.optionalClassProp)
   expectEqual(true, hasOwnProp.optionalClassProp!)
 
   let hasPropObjC: ProtoWithClassProperty.Type = ObjCSubclassWithClassProperty.self
-  expectNotEmpty(hasPropObjC.optionalClassProp)
+  expectNotNil(hasPropObjC.optionalClassProp)
   expectEqual(true, hasPropObjC.optionalClassProp!)
 }
 
@@ -183,8 +183,8 @@ ClassProperties.test("namingConflict") {
 
   let sub = NamingConflictSubclass()
   expectNil(sub.prop)
-  expectNotEmpty(type(of: sub).prop)
-  expectNotEmpty(NamingConflictSubclass.prop)
+  expectNotNil(type(of: sub).prop)
+  expectNotNil(NamingConflictSubclass.prop)
 }
 
 extension NamingConflictSubclass : PropertyNamingConflictProto {

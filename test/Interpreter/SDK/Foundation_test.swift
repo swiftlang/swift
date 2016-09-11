@@ -278,7 +278,7 @@ FoundationTestSuite.test("NSKeyedUnarchiver/decodeObjectOfClass(_:forKey:)") {
   expectType((NSPredicate?).self, &missing)
 
   var decoded = KU.decodeObject(of: NSPredicate.self, forKey: KEY)
-  expectNotEmpty(decoded)
+  expectNotNil(decoded)
   expectType((NSPredicate?).self, &decoded)
 
   var wrongType = KU.decodeObject(of: DateFormatter.self, forKey: KEY)

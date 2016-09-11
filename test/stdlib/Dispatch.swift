@@ -26,12 +26,12 @@ DispatchAPI.test("OS_OBJECT support") {
   expectTrue(mainQueue is DispatchQueue)
 
   // This should not be optimized out, and should succeed.
-  expectNotEmpty(mainQueue as? DispatchQueue)
+  expectNotNil(mainQueue as? DispatchQueue)
 }
 
 DispatchAPI.test("DispatchGroup creation") {
   let group = DispatchGroup()
-  expectNotEmpty(group)
+  expectNotNil(group)
 }
 
 DispatchAPI.test("dispatch_block_t conversions") {

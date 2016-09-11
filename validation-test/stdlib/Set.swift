@@ -1005,7 +1005,7 @@ SetTestSuite.test("COW.Fast.FirstDoesNotReallocate") {
   var s = getCOWFastSet()
   var identity1 = s._rawIdentifier()
 
-  expectNotEmpty(s.first)
+  expectNotNil(s.first)
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1021,7 +1021,7 @@ SetTestSuite.test("COW.Slow.FirstDoesNotReallocate") {
   var s = getCOWSlowSet()
   var identity1 = s._rawIdentifier()
 
-  expectNotEmpty(s.first)
+  expectNotNil(s.first)
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1236,7 +1236,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.SetIsCopied") {
   expectTrue(isCocoaSet(s))
 
   expectTrue(s.contains(TestObjCKeyTy(1010)))
-  expectNotEmpty(nss.member(TestObjCKeyTy(1010)))
+  expectNotNil(nss.member(TestObjCKeyTy(1010)))
 
   nss.remove(TestObjCKeyTy(1010))
   expectNil(nss.member(TestObjCKeyTy(1010)))
@@ -1249,7 +1249,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
   expectTrue(isNativeSet(s))
 
   expectTrue(s.contains(TestBridgedKeyTy(1010)))
-  expectNotEmpty(nss.member(TestBridgedKeyTy(1010) as AnyObject))
+  expectNotNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))
 
   nss.remove(TestBridgedKeyTy(1010) as AnyObject)
   expectNil(nss.member(TestBridgedKeyTy(1010) as AnyObject))

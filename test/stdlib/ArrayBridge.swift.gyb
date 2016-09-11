@@ -259,28 +259,28 @@ tests.test("Another/${Any}") {
   let subclass2 = subclassInBaseBuffer
   
   // Explicit downcast-ability is based on element type, not buffer type
-  expectNotEmpty(subclassInBaseBuffer as? [Subclass])
+  expectNotNil(subclassInBaseBuffer as? [Subclass])
 
   // We can up-cast to array of Any
   let subclassAsAnyArray: [${Any}] = subclassInBaseBuffer
   expectEqual(subclass2, subclassAsAnyArray.map { $0 as! Base })
 
   let downcastBackToBase = subclassAsAnyArray as? [Base]
-  expectNotEmpty(downcastBackToBase)
+  expectNotNil(downcastBackToBase)
 
-  if let downcastBackToSubclass = expectNotEmpty(subclassAsAnyArray as? [Subclass]) {
+  if let downcastBackToSubclass = expectNotNil(subclassAsAnyArray as? [Subclass]) {
     expectEqual(subclass2, downcastBackToSubclass)
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Fooable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Barable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable & Fooable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Barable & Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
@@ -364,7 +364,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   }
 
   // Downcasts of up-casted arrays.
-  if let downcasted = expectNotEmpty(
+  if let downcasted = expectNotNil(
     bridgeableValuesAsAnys as? [Subclass]
   ) {
     expectEqualSequence(expectedSubclasses, downcasted)

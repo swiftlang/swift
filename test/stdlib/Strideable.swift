@@ -213,7 +213,7 @@ func strideIteratorTest<
 >(_ stride: Stride, nonNilResults: Int) {
   var i = stride.makeIterator()
   for _ in 0..<nonNilResults {
-     expectNotEmpty(i.next())
+     expectNotNil(i.next())
   }
   for _ in 0..<10 {
     expectNil(i.next())

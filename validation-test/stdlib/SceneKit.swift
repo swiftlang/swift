@@ -354,7 +354,7 @@ if #available(iOS 8.0, *) {
       var unarchivedPlaneNode_nil =
         sceneSource.entryWithIdentifier("plane-node", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedPlaneGeometry)
+      expectNotNil(unarchivedPlaneGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedPlaneGeometry)
 
       expectNil(unarchivedPlaneNode_nil)
@@ -366,7 +366,7 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxGeometry_nil =
         sceneSource.entryWithIdentifier("box-node", withClass: SCNGeometry.self)
 
-      expectNotEmpty(unarchivedBoxGeometry)
+      expectNotNil(unarchivedBoxGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedBoxGeometry)
 
       expectNil(unarchivedBoxGeometry_nil)
@@ -378,7 +378,7 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxNode_nil =
         sceneSource.entryWithIdentifier("box", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedBoxNode)
+      expectNotNil(unarchivedBoxNode)
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
       expectNil(unarchivedBoxNode_nil)

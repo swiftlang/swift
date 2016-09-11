@@ -88,7 +88,7 @@ FloatingPointConversionFailures.test("${OtherFloat}To${Self}FailableConversion")
   input in
   let result = ${Self}(exactly: input)
 %   if OtherSignificandBits <= SelfSignificandBits:
-  if let result = expectNotEmpty(result) {
+  if let result = expectNotNil(result) {
     // FIXME: we should have a stronger postcondition here.
     expectEqual(input, ${OtherFloat}(result))
   }

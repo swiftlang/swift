@@ -71,7 +71,7 @@ GamePlayKitTests.test("GKEntity.component(ofType)") {
     var componentForOtherTestComponent_nil =
       entity.component(ofType: OtherTestComponent.self)
 
-    expectNotEmpty(componentForTestComponent)
+    expectNotNil(componentForTestComponent)
     expectType(Optional<TestComponent>.self, &componentForTestComponent)
 
     expectNil(componentForOtherTestComponent_nil)
@@ -86,7 +86,7 @@ GamePlayKitTests.test("GKEntity.component(ofType)") {
     var componentForTestComponent_nil =
       entity.component(ofType: TestComponent.self)
 
-    expectNotEmpty(componentForOtherTestComponent)
+    expectNotNil(componentForOtherTestComponent)
     expectType(Optional<OtherTestComponent>.self, &componentForOtherTestComponent)
 
     expectNil(componentForTestComponent_nil)
@@ -104,7 +104,7 @@ GamePlayKitTests.test("GKStateMachine.state(forClass:)") {
     var stateForTestState2_nil =
       stateMachine.state(forClass: TestState2.self)
 
-    expectNotEmpty(stateForTestState1)
+    expectNotNil(stateForTestState1)
     expectType(Optional<TestState1>.self, &stateForTestState1)
 
     expectNil(stateForTestState2_nil)
@@ -120,7 +120,7 @@ GamePlayKitTests.test("GKStateMachine.state(forClass:)") {
     var stateForTestState1_nil =
       stateMachine.state(forClass: TestState1.self)
 
-    expectNotEmpty(stateForTestState2)
+    expectNotNil(stateForTestState2)
     expectType(Optional<TestState2>.self, &stateForTestState2)
 
     expectNil(stateForTestState1_nil)

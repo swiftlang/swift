@@ -359,7 +359,7 @@ tests.test("ForwardCollection") {
   expectEqual(a0, a1)
   for e in a0 {
     let i = fc0.index(of: e)
-    expectNotEmpty(i)
+    expectNotNil(i)
     expectEqual(e, fc0[i!])
   }
   for i in fc0.indices {
@@ -373,7 +373,7 @@ tests.test("BidirectionalCollection") {
   let fc0 = AnyCollection(a0.lazy.reversed())
   
   let bc0_ = AnyBidirectionalCollection(fc0)  // upgrade!
-  expectNotEmpty(bc0_)
+  expectNotNil(bc0_)
   let bc0 = bc0_!
   expectTrue(storesSameUnderlyingCollection(fc0, bc0))
 
@@ -387,7 +387,7 @@ tests.test("BidirectionalCollection") {
   expectEqual(a0, a1)
   for e in a0 {
     let i = bc0.index(of: e)
-    expectNotEmpty(i)
+    expectNotNil(i)
     expectEqual(e, bc0[i!])
   }
   for i in bc0.indices {
@@ -408,7 +408,7 @@ tests.test("RandomAccessCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
   let fc0 = AnyCollection(a0.lazy.reversed())
   let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
-  expectNotEmpty(rc0_)
+  expectNotNil(rc0_)
   let rc0 = rc0_!
   expectTrue(storesSameUnderlyingCollection(rc0, fc0))
 
@@ -422,7 +422,7 @@ tests.test("RandomAccessCollection") {
   expectEqual(a0, a1)
   for e in a0 {
     let i = rc0.index(of: e)
-    expectNotEmpty(i)
+    expectNotNil(i)
     expectEqual(e, rc0[i!])
   }
   for i in rc0.indices {

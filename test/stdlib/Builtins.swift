@@ -164,8 +164,8 @@ class C : B {}
 tests.test("_getSuperclass") {
   expectNil(_getSuperclass(A.self))
   expectNil(_getSuperclass(Classy.self))
-  expectNotEmpty(_getSuperclass(B.self))
-  expectNotEmpty(_getSuperclass(C.self))
+  expectNotNil(_getSuperclass(B.self))
+  expectNotNil(_getSuperclass(C.self))
   expectTrue(_getSuperclass(B.self)! == A.self)
   expectTrue(_getSuperclass(C.self)! == B.self)
 }
