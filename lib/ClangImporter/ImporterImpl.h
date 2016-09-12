@@ -338,9 +338,6 @@ public:
   llvm::DenseMap<std::pair<NominalTypeDecl *, const clang::Module *>,
                  ExtensionDecl *> extensionPoints;
 
-  /// Is the given identifier a reserved name in Swift?
-  static bool isSwiftReservedName(StringRef name);
-
   /// Translation API nullability from an API note into an optional kind.
   static OptionalTypeKind translateNullability(clang::NullabilityKind kind);
 
@@ -356,12 +353,6 @@ public:
   /// Determine whether the given method is a required initializer
   /// of the given class.
   bool isRequiredInitializer(const clang::ObjCMethodDecl *method);
-
-  /// Determine whether the given class method should be imported as
-  /// an initializer.
-  static FactoryAsInitKind
-  getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
-                   const clang::ObjCMethodDecl *method);
 
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
@@ -398,11 +389,6 @@ public:
   /// Whether we should suppress the import of the given Clang declaration.
   static bool shouldSuppressDeclImport(const clang::Decl *decl);
 
-  /// Whether we should suppress importing the Objective-C generic type params
-  /// of this class as Swift generic type params.
-  static bool shouldSuppressGenericParamsImport(
-      const clang::ObjCInterfaceDecl *decl);
-
   /// \brief Check if the declaration is one of the specially handled
   /// accessibility APIs.
   ///
@@ -413,20 +399,6 @@ public:
   /// Determine whether this method is an Objective-C "init" method
   /// that will be imported as a Swift initializer.
   static bool isInitMethod(const clang::ObjCMethodDecl *method);
-
-  /// Determine whether this Objective-C method should be imported as
-  /// an initializer.
-  ///
-  /// \param prefixLength Will be set to the length of the prefix that
-  /// should be stripped from the first selector piece, e.g., "init"
-  /// or the restated name of the class in a factory method.
-  ///
-  ///  \param kind Will be set to the kind of initializer being
-  ///  imported. Note that this does not distinguish designated
-  ///  vs. convenience; both will be classified as "designated".
-  static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
-                                        unsigned &prefixLength,
-                                        CtorInitializerKind &kind);
 
 private:
   /// \brief Generation number that is used for crude versioning.
@@ -745,13 +717,6 @@ public:
   /// or a null type if the DeclContext does not have a corresponding type.
   static clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
 
-  /// Determine whether this typedef is a CF type.
-  static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-  /// Determine the imported CF type for the given typedef-name, or the empty
-  /// string if this is not an imported CF type name.
-  static StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
-
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
   static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
@@ -799,11 +764,6 @@ public:
   /// or the 'Rename' field of AvailableAttr.
   void printSwiftName(importer::ImportedName, bool fullyQualified,
                       llvm::raw_ostream &os);
-
-  /// Retrieve the property type as determined by the given accessor.
-  static clang::QualType
-  getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
-                          Optional<unsigned> selfIndex);
 
   /// \brief Import the given Clang identifier into Swift.
   ///

@@ -1514,9 +1514,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         return {false, expr};
       }
 
-      // Let's not attempt to type-check closures or default values,
-      // which has already been type checked anyway.
-      if (isa<ClosureExpr>(expr) || isa<DefaultValueExpr>(expr)) {
+      // Let's not attempt to type-check closures, which has already been
+      // type checked anyway.
+      if (isa<ClosureExpr>(expr)) {
         return { false, expr };
       }
 

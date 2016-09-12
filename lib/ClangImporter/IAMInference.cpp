@@ -503,8 +503,7 @@ private:
 static StringRef getTypeName(clang::QualType qt) {
   if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
     // Check for a CF type name (drop the "Ref")
-    auto cfName = ClangImporter::Implementation::getCFTypeName(
-        typedefTy->getDecl()->getCanonicalDecl());
+    auto cfName = getCFTypeName(typedefTy->getDecl()->getCanonicalDecl());
     if (cfName != StringRef())
       return cfName;
   }

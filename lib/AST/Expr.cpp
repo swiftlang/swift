@@ -178,9 +178,6 @@ Expr *Expr::getSemanticsProvidingExpr() {
   if (TryExpr *TE = dyn_cast<TryExpr>(this))
     return TE->getSubExpr()->getSemanticsProvidingExpr();
 
-  if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
-    return DE->getSubExpr()->getSemanticsProvidingExpr();
-  
   return this;
 }
 
@@ -343,7 +340,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(OptionalEvaluation)
     NON_LVALUE_EXPR(If)
     NON_LVALUE_EXPR(Assign)
-    NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
@@ -485,7 +481,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(If);
   NO_REFERENCE(EnumIsCase);
   NO_REFERENCE(Assign);
-  NO_REFERENCE(DefaultValue);
   NO_REFERENCE(CodeCompletion);
   NO_REFERENCE(UnresolvedPattern);
   NO_REFERENCE(EditorPlaceholder);
@@ -768,7 +763,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Arrow:
   case ExprKind::If:
   case ExprKind::Assign:
-  case ExprKind::DefaultValue:
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
     return false;

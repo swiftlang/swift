@@ -1439,12 +1439,6 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 
 #pragma mark Importing names
 
-/// \brief Determine whether the given name is reserved for Swift.
-bool ClangImporter::Implementation::isSwiftReservedName(StringRef name) {
-  tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
-  return (kind != tok::identifier);
-}
-
 clang::DeclarationName
 ClangImporter::Implementation::exportName(Identifier name) {
   // FIXME: When we start dealing with C++, we can map over some operator
@@ -1642,23 +1636,6 @@ bool ClangImporter::Implementation::isRequiredInitializer(
   return false;
 }
 
-FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
-                    const clang::ObjCInterfaceDecl *classDecl,
-                    const clang::ObjCMethodDecl *method) {
-  if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
-    if (customNameAttr->getName().startswith("init("))
-      return FactoryAsInitKind::AsInitializer;
-    else
-      return FactoryAsInitKind::AsClassMethod;
-  }
-
-  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
-    return FactoryAsInitKind::AsClassMethod;
-  }
-
-  return FactoryAsInitKind::Infer;
-}
-
 /// Check if this method is declared in the context that conforms to
 /// NSAccessibility.
 static bool
@@ -1805,21 +1782,6 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
     return false;
   }
 
-  return false;
-}
-
-bool
-ClangImporter::Implementation::shouldSuppressGenericParamsImport(
-    const clang::ObjCInterfaceDecl *decl) {
-  while (decl) {
-    StringRef name = decl->getName();
-    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator" ||
-        name == "NSMeasurement") {
-      return true;
-    }
-    decl = decl->getSuperClass();
-  }
   return false;
 }
 
