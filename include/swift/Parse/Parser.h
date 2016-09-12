@@ -121,8 +121,6 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  bool GreaterThanIsOperator = true;
-
   /// FIXME: Temporary hack to keep the selector-style declaration
   /// syntax working.
   bool ArgumentIsParameter = false;
@@ -219,24 +217,6 @@ public:
 
     void pop() {
       CC.pop();
-    }
-  };
-
-  /// A RAII object for temporarily changing whether an operator starting with
-  /// '>' is an operator.
-  class GreaterThanIsOperatorRAII {
-    Parser &P;
-    bool OldValue;
-
-  public:
-    GreaterThanIsOperatorRAII(Parser &p, bool newValue)
-      : P(p), OldValue(p.GreaterThanIsOperator)
-    {
-      P.GreaterThanIsOperator = newValue;
-    }
-
-    ~GreaterThanIsOperatorRAII() {
-      P.GreaterThanIsOperator = OldValue;
     }
   };
 
