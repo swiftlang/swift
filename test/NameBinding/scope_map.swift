@@ -197,12 +197,17 @@ class LazyProperties {
 // RUN: %FileCheck -check-prefix CHECK-EXPANDED %s < %t.expanded
 
 // CHECK-EXPANDED: SourceFile{{.*}}scope_map.swift{{.*}}expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} S0 [4:1 - 6:1] expanded
 // CHECK-EXPANDED-NEXT: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
+// CHECK-EXPANDED-NEXT: -TypeDecl {{.*}} InnerC0 [5:3 - 5:19] expanded
 // CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
 // CHECK-EXPANDED-NEXT: -ExtensionGenericParams {{.*}} extension of 'S0' [8:14 - 9:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} extension of 'S0' [8:14 - 9:1] expanded
-// CHECK-EXPANDED-NEXT: |-TypeOrExtensionBody {{.*}} 'C0' [11:10 - 12:1] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} C0 [11:1 - 12:1] expanded
+// CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'C0' [11:10 - 12:1] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} E0 [14:1 - 17:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'E0' [14:9 - 17:1] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} GenericS0 [19:1 - 20:1] expanded
 // CHECK-EXPANDED-NEXT: -GenericParams {{.*}} param 0 [19:18 - 20:1] expanded
 // CHECK-EXPANDED-NEXT:   -GenericParams {{.*}} param 1 [19:21 - 20:1] expanded
 // CHECK-EXPANDED-NEXT:     -TypeOrExtensionBody {{.*}} 'GenericS0' [19:24 - 20:1] expanded
@@ -215,6 +220,7 @@ class LazyProperties {
 // CHECK-EXPANDED:            `-AbstractFunctionParams {{.*}} genericFunc0(t:u:i:) param 0:2 [22:46 - 23:1] expanded
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionBody {{.*}} genericFunc0(t:u:i:) [22:50 - 23:1] expanded
 // CHECK-EXPANDED-NEXT:         -BraceStmt {{.*}} [22:50 - 23:1] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} ContainsGenerics0 [25:1 - 31:1] expanded
 // CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
 // CHECK-EXPANDED-NEXT:  -AbstractFunctionDecl {{.*}} init(t:u:) [26:3 - 27:3] expanded
 // CHECK-EXPANDED-NEXT:   -GenericParams {{.*}} param 0 [26:8 - 27:3] expanded
@@ -228,8 +234,10 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:   -AbstractFunctionParams {{.*}} deinit param 0:0 [29:3 - 30:3] expanded
 // CHECK-EXPANDED-NEXT:     `-AbstractFunctionBody {{.*}} deinit [29:10 - 30:3] expanded
 // CHECK-EXPANDED-NEXT:     -BraceStmt {{.*}} [29:10 - 30:3] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} GenericAlias0 [33:1 - 33:32] expanded
 // CHECK-EXPANDED-NEXT: -GenericParams {{.*}} param 0 [33:25 - 33:32] expanded
-// CHECK-EXPANDED-NEXT: {{^[|`]}}-TypeOrExtensionBody {{.*}} '{{.*}}ArchStruct' [{{.*}}] expanded
+// CHECK-EXPANDED-NEXT: TypeDecl {{.*}} {{.*}}ArchStruct [{{.*}}] expanded
+// CHECK-EXPANDED-NEXT: TypeOrExtensionBody {{.*}} '{{.*}}ArchStruct' [{{.*}}] expanded
 // CHECK-EXPANDED-NEXT: {{^}}|-AbstractFunctionDecl {{.*}} functionBodies1(a:b:) [41:1 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:1 [41:36 - 100:1] expanded
@@ -263,15 +271,14 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}                |-PatternInitializer {{.*}} entry 0 [54:14 - 54:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [54:14 - 56:3] expanded
 // CHECK-EXPANDED: {{^}}                `-AfterPatternBinding {{.*}} entry 0 [55:14 - 56:3] expanded
-// CHECK-EXPANDED-NEXT: {{^}}            `-LocalDeclaration {{.*}} [57:3 - 100:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}              |-AbstractFunctionDecl {{.*}} f(_:) [57:3 - 57:38] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                `-AbstractFunctionParams {{.*}} f(_:) param 0:0 [57:15 - 57:38] expanded
+// CHECK-EXPANDED-NEXT: {{^}}              `-AbstractFunctionDecl {{.*}} f(_:) [57:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                |-AbstractFunctionParams {{.*}} f(_:) param 0:0 [57:15 - 57:38] expanded
 // CHECK-EXPANDED-NEXT:                       `-AbstractFunctionBody {{.*}} f(_:) [57:27 - 57:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  `-BraceStmt {{.*}} [57:27 - 57:38] expanded
 // CHECK-EXPANDED: {{^}}              `-AfterPatternBinding {{.*}} entry 0 [58:16 - 100:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                `-LocalDeclaration {{.*}} [59:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                `-TypeDecl {{.*}} S7 [59:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                  |-TypeOrExtensionBody {{.*}} 'S7' [59:13 - 59:15] expanded
-// CHECK-EXPANDED-NEXT: {{^}}                  `-LocalDeclaration {{.*}} [60:3 - 100:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}                  `-TypeDecl {{.*}} S7Alias [60:3 - 100:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                    |-IfStmt {{.*}} [62:3 - 66:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                      |-ConditionalClause {{.*}} index 0 [62:18 - 64:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                        `-ConditionalClause {{.*}} index 1 [62:29 - 64:3] expanded
@@ -316,7 +323,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}                            `-ForStmtInitializer {{.*}} [99:17 - 99:38] expanded
 // CHECK-EXPANDED-NEXT: {{^}}                              `-BraceStmt {{.*}} [99:36 - 99:38] expanded
 
-// CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'StructContainsAbstractStorageDecls' [114:43 - 130:1] expanded
+// CHECK-EXPANDED:        TypeDecl {{.*}} StructContainsAbstractStorageDecls [114:1 - 130:1] expanded
+// CHECK-EXPANDED-NEXT: `-TypeOrExtensionBody {{.*}} 'StructContainsAbstractStorageDecls' [114:43 - 130:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  |-Accessors {{.*}} scope_map.(file).StructContainsAbstractStorageDecls.subscript@{{.*}}scope_map.swift:115:3 [115:37 - 121:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}  |-AbstractFunctionDecl {{.*}} _ [116:5 - 117:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [116:5 - 117:5] expanded
@@ -343,7 +351,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:              `-AbstractFunctionBody {{.*}} _ [127:9 - 128:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-BraceStmt {{.*}} [127:9 - 128:5] expanded
 
-// CHECK-EXPANDED: {{^}}|-TypeOrExtensionBody {{.*}} 'ClassWithComputedProperties' [132:35 - 140:1] expanded
+// CHECK-EXPANDED:  TypeDecl {{.*}} ClassWithComputedProperties [132:1 - 140:1] expanded
+// CHECK-EXPANDED-NEXT: -TypeOrExtensionBody {{.*}} 'ClassWithComputedProperties' [132:35 - 140:1] expanded
 // CHECK-EXPANDED: {{^}}  `-Accessors {{.*}} scope_map.(file).ClassWithComputedProperties.willSetProperty@{{.*}}scope_map.swift:133:7 [133:32 - 135:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}   `-AbstractFunctionDecl {{.*}} _ [134:5 - 134:15] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} _ param 0:0 [134:5 - 134:15] expanded
@@ -366,8 +375,7 @@ class LazyProperties {
 // CHECK-EXPANDED: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [149:3 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}          `-LocalDeclaration {{.*}} [150:25 - 155:1] expanded
-// CHECK-EXPANDED-NEXT: {{^}}           |-AbstractFunctionDecl {{.*}} _ [150:25 - 152:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}}           `-AbstractFunctionDecl {{.*}} _ [150:25 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}            `-BraceStmt {{.*}} [150:25 - 152:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}              `-BraceStmt {{.*}} [154:6 - 154:8] expanded
 
@@ -381,12 +389,12 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [161:10 - 161:19] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [161:10 - 161:19] expanded
 
-// CHECK-EXPANDED: |-TopLevelCode {{.*}} [164:1 - 164:16] expanded
-// CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [164:1 - 164:16] expanded
-// CHECK-EXPANDED-NEXT: {{^}}    `-Closure {{.*}} [164:1 - 164:14] expanded
+// CHECK-EXPANDED: `-TopLevelCode {{.*}} [164:1 - [[EOF:[0-9]+:[0-9]+]]] expanded
+// CHECK-EXPANDED-NEXT: {{^}}  `-BraceStmt {{.*}} [164:1 - [[EOF]]] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    |-Closure {{.*}} [164:1 - 164:14] expanded
 // CHECK-EXPANDED-NEXT: {{^}}      `-BraceStmt {{.*}} [164:1 - 164:14] expanded
 
-// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - 175:1] expanded
+// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - [[EOF]]] expanded
 // CHECK-EXPANDED: {{^}}    |-DefaultArgument {{.*}} [166:32 - 166:32] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionParams {{.*}} defaultArguments(i:j:) param 0:0 [166:32 - 175:1] expanded
 // CHECK-EXPANDED: {{^}}        |-DefaultArgument {{.*}} [167:32 - 167:48] expanded
@@ -403,7 +411,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionParams {{.*}} _ param 1:0 [183:39 - 183:39] expanded
 // CHECK-EXPANDED-NEXT:           `-AbstractFunctionParams {{.*}} _ param 1:1 [183:39 - 183:39] expanded
 
-// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - 188:1] expanded
+// CHECK-EXPANDED: -AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - [[EOF]]] expanded
 // CHECK-EXPANDED:  `-BraceStmt {{.*}} [186:36 - 188:1] expanded
 // CHECK-EXPANDED-NEXT:    `-PatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
 // CHECK-EXPANDED-NEXT:      `-AfterPatternBinding {{.*}} entry 0 [187:7 - 188:1] expanded
@@ -453,11 +461,12 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: Local bindings: self
 
 // CHECK-SEARCHES-LABEL: ***Complete scope map***
-// CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - {{.*}}:1] expanded
+// CHECK-SEARCHES-NEXT: SourceFile {{.*}} '{{.*}}scope_map.swift' [1:1 - [[EOF:[0-9]+:[0-9]+]]] unexpanded
 // CHECK-SEARCHES: TypeOrExtensionBody {{.*}} 'S0' [4:11 - 6:1] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'InnerC0' [5:17 - 5:19] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}
-// CHECK-SEARCHES: |-TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
+// CHECK-SEARCHES: -TypeDecl {{.*}} ContainsGenerics0 [25:1 - 31:1] expanded
+// CHECK-SEARCHES-NEXT: `-TypeOrExtensionBody {{.*}} 'ContainsGenerics0' [25:25 - 31:1] expanded
 // CHECK-SEARCHES-NEXT:   |-AbstractFunctionDecl {{.*}} init(t:u:) [26:3 - 27:3] expanded
 // CHECK-SEARCHES-NEXT:   `-GenericParams {{.*}} param 0 [26:8 - 27:3] expanded
 // CHECK-SEARCHES-NEXT:     `-GenericParams {{.*}} param 1 [26:11 - 27:3] expanded
@@ -468,14 +477,19 @@ class LazyProperties {
 // CHECK-SEARCHES: |-AbstractFunctionDecl {{.*}} functionBodies1(a:b:) [41:1 - 100:1] expanded
 // CHECK-SEARCHES: `-AbstractFunctionParams {{.*}} functionBodies1(a:b:) param 0:0 [41:25 - 100:1] expanded
 // CHECK-SEARCHES: |-AbstractFunctionDecl {{.*}} throwing() [102:1 - 102:26] unexpanded
-// CHECK-SEARCHES: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - 175:1] expanded
+// CHECK-SEARCHES: -AbstractFunctionDecl {{.*}} defaultArguments(i:j:) [166:1 - [[EOF]]] expanded
 // CHECK-SEARCHES: DefaultArgument {{.*}} [166:32 - 166:32] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES: `-TypeDecl {{.*}} PatternInitializers [177:1 - [[EOF]]] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'PatternInitializers' [177:28 - 180:1] expanded
 // CHECK-SEARCHES:    |-PatternBinding {{.*}} entry 0 [178:7 - 178:21] unexpanded
 // CHECK-SEARCHES:    `-PatternBinding {{.*}} entry 1 [179:7 - 179:25] expanded
 // CHECK-SEARCHES:      `-PatternInitializer {{.*}} entry 1 [179:16 - 179:25] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES:    `-TypeDecl {{.*}} ProtoWithSubscript [182:1 - [[EOF]]] expanded
+// CHECK-SEARCHES-NOT: {{ expanded}}
+// CHECK-SEARCHES: `-AbstractFunctionDecl {{.*}} localPatternsWithSharedType() [186:1 - [[EOF]]] expanded
+// CHECK-SEARCHES: `-TypeDecl {{.*}} LazyProperties [190:1 - [[EOF]]] expanded
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'LazyProperties' [190:22 - 194:1] expanded
 // CHECK-SEARCHES-NEXT:   |-PatternBinding {{.*}} entry 0 [191:7 - 191:20] unexpanded
 // CHECK-SEARCHES-NEXT:   `-PatternBinding {{.*}} entry 0 [193:12 - 193:29] expanded

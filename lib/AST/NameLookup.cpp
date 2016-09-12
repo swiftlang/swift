@@ -403,7 +403,6 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
   case ASTScopeKind::TypeOrExtensionBody:
-  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::PatternBinding:
@@ -428,8 +427,9 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   case ASTScopeKind::PatternInitializer:  // lazy var 'self'
     return DeclVisibilityKind::FunctionParameter;
 
+  case ASTScopeKind::TypeDecl:
+  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AfterPatternBinding:
-  case ASTScopeKind::LocalDeclaration:
   case ASTScopeKind::ConditionalClause:
   case ASTScopeKind::ForEachPattern:
   case ASTScopeKind::CatchStmt:
