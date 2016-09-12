@@ -1680,6 +1680,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool HaveLParen = false;
   bool HaveRParen = false;
   bool IsSuperRefExpr = false;
+  bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
   bool IsDynamicLookup = false;
   bool PreferFunctionReferencesToCalls = false;
@@ -1833,6 +1834,8 @@ public:
   void setIsSuperRefExpr() {
     IsSuperRefExpr = true;
   }
+
+  void setIsSelfRefExpr(bool value) { IsSelfRefExpr = value; }
 
   void setIsKeyPathExpr() {
     IsKeyPathExpr = true;
@@ -2533,7 +2536,7 @@ public:
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
-                          Optional<Type> Result,
+                          Optional<Type> Result, bool IsOnMetatype = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD);
@@ -2544,7 +2547,7 @@ public:
                             ->castTo<AnyFunctionType>();
 
     bool needInit = false;
-    if (IsSuperRefExpr) {
+    if (!IsOnMetatype) {
       assert(addName.empty());
       assert(isa<ConstructorDecl>(CurrDeclContext) &&
              "can call super.init only inside a constructor");
@@ -2626,7 +2629,8 @@ public:
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
-        addConstructorCall(cast<ConstructorDecl>(init), Reason, None, name);
+        addConstructorCall(cast<ConstructorDecl>(init), Reason, None,
+                           /*IsOnMetatype=*/true, name);
       }
     }
   }
@@ -2880,10 +2884,10 @@ public:
           }
           addConstructorCall(CD, Reason, Result);
         }
-        if (IsSuperRefExpr) {
+        if (IsSuperRefExpr || IsSelfRefExpr) {
           if (!isa<ConstructorDecl>(CurrDeclContext))
             return;
-          addConstructorCall(CD, Reason, None);
+          addConstructorCall(CD, Reason, None, /*IsOnMetatype=*/false);
         }
         return;
       }
@@ -5094,6 +5098,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
+  if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
+    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
+  }
+
   if (isInsideObjCSelector())
     Lookup.includeInstanceMembers();
   if (PreferFunctionReferencesToCalls)
