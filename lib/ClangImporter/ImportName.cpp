@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CFTypeInfo.h"
 #include "IAMInference.h"
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
@@ -302,6 +303,13 @@ static OptionalTypeKind getResultOptionality(
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
+/// \brief Determine whether the given name is reserved for Swift.
+static bool isSwiftReservedName(StringRef name) {
+  tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
+  return (kind != tok::identifier);
+}
+
+
 static Optional<ImportedErrorInfo>
 considerErrorImport(ClangImporter::Implementation &importer,
                     const clang::ObjCMethodDecl *clangDecl,
@@ -354,7 +362,7 @@ considerErrorImport(ClangImporter::Implementation &importer,
 
       if (!suffixToStrip.empty()) {
         StringRef newBaseName = baseName.drop_back(suffixToStrip.size());
-        if (newBaseName.empty() || importer.isSwiftReservedName(newBaseName)) {
+        if (newBaseName.empty() || isSwiftReservedName(newBaseName)) {
           adjustName = false;
           suffixToStrip = {};
         } else {
@@ -786,12 +794,40 @@ determineCtorInitializerKind(const clang::ObjCMethodDecl *method) {
   return None;
 }
 
-bool ClangImporter::Implementation::shouldImportAsInitializer(
-       const clang::ObjCMethodDecl *method,
-       unsigned &prefixLength,
-       CtorInitializerKind &kind) {
+/// Determine whether the given class method should be imported as
+/// an initializer.
+static FactoryAsInitKind
+getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
+                 const clang::ObjCMethodDecl *method) {
+  if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
+    if (customNameAttr->getName().startswith("init("))
+      return FactoryAsInitKind::AsInitializer;
+    else
+      return FactoryAsInitKind::AsClassMethod;
+  }
+
+  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
+    return FactoryAsInitKind::AsClassMethod;
+  }
+
+  return FactoryAsInitKind::Infer;
+}
+
+/// Determine whether this Objective-C method should be imported as
+/// an initializer.
+///
+/// \param prefixLength Will be set to the length of the prefix that
+/// should be stripped from the first selector piece, e.g., "init"
+/// or the restated name of the class in a factory method.
+///
+///  \param kind Will be set to the kind of initializer being
+///  imported. Note that this does not distinguish designated
+///  vs. convenience; both will be classified as "designated".
+static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
+                                      unsigned &prefixLength,
+                                      CtorInitializerKind &kind) {
   /// Is this an initializer?
-  if (isInitMethod(method)) {
+  if (ClangImporter::Implementation::isInitMethod(method)) {
     prefixLength = 4;
     kind = CtorInitializerKind::Designated;
     return true;
