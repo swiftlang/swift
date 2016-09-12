@@ -156,14 +156,27 @@ class ASTScope {
   /// whether the children of this node have already been expanded.
   mutable llvm::PointerIntPair<const ASTScope *, 1, bool> parentAndExpanded;
 
+  /// Describes the kind of continuation stored in the continuation field.
+  enum class ContinuationKind {
+    /// The continuation is historical: if the continuation is non-null, we
+    /// preserve it so we know which scope to look at to compute the end of the
+    /// source range.
+    Historical = 0,
+    /// The continuation is active.
+    Active = 1,
+    /// The continuation stored in the pointer field is active, and replaced a
+    /// \c SourceFile continuation.
+    ActiveThenSourceFile = 2,
+  };
+
   /// The scope from which the continuation child nodes will be populated.
   ///
-  /// The bit indicates whether the continuation is currently active. When set,
-  /// the pointer will be non-null and refers to the scope from which this
-  /// node will draw additional children. When clear, there is no active
-  /// continuation, but the pointer may still point to
-  mutable llvm::PointerIntPair<const ASTScope *, 1, bool> continuation
-    = { nullptr, false };
+  /// The enumeration bits indicate whether the continuation pointer represents
+  /// an active continuation (vs. a historical one) and whether the former
+  /// continuation was for a \c SourceFile (which can be stacked behind another
+  /// continuation).
+  mutable llvm::PointerIntPair<const ASTScope *, 2, ContinuationKind>
+    continuation = { nullptr, ContinuationKind::Historical };
 
   /// Union describing the various kinds of AST nodes that can introduce
   /// scopes.
@@ -302,42 +315,24 @@ class ASTScope {
   mutable SmallVector<ASTScope *, 4> storedChildren;
 
   /// Retrieve the active continuation.
-  const ASTScope *getActiveContinuation() const {
-    if (!continuation.getInt()) return nullptr;
-    assert(continuation.getPointer() != nullptr);
-    return continuation.getPointer();
-  }
-
-  /// Retrieve the next active continuation, i.e., the active continuation's
-  /// active continuation.
-  const ASTScope *getNextActiveContinuation() const {
-    if (auto active = getActiveContinuation()) {
-      if (active != this) return active->getActiveContinuation();
-    }
-
-    return nullptr;
-  }
+  const ASTScope *getActiveContinuation() const;
 
   /// Retrieve the historical continuation (which might also be active).
-  const ASTScope *getHistoricalContinuation() const {
-    return continuation.getPointer();
-  }
+  ///
+  /// This is the oldest historical continuation, so a \c SourceFile
+  /// continuation will be returned even if it's been replaced by a more local
+  /// continuation.
+  const ASTScope *getHistoricalContinuation() const;
 
   /// Set the active continuation.
-  void setActiveContinuation(const ASTScope *newContinuation) const {
-    // If we're clearing out the continuation, just clear the bit.
-    if (!newContinuation) {
-      if (getActiveContinuation()) continuation.setInt(false);
-      return;
-    }
+  void addActiveContinuation(const ASTScope *newContinuation) const;
 
-    // If we're setting the active continuation, make sure we're not losing
-    // historical information.
-    assert((!continuation.getPointer() ||
-            continuation.getPointer() == newContinuation) &&
-           "Erasing continuation history");
-    continuation.setPointerAndInt(newContinuation, true);
-  }
+  /// Remove the active continuation.
+  void removeActiveContinuation() const;
+
+  /// Clear out the continuation, because it has been stolen been transferred to
+  /// a child node.
+  void clearActiveContinuation() const;
 
   /// Constructor that only initializes the kind and parent, leaving the
   /// pieces to be initialized by the caller.
@@ -495,7 +490,8 @@ class ASTScope {
   /// Expand the children of this AST scope so they can be queried.
   void expand() const;
 
-  /// Determine whether the given scope has already been expanded.
+  /// Determine whether the given scope has already been completely expanded,
+  /// and cannot create any new children.
   bool isExpanded() const;
 
   /// Create a new AST scope if one is needed for the given declaration.
@@ -540,6 +536,9 @@ class ASTScope {
 
   /// Retrieve the ASTContext in which this scope exists.
   ASTContext &getASTContext() const;
+
+  /// Retrieve the source file scope, which is the root of the tree.
+  const ASTScope *getSourceFileScope() const;
 
   /// Retrieve the source file in which this scope exists.
   SourceFile &getSourceFile() const;
