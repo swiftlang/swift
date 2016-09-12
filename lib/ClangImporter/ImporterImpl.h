@@ -411,9 +411,7 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  /// \brief Cache enum infos, referenced with a dotted Clang name
-  /// "ModuleName.EnumName".
-  llvm::StringMap<importer::EnumInfo> enumInfos;
+  importer::EnumInfoCache enumInfoCache;
 
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
@@ -424,61 +422,14 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
-  /// Retrieve the key to use when looking for enum information.
-  StringRef getEnumInfoKey(const clang::EnumDecl *decl,
-                           SmallVectorImpl<char> &scratch) {
-    StringRef moduleName;
-    if (auto moduleOpt = getClangSubmoduleForDecl(decl)) {
-      if (*moduleOpt)
-        moduleName = (*moduleOpt)->getTopLevelModuleName();
-    }
-    if (moduleName.empty())
-      moduleName = decl->getASTContext().getLangOpts().CurrentModule;
-
-    StringRef enumName =
-      decl->getDeclName() ? decl->getName()
-                          : decl->getTypedefNameForAnonDecl()->getName();
-
-    if (moduleName.empty()) return enumName;
-
-    scratch.append(moduleName.begin(), moduleName.end());
-    scratch.push_back('.');
-    scratch.append(enumName.begin(), enumName.end());
-    return StringRef(scratch.data(), scratch.size());
-  }
-
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl,
                                  clang::Preprocessor *ppOverride = nullptr) {
-    // Due to the semaOverride present in importFullName(), we might be using a
-    // decl from a different context.
-    auto &preprocessor = ppOverride ? *ppOverride : getClangPreprocessor();
-
-    // If there is no name for linkage, the computation is trivial and we
-    // wouldn't be able to perform name-based caching anyway.
-    if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(SwiftContext, decl, preprocessor);
-
-    SmallString<32> keyScratch;
-    auto key = getEnumInfoKey(decl, keyScratch);
-    auto known = enumInfos.find(key);
-    if (known != enumInfos.end())
-      return known->second;
-
-    importer::EnumInfo enumInfo(SwiftContext, decl, preprocessor);
-    enumInfos[key] = enumInfo;
-    return enumInfo;
+    return enumInfoCache.getEnumInfo(
+        SwiftContext, decl, ppOverride ? *ppOverride : getClangPreprocessor());
   }
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
                                  clang::Preprocessor *ppOverride = nullptr) {
     return getEnumInfo(decl, ppOverride).getKind();
-  }
-
-  /// \brief the prefix to be stripped from the names of the enum constants
-  /// within the given enum.
-  StringRef
-  getEnumConstantNamePrefix(const clang::EnumDecl *decl,
-                            clang::Preprocessor *ppOverride = nullptr) {
-    return getEnumInfo(decl, ppOverride).getConstantNamePrefix();
   }
 
 private:
