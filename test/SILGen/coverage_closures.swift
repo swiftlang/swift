@@ -27,5 +27,11 @@ func foo() {
   f1 { left, right in left == 0 || right == 1 }
 }
 
+// SR-2615: Implicit constructor decl has no body, and shouldn't be mapped
+struct C1 {
+// CHECK-NOT: sil_coverage_map{{.*}}errors
+  private var errors = [String]()
+}
+
 bar(arr: [{ x in x }])
 foo()

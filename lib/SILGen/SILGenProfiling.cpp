@@ -30,6 +30,10 @@ using namespace swift;
 using namespace Lowering;
 
 static bool isUnmappedDecl(Decl *D) {
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+    if (!AFD->getBody())
+      return true;
+
   if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
     return false;
 
