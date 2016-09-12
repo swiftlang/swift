@@ -214,7 +214,6 @@ namespace {
                                              SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
-    RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
 
@@ -2579,10 +2578,6 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     return RValue(SGF, E,
                   SGF.manageBufferForExprResult(resultAddr, lowering, C));
   }
-}
-
-RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
-  return visit(E->getSubExpr(), C);
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc,
