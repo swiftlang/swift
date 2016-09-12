@@ -121,10 +121,6 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  /// FIXME: Temporary hack to keep the selector-style declaration
-  /// syntax working.
-  bool ArgumentIsParameter = false;
-
   bool InPoundLineEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
