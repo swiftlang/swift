@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/empty
 // RUN: touch %t/empty.swiftmodule
 // RUN: touch %t/empty.o

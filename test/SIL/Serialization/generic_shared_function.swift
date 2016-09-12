@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/generic_shared_function_helper.sil -module-name SILSource
 // RUN: %target-swift-frontend -emit-module -o %t -I %t -primary-file %s -module-name main -sil-link-all
 

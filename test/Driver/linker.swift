@@ -48,7 +48,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
 // RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2.0    %s | %FileCheck -check-prefix NO_ARCLITE %s
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
@@ -275,7 +275,7 @@
 // the Swift driver really thinks it's been moved.
 
 // RUN: rm -rf %t
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/bin)
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
@@ -288,8 +288,8 @@
 // Also test arclite detection. This uses xcrun to find arclite when it's not
 // next to Swift.
 
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/bin
-// RUN: mkdir -p %t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/bin)
+// RUN: %empty-directory(%t/ANOTHER-DISTINCTIVE-PATH/usr/lib/arc)
 // RUN: cp %S/Inputs/xcrun-return-self.sh %t/ANOTHER-DISTINCTIVE-PATH/usr/bin/xcrun
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=XCRUN_ARCLITE %s
@@ -298,7 +298,7 @@
 // XCRUN_ARCLITE: /ANOTHER-DISTINCTIVE-PATH/usr/lib/arc/libarclite_macosx.a
 // XCRUN_ARCLITE: -o {{[^ ]+}}
 
-// RUN: mkdir -p %t/DISTINCTIVE-PATH/usr/lib/arc
+// RUN: %empty-directory(%t/DISTINCTIVE-PATH/usr/lib/arc)
 
 // RUN: env PATH=%t/ANOTHER-DISTINCTIVE-PATH/usr/bin %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=RELATIVE_ARCLITE %s
 

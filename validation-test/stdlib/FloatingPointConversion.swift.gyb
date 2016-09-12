@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/FloatingPointConversion.swift
 // RUN: %line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Debug
 // RUN: %line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Release -O

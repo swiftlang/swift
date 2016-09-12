@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_noinline.swift
 // RUN: llvm-bcanalyzer %t/def_noinline.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL

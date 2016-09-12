@@ -1,6 +1,6 @@
 // Tests lookup and mangling of local types
 
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
 // RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypes -source-filename %s | %FileCheck %s
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/mangling_private_helper.swift
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
 

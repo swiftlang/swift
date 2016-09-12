@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // This test checks that we serialize the -enable-resilience and -sil-serialize-all
 // flags correctly.

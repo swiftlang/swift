@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // REQUIRES: objc_interop
 // FIXME: this is failing on simulators

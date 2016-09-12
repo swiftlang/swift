@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/struct_with_operators.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/alias.swift -module-name has_alias
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/has_xref.swift

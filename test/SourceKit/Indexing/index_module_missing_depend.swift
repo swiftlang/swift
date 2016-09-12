@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %swift -emit-module -o %t %S/Inputs/cycle-depend/A.swift -I %S/Inputs/cycle-depend -enable-source-import
 
 // RUN: not %sourcekitd-test -req=index %t/A.swiftmodule -- %t/A.swiftmodule 2>&1 | %FileCheck %s

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: cp %s %t/main.swift
 // RUN: cp %S/Inputs/rdar25405605/helper-1.swift %t/helper.swift

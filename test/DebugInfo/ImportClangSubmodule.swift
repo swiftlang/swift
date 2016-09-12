@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // REQUIRES: OS=macosx
 
 // RUN: %target-swift-frontend -emit-ir %s -g -o - | %FileCheck %s

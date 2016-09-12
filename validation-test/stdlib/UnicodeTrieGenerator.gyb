@@ -1,6 +1,6 @@
 %{
 
-# RUN: rm -rf %t && mkdir -p %t && %gyb %s | %FileCheck %s
+# RUN: %gyb %s | %FileCheck %s
 
 from __future__ import print_function
 

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 //
 // RUN: %target-build-swift %S/Inputs/CommandLineStressTest/CommandLineStressTest.swift -parse-as-library -force-single-frontend-invocation -module-name CommandLineStressTestSwift -emit-object -o %t/CommandLineStressTestSwift.o

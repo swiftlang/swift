@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -parse-stdlib -module-name Swift -emit-module -emit-module-path %t/Swift.swiftmodule -o %t/Swift.o %S/Inputs/Swift.swift
 // RUN: ls %t/Swift.swiftmodule
 // RUN: ls %t/Swift.swiftdoc

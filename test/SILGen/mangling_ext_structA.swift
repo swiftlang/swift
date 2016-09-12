@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_structA.swift
 // RUN: %target-swift-frontend -emit-silgen -module-name ext_structA -I %t %s | %FileCheck %s
 

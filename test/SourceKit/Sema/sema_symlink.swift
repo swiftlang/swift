@@ -1,5 +1,4 @@
-// RUN: rm -rf %t.dir
-// RUN: mkdir -p %t.dir
+// RUN: %empty-directory(%t.dir)
 // RUN: echo "let foo: Int = goo" > %t.dir/real.swift
 // RUN: ln -s %t.dir/real.swift %t.dir/linked.swift
 // RUN: %sourcekitd-test -req=sema %t.dir/linked.swift -- %t.dir/real.swift | %sed_clean > %t.link.response

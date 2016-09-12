@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -emit-sib %s -module-name test -o %t/test.sib
 // RUN: %target-build-swift -Xfrontend -disable-llvm-optzns -emit-ir %s -module-name test -o %t/test-orig.ll

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %swift -target x86_64-unknown-linux-gnu -emit-module -parse-stdlib -o %t -module-name Empty -module-link-name swiftEmpty %S/../Inputs/empty.swift
 // RUN: %swift -target x86_64-unknown-linux-gnu %s -I %t -parse-stdlib -disable-objc-interop -module-name main -emit-ir -o - | %FileCheck %s
 

@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name def_class -emit-module-path %t/def_class.1.swiftmodule %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -module-name def_class -emit-module-path %t/def_class.2.swiftmodule %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
 // RUN: diff <(llvm-bcanalyzer -dump %t/def_class.1.swiftmodule | sed -e 's/\.[0-9]\.swiftmodule/\.x\.swiftmodule/g') <(llvm-bcanalyzer -dump %t/def_class.2.swiftmodule | sed -e 's/\.[0-9]\.swiftmodule/\.x\.swiftmodule/g')

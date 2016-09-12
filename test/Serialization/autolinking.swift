@@ -1,11 +1,10 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -I %t > %t/out.txt
 // RUN: %FileCheck %s < %t/out.txt
 // RUN: %FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/out.txt
 
-// RUN: mkdir -p %t/someModule.framework/Modules/someModule.swiftmodule/
+// RUN: %empty-directory(%t/someModule.framework/Modules/someModule.swiftmodule)
 // RUN: mv %t/someModule.swiftmodule %t/someModule.framework/Modules/someModule.swiftmodule/%target-swiftmodule-name
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -F %t > %t/framework.txt
 // RUN: %FileCheck -check-prefix=FRAMEWORK %s < %t/framework.txt
