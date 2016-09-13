@@ -17,6 +17,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_IMPL_H
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
+#include "ClangAdapter.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -338,25 +339,10 @@ public:
   llvm::DenseMap<std::pair<NominalTypeDecl *, const clang::Module *>,
                  ExtensionDecl *> extensionPoints;
 
-  /// Translation API nullability from an API note into an optional kind.
-  static OptionalTypeKind translateNullability(clang::NullabilityKind kind);
-
-  /// Determine whether the given class has designated initializers,
-  /// consulting 
-  bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
-
-  /// Determine whether the given method is a designated initializer
-  /// of the given class.
-  bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
-                               const clang::ObjCMethodDecl *method);
-
-  /// Determine whether the given method is a required initializer
-  /// of the given class.
-  bool isRequiredInitializer(const clang::ObjCMethodDecl *method);
-
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
   llvm::DenseSet<const clang::Decl *> SuperfluousTypedefs;
+
   /// Tag decls whose typedefs were imported instead.
   ///
   /// \sa SuperfluousTypedefs
@@ -388,17 +374,6 @@ public:
 
   /// Whether we should suppress the import of the given Clang declaration.
   static bool shouldSuppressDeclImport(const clang::Decl *decl);
-
-  /// \brief Check if the declaration is one of the specially handled
-  /// accessibility APIs.
-  ///
-  /// These appear as both properties and methods in ObjC and should be
-  /// imported as methods into Swift.
-  static bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
-
-  /// Determine whether this method is an Objective-C "init" method
-  /// that will be imported as a Swift initializer.
-  static bool isInitMethod(const clang::ObjCMethodDecl *method);
 
 private:
   /// \brief Generation number that is used for crude versioning.
@@ -631,24 +606,6 @@ public:
                     bool trackParsedSymbols,
                     std::unique_ptr<llvm::MemoryBuffer> contents);
 
-  /// Returns the redeclaration of \p D that contains its definition for any
-  /// tag type decl (struct, enum, or union) or Objective-C class or protocol.
-  ///
-  /// Returns \c None if \p D is not a redeclarable type declaration.
-  /// Returns null if \p D is a redeclarable type, but it does not have a
-  /// definition yet.
-  static Optional<const clang::Decl *>
-  getDefinitionForClangTypeDecl(const clang::Decl *D);
-
-  /// Returns the module \p D comes from, or \c None if \p D does not have
-  /// a valid associated module.
-  ///
-  /// The returned module may be null (but not \c None) if \p D comes from
-  /// an imported header.
-  static Optional<clang::Module *>
-  getClangSubmoduleForDecl(const clang::Decl *D,
-                           bool allowForwardDeclaration = false);
-
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
@@ -663,15 +620,6 @@ public:
   getClangSubmoduleForMacro(const clang::MacroInfo *MI);
 
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
-
-  /// Retrieve the type of an instance of the given Clang declaration context,
-  /// or a null type if the DeclContext does not have a corresponding type.
-  static clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
-
-  /// Retrieve the type name of a Clang type for the purposes of
-  /// omitting unneeded words.
-  static OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
-                                                      clang::QualType type);
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
@@ -749,10 +697,6 @@ public:
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
   ValueDecl *importMacro(Identifier name, clang::MacroInfo *macro);
-
-  /// Find the swift_newtype attribute on the given typedef, if present.
-  static clang::SwiftNewtypeAttr *
-  getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl, bool useSwift2Name);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
@@ -1059,12 +1003,6 @@ public:
                                            bool isFirstParameter,
                                            bool isLastParameter);
 
-  /// Retrieve a bit vector containing the non-null argument
-  /// annotations for the given declaration.
-  static llvm::SmallBitVector
-  getNonNullArgs(const clang::Decl *decl,
-                 ArrayRef<const clang::ParmVarDecl *> params);
-
   /// \brief Import the type of an Objective-C method.
   ///
   /// This routine should be preferred when importing function types for
@@ -1233,26 +1171,6 @@ public:
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
-
-  /// Whether the given decl is a global Notification
-  static bool isNSNotificationGlobal(const clang::NamedDecl *);
-
-  // If this decl is associated with a swift_newtype (and we're honoring
-  // swift_newtype), return it, otherwise null
-  static clang::TypedefNameDecl *findSwiftNewtype(const clang::NamedDecl *decl,
-                                                  clang::Sema &clangSema,
-                                                  bool useSwift2Name);
-
-  /// Whether the passed type is NSString *
-  static bool isNSString(const clang::Type *);
-  static bool isNSString(clang::QualType);
-
-  /// Whether the given declaration was exported from Swift.
-  ///
-  /// Note that this only checks the immediate declaration being passed.
-  /// For things like methods and properties that are nested in larger types,
-  /// it's the top-level declaration that should be checked.
-  static bool hasNativeSwiftDecl(const clang::Decl *decl);
 };
 
 }

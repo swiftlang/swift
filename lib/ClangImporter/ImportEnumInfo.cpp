@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ClangAdapter.h"
 #include "ImportEnumInfo.h"
 #include "ImporterImpl.h"
 #include "swift/Basic/StringExtras.h"
@@ -290,8 +291,7 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
 StringRef EnumInfoCache::getEnumInfoKey(const clang::EnumDecl *decl,
                                         SmallVectorImpl<char> &scratch) {
   StringRef moduleName;
-  if (auto moduleOpt =
-          ClangImporter::Implementation::getClangSubmoduleForDecl(decl)) {
+  if (auto moduleOpt = getClangSubmoduleForDecl(decl)) {
     if (*moduleOpt)
       moduleName = (*moduleOpt)->getTopLevelModuleName();
   }

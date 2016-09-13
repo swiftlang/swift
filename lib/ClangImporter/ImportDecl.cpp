@@ -1926,7 +1926,7 @@ namespace {
 
               // Check for a newtype
               if (auto newtypeAttr =
-                      Impl.getSwiftNewtypeAttr(Decl, useSwift2Name))
+                      getSwiftNewtypeAttr(Decl, useSwift2Name))
                 if (auto newtype =
                         importSwiftNewtype(Decl, newtypeAttr, DC, Name))
                   return newtype;
@@ -2007,7 +2007,7 @@ namespace {
 
       // Check for swift_newtype
       if (!SwiftType)
-        if (auto newtypeAttr = Impl.getSwiftNewtypeAttr(Decl, useSwift2Name))
+        if (auto newtypeAttr = getSwiftNewtypeAttr(Decl, useSwift2Name))
           if (auto newtype = importSwiftNewtype(Decl, newtypeAttr, DC, Name))
             return newtype;
 
@@ -3034,9 +3034,9 @@ namespace {
       auto declType = decl->getType();
 
       // Special case: NS Notifications
-      if (ClangImporter::Implementation::isNSNotificationGlobal(decl))
+      if (isNSNotificationGlobal(decl))
         if (auto newtypeDecl =
-                Impl.findSwiftNewtype(decl, Impl.getClangSema(), false))
+                findSwiftNewtype(decl, Impl.getClangSema(), false))
           declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
       Type type = Impl.importType(declType,
@@ -3196,7 +3196,7 @@ namespace {
                               DeclContext *dc,
                               bool forceClassMethod) {
       // If we have an init method, import it as an initializer.
-      if (Impl.isInitMethod(decl)) {
+      if (isInitMethod(decl)) {
         // Cannot force initializers into class methods.
         if (forceClassMethod)
           return nullptr;
@@ -3313,7 +3313,7 @@ namespace {
         if (auto typeNullability = decl->getReturnType()->getNullability(
                                      Impl.getClangASTContext())) {
           // If the return type has nullability, use it.
-          nullability = Impl.translateNullability(*typeNullability);
+          nullability = translateNullability(*typeNullability);
         }
         if (nullability != OTK_None && !errorConvention.hasValue()) {
           resultTy = OptionalType::get(nullability, resultTy);
@@ -3532,7 +3532,7 @@ namespace {
       if (decl->isInvalidDecl()) return nullptr;
 
       // Objective-C categories and extensions map to Swift extensions.
-      if (ClangImporter::Implementation::hasNativeSwiftDecl(decl))
+      if (importer::hasNativeSwiftDecl(decl))
         return nullptr;
 
       // Find the Swift class being extended.
@@ -3650,7 +3650,7 @@ namespace {
     template <typename T, typename U>
     bool hasNativeSwiftDecl(const U *decl, Identifier name,
                             const DeclContext *dc, T *&swiftDecl) {
-      if (!ClangImporter::Implementation::hasNativeSwiftDecl(decl))
+      if (!importer::hasNativeSwiftDecl(decl))
         return false;
       if (auto *nameAttr = decl->template getAttr<clang::SwiftNameAttr>()) {
         StringRef customName = nameAttr->getName();
@@ -4023,7 +4023,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      if (Impl.isAccessibilityDecl(decl))
+      if (isAccessibilityDecl(decl))
         return nullptr;
 
       // Check whether there is a function with the same name as this
@@ -4883,7 +4883,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // Find the other accessor, if it exists.
   auto propertyName = importedName.Imported.getBaseName();
   auto lookupTable =
-      Impl.findLookupTable(*Impl.getClangSubmoduleForDecl(accessor));
+      Impl.findLookupTable(*getClangSubmoduleForDecl(accessor));
   assert(lookupTable && "No lookup table?");
   bool foundAccessor = false;
   for (auto entry :
@@ -5078,7 +5078,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     const clang::ObjCMethodDecl *objcMethod, DeclContext *dc, bool implicit,
     Optional<CtorInitializerKind> kind, bool required) {
   // Only methods in the 'init' family can become constructors.
-  assert(Impl.isInitMethod(objcMethod) && "Not a real init method");
+  assert(isInitMethod(objcMethod) && "Not a real init method");
 
   // Check whether we've already created the constructor.
   auto known =
@@ -5247,14 +5247,14 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     kind = *kindIn;
 
     // If we know this is a designated initializer, mark it as such.
-    if (interface && Impl.hasDesignatedInitializers(interface) &&
-        Impl.isDesignatedInitializer(interface, objcMethod))
+    if (interface && hasDesignatedInitializers(interface) &&
+        isDesignatedInitializer(interface, objcMethod))
       kind = CtorInitializerKind::Designated;
   } else {
     // If the owning Objective-C class has designated initializers and this
     // is not one of them, treat it as a convenience initializer.
-    if (interface && Impl.hasDesignatedInitializers(interface) &&
-        !Impl.isDesignatedInitializer(interface, objcMethod)) {
+    if (interface && hasDesignatedInitializers(interface) &&
+        !isDesignatedInitializer(interface, objcMethod)) {
       kind = CtorInitializerKind::Convenience;
     } else {
       kind = CtorInitializerKind::Designated;
@@ -5414,7 +5414,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   result->setInitKind(kind);
 
   // Consult API notes to determine whether this initializer is required.
-  if (!required && Impl.isRequiredInitializer(objcMethod))
+  if (!required && isRequiredInitializer(objcMethod))
     required = true;
 
   // Check whether this initializer satisfies a requirement in a protocol.
@@ -6130,7 +6130,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         continue;
 
       // When mirroring an initializer, make it designated and required.
-      if (Impl.isInitMethod(objcMethod)) {
+      if (isInitMethod(objcMethod)) {
         // Import the constructor.
         if (auto imported = importConstructor(objcMethod, dc, /*implicit=*/true,
                                               CtorInitializerKind::Designated,
@@ -6247,7 +6247,7 @@ void SwiftDeclConverter::importInheritedConstructors(
   // The kind of initializer to import. If this class has designated
   // initializers, everything it imports is a convenience initializer.
   Optional<CtorInitializerKind> kind;
-  if (Impl.hasDesignatedInitializers(curObjCClass))
+  if (hasDesignatedInitializers(curObjCClass))
     kind = CtorInitializerKind::Convenience;
 
   auto superclass =
@@ -6321,26 +6321,6 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 
   TypedefIsSuperfluous = true;
   return UnderlyingDecl;
-}
-
-clang::SwiftNewtypeAttr *ClangImporter::Implementation::getSwiftNewtypeAttr(
-    const clang::TypedefNameDecl *decl,
-    bool useSwift2Name) {
-  // If we're determining the Swift 2 name, don't honor this attribute.
-  if (useSwift2Name)
-    return nullptr;
-
-  // Retrieve the attribute.
-  auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
-  if (!attr) return nullptr;
-
-  // Blacklist types that temporarily lose their
-  // swift_wrapper/swift_newtype attributes in Foundation.
-  auto name = decl->getName();
-  if (name == "CFErrorDomain")
-    return nullptr;
-
-  return attr;
 }
 
 StringRef ClangImporter::Implementation::

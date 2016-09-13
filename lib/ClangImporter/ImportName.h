@@ -123,6 +123,10 @@ struct ImportedName {
   }
 };
 
+/// Strips a trailing "Notification", if present. Returns {} if name doesn't end
+/// in "Notification", or it there would be nothing left.
+StringRef stripNotification(StringRef name);
+
 /// Flags that control the import of names in importFullName.
 enum class ImportNameFlags {
   /// Suppress the factory-method-as-initializer transformation.

@@ -292,7 +292,7 @@ static OptionalTypeKind getResultOptionality(
 
   // If nullability is available on the type, use it.
   if (auto nullability = method->getReturnType()->getNullability(clangCtx)) {
-    return ClangImporter::Implementation::translateNullability(*nullability);
+    return translateNullability(*nullability);
   }
 
   // If there is a returns_nonnull attribute, non-null.
@@ -544,12 +544,10 @@ namespace llvm {
 /// Retrieve the name of the given Clang declaration context for
 /// printing.
 static StringRef getClangDeclContextName(const clang::DeclContext *dc) {
-  auto type = ClangImporter::Implementation::getClangDeclContextType(dc);
+  auto type = getClangDeclContextType(dc);
   if (type.isNull()) return StringRef();
 
-  return ClangImporter::Implementation::getClangTypeNameForOmission(
-           dc->getParentASTContext(),
-           type).Name;
+  return getClangTypeNameForOmission(dc->getParentASTContext(), type).Name;
 }
 
 namespace {
@@ -628,41 +626,13 @@ static StringRef stripLeadingK(StringRef name) {
 
 /// Strips a trailing "Notification", if present. Returns {} if name doesn't end
 /// in "Notification", or it there would be nothing left.
-static StringRef stripNotification(StringRef name) {
+StringRef importer::stripNotification(StringRef name) {
   name = stripLeadingK(name);
   StringRef notification = "Notification";
   if (name.size() <= notification.size() || !name.endswith(notification))
     return {};
   return name.drop_back(notification.size());
 }
-
-bool ClangImporter::Implementation::isNSNotificationGlobal(
-    const clang::NamedDecl *decl) {
-  // Looking for: extern NSString *fooNotification;
-
-  // Must be extern global variable
-  auto vDecl = dyn_cast<clang::VarDecl>(decl);
-  if (!vDecl || !vDecl->hasExternalFormalLinkage())
-    return false;
-
-  // No explicit swift_name
-  if (decl->getAttr<clang::SwiftNameAttr>())
-    return false;
-
-  // Must end in Notification
-  if (!vDecl->getDeclName().isIdentifier())
-    return false;
-  if (stripNotification(vDecl->getName()).empty())
-    return false;
-
-  // Must be NSString *
-  if (!isNSString(vDecl->getType()))
-    return false;
-
-  // We're a match!
-  return true;
-}
-
 
 /// Whether the decl is from a module who requested import-as-member inference
 static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
@@ -694,52 +664,11 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
   return false;
 }
 
-// If this decl is associated with a swift_newtype typedef, return it, otherwise
-// null
-clang::TypedefNameDecl *ClangImporter::Implementation::findSwiftNewtype(
-    const clang::NamedDecl *decl, clang::Sema &clangSema, bool useSwift2Name) {
-  // If we aren't honoring the swift_newtype attribute, don't even
-  // bother looking. Similarly for swift2 names
-  if (useSwift2Name)
-    return nullptr;
-
-  auto varDecl = dyn_cast<clang::VarDecl>(decl);
-  if (!varDecl)
-    return nullptr;
-
-  if (auto typedefTy = varDecl->getType()->getAs<clang::TypedefType>())
-    if (getSwiftNewtypeAttr(typedefTy->getDecl(), false))
-      return typedefTy->getDecl();
-
-  // Special case: "extern NSString * fooNotification" adopts
-  // NSNotificationName type, and is a member of NSNotificationName
-  if (ClangImporter::Implementation::isNSNotificationGlobal(decl)) {
-    clang::IdentifierInfo *notificationName =
-        &clangSema.getASTContext().Idents.get("NSNotificationName");
-    clang::LookupResult lookupResult(clangSema, notificationName,
-                                     clang::SourceLocation(),
-                                     clang::Sema::LookupOrdinaryName);
-    if (!clangSema.LookupName(lookupResult, nullptr))
-      return nullptr;
-    auto nsDecl = lookupResult.getAsSingle<clang::TypedefNameDecl>();
-    if (!nsDecl)
-      return nullptr;
-
-    // Make sure it also has a newtype decl on it
-    if (getSwiftNewtypeAttr(nsDecl, false))
-      return nsDecl;
-
-    return nullptr;
-  }
-
-  return nullptr;
-}
-
 /// Match the name of the given Objective-C method to its enclosing class name
 /// to determine the name prefix that would be stripped if the class method
 /// were treated as an initializer.
-static Optional<unsigned> matchFactoryAsInitName(
-                            const clang::ObjCMethodDecl *method){
+static Optional<unsigned>
+matchFactoryAsInitName(const clang::ObjCMethodDecl *method) {
   // Only class methods can be mapped to initializers in this way.
   if (!method->isClassMethod()) return None;
 
@@ -827,7 +756,7 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
                                       unsigned &prefixLength,
                                       CtorInitializerKind &kind) {
   /// Is this an initializer?
-  if (ClangImporter::Implementation::isInitMethod(method)) {
+  if (isInitMethod(method)) {
     prefixLength = 4;
     kind = CtorInitializerKind::Designated;
     return true;

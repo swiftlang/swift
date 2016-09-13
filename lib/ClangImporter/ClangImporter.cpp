@@ -1365,41 +1365,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   return file;
 }
 
-Optional<const clang::Decl *>
-ClangImporter::Implementation::getDefinitionForClangTypeDecl(
-    const clang::Decl *D) {
-  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
-    return OID->getDefinition();
-
-  if (auto TD = dyn_cast<clang::TagDecl>(D))
-    return TD->getDefinition();
-
-  if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
-    return OPD->getDefinition();
-
-  return None;
-}
-
-Optional<clang::Module *>
-ClangImporter::Implementation::getClangSubmoduleForDecl(
-    const clang::Decl *D,
-    bool allowForwardDeclaration) {
-  const clang::Decl *actual = nullptr;
-
-  // Put an Objective-C class into the module that contains the @interface
-  // definition, not just some @class forward declaration.
-  if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
-    actual = maybeDefinition.getValue();
-    if (!actual && !allowForwardDeclaration)
-      return None;
-  }
-
-  if (!actual)
-    actual = D->getCanonicalDecl();
-
-  return actual->getImportedOwningModule();
-}
-
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
     const clang::Decl *D,
     bool allowForwardDeclaration) {
@@ -1591,76 +1556,6 @@ ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
                                                     pieces.data());
 }
 
-/// Translate the "nullability" notion from API notes into an optional type
-/// kind.
-OptionalTypeKind ClangImporter::Implementation::translateNullability(
-                   clang::NullabilityKind kind) {
-  switch (kind) {
-  case clang::NullabilityKind::NonNull:
-    return OptionalTypeKind::OTK_None;
-
-  case clang::NullabilityKind::Nullable:
-    return OptionalTypeKind::OTK_Optional;
-
-  case clang::NullabilityKind::Unspecified:
-    return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
-  }
-}
-
-bool ClangImporter::Implementation::hasDesignatedInitializers(
-       const clang::ObjCInterfaceDecl *classDecl) {
-  if (classDecl->hasDesignatedInitializers())
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isDesignatedInitializer(
-       const clang::ObjCInterfaceDecl *classDecl,
-       const clang::ObjCMethodDecl *method) {
-  // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers()) {
-    auto *methodParent = method->getClassInterface();
-    if (!methodParent ||
-        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
-      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
-    }
-  }
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isRequiredInitializer(
-       const clang::ObjCMethodDecl *method) {
-  // FIXME: No way to express this in Objective-C.
-  return false;
-}
-
-/// Check if this method is declared in the context that conforms to
-/// NSAccessibility.
-static bool
-isAccessibilityConformingContext(const clang::DeclContext *ctx) {
-  const clang::ObjCProtocolList *protocols = nullptr;
-
-  if (auto protocol = dyn_cast<clang::ObjCProtocolDecl>(ctx)) {
-    if (protocol->getName() == "NSAccessibility")
-      return true;
-    return false;
-  } else if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
-    protocols = &interface->getReferencedProtocols();
-  else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(ctx))
-    protocols = &category->getReferencedProtocols();
-  else
-    return false;
-
-  for (auto pi : *protocols) {
-    if (pi->getName() == "NSAccessibility")
-      return true;
-  }
-  return false;
-
-}
-
 /// Determine whether the given method potentially conflicts with the
 /// setter for a property in the given protocol.
 static bool
@@ -1677,39 +1572,6 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   for (auto *prop : proto->properties()) {
     if (prop->getSetterName() == sel)
       return true;
-  }
-
-  return false;
-}
-
-bool
-ClangImporter::Implementation::hasNativeSwiftDecl(const clang::Decl *decl) {
-  for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
-    if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
-      return true;
-    }
-  }
-
-  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(decl)) {
-    clang::SourceLocation categoryNameLoc = category->getCategoryNameLoc();
-    if (categoryNameLoc.isMacroID()) {
-      // Climb up to the top-most macro invocation.
-      clang::ASTContext &clangCtx = category->getASTContext();
-      clang::SourceManager &SM = clangCtx.getSourceManager();
-
-      clang::SourceLocation macroCaller =
-          SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      while (macroCaller.isMacroID()) {
-        categoryNameLoc = macroCaller;
-        macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      }
-
-      StringRef macroName =
-          clang::Lexer::getImmediateMacroName(categoryNameLoc, SM,
-                                              clangCtx.getLangOpts());
-      if (macroName == "SWIFT_EXTENSION")
-        return true;
-    }
   }
 
   return false;
@@ -1783,45 +1645,6 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
   }
 
   return false;
-}
-
-bool
-ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
-
-  if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    StringRef name = objCMethod->getSelector().getNameForSlot(0);
-    if (!(objCMethod->getSelector().getNumArgs() <= 1 &&
-          (name.startswith("accessibility") ||
-           name.startswith("setAccessibility") ||
-           name.startswith("isAccessibility")))) {
-      return false;
-    }
-
-  } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
-    if (!objCProperty->getName().startswith("accessibility"))
-      return false;
-
-  } else {
-    llvm_unreachable("The declaration is not an ObjC property or method.");
-  }
-
-  if (isAccessibilityConformingContext(decl->getDeclContext()))
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isInitMethod(
-       const clang::ObjCMethodDecl *method) {
-  // init methods are always instance methods.
-  if (!method->isInstanceMethod()) return false;
-
-  // init methods must be classified as such by Clang.
-  if (method->getMethodFamily() != clang::OMF_init) return false;
-
-  // Swift restriction: init methods must start with the word "init".
-  auto selector = method->getSelector();
-  return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
 }
 
 #pragma mark Name lookup
