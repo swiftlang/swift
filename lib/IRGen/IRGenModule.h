@@ -275,6 +275,13 @@ public:
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
 
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
+  void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
+  void emitReflectionMetadataVersion();
+
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
@@ -747,8 +754,22 @@ public:
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+
+  /// Emit a reflection metadata record for a builtin type referenced
+  /// from this module.
+  void emitBuiltinTypeMetadataRecord(CanType builtinType);
+
+  /// Emit a reflection metadata record for an imported type referenced
+  /// from this module.
+  void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
   void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
+
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();
