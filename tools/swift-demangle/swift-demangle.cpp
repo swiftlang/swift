@@ -14,6 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__FreeBSD__)
+#define _WITH_GETLINE
+#endif
+
 #include "swift/Basic/DemangleWrappers.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
@@ -101,6 +105,8 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     llvm::outs() << (string.empty() ? name : llvm::StringRef(string));
   }
 }
+
+extern ssize_t getline(char **linep, size_t *linecapp, FILE *stream);
 
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
