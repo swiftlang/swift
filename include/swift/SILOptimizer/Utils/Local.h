@@ -15,6 +15,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
@@ -80,8 +81,7 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 
 /// \brief Return true if this is a release instruction that's not going to
 /// free the object.
-bool isIntermediateRelease(SILInstruction *I,
-                           ConsumedArgToEpilogueReleaseMatcher &ERM); 
+bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
 
 /// \brief Recursively collect all the uses and transitive uses of the
 /// instruction.
