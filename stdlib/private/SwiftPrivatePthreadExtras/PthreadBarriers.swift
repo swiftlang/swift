@@ -16,6 +16,7 @@ import Darwin
 import Glibc
 #endif
 
+#if !os(FreeBSD)
 //
 // Implement pthread barriers.
 //
@@ -129,3 +130,4 @@ public func _stdlib_pthread_barrier_wait(
     return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD
   }
 }
+#endif

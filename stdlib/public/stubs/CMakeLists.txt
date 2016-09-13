@@ -1,9 +1,11 @@
 set(swift_stubs_objc_sources)
 set(swift_stubs_unicode_normalization_sources)
 
-include_directories(AFTER 
-  /usr/local/include
-)
+if("${CMAKE_SDK}" STREQUAL "FREEBSD")
+  include_directories(AFTER 
+    /usr/local/include
+  )
+endif()
 
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_stubs_objc_sources

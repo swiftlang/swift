@@ -21,6 +21,7 @@ import Darwin
 import Glibc
 #endif
 
+#if !os(FreeBSD)
 /// An abstract base class to encapsulate the context necessary to invoke
 /// a block from pthread_create.
 internal class PthreadBlockContext {
@@ -140,3 +141,4 @@ public class _stdlib_Barrier {
     }
   }
 }
+#endif
