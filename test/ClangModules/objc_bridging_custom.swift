@@ -23,6 +23,7 @@ class Base : NSObject {
   class func testInout(_: inout Refrigerator) {} // expected-note {{potential overridden class method 'testInout' here}}
   func testUnmigrated(a: NSRuncingMode, b: Refrigerator, c: NSCoding) {} // expected-note {{potential overridden instance method 'testUnmigrated(a:b:c:)' here}}
   func testPartialMigrated(a: NSRuncingMode, b: Refrigerator) {} // expected-note {{potential overridden instance method 'testPartialMigrated(a:b:)' here}}
+  func testAny(a: Any, b: Any) -> Any? {} // expected-note {{potential overridden instance method 'testAny(a:b:)' here}}
 
   subscript(a a: Refrigerator, b b: Refrigerator) -> Refrigerator? { // expected-note {{potential overridden subscript 'subscript(a:b:)' here}} {{none}}
     return nil
@@ -57,6 +58,9 @@ class Sub : Base {
 
   // expected-note@+1 {{type does not match superclass instance method with type '(NSRuncingMode, Refrigerator) -> ()'}} {{53-68=Refrigerator}}
   override func testPartialMigrated(a: NSObject, b: APPRefrigerator) {} // expected-error {{method does not override any method from its superclass}} {{none}}
+
+  // expected-note@+1 {{type does not match superclass instance method with type '(Any, Any) -> Any?'}} {{28-37=Any}} {{42-52=Any?}} {{57-66=Any}}
+  override func testAny(a: AnyObject, b: AnyObject?) -> AnyObject {} // expected-error {{method does not override any method from its superclass}}
 
   // expected-note@+1 {{type does not match superclass subscript with type '(Refrigerator, Refrigerator) -> Refrigerator?'}} {{27-42=Refrigerator}} {{49-65=Refrigerator?}} {{70-85=Refrigerator}}
   override subscript(a a: APPRefrigerator, b b: APPRefrigerator?) -> APPRefrigerator { // expected-error {{subscript does not override any subscript from its superclass}} {{none}}
