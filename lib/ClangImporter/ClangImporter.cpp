@@ -1258,84 +1258,75 @@ Module *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts)
-  : SwiftContext(ctx),
-    ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    InferImportAsMember(opts.InferImportAsMember),
-    DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-    BridgingHeaderLookupTable(nullptr)
-{
+PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
 
-  if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "ios"; };
+  if (langOpts.Target.isiOS() && !langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "ios"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "ios" ||
-                 Platform == "ios_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "ios" || Platform == "ios_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "tvos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "tvos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "tvos" ||
-                 Platform == "tvos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "tvos" || Platform == "tvos_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isWatchOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "watchos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isWatchOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "watchos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "watchos" ||
-                 Platform == "watchos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "watchos" || Platform == "watchos_app_extension";
+      };
     }
     // No deprecation filter on watchOS
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return false; };
-    DeprecatedAsUnavailableMessage = "";
-  }
-  else if (ctx.LangOpts.Target.isMacOSX()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return false; };
+    deprecatedAsUnavailableMessage = "";
+  } else if (langOpts.Target.isMacOSX()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "macos"; };
     } else {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) {
-        return Platform == "macos" ||
-               Platform == "macos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "macos" || Platform == "macos_app_extension";
+      };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) {
-        return major < 10 ||
-               (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+    deprecatedAsUnavailableFilter = [](unsigned major,
+                                       llvm::Optional<unsigned> minor) {
+      return major < 10 ||
+             (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
     };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
 }
 
+ClangImporter::Implementation::Implementation(ASTContext &ctx,
+                                              const ClangImporterOptions &opts)
+    : SwiftContext(ctx),
+      ImportForwardDeclarations(opts.ImportForwardDeclarations),
+      InferImportAsMember(opts.InferImportAsMember),
+      DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts) {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
@@ -1363,41 +1354,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   cacheEntry.setPointer(file);
 
   return file;
-}
-
-Optional<const clang::Decl *>
-ClangImporter::Implementation::getDefinitionForClangTypeDecl(
-    const clang::Decl *D) {
-  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
-    return OID->getDefinition();
-
-  if (auto TD = dyn_cast<clang::TagDecl>(D))
-    return TD->getDefinition();
-
-  if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
-    return OPD->getDefinition();
-
-  return None;
-}
-
-Optional<clang::Module *>
-ClangImporter::Implementation::getClangSubmoduleForDecl(
-    const clang::Decl *D,
-    bool allowForwardDeclaration) {
-  const clang::Decl *actual = nullptr;
-
-  // Put an Objective-C class into the module that contains the @interface
-  // definition, not just some @class forward declaration.
-  if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
-    actual = maybeDefinition.getValue();
-    if (!actual && !allowForwardDeclaration)
-      return None;
-  }
-
-  if (!actual)
-    actual = D->getCanonicalDecl();
-
-  return actual->getImportedOwningModule();
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
@@ -1591,76 +1547,6 @@ ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
                                                     pieces.data());
 }
 
-/// Translate the "nullability" notion from API notes into an optional type
-/// kind.
-OptionalTypeKind ClangImporter::Implementation::translateNullability(
-                   clang::NullabilityKind kind) {
-  switch (kind) {
-  case clang::NullabilityKind::NonNull:
-    return OptionalTypeKind::OTK_None;
-
-  case clang::NullabilityKind::Nullable:
-    return OptionalTypeKind::OTK_Optional;
-
-  case clang::NullabilityKind::Unspecified:
-    return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
-  }
-}
-
-bool ClangImporter::Implementation::hasDesignatedInitializers(
-       const clang::ObjCInterfaceDecl *classDecl) {
-  if (classDecl->hasDesignatedInitializers())
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isDesignatedInitializer(
-       const clang::ObjCInterfaceDecl *classDecl,
-       const clang::ObjCMethodDecl *method) {
-  // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers()) {
-    auto *methodParent = method->getClassInterface();
-    if (!methodParent ||
-        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
-      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
-    }
-  }
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isRequiredInitializer(
-       const clang::ObjCMethodDecl *method) {
-  // FIXME: No way to express this in Objective-C.
-  return false;
-}
-
-/// Check if this method is declared in the context that conforms to
-/// NSAccessibility.
-static bool
-isAccessibilityConformingContext(const clang::DeclContext *ctx) {
-  const clang::ObjCProtocolList *protocols = nullptr;
-
-  if (auto protocol = dyn_cast<clang::ObjCProtocolDecl>(ctx)) {
-    if (protocol->getName() == "NSAccessibility")
-      return true;
-    return false;
-  } else if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
-    protocols = &interface->getReferencedProtocols();
-  else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(ctx))
-    protocols = &category->getReferencedProtocols();
-  else
-    return false;
-
-  for (auto pi : *protocols) {
-    if (pi->getName() == "NSAccessibility")
-      return true;
-  }
-  return false;
-
-}
-
 /// Determine whether the given method potentially conflicts with the
 /// setter for a property in the given protocol.
 static bool
@@ -1677,39 +1563,6 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   for (auto *prop : proto->properties()) {
     if (prop->getSetterName() == sel)
       return true;
-  }
-
-  return false;
-}
-
-bool
-ClangImporter::Implementation::hasNativeSwiftDecl(const clang::Decl *decl) {
-  for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
-    if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
-      return true;
-    }
-  }
-
-  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(decl)) {
-    clang::SourceLocation categoryNameLoc = category->getCategoryNameLoc();
-    if (categoryNameLoc.isMacroID()) {
-      // Climb up to the top-most macro invocation.
-      clang::ASTContext &clangCtx = category->getASTContext();
-      clang::SourceManager &SM = clangCtx.getSourceManager();
-
-      clang::SourceLocation macroCaller =
-          SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      while (macroCaller.isMacroID()) {
-        categoryNameLoc = macroCaller;
-        macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      }
-
-      StringRef macroName =
-          clang::Lexer::getImmediateMacroName(categoryNameLoc, SM,
-                                              clangCtx.getLangOpts());
-      if (macroName == "SWIFT_EXTENSION")
-        return true;
-    }
   }
 
   return false;
@@ -1783,45 +1636,6 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
   }
 
   return false;
-}
-
-bool
-ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
-
-  if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    StringRef name = objCMethod->getSelector().getNameForSlot(0);
-    if (!(objCMethod->getSelector().getNumArgs() <= 1 &&
-          (name.startswith("accessibility") ||
-           name.startswith("setAccessibility") ||
-           name.startswith("isAccessibility")))) {
-      return false;
-    }
-
-  } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
-    if (!objCProperty->getName().startswith("accessibility"))
-      return false;
-
-  } else {
-    llvm_unreachable("The declaration is not an ObjC property or method.");
-  }
-
-  if (isAccessibilityConformingContext(decl->getDeclContext()))
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isInitMethod(
-       const clang::ObjCMethodDecl *method) {
-  // init methods are always instance methods.
-  if (!method->isInstanceMethod()) return false;
-
-  // init methods must be classified as such by Clang.
-  if (method->getMethodFamily() != clang::OMF_init) return false;
-
-  // Swift restriction: init methods must start with the word "init".
-  auto selector = method->getSelector();
-  return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
 }
 
 #pragma mark Name lookup
