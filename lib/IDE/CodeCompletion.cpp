@@ -3995,12 +3995,11 @@ public:
       return false;
     if (DeclAttribute::shouldBeRejectedByParser(DAK))
       return false;
-    if (IsInSil && DeclAttribute::isSilOnly(DAK))
+    if (!IsInSil && DeclAttribute::isSilOnly(DAK))
       return false;
-    if (DK.hasValue() &&
-        !DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue()))
-      return false;
-    return true;
+    if (!DK.hasValue())
+      return true;
+    return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
   }
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
