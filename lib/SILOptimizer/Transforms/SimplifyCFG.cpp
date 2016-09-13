@@ -3190,6 +3190,7 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
   }
   
   SmallVector<std::pair<SILValue, SILValue>, 8> Cases;
+  llvm::SmallDenseMap<SILValue, SILValue> CaseLiteralsToResultMap;
   SILValue defaultResult;
   
   // The block of the first input value compare. It dominates all other blocks
@@ -3202,7 +3203,23 @@ bool simplifyToSelectValue(SILBasicBlock *MergeBlock, unsigned ArgNum,
       auto *BrInst = cast<CondBranchInst>(CaseInfo.CmpOrDefault->getTerminator());
       if (FoundCmpBlocks.count(BrInst->getFalseBB()) != 1)
         return false;
-      Cases.push_back({CaseInfo.Literal, CaseInfo.Result});
+      // Ignore duplicate cases
+      if (CaseLiteralsToResultMap.find(CaseInfo.Literal) ==
+          CaseLiteralsToResultMap.end()) {
+        CaseLiteralsToResultMap.insert({CaseInfo.Literal, CaseInfo.Result});
+        Cases.push_back({CaseInfo.Literal, CaseInfo.Result});
+      } else {
+        // Check if the result value matches
+        EnumInst *PrevResult =
+            dyn_cast<EnumInst>(CaseLiteralsToResultMap[CaseInfo.Literal]);
+        assert(PrevResult && "Prev. case result is not an EnumInst");
+        EnumInst *CurrResult = dyn_cast<EnumInst>(CaseInfo.Result);
+        assert(CurrResult && "Curr. case result is not an EnumInst");
+        if (PrevResult->getElement() != CurrResult->getElement()) {
+          // result value does not match - bail
+          return false;
+        }
+      }
       SILBasicBlock *Pred = CaseInfo.CmpOrDefault->getSinglePredecessor();
       if (!Pred || FoundCmpBlocks.count(Pred) == 0) {
         // There may be only a single block whose predecessor we didn't see. And

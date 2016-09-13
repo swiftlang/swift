@@ -29,6 +29,7 @@
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenModule.h"
+#include "Linking.h"
 #include "LoadableTypeInfo.h"
 
 using namespace swift;
@@ -276,13 +277,13 @@ public:
     if (!init)
       return nullptr;
 
-    auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
-                                        /*isConstant*/ true,
-                                        llvm::GlobalValue::PrivateLinkage,
-                                        init,
-                                        "\x01l__swift3_assocty_metadata");
+    auto entity = LinkEntity::forReflectionAssociatedTypeDescriptor(Conformance);
+    auto info = LinkInfo::get(IGM, entity, ForDefinition);
+
+    auto var = info.createVariable(IGM, init->getType(), Alignment(4));
+    var->setConstant(true);
+    var->setInitializer(init);
     var->setSection(IGM.getAssociatedTypeMetadataSectionName());
-    var->setAlignment(4);
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
     tempBase->replaceAllUsesWith(replacer);
@@ -444,13 +445,14 @@ public:
     if (!init)
       return nullptr;
 
-    auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
-                                        /*isConstant*/ true,
-                                        llvm::GlobalValue::PrivateLinkage,
-                                        init,
-                                        "\x01l__swift3_reflection_metadata");
+    auto entity = LinkEntity::forReflectionFieldDescriptor(
+        NTD->getDeclaredType()->getCanonicalType());
+    auto info = LinkInfo::get(IGM, entity, ForDefinition);
+
+    auto var = info.createVariable(IGM, init->getType(), Alignment(4));
+    var->setConstant(true);
+    var->setInitializer(init);
     var->setSection(IGM.getFieldTypeMetadataSectionName());
-    var->setAlignment(4);
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
     tempBase->replaceAllUsesWith(replacer);
@@ -460,61 +462,57 @@ public:
 };
 
 class FixedTypeMetadataBuilder : public ReflectionMetadataBuilder {
-  void addFixedType(Module *module, CanType type,
-                    const FixedTypeInfo &ti) {
-    addTypeRef(module, type);
+  ModuleDecl *module;
+  CanType type;
+  const FixedTypeInfo *ti;
 
-    addConstantInt32(ti.getFixedSize().getValue());
-    addConstantInt32(ti.getFixedAlignment().getValue());
-    addConstantInt32(ti.getFixedStride().getValue());
-    addConstantInt32(ti.getFixedExtraInhabitantCount(IGM));
+public:
+  FixedTypeMetadataBuilder(IRGenModule &IGM,
+                           CanType builtinType)
+    : ReflectionMetadataBuilder(IGM) {
+    module = builtinType->getASTContext().TheBuiltinModule;
+    type = builtinType;
+    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
   }
 
-  void addBuiltinType(CanType builtinType) {
-    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(builtinType));
-    addFixedType(builtinType->getASTContext().TheBuiltinModule, builtinType, ti);
-  }
-
-  void addOpaqueType(const NominalTypeDecl *nominalDecl) {
-    auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
+  FixedTypeMetadataBuilder(IRGenModule &IGM,
+                           const NominalTypeDecl *nominalDecl)
+    : ReflectionMetadataBuilder(IGM) {
+    module = nominalDecl->getParentModule();
+    type = nominalDecl->getDeclaredType()->getCanonicalType();
+    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(
         nominalDecl->getDeclaredTypeInContext()->getCanonicalType()));
-
-    addFixedType(nominalDecl->getParentModule(),
-                 nominalDecl->getDeclaredType()->getCanonicalType(), ti);
   }
 
   void layout() {
-    for (auto builtinType : IGM.BuiltinTypes)
-      addBuiltinType(builtinType);
+    addTypeRef(module, type);
 
-    for (auto nominalDecl : IGM.OpaqueTypes)
-      addOpaqueType(nominalDecl);
+    addConstantInt32(ti->getFixedSize().getValue());
+    addConstantInt32(ti->getFixedAlignment().getValue());
+    addConstantInt32(ti->getFixedStride().getValue());
+    addConstantInt32(ti->getFixedExtraInhabitantCount(IGM));
   }
 
-public:
-  FixedTypeMetadataBuilder(IRGenModule &IGM)
-    : ReflectionMetadataBuilder(IGM) {}
-
   llvm::GlobalVariable *emit() {
-
     auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
         new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
                                  llvm::GlobalValue::PrivateLinkage));
     setRelativeAddressBase(tempBase.get());
 
     layout();
+
     auto init = getInit();
 
     if (!init)
       return nullptr;
 
-    auto var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
-                                        /*isConstant*/ true,
-                                        llvm::GlobalValue::PrivateLinkage,
-                                        init,
-                                        "\x01l__swift3_builtin_metadata");
+    auto entity = LinkEntity::forReflectionBuiltinDescriptor(type);
+    auto info = LinkInfo::get(IGM, entity, ForDefinition);
+
+    auto var = info.createVariable(IGM, init->getType(), Alignment(4));
+    var->setConstant(true);
+    var->setInitializer(init);
     var->setSection(IGM.getBuiltinTypeMetadataSectionName());
-    var->setAlignment(4);
 
     auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
     tempBase->replaceAllUsesWith(replacer);
@@ -522,6 +520,20 @@ public:
     return var;
   }
 };
+
+void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
+  FixedTypeMetadataBuilder builder(*this, builtinType);
+  auto var = builder.emit();
+  if (var)
+    addUsedGlobal(var);
+}
+
+void IRGenModule::emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl) {
+  FixedTypeMetadataBuilder builder(*this, nominalDecl);
+  auto var = builder.emit();
+  if (var)
+    addUsedGlobal(var);
+}
 
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
@@ -916,10 +928,17 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
   for (auto PD : ImportedProtocols)
     emitFieldMetadataRecord(PD);
 
-  FixedTypeMetadataBuilder builder(*this);
-  auto var = builder.emit();
-  if (var)
-    addUsedGlobal(var);
+  for (auto builtinType : BuiltinTypes)
+    emitBuiltinTypeMetadataRecord(builtinType);
+
+  for (auto nominalDecl : OpaqueTypes)
+    emitOpaqueTypeMetadataRecord(nominalDecl);
+}
+
+void IRGenerator::emitBuiltinReflectionMetadata() {
+  for (auto &m : *this) {
+    m.second->emitBuiltinReflectionMetadata();
+  }
 }
 
 void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
@@ -941,4 +960,10 @@ void IRGenModule::emitReflectionMetadataVersion() {
                                           "__swift_reflection_version");
   Version->setVisibility(llvm::GlobalValue::HiddenVisibility);
   addUsedGlobal(Version);
+}
+
+void IRGenerator::emitReflectionMetadataVersion() {
+  for (auto &m : *this) {
+    m.second->emitReflectionMetadataVersion();
+  }
 }

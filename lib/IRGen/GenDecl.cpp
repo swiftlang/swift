@@ -1135,6 +1135,19 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
       
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();
+
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+    // Reflection descriptors for imported types have shared linkage,
+    // since we may emit them in other TUs in the same module.
+    if (getTypeLinkage(getType()) == FormalLinkage::PublicNonUnique)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    if (getConformanceLinkage(IGM, getProtocolConformance())
+          == SILLinkage::Shared)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1198,6 +1211,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::SILFunction:
   case Kind::SILGlobalVariable:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");

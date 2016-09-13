@@ -687,7 +687,7 @@ Associated type inference is a useful feature. It's used throughout the standard
 
 ## Existentials
 
-Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutable dependence on protocols.
+Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutual dependence on protocols.
 
 ### Generalized existentials
 

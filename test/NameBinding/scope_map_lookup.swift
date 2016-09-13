@@ -77,3 +77,17 @@ extension PConstrained4 where Self : Superclass {
     self.bar()
   }
 }
+
+// Top-level code.
+func topLevel() { }
+
+topLevel()
+
+let c1opt: C1? = C1()
+guard let c1 = c1opt else { }
+
+protocol Fooable {
+  associatedtype Foo
+
+  var foo: Foo { get }
+}
