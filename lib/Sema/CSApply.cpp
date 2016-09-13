@@ -4224,7 +4224,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // We need to convert the source element to the destination type.
     if (!fromTupleExpr) {
       // FIXME: Lame! We can't express this in the AST.
-      InFlightDiagnostic diag = tc.diagnose(expr->getLoc(),
+      auto anchorExpr = locator.getBaseLocator()->getAnchor();
+      InFlightDiagnostic diag = tc.diagnose(anchorExpr->getLoc(),
                                         diag::tuple_conversion_not_expressible,
                                             fromTuple, toTuple);
       if (typeFromPattern) {
