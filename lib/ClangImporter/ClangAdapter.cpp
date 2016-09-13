@@ -701,3 +701,19 @@ bool importer::isUnavailableInSwift(const clang::Decl *decl,
   return false;
 }
 
+OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
+                                               bool knownNonNull) {
+  auto &clangCtx = param->getASTContext();
+
+  // If nullability is available on the type, use it.
+  if (auto nullability = param->getType()->getNullability(clangCtx)) {
+    return translateNullability(*nullability);
+  }
+
+  // If it's known non-null, use that.
+  if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
+    return OTK_None;
+
+  // Default to implicitly unwrapped optionals.
+  return OTK_ImplicitlyUnwrappedOptional;
+}

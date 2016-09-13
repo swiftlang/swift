@@ -637,20 +637,6 @@ public:
   static bool shouldAllowNSUIntegerAsInt(bool isFromSystemModule,
                                          const clang::NamedDecl *decl);
 
-  /// Omit needless words in a function name.
-  bool omitNeedlessWordsInFunctionName(
-         clang::Sema &clangSema,
-         StringRef &baseName,
-         SmallVectorImpl<StringRef> &argumentNames,
-         ArrayRef<const clang::ParmVarDecl *> params,
-         clang::QualType resultType,
-         const clang::DeclContext *dc,
-         const llvm::SmallBitVector &nonNullArgs,
-         Optional<unsigned> errorParamIndex,
-         bool returnsSelf,
-         bool isInstanceMethod,
-         StringScratchSpace &scratch);
-
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
@@ -1008,14 +994,12 @@ public:
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
-  DefaultArgumentKind inferDefaultArgument(clang::Preprocessor &pp,
-                                           clang::QualType type,
-                                           OptionalTypeKind clangOptionality,
-                                           Identifier baseName,
-                                           unsigned numParams,
-                                           StringRef argumentLabel,
-                                           bool isFirstParameter,
-                                           bool isLastParameter);
+  static DefaultArgumentKind
+  inferDefaultArgument(ASTContext &, importer::EnumInfoCache &,
+                       clang::Preprocessor &pp, clang::QualType type,
+                       OptionalTypeKind clangOptionality, Identifier baseName,
+                       unsigned numParams, StringRef argumentLabel,
+                       bool isFirstParameter, bool isLastParameter);
 
   /// \brief Import the type of an Objective-C method.
   ///

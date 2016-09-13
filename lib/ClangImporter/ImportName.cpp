@@ -850,6 +850,71 @@ static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
   return nullptr;
 }
 
+/// Attempt to omit needless words from the given function name.
+static bool omitNeedlessWordsInFunctionName(
+    ASTContext &SwiftContext, EnumInfoCache &enumInfoCache,
+    clang::Sema &clangSema, StringRef &baseName,
+    SmallVectorImpl<StringRef> &argumentNames,
+    ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
+    const clang::DeclContext *dc, const llvm::SmallBitVector &nonNullArgs,
+    Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
+    StringScratchSpace &scratch) {
+  clang::ASTContext &clangCtx = clangSema.Context;
+
+  // Collect the parameter type names.
+  StringRef firstParamName;
+  SmallVector<OmissionTypeName, 4> paramTypes;
+  for (unsigned i = 0, n = params.size(); i != n; ++i) {
+    auto param = params[i];
+
+    // Capture the first parameter name.
+    if (i == 0)
+      firstParamName = param->getName();
+
+    // Determine the number of parameters.
+    unsigned numParams = params.size();
+    if (errorParamIndex) --numParams;
+
+    bool isLastParameter
+      = (i == params.size() - 1) ||
+        (i == params.size() - 2 &&
+         errorParamIndex && *errorParamIndex == params.size() - 1);
+
+    // Figure out whether there will be a default argument for this
+    // parameter.
+    StringRef argumentName;
+    if (i < argumentNames.size())
+      argumentName = argumentNames[i];
+    bool hasDefaultArg =
+        ClangImporter::Implementation::inferDefaultArgument(
+            SwiftContext, enumInfoCache, clangSema.PP, param->getType(),
+            getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
+            SwiftContext.getIdentifier(baseName), numParams, argumentName,
+            i == 0, isLastParameter) != DefaultArgumentKind::None;
+
+    paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
+                                                     param->getOriginalType())
+                            .withDefaultArgument(hasDefaultArg));
+  }
+
+  // Find the property names.
+  const InheritedNameSet *allPropertyNames = nullptr;
+  auto contextType = getClangDeclContextType(dc);
+  if (!contextType.isNull()) {
+    if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
+      if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
+        allPropertyNames = SwiftContext.getAllPropertyNames(objcClassDecl,
+                                                            isInstanceMethod);
+  }
+
+  // Omit needless words.
+  return omitNeedlessWords(baseName, argumentNames, firstParamName,
+                           getClangTypeNameForOmission(clangCtx, resultType),
+                           getClangTypeNameForOmission(clangCtx, contextType),
+                           paramTypes, returnsSelf, /*isProperty=*/false,
+                           allPropertyNames, scratch);
+}
+
 /// Prepare global name for importing onto a swift_newtype.
 static StringRef determineSwiftNewtypeBaseName(StringRef baseName,
                                                StringRef newtypeName,
@@ -1436,6 +1501,8 @@ auto ClangImporter::Implementation::importFullName(
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
+        SwiftContext,
+        enumInfoCache,
         clangSema,
         baseName,
         argumentNames,

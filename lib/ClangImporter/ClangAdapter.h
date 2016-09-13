@@ -138,6 +138,15 @@ bool isObjCId(const clang::Decl *decl);
 /// 'unavailable' in Swift.
 bool isUnavailableInSwift(const clang::Decl *decl, PlatformAvailability &,
                           bool enableObjCInterop);
+
+/// Determine the optionality of the given Clang parameter.
+///
+/// \param param The Clang parameter.
+///
+/// \param knownNonNull Whether a function- or method-level "nonnull" attribute
+/// applies to this parameter.
+OptionalTypeKind getParamOptionality(const clang::ParmVarDecl *param,
+                                     bool knownNonNull);
 }
 }
 

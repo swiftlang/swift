@@ -1466,30 +1466,6 @@ static Type applyNoEscape(Type type) {
   return type;
 }
 
-/// Determine the optionality of the given Clang parameter.
-///
-/// \param param The Clang parameter.
-///
-/// \param knownNonNull Whether a function- or method-level "nonnull" attribute
-/// applies to this parameter.
-static OptionalTypeKind getParamOptionality(
-                          const clang::ParmVarDecl *param,
-                          bool knownNonNull) {
-  auto &clangCtx = param->getASTContext();
-
-  // If nullability is available on the type, use it.
-  if (auto nullability = param->getType()->getNullability(clangCtx)) {
-    return translateNullability(*nullability);
-  }
-
-  // If it's known non-null, use that.
-  if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
-    return OTK_None;
-
-  // Default to implicitly unwrapped optionals.
-  return OTK_ImplicitlyUnwrappedOptional;
-}
-
 Type ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc,
     const clang::FunctionDecl *clangDecl, clang::QualType resultType,
@@ -1648,78 +1624,8 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
           decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
 }
 
-/// Attempt to omit needless words from the given function name.
-bool ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
-       clang::Sema &clangSema,
-       StringRef &baseName,
-       SmallVectorImpl<StringRef> &argumentNames,
-       ArrayRef<const clang::ParmVarDecl *> params,
-       clang::QualType resultType,
-       const clang::DeclContext *dc,
-       const llvm::SmallBitVector &nonNullArgs,
-       Optional<unsigned> errorParamIndex,
-       bool returnsSelf,
-       bool isInstanceMethod,
-       StringScratchSpace &scratch) {
-  clang::ASTContext &clangCtx = clangSema.Context;
-
-  // Collect the parameter type names.
-  StringRef firstParamName;
-  SmallVector<OmissionTypeName, 4> paramTypes;
-  for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto param = params[i];
-
-    // Capture the first parameter name.
-    if (i == 0)
-      firstParamName = param->getName();
-
-    // Determine the number of parameters.
-    unsigned numParams = params.size();
-    if (errorParamIndex) --numParams;
-
-    bool isLastParameter
-      = (i == params.size() - 1) ||
-        (i == params.size() - 2 &&
-         errorParamIndex && *errorParamIndex == params.size() - 1);
-
-    // Figure out whether there will be a default argument for this
-    // parameter.
-    StringRef argumentName;
-    if (i < argumentNames.size())
-      argumentName = argumentNames[i];
-    bool hasDefaultArg
-      = inferDefaultArgument(
-          clangSema.PP,
-          param->getType(),
-          getParamOptionality(param,
-                              !nonNullArgs.empty() && nonNullArgs[i]),
-          SwiftContext.getIdentifier(baseName), numParams,
-          argumentName, i == 0, isLastParameter) != DefaultArgumentKind::None;
-
-    paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
-                                                     param->getOriginalType())
-                            .withDefaultArgument(hasDefaultArg));
-  }
-
-  // Find the property names.
-  const InheritedNameSet *allPropertyNames = nullptr;
-  auto contextType = getClangDeclContextType(dc);
-  if (!contextType.isNull()) {
-    if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
-      if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
-        allPropertyNames = SwiftContext.getAllPropertyNames(objcClassDecl,
-                                                            isInstanceMethod);
-  }
-
-  // Omit needless words.
-  return omitNeedlessWords(baseName, argumentNames, firstParamName,
-                           getClangTypeNameForOmission(clangCtx, resultType),
-                           getClangTypeNameForOmission(clangCtx, contextType),
-                           paramTypes, returnsSelf, /*isProperty=*/false,
-                           allPropertyNames, scratch);
-}
-
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
+                      ASTContext &SwiftContext, EnumInfoCache &enumInfoCache,
                       clang::Preprocessor &pp, clang::QualType type,
                       OptionalTypeKind clangOptionality, Identifier baseName,
                       unsigned numParams, StringRef argumentLabel,
@@ -1753,7 +1659,8 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    if (getEnumKind(enumTy->getDecl(), &pp) == EnumKind::Options) {
+    if (enumInfoCache.getEnumKind(SwiftContext, enumTy->getDecl(), pp) ==
+        EnumKind::Options) {
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
@@ -2123,16 +2030,12 @@ Type ClangImporter::Implementation::importMethodType(
       bool isLastParameter = (paramIndex == params.size() - 1) ||
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
-      
-      auto defaultArg = inferDefaultArgument(getClangPreprocessor(),
-                                             param->getType(),
-                                             optionalityOfParam,
-                                             methodName.getBaseName(),
-                                             numEffectiveParams,
-                                             name.empty() ? StringRef()
-                                                          : name.str(),
-                                             paramIndex == 0,
-                                             isLastParameter);
+
+      auto defaultArg = inferDefaultArgument(
+          SwiftContext, enumInfoCache, getClangPreprocessor(), param->getType(),
+          optionalityOfParam, methodName.getBaseName(), numEffectiveParams,
+          name.empty() ? StringRef() : name.str(), paramIndex == 0,
+          isLastParameter);
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
     }
