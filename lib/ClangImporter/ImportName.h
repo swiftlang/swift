@@ -18,11 +18,13 @@
 #define SWIFT_IMPORT_NAME_H
 
 #include "SwiftLookupTable.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 
 namespace swift {
 namespace importer {
+class EnumInfoCache;
 
 /// Information about imported error parameters.
 struct ImportedErrorInfo {
@@ -137,6 +139,16 @@ enum class ImportNameFlags {
 
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
+
+/// The below is a work in progress to make import naming less stateful and tied
+/// to the Impl. In it's current form, it is rather unwieldy.
+// TODO: refactor into convenience class, multi-versioned, etc.
+ImportedName importFullName(const clang::NamedDecl *, ASTContext &SwiftContext,
+                            clang::Sema &clangSema,
+                            EnumInfoCache &enumInfoCache,
+                            PlatformAvailability &platformAvailability,
+                            ImportNameOptions options,
+                            bool inferImportAsMember);
 }
 }
 
