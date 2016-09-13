@@ -1258,84 +1258,75 @@ Module *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts)
-  : SwiftContext(ctx),
-    ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    InferImportAsMember(opts.InferImportAsMember),
-    DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-    BridgingHeaderLookupTable(nullptr)
-{
+PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
 
-  if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "ios"; };
+  if (langOpts.Target.isiOS() && !langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "ios"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "ios" ||
-                 Platform == "ios_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "ios" || Platform == "ios_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "tvos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "tvos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "tvos" ||
-                 Platform == "tvos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "tvos" || Platform == "tvos_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isWatchOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "watchos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isWatchOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "watchos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "watchos" ||
-                 Platform == "watchos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "watchos" || Platform == "watchos_app_extension";
+      };
     }
     // No deprecation filter on watchOS
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return false; };
-    DeprecatedAsUnavailableMessage = "";
-  }
-  else if (ctx.LangOpts.Target.isMacOSX()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return false; };
+    deprecatedAsUnavailableMessage = "";
+  } else if (langOpts.Target.isMacOSX()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "macos"; };
     } else {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) {
-        return Platform == "macos" ||
-               Platform == "macos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "macos" || Platform == "macos_app_extension";
+      };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) {
-        return major < 10 ||
-               (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+    deprecatedAsUnavailableFilter = [](unsigned major,
+                                       llvm::Optional<unsigned> minor) {
+      return major < 10 ||
+             (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
     };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
 }
 
+ClangImporter::Implementation::Implementation(ASTContext &ctx,
+                                              const ClangImporterOptions &opts)
+    : SwiftContext(ctx),
+      ImportForwardDeclarations(opts.ImportForwardDeclarations),
+      InferImportAsMember(opts.InferImportAsMember),
+      DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts) {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);

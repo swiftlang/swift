@@ -230,6 +230,29 @@ enum class FactoryAsInitKind {
   AsInitializer
 };
 
+namespace importer {
+struct PlatformAvailability {
+  /// A predicate that indicates if the given platform should be
+  /// considered for availability.
+  std::function<bool(StringRef PlatformName)> filter;
+
+  /// A predicate that indicates if the given platform version should
+  /// should be included in the cutoff of deprecated APIs marked unavailable.
+  std::function<bool(unsigned major, llvm::Optional<unsigned> minor)>
+      deprecatedAsUnavailableFilter;
+
+  /// The message to embed for implicitly unavailability if a deprecated
+  /// API is now unavailable.
+  std::string deprecatedAsUnavailableMessage;
+
+  PlatformAvailability(LangOptions &opts);
+
+private:
+  PlatformAvailability(const PlatformAvailability&) = delete;
+  PlatformAvailability &operator=(const PlatformAvailability &) = delete;
+};
+}
+
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader
@@ -531,19 +554,7 @@ private:
   };
 
 public:
-  /// A predicate that indicates if the given platform should be
-  /// considered for availability.
-  std::function<bool (StringRef PlatformName)>
-    PlatformAvailabilityFilter;
-
-  /// A predicate that indicates if the given platform version should
-  /// should be included in the cutoff of deprecated APIs marked unavailable.
-  std::function<bool (unsigned major, llvm::Optional<unsigned> minor)>
-    DeprecatedAsUnavailableFilter;
-
-  /// The message to embed for implicitly unavailability if a deprecated
-  /// API is now unavailable.
-  std::string DeprecatedAsUnavailableMessage;
+  importer::PlatformAvailability platformAvailability;
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -817,7 +828,10 @@ public:
 
   /// Determine whether the given declaration is considered
   /// 'unavailable' in Swift.
-  bool isUnavailableInSwift(const clang::Decl *decl);
+  bool isUnavailableInSwift(const clang::Decl *decl) {
+    return importer::isUnavailableInSwift(
+        decl, platformAvailability, SwiftContext.LangOpts.EnableObjCInterop);
+  }
 
   /// \brief Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);

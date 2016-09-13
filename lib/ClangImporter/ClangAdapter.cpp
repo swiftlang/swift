@@ -653,3 +653,51 @@ bool importer::isInitMethod(const clang::ObjCMethodDecl *method) {
   auto selector = method->getSelector();
   return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
 }
+
+bool importer::isObjCId(const clang::Decl *decl) {
+  auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
+  if (!typedefDecl)
+    return false;
+
+  if (!typedefDecl->getDeclContext()->getRedeclContext()->isTranslationUnit())
+    return false;
+
+  return typedefDecl->getName() == "id";
+}
+
+bool importer::isUnavailableInSwift(const clang::Decl *decl,
+                                    PlatformAvailability &platformAvailability,
+                                    bool enableObjCInterop) {
+  // 'id' is always unavailable in Swift.
+  if (enableObjCInterop && isObjCId(decl))
+    return true;
+
+  // FIXME: Somewhat duplicated from importAttributes(), but this is a
+  // more direct path.
+  if (decl->getAvailability() == clang::AR_Unavailable)
+    return true;
+
+  // Apply the deprecated-as-unavailable filter.
+  if (!platformAvailability.deprecatedAsUnavailableFilter)
+    return false;
+
+  for (auto *attr : decl->specific_attrs<clang::AvailabilityAttr>()) {
+    if (attr->getPlatform()->getName() == "swift")
+      return true;
+
+    if (platformAvailability.filter &&
+        !platformAvailability.filter(attr->getPlatform()->getName())) {
+      continue;
+    }
+
+    clang::VersionTuple version = attr->getDeprecated();
+    if (version.empty())
+      continue;
+    if (platformAvailability.deprecatedAsUnavailableFilter(version.getMajor(),
+                                                           version.getMinor()))
+      return true;
+  }
+
+  return false;
+}
+

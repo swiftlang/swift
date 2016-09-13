@@ -1566,19 +1566,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   return addErrorDomain(swiftDecl, clangNamedDecl, importer);
 }
 
-/// Determine whether this is the declaration of Objective-C's 'id' type.
-static bool isObjCId(ASTContext &ctx, const clang::Decl *decl) {
-  if (!ctx.LangOpts.EnableObjCInterop) return false;
-
-  auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
-  if (!typedefDecl) return false;
-
-  if (!typedefDecl->getDeclContext()->getRedeclContext()->isTranslationUnit())
-    return false;
-
-  return typedefDecl->getName() == "id";
-}
-
 /// Retrieve the property type as determined by the given accessor.
 static clang::QualType
 getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
@@ -2038,7 +2025,7 @@ namespace {
 
       // Make Objective-C's 'id' unavailable.
       ASTContext &ctx = DC->getASTContext();
-      if (isObjCId(ctx, Decl)) {
+      if (ctx.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
         auto attr = AvailableAttr::createUnconditional(
                       ctx,
                       "'id' is not available in Swift; use 'Any'", "",
@@ -5136,8 +5123,8 @@ SwiftDeclConverter::findLatestIntroduction(const clang::Decl *D) {
 
     // Does this availability attribute map to the platform we are
     // currently targeting?
-    if (!Impl.PlatformAvailabilityFilter ||
-        !Impl.PlatformAvailabilityFilter(attr->getPlatform()->getName()))
+    if (!Impl.platformAvailability.filter ||
+        !Impl.platformAvailability.filter(attr->getPlatform()->getName()))
       continue;
 
     // Take advantage of the empty version being 0.0.0.0.
@@ -6434,8 +6421,8 @@ void ClangImporter::Implementation::importAttributes(
 
       // Does this availability attribute map to the platform we are
       // currently targeting?
-      if (!PlatformAvailabilityFilter ||
-          !PlatformAvailabilityFilter(Platform))
+      if (!platformAvailability.filter ||
+          !platformAvailability.filter(Platform))
         continue;
 
       auto platformK =
@@ -6466,13 +6453,13 @@ void ClangImporter::Implementation::importAttributes(
 
       const auto &deprecated = avail->getDeprecated();
       if (!deprecated.empty()) {
-        if (DeprecatedAsUnavailableFilter &&
-            DeprecatedAsUnavailableFilter(deprecated.getMajor(),
-                                          deprecated.getMinor())) {
+        if (platformAvailability.deprecatedAsUnavailableFilter &&
+            platformAvailability.deprecatedAsUnavailableFilter(
+                deprecated.getMajor(), deprecated.getMinor())) {
           AnyUnavailable = true;
           Unconditional = UnconditionalAvailabilityKind::Unavailable;
           if (message.empty())
-            message = DeprecatedAsUnavailableMessage;
+            message = platformAvailability.deprecatedAsUnavailableMessage;
         }
       }
 
@@ -6554,38 +6541,6 @@ void ClangImporter::Implementation::importAttributes(
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
   }
-}
-
-bool ClangImporter::Implementation::isUnavailableInSwift(
-    const clang::Decl *decl) {
-  // 'id' is always unavailable in Swift.
-  if (isObjCId(SwiftContext, decl)) return true;
-
-  // FIXME: Somewhat duplicated from importAttributes(), but this is a
-  // more direct path.
-  if (decl->getAvailability() == clang::AR_Unavailable) return true;
-
-  // Apply the deprecated-as-unavailable filter.
-  if (!DeprecatedAsUnavailableFilter) return false;
-
-  for (auto *attr : decl->specific_attrs<clang::AvailabilityAttr>()) {
-    if (attr->getPlatform()->getName() == "swift")
-      return true;
-
-    if (PlatformAvailabilityFilter &&
-        !PlatformAvailabilityFilter(attr->getPlatform()->getName())){
-      continue;
-    }
-
-    clang::VersionTuple version = attr->getDeprecated();
-    if (version.empty())
-      continue;
-    if (DeprecatedAsUnavailableFilter(version.getMajor(),
-                                      version.getMinor()))
-      return true;
-  }
-
-  return false;
 }
 
 Decl *

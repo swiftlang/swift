@@ -45,6 +45,7 @@ class TypedefNameDecl;
 
 namespace swift {
 namespace importer {
+struct PlatformAvailability;
 
 /// Returns the redeclaration of \p D that contains its definition for any
 /// tag type decl (struct, enum, or union) or Objective-C class or protocol.
@@ -129,6 +130,14 @@ bool isAccessibilityDecl(const clang::Decl *objCMethodOrProp);
 /// Determine whether this method is an Objective-C "init" method
 /// that will be imported as a Swift initializer.
 bool isInitMethod(const clang::ObjCMethodDecl *method);
+
+/// Determine whether this is the declaration of Objective-C's 'id' type.
+bool isObjCId(const clang::Decl *decl);
+
+/// Determine whether the given declaration is considered
+/// 'unavailable' in Swift.
+bool isUnavailableInSwift(const clang::Decl *decl, PlatformAvailability &,
+                          bool enableObjCInterop);
 }
 }
 
