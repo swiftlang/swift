@@ -154,11 +154,9 @@ Projection::Projection(SILInstruction *I) : Value() {
     // updated and a MaxLargeIndex will need to be used here. Currently we
     // represent large Indexes using a 64 bit integer, so we don't need to mess
     // with anything.
-    unsigned NewIndex = ~0;
+    unsigned NewIndex = 0;
     auto *IAI = cast<IndexAddrInst>(I);
     if (getIntegerIndex(IAI->getIndex(), NewIndex)) {
-      assert(NewIndex != unsigned(~0) && "NewIndex should have been changed "
-                                         "by getIntegerIndex?!");
       Value = ValueTy(ProjectionKind::Index, NewIndex);
       assert(getKind() == ProjectionKind::Index);
       assert(getIndex() == NewIndex);
