@@ -10,6 +10,7 @@ set(ANALYSIS_SOURCES
   Analysis/ColdBlockInfo.cpp
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp
+  Analysis/EpilogueARCAnalysis.cpp
   Analysis/FunctionOrder.cpp
   Analysis/IVAnalysis.cpp
   Analysis/LoopAnalysis.cpp
