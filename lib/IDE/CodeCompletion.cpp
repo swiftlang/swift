@@ -3991,6 +3991,21 @@ public:
     addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
 
+  static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
+                                    Optional<DeclKind> DK) {
+    if (DeclAttribute::isUserInaccessible(DAK))
+      return false;
+    if (DeclAttribute::isDeclModifier(DAK))
+      return false;
+    if (DeclAttribute::shouldBeRejectedByParser(DAK))
+      return false;
+    if (!IsInSil && DeclAttribute::isSilOnly(DAK))
+      return false;
+    if (!DK.hasValue())
+      return true;
+    return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
+  }
+
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
     // FIXME: also include user-defined attribute keywords
     StringRef TargetName = "Declaration";
@@ -4005,14 +4020,8 @@ public:
     }
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
-        !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
-        !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
-        (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
-          if (!DK.hasValue() || DeclAttribute::canAttributeAppearOnDeclKind   \
-            (DAK_##NAME, DK.getValue()))                                      \
-              addDeclAttrKeyword(#KEYWORD, Description);                      \
-    }
+    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, DK))                       \
+      addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
   }
 
