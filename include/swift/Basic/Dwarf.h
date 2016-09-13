@@ -21,8 +21,7 @@
 
 namespace swift {
   /// The DWARF version emitted by the Swift compiler.
-  const unsigned GenericDWARFVersion = 3;
-  const unsigned CygwinDWARFVersion = 4;
+  const unsigned DWARFVersion = 4;
 
   static const char MachOASTSegmentName[] = "__SWIFT";
   static const char MachOASTSectionName[] = "__ast";

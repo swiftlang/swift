@@ -1182,9 +1182,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = swift::GenericDWARFVersion;
-  if (Invocation.getLangOptions().Target.isWindowsCygwinEnvironment())
-    IRGenOpts.DWARFVersion = swift::CygwinDWARFVersion;
+  IRGenOpts.DWARFVersion = swift::DWARFVersion;
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
