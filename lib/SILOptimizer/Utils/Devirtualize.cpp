@@ -225,7 +225,7 @@ static bool isKnownFinalClass(ClassDecl *CD, SILModule &M,
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
                                                 ClassHierarchyAnalysis *CHA) {
 
   while (S) {
@@ -268,6 +268,143 @@ static SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
   return SILValue();
 }
 
+/// Try to determine the exact dynamic type of an object.
+/// returns the exact dynamic type of the object, or an empty type if the exact
+/// type could not be determined.
+SILType swift::getExactDynamicType(SILValue S, SILModule &M,
+                                   ClassHierarchyAnalysis *CHA,
+                                   bool ForUnderlyingObject) {
+  // Set of values to be checked for their exact types.
+  SmallVector<SILValue, 8> WorkList;
+  // The detected type of the underlying object.
+  SILType ResultType;
+  // Set of processed values.
+  llvm::SetVector<SILValue> Processed;
+  WorkList.push_back(S);
+
+  while (!WorkList.empty()) {
+    auto V = WorkList.pop_back_val();
+    if (!V)
+      return SILType();
+    if (Processed.count(V))
+      continue;
+    Processed.insert(V);
+    // For underlying object strip casts and projections.
+    // For the object itself, simply strip casts.
+    V = ForUnderlyingObject ? getUnderlyingObject(V) : stripCasts(V);
+
+    if (isa<AllocRefInst>(V) || isa<MetatypeInst>(V)) {
+      if (ResultType && ResultType != V->getType())
+        return SILType();
+      ResultType = V->getType();
+      continue;
+    }
+
+    if (isa<LiteralInst>(V)) {
+      if (ResultType && ResultType != V->getType())
+        return SILType();
+      ResultType = V->getType();
+      continue;
+    }
+
+    if (isa<StructInst>(V) || isa<TupleInst>(V) || isa<EnumInst>(V)) {
+      if (ResultType && ResultType != V->getType())
+        return SILType();
+      ResultType = V->getType();
+      continue;
+    }
+
+    if (ForUnderlyingObject) {
+      if (isa<AllocationInst>(V)) {
+        if (ResultType && ResultType != V->getType())
+          return SILType();
+        ResultType = V->getType();
+        continue;
+      }
+      // Look through strong_pin instructions.
+      if (isa<StrongPinInst>(V)) {
+        WorkList.push_back(cast<SILInstruction>(V)->getOperand(0));
+        continue;
+      }
+    }
+
+    auto Arg = dyn_cast<SILArgument>(V);
+    if (!Arg) {
+      // We don't know what it is.
+      return SILType();
+    }
+
+    if (Arg->isFunctionArg()) {
+      // Bail on metatypes for now.
+      if (Arg->getType().getSwiftRValueType()->is<AnyMetatypeType>()) {
+        return SILType();
+      }
+      auto *CD = Arg->getType().getClassOrBoundGenericClass();
+      // If it is not class and it is a trivial type, then it
+      // should be the exact type.
+      if (!CD && Arg->getType().isTrivial(M)) {
+        if (ResultType && ResultType != Arg->getType())
+          return SILType();
+        ResultType = Arg->getType();
+        continue;
+      }
+
+      if (!CD) {
+        // It is not a class or a trivial type, so we don't know what it is.
+        return SILType();
+      }
+
+      // Check if this class is effectively final.
+      if (!isKnownFinalClass(CD, M, CHA)) {
+        return SILType();
+      }
+
+      if (ResultType && ResultType != Arg->getType())
+        return SILType();
+      ResultType = Arg->getType();
+      continue;
+    }
+
+    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    if (SinglePred) {
+      // If it is a BB argument received on a success branch
+      // of a checked_cast_br, then we know its exact type.
+      auto *CCBI = dyn_cast<CheckedCastBranchInst>(SinglePred->getTerminator());
+      if (CCBI && CCBI->isExact() && CCBI->getSuccessBB() == Arg->getParent()) {
+        if (ResultType && ResultType != Arg->getType())
+          return SILType();
+        ResultType = Arg->getType();
+        continue;
+      }
+    }
+
+    // It is a BB argument, look through incoming values. If they all have the
+    // same exact type, then we consider it to be the type of the BB argument.
+    SmallVector<SILValue, 4> IncomingValues;
+
+    if (Arg->getIncomingValues(IncomingValues)) {
+      for (auto InValue : IncomingValues) {
+        WorkList.push_back(InValue);
+      }
+      continue;
+    }
+
+    // The exact type is unknown.
+    return SILType();
+  }
+
+  return ResultType;
+}
+
+
+/// Try to determine the exact dynamic type of the underlying object.
+/// returns the exact dynamic type of a value, or an empty type if the exact
+/// type could not be determined.
+SILType
+swift::getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+                                             ClassHierarchyAnalysis *CHA) {
+  return getExactDynamicType(S, M, CHA, /* ForUnderlyingObject */ true);
+}
 
 // Start with the substitutions from the apply.
 // Try to propagate them to find out the real substitutions required
@@ -873,6 +1010,12 @@ swift::tryDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
                                                         CMI->getModule(),
                                                         CHA))
       return tryDevirtualizeClassMethod(AI, Instance);
+
+    if (auto ExactTy = getExactDynamicType(CMI->getOperand(), CMI->getModule(),
+                                           CHA)) {
+      if (ExactTy == CMI->getOperand()->getType())
+        return tryDevirtualizeClassMethod(AI, CMI->getOperand());
+    }
   }
 
   if (isa<SuperMethodInst>(AI.getCallee())) {
