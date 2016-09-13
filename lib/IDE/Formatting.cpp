@@ -366,7 +366,8 @@ public:
     Expr *AtExprEnd = End.getAsExpr();
     if (AtExprEnd && (isa<ClosureExpr>(AtExprEnd) ||
                       isa<ParenExpr>(AtExprEnd) ||
-                      isa<TupleExpr>(AtExprEnd))) {
+                      isa<TupleExpr>(AtExprEnd) ||
+                      isa<CaptureListExpr>(AtExprEnd))) {
 
       if (auto *Paren = dyn_cast_or_null<ParenExpr>(Cursor->getAsExpr())) {
         auto *SubExpr = Paren->getSubExpr();
