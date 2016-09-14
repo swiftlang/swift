@@ -221,7 +221,7 @@ class ASTScope {
     /// or \c kind == ASTScopeKind::AbstractFunctionBody.
     AbstractFunctionDecl *abstractFunction;
 
-    /// An parameter for an abstract function (init/func/deinit).
+    /// A parameter for an abstract function (init/func/deinit).
     ///
     /// For \c kind == ASTScopeKind::AbstractFunctionParams.
     struct {
