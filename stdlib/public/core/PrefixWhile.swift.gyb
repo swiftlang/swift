@@ -1,4 +1,4 @@
-//===--- PrefixWhile.swift.gyb - Lazy views for prefix(while:) ------------===//
+//===-- PrefixWhile.swift.gyb - Lazy views for prefix(while:) -*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

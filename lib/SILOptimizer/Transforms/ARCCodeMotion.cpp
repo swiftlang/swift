@@ -1,4 +1,4 @@
-//===------------------------ ARCCodeMotion.cpp - SIL ARC Code Motion ----===//
+//===--- ARCCodeMotion.cpp - SIL ARC Code Motion --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
