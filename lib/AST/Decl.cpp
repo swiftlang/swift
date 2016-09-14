@@ -2185,7 +2185,7 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
 
 
 void GenericTypeDecl::setGenericParams(GenericParamList *params) {
-  // Set the specified generic parameters onto this type alias, setting
+  // Set the specified generic parameters onto this type declaration, setting
   // the parameters' context along the way.
   GenericParams = params;
   if (params)

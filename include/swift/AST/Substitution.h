@@ -57,15 +57,6 @@ public:
   
   /// Apply a substitution to this substitution's replacement type and
   /// conformances.
-  ///
-  /// Our replacement type must be written in terms of the context
-  /// archetypes of 'env', which in turn must be derived from the
-  /// generic requirements of 'sig'.
-  Substitution subst(ModuleDecl *module,
-                     GenericSignature *sig,
-                     GenericEnvironment *env,
-                     ArrayRef<Substitution> subs) const;
-
   Substitution subst(ModuleDecl *module,
                      const SubstitutionMap &subMap) const;
 

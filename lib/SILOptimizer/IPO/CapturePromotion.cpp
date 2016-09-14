@@ -193,7 +193,6 @@ public:
   ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                 StringRef ClonedName,
                 SubstitutionMap &InterfaceSubs,
-                SubstitutionMap &ContextSubs,
                 ArrayRef<Substitution> ApplySubs,
                 IndicesSet &PromotableIndices);
 
@@ -311,13 +310,12 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                              StringRef ClonedName,
                              SubstitutionMap &InterfaceSubs,
-                             SubstitutionMap &ContextSubs,
                              ArrayRef<Substitution> ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
                            *initCloned(Orig, Fragile, ClonedName, InterfaceSubs,
                                        PromotableIndices),
-                           *Orig, ContextSubs, ApplySubs),
+                           *Orig, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -861,23 +859,11 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   SILFunction *F = PAI->getFunction();
 
   // Create the substitution maps.
+  auto ApplySubs = PAI->getSubstitutions();
+
   SubstitutionMap InterfaceSubs;
-  SubstitutionMap ContextSubs;
-
-  ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
-  auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
-  auto *genericParams = F->getGenericEnvironment();
-
-  if (!ApplySubs.empty()) {
+  if (auto genericSig = F->getLoweredFunctionType()->getGenericSignature())
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-    ContextSubs = genericParams->getSubstitutionMap(
-        F->getModule().getSwiftModule(),
-        genericSig, ApplySubs);
-  } else {
-    assert(!genericSig && "Function type has Unexpected generic signature!");
-    assert(!genericParams &&
-           "Function definition has unexpected generic params!");
-  }
 
   // Create the Cloned Name for the function.
   SILFunction *Orig = FRI->getReferencedFunction();
@@ -896,7 +882,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   // Otherwise, create a new clone.
   ClosureCloner cloner(Orig, Fragile, ClonedName, InterfaceSubs,
-                       ContextSubs, ApplySubs, PromotableIndices);
+                       ApplySubs, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }
