@@ -25,6 +25,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -138,26 +139,82 @@ private:
   SmallVector<LinkLibrary, 8> LinkLibraries;
 
 public:
+
+  // FIXME: Replace with llvm::Error post-haste.
+  class alignas(16) ErrorInfo /* : public llvm::ErrorInfo<ErrorInfo> */ {
+    const char *message;
+  public:
+    explicit ErrorInfo(const char *m) : message(m) {}
+    static ErrorInfo success() {
+      return ErrorInfo(nullptr);
+    }
+    explicit operator bool() const {
+      return message != nullptr;
+    }
+
+    friend raw_ostream &operator<<(raw_ostream &os, const ErrorInfo &self) {
+      os << self.message;
+      return os;
+    }
+  };
+
+  // FIXME: Replace with llvm::Expected post-haste.
+  template <typename T>
+  class Expected {
+    // FIXME: Replace with a real error type.
+    Optional<T> payload;
+    ErrorInfo error;
+  public:
+    /*implicit*/Expected(T value)
+        : payload(value), error(ErrorInfo::success()) {}
+    /*implicit*/Expected(ErrorInfo info)
+        : error(std::move(info)) {}
+
+    explicit operator bool() const {
+      return payload.hasValue();
+    }
+
+    T get() const {
+      return payload.getValue();
+    }
+
+    ErrorInfo takeError() {
+      return std::move(error);
+    }
+  };
+
   template <typename T>
   class Serialized {
   private:
     using RawBitOffset = decltype(DeclTypeCursor.GetCurrentBitNo());
-
-    using ImplTy = PointerUnion<T, serialization::BitOffset>;
+    using ResultTy = PointerUnion<T, const ErrorInfo *>;
+    using ImplTy = PointerUnion<ResultTy, serialization::BitOffset>;
     ImplTy Value;
 
   public:
     /*implicit*/ Serialized(serialization::BitOffset offset) : Value(offset) {}
 
     bool isComplete() const {
-      return Value.template is<T>();
+      return Value.template is<ResultTy>();
+    }
+
+    bool isError() const {
+      assert(isComplete());
+      return Value.template get<ResultTy>().template is<const ErrorInfo *>();
     }
 
     T get() const {
-      return Value.template get<T>();
+      return Value.template get<ResultTy>().template get<T>();
     }
 
-    /*implicit*/ operator T() const {
+    const ErrorInfo &getError() const {
+      return *Value.template get<ResultTy>().template get<const ErrorInfo *>();
+    }
+
+    Expected<T> getAsExpected() const {
+      assert(isComplete());
+      if (isError())
+        return getError();
       return get();
     }
 
@@ -170,9 +227,17 @@ public:
     }
 
     template <typename Derived>
-    Serialized &operator=(Derived deserialized) {
-      assert(!isComplete() || ImplTy(deserialized) == Value);
-      Value = deserialized;
+    typename std::enable_if<std::is_constructible<T, Derived>::value,
+                            Serialized &>::type
+    operator=(Derived deserialized) {
+      assert(!isComplete() || ImplTy(ResultTy(deserialized)) == Value);
+      Value = ResultTy(deserialized);
+      return *this;
+    }
+
+    // Errors can be assigned after the fact, unfortunately.
+    Serialized &operator=(const ErrorInfo *error) {
+      Value = ResultTy(error);
       return *this;
     }
 
@@ -352,6 +417,9 @@ private:
   template <typename T, typename ...Args>
   T *createDecl(Args &&... args);
 
+  /// Moves this error info into the ASTContext, so we can retrieve it later.
+  ErrorInfo *persist(ErrorInfo info);
+
   /// Constructs a new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
              std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -421,9 +489,9 @@ private:
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern();
+  Expected<Pattern *> maybeReadPattern();
 
-  ParameterList *readParameterList();
+  Expected<ParameterList *> readParameterList();
   
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC);
@@ -436,13 +504,13 @@ private:
                                      GenericParamList *outerParams = nullptr);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
-  void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
+  ErrorInfo readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
 
-  /// Reads a GenericEnvironment from \c DeclTypeCursor.
+  /// Reads a GenericEnvironment from the given cursor.
   ///
   /// Also returns the set of generic parameters read, in order, to help with
-  /// forming a GenericSignature.
-  GenericEnvironment *readGenericEnvironment(
+  /// forming a GenericSignature. This vector should not be read from on error.
+  Expected<GenericEnvironment *> readGenericEnvironment(
       SmallVectorImpl<GenericTypeParamType *> &paramTypes,
       llvm::BitstreamCursor &Cursor);
 
@@ -453,7 +521,7 @@ private:
   /// read requirements.
   ///
   /// Returns nullptr if there's no generic signature here.
-  std::pair<GenericSignature *, GenericEnvironment *>
+  Expected<std::pair<GenericSignature *, GenericEnvironment *>>
   maybeReadGenericSignature();
 
   /// Populates the vector with members of a DeclContext from \c DeclTypeCursor.
@@ -480,19 +548,21 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  Decl *resolveCrossReference(Module *M, uint32_t pathLen);
+  Expected<Decl *> resolveCrossReference(Module *M, uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
-  void configureStorage(AbstractStorageDecl *storage, unsigned rawStorageKind,
-                        serialization::DeclID getter,
-                        serialization::DeclID setter,
-                        serialization::DeclID materializeForSet,
-                        serialization::DeclID addressor,
-                        serialization::DeclID mutableAddressor,
-                        serialization::DeclID willSet,
-                        serialization::DeclID didSet);
+  /// Sets the accessors for \p storage based on \p rawStorageKind.
+  ErrorInfo configureStorage(AbstractStorageDecl *storage,
+                             unsigned rawStorageKind,
+                             serialization::DeclID getter,
+                             serialization::DeclID setter,
+                             serialization::DeclID materializeForSet,
+                             serialization::DeclID addressor,
+                             serialization::DeclID mutableAddressor,
+                             serialization::DeclID willSet,
+                             serialization::DeclID didSet);
 
 public:
   /// Loads a module from the given memory buffer.
@@ -674,7 +744,7 @@ public:
   }
 
   /// Returns the type with the given ID, deserializing it if needed.
-  Type getType(serialization::TypeID TID);
+  Expected<Type> getType(serialization::TypeID TID);
 
   /// Returns the identifier with the given ID, deserializing it if needed.
   Identifier getIdentifier(serialization::IdentifierID IID);
@@ -685,14 +755,14 @@ public:
   /// \param ForcedContext Optional override for the decl context of certain
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
-  Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = None);
+  Expected<Decl *> getDecl(serialization::DeclID DID,
+                           Optional<DeclContext *> ForcedContext = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
-  DeclContext *getDeclContext(serialization::DeclContextID DID);
+  Expected<DeclContext *> getDeclContext(serialization::DeclContextID DID);
 
   /// Returns the local decl context with the given ID, deserializing it if needed.
-  DeclContext *getLocalDeclContext(serialization::DeclContextID DID);
+  Expected<DeclContext *> getLocalDeclContext(serialization::DeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
   Module *getModule(serialization::ModuleID MID);
