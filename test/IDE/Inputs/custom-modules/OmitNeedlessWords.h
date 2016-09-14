@@ -7,9 +7,6 @@
 @interface SEGreebieArray : NSObject
 @end
 
-@interface Echo : NSObject
-@end
-
 typedef NS_OPTIONS(NSUInteger, OMWWobbleOptions) {
   OMWWobbleSideToSide = 0x01,
   OMWWobbleBackAndForth = 0x02,
@@ -24,7 +21,6 @@ typedef NS_OPTIONS(NSUInteger, OMWWobbleOptions) {
 -(void)jumpToTop:(nonnull id)sender;
 -(void)removeWithNoRemorse:(nonnull id)object;
 -(void)bookmarkWithURLs:(nonnull NSArray<NSURL *> *)urls;
--(void)listenToEchoes:(nonnull NSArray<Echo *> *)echoes;
 -(void)saveToURL:(nonnull NSURL *)url forSaveOperation:(NSInteger)operation;
 -(void)indexWithItemNamed:(nonnull NSString *)name;
 -(void)methodAndReturnError:(NSError **)error;

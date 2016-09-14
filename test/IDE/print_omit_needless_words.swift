@@ -209,7 +209,6 @@
 // CHECK-OMIT-NEEDLESS-WORDS: func jumpToTop(_: Any)
 // CHECK-OMIT-NEEDLESS-WORDS: func removeWithNoRemorse(_: Any)
 // CHECK-OMIT-NEEDLESS-WORDS: func bookmark(with: [NSURL])
-// CHECK-OMIT-NEEDLESS-WORDS: func listen(to: [Echo])
 // CHECK-OMIT-NEEDLESS-WORDS: func save(to: NSURL, forSaveOperation: Int)
 // CHECK-OMIT-NEEDLESS-WORDS: func index(withItemNamed: String)
 // CHECK-OMIT-NEEDLESS-WORDS: func methodAndReturnError(_: AutoreleasingUnsafeMutablePointer<NSError?>!)
