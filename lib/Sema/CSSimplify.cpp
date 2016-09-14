@@ -3938,7 +3938,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
 
     // If the bridged value type is generic, the generic arguments
-    // must match the 
+    // must either match or be bridged.
     // FIXME: This should be an associated type of the protocol.
     if (auto bgt1 = type2->getAs<BoundGenericType>()) {
       if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
@@ -3981,7 +3981,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                         locator.withPathElement(
                           LocatorPathElt::getGenericArgument(0))));
       } else {
-        llvm_unreachable("unhandled generic bridged type");
+        // Nothing special to do; matchTypes will match generic arguments.
       }
     }
 
