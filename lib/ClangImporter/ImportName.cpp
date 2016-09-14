@@ -814,6 +814,12 @@ struct ImportFullNameEnv {
                                    unsigned paramIndex,
                                    StringRef suffixToStrip);
 
+  /// Test to see if there is a value with the same name as 'proposedName' in
+  /// the same module as the decl
+  bool hasNamingConflict(const clang::NamedDecl *decl,
+                         const clang::IdentifierInfo *proposedName,
+                         const clang::TypedefNameDecl *cfTypedef);
+
   Optional<ImportedErrorInfo>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
@@ -826,6 +832,75 @@ struct ImportFullNameEnv {
 
   ImportedName importFullName(const clang::NamedDecl *);
 };
+}
+
+bool ImportFullNameEnv::hasNamingConflict(
+    const clang::NamedDecl *decl, const clang::IdentifierInfo *proposedName,
+    const clang::TypedefNameDecl *cfTypedef) {
+  // Test to see if there is a value with the same name as 'proposedName'
+  // in the same module as the decl
+  // FIXME: This will miss macros.
+  auto clangModule = getClangSubmoduleForDecl(decl);
+  if (clangModule.hasValue() && clangModule.getValue())
+    clangModule = clangModule.getValue()->getTopLevelModule();
+
+  auto conflicts = [&](const clang::Decl *OtherD) -> bool {
+    // If these are simply redeclarations, they do not conflict.
+    if (decl->getCanonicalDecl() == OtherD->getCanonicalDecl())
+      return false;
+
+    // If we have a CF typedef, check whether the "other"
+    // declaration we found is just the opaque type behind it. If
+    // so, it does not conflict.
+    if (cfTypedef) {
+      if (auto cfPointerTy =
+              cfTypedef->getUnderlyingType()->getAs<clang::PointerType>()) {
+        if (auto tagDecl = cfPointerTy->getPointeeType()->getAsTagDecl()) {
+          if (tagDecl->getCanonicalDecl() == OtherD)
+            return false;
+        }
+      }
+    }
+
+    auto declModule = getClangSubmoduleForDecl(OtherD);
+    if (!declModule.hasValue())
+      return false;
+
+    // Handle the bridging header case. This is pretty nasty since things
+    // can get added to it *later*, but there's not much we can do.
+    if (!declModule.getValue())
+      return *clangModule == nullptr;
+    return *clangModule == declModule.getValue()->getTopLevelModule();
+  };
+
+  // Allow this lookup to find hidden names.  We don't want the
+  // decision about whether to rename the decl to depend on
+  // what exactly the user has imported.  Indeed, if we're being
+  // asked to resolve a serialization cross-reference, the user
+  // may not have imported this module at all, which means a
+  // normal lookup wouldn't even find the decl!
+  //
+  // Meanwhile, we don't need to worry about finding unwanted
+  // hidden declarations from different modules because we do a
+  // module check before deciding that there's a conflict.
+  clang::LookupResult lookupResult(clangSema, proposedName,
+                                   clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  lookupResult.setAllowHidden(true);
+  lookupResult.suppressDiagnostics();
+
+  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      return true;
+  }
+
+  lookupResult.clear(clang::Sema::LookupTagName);
+  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      return true;
+  }
+
+  return false;
 }
 
 bool ImportFullNameEnv::shouldBeSwiftPrivate(const clang::NamedDecl *decl) {
@@ -1420,81 +1495,13 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
       baseName = baseName.substr(0, baseName.size() - 4);
   }
 
-  auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
-                         const clang::TypedefNameDecl *cfTypedef) -> bool {
-    // Test to see if there is a value with the same name as 'proposedName'
-    // in the same module as the decl
-    // FIXME: This will miss macros.
-    auto clangModule = getClangSubmoduleForDecl(D);
-    if (clangModule.hasValue() && clangModule.getValue())
-      clangModule = clangModule.getValue()->getTopLevelModule();
-
-    auto conflicts = [&](const clang::Decl *OtherD) -> bool {
-      // If these are simply redeclarations, they do not conflict.
-      if (D->getCanonicalDecl() == OtherD->getCanonicalDecl())
-        return false;
-
-      // If we have a CF typedef, check whether the "other"
-      // declaration we found is just the opaque type behind it. If
-      // so, it does not conflict.
-      if (cfTypedef) {
-        if (auto cfPointerTy =
-                cfTypedef->getUnderlyingType()->getAs<clang::PointerType>()) {
-          if (auto tagDecl = cfPointerTy->getPointeeType()->getAsTagDecl()) {
-            if (tagDecl->getCanonicalDecl() == OtherD)
-              return false;
-          }
-        }
-      }
-
-      auto declModule = getClangSubmoduleForDecl(OtherD);
-      if (!declModule.hasValue())
-        return false;
-
-      // Handle the bridging header case. This is pretty nasty since things
-      // can get added to it *later*, but there's not much we can do.
-      if (!declModule.getValue())
-        return *clangModule == nullptr;
-      return *clangModule == declModule.getValue()->getTopLevelModule();
-    };
-
-    // Allow this lookup to find hidden names.  We don't want the
-    // decision about whether to rename the decl to depend on
-    // what exactly the user has imported.  Indeed, if we're being
-    // asked to resolve a serialization cross-reference, the user
-    // may not have imported this module at all, which means a
-    // normal lookup wouldn't even find the decl!
-    //
-    // Meanwhile, we don't need to worry about finding unwanted
-    // hidden declarations from different modules because we do a
-    // module check before deciding that there's a conflict.
-    clang::LookupResult lookupResult(clangSema, proposedName,
-                                     clang::SourceLocation(),
-                                     clang::Sema::LookupOrdinaryName);
-    lookupResult.setAllowHidden(true);
-    lookupResult.suppressDiagnostics();
-
-    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-        return true;
-    }
-
-    lookupResult.clear(clang::Sema::LookupTagName);
-    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-        return true;
-    }
-
-    return false;
-  };
-
   // Objective-C protocols may have the suffix "Protocol" appended if
   // the non-suffixed name would conflict with another entity in the
   // same top-level module.
   SmallString<16> baseNameWithProtocolSuffix;
   if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(D)) {
     if (objcProto->hasDefinition()) {
-      if (hasConflict(objcProto->getIdentifier(), nullptr)) {
+      if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
         baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
         baseName = baseNameWithProtocolSuffix;
@@ -1509,7 +1516,8 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
     if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
       auto swiftName = getCFTypeName(typedefNameDecl);
       if (!swiftName.empty() &&
-          !hasConflict(&clangCtx.Idents.get(swiftName), typedefNameDecl)) {
+          !hasNamingConflict(D, &clangCtx.Idents.get(swiftName),
+                             typedefNameDecl)) {
         // Adopt the requested name.
         baseName = swiftName;
       }
