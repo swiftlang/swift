@@ -87,12 +87,3 @@ struct P {
 func sr1794(pt: P, p0: P, p1: P) -> Bool {
   return (pt.x - p0.x) * (p1.y - p0.y) - (pt.y - p0.y) * (p1.x - p0.x) < 0.0
 }
-
-// Tests for partial contextual type application in sub-expressions
-
-let v1 = (1 - 2 / 3 * 6) as UInt
-let v2 = (([1 + 2 * 3, 4, 5])) as [UInt]
-let v3 = ["hello": 1 + 2, "world": 3 + 4 + 5 * 3] as Dictionary<String, UInt>
-let v4 = [1 + 2 + 3, 4] as [UInt32] + [2 * 3] as [UInt32]
-let v5 = ([1 + 2 + 3, 4] as [UInt32]) + ([2 * 3] as [UInt32])
-let v6 = [1 + 2 + 3, 4] as Set<UInt32>
