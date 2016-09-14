@@ -58,6 +58,11 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   return *_NSGetArgv();
 }
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
+#if defined(__FreeBSD__)
+#  define PROCFS_CMDLINE_PATH "/proc/curproc/cmdline"
+#else
+#  define PROCFS_CMDLINE_PATH "/proc/self/cmdline"
+#endif
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
@@ -67,10 +72,12 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     return _swift_stdlib_ProcessOverrideUnsafeArgv;
   }
 
-  FILE *cmdline = fopen("/proc/self/cmdline", "rb");
+  FILE *cmdline = fopen(PROCFS_CMDLINE_PATH, "rb");
   if (!cmdline) {
     swift::fatalError(0,
-            "fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
+            "fatal error: Unable to open interface to '"
+            PROCFS_CMDLINE_PATH
+            "'.\n");
   }
   char *arg = nullptr;
   size_t size = 0;

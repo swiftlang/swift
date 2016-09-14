@@ -1,6 +1,10 @@
 set(swift_stubs_objc_sources)
 set(swift_stubs_unicode_normalization_sources)
 
+include_directories(AFTER 
+  /usr/local/include
+)
+
 if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
   set(swift_stubs_objc_sources
       Availability.mm
