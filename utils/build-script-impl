@@ -1243,7 +1243,7 @@ fi
 # Checks if a given product is enabled (i.e. part of $PRODUCTS array)
 function contains_product() {
   local current_product
-  for current_product in "$PRODUCTS"; do
+  for current_product in "${PRODUCTS[@]}"; do
     if [[ "$current_product" == "$1" ]]; then
       return 0
     fi
