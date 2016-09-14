@@ -78,6 +78,19 @@ extension PConstrained4 where Self : Superclass {
   }
 }
 
+// Local computed properties.
+func localComputedProperties() {
+  var localProperty: Int {
+    get {
+      return localProperty // expected-warning{{attempting to access 'localProperty' within its own getter}}
+    }
+    set {
+      print(localProperty)
+    }
+  }
+  { print(localProperty) }()
+}
+
 // Top-level code.
 func topLevel() { }
 
