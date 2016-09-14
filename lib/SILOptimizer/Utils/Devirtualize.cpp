@@ -24,6 +24,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Casting.h"
 using namespace swift;
@@ -279,7 +280,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
   // The detected type of the underlying object.
   SILType ResultType;
   // Set of processed values.
-  llvm::SetVector<SILValue> Processed;
+  llvm::SmallSet<SILValue, 8> Processed;
   WorkList.push_back(S);
 
   while (!WorkList.empty()) {
