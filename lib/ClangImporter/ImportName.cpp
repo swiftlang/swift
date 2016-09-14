@@ -821,8 +821,41 @@ struct ImportFullNameEnv {
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
+  /// Whether we should import this as Swift Private
+  bool shouldBeSwiftPrivate(const clang::NamedDecl *);
+
   ImportedName importFullName(const clang::NamedDecl *);
 };
+}
+
+bool ImportFullNameEnv::shouldBeSwiftPrivate(const clang::NamedDecl *decl) {
+
+  // Decl with the attribute are obviously private
+  if (decl->hasAttr<clang::SwiftPrivateAttr>())
+    return true;
+
+  // Enum constants that are not imported as members should be considered
+  // private if the parent enum is marked private.
+  if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
+    auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
+    switch (enumInfoCache.getEnumKind(SwiftContext, ED,
+                                      clangSema.getPreprocessor())) {
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      if (ED->hasAttr<clang::SwiftPrivateAttr>())
+        return true;
+      if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
+        if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+          return true;
+      break;
+
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      break;
+    }
+  }
+
+  return false;
 }
 
 Optional<ImportedErrorInfo> ImportFullNameEnv::considerErrorImport(
@@ -973,7 +1006,7 @@ importer::importFullName(const clang::NamedDecl *decl, ASTContext &SwiftContext,
                          PlatformAvailability &platformAvailability,
                          ImportNameOptions options, bool inferImportAsMember) {
   ImportFullNameEnv env{SwiftContext, clangSema, enumInfoCache,
-                        platformAvailability, options, inferImportAsMember};
+                        platformAvailability, options, inferImportAsMember, {}};
   return env.importFullName(decl);
 }
 
@@ -1561,77 +1594,33 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
     }
   }
 
-  // Local function to determine whether the given declaration is subject to
-  // a swift_private attribute.
-  auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {
-    if (D->hasAttr<clang::SwiftPrivateAttr>())
-      return true;
-
-    // Enum constants that are not imported as members should be considered
-    // private if the parent enum is marked private.
-    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
-      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-      switch (enumInfoCache.getEnumKind(SwiftContext, ED,
-                                        clangSema.getPreprocessor())) {
-      case EnumKind::Constants:
-      case EnumKind::Unknown:
-        if (ED->hasAttr<clang::SwiftPrivateAttr>())
-          return true;
-        if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
-          if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
-            return true;
-        break;
-
-      case EnumKind::Enum:
-      case EnumKind::Options:
-        break;
-      }
-    }
-
-    return false;
-  };
-
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
-  if (hasSwiftPrivate(D)) {
-    // Make the given name private.
-    //
-    // Returns true if this is not possible.
-    auto makeNamePrivate = [](bool isInitializer, StringRef &baseName,
-                              SmallVectorImpl<StringRef> &argumentNames,
-                              CtorInitializerKind initKind,
-                              SmallString<16> &scratch) -> bool {
-      scratch = "__";
-
-      if (isInitializer) {
-        // For initializers, prepend "__" to the first argument name.
-        if (argumentNames.empty()) {
-          // FIXME: ... unless it was from a factory method, for historical
-          // reasons.
-          if (initKind == CtorInitializerKind::Factory ||
-              initKind == CtorInitializerKind::ConvenienceFactory)
-            return true;
-
-          // FIXME: Record that we did this.
-          argumentNames.push_back("__");
-        } else {
-          scratch += argumentNames[0];
-          argumentNames[0] = scratch;
-        }
-      } else {
-        // For all other entities, prepend "__" to the base name.
-        scratch += baseName;
-        baseName = scratch;
-      }
-
-      return false;
-    };
-
-    // Make the name private.
-    if (makeNamePrivate(isInitializer, baseName, argumentNames, result.InitKind,
-                        swiftPrivateScratch))
+  if (shouldBeSwiftPrivate(D)) {
+    // Special case: empty arg factory, "for historical reasons", is not private
+    if (isInitializer && argumentNames.empty() &&
+        (result.InitKind == CtorInitializerKind::Factory ||
+         result.InitKind == CtorInitializerKind::ConvenienceFactory))
       return result;
+
+    // Make the given name private.
+    swiftPrivateScratch = "__";
+
+    if (isInitializer) {
+      // For initializers, prepend "__" to the first argument name.
+      if (argumentNames.empty()) {
+        // FIXME: Record that we did this.
+        argumentNames.push_back("__");
+      } else {
+        swiftPrivateScratch += argumentNames[0];
+        argumentNames[0] = swiftPrivateScratch;
+      }
+    } else {
+      // For all other entities, prepend "__" to the base name.
+      swiftPrivateScratch += baseName;
+      baseName = swiftPrivateScratch;
+    }
   }
 
   result.Imported =
