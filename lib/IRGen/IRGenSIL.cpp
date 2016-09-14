@@ -100,32 +100,6 @@ public:
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };
   
-/// Represents an ObjC method reference that will be invoked by a form of
-/// objc_msgSend.
-class ObjCMethod {
-  /// The SILDeclRef declaring the method.
-  SILDeclRef method;
-  /// For a bounded call, the static type that provides the lower bound for
-  /// the search. Null for unbounded calls that will look for the method in
-  /// the dynamic type of the object.
-  llvm::PointerIntPair<SILType, 1, bool> searchTypeAndSuper;
-
-public:
-  ObjCMethod(SILDeclRef method, SILType searchType, bool startAtSuper)
-    : method(method), searchTypeAndSuper(searchType, startAtSuper)
-  {}
-  
-  SILDeclRef getMethod() const { return method; }
-  SILType getSearchType() const { return searchTypeAndSuper.getPointer(); }
-  bool shouldStartAtSuper() const { return searchTypeAndSuper.getInt(); }
-  
-  /// FIXME: Thunk down to a Swift function value?
-  llvm::Value *getExplosionValue(IRGenFunction &IGF) const {
-    llvm_unreachable("thunking unapplied objc method to swift function "
-                     "not yet implemented");
-  }
-};
-  
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
 /// - an Explosion of (unmanaged) Values, corresponding to a SIL "register"; or
@@ -1921,10 +1895,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::ObjCMethod: {
     assert(selfValue);
     auto &objcMethod = lv.getObjCMethod();
-    ObjCMessageKind kind = ObjCMessageKind::Normal;
-    if (objcMethod.getSearchType())
-      kind = objcMethod.shouldStartAtSuper()? ObjCMessageKind::Super
-                                            : ObjCMessageKind::Peer;
+    ObjCMessageKind kind = objcMethod.getMessageKind();
 
     CallEmission emission =
       prepareObjCMethodRootCall(IGF, objcMethod.getMethod(),
@@ -2247,7 +2218,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
     
     Explosion function;
     emitObjCPartialApplication(*this,
-                               objcMethod.getMethod(),
+                               objcMethod,
                                i->getOrigCalleeType(),
                                i->getType().castTo<SILFunctionType>(),
                                selfVal,
