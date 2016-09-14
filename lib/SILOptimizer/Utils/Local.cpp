@@ -1664,6 +1664,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
+  
+  // TODO: Handle indirect argument to or return from witness function.
+  if (ParamTypes[0].isIndirect()
+      || BridgedFunc->getLoweredFunctionType()->getSingleResult().isIndirect())
+    return nullptr;
 
   // Get substitutions, if source is a bound generic type.
   ArrayRef<Substitution> Subs =
@@ -1730,9 +1735,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Direct_Unowned:
       break;
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Direct_Deallocating:
       llvm_unreachable("unsupported convention for bridging conversion");
   }

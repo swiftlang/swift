@@ -70,6 +70,15 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     witnessFnTy = witnessFnTy.substGenericArgs(gen.SGM.M, substitutions);
   }
 
+  // The witness may be more abstract than the concrete value we're bridging,
+  // for instance, if the value is a concrete instantiation of a generic type.
+  if (witnessFnTy.castTo<SILFunctionType>()->getParameters()[0].isIndirect()
+      && !swiftValue.getType().isAddress()) {
+    auto tmp = gen.emitTemporaryAllocation(loc, swiftValue.getType());
+    gen.B.createStore(loc, swiftValue.getValue(), tmp);
+    swiftValue = ManagedValue::forUnmanaged(tmp);
+  }
+
   // Call the witness.
   SILType resultTy = gen.getLoweredType(objcType);
   SILValue bridgedValue = gen.B.createApply(loc, witnessRef, witnessFnTy,

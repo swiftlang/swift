@@ -126,27 +126,29 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(knownUnbridged)
 
+  // These cases bridge using Optional's _ObjectiveCBridgeable conformance.
+
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<String>
   // CHECK: store [[OPT_STRING]] to [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<String>>([[TMP]])
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalA)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<NSString>
   // CHECK: store [[OPT_NSSTRING]] to [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<NSString>>([[TMP]])
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalB)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<Any>
   // CHECK: copy_addr [[OPT_ANY]] to [initialization] [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<Any>>([[TMP]])
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<Any>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalC)
 

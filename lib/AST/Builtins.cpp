@@ -701,6 +701,7 @@ static ValueDecl *getIsOptionalOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   Type ResultTy = Context.TheRawPointerType;
