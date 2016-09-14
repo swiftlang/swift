@@ -104,3 +104,7 @@ protocol Fooable {
 
   var foo: Foo { get }
 }
+
+let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
+// expected-error@-1 {{'a' used within its own type}}
+// FIXME: That second error is bogus.

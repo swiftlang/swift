@@ -472,6 +472,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
 
     ValueDecl *D = Result.Decl;
+    if (!D->hasType()) validateDecl(D);
+
     if (!D->hasType()) {
       assert(D->getDeclContext()->isLocalContext());
       if (!D->isInvalid()) {
