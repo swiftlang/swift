@@ -61,6 +61,8 @@ def emit_fixits_path
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
+def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
+  HelpText<"Like -verify, but updates the original source file">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
