@@ -801,6 +801,8 @@ struct ImportFullNameEnv {
   ImportNameOptions options;
   bool inferImportAsMember;
 
+  StringScratchSpace scratch;
+
   bool enableObjCInterop() const {
     return SwiftContext.LangOpts.EnableObjCInterop;
   }
@@ -1481,9 +1483,6 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
     }
   }
 
-  // Omit needless words.
-  StringScratchSpace omitNeedlessWordsScratch;
-
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
@@ -1539,7 +1538,7 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                omitNeedlessWordsScratch);
+                                scratch);
       }
     }
 
@@ -1552,14 +1551,13 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
           result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                            : None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          omitNeedlessWordsScratch);
+          scratch);
     }
 
     // If the result is a value, lowercase it.
     if (strippedPrefix && isa<clang::ValueDecl>(D) &&
         shouldLowercaseValueName(baseName)) {
-      baseName = camel_case::toLowercaseInitialisms(baseName,
-                                                    omitNeedlessWordsScratch);
+      baseName = camel_case::toLowercaseInitialisms(baseName, scratch);
     }
   }
 
