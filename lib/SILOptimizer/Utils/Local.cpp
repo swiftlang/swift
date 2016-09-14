@@ -1605,10 +1605,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto &M = Inst->getModule();
   auto Loc = Inst->getLoc();
-  
+
+  bool AddressOnlyType = false;
   if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
-    // TODO: Handle address-only types.
-    return nullptr;
+    AddressOnlyType = true;
   }
 
   // Find the _BridgedToObjectiveC protocol.
@@ -1670,7 +1670,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
-  if (Src->getType().isAddress()) {
+  if (Src->getType().isAddress() && !AddressOnlyType) {
     // Create load
     Src = Builder.createLoad(Loc, Src);
   }
@@ -1682,6 +1682,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   bool needReleaseInSucc = false;
   switch (ParamTypes[0].getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
+      assert(!AddressOnlyType &&
+             "AddressOnlyType with Direct_Guaranteed is not supported");
       switch (ConsumptionKind) {
         case CastConsumptionKind::TakeAlways:
           needReleaseAfterCall = true;
@@ -1711,6 +1713,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       // The Direct_Owned case is only handled for completeness. Currently this
       // cannot appear, because the _bridgeToObjectiveC protocol witness method
       // always receives the this pointer (= the source) as guaranteed.
+      assert(!AddressOnlyType &&
+             "AddressOnlyType with Direct_Owned is not supported");
       switch (ConsumptionKind) {
         case CastConsumptionKind::TakeAlways:
           break;
@@ -1724,11 +1728,23 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       }
       break;
     case ParameterConvention::Direct_Unowned:
+      assert(!AddressOnlyType &&
+             "AddressOnlyType with Direct_Unowned is not supported");
       break;
-    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      // Source as-is, we don't need to copy it due to guarantee
+      break;
+    case ParameterConvention::Indirect_In: {
+      assert(AddressOnlyType &&
+             "Expected an AddressOnlyType with Indirect_In Convention");
+      // Need to make a copy of the source, can be changed in ObjC
+      auto BridgeStack = Builder.createAllocStack(Loc, Src->getType());
+      Src = Builder.createCopyAddr(Loc, Src, BridgeStack, IsNotTake,
+                                   IsInitialization);
+      break;
+    }
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Direct_Deallocating:
       llvm_unreachable("unsupported convention for bridging conversion");
   }
