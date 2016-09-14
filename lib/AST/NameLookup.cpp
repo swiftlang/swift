@@ -601,6 +601,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
+
+        // FIXME: Hack to deal with missing 'Self' archetypes.
+        if (!lookupType) {
+          if (auto proto = dc->getAsProtocolOrProtocolExtensionContext())
+            lookupType = proto->getDeclaredType();
+        }
+
         if (!lookupType || lookupType->is<ErrorType>()) continue;
 
         // If we're performing a static lookup, use the metatype.

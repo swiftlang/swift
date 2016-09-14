@@ -22,6 +22,11 @@ protocol P1 {
   associatedtype A = Self
 }
 
+// Protocols involving associated types.
+protocol AProtocol {
+  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+}
+
 // Extensions.
 protocol P2 {
 }
