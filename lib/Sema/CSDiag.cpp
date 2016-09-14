@@ -312,12 +312,26 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
 
 /// \brief Determine the name of the overload in a set of overload choices.
 static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+  DeclName name;
   for (auto choice : choices) {
-    if (choice.isDecl())
-      return choice.getDecl()->getFullName();
+    if (!choice.isDecl())
+      continue;
+
+    DeclName nextName = choice.getDecl()->getFullName();
+    if (!name) {
+      name = nextName;
+      continue;
+    }
+
+    if (name != nextName) {
+      // Assume all choices have the same base name and only differ in
+      // argument labels. This may not be a great assumption, but we don't
+      // really have a way to recover for diagnostics otherwise.
+      return name.getBaseName();
+    }
   }
 
-  return DeclName();
+  return name;
 }
 
 static bool diagnoseAmbiguity(ConstraintSystem &cs,
