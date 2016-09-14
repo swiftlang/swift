@@ -163,6 +163,8 @@ protected:
   /// All the unique refcount roots retained or released in the function.
   llvm::SetVector<SILValue> RCRootVault;
 
+  llvm::SmallVector<Atomicity, 8> RCRootAtomicityVault;
+
   /// Contains a map between RC roots to their index in the RCRootVault.
   /// used to facilitate fast RC roots to index lookup.
   llvm::DenseMap<SILValue, unsigned> RCRootIndex;
@@ -375,16 +377,46 @@ bool RetainCodeMotionContext::requireIteration() {
 
 void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
   // Find all the RC roots in the function.
+  llvm::DenseMap<SILValue, Atomicity> AtomicityOfRoot;
+
   for (auto &BB : *F) {
     for (auto &II : BB) {
+      auto RCInst = dyn_cast<RefCountingInst>(&II);
+      if (!RCInst)
+        continue;
+      // Remember the atomicity of the root. If any
+      // of the RC operations on a the root are atomic,
+      // then the root is considered to be atomic.
+      Atomicity InstAtomicity = (RCInst->getAtomicity() == Atomicity::Atomic)
+                                    ? Atomicity::Atomic
+                                    : Atomicity::NonAtomic;
+      auto Root = getRCRoot(RCInst->getOperand(0));
+
+      auto IsNewRoot = !AtomicityOfRoot.count(Root);
+      auto &RootAtomicity = AtomicityOfRoot[Root];
+
+      if (IsNewRoot)
+        RootAtomicity = InstAtomicity;
+      else if (InstAtomicity == Atomicity::Atomic)
+        RootAtomicity = Atomicity::Atomic;
+
+      if (RCRootIndex.find(Root) != RCRootIndex.end()) {
+        if (InstAtomicity == Atomicity::Atomic) {
+          // Update the atomicity.
+          auto &RootAtomicity = RCRootAtomicityVault[RCRootIndex[Root]];
+          RootAtomicity = Atomicity::Atomic;
+        }
+      }
+
       if (!isRetainInstruction(&II))
         continue;
       RCInstructions.insert(&II);
-      SILValue Root = getRCRoot(&II);
-      if (RCRootIndex.find(Root) != RCRootIndex.end())
+      if (RCRootIndex.find(Root) != RCRootIndex.end()) {
         continue;
+      }
       RCRootIndex[Root] = RCRootVault.size();
       RCRootVault.insert(Root);
+      RCRootAtomicityVault.push_back(RootAtomicity);
     }
   }
 
@@ -457,13 +489,15 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
 
 bool RetainCodeMotionContext::performCodeMotion() {
   bool Changed = false;
+  unsigned Idx = 0;
   // Create the new retain instructions.
   for (auto RC : RCRootVault) {
+    auto RootIdx = Idx++;
     auto Iter = InsertPoints.find(RC);
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
-      createIncrementBefore(Iter->first, IP);
+      createIncrementBefore(Iter->first, IP, RCRootAtomicityVault[RootIdx]);
       Changed = true;
     }
   }
@@ -707,19 +741,50 @@ bool ReleaseCodeMotionContext::requireIteration() {
 
 void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
   // Find all the RC roots in the function.
+  llvm::DenseMap<SILValue, Atomicity> AtomicityOfRoot;
+
   for (auto &BB : *F) {
     for (auto &II : BB) {
+      auto RCInst = dyn_cast<RefCountingInst>(&II);
+      if (!RCInst)
+        continue;
+      // Remember the atomicity of the root. If any
+      // of the RC operations on a the root are atomic,
+      // then the root is considered to be atomic.
+      Atomicity InstAtomicity = (RCInst->getAtomicity() == Atomicity::Atomic)
+                                    ? Atomicity::Atomic
+                                    : Atomicity::NonAtomic;
+      auto Root = getRCRoot(RCInst->getOperand(0));
+
+      auto IsNewRoot = !AtomicityOfRoot.count(Root);
+      auto &RootAtomicity = AtomicityOfRoot[Root];
+
+      if (IsNewRoot)
+        RootAtomicity = InstAtomicity;
+      else if (InstAtomicity == Atomicity::Atomic)
+        RootAtomicity = Atomicity::Atomic;
+
+      if (RCRootIndex.find(Root) != RCRootIndex.end()) {
+        if (InstAtomicity == Atomicity::Atomic) {
+          // Update the atomicity.
+          auto &RootAtomicity = RCRootAtomicityVault[RCRootIndex[Root]];
+          RootAtomicity = Atomicity::Atomic;
+        }
+      }
+
       if (!isReleaseInstruction(&II))
         continue;
       // Do not try to enumerate if we are not hoisting epilogue releases.
       if (FreezeEpilogueReleases && ERM.isEpilogueRelease(&II))
         continue;
-      SILValue Root = getRCRoot(&II);
       RCInstructions.insert(&II);
-      if (RCRootIndex.find(Root) != RCRootIndex.end())
+
+      if (RCRootIndex.find(Root) != RCRootIndex.end()) {
         continue;
+      }
       RCRootIndex[Root] = RCRootVault.size();
       RCRootVault.insert(Root);
+      RCRootAtomicityVault.push_back(RootAtomicity);
     }
   }
 
@@ -823,13 +888,15 @@ void ReleaseCodeMotionContext::mergeBBDataFlowStates(SILBasicBlock *BB) {
 
 bool ReleaseCodeMotionContext::performCodeMotion() {
   bool Changed = false;
+  unsigned Idx = 0;
   // Create the new releases at each anchor point.
   for (auto RC : RCRootVault) {
+    auto RootIdx = Idx++;
     auto Iter = InsertPoints.find(RC);
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
-      createDecrementBefore(Iter->first, IP);
+      createDecrementBefore(Iter->first, IP, RCRootAtomicityVault[RootIdx]);
       Changed = true;
     }
   }

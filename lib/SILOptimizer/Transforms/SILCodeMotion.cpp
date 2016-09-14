@@ -140,7 +140,8 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
   // Ok, we can get all the incoming values and create releases for them.
   unsigned indices = 0;
   for (auto P : BB->getPreds()) {
-    createDecrementBefore(PredValues[indices++], P->getTerminator());
+    createDecrementBefore(PredValues[indices++], P->getTerminator(),
+                          Atomicity::Atomic);
   }
   // Erase the old instruction.
   Head->eraseFromParent();

@@ -443,3 +443,48 @@ bb3:
   %5 = tuple()
   return %5 : $()
 }
+
+sil @c_foo : $@convention(thin) () -> Int32
+
+// Check that all nonatomic RC instructions are preserved as long
+// as all original  RC instructions are non-atomic.
+// CHECK-LABEL: sil @test_retain_release_code_motion_with_nonatomic_rr
+// CHECK: strong_retain [nonatomic]
+// CHECK: strong_release [nonatomic]
+// CHECK: strong_release [nonatomic]
+sil @test_retain_release_code_motion_with_nonatomic_rr : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_ref [stack] $C
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = function_ref @c_foo : $@convention(thin) () -> Int32
+  strong_retain [nonatomic] %0 : $C
+  %5 = apply %3() : $@convention(thin) () -> Int32
+  strong_release [nonatomic] %0 : $C
+  strong_release [nonatomic] %0 : $C
+  dealloc_ref [stack] %0 : $C
+  return %2 : $Int32
+}
+
+// Check that all nonatomic RC instructions are marked as atomic
+// because one of the original RC instructions is atomic.
+// CHECK-LABEL: sil @test_retain_release_code_motion_with_atomic_and_nonatomic_rr
+// CHECK-NOT: strong_retain [nonatomic]
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK-NOT: strong_release [nonatomic]
+// CHECK: strong_retain
+// CHECK: strong_release
+// CHECK: strong_release
+sil @test_retain_release_code_motion_with_atomic_and_nonatomic_rr : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_ref $C
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = function_ref @c_foo : $@convention(thin) () -> Int32
+  strong_retain [nonatomic] %0 : $C
+  %5 = apply %3() : $@convention(thin) () -> Int32
+  // This RC instruction is atomic and thus all others should be considered as atomic as well.
+  strong_release %0 : $C
+  strong_release [nonatomic] %0 : $C
+  return %2 : $Int32
+}

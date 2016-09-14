@@ -701,7 +701,9 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransformFunctionResults() {
       }
       // Create a release to balance it out.
       assert(isa<ApplyInst>(X) && "Unknown epilogue retain");
-      createDecrementBefore(X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator());
+      createDecrementBefore(
+          X, dyn_cast<ApplyInst>(X)->getParent()->getTerminator(),
+          Atomicity::Atomic);
     }
   }
 }
