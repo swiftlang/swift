@@ -1,0 +1,43 @@
+#!/bin/bash
+
+SWIFT_PATH=/home/amr/swift
+PATH=/home/amr/resources/git-plus:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PARAM=x$1
+cd $SWIFT_PATH
+
+if [ ${PARAM} = "x-c" ] ; then
+echo ========== Cleaning ===========
+PARAM="x-u"
+rm -rf build
+mkdir -p build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
+cp $SWIFT_PATH/toolchains/swift-preview/usr/lib/swift/linux/x86_64/glibc.modulemap $SWIFT_PATH/build/buildbot_linux/swift-linux-x86_64/lib/swift/linux/x86_64
+rm -f swift/*.tar.gz
+fi
+
+if [ ${PARAM} = "x-u" ] ; then
+echo ========== Syncing ==========
+git multi commit -am "auto commit from build-toolchain-daily"
+git multi pull
+git multi push
+git multi checkout stable
+git multi checkout master
+git multi pull
+git multi fetch upstream
+git multi merge upstream/master
+git multi push
+git multi checkout develop
+git multi pull
+git multi merge master
+git multi push
+fi
+
+echo ========== Running script ==========
+./swift/utils/build-toolchain local.swift
+
+echo ========== Finishing ==========
+cd $SWIFT_PATH
+test -e swift/swift-nightly-install || exit 
+rm -rf toolchains/swift-toolchain-$(date "+%u")
+mv toolchains/swift-toolchain toolchains/swift-toolchain-$(date "+%u")
+cp -r swift/swift-nightly-install toolchains/swift-toolchain
+

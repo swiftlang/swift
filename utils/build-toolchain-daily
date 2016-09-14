@@ -1,0 +1,2 @@
+#!/bin/bash
+/home/amr/swift/swift/utils/build-toolchain-manually -c
