@@ -594,7 +594,7 @@ V12TypeLowering14MetatypeStruct
 // CHECK-64-NEXT:           (field name=wtable offset=16
 // CHECK-64-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))))
 // CHECK-64-NEXT:   (field name=structMetatype offset=112
-// CHECK-64-NEXT:     (builtin size=0 alignment=1 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (builtin size=0 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=optionalStructMetatype offset=112
 // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]]
 // CHECK-64-NEXT:       (field name=some offset=0
@@ -667,7 +667,7 @@ V12TypeLowering14MetatypeStruct
 // CHECK-32-NEXT:           (field name=wtable offset=8
 // CHECK-32-NEXT:             (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))))
 // CHECK-32-NEXT:   (field name=structMetatype offset=56
-// CHECK-32-NEXT:     (builtin size=0 alignment=1 stride=0 num_extra_inhabitants=0))
+// CHECK-32-NEXT:     (builtin size=0 alignment=1 stride=1 num_extra_inhabitants=0))
 // CHECK-32-NEXT:   (field name=optionalStructMetatype offset=56
 // CHECK-32-NEXT:     (single_payload_enum size=4 alignment=4 stride=4 num_extra_inhabitants=4095
 // CHECK-32-NEXT:       (field name=some offset=0
@@ -689,11 +689,11 @@ V12TypeLowering10EnumStruct
 // CHECK-64: (struct TypeLowering.EnumStruct)
 // CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=empty offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (no_payload_enum size=0 alignment=0 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=noPayload offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=sillyNoPayload offset=0
-// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=0 num_extra_inhabitants=0))
+// CHECK-64-NEXT:     (no_payload_enum size=1 alignment=0 stride=1 num_extra_inhabitants=0))
 // CHECK-64-NEXT:   (field name=singleton offset=8
 // CHECK-64-NEXT:     (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:   (field name=singlePayload offset=16
