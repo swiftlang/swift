@@ -807,6 +807,10 @@ struct ImportFullNameEnv {
     return SwiftContext.LangOpts.EnableObjCInterop;
   }
 
+  bool useSwift2Name() const {
+    return options.contains(ImportNameFlags::Swift2Name);
+  }
+
   /// Look for a method that will import to have the same name as the
   /// given method after importing the Nth parameter as an elided error
   /// parameter.
@@ -830,8 +834,58 @@ struct ImportFullNameEnv {
   /// Whether we should import this as Swift Private
   bool shouldBeSwiftPrivate(const clang::NamedDecl *);
 
+  EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
+                                                  const clang::DeclContext *);
+
   ImportedName importFullName(const clang::NamedDecl *);
 };
+}
+
+EffectiveClangContext
+ImportFullNameEnv::determineEffectiveContext(const clang::NamedDecl *decl,
+                                             const clang::DeclContext *dc) {
+  EffectiveClangContext res;
+
+  // Enumerators can end up within their enclosing enum or in the global
+  // scope, depending how their enclosing enumeration is imported.
+  if (isa<clang::EnumConstantDecl>(decl)) {
+    auto enumDecl = cast<clang::EnumDecl>(dc);
+    switch (enumInfoCache.getEnumKind(SwiftContext, enumDecl,
+                                      clangSema.getPreprocessor())) {
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      // Enums are mapped to Swift enums, Options to Swift option sets.
+      res = cast<clang::DeclContext>(enumDecl);
+      break;
+
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      // The enum constant goes into the redeclaration context of the
+      // enum.
+      res = enumDecl->getRedeclContext();
+      break;
+    }
+    // Import onto a swift_newtype if present
+  } else if (auto newtypeDecl =
+                 findSwiftNewtype(decl, clangSema, useSwift2Name())) {
+    res = newtypeDecl;
+    // Everything else goes into its redeclaration context.
+  } else {
+    res = dc->getRedeclContext();
+  }
+
+  // Anything in an Objective-C category or extension is adjusted to the
+  // class context.
+  if (auto category =
+          dyn_cast_or_null<clang::ObjCCategoryDecl>(res.getAsDeclContext())) {
+    // If the enclosing category is invalid, we cannot import the declaration.
+    if (category->isInvalidDecl())
+      return {};
+
+    return category->getClassInterface();
+  }
+
+  return res;
 }
 
 bool ImportFullNameEnv::hasNamingConflict(
@@ -1099,12 +1153,12 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
   ImportedName result;
 
   /// Whether we want the Swift 2.0 name.
-  bool swift2Name = options.contains(ImportNameFlags::Swift2Name);
+  bool swift2Name = useSwift2Name();
 
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
-    return result;
+    return {};
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1114,45 +1168,15 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
 
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
+  auto effectiveCtx = determineEffectiveContext(D, dc);
+  if (!effectiveCtx)
+    return {};
+  result.EffectiveContext = effectiveCtx;
 
-  // Enumerators can end up within their enclosing enum or in the global
-  // scope, depending how their enclosing enumeration is imported.
-  if (isa<clang::EnumConstantDecl>(D)) {
-    auto enumDecl = cast<clang::EnumDecl>(dc);
-    switch (enumInfoCache.getEnumKind(SwiftContext, enumDecl,
-                                      clangSema.getPreprocessor())) {
-    case EnumKind::Enum:
-    case EnumKind::Options:
-      // Enums are mapped to Swift enums, Options to Swift option sets.
-      result.EffectiveContext = cast<clang::DeclContext>(enumDecl);
-      break;
-
-    case EnumKind::Constants:
-    case EnumKind::Unknown:
-      // The enum constant goes into the redeclaration context of the
-      // enum.
-      result.EffectiveContext = enumDecl->getRedeclContext();
-      break;
-    }
-    // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
-    result.EffectiveContext = newtypeDecl;
+  // FIXME: ugly to check here, instead perform unified check up front in
+  // containing struct...
+  if (findSwiftNewtype(D, clangSema, useSwift2Name()))
     result.ImportAsMember = true;
-    // Everything else goes into its redeclaration context.
-  } else {
-    result.EffectiveContext = dc->getRedeclContext();
-  }
-
-  // Anything in an Objective-C category or extension is adjusted to the
-  // class context.
-  if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
-          result.EffectiveContext.getAsDeclContext())) {
-    // If the enclosing category is invalid, we cannot import the declaration.
-    if (category->isInvalidDecl())
-      return result;
-
-    result.EffectiveContext = category->getClassInterface();
-  }
 
   // Find the original method/property declaration and retrieve the
   // name from there.
@@ -1527,6 +1551,7 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
+    result.ImportAsMember = true;
     baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName(),
                                              strippedPrefix);
   }
