@@ -358,11 +358,6 @@ BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
-/// Strideof has type T.Type -> Int.
-/// Note that this version will never return 0.  It instead always returns
-/// at least 1
-BUILTIN_MISC_OPERATION(StrideofNonZero, "strideof_nonzero", "n", Special)
-
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
