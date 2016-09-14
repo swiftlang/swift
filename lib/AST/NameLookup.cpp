@@ -457,7 +457,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   SmallVector<UnqualifiedLookupResult, 4> UnavailableInnerResults;
 
-  if (Loc.isValid() && Ctx.LangOpts.EnableASTScopeLookup) {
+  if (Loc.isValid() &&
+      DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
+      Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
     SourceFile &sourceFile = *DC->getParentSourceFile();
 
