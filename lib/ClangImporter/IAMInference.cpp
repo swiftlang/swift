@@ -431,9 +431,8 @@ private:
 
     SmallVector<OmissionTypeName, 8> paramTypeNames;
     for (auto param : params) {
-      paramTypeNames.push_back(
-          ClangImporter::Implementation::getClangTypeNameForOmission(
-              clangSema.getASTContext(), param->getType()));
+      paramTypeNames.push_back(getClangTypeNameForOmission(
+          clangSema.getASTContext(), param->getType()));
     }
 
     auto humbleBaseName = getHumbleIdentifier(baseName);

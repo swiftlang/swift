@@ -25,21 +25,42 @@ using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
 
 } // end anonymous namespace
 
+
+//===----------------------------------------------------------------------===//
+//                             Utilities 
+//===----------------------------------------------------------------------===//
+
+/// Return true if this instruction is the epilogue release for the \p Arg.
+/// false otherwise.
+static bool isOwnedArgumentEpilogueRelease(SILInstruction *I, SILValue Arg,
+                                           EpilogueARCFunctionInfo *EAFI) {
+  auto Releases = 
+    EAFI->computeEpilogueARCInstructions(
+            EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  return Releases.size() && Releases.count(I); 
+}
+
+static bool isGuaranteedSafetyByEpilogueRelease(SILInstruction *I, SILValue Arg,
+                                                EpilogueARCFunctionInfo *EAFI) {
+  auto Releases = 
+    EAFI->computeEpilogueARCInstructions(
+            EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  return Releases.size() && !Releases.count(I);
+}
+
 //===----------------------------------------------------------------------===//
 //                      BottomUpRCStateTransitionVisitor
 //===----------------------------------------------------------------------===//
 
 template <class ARCState>
 BottomUpDataflowRCStateVisitor<ARCState>::BottomUpDataflowRCStateVisitor(
-    RCIdentityFunctionInfo *RCFI, ARCState &State,
-    bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ERM,
+    RCIdentityFunctionInfo *RCFI, EpilogueARCFunctionInfo *EAFI,
+    ARCState &State, bool FreezeOwnedArgEpilogueReleases,
     IncToDecStateMapTy &IncToDecStateMap,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory)
-    : RCFI(RCFI), DataflowState(State),
+    : RCFI(RCFI), EAFI(EAFI), DataflowState(State),
       FreezeOwnedArgEpilogueReleases(FreezeOwnedArgEpilogueReleases),
-      EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap),
-      SetFactory(SetFactory) {}
+      IncToDecStateMap(IncToDecStateMap), SetFactory(SetFactory) {}
 
 template <class ARCState>
 typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
@@ -60,10 +81,8 @@ static bool isKnownSafe(BottomUpDataflowRCStateVisitor<ARCState> *State,
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
   if (State->FreezeOwnedArgEpilogueReleases)
-    if (auto *OwnedRelease =
-            State->EpilogueReleaseMatcher.getSingleReleaseForArgument(Op))
-      if (I != OwnedRelease)
-        return true;
+    if (isGuaranteedSafetyByEpilogueRelease(I, Op, State->EAFI))
+      return true;
 
   // A guaranteed function argument is guaranteed to outlive the function we are
   // processing. So bottom up for such a parameter, we are always known safe.
@@ -100,8 +119,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   // If this instruction is a post dominating release, skip it so we don't pair
   // it up with anything. Do make sure that it does not effect any other
   // instructions.
-  if (FreezeOwnedArgEpilogueReleases &&
-      EpilogueReleaseMatcher.isSingleReleaseMatchedToArgument(I))
+  if (FreezeOwnedArgEpilogueReleases && isOwnedArgumentEpilogueRelease(I, Op, EAFI))
     return DataflowResult(Op);
 
   BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
