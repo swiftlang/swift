@@ -801,8 +801,14 @@ struct ImportFullNameEnv {
   ImportNameOptions options;
   bool inferImportAsMember;
 
+  StringScratchSpace scratch;
+
   bool enableObjCInterop() const {
     return SwiftContext.LangOpts.EnableObjCInterop;
+  }
+
+  bool useSwift2Name() const {
+    return options.contains(ImportNameFlags::Swift2Name);
   }
 
   /// Look for a method that will import to have the same name as the
@@ -812,6 +818,12 @@ struct ImportFullNameEnv {
                                    unsigned paramIndex,
                                    StringRef suffixToStrip);
 
+  /// Test to see if there is a value with the same name as 'proposedName' in
+  /// the same module as the decl
+  bool hasNamingConflict(const clang::NamedDecl *decl,
+                         const clang::IdentifierInfo *proposedName,
+                         const clang::TypedefNameDecl *cfTypedef);
+
   Optional<ImportedErrorInfo>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
@@ -819,8 +831,160 @@ struct ImportFullNameEnv {
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
+  /// Whether we should import this as Swift Private
+  bool shouldBeSwiftPrivate(const clang::NamedDecl *);
+
+  EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
+                                                  const clang::DeclContext *);
+
   ImportedName importFullName(const clang::NamedDecl *);
 };
+}
+
+EffectiveClangContext
+ImportFullNameEnv::determineEffectiveContext(const clang::NamedDecl *decl,
+                                             const clang::DeclContext *dc) {
+  EffectiveClangContext res;
+
+  // Enumerators can end up within their enclosing enum or in the global
+  // scope, depending how their enclosing enumeration is imported.
+  if (isa<clang::EnumConstantDecl>(decl)) {
+    auto enumDecl = cast<clang::EnumDecl>(dc);
+    switch (enumInfoCache.getEnumKind(SwiftContext, enumDecl,
+                                      clangSema.getPreprocessor())) {
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      // Enums are mapped to Swift enums, Options to Swift option sets.
+      res = cast<clang::DeclContext>(enumDecl);
+      break;
+
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      // The enum constant goes into the redeclaration context of the
+      // enum.
+      res = enumDecl->getRedeclContext();
+      break;
+    }
+    // Import onto a swift_newtype if present
+  } else if (auto newtypeDecl =
+                 findSwiftNewtype(decl, clangSema, useSwift2Name())) {
+    res = newtypeDecl;
+    // Everything else goes into its redeclaration context.
+  } else {
+    res = dc->getRedeclContext();
+  }
+
+  // Anything in an Objective-C category or extension is adjusted to the
+  // class context.
+  if (auto category =
+          dyn_cast_or_null<clang::ObjCCategoryDecl>(res.getAsDeclContext())) {
+    // If the enclosing category is invalid, we cannot import the declaration.
+    if (category->isInvalidDecl())
+      return {};
+
+    return category->getClassInterface();
+  }
+
+  return res;
+}
+
+bool ImportFullNameEnv::hasNamingConflict(
+    const clang::NamedDecl *decl, const clang::IdentifierInfo *proposedName,
+    const clang::TypedefNameDecl *cfTypedef) {
+  // Test to see if there is a value with the same name as 'proposedName'
+  // in the same module as the decl
+  // FIXME: This will miss macros.
+  auto clangModule = getClangSubmoduleForDecl(decl);
+  if (clangModule.hasValue() && clangModule.getValue())
+    clangModule = clangModule.getValue()->getTopLevelModule();
+
+  auto conflicts = [&](const clang::Decl *OtherD) -> bool {
+    // If these are simply redeclarations, they do not conflict.
+    if (decl->getCanonicalDecl() == OtherD->getCanonicalDecl())
+      return false;
+
+    // If we have a CF typedef, check whether the "other"
+    // declaration we found is just the opaque type behind it. If
+    // so, it does not conflict.
+    if (cfTypedef) {
+      if (auto cfPointerTy =
+              cfTypedef->getUnderlyingType()->getAs<clang::PointerType>()) {
+        if (auto tagDecl = cfPointerTy->getPointeeType()->getAsTagDecl()) {
+          if (tagDecl->getCanonicalDecl() == OtherD)
+            return false;
+        }
+      }
+    }
+
+    auto declModule = getClangSubmoduleForDecl(OtherD);
+    if (!declModule.hasValue())
+      return false;
+
+    // Handle the bridging header case. This is pretty nasty since things
+    // can get added to it *later*, but there's not much we can do.
+    if (!declModule.getValue())
+      return *clangModule == nullptr;
+    return *clangModule == declModule.getValue()->getTopLevelModule();
+  };
+
+  // Allow this lookup to find hidden names.  We don't want the
+  // decision about whether to rename the decl to depend on
+  // what exactly the user has imported.  Indeed, if we're being
+  // asked to resolve a serialization cross-reference, the user
+  // may not have imported this module at all, which means a
+  // normal lookup wouldn't even find the decl!
+  //
+  // Meanwhile, we don't need to worry about finding unwanted
+  // hidden declarations from different modules because we do a
+  // module check before deciding that there's a conflict.
+  clang::LookupResult lookupResult(clangSema, proposedName,
+                                   clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  lookupResult.setAllowHidden(true);
+  lookupResult.suppressDiagnostics();
+
+  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      return true;
+  }
+
+  lookupResult.clear(clang::Sema::LookupTagName);
+  if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
+    if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
+      return true;
+  }
+
+  return false;
+}
+
+bool ImportFullNameEnv::shouldBeSwiftPrivate(const clang::NamedDecl *decl) {
+
+  // Decl with the attribute are obviously private
+  if (decl->hasAttr<clang::SwiftPrivateAttr>())
+    return true;
+
+  // Enum constants that are not imported as members should be considered
+  // private if the parent enum is marked private.
+  if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
+    auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
+    switch (enumInfoCache.getEnumKind(SwiftContext, ED,
+                                      clangSema.getPreprocessor())) {
+    case EnumKind::Constants:
+    case EnumKind::Unknown:
+      if (ED->hasAttr<clang::SwiftPrivateAttr>())
+        return true;
+      if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
+        if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+          return true;
+      break;
+
+    case EnumKind::Enum:
+    case EnumKind::Options:
+      break;
+    }
+  }
+
+  return false;
 }
 
 Optional<ImportedErrorInfo> ImportFullNameEnv::considerErrorImport(
@@ -971,7 +1135,7 @@ importer::importFullName(const clang::NamedDecl *decl, ASTContext &SwiftContext,
                          PlatformAvailability &platformAvailability,
                          ImportNameOptions options, bool inferImportAsMember) {
   ImportFullNameEnv env{SwiftContext, clangSema, enumInfoCache,
-                        platformAvailability, options, inferImportAsMember};
+                        platformAvailability, options, inferImportAsMember, {}};
   return env.importFullName(decl);
 }
 
@@ -989,12 +1153,12 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
   ImportedName result;
 
   /// Whether we want the Swift 2.0 name.
-  bool swift2Name = options.contains(ImportNameFlags::Swift2Name);
+  bool swift2Name = useSwift2Name();
 
   // Objective-C categories and extensions don't have names, despite
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
-    return result;
+    return {};
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1004,45 +1168,15 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
 
   // Compute the effective context.
   auto dc = const_cast<clang::DeclContext *>(D->getDeclContext());
+  auto effectiveCtx = determineEffectiveContext(D, dc);
+  if (!effectiveCtx)
+    return {};
+  result.EffectiveContext = effectiveCtx;
 
-  // Enumerators can end up within their enclosing enum or in the global
-  // scope, depending how their enclosing enumeration is imported.
-  if (isa<clang::EnumConstantDecl>(D)) {
-    auto enumDecl = cast<clang::EnumDecl>(dc);
-    switch (enumInfoCache.getEnumKind(SwiftContext, enumDecl,
-                                      clangSema.getPreprocessor())) {
-    case EnumKind::Enum:
-    case EnumKind::Options:
-      // Enums are mapped to Swift enums, Options to Swift option sets.
-      result.EffectiveContext = cast<clang::DeclContext>(enumDecl);
-      break;
-
-    case EnumKind::Constants:
-    case EnumKind::Unknown:
-      // The enum constant goes into the redeclaration context of the
-      // enum.
-      result.EffectiveContext = enumDecl->getRedeclContext();
-      break;
-    }
-    // Import onto a swift_newtype if present
-  } else if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
-    result.EffectiveContext = newtypeDecl;
+  // FIXME: ugly to check here, instead perform unified check up front in
+  // containing struct...
+  if (findSwiftNewtype(D, clangSema, useSwift2Name()))
     result.ImportAsMember = true;
-    // Everything else goes into its redeclaration context.
-  } else {
-    result.EffectiveContext = dc->getRedeclContext();
-  }
-
-  // Anything in an Objective-C category or extension is adjusted to the
-  // class context.
-  if (auto category = dyn_cast_or_null<clang::ObjCCategoryDecl>(
-          result.EffectiveContext.getAsDeclContext())) {
-    // If the enclosing category is invalid, we cannot import the declaration.
-    if (category->isInvalidDecl())
-      return result;
-
-    result.EffectiveContext = category->getClassInterface();
-  }
 
   // Find the original method/property declaration and retrieve the
   // name from there.
@@ -1385,81 +1519,13 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
       baseName = baseName.substr(0, baseName.size() - 4);
   }
 
-  auto hasConflict = [&](const clang::IdentifierInfo *proposedName,
-                         const clang::TypedefNameDecl *cfTypedef) -> bool {
-    // Test to see if there is a value with the same name as 'proposedName'
-    // in the same module as the decl
-    // FIXME: This will miss macros.
-    auto clangModule = getClangSubmoduleForDecl(D);
-    if (clangModule.hasValue() && clangModule.getValue())
-      clangModule = clangModule.getValue()->getTopLevelModule();
-
-    auto conflicts = [&](const clang::Decl *OtherD) -> bool {
-      // If these are simply redeclarations, they do not conflict.
-      if (D->getCanonicalDecl() == OtherD->getCanonicalDecl())
-        return false;
-
-      // If we have a CF typedef, check whether the "other"
-      // declaration we found is just the opaque type behind it. If
-      // so, it does not conflict.
-      if (cfTypedef) {
-        if (auto cfPointerTy =
-                cfTypedef->getUnderlyingType()->getAs<clang::PointerType>()) {
-          if (auto tagDecl = cfPointerTy->getPointeeType()->getAsTagDecl()) {
-            if (tagDecl->getCanonicalDecl() == OtherD)
-              return false;
-          }
-        }
-      }
-
-      auto declModule = getClangSubmoduleForDecl(OtherD);
-      if (!declModule.hasValue())
-        return false;
-
-      // Handle the bridging header case. This is pretty nasty since things
-      // can get added to it *later*, but there's not much we can do.
-      if (!declModule.getValue())
-        return *clangModule == nullptr;
-      return *clangModule == declModule.getValue()->getTopLevelModule();
-    };
-
-    // Allow this lookup to find hidden names.  We don't want the
-    // decision about whether to rename the decl to depend on
-    // what exactly the user has imported.  Indeed, if we're being
-    // asked to resolve a serialization cross-reference, the user
-    // may not have imported this module at all, which means a
-    // normal lookup wouldn't even find the decl!
-    //
-    // Meanwhile, we don't need to worry about finding unwanted
-    // hidden declarations from different modules because we do a
-    // module check before deciding that there's a conflict.
-    clang::LookupResult lookupResult(clangSema, proposedName,
-                                     clang::SourceLocation(),
-                                     clang::Sema::LookupOrdinaryName);
-    lookupResult.setAllowHidden(true);
-    lookupResult.suppressDiagnostics();
-
-    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-        return true;
-    }
-
-    lookupResult.clear(clang::Sema::LookupTagName);
-    if (clangSema.LookupName(lookupResult, /*scope=*/nullptr)) {
-      if (std::any_of(lookupResult.begin(), lookupResult.end(), conflicts))
-        return true;
-    }
-
-    return false;
-  };
-
   // Objective-C protocols may have the suffix "Protocol" appended if
   // the non-suffixed name would conflict with another entity in the
   // same top-level module.
   SmallString<16> baseNameWithProtocolSuffix;
   if (auto objcProto = dyn_cast<clang::ObjCProtocolDecl>(D)) {
     if (objcProto->hasDefinition()) {
-      if (hasConflict(objcProto->getIdentifier(), nullptr)) {
+      if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
         baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
         baseName = baseNameWithProtocolSuffix;
@@ -1474,19 +1540,18 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
     if (auto typedefNameDecl = dyn_cast<clang::TypedefNameDecl>(D)) {
       auto swiftName = getCFTypeName(typedefNameDecl);
       if (!swiftName.empty() &&
-          !hasConflict(&clangCtx.Idents.get(swiftName), typedefNameDecl)) {
+          !hasNamingConflict(D, &clangCtx.Idents.get(swiftName),
+                             typedefNameDecl)) {
         // Adopt the requested name.
         baseName = swiftName;
       }
     }
   }
 
-  // Omit needless words.
-  StringScratchSpace omitNeedlessWordsScratch;
-
   // swift_newtype-ed declarations may have common words with the type name
   // stripped.
   if (auto newtypeDecl = findSwiftNewtype(D, clangSema, swift2Name)) {
+    result.ImportAsMember = true;
     baseName = determineSwiftNewtypeBaseName(baseName, newtypeDecl->getName(),
                                              strippedPrefix);
   }
@@ -1539,7 +1604,7 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
         (void)omitNeedlessWords(baseName, {}, "", propertyTypeName,
                                 contextTypeName, {}, /*returnsSelf=*/false,
                                 /*isProperty=*/true, allPropertyNames,
-                                omitNeedlessWordsScratch);
+                                scratch);
       }
     }
 
@@ -1552,88 +1617,43 @@ ImportedName ImportFullNameEnv::importFullName(const clang::NamedDecl *D) {
           result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                            : None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          omitNeedlessWordsScratch);
+          scratch);
     }
 
     // If the result is a value, lowercase it.
     if (strippedPrefix && isa<clang::ValueDecl>(D) &&
         shouldLowercaseValueName(baseName)) {
-      baseName = camel_case::toLowercaseInitialisms(baseName,
-                                                    omitNeedlessWordsScratch);
+      baseName = camel_case::toLowercaseInitialisms(baseName, scratch);
     }
   }
-
-  // Local function to determine whether the given declaration is subject to
-  // a swift_private attribute.
-  auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {
-    if (D->hasAttr<clang::SwiftPrivateAttr>())
-      return true;
-
-    // Enum constants that are not imported as members should be considered
-    // private if the parent enum is marked private.
-    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
-      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-      switch (enumInfoCache.getEnumKind(SwiftContext, ED,
-                                        clangSema.getPreprocessor())) {
-      case EnumKind::Constants:
-      case EnumKind::Unknown:
-        if (ED->hasAttr<clang::SwiftPrivateAttr>())
-          return true;
-        if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
-          if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
-            return true;
-        break;
-
-      case EnumKind::Enum:
-      case EnumKind::Options:
-        break;
-      }
-    }
-
-    return false;
-  };
 
   // If this declaration has the swift_private attribute, prepend "__" to the
   // appropriate place.
   SmallString<16> swiftPrivateScratch;
-  if (hasSwiftPrivate(D)) {
-    // Make the given name private.
-    //
-    // Returns true if this is not possible.
-    auto makeNamePrivate = [](bool isInitializer, StringRef &baseName,
-                              SmallVectorImpl<StringRef> &argumentNames,
-                              CtorInitializerKind initKind,
-                              SmallString<16> &scratch) -> bool {
-      scratch = "__";
-
-      if (isInitializer) {
-        // For initializers, prepend "__" to the first argument name.
-        if (argumentNames.empty()) {
-          // FIXME: ... unless it was from a factory method, for historical
-          // reasons.
-          if (initKind == CtorInitializerKind::Factory ||
-              initKind == CtorInitializerKind::ConvenienceFactory)
-            return true;
-
-          // FIXME: Record that we did this.
-          argumentNames.push_back("__");
-        } else {
-          scratch += argumentNames[0];
-          argumentNames[0] = scratch;
-        }
-      } else {
-        // For all other entities, prepend "__" to the base name.
-        scratch += baseName;
-        baseName = scratch;
-      }
-
-      return false;
-    };
-
-    // Make the name private.
-    if (makeNamePrivate(isInitializer, baseName, argumentNames, result.InitKind,
-                        swiftPrivateScratch))
+  if (shouldBeSwiftPrivate(D)) {
+    // Special case: empty arg factory, "for historical reasons", is not private
+    if (isInitializer && argumentNames.empty() &&
+        (result.InitKind == CtorInitializerKind::Factory ||
+         result.InitKind == CtorInitializerKind::ConvenienceFactory))
       return result;
+
+    // Make the given name private.
+    swiftPrivateScratch = "__";
+
+    if (isInitializer) {
+      // For initializers, prepend "__" to the first argument name.
+      if (argumentNames.empty()) {
+        // FIXME: Record that we did this.
+        argumentNames.push_back("__");
+      } else {
+        swiftPrivateScratch += argumentNames[0];
+        argumentNames[0] = swiftPrivateScratch;
+      }
+    } else {
+      // For all other entities, prepend "__" to the base name.
+      swiftPrivateScratch += baseName;
+      baseName = swiftPrivateScratch;
+    }
   }
 
   result.Imported =
