@@ -952,7 +952,7 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  ReferencedNameTracker *getReferencedNameTracker() {
+  ReferencedNameTracker *getReferencedNameTracker() const {
     return ReferencedNames;
   }
   void setReferencedNameTracker(ReferencedNameTracker *Tracker) {

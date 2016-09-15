@@ -15,7 +15,7 @@ LiteralsTestSuite.test("file") {
   // This is what requires the proper bundle folder structure.
   let resource = #fileLiteral(resourceName: "testData.plist")
   let contents = NSDictionary(contentsOf: resource) as! [String: NSObject]?
-  _ = expectNotEmpty(contents)
+  _ = expectNotNil(contents)
   expectEqual(["test": true as NSObject], contents!)
 }
 

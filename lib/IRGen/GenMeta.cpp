@@ -474,7 +474,7 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
         return false;
 
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForLowered(type).isFixedSize());
+    return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
   }
 
   // The empty tuple type has a singleton metadata.
@@ -1147,7 +1147,7 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   // code in emitInPlaceTypeMetadataAccessFunctionBody.
   if (!isLoadFrom(directResult, cache)) {
     IGF.Builder.CreateStore(directResult, cache)
-      ->setAtomic(llvm::Release);
+      ->setAtomic(llvm::AtomicOrdering::Release);
   }
 
   IGF.Builder.CreateBr(contBB);
@@ -1244,7 +1244,7 @@ createInPlaceMetadataInitializationFunction(IRGenModule &IGM,
   // Store back to the cache variable.
   IGF.Builder.CreateStore(relocatedMetadata,
                           Address(cacheVariable, IGM.getPointerAlignment()))
-    ->setAtomic(llvm::Release);
+    ->setAtomic(llvm::AtomicOrdering::Release);
 
   IGF.Builder.CreateRetVoid();
   return fn;
@@ -1713,13 +1713,13 @@ namespace {
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
       return IGF.tryGetLocalTypeDataForLayout(
-                                          SILType::getPrimitiveObjectType(type),
+                                          IGF.IGM.getLoweredType(type),
                                           LocalTypeDataKind::forTypeMetadata());
     }
 
     /// Set the metatype in local data.
     llvm::Value *setLocal(CanType type, llvm::Instruction *metatype) {
-      IGF.setScopedLocalTypeDataForLayout(SILType::getPrimitiveObjectType(type),
+      IGF.setScopedLocalTypeDataForLayout(IGF.IGM.getLoweredType(type),
                                           LocalTypeDataKind::forTypeMetadata(),
                                           metatype);
       return metatype;
@@ -1770,7 +1770,7 @@ namespace {
     /// Emit the type layout by projecting it from dynamic type metadata.
     llvm::Value *emitFromTypeMetadata(CanType t) {
       auto *vwtable = IGF.emitValueWitnessTableRefForLayout(
-                                            SILType::getPrimitiveObjectType(t));
+                                                    IGF.IGM.getLoweredType(t));
       return emitFromValueWitnessTablePointer(vwtable);
     }
 
@@ -1811,7 +1811,7 @@ namespace {
 
     /// Fallback default implementation.
     llvm::Value *visitType(CanType t) {
-      auto silTy = SILType::getPrimitiveObjectType(t);
+      auto silTy = IGF.IGM.getLoweredType(t);
       auto &ti = IGF.getTypeInfo(silTy);
 
       // If the type is in the same source file, or has a common value
@@ -2428,6 +2428,19 @@ namespace {
                          NominalTypeDecl *type,
                          ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<FieldTypeInfo, 4> types;
+
+    // This is a terrible special case, but otherwise the archetypes
+    // aren't mapped correctly because the EnumImplStrategy ends up
+    // using the lowered cases, i.e. the cases for Optional<>.
+    if (type->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional) {
+      assert(enumElements.size() == 1);
+      auto caseType =
+        IGM.Context.getImplicitlyUnwrappedOptionalSomeDecl()
+           ->getArgumentType()->getCanonicalType();
+      types.push_back(FieldTypeInfo(caseType, false, false));
+      return getFieldTypeAccessorFn(IGM, type, types);
+    }
+
     for (auto &elt : enumElements) {
       assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
       auto caseType = elt.decl->getArgumentType()->getCanonicalType();
@@ -4813,8 +4826,7 @@ namespace {
       assert(var->hasStorage() &&
              "storing field offset for computed property?!");
       SILType structType =
-        SILType::getPrimitiveAddressType(
-                       Target->getDeclaredTypeInContext()->getCanonicalType());
+        IGM.getLoweredType(Target->getDeclaredTypeInContext());
 
       llvm::Constant *offset =
         emitPhysicalStructMemberFixedOffset(IGM, structType, var);
@@ -4943,9 +4955,9 @@ namespace {
                                 llvm::Value *vwtable) {
       // Nominal types are always preserved through SIL lowering.
       auto structTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-      IGM.getTypeInfoForLowered(structTy)
+      IGM.getTypeInfoForUnlowered(structTy)
         .initializeMetadata(IGF, metadata, vwtable,
-                            SILType::getPrimitiveAddressType(structTy));
+                            IGF.IGM.getLoweredType(structTy));
     }
   };
 }
@@ -5050,7 +5062,7 @@ public:
   
   void addPayloadSize() {
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
     if (!enumTI.isFixedSize(ResilienceExpansion::Maximal)) {
       addConstantWord(0);
       HasUnfilledPayloadSize = true;
@@ -5120,7 +5132,7 @@ public:
     // In all cases where a payload size is demanded in the metadata, it's
     // runtime-dependent, so fill in a zero here.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    auto &enumTI = IGM.getTypeInfoForLowered(enumTy);
+    auto &enumTI = IGM.getTypeInfoForUnlowered(enumTy);
     (void) enumTI;
     assert(!enumTI.isFixedSize(ResilienceExpansion::Minimal) &&
            "non-generic, non-resilient enums don't need payload size in metadata");
@@ -5132,9 +5144,9 @@ public:
                               llvm::Value *vwtable) {
     // Nominal types are always preserved through SIL lowering.
     auto enumTy = Target->getDeclaredTypeInContext()->getCanonicalType();
-    IGM.getTypeInfoForLowered(enumTy)
+    IGM.getTypeInfoForUnlowered(enumTy)
       .initializeMetadata(IGF, metadata, vwtable,
-                          SILType::getPrimitiveAddressType(enumTy));
+                          IGF.IGM.getLoweredType(enumTy));
   }
 };
   

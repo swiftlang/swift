@@ -373,9 +373,12 @@ ManagedValue Transform::transform(ManagedValue v,
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
   if (outputOTK != OTK_None && inputOTK == OTK_None) {
-    return SGF.emitInjectOptional(Loc, v,
-                                  inputSubstType, outputSubstType,
-                                  expectedTL, ctxt);
+    return SGF.emitInjectOptional(Loc, expectedTL, ctxt,
+                                  [&](SGFContext objectCtxt) {
+      return transform(v, inputOrigType, inputSubstType,
+                       outputOrigType.getAnyOptionalObjectType(),
+                       outputObjectType, objectCtxt);
+    });
   }
 
   // If the value is IUO, but the desired formal type isn't optional, force it.
@@ -393,12 +396,9 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // Optional-to-optional conversion.
-  if (inputOTK != OTK_None && outputOTK != OTK_None &&
-      (inputOTK != outputOTK ||
-       inputObjectType != outputObjectType)) {
+  if (inputOTK != OTK_None && outputOTK != OTK_None) {
     // If the conversion is trivial, just cast.
-    if (SGF.SGM.Types.checkForABIDifferences(v.getType().getSwiftRValueType(),
-                                             loweredResultTy.getSwiftRValueType())
+    if (SGF.SGM.Types.checkForABIDifferences(v.getType(), loweredResultTy)
           == TypeConverter::ABIDifference::Trivial) {
       SILValue result = v.getValue();
       if (v.getType().isAddress())
@@ -413,8 +413,10 @@ ManagedValue Transform::transform(ManagedValue v,
                                         ManagedValue input,
                                         SILType loweredResultTy) -> ManagedValue {
       return transform(input,
-                       AbstractionPattern::getOpaque(), inputObjectType,
-                       AbstractionPattern::getOpaque(), outputObjectType,
+                       inputOrigType.getAnyOptionalObjectType(),
+                       inputObjectType,
+                       outputOrigType.getAnyOptionalObjectType(),
+                       outputObjectType,
                        SGFContext());
     };
 
@@ -852,8 +854,8 @@ namespace {
         }
 
         // Tuple types are subtypes of their optionals
-        OptionalTypeKind outputOTK;
-        if (auto outputObjectType = outputSubstType.getAnyOptionalObjectType(outputOTK)) {
+        if (auto outputObjectType =
+              outputSubstType.getAnyOptionalObjectType()) {
           // The input is exploded and the output is an optional tuple.
           // Translate values and collect them into a single optional
           // payload.
@@ -861,8 +863,8 @@ namespace {
 
           return translateAndImplodeIntoOptional(inputOrigType,
                                                  inputTupleType,
-                                                 outputTupleType,
-                                                 outputOTK);
+                                  outputOrigType.getAnyOptionalObjectType(),
+                                                 outputTupleType);
 
           // FIXME: optional of Any (ugh...)
         }
@@ -919,144 +921,97 @@ namespace {
     }
 
   private:
+    /// Take a tuple that has been exploded in the input and turn it into
+    /// a tuple value in the output.
+    ManagedValue translateAndImplodeIntoValue(AbstractionPattern inputOrigType,
+                                              CanTupleType inputType,
+                                              AbstractionPattern outputOrigType,
+                                              CanTupleType outputType,
+                                              SILType loweredOutputTy) {
+      assert(loweredOutputTy.is<TupleType>());
+
+      SmallVector<ManagedValue, 4> elements;
+      assert(outputType->getNumElements() == inputType->getNumElements());
+      for (unsigned i : indices(outputType->getElementTypes())) {
+        auto inputOrigEltType = inputOrigType.getTupleElementType(i);
+        auto inputEltType = inputType.getElementType(i);
+        auto outputOrigEltType = outputOrigType.getTupleElementType(i);
+        auto outputEltType = outputType.getElementType(i);
+        SILType loweredOutputEltTy = loweredOutputTy.getTupleElementType(i);
+
+        ManagedValue elt;
+        if (auto inputEltTupleType = dyn_cast<TupleType>(inputEltType)) {
+          elt = translateAndImplodeIntoValue(inputOrigEltType,
+                                             inputEltTupleType,
+                                             outputOrigEltType,
+                                             cast<TupleType>(outputEltType),
+                                             loweredOutputEltTy);
+        } else {
+          elt = claimNextInput();
+
+          // Load if necessary.
+          if (elt.getType().isAddress()) {
+            elt = SGF.emitLoad(Loc, elt.forward(SGF),
+                               SGF.getTypeLowering(elt.getType()),
+                               SGFContext(), IsTake);
+          }
+        }
+
+        if (elt.getType() != loweredOutputEltTy)
+          elt = translatePrimitive(inputOrigEltType, inputEltType,
+                                   outputOrigEltType, outputEltType,
+                                   elt);
+
+        elements.push_back(elt);
+      }
+
+      SmallVector<SILValue, 4> forwarded;
+      for (auto &elt : elements)
+        forwarded.push_back(elt.forward(SGF));
+
+      auto tuple = SGF.B.createTuple(Loc, loweredOutputTy, forwarded);
+      return SGF.emitManagedRValueWithCleanup(tuple);
+    }
+
     /// Handle a tuple that has been exploded in the input but wrapped in
     /// an optional in the output.
     void translateAndImplodeIntoOptional(AbstractionPattern inputOrigType,
                                          CanTupleType inputTupleType,
-                                         CanTupleType outputTupleType,
-                                         OptionalTypeKind OTK) {
+                                         AbstractionPattern outputOrigType,
+                                         CanTupleType outputTupleType) {
       assert(!inputTupleType->hasInOut() &&
              !outputTupleType->hasInOut());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
-      // Collect the tuple elements, which should all be maximally abstracted
-      // to go in the optional payload.
-      auto opaque = AbstractionPattern::getOpaque();
-      auto &loweredTL = SGF.getTypeLowering(opaque, outputTupleType);
+      // Collect the tuple elements.
+      auto &loweredTL = SGF.getTypeLowering(outputOrigType, outputTupleType);
       auto loweredTy = loweredTL.getLoweredType();
       auto optionalTy = claimNextOutputType().getSILType();
-      auto someDecl = SGF.getASTContext().getOptionalSomeDecl(OTK);
+      auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
       if (loweredTL.isLoadable()) {
-        // Implode into a maximally-abstracted value.
-        std::function<ManagedValue (CanTupleType, CanTupleType, CanTupleType)>
-        translateAndImplodeIntoValue
-          = [&](CanTupleType lowered, CanTupleType input, CanTupleType output) -> ManagedValue {
-            SmallVector<ManagedValue, 4> elements;
-            assert(output->getNumElements() == input->getNumElements());
-            for (unsigned i = 0, e = output->getNumElements(); i < e; ++i) {
-              auto inputTy = input.getElementType(i);
-              auto outputTy = output.getElementType(i);
-              ManagedValue arg;
-              if (auto outputTuple = dyn_cast<TupleType>(outputTy)) {
-                auto inputTuple = cast<TupleType>(inputTy);
-                arg = translateAndImplodeIntoValue(
-                                    cast<TupleType>(lowered.getElementType(i)),
-                                    inputTuple, outputTuple);
-              } else {
-                arg = claimNextInput();
-                
-              }
-              
-              if (arg.getType().isAddress())
-                arg = SGF.emitLoad(Loc, arg.forward(SGF),
-                                   SGF.getTypeLowering(arg.getType()),
-                                   SGFContext(), IsTake);
+        auto payload =
+          translateAndImplodeIntoValue(inputOrigType, inputTupleType,
+                                       outputOrigType, outputTupleType,
+                                       loweredTy);
 
-              if (arg.getType().getSwiftRValueType() != lowered.getElementType(i))
-                arg = translatePrimitive(AbstractionPattern(inputTy), inputTy,
-                                         opaque, outputTy,
-                                         arg);
-
-              elements.push_back(arg);
-            }
-            SmallVector<SILValue, 4> forwarded;
-            for (auto element : elements)
-              forwarded.push_back(element.forward(SGF));
-            
-            auto tuple = SGF.B.createTuple(Loc,
-                                       SILType::getPrimitiveObjectType(lowered),
-                                       forwarded);
-            return SGF.emitManagedRValueWithCleanup(tuple);
-          };
-        
-        auto payload = translateAndImplodeIntoValue(
-                                cast<TupleType>(loweredTy.getSwiftRValueType()),
-                                inputTupleType,
-                                outputTupleType);
         optionalTy = SGF.F.mapTypeIntoContext(optionalTy);
         auto optional = SGF.B.createEnum(Loc, payload.getValue(),
                                          someDecl, optionalTy);
         Outputs.push_back(ManagedValue(optional, payload.getCleanup()));
-        return;
       } else {
-        // Implode into a maximally-abstracted indirect buffer.
         auto optionalBuf = SGF.emitTemporaryAllocation(Loc, optionalTy);
         auto tupleBuf = SGF.B.createInitEnumDataAddr(Loc, optionalBuf, someDecl,
                                                      loweredTy);
         
         auto tupleTemp = SGF.useBufferAsTemporary(tupleBuf, loweredTL);
 
-        std::function<void (CanTupleType,
-                            CanTupleType,
-                            CanTupleType,
-                            TemporaryInitialization&)>
-        translateAndImplodeIntoBuffer
-          = [&](CanTupleType lowered,
-                CanTupleType input,
-                CanTupleType output,
-                TemporaryInitialization &buf) {
-            auto tupleAddr = buf.getAddress();
-            SmallVector<CleanupHandle, 4> cleanups;
-            
-            for (unsigned i = 0, e = output->getNumElements(); i < e; ++i) {
-              auto inputTy = input.getElementType(i);
-              auto outputTy = output.getElementType(i);
-              auto loweredOutputTy
-                = SILType::getPrimitiveAddressType(lowered.getElementType(i));
-              auto &loweredOutputTL = SGF.getTypeLowering(loweredOutputTy);
-              auto eltAddr = SGF.B.createTupleElementAddr(Loc, tupleAddr, i,
-                                                          loweredOutputTy);
-              CleanupHandle eltCleanup
-                = SGF.enterDormantTemporaryCleanup(eltAddr, loweredOutputTL);
-              
-              if (eltCleanup.isValid()) cleanups.push_back(eltCleanup);
-              TemporaryInitialization eltInit(eltAddr, eltCleanup);
-              
-              if (auto outputTuple = dyn_cast<TupleType>(outputTy)) {
-                auto inputTuple = cast<TupleType>(inputTy);
-                translateAndImplodeIntoBuffer(
-                             cast<TupleType>(loweredOutputTy.getSwiftRValueType()),
-                             inputTuple, outputTuple, eltInit);
-              } else {
-                auto arg = claimNextInput();
-                auto &argTL = SGF.getTypeLowering(arg.getType());
-                if (arg.getType().isAddress() && argTL.isLoadable())
-                  arg = SGF.emitLoad(Loc, arg.forward(SGF),
-                                     argTL, SGFContext(), IsTake);
-                
-                if (arg.getType().getSwiftRValueType()
-                      != loweredOutputTy.getSwiftRValueType()) {
-                  arg = translatePrimitive(AbstractionPattern(inputTy), inputTy,
-                                           opaque, outputTy,
-                                           arg);
-                }
-                
-                emitForceInto(SGF, Loc, arg, eltInit);
-              }
-            }
-            
-            // Deactivate the element cleanups and activate the tuple cleanup.
-            for (auto cleanup : cleanups)
-              SGF.Cleanups.forwardCleanup(cleanup);
-            buf.finishInitialization(SGF);
-          };
-        translateAndImplodeIntoBuffer(
-                                cast<TupleType>(loweredTy.getSwiftRValueType()),
-                                inputTupleType,
-                                outputTupleType,
-                                *tupleTemp.get());
+        translateAndImplodeInto(inputOrigType, inputTupleType,
+                                outputOrigType, outputTupleType,
+                                *tupleTemp);
+
         SGF.B.createInjectEnumAddr(Loc, optionalBuf, someDecl);
+
         auto payload = tupleTemp->getManagedAddress();
         Outputs.push_back(ManagedValue(optionalBuf, payload.getCleanup()));
       }
@@ -1141,7 +1096,7 @@ namespace {
                                  CanTupleType outputSubstType,
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
-      assert(outputOrigType.isTypeParameter());
+      assert(outputOrigType.matchesTuple(outputSubstType));
       assert(!inputSubstType->hasInOut() &&
              !outputSubstType->hasInOut());
       assert(inputSubstType->getNumElements() ==
@@ -1757,7 +1712,7 @@ void ResultPlanner::planIntoIndirectResult(AbstractionPattern innerOrigType,
                                            CanType outerSubstType,
                                            PlanData &planData,
                                            SILValue outerResultAddr) {
-  assert(!outerOrigType.isTuple());
+  // outerOrigType can be a tuple if we're also injecting into an optional.
 
   // If the inner pattern is a tuple, expand it.
   if (innerOrigType.isTuple()) {
@@ -1786,24 +1741,24 @@ ResultPlanner::planTupleIntoIndirectResult(AbstractionPattern innerOrigType,
                                            PlanData &planData,
                                            SILValue outerResultAddr) {
   assert(innerOrigType.isTuple());
-  assert(!outerOrigType.isTuple());
+  // outerOrigType can be a tuple if we're doing something like
+  // injecting into an optional tuple.
 
   CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
     // Figure out what kind of optional it is.
-    OptionalTypeKind optKind;
     CanType outerSubstObjectType =
-      outerSubstType.getAnyOptionalObjectType(optKind);
+      outerSubstType.getAnyOptionalObjectType();
     assert(outerSubstObjectType &&
            "inner type was a tuple but outer type was neither a tuple nor "
            "optional");
-    auto someDecl = Gen.getASTContext().getOptionalSomeDecl(optKind);
+    auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
 
     // Prepare the value slot in the optional value.
     SILType outerObjectType =
-      outerResultAddr->getType().getAnyOptionalObjectType(Gen.SGM.M, optKind);
+      outerResultAddr->getType().getAnyOptionalObjectType();
     SILValue outerObjectResultAddr
       = Gen.B.createInitEnumDataAddr(Loc, outerResultAddr, someDecl,
                                      outerObjectType);
@@ -1879,16 +1834,15 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
 
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
-    OptionalTypeKind optKind;
     CanType outerSubstObjectType =
-      outerSubstType.getAnyOptionalObjectType(optKind);
+      outerSubstType.getAnyOptionalObjectType();
     assert(outerSubstObjectType &&
            "inner type was a tuple but outer type was neither a tuple nor "
            "optional");
 
-    auto someDecl = Gen.getASTContext().getOptionalSomeDecl(optKind);
+    auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
     SILType outerObjectType =
-      outerResult.getSILType().getAnyOptionalObjectType(Gen.SGM.M, optKind);
+      outerResult.getSILType().getAnyOptionalObjectType();
     SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
                                     outerResult.getConvention());
 
@@ -2497,8 +2451,10 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // Check if we require a re-abstraction thunk.
-  if (SGF.SGM.Types.checkForABIDifferences(fnType, expectedFnType) ==
-        TypeConverter::ABIDifference::NeedsThunk) {
+  if (SGF.SGM.Types.checkForABIDifferences(
+                              SILType::getPrimitiveObjectType(fnType),
+                              SILType::getPrimitiveObjectType(expectedFnType))
+        == TypeConverter::ABIDifference::NeedsThunk) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
     return createThunk(SGF, Loc, fn,
@@ -2686,10 +2642,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
     inputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(inputSubstType)
-            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+            ->substGenericArgs(subs)->getCanonicalType());
     outputSubstType = cast<FunctionType>(
         cast<GenericFunctionType>(outputSubstType)
-            ->substGenericArgs(SGM.SwiftModule, subs)->getCanonicalType());
+            ->substGenericArgs(subs)->getCanonicalType());
   }
 
   // Emit the indirect return and arguments.
@@ -2822,119 +2778,6 @@ static CanType dropLastElement(CanType type) {
   return TupleType::get(elts, type->getASTContext())->getCanonicalType();
 }
 
-static void addConformanceToSubstitutionMap(SILGenModule &SGM,
-                                TypeSubstitutionMap &subs,
-                                GenericEnvironment *genericEnv,
-                                CanType base,
-                                const ProtocolConformance *conformance) {
-  conformance->forEachTypeWitness(nullptr, [&](AssociatedTypeDecl *assocTy,
-                                               Substitution sub,
-                                               TypeDecl *) -> bool {
-    auto depTy =
-      CanDependentMemberType::get(base, assocTy, SGM.getASTContext());
-    auto replacement = sub.getReplacement()->getCanonicalType();
-    replacement = ArchetypeBuilder::mapTypeOutOfContext(SGM.M.getSwiftModule(),
-                                                        genericEnv,
-                                                        replacement)
-      ->getCanonicalType();
-    subs.insert({depTy.getPointer(), replacement});
-    for (auto conformance : sub.getConformances()) {
-      if (conformance.isAbstract())
-        continue;
-      addConformanceToSubstitutionMap(SGM, subs, genericEnv,
-                                      depTy, conformance.getConcrete());
-    }
-    return false;
-  });
-}
-
-/// Substitute the `Self` type from a protocol conformance into a protocol
-/// requirement's type to get the type of the witness.
-CanAnyFunctionType SILGenModule::
-substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
-                                         ProtocolConformance *conformance) {
-  // Build a substitution map to replace `self` and its associated types.
-  auto &C = M.getASTContext();
-  CanType selfParamTy = CanGenericTypeParamType::get(0, 0, C);
-  
-  TypeSubstitutionMap subs;
-  subs.insert({selfParamTy.getPointer(), conformance->getInterfaceType()
-                                                    ->getCanonicalType()});
-  addConformanceToSubstitutionMap(*this, subs,
-                                  conformance->getGenericEnvironment(),
-                                  selfParamTy, conformance);
-  
-  // Drop requirements rooted in the applied generic parameters.
-  SmallVector<Requirement, 4> unappliedReqts;
-  auto rootedInSelf = [&](Type t) -> bool {
-    while (auto dmt = t->getAs<DependentMemberType>()) {
-      t = dmt->getBase();
-    }
-    return t->isEqual(selfParamTy);
-  };
-
-  #if 0
-  llvm::errs() << "--\n";
-  for (auto &pair : subs) {
-    pair.first->print(llvm::errs());
-    llvm::errs() << " => ";
-    pair.second->dump();
-    llvm::errs() << "\n";
-  }
-  #endif
-
-  // Get the unapplied params.
-  auto unappliedParams = reqtTy->getGenericParams().slice(1);
-
-  // Get the requirements that aren't rooted in the applied 'self' parameter.
-  for (auto &reqt : reqtTy->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-    case RequirementKind::WitnessMarker:
-      // Substituting the parameter eliminates conformance constraints rooted
-      // in the parameter.
-      if (rootedInSelf(reqt.getFirstType()))
-        continue;
-      break;
-        
-    case RequirementKind::SameType: {
-      // Same-type constraints are eliminated if both sides of the constraint
-      // are rooted in substituted parameters.
-      if (rootedInSelf(reqt.getFirstType())
-          && rootedInSelf(reqt.getSecondType()))
-        continue;
-        
-      // Otherwise, substitute the constrained types.
-      unappliedReqts.push_back(
-        Requirement(RequirementKind::SameType,
-                    reqt.getFirstType().subst(M.getSwiftModule(), subs,
-                                              SubstFlags::IgnoreMissing),
-                    reqt.getSecondType().subst(M.getSwiftModule(), subs,
-                                               SubstFlags::IgnoreMissing)));
-      continue;
-    }
-    }
-    unappliedReqts.push_back(reqt);
-  }
-
-  auto input = reqtTy->getInput().subst(M.getSwiftModule(), subs,
-                                        SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
-  auto result = reqtTy->getResult().subst(M.getSwiftModule(), subs,
-                                          SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
-
-  if (!unappliedParams.empty() && !unappliedReqts.empty()) {
-    auto sig = GenericSignature::get(unappliedParams,
-                                     unappliedReqts)->getCanonicalSignature();
-    
-    return CanGenericFunctionType::get(sig, input, result, reqtTy->getExtInfo());
-  } else {
-    return CanFunctionType::get(input, result, reqtTy->getExtInfo());
-  }
-}
-
 void SILGenFunction::emitProtocolWitness(Type selfType,
                                          AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
@@ -2969,7 +2812,7 @@ void SILGenFunction::emitProtocolWitness(Type selfType,
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
       cast<GenericFunctionType>(witnessSubstTy)
-        ->substGenericArgs(SGM.M.getSwiftModule(), witnessSubs)
+        ->substGenericArgs(witnessSubs)
         ->getCanonicalType());
   }
   CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())

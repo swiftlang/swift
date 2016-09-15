@@ -63,15 +63,21 @@ public:
     /// The requirement was explicitly stated in the generic parameter
     /// clause.
     Explicit,
-    /// The requirement was explicitly stated in the generic parameter clause
-    /// but is redundant with some other requirement.
-    Redundant,
-    /// The requirement was part of a protocol requirement, e.g., an
-    /// inherited protocol or a requirement on an associated type.
-    Protocol,
-    /// 
-    /// The requirement was inferred from part of the signature.
+    /// The requirement was inferred from the function's parameter or
+    /// result types.
     Inferred,
+
+    /// The requirement was part of a protocol requirement on an
+    /// associated type.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Protocol,
+
+    /// The requirement is redundant with some other requirement.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Redundant,
+
     /// The requirement came from an outer scope.
     /// FIXME: eliminate this in favor of keeping requirement sources in 
     /// GenericSignatures, at least non-canonical ones?
@@ -242,9 +248,10 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// FIXME: Requirements from the generic signature are treated as coming from
-  /// an outer scope in order to avoid disturbing the AllDependentTypes.
-  /// Setting \c treatRequirementsAsExplicit to true disables this behavior.
-  void addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
+  /// an outer scope. Setting \c treatRequirementsAsExplicit to true disables
+  /// this behavior.
+  void addGenericSignature(GenericSignature *sig,
+                           GenericEnvironment *genericEnv,
                            bool treatRequirementsAsExplicit = false);
 
   /// \brief Get a generic signature based on the provided complete list
@@ -338,17 +345,6 @@ public:
   static Type mapTypeOutOfContext(ModuleDecl *M,
                                   GenericEnvironment *genericEnv,
                                   Type type);
-
-  using SameTypeRequirement
-    = std::pair<PotentialArchetype *,
-                PointerUnion<Type, PotentialArchetype*>>;
-  
-  /// Retrieve the set of same-type requirements that apply to the potential
-  /// archetypes known to this builder.
-  ArrayRef<SameTypeRequirement> getSameTypeRequirements() const;
-
-  // FIXME: Compute the set of 'extra' witness tables needed to express this
-  // requirement set.
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -617,15 +613,15 @@ public:
   }
 
   void setIsRecursive() { IsRecursive = true; }
-  bool isRecursive() { return IsRecursive; }
+  bool isRecursive() const { return IsRecursive; }
 
-  bool isInvalid() { return Invalid; }
+  bool isInvalid() const { return Invalid; }
 
   void setInvalid() { Invalid = true; }
 
   /// Determine whether this archetype was renamed due to typo
   /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() { return Renamed; }
+  bool wasRenamed() const { return Renamed; }
 
   /// Note that this potential archetype was renamed (due to typo
   /// correction), providing the new name.
@@ -636,7 +632,7 @@ public:
 
   /// Whether this potential archetype makes a better archetype anchor than
   /// the given archetype anchor.
-  bool isBetterArchetypeAnchor(PotentialArchetype *other);
+  bool isBetterArchetypeAnchor(PotentialArchetype *other) const;
 
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);

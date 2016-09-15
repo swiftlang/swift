@@ -15,6 +15,8 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
@@ -80,8 +82,7 @@ bool isInstructionTriviallyDead(SILInstruction *I);
 
 /// \brief Return true if this is a release instruction that's not going to
 /// free the object.
-bool isIntermediateRelease(SILInstruction *I,
-                           ConsumedArgToEpilogueReleaseMatcher &ERM); 
+bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
 
 /// \brief Recursively collect all the uses and transitive uses of the
 /// instruction.
@@ -138,7 +139,7 @@ void replaceDeadApply(ApplySite Old, ValueBase *New);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that is an unbound generic type.
-bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
+bool hasUnboundGenericTypes(const TypeSubstitutionMap &SubsMap);
 
 /// Return true if the substitution list contains a substitution
 /// that is an unbound generic.
@@ -146,7 +147,7 @@ bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that refers to the dynamic Self type.
-bool hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap);
+bool hasDynamicSelfTypes(const TypeSubstitutionMap &SubsMap);
 
 /// \brief Return true if the substitution list contains a
 /// substitution that refers to the dynamic Self type.
@@ -693,6 +694,28 @@ void replaceLoadSequence(SILInstruction *I,
 /// Do we have enough information to determine all callees that could
 /// be reached by calling the function represented by Decl?
 bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
+
+// Attempt to get the instance for S, whose static type is the same as
+// its exact dynamic type, returning a null SILValue() if we cannot find it.
+// The information that a static type is the same as the exact dynamic,
+// can be derived e.g.:
+// - from a constructor or
+// - from a successful outcome of a checked_cast_br [exact] instruction.
+SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+                                         ClassHierarchyAnalysis *CHA);
+
+/// Try to determine the exact dynamic type of an object.
+/// returns the exact dynamic type of the object, or an empty type if the exact
+/// type could not be determined.
+SILType getExactDynamicType(SILValue S, SILModule &M,
+                            ClassHierarchyAnalysis *CHA,
+                            bool ForUnderlyingObject = false);
+
+/// Try to statically determine the exact dynamic type of the underlying object.
+/// returns the exact dynamic type of the underlying object, or an empty SILType
+/// if the exact type could not be determined.
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+                                              ClassHierarchyAnalysis *CHA);
 
 /// Hoist the address projection rooted in \p Op to \p InsertBefore.
 /// Requires the projected value to dominate the insertion point.

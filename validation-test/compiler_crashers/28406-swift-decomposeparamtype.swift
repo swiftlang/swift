@@ -7,11 +7,6 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-{
-extension{
-protocol A{{
-}
-typealias e struct b{func a{
-enum b{
-let f=F
-class b:A class A:b
+func b<T>
+func b(t:AnyObject
+var f=b()?

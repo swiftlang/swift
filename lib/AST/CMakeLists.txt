@@ -39,6 +39,7 @@ add_swift_library(swiftAST STATIC
   Stmt.cpp
   SourceEntityWalker.cpp
   Substitution.cpp
+  SubstitutionMap.cpp
   Type.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
@@ -71,7 +72,7 @@ add_swift_library(swiftAST STATIC
     clangBasic
 
   LLVM_COMPONENT_DEPENDS
-    bitreader bitwriter irreader debuginfoDWARF
+    bitreader bitwriter coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )

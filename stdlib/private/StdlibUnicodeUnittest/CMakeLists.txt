@@ -9,6 +9,7 @@ add_swift_library(swiftStdlibUnicodeUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   StdlibUnicodeUnittest.swift
+  Collation.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}

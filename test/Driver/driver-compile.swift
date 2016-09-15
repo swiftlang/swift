@@ -38,7 +38,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-use-filelists 2>&1 | %FileCheck -check-prefix=FILELIST %s
 
 // RUN: rm -rf %t && mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
-// RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
+// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
 // RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
 // RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
 // RUN: %FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt

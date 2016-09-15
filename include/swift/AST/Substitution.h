@@ -17,22 +17,17 @@
 #ifndef SWIFT_AST_SUBSTITUTION_H
 #define SWIFT_AST_SUBSTITUTION_H
 
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 
 namespace llvm {
   class raw_ostream;
 }
 
 namespace swift {
-  class ArchetypeType;
   class GenericEnvironment;
-  class ProtocolConformanceRef;
-  
-/// DenseMap type used internally by Substitution::subst to track conformances
-/// applied to archetypes.
-using ArchetypeConformanceMap
-  = llvm::DenseMap<ArchetypeType*, ArrayRef<ProtocolConformanceRef>>;
 
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
@@ -62,22 +57,11 @@ public:
   
   /// Apply a substitution to this substitution's replacement type and
   /// conformances.
-  ///
-  /// Our replacement type must be written in terms of the context
-  /// archetypes of 'env', which in turn must be derived from the
-  /// generic requirements of 'sig'.
   Substitution subst(ModuleDecl *module,
-                     GenericSignature *sig,
-                     GenericEnvironment *env,
-                     ArrayRef<Substitution> subs) const;
+                     const SubstitutionMap &subMap) const;
 
 private:
   friend class ProtocolConformance;
-  
-  Substitution subst(ModuleDecl *module,
-                     ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subMap,
-                     ArchetypeConformanceMap &conformanceMap) const;
 };
 
 void dump(const ArrayRef<Substitution> &subs);

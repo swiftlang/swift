@@ -24,7 +24,7 @@ extension AnyHashable : _AnyHashableProtocol {}
 // Convenience APIs for Set<AnyHashable>
 //===----------------------------------------------------------------------===//
 
-// FIXME: remove these trampolines when extensions below can be
+// FIXME(ABI): remove these trampolines when extensions below can be
 // properly expressed in the language.
 extension Set {
   @inline(__always)
@@ -82,7 +82,7 @@ extension Set where Element : _AnyHashableProtocol {
 // Convenience APIs for Dictionary<AnyHashable, *>
 //===----------------------------------------------------------------------===//
 
-// FIXME: remove these trampolines when extensions below can be
+// FIXME(ABI): remove these trampolines when extensions below can be
 // properly expressed in the language.
 extension Dictionary {
   internal subscript(_concreteKey key: Key) -> Value? {

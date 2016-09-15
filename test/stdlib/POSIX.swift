@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 
 // Android Bionic does not provide a working implementation of
@@ -12,6 +12,7 @@ import StdlibUnittest
   import Darwin
 #endif
 
+chdir(CommandLine.arguments[1])
 
 var POSIXTests = TestSuite("POSIXTests")
 

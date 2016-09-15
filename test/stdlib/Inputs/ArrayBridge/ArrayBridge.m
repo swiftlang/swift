@@ -66,3 +66,18 @@ void testBridgeableValue(id thunks) {
   [toSwiftArr addObject: [thunks createSubclass:14]];
   [thunks acceptBridgeableValueArray: toSwiftArr];
 }
+
+@implementation RDar27905230
+
++ (NSDictionary<NSString *, NSArray<id> *> *)mutableDictionaryOfMutableLists  {
+    NSMutableArray *arr = [NSMutableArray array];
+    [arr addObject:[NSNull null]];
+    [arr addObject:@""];
+    [arr addObject:@1];
+    [arr addObject:@YES];
+    [arr addObject:[NSValue valueWithRange:NSMakeRange(0, 1)]];
+    [arr addObject:[NSDate dateWithTimeIntervalSince1970: 0]];
+    return [NSMutableDictionary dictionaryWithObject:arr forKey:@"list"];
+}
+
+@end

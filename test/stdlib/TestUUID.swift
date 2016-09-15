@@ -46,12 +46,12 @@ class TestUUID : TestUUIDSuper {
     
     func test_NS_InvalidUUID() {
         let uuid = NSUUID(uuidString: "Invalid UUID")
-        expectEmpty(uuid, "The convenience initializer `init?(uuidString string:)` must return nil for an invalid UUID string.")
+        expectNil(uuid, "The convenience initializer `init?(uuidString string:)` must return nil for an invalid UUID string.")
     }
     
     func test_InvalidUUID() {
         let uuid = UUID(uuidString: "Invalid UUID")
-        expectEmpty(uuid, "The convenience initializer `init?(uuidString string:)` must return nil for an invalid UUID string.")
+        expectNil(uuid, "The convenience initializer `init?(uuidString string:)` must return nil for an invalid UUID string.")
     }
     
     func test_NS_uuidString() {
@@ -80,7 +80,7 @@ class TestUUID : TestUUIDSuper {
         let valFromStr = UUID(uuidString: ref.uuidString)
         expectEqual(ref.uuidString, valFromRef.uuidString)
         expectEqual(ref.uuidString, valFromBytes.uuidString)
-        expectNotEmpty(valFromStr)
+        expectNotNil(valFromStr)
         expectEqual(ref.uuidString, valFromStr!.uuidString)
     }
     

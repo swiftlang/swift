@@ -102,6 +102,9 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
 
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
@@ -234,10 +237,6 @@ def disable_availability_checking : Flag<["-"],
 def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
-
-def enable_swift_newtype :
-  Flag<["-"], "enable-swift-newtype">,
-  HelpText<"Enable the swift_newtype attribute">;
 
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,

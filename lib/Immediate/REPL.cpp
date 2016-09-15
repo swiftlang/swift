@@ -19,6 +19,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/IDE/Utils.h"
@@ -771,7 +772,7 @@ private:
     for (auto &global : M.globals()) {
       if (!global.hasName())
         continue;
-      if (global.hasUnnamedAddr())
+      if (global.hasGlobalUnnamedAddr())
         continue;
 
       global.setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -859,9 +860,9 @@ private:
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile, sil.get(),
-                                          "REPLLine", llvm::getGlobalContext(),
-                                          RC.CurIRGenElem);
+    auto LineModule =
+        performIRGeneration(IRGenOpts, REPLInputFile, sil.get(), "REPLLine",
+                            getGlobalLLVMContext(), RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
@@ -1166,7 +1167,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 
 void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
-  REPLEnvironment env(CI, CmdLine, llvm::getGlobalContext(), ParseStdlib);
+  REPLEnvironment env(CI, CmdLine, getGlobalLLVMContext(), ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   

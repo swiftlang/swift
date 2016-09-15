@@ -468,18 +468,6 @@ internal enum _SubSequenceSubscriptOnRangeMode {
   }
 }
 
-internal func _product<C1 : Collection, C2 : Collection>(
-  _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
-  for e1 in c1 {
-    for e2 in c2 {
-      result.append((e1, e2))
-    }
-  }
-  return result
-}
-
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
@@ -626,7 +614,7 @@ extension TestSuite {
         _blackHole(c[index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnIndexMode.all)
 
@@ -725,7 +713,7 @@ extension TestSuite {
         _blackHole(c[index..<index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnRangeMode.all)
 
@@ -902,7 +890,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.first
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[0],
@@ -1187,7 +1175,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popFirst())
+      expectNil(slice.popFirst())
     }
 
     //===------------------------------------------------------------------===//
@@ -1237,7 +1225,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.last
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[test.count - 1],
@@ -1394,7 +1382,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popLast())
+      expectNil(slice.popLast())
     }
 
 
@@ -1702,7 +1690,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       }
     }
@@ -1743,7 +1731,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       } else {
         expectCrashLater()

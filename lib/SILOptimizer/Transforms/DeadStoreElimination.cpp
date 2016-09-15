@@ -319,11 +319,11 @@ private:
   /// Type Expansion Analysis.
   TypeExpansionAnalysis *TE;
 
+  /// Epilogue release analysis.
+  EpilogueARCFunctionInfo *EAFI;
+
   /// The allocator we are using.
   llvm::SpecificBumpPtrAllocator<BlockState> &BPA;
-
-  /// The epilogue release matcher we are using.
-  ConsumedArgToEpilogueReleaseMatcher &ERM;
 
   /// Map every basic block to its location state.
   llvm::SmallDenseMap<SILBasicBlock *, BlockState *> BBToLocState;
@@ -426,9 +426,9 @@ public:
   /// Constructor.
   DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
              AliasAnalysis *AA, TypeExpansionAnalysis *TE,
-             llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
-             ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), BPA(BPA), ERM(ERM) {}
+             EpilogueARCFunctionInfo *EAFI,
+             llvm::SpecificBumpPtrAllocator<BlockState> &BPA) 
+    : Mod(M), F(F), PM(PM), AA(AA), TE(TE), EAFI(EAFI), BPA(BPA) {}
 
   /// Entry point for dead store elimination.
   bool run();
@@ -438,9 +438,6 @@ public:
 
   /// Returns the location vault of the current function.
   std::vector<LSLocation> &getLocationVault() { return LocationVault; }
-
-  /// Returns the epilogue release matcher we are using.
-  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; }
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -1053,7 +1050,7 @@ void DSEContext::processUnknownReadInstForDSE(SILInstruction *I) {
 void DSEContext::processUnknownReadInst(SILInstruction *I, DSEKind Kind) {
   // If this is a release on a guaranteed parameter, it can not call deinit,
   // which might read or write memory.
-  if (isIntermediateRelease(I, ERM))
+  if (isIntermediateRelease(I, EAFI))
     return;
 
   // Are we building genset and killset.
@@ -1228,15 +1225,12 @@ public:
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
-    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 
     // The allocator we are using.
     llvm::SpecificBumpPtrAllocator<BlockState> BPA;
 
-    // The epilogue release matcher we are using.
-    ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
-
-    DSEContext DSE(F, &F->getModule(), PM, AA, TE, BPA, ERM);
+    DSEContext DSE(F, &F->getModule(), PM, AA, TE, EAFI, BPA);
     if (DSE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

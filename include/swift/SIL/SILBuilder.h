@@ -757,27 +757,13 @@ public:
 
   /// Inject a loadable value into the corresponding optional type.
   EnumInst *createOptionalSome(SILLocation Loc, SILValue operand, SILType ty) {
-    return createOptionalSome(Loc, operand, ty.getOptionalTypeKind(), ty);
-  }
-
-  /// Inject a loadable value into the corresponding optional type.
-  EnumInst *createOptionalSome(SILLocation Loc, SILValue operand,
-                               OptionalTypeKind optKind, SILType ty) {
-    assert(ty.getOptionalTypeKind() == optKind);
-    auto someDecl = F.getModule().getASTContext().getOptionalSomeDecl(optKind);
+    auto someDecl = F.getModule().getASTContext().getOptionalSomeDecl();
     return createEnum(Loc, operand, someDecl, ty);
   }
 
   /// Create the nil value of a loadable optional type.
   EnumInst *createOptionalNone(SILLocation Loc, SILType ty) {
-    return createOptionalNone(Loc, ty.getOptionalTypeKind(), ty);
-  }
-
-  /// Create the nil value of a loadable optional type.
-  EnumInst *createOptionalNone(SILLocation Loc, OptionalTypeKind optKind,
-                               SILType ty) {
-    assert(ty.getOptionalTypeKind() == optKind);
-    auto noneDecl = F.getModule().getASTContext().getOptionalNoneDecl(optKind);
+    auto noneDecl = F.getModule().getASTContext().getOptionalNoneDecl();
     return createEnum(Loc, nullptr, noneDecl, ty);
   }
 

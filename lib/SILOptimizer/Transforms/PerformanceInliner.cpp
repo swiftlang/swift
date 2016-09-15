@@ -1483,11 +1483,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // the substitution list.
     OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
 
-    // Notice that we will skip all of the newly inlined ApplyInsts. That's
-    // okay because we will visit them in our next invocation of the inliner.
-    TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
-                       SILInliner::InlineKind::PerformanceInline, ContextSubs,
+                       SILInliner::InlineKind::PerformanceInline,
                        AI.getSubstitutions(),
                        OpenedArchetypesTracker);
 

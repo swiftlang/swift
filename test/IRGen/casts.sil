@@ -244,9 +244,9 @@ nay:
 // CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
 // CHECK:         br i1 [[COND]]
-sil @checked_downcast_optional_metatype : $@convention(thin) (Optional<A.Type>) -> @thick B.Type {
-entry(%a : $Optional<A.Type>):
-  checked_cast_br %a : $Optional<A.Type> to $@thick B.Type, yea, nay
+sil @checked_downcast_optional_metatype : $@convention(thin) (Optional<@thick A.Type>) -> @thick B.Type {
+entry(%a : $Optional<@thick A.Type>):
+  checked_cast_br %a : $Optional<@thick A.Type> to $@thick B.Type, yea, nay
 yea(%b : $@thick B.Type):
   return %b : $@thick B.Type
 nay:
@@ -259,9 +259,9 @@ nay:
 // CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
 // CHECK:         br i1 [[COND]]
-sil @checked_downcast_optional_exmetatype : $@convention(thin) (Optional<CP.Type>) -> @thick B.Type {
-entry(%a : $Optional<CP.Type>):
-  checked_cast_br %a : $Optional<CP.Type> to $@thick B.Type, yea, nay
+sil @checked_downcast_optional_exmetatype : $@convention(thin) (Optional<@thick CP.Type>) -> @thick B.Type {
+entry(%a : $Optional<@thick CP.Type>):
+  checked_cast_br %a : $Optional<@thick CP.Type> to $@thick B.Type, yea, nay
 yea(%b : $@thick B.Type):
   return %b : $@thick B.Type
 nay:

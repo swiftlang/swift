@@ -114,7 +114,7 @@ Type Solution::computeSubstitutions(
   }
 
   auto lookupConformanceFn =
-      [&](Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolType *protoType)
           -> ProtocolConformanceRef {
     ProtocolConformance *conformance = nullptr;
 
@@ -2814,10 +2814,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
     Expr *visitApplyExpr(ApplyExpr *expr) {
       return finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
@@ -4228,7 +4224,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // We need to convert the source element to the destination type.
     if (!fromTupleExpr) {
       // FIXME: Lame! We can't express this in the AST.
-      InFlightDiagnostic diag = tc.diagnose(expr->getLoc(),
+      auto anchorExpr = locator.getBaseLocator()->getAnchor();
+      InFlightDiagnostic diag = tc.diagnose(anchorExpr->getLoc(),
                                         diag::tuple_conversion_not_expressible,
                                             fromTuple, toTuple);
       if (typeFromPattern) {
@@ -6382,10 +6379,6 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For a default-value expression, do nothing.
-      if (isa<DefaultValueExpr>(expr))
-        return { false, expr };
-
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);

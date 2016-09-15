@@ -6,5 +6,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
-extension{protocol c{struct c{let e={enum T{case
+t c
+let : {{
+return $0
+== Int
+struct B
+}
+g:

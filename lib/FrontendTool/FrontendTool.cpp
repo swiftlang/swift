@@ -34,6 +34,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -708,7 +709,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   bool inputIsLLVMIr = Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR;
   if (inputIsLLVMIr) {
-    auto &LLVMContext = llvm::getGlobalContext();
+    auto &LLVMContext = getGlobalLLVMContext();
 
     // Load in bitcode file.
     assert(Invocation.getInputFilenames().size() == 1 &&
@@ -813,6 +814,20 @@ static bool performCompile(CompilerInstance &Instance,
           // Dump the AST context, too.
           if (auto dc = locScope->getDeclContext()) {
             dc->printContext(llvm::errs());
+          }
+
+          // Grab the local bindings introduced by this scope.
+          auto localBindings = locScope->getLocalBindings();
+          if (!localBindings.empty()) {
+            llvm::errs() << "Local bindings: ";
+            interleave(localBindings.begin(), localBindings.end(),
+                       [&](ValueDecl *value) {
+                         llvm::errs() << value->getFullName();
+                       },
+                       [&]() {
+                         llvm::errs() << " ";
+                       });
+            llvm::errs() << "\n";
           }
         }
 
@@ -1061,7 +1076,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto &LLVMContext = llvm::getGlobalContext();
+  auto &LLVMContext = getGlobalLLVMContext();
   if (PrimarySourceFile) {
     performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
                         opts.getSingleOutputFilename(), LLVMContext);
@@ -1167,9 +1182,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   // Setting DWARF Version depend on platform
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = swift::GenericDWARFVersion;
-  if (Invocation.getLangOptions().Target.isWindowsCygwinEnvironment())
-    IRGenOpts.DWARFVersion = swift::CygwinDWARFVersion;
+  IRGenOpts.DWARFVersion = swift::DWARFVersion;
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {

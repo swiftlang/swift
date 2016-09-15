@@ -431,9 +431,8 @@ private:
 
     SmallVector<OmissionTypeName, 8> paramTypeNames;
     for (auto param : params) {
-      paramTypeNames.push_back(
-          ClangImporter::Implementation::getClangTypeNameForOmission(
-              clangSema.getASTContext(), param->getType()));
+      paramTypeNames.push_back(getClangTypeNameForOmission(
+          clangSema.getASTContext(), param->getType()));
     }
 
     auto humbleBaseName = getHumbleIdentifier(baseName);
@@ -503,8 +502,7 @@ private:
 static StringRef getTypeName(clang::QualType qt) {
   if (auto typedefTy = qt->getAs<clang::TypedefType>()) {
     // Check for a CF type name (drop the "Ref")
-    auto cfName = ClangImporter::Implementation::getCFTypeName(
-        typedefTy->getDecl()->getCanonicalDecl());
+    auto cfName = getCFTypeName(typedefTy->getDecl()->getCanonicalDecl());
     if (cfName != StringRef())
       return cfName;
   }

@@ -181,6 +181,11 @@ public:
   SILType getLoweredType(Type t) {
     return Types.getTypeLowering(t).getLoweredType();
   }
+
+  /// Translate a formal enum element decl into its lowered form.
+  ///
+  /// This just turns ImplicitlyUnwrappedOptional's cases into Optional's.
+  EnumElementDecl *getLoweredEnumElementDecl(EnumElementDecl *element);
   
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
@@ -423,12 +428,6 @@ public:
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
-
-  /// Substitute the `Self` type from a protocol conformance into a protocol
-  /// requirement's type to get the type of the witness.
-  CanAnyFunctionType
-  substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
-                                           ProtocolConformance *conformance);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.

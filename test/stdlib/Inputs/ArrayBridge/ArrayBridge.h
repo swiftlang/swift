@@ -16,3 +16,7 @@ NSArray* idAsArray(id a);
 
 void testSubclass(id thunks);
 void testBridgeableValue(id thunks);
+
+@interface RDar27905230 : NSObject
++ (NSDictionary<NSString *, NSArray<id> *> *)mutableDictionaryOfMutableLists;
+@end

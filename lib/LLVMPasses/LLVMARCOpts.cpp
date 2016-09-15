@@ -557,7 +557,7 @@ static DtorKind analyzeDestructor(Value *P) {
   // unified.
   enum { DTorSlotOfHeapMetadata = 0 };
   Function *DtorFn =dyn_cast<Function>(CS->getOperand(DTorSlotOfHeapMetadata));
-  if (DtorFn == 0 || DtorFn->mayBeOverridden() || DtorFn->hasExternalLinkage())
+  if (DtorFn == 0 || DtorFn->isInterposable() || DtorFn->hasExternalLinkage())
     return DtorKind::Unknown;
 
   // Okay, we have a body, and we can trust it.  If the function is marked

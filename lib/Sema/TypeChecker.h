@@ -393,6 +393,9 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether this is the type of an editor placeholder.
   TR_EditorPlaceholder = 0x200000,
+
+  /// Whether we are in a type argument for an optional
+  TR_ImmediateOptionalTypeArgument = 0x400000,
 };
 
 /// Option set describing how type resolution should work.
@@ -405,10 +408,12 @@ inline TypeResolutionOptions operator|(TypeResolutionFlags lhs,
 
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
-withoutContext(TypeResolutionOptions options) {
+withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
   options -= TR_EnumCase;
+  options -= TR_ImmediateOptionalTypeArgument;
+  if (!preserveSIL) options -= TR_SILType;
   return options;
 }
 
@@ -806,8 +811,7 @@ public:
   /// \param dc The context where the arguments are applied.
   /// \param generic The arguments to apply with the angle bracket range for
   /// diagnostics.
-  /// \param isGenericSignature True if we are looking only in the generic
-  /// signature of the context.
+  /// \param options The type resolution context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -816,7 +820,7 @@ public:
   /// \see applyUnboundGenericArguments
   Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
-                             bool isGenericSignature,
+                             TypeResolutionOptions options,
                              GenericTypeResolver *resolver);
 
   /// Apply generic arguments to the given type.
@@ -975,6 +979,8 @@ public:
     validateDecl(VD, true);
   }
 
+  virtual void bindExtension(ExtensionDecl *ext) override;
+
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
     checkInheritanceClause(ext);
@@ -988,6 +994,9 @@ public:
   resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
     handleExternalDecl(nominal);
   }
+
+  /// Introduce the accessors for a 'lazy' variable.
+  void introduceLazyVarAccessors(VarDecl *var) override;
 
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
@@ -1062,8 +1071,8 @@ public:
   bool checkGenericParamList(ArchetypeBuilder *builder,
                              GenericParamList *genericParams,
                              GenericSignature *parentSig,
-                             bool adoptArchetypes = true,
-                             GenericTypeResolver *resolver = nullptr);
+                             GenericEnvironment *parentEnv,
+                             GenericTypeResolver *resolver);
 
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
@@ -1592,14 +1601,14 @@ public:
   /// Find the @objc requirement that are witnessed by the given
   /// declaration.
   ///
-  /// \param onlyFirstRequirement If true, only returns the first such
-  /// requirement, rather than all of them.
+  /// \param anySingleRequirement If true, returns at most a single requirement,
+  /// which might be any of the requirements that match.
   ///
   /// \returns the set of requirements to which the given witness is a
   /// witness.
   llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
                                      const ValueDecl *witness,
-                                     bool onlyFirstRequirement);
+                                     bool anySingleRequirement = false);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
   void useObjectiveCBridgeableConformances(DeclContext *dc, Type type);

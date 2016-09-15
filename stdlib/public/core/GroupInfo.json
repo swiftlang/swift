@@ -135,6 +135,7 @@
     "AnyHashable.swift",
     "Interval.swift",
     "Hashing.swift",
+    "SipHash.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",

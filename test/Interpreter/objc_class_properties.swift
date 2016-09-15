@@ -155,18 +155,18 @@ ClassProperties.test("inheritance/generic") {
 
 ClassProperties.test("optionalProp") {
   let noProp: ProtoWithClassProperty.Type = ClassWithClassProperty.self
-  expectEmpty(noProp.optionalClassProp)
+  expectNil(noProp.optionalClassProp)
 
   let hasProp: ProtoWithClassProperty.Type = Subclass.self
-  expectNotEmpty(hasProp.optionalClassProp)
+  expectNotNil(hasProp.optionalClassProp)
   expectEqual(true, hasProp.optionalClassProp!)
 
   let hasOwnProp: ProtoWithClassProperty.Type = SwiftClass.self
-  expectNotEmpty(hasOwnProp.optionalClassProp)
+  expectNotNil(hasOwnProp.optionalClassProp)
   expectEqual(true, hasOwnProp.optionalClassProp!)
 
   let hasPropObjC: ProtoWithClassProperty.Type = ObjCSubclassWithClassProperty.self
-  expectNotEmpty(hasPropObjC.optionalClassProp)
+  expectNotNil(hasPropObjC.optionalClassProp)
   expectEqual(true, hasPropObjC.optionalClassProp!)
 }
 
@@ -178,13 +178,13 @@ class NamingConflictSubclass : PropertyNamingConflict {
 ClassProperties.test("namingConflict") {
   let obj = PropertyNamingConflict()
   expectTrue(obj === obj.prop.map { $0 as AnyObject })
-  expectEmpty(type(of: obj).prop)
-  expectEmpty(PropertyNamingConflict.prop)
+  expectNil(type(of: obj).prop)
+  expectNil(PropertyNamingConflict.prop)
 
   let sub = NamingConflictSubclass()
-  expectEmpty(sub.prop)
-  expectNotEmpty(type(of: sub).prop)
-  expectNotEmpty(NamingConflictSubclass.prop)
+  expectNil(sub.prop)
+  expectNotNil(type(of: sub).prop)
+  expectNotNil(NamingConflictSubclass.prop)
 }
 
 extension NamingConflictSubclass : PropertyNamingConflictProto {
@@ -201,10 +201,10 @@ extension NamingConflictSubclass : PropertyNamingConflictProto {
 ClassProperties.test("namingConflict/protocol") {
   let obj: PropertyNamingConflictProto = NamingConflictSubclass()
   expectTrue(obj === obj.protoProp.map { $0 as AnyObject })
-  expectEmpty(type(of: obj).protoProp)
+  expectNil(type(of: obj).protoProp)
 
   let type: PropertyNamingConflictProto.Type = NamingConflictSubclass.self
-  expectEmpty(type.protoProp)
+  expectNil(type.protoProp)
 }
 
 runAllTests()

@@ -359,7 +359,7 @@ ArrayTestSuite.test("${Kind}/popLast") {
   do {
     var a = ${Kind}<Int>()
     let popped = a.popLast()
-    expectEmpty(popped)
+    expectNil(popped)
     expectTrue(a.isEmpty)
   }
 

@@ -919,15 +919,23 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
 }
 
 SourceRange PatternBindingEntry::getSourceRange() const {
+  ASTContext *ctx = nullptr;
+
   SourceLoc endLoc;
   getPattern()->forEachVariable([&](VarDecl *var) {
     auto accessorsEndLoc = var->getBracesRange().End;
-    if (accessorsEndLoc.isValid()) endLoc = accessorsEndLoc;
+    if (accessorsEndLoc.isValid()) {
+      endLoc = accessorsEndLoc;
+      if (!ctx) ctx = &var->getASTContext();
+    }
   });
 
   // Check the initializer.
-  if (endLoc.isInvalid())
-    endLoc = getOrigInitRange().End;
+  SourceLoc initEndLoc = getOrigInitRange().End;
+  if (initEndLoc.isValid() &&
+      (endLoc.isInvalid() ||
+       (ctx && ctx->SourceMgr.isBeforeInBuffer(endLoc, initEndLoc))))
+    endLoc = initEndLoc;
 
   // Check the pattern.
   if (endLoc.isInvalid())
@@ -2028,9 +2036,8 @@ void NominalTypeDecl::computeType() {
   //
   // If this protocol has been deserialized, it already has generic parameters.
   // Don't add them again.
-  if (!getGenericParams())
-    if (auto proto = dyn_cast<ProtocolDecl>(this))
-      setGenericParams(proto->createGenericParams(proto));
+  if (auto proto = dyn_cast<ProtocolDecl>(this))
+    proto->createGenericParamsIfMissing();
 
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
@@ -2178,7 +2185,7 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
 
 
 void GenericTypeDecl::setGenericParams(GenericParamList *params) {
-  // Set the specified generic parameters onto this type alias, setting
+  // Set the specified generic parameters onto this type declaration, setting
   // the parameters' context along the way.
   GenericParams = params;
   if (params)
@@ -2940,6 +2947,11 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
                                          SourceLoc());
   result->setOuterParameters(outerGenericParams);
   return result;
+}
+
+void ProtocolDecl::createGenericParamsIfMissing() {
+  if (!getGenericParams())
+    setGenericParams(createGenericParams(this));
 }
 
 /// Returns the default witness for a requirement, or nullptr if there is
@@ -3820,38 +3832,41 @@ ParamDecl *ParamDecl::createSelf(SourceLoc loc, DeclContext *DC,
 
 /// Return the full source range of this parameter.
 SourceRange ParamDecl::getSourceRange() const {
-  SourceRange range;
-  
   SourceLoc APINameLoc = getArgumentNameLoc();
   SourceLoc nameLoc = getNameLoc();
-  
-  if (APINameLoc.isValid() && nameLoc.isInvalid())
-    range = APINameLoc;
-  else if (APINameLoc.isInvalid() && nameLoc.isValid())
-    range = nameLoc;
-  else
-    range = SourceRange(APINameLoc, nameLoc);
-  
-  if (range.isInvalid()) return range;
-  
+
+  SourceLoc startLoc;
+  if (APINameLoc.isValid())
+    startLoc = APINameLoc;
+  else if (nameLoc.isValid())
+    startLoc = nameLoc;
+  else {
+    startLoc = getTypeLoc().getSourceRange().Start;
+  }
+  if (startLoc.isInvalid())
+    return SourceRange();
+
   // It would be nice to extend the front of the range to show where inout is,
   // but we don't have that location info.  Extend the back of the range to the
   // location of the default argument, or the typeloc if they are valid.
   if (auto expr = getDefaultValue()) {
     auto endLoc = expr->getEndLoc();
     if (endLoc.isValid())
-      return SourceRange(range.Start, endLoc);
+      return SourceRange(startLoc, endLoc);
   }
   
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeLoc().getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
     if (endLoc.isValid() && !isTypeLocImplicit())
-      return SourceRange(range.Start, endLoc);
+      return SourceRange(startLoc, endLoc);
   }
-  
-  // Otherwise, just return the info we have about the parameter.
-  return range;
+
+  // The name has a location we can use.
+  if (nameLoc.isValid())
+    return SourceRange(startLoc, nameLoc);
+
+  return startLoc;
 }
 
 Type ParamDecl::getVarargBaseTy(Type VarArgT) {

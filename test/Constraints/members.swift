@@ -575,7 +575,7 @@ enum SomeErrorType {
 
   static func someErrorFromString(_ str: String) -> SomeErrorType? {
     if str == "standalone" { return .StandaloneError }
-    if str == "underlying" { return .UnderlyingError }  // expected-error {{contextual member 'UnderlyingError' expects argument of type 'String'}}
+    if str == "underlying" { return .UnderlyingError }  // expected-error {{member 'UnderlyingError' expects argument of type 'String'}}
     return nil
   }
 }

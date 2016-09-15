@@ -1,4 +1,4 @@
-//===--- RetainReleaseCodeMotion.cpp - SIL Retain and Release Code Motion -===//
+//===------------------------ ARCCodeMotion.cpp - SIL ARC Code Motion ----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -92,7 +92,7 @@ using namespace swift;
 STATISTIC(NumRetainsSunk, "Number of retains sunk");
 STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
-llvm::cl::opt<bool> DisableRRCodeMotion("disable-rr-cm", llvm::cl::init(false));
+llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
 /// Disable optimization if we have to break critical edges in the function.
 llvm::cl::opt<bool>
@@ -974,7 +974,7 @@ namespace {
 /// Code motion kind.
 enum CodeMotionKind : unsigned { Retain = 0, Release = 1};
 
-class RRCodeMotion : public SILFunctionTransform {
+class ARCCodeMotion : public SILFunctionTransform {
   /// Whether to hoist releases or sink retains.
   CodeMotionKind Kind;
 
@@ -982,15 +982,15 @@ class RRCodeMotion : public SILFunctionTransform {
   bool FreezeEpilogueReleases;
 
 public:
-  StringRef getName() override { return "SIL Retain Release Code Motion"; }
+  StringRef getName() override { return "SIL ARC Code Motion"; }
 
   /// Constructor.
-  RRCodeMotion(CodeMotionKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
+  ARCCodeMotion(CodeMotionKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
 
   /// The entry point to the transformation.
   void run() override {
     // Code motion disabled.
-    if (DisableRRCodeMotion)
+    if (DisableARCCodeMotion)
       return;
 
     // Respect function no.optimize.
@@ -1003,7 +1003,7 @@ public:
     if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
       return;
 
-    DEBUG(llvm::dbgs() << "*** RRCM on function: " << F->getName() << " ***\n");
+    DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName() << " ***\n");
     // Split all critical edges.
     //
     // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
@@ -1048,16 +1048,16 @@ public:
 
 /// Sink Retains.
 SILTransform *swift::createRetainSinking() {
-  return new RRCodeMotion(CodeMotionKind::Retain, false);
+  return new ARCCodeMotion(CodeMotionKind::Retain, false);
 }
 
 /// Hoist releases, but not epilogue release. ASO relies on epilogue releases
 /// to prove knownsafety on enclosed releases.
 SILTransform *swift::createReleaseHoisting() {
-  return new RRCodeMotion(CodeMotionKind::Release, true);
+  return new ARCCodeMotion(CodeMotionKind::Release, true);
 }
 
 /// Hoist all releases.
 SILTransform *swift::createLateReleaseHoisting() {
-  return new RRCodeMotion(CodeMotionKind::Release, false);
+  return new ARCCodeMotion(CodeMotionKind::Release, false);
 }

@@ -74,10 +74,10 @@ ClassProperties.test("runtime")
   .code {
   let theClass: AnyObject = SwiftClass.self
   let prop = class_getProperty(object_getClass(theClass), "value")
-  expectNotEmpty(prop)
+  expectNotNil(prop)
 
   let nameAsCString = property_getName(prop)!
-  expectNotEmpty(nameAsCString)
+  expectNotNil(nameAsCString)
   expectEqual("value", String(cString: nameAsCString))
 }
 

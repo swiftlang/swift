@@ -141,9 +141,6 @@ Optional<bool> swift::computeSignBit(SILValue V) {
       // Strideof always returns non-negative results.
       case BuiltinValueKind::Strideof:
         return false;
-      // StrideofNonZero always returns positive results.
-      case BuiltinValueKind::StrideofNonZero:
-        return false;
       // Alignof always returns non-negative results.
       case BuiltinValueKind::Alignof:
         return false;

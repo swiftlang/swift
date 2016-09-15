@@ -786,7 +786,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
-                                            SILDeclRef method,
+                                                           ObjCMethod method,
                                             CanSILFunctionType origMethodType,
                                             CanSILFunctionType resultType,
                                             const HeapLayout &layout,
@@ -884,10 +884,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   }
 
   // Prepare the call to the underlying method.
+  
   CallEmission emission
-    = prepareObjCMethodRootCall(subIGF, method, origMethodType, origMethodType,
+    = prepareObjCMethodRootCall(subIGF, method.getMethod(),
+                                origMethodType, origMethodType,
                                 ArrayRef<Substitution>{},
-                                ObjCMessageKind::Normal);
+                                method.getMessageKind());
   
   Explosion args;
 
@@ -895,7 +897,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   if (formalIndirectResult)
     args.add(formalIndirectResult);
 
-  addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
+  addObjCMethodCallImplicitArguments(subIGF, args, method.getMethod(), self,
+                                     method.getSearchType());
   args.add(params.claimAll());
   emission.setArgs(args);
   
@@ -930,7 +933,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 }
 
 void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
-                                       SILDeclRef method,
+                                       ObjCMethod method,
                                        CanSILFunctionType origMethodType,
                                        CanSILFunctionType resultType,
                                        llvm::Value *self,
@@ -983,7 +986,7 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
   fn->setVisibility(llvm::GlobalValue::DefaultVisibility);
   fn->setLinkage(llvm::GlobalValue::InternalLinkage);
-  fn->setUnnamedAddr(true);
+  fn->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   return llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
 }

@@ -47,7 +47,7 @@ ObjCRuntimeVisibleTestSuite.test("downcast") {
   let obj = HiddenClass.create()
   let opaque: AnyObject = obj
   let downcasted = opaque as? HiddenClass
-  expectNotEmpty(downcasted)
+  expectNotNil(downcasted)
   expectTrue(obj === downcasted)
 }
 
@@ -67,7 +67,7 @@ ObjCRuntimeVisibleTestSuite.test("protocols/downcast")
   let obj = HiddenClass.create()
   let opaque: AnyObject = obj
   let downcasted = opaque as? SwiftProto
-  expectNotEmpty(downcasted)
+  expectNotNil(downcasted)
   expectTrue(obj === downcasted!.doTheThing())
 }
 

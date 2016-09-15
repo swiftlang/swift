@@ -388,6 +388,8 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
 // PrecedenceGroup
+ERROR(precedencegroup_not_infix,none,
+      "only infix operators may declare a precedence", ())
 ERROR(expected_precedencegroup_name,none,
       "expected identifier after 'precedencegroup'", ())
 ERROR(expected_precedencegroup_lbrace,none,
@@ -1169,17 +1171,6 @@ ERROR(attr_interpolated_string,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
-
-ERROR(attr_expected_colon_separator,none,
-      "expected ':' following '%0' argument of '%1'",
-      (StringRef, StringRef))
-
-ERROR(attr_expected_string_literal_arg,none,
-      "expected string literal for '%0' argument of '%1'",
-      (StringRef, StringRef))
-
-ERROR(attr_duplicate_argument,none,
-      "duplicate '%0' argument", (StringRef))
 
 // accessibility
 ERROR(attr_accessibility_expected_set,none,

@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar25733187
+
 // watchOS 2.0 does not have an XCTest module.
 // XFAIL: OS=watchos
 

@@ -68,12 +68,13 @@ class ARCLoopOpts : public SILFunctionTransform {
     // Get all of the analyses that we need.
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     ProgramTerminationFunctionInfo PTFI(F);
 
     // Create all of our visitors, register them with the visitor group, and
     // run.
-    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, &PTFI);
+    LoopARCPairingContext LoopARCContext(*F, AA, LRFI, LI, RCFI, EAFI, &PTFI);
     SILLoopVisitorGroup VisitorGroup(F, LI);
     VisitorGroup.addVisitor(&LoopARCContext);
     VisitorGroup.run();

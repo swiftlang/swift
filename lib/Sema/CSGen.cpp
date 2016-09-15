@@ -2310,11 +2310,6 @@ namespace {
       return expr->getType();
     }
 
-    Type visitDefaultValueExpr(DefaultValueExpr *expr) {
-      expr->setType(expr->getSubExpr()->getType());
-      return expr->getType();
-    }
-
     Type visitApplyExpr(ApplyExpr *expr) {
       Type outputTy;
       
@@ -2757,11 +2752,6 @@ namespace {
   public:
     SanitizeExpr(TypeChecker &tc) : TC(tc) { }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Don't recurse into default-value expressions.
-      return { !isa<DefaultValueExpr>(expr), expr };
-    }
-
     Expr *walkToExprPost(Expr *expr) override {
       if (auto implicit = dyn_cast<ImplicitConversionExpr>(expr)) {
         // Skip implicit conversions completely.
@@ -2839,12 +2829,6 @@ namespace {
         }
 
         return { true, expr };
-      }
-
-      // We don't visit default value expressions; they've already been
-      // type-checked.
-      if (isa<DefaultValueExpr>(expr)) {
-        return { false, expr };
       }
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur

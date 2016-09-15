@@ -7,4 +7,11 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-protocol A{class A{var _=c<}protocol A{extension{func<:a
+@objc protocol P{
+func a
+typealias a
+class d{protocol c:P{
+{{
+}
+}
+let a

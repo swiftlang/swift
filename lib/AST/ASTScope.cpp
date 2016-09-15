@@ -28,6 +28,104 @@
 #include <algorithm>
 using namespace swift;
 
+const ASTScope *ASTScope::getActiveContinuation() const {
+  switch (continuation.getInt()) {
+  case ContinuationKind::Historical:
+    return nullptr;
+
+  case ContinuationKind::Active:
+  case ContinuationKind::ActiveThenSourceFile:
+    return continuation.getPointer();
+  }
+}
+
+const ASTScope *ASTScope::getHistoricalContinuation() const {
+  switch (continuation.getInt()) {
+  case ContinuationKind::Historical:
+  case ContinuationKind::Active:
+    return continuation.getPointer();
+
+  case ContinuationKind::ActiveThenSourceFile:
+    return getSourceFileScope();
+  }
+}
+
+void ASTScope::addActiveContinuation(const ASTScope *newContinuation) const {
+  assert(newContinuation && "Use 'remove active continuation'");
+
+  // Add a new, active continuation, making sure we're not losing historical
+  // information.
+
+  // Simple case: this is the first time this node has had a continuation.
+  if (!continuation.getPointer()) {
+    continuation.setPointerAndInt(newContinuation, ContinuationKind::Active);
+    return;
+  }
+
+  // Setting a continuation to itself is a no-op.
+  if (continuation.getPointer() == newContinuation) return;
+
+  // Setting a new continuation is only valid when we're replacing a
+  // \c SourceFile continuation.
+  switch (continuation.getInt()) {
+  case ContinuationKind::Active:
+    // Only a \c SourceFile continuation can be replaced.
+    assert(continuation.getPointer()->getKind() == ASTScopeKind::SourceFile ||
+           continuation.getPointer()->getParent()->getKind()
+             == ASTScopeKind::TopLevelCode);
+    continuation.setPointerAndInt(newContinuation,
+                                  ContinuationKind::ActiveThenSourceFile);
+    break;
+
+  case ContinuationKind::Historical:
+    // Only a \c SourceFile continuation can be replaced.
+    assert(continuation.getPointer()->getKind() == ASTScopeKind::SourceFile ||
+           continuation.getPointer()->getParent()->getKind()
+             == ASTScopeKind::TopLevelCode);
+    continuation.setPointerAndInt(newContinuation, ContinuationKind::Active);
+    break;
+
+  case ContinuationKind::ActiveThenSourceFile:
+    llvm_unreachable("cannot replace a continuation twice");
+  }
+}
+
+void ASTScope::removeActiveContinuation() const {
+  switch (continuation.getInt()) {
+  case ContinuationKind::Active:
+    continuation.setInt(ContinuationKind::Historical);
+    break;
+
+  case ContinuationKind::Historical:
+    llvm_unreachable("nothing to remove");
+    break;
+
+  case ContinuationKind::ActiveThenSourceFile:
+    // Make the \c SourceFile the active continuation.
+    continuation.setPointerAndInt(getSourceFileScope(),
+                                  ContinuationKind::Active);
+    break;
+  }
+}
+
+void ASTScope::clearActiveContinuation() const {
+  switch (continuation.getInt()) {
+  case ContinuationKind::Active:
+    continuation.setInt(ContinuationKind::Historical);
+    break;
+
+  case ContinuationKind::Historical:
+    llvm_unreachable("nothing to clear");
+    break;
+
+  case ContinuationKind::ActiveThenSourceFile:
+    // Make the \c SourceFile the historical continuation.
+    continuation.setPointerAndInt(getSourceFileScope(),
+                                  ContinuationKind::Historical);
+    break;
+  }
+}
+
 ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
     : ASTScope(ASTScopeKind::Preexpanded, parent) {
   assert(children.size() > 1 && "Don't use this without multiple nodes");
@@ -63,23 +161,6 @@ static bool shouldSkipBraceStmtElement(ASTNode element) {
   return false;
 }
 
-/// Determines whether the given AST node introduces a continuation.
-static bool introducesContinuation(ASTNode element) {
-  if (auto decl = element.dyn_cast<Decl *>()) {
-    // Declarations in local contexts introduce continuations.
-    return decl->getDeclContext()->isLocalContext();
-  }
-
-  if (auto stmt = element.dyn_cast<Stmt *>()) {
-    // Guard statements introduce continuations.
-    if (isa<GuardStmt>(stmt)) return true;
-
-    return false;
-  }
-
-  return false;
-}
-
 /// Determine whether the given abstract storage declaration has accessors.
 static bool hasAccessors(AbstractStorageDecl *asd) {
   switch (asd->getStorageKind()) {
@@ -90,12 +171,30 @@ static bool hasAccessors(AbstractStorageDecl *asd) {
   case AbstractStorageDecl::ComputedWithMutableAddress:
   case AbstractStorageDecl::InheritedWithObservers:
   case AbstractStorageDecl::StoredWithObservers:
-    return true;
+    return asd->getBracesRange().isValid();
 
   case AbstractStorageDecl::Stored:
   case AbstractStorageDecl::StoredWithTrivialAccessors:
     return false;
   }
+}
+
+/// Determine whether this is a top-level code declaration that isn't just
+/// wrapping an #if.
+static bool isRealTopLevelCodeDecl(Decl *decl) {
+  auto topLevelCode = dyn_cast<TopLevelCodeDecl>(decl);
+  if (!topLevelCode) return false;
+
+  // Drop top-level statements containing just an IfConfigStmt.
+  // FIXME: The modeling of IfConfig is weird.
+  auto braceStmt = topLevelCode->getBody();
+  auto elements = braceStmt->getElements();
+  if (elements.size() == 1 &&
+      elements[0].is<Stmt *>() &&
+      isa<IfConfigStmt>(elements[0].get<Stmt *>()))
+    return false;
+
+  return true;
 }
 
 void ASTScope::expand() const {
@@ -113,8 +212,19 @@ void ASTScope::expand() const {
 
   // Local function to add a child to the list of children.
   bool previouslyEmpty = storedChildren.empty();
-  auto addChild = [&](ASTScope *child) {
+  auto addChild = [&](ASTScope *child) -> bool {
     assert(child->getParent() == this && "Wrong parent");
+
+    // If we have a continuation and the child can steal it, transfer the
+    // continuation to that child.
+    bool stoleContinuation = false;
+    if (getActiveContinuation() && child->canStealContinuation()) {
+      assert(!child->getActiveContinuation() &&
+             "Child cannot have a continuation already");
+      child->continuation = this->continuation;
+      this->clearActiveContinuation();
+      stoleContinuation = true;
+    }
 
 #ifndef NDEBUG
     // Check invariants in asserting builds.
@@ -163,24 +273,45 @@ void ASTScope::expand() const {
 
     // Add the child.
     storedChildren.push_back(child);
+
+    return stoleContinuation;
   };
 
+  if (!parentAndExpanded.getInt()) {
   // Expand the children in the current scope.
-  switch (kind) {
+  switch (getKind()) {
   case ASTScopeKind::Preexpanded:
     llvm_unreachable("Node should be pre-expanded");
 
   case ASTScopeKind::SourceFile: {
-    /// Add all of the new declarations to the list of children.
-    for (Decl *decl : llvm::makeArrayRef(sourceFile.file->Decls)
-                        .slice(sourceFile.nextElement)) {
-      // Create a child node for this declaration.
-      if (ASTScope *child = createIfNeeded(this, decl))
-        addChild(child);
-    }
+    if (!getHistoricalContinuation()) {
+      /// Add declarations to the list of children directly.
+      for (unsigned i : range(sourceFile.nextElement,
+                              sourceFile.file->Decls.size())) {
+        Decl *decl = sourceFile.file->Decls[i];
 
-    // Make sure we don't visit these children again.
-    sourceFile.nextElement = sourceFile.file->Decls.size();
+        // If the declaration is a top-level code declaration, turn the source
+        // file into a continuation. We're done.
+        if (isRealTopLevelCodeDecl(decl)) {
+          addActiveContinuation(this);
+          break;
+        }
+
+        // Note the next element to be consumed.
+        sourceFile.nextElement = i + 1;
+
+        // Create a child node for this declaration.
+        if (ASTScope *child = createIfNeeded(this, decl))
+          (void)addChild(child);
+      }
+    }
+    break;
+  }
+
+  case ASTScopeKind::ExtensionGenericParams: {
+    // Create a child node.
+    if (ASTScope *child = createIfNeeded(this, extension))
+      addChild(child);
     break;
   }
 
@@ -195,6 +326,12 @@ void ASTScope::expand() const {
   case ASTScopeKind::GenericParams:
     // Create a child of the generic parameters, if needed.
     if (auto child = createIfNeeded(this, genericParams.decl))
+      addChild(child);
+    break;
+
+  case ASTScopeKind::TypeDecl:
+    // Create the child of the function, if any.
+    if (auto child = createIfNeeded(this, typeDecl))
       addChild(child);
     break;
 
@@ -217,39 +354,63 @@ void ASTScope::expand() const {
       addChild(child);
     break;
 
+  case ASTScopeKind::AbstractFunctionBody:
+    // Create a child for the actual body.
+    if (auto child = createIfNeeded(this, abstractFunction->getBody()))
+      addChild(child);
+    break;
+
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
     // Create a child for the initializer, if present.
-    if (patternEntry.getInit() &&
-        patternEntry.getInit()->getSourceRange().isValid())
-      addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
-                                  patternBinding.decl, patternBinding.entry));
+    ASTScope *initChild = nullptr;
+    if (patternEntry.getInitAsWritten() &&
+        patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
+      initChild = new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
+                                     patternBinding.decl, patternBinding.entry);
+    }
 
     // Create children for the accessors of any variables in the pattern that
     // have them.
     patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-      if (hasAccessors(var))
+      if (hasAccessors(var)) {
+        // If there is an initializer child that precedes this node (the
+        // normal case), add teh initializer child first.
+        if (initChild &&
+            ctx.SourceMgr.isBeforeInBuffer(
+                                 patternEntry.getInitAsWritten()->getEndLoc(),
+                                 var->getBracesRange().Start)) {
+          addChild(initChild);
+          initChild = nullptr;
+        }
+
         addChild(new (ctx) ASTScope(this, var));
+      }
     });
 
-    // If the pattern binding is in a local context, we nest the remaining
-    // pattern bindings.
-    if (patternBinding.decl->getDeclContext()->isLocalContext()) {
+    // If an initializer child remains, add it now.
+    if (initChild)
+      addChild(initChild);
+
+    // If there is an active continuation, nest the remaining pattern bindings.
+    if (getActiveContinuation()) {
       addChild(new (ctx) ASTScope(ASTScopeKind::AfterPatternBinding, this,
                                   patternBinding.decl, patternBinding.entry));
     }
     break;
   }
 
-  case ASTScopeKind::PatternInitializer:
+  case ASTScopeKind::PatternInitializer: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
     // Create a child for the initializer expression.
-    if (auto child =
-            createIfNeeded(this,
-                           patternBinding.decl->getInit(patternBinding.entry)))
+    if (auto child = createIfNeeded(this, patternEntry.getInitAsWritten()))
       addChild(child);
     break;
+  }
 
   case ASTScopeKind::AfterPatternBinding: {
     // Create a child for the next pattern binding.
@@ -258,31 +419,10 @@ void ASTScope::expand() const {
     break;
   }
 
-  case ASTScopeKind::BraceStmt: {
-    // Find the first element that requires a scope.
-    auto elements = braceStmt.stmt->getElements();
-    for (unsigned i : range(braceStmt.nextElement, elements.size())) {
-      braceStmt.nextElement = i + 1;
-
-      // Skip this brace element if it's unnecessary.
-      if (shouldSkipBraceStmtElement(elements[i])) continue;
-
-      // Try to create the child. If it succeeds, we're done.
-      if (auto child = createIfNeeded(this, elements[i])) {
-        addChild(child);
-
-        // If this element introduces a continuation, it's expansion will
-        // handle the remainder of the brace statement.
-        if (introducesContinuation(elements[i])) break;
-      }
-    }
-    break;
-  }
-
-  case ASTScopeKind::LocalDeclaration:
-    // Add the contents of the declaration itself.
-    if (auto child = createIfNeeded(this, localDeclaration))
-      addChild(child);
+  case ASTScopeKind::BraceStmt:
+    // Expanding a brace statement means setting it as its own continuation,
+    // unless that's already been done.
+    addActiveContinuation(this);
     break;
 
   case ASTScopeKind::IfStmt:
@@ -338,8 +478,8 @@ void ASTScope::expand() const {
 
   case ASTScopeKind::GuardStmt:
     // Add a child to describe the guard condition.
-      addChild(new (ctx) ASTScope(this, guard, 0,
-                                  /*isGuardContinuation=*/false));
+    addChild(new (ctx) ASTScope(this, guard, 0,
+                                /*isGuardContinuation=*/false));
 
     // Add a child for the 'guard' body, which always exits.
     if (auto bodyChild = createIfNeeded(this, guard->getBody()))
@@ -502,6 +642,7 @@ void ASTScope::expand() const {
       addChild(bodyChild);
     break;
   }
+  }
 
   // Enumerate any continuation scopes associated with this parent.
   enumerateContinuationScopes(addChild);
@@ -512,22 +653,30 @@ void ASTScope::expand() const {
   if (previouslyEmpty && !storedChildren.empty())
     getASTContext().addDestructorCleanup(storedChildren);
 
-  // Anything but a SourceFile is considered "expanded" at this point; source
-  // files can grow due to the REPL.
-  if (kind != ASTScopeKind::SourceFile)
+  // The scope is considered "expanded" at this point, although there might be
+  // further work to do if there is an active continuation.
+  if (getKind() != ASTScopeKind::SourceFile || getHistoricalContinuation())
     parentAndExpanded.setInt(true);
 }
 
 bool ASTScope::isExpanded() const {
-  // If the 'expanded' bit is set, we've expanded already.
-  if (parentAndExpanded.getInt()) return true;
+  // If the 'expanded' bit is not set, we haven't expanded.
+  if (!parentAndExpanded.getInt()) return false;
 
-  // Source files are expanded when there are no new declarations to process.
-  if (kind == ASTScopeKind::SourceFile &&
-      sourceFile.nextElement == sourceFile.file->Decls.size())
-    return true;
+  // If there is an active continuation, we're expanded if it's not the
+  // source-file continuation or if we're at the end of the list of
+  // declarations.
+  if (auto continuation = getActiveContinuation()) {
+    return continuation->getKind() != ASTScopeKind::SourceFile ||
+           (continuation->sourceFile.nextElement
+              == continuation->sourceFile.file->Decls.size());
+  }
 
-  return false;
+  // If it's a source file that has never been a continuation, check whether
+  // we're at the last declaration.
+  return getKind() != ASTScopeKind::SourceFile ||
+         ((sourceFile.nextElement == sourceFile.file->Decls.size()) &&
+          !getHistoricalContinuation());
 }
 
 /// Create the AST scope for a source file, which is the root of the scope
@@ -567,51 +716,6 @@ findNextParameter(AbstractFunctionDecl *func, unsigned listIndex,
   return None;
 }
 
-/// Determine whether the given parent is a local declaration or is
-/// directly descended from one.
-static bool parentDirectDescendedFromLocalDeclaration(const ASTScope *parent,
-                                                      const Decl *decl) {
-  while (true) {
-    switch (parent->getKind()) {
-    case ASTScopeKind::Preexpanded:
-    case ASTScopeKind::AbstractFunctionDecl:
-    case ASTScopeKind::AbstractFunctionParams:
-    case ASTScopeKind::GenericParams:
-    case ASTScopeKind::TypeOrExtensionBody:
-    case ASTScopeKind::Accessors:
-      // Keep looking.
-      parent = parent->getParent();
-      continue;
-
-    case ASTScopeKind::LocalDeclaration:
-      return (parent->getLocalDeclaration() == decl);
-
-    case ASTScopeKind::SourceFile:
-    case ASTScopeKind::DefaultArgument:
-    case ASTScopeKind::PatternBinding:
-    case ASTScopeKind::PatternInitializer:
-    case ASTScopeKind::AfterPatternBinding:
-    case ASTScopeKind::BraceStmt:
-    case ASTScopeKind::ConditionalClause:
-    case ASTScopeKind::IfStmt:
-    case ASTScopeKind::GuardStmt:
-    case ASTScopeKind::RepeatWhileStmt:
-    case ASTScopeKind::ForEachStmt:
-    case ASTScopeKind::ForEachPattern:
-    case ASTScopeKind::DoCatchStmt:
-    case ASTScopeKind::CatchStmt:
-    case ASTScopeKind::SwitchStmt:
-    case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::ForStmt:
-    case ASTScopeKind::ForStmtInitializer:
-    case ASTScopeKind::Closure:
-    case ASTScopeKind::TopLevelCode:
-      // Not a direct descendant.
-      return false;
-    }
-  }
-}
-
 /// Determine whether the given parent is the accessor node for an abstract
 /// storage declaration or is directly descended from it.
 static bool parentDirectDescendedFromAbstractStorageDecl(
@@ -631,9 +735,11 @@ static bool parentDirectDescendedFromAbstractStorageDecl(
       return (parent->getAbstractStorageDecl() == decl);
 
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::TypeDecl:
+    case ASTScopeKind::ExtensionGenericParams:
     case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::DefaultArgument:
-    case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
@@ -668,6 +774,7 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
     case ASTScopeKind::Preexpanded:
     case ASTScopeKind::AbstractFunctionParams:
     case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
     case ASTScopeKind::GenericParams:
       // Keep looking.
       parent = parent->getParent();
@@ -677,8 +784,56 @@ static bool parentDirectDescendedFromAbstractFunctionDecl(
       return (parent->getAbstractFunctionDecl() == decl);
 
     case ASTScopeKind::SourceFile:
+    case ASTScopeKind::TypeDecl:
+    case ASTScopeKind::ExtensionGenericParams:
     case ASTScopeKind::TypeOrExtensionBody:
-    case ASTScopeKind::LocalDeclaration:
+    case ASTScopeKind::PatternBinding:
+    case ASTScopeKind::PatternInitializer:
+    case ASTScopeKind::AfterPatternBinding:
+    case ASTScopeKind::Accessors:
+    case ASTScopeKind::BraceStmt:
+    case ASTScopeKind::ConditionalClause:
+    case ASTScopeKind::IfStmt:
+    case ASTScopeKind::GuardStmt:
+    case ASTScopeKind::RepeatWhileStmt:
+    case ASTScopeKind::ForEachStmt:
+    case ASTScopeKind::ForEachPattern:
+    case ASTScopeKind::DoCatchStmt:
+    case ASTScopeKind::CatchStmt:
+    case ASTScopeKind::SwitchStmt:
+    case ASTScopeKind::CaseStmt:
+    case ASTScopeKind::ForStmt:
+    case ASTScopeKind::ForStmtInitializer:
+    case ASTScopeKind::Closure:
+    case ASTScopeKind::TopLevelCode:
+      // Not a direct descendant.
+      return false;
+    }
+  }
+}
+
+/// Determine whether the given parent is the node for a specific type
+/// declaration or is directly descended from it.
+static bool parentDirectDescendedFromTypeDecl(const ASTScope *parent,
+                                              const TypeDecl *decl) {
+  while (true) {
+    switch (parent->getKind()) {
+    case ASTScopeKind::Preexpanded:
+    case ASTScopeKind::GenericParams:
+      // Keep looking.
+      parent = parent->getParent();
+      continue;
+
+    case ASTScopeKind::TypeDecl:
+      return (parent->getTypeDecl() == decl);
+
+    case ASTScopeKind::SourceFile:
+    case ASTScopeKind::AbstractFunctionDecl:
+    case ASTScopeKind::AbstractFunctionParams:
+    case ASTScopeKind::DefaultArgument:
+    case ASTScopeKind::AbstractFunctionBody:
+    case ASTScopeKind::ExtensionGenericParams:
+    case ASTScopeKind::TypeOrExtensionBody:
     case ASTScopeKind::PatternBinding:
     case ASTScopeKind::PatternInitializer:
     case ASTScopeKind::AfterPatternBinding:
@@ -721,27 +876,22 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     }
   }
 
-  // If this is a local declaration for which we have not yet produced a
-  // local declaration scope, introduce that local declaration scope now.
-  //
-  // Note that pattern bindings are handled as a special case, because they
-  // potentially introduce several levels of bindings.
   ASTContext &ctx = decl->getASTContext();
-  bool inLocalContext = decl->getDeclContext()->isLocalContext();
-  if (!isa<PatternBindingDecl>(decl) && !isa<AbstractStorageDecl>(decl) &&
-      inLocalContext && !isAccessor &&
-      !parentDirectDescendedFromLocalDeclaration(parent, decl)) {
-    auto scope = new (ctx) ASTScope(ASTScopeKind::LocalDeclaration,
-                                    parent);
-    scope->localDeclaration = decl;
-    return scope;
+
+  // If this is a type declaration for which we have not introduced a TypeDecl
+  // scope, add it now.
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    if (!parentDirectDescendedFromTypeDecl(parent, typeDecl)) {
+      return new (ctx) ASTScope(parent, typeDecl);
+    }
   }
 
   // If this is a function declaration for which we have not introduced
   // an AbstractFunctionDecl scope, add it now.
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (!parentDirectDescendedFromAbstractFunctionDecl(parent, func)) {
-      return new (ctx) ASTScope(parent, func);
+      return new (ctx) ASTScope(ASTScopeKind::AbstractFunctionDecl, parent,
+                                func);
     }
   }
 
@@ -781,22 +931,25 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     // Always handled by a pattern-binding declaration.
     return nullptr;
 
-  case DeclKind::Extension:
-    return new (ctx) ASTScope(parent, cast<ExtensionDecl>(decl));
+  case DeclKind::Extension: {
+    auto ext = cast<ExtensionDecl>(decl);
 
-  case DeclKind::TopLevelCode: {
-    // Drop top-level statements containing just an IfConfigStmt.
-    // FIXME: The modeling of IfConfig is weird.
-    auto topLevelCode = cast<TopLevelCodeDecl>(decl);
-    auto braceStmt = topLevelCode->getBody();
-    auto elements = braceStmt->getElements();
-    if (elements.size() == 1 &&
-        elements[0].is<Stmt *>() &&
-        isa<IfConfigStmt>(elements[0].get<Stmt *>()))
-      return nullptr;
+    // If we already have a scope of the (possible) generic parameters,
+    // add the body.
+    if (parent->getKind() == ASTScopeKind::ExtensionGenericParams)
+      return new (ctx) ASTScope(parent, cast<IterableDeclContext>(ext));
 
-    return new (ctx) ASTScope(parent, topLevelCode);
+    // Otherwise, form the extension's generic parameters scope.
+    return new (ctx) ASTScope(parent, ext);
   }
+
+  case DeclKind::TopLevelCode:
+    if (!isRealTopLevelCodeDecl(decl)) return nullptr;
+    return new (ctx) ASTScope(parent, cast<TopLevelCodeDecl>(decl));
+
+  case DeclKind::Protocol:
+    cast<ProtocolDecl>(decl)->createGenericParamsIfMissing();
+    SWIFT_FALLTHROUGH;
 
   case DeclKind::Class:
   case DeclKind::Enum:
@@ -808,11 +961,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
     if (auto scope = nextGenericParam(nominal->getGenericParams(), nominal))
       return scope;
 
-    return new (ctx) ASTScope(parent, nominal);
+    return new (ctx) ASTScope(parent, cast<IterableDeclContext>(nominal));
   }
-
-  case DeclKind::Protocol:
-    return new (ctx) ASTScope(parent, cast<ProtocolDecl>(decl));
 
   case DeclKind::TypeAlias: {
     // If we have a generic typealias and our parent isn't describing our
@@ -879,16 +1029,18 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
       return afterParamScope;
     }
 
-
     // Function body, if present.
-    return createIfNeeded(parent, abstractFunction->getBody());
+    if (abstractFunction->hasBody())
+      return new (ctx) ASTScope(ASTScopeKind::AbstractFunctionBody, parent,
+                                abstractFunction);
+    return nullptr;
   }
 
   case DeclKind::PatternBinding: {
     auto patternBinding = cast<PatternBindingDecl>(decl);
 
-    // Within a local context, bindings nest.
-    if (inLocalContext) {
+    // When the parent has an active continuation, bindings nest.
+    if (parent->getActiveContinuation()) {
       // Find the next pattern binding.
       unsigned entry = (parent->getKind() == ASTScopeKind::AfterPatternBinding&&
                         parent->patternBinding.decl == decl)
@@ -1073,21 +1225,19 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, ASTNode node) {
   return createIfNeeded(parent, node.get<Expr *>());
 }
 
-bool ASTScope::isContinuationScope() const {
+bool ASTScope::canStealContinuation() const {
   switch (getKind()) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
+  case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::GenericParams:
-  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::DefaultArgument:
-  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternInitializer:
   case ASTScopeKind::Accessors:
-  case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
-  case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
   case ASTScopeKind::ForEachStmt:
   case ASTScopeKind::ForEachPattern:
@@ -1098,103 +1248,85 @@ bool ASTScope::isContinuationScope() const {
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
-  case ASTScopeKind::TopLevelCode:
-    // These node kinds never have a viable continuation.
+    // These node kinds don't introduce names that would be visible in a
+    // continuation.
     return false;
 
-  case ASTScopeKind::AfterPatternBinding:
-    // The last parameter binding in a local scope can have a continuation.
-    return patternBinding.decl->getDeclContext()->isLocalContext() &&
-      patternBinding.entry == patternBinding.decl->getNumPatternEntries() - 1;
+  case ASTScopeKind::TopLevelCode:
+    // Top-level code can steal the continuation from the source file.
+    return true;
 
-  case ASTScopeKind::LocalDeclaration:
-    // Local declarations can always have a continuation.
+  case ASTScopeKind::BraceStmt:
+    // Brace statements that describe top-level code can steal the continuation
+    // from the source file.
+    return getParent()->getKind() == ASTScopeKind::TopLevelCode;
+
+  case ASTScopeKind::AfterPatternBinding:
+  case ASTScopeKind::TypeDecl:
+  case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::PatternBinding:
+    // Declarations always steal continuations.
+    return true;
+
+  case ASTScopeKind::GuardStmt:
+    // Guard statements steal on behalf of their children. How noble.
     return true;
 
   case ASTScopeKind::ConditionalClause:
-    // The last conditional clause of a 'guard' statement can have a
-    // continuation if it is marked accordingly.
-    return conditionalClause.isGuardContinuation &&
-      conditionalClause.index + 1 == conditionalClause.stmt->getCond().size();
+    // Guard conditions steal continuations.
+    return conditionalClause.isGuardContinuation;
   }
 }
 
 void ASTScope::enumerateContinuationScopes(
-       llvm::function_ref<void(ASTScope *)> fn) const {
-  // Only consider scopes that can be continuation scopes.
-  if (!isContinuationScope()) return;
+       llvm::function_ref<bool(ASTScope *)> addChild) const {
+  while (auto continuation = getActiveContinuation()) {
+    // Continue to brace statements.
+    if (continuation->getKind() == ASTScopeKind::BraceStmt) {
+      // Find the next suitable child in the brace statement.
+      auto continuationElements = continuation->braceStmt.stmt->getElements();
+      for (unsigned i : range(continuation->braceStmt.nextElement,
+                              continuationElements.size())) {
+        continuation->braceStmt.nextElement = i + 1;
 
-  // Look for the nearest enclosing BraceStmt; that's where we continue from.
-  const ASTScope *continuation = getParent();
-  while (true) {
-    switch (continuation->getKind()) {
-    case ASTScopeKind::Preexpanded:
-    case ASTScopeKind::SourceFile:
-    case ASTScopeKind::DefaultArgument:
-    case ASTScopeKind::PatternInitializer:
-    case ASTScopeKind::IfStmt:
-    case ASTScopeKind::RepeatWhileStmt:
-    case ASTScopeKind::ForEachStmt:
-    case ASTScopeKind::ForEachPattern:
-    case ASTScopeKind::DoCatchStmt:
-    case ASTScopeKind::CatchStmt:
-    case ASTScopeKind::SwitchStmt:
-    case ASTScopeKind::CaseStmt:
-    case ASTScopeKind::ForStmt:
-    case ASTScopeKind::ForStmtInitializer:
-    case ASTScopeKind::Closure:
-    case ASTScopeKind::TopLevelCode:
-      // These scopes are hard barriers; if we hit one, there is nothing to
-      // continue to.
-      return;
+        // Skip this element if it's useless.
+        if (shouldSkipBraceStmtElement(continuationElements[i])) continue;
 
-    case ASTScopeKind::Accessors:
-      // Non-local variables/subscripts are hard barriers; there's nothing
-      // to continue to.
-      if (!abstractStorageDecl->getDeclContext()->isLocalContext())
-        return;
+        // Try to create this child.
+        if (auto child = createIfNeeded(this, continuationElements[i])) {
+          // Add this child.
+          if (addChild(child)) return;
+        }
+      }
 
-      SWIFT_FALLTHROUGH;
-
-    case ASTScopeKind::TypeOrExtensionBody:
-    case ASTScopeKind::AbstractFunctionDecl:
-    case ASTScopeKind::AbstractFunctionParams:
-    case ASTScopeKind::GenericParams:
-    case ASTScopeKind::PatternBinding:
-    case ASTScopeKind::AfterPatternBinding:
-    case ASTScopeKind::LocalDeclaration:
-    case ASTScopeKind::ConditionalClause:
-    case ASTScopeKind::GuardStmt:
-      // Continue looking for the continuation parent.
-      continuation = continuation->getParent();
+      // We've exhausted this continuation; remove it.
+      removeActiveContinuation();
       continue;
-
-    case ASTScopeKind::BraceStmt:
-      // Found it. We're done.
-      break;
     }
 
-    break;
-  }
-  assert(continuation->getKind() == ASTScopeKind::BraceStmt);
+    // Continue within a source file containing top-level code.
+    if (continuation->getKind() == ASTScopeKind::SourceFile) {
+      auto continuationDecls
+        = llvm::makeArrayRef(continuation->sourceFile.file->Decls);
+      for (unsigned i : range(continuation->sourceFile.nextElement,
+                              continuationDecls.size())) {
+        // Note the next element to be consumed.
+        continuation->sourceFile.nextElement = i + 1;
 
-  // Find the next suitable child in the brace statement.
-  auto continuationElements = continuation->braceStmt.stmt->getElements();
-  for (unsigned i : range(continuation->braceStmt.nextElement,
-                          continuationElements.size())) {
-    continuation->braceStmt.nextElement = i + 1;
+        Decl *decl = continuation->sourceFile.file->Decls[i];
 
-    // Skip this element if it's useless.
-    if (shouldSkipBraceStmtElement(continuationElements[i])) continue;
+        // Try to create this child.
+        if (auto child = createIfNeeded(this, decl)) {
+          // Add this child.
+          if (addChild(child)) return;
+        }
+      }
 
-    // Try to create this child.
-    if (auto child = createIfNeeded(this, continuationElements[i])) {
-      // List this child.
-      fn(child);
-
-      // If this child introduces a continuation itself, we're done.
-      if (introducesContinuation(continuationElements[i])) return;
+      // The source file is never truly exhausted; just return.
+      return;
     }
+
+    llvm_unreachable("Unhandled continuation scope");
   }
 }
 
@@ -1203,6 +1335,12 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::SourceFile:
     return sourceFile.file->getASTContext();
 
+  case ASTScopeKind::TypeDecl:
+    return typeDecl->getASTContext();
+
+  case ASTScopeKind::ExtensionGenericParams:
+    return extension->getASTContext();
+
   case ASTScopeKind::TypeOrExtensionBody:
     return getParent()->getASTContext();
 
@@ -1210,6 +1348,7 @@ ASTContext &ASTScope::getASTContext() const {
     return genericParams.decl->getASTContext();
 
   case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::AbstractFunctionBody:
     return abstractFunction->getASTContext();
 
   case ASTScopeKind::AbstractFunctionParams:
@@ -1240,9 +1379,6 @@ ASTContext &ASTScope::getASTContext() const {
   case ASTScopeKind::Closure:
     return getParent()->getASTContext();
 
-  case ASTScopeKind::LocalDeclaration:
-    return localDeclaration->getASTContext();
-
   case ASTScopeKind::Accessors:
     return abstractStorageDecl->getASTContext();
 
@@ -1251,11 +1387,16 @@ ASTContext &ASTScope::getASTContext() const {
   }
 }
 
-SourceFile &ASTScope::getSourceFile() const {
-  if (kind == ASTScopeKind::SourceFile)
-    return *sourceFile.file;
+const ASTScope *ASTScope::getSourceFileScope() const {
+  auto result = this;
+  while (result->getKind() != ASTScopeKind::SourceFile)
+    result = result->getParent();
 
-  return getParent()->getSourceFile();
+  return result;
+}
+
+SourceFile &ASTScope::getSourceFile() const {
+  return *getSourceFileScope()->sourceFile.file;
 }
 
 SourceRange ASTScope::getSourceRangeImpl() const {
@@ -1270,8 +1411,27 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       return SourceRange(charRange.getStart(), charRange.getEnd());
     }
 
-    return SourceRange();
+    if (sourceFile.file->Decls.empty()) return SourceRange();
 
+    // Use the source ranges of the declarations in the file.
+    return SourceRange(sourceFile.file->Decls.front()->getStartLoc(),
+                       sourceFile.file->Decls.back()->getEndLoc());
+
+  case ASTScopeKind::TypeDecl:
+    return typeDecl->getSourceRange();
+
+  case ASTScopeKind::ExtensionGenericParams: {
+    // The generic parameters of an extension are available from the trailing
+    // 'where' (if present) or from the start of the body.
+    SourceLoc startLoc;
+    if (auto trailingWhere = extension->getTrailingWhereClause())
+      startLoc = trailingWhere->getWhereLoc();
+    else
+      startLoc = extension->getBraces().Start;
+
+    return SourceRange(startLoc, extension->getEndLoc());
+  }
+      
   case ASTScopeKind::TypeOrExtensionBody:
     if (auto ext = dyn_cast<ExtensionDecl>(iterableDeclContext))
       return ext->getBraces();
@@ -1279,6 +1439,15 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     return cast<NominalTypeDecl>(iterableDeclContext)->getBraces();
 
   case ASTScopeKind::GenericParams:
+    // A protocol's generic parameter list is not written in source, and
+    // is visible from the start of the body.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(genericParams.decl)) {
+      return SourceRange(protoDecl->getBraces().Start,
+                         protoDecl->getEndLoc());
+    }
+
+    // Explicitly-written generic parameters are in scope following their
+    // definition.
     return SourceRange(genericParams.params->getParams()[genericParams.index]
                          ->getEndLoc(),
                        genericParams.decl->getEndLoc());
@@ -1328,32 +1497,38 @@ SourceRange ASTScope::getSourceRangeImpl() const {
   case ASTScopeKind::DefaultArgument:
     return parameter->getDefaultValue()->getSourceRange();
 
+  case ASTScopeKind::AbstractFunctionBody:
+    return abstractFunction->getBodySourceRange();
+
   case ASTScopeKind::PatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    SourceRange range = patternEntry.getSourceRange();
+    // We expect a continuation here.
+    assert(!patternBinding.decl->getDeclContext()->isLocalContext() ||
+           getHistoricalContinuation());
 
-    // Local pattern bindings cover the entire binding + continuation.
-    if (patternBinding.decl->getDeclContext()->isLocalContext()) {
-      range.End = getParent()->getSourceRange().End;
-    }
-
-    return range;
+    return patternEntry.getSourceRange();
   }
 
-  case ASTScopeKind::PatternInitializer:
-    return patternBinding.decl->getInit(patternBinding.entry)->getSourceRange();
+  case ASTScopeKind::PatternInitializer: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
+    return patternEntry.getInitAsWritten()->getSourceRange();
+  }
 
   case ASTScopeKind::AfterPatternBinding: {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
-    // The scope of the binding begins at the end of the binding.
-    SourceLoc startLoc = patternEntry.getSourceRange().End;
 
-    // And extends to the end of the parent range.
-    return SourceRange(startLoc, getParent()->getSourceRange().End);
+    // We expect a continuation here.
+    assert(getHistoricalContinuation());
+
+    // The scope of the binding begins at the end of the binding.
+    return SourceRange(patternEntry.getSourceRange().End);
   }
+
   case ASTScopeKind::BraceStmt:
     // The brace statements that represent closures start their scope at the
     // 'in' keyword, when present.
@@ -1364,10 +1539,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
 
     return braceStmt.stmt->getSourceRange();
 
-  case ASTScopeKind::LocalDeclaration:
-    return SourceRange(localDeclaration->getStartLoc(),
-                       getParent()->getSourceRange().End);
-
   case ASTScopeKind::IfStmt:
     return ifStmt->getSourceRange();
 
@@ -1375,14 +1546,15 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // For a guard continuation, the scope extends from the end of the 'else'
     // to the end of the continuation.
     if (conditionalClause.isGuardContinuation) {
-      // Find the 'guard' parent.
+      // We expect a continuation here.
+      assert(getHistoricalContinuation());
       const ASTScope *guard = this;
       do {
         guard = guard->getParent();
       } while (guard->getKind() != ASTScopeKind::GuardStmt);
 
-      return SourceRange(guard->guard->getBody()->getEndLoc(),
-                         getParent()->getSourceRange().End);
+
+      return SourceRange(guard->guard->getBody()->getEndLoc());
     }
 
     // Determine the start location, which is either the beginning of the next
@@ -1399,7 +1571,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
       startLoc = conditionals[conditionalClause.index].getStartLoc();
     }
 
-    // For 'guard' statements, the conditional clause covers the continuation.
+    // For 'guard' statements, the conditional clause.
     if (auto guard = dyn_cast<GuardStmt>(conditionalClause.stmt)) {
       // If we didn't have a condition clause to start the new scope, use the
       // end of the guard statement itself.
@@ -1429,7 +1601,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
   }
 
   case ASTScopeKind::GuardStmt:
-    return SourceRange(guard->getStartLoc(), getParent()->getSourceRange().End);
+    return guard->getSourceRange();
 
   case ASTScopeKind::RepeatWhileStmt:
     return repeatWhile->getSourceRange();
@@ -1547,6 +1719,12 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::SourceFile:
     return sourceFile.file;
 
+  case ASTScopeKind::TypeDecl:
+    if (auto typeAlias = dyn_cast<TypeAliasDecl>(typeDecl))
+      return typeAlias;
+
+    return nullptr;
+
   case ASTScopeKind::TypeOrExtensionBody:
     if (auto nominal = dyn_cast<NominalTypeDecl>(iterableDeclContext))
       return nominal;
@@ -1568,7 +1746,7 @@ DeclContext *ASTScope::getDeclContext() const {
 
   case ASTScopeKind::Accessors:
     // FIXME: Somewhat odd modeling because Subscripts don't have their
-    // own nodes. Maybe that should.
+    // own nodes. Maybe they should.
     if (auto subscript = dyn_cast<SubscriptDecl>(abstractStorageDecl))
       return subscript;
 
@@ -1577,6 +1755,7 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::TopLevelCode:
     return topLevelCode;
 
+  case ASTScopeKind::ExtensionGenericParams:
   case ASTScopeKind::GenericParams:
   case ASTScopeKind::AbstractFunctionParams:
   case ASTScopeKind::PatternBinding:
@@ -1595,7 +1774,7 @@ DeclContext *ASTScope::getDeclContext() const {
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
-  case ASTScopeKind::LocalDeclaration:
+  case ASTScopeKind::AbstractFunctionBody:
     return nullptr;
   }
 }
@@ -1605,6 +1784,137 @@ DeclContext *ASTScope::getInnermostEnclosingDeclContext() const {
     if (auto dc = scope->getDeclContext()) return dc;
   }
   llvm_unreachable("Top-most scope is a declaration context");
+}
+
+SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
+  SmallVector<ValueDecl *, 4> result;
+
+  auto handlePattern = [&](const Pattern *pattern) {
+    if (!pattern) return;
+    pattern->forEachVariable([&](VarDecl *var) {
+        result.push_back(var);
+      });
+  };
+
+  switch (getKind()) {
+  case ASTScopeKind::Preexpanded:
+  case ASTScopeKind::SourceFile:
+  case ASTScopeKind::TypeOrExtensionBody:
+  case ASTScopeKind::DefaultArgument:
+  case ASTScopeKind::AbstractFunctionBody:
+  case ASTScopeKind::PatternBinding:
+  case ASTScopeKind::BraceStmt:
+  case ASTScopeKind::IfStmt:
+  case ASTScopeKind::GuardStmt:
+  case ASTScopeKind::RepeatWhileStmt:
+  case ASTScopeKind::ForEachStmt:
+  case ASTScopeKind::DoCatchStmt:
+  case ASTScopeKind::SwitchStmt:
+  case ASTScopeKind::ForStmt:
+  case ASTScopeKind::Accessors:
+  case ASTScopeKind::TopLevelCode:
+    // No local declarations.
+    break;
+
+  case ASTScopeKind::TypeDecl:
+    if (getHistoricalContinuation())
+      result.push_back(typeDecl);
+    break;
+
+  case ASTScopeKind::ExtensionGenericParams:
+    // Bind this extension, if we haven't done so already.
+    if (!extension->getExtendedType())
+      if (auto resolver = extension->getASTContext().getLazyResolver())
+        resolver->bindExtension(extension);
+
+    // If there are generic parameters, add them.
+    for (auto genericParams = extension->getGenericParams();
+         genericParams;
+         genericParams = genericParams->getOuterParameters()) {
+      for (auto param : genericParams->getParams())
+        result.push_back(param);
+    }
+    break;
+
+  case ASTScopeKind::GenericParams:
+    result.push_back(genericParams.params->getParams()[genericParams.index]);
+    break;
+
+  case ASTScopeKind::AbstractFunctionParams:
+    result.push_back(abstractFunctionParams.decl->getParameterList(
+                         abstractFunctionParams.listIndex)
+                       ->get(abstractFunctionParams.paramIndex));
+    break;
+
+  case ASTScopeKind::AfterPatternBinding:
+    handlePattern(patternBinding.decl->getPattern(patternBinding.entry));
+    break;
+
+  case ASTScopeKind::AbstractFunctionDecl:
+    // FIXME: This allows overloading to work in top-level code, but is probably
+    // incorrect. We should likely use
+    //
+    //   if (getHistoricalContext())
+    //
+    // and name lookup should apply the normal name-hiding rules.
+    if (abstractFunction->getDeclContext()->isLocalContext())
+      result.push_back(abstractFunction);
+    break;
+
+  case ASTScopeKind::ConditionalClause:
+    handlePattern(conditionalClause.stmt->getCond()[conditionalClause.index]
+                    .getPatternOrNull());
+    break;
+
+  case ASTScopeKind::ForEachPattern:
+    handlePattern(forEach->getPattern());
+    break;
+
+  case ASTScopeKind::CatchStmt:
+    handlePattern(catchStmt->getErrorPattern());
+    break;
+
+  case ASTScopeKind::CaseStmt:
+    for (const auto &item : caseStmt->getCaseLabelItems())
+      handlePattern(item.getPattern());
+    break;
+
+  case ASTScopeKind::ForStmtInitializer:
+    for (auto decl : forStmt->getInitializerVarDecls()) {
+      if (auto value = dyn_cast<ValueDecl>(decl))
+        result.push_back(value);
+    }
+    break;
+
+  case ASTScopeKind::PatternInitializer:
+    // 'self' is available within the pattern initializer of a 'lazy' variable.
+    if (auto singleVar = patternBinding.decl->getSingleVar()) {
+      if (singleVar->getAttrs().hasAttribute<LazyAttr>() &&
+          singleVar->getDeclContext()->isTypeContext()) {
+        // If there is no getter (yet), add them.
+        if (!singleVar->getGetter()) {
+          ASTContext &ctx = singleVar->getASTContext();
+          if (auto resolver = ctx.getLazyResolver())
+            resolver->introduceLazyVarAccessors(singleVar);
+        }
+
+        // Add the getter's 'self'.
+        if (auto getter = singleVar->getGetter())
+          if (auto self = getter->getImplicitSelfDecl())
+            result.push_back(self);
+      }
+    }
+    break;
+
+  case ASTScopeKind::Closure:
+    // Note: Parameters all at once is different from functions, but it's not
+    // relevant because there are no default arguments.
+    for (auto param : *closure->getParameters())
+      result.push_back(param);
+    break;
+  }
+
+  return result;
 }
 
 void ASTScope::expandAll() const {
@@ -1640,6 +1950,11 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   // Print the source location of the node.
   auto printRange = [&]() {
     auto range = getSourceRange();
+    if (range.isInvalid()) {
+      out << " [invalid source range]";
+      return;
+    }
+
     auto startLineAndCol = sourceMgr.getLineAndColumn(range.Start);
     auto endLineAndCol = sourceMgr.getLineAndColumn(range.End);
 
@@ -1659,6 +1974,25 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printScopeKind("SourceFile");
     printAddress(sourceFile.file);
     out << " '" << sourceFile.file->getFilename() << "'";
+    printRange();
+    break;
+
+  case ASTScopeKind::TypeDecl:
+    printScopeKind("TypeDecl");
+    printAddress(typeDecl);
+    out << " " << typeDecl->getFullName();
+    printRange();
+    break;
+
+  case ASTScopeKind::ExtensionGenericParams:
+    printScopeKind("ExtensionGenericParams");
+    printAddress(extension);
+    out << " extension of '";
+    if (auto typeRepr = extension->getExtendedTypeLoc().getTypeRepr())
+      typeRepr->print(out);
+    else
+      extension->getExtendedType()->print(out);
+    out << "'";
     printRange();
     break;
 
@@ -1711,6 +2045,13 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
     printRange();
     break;
 
+  case ASTScopeKind::AbstractFunctionBody:
+    printScopeKind("AbstractFunctionBody");
+    printAddress(abstractFunction);
+    out << " " << abstractFunction->getFullName();
+    printRange();
+    break;
+
   case ASTScopeKind::PatternBinding:
     printScopeKind("PatternBinding");
     printAddress(patternBinding.decl);
@@ -1735,12 +2076,6 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
   case ASTScopeKind::BraceStmt:
     printScopeKind("BraceStmt");
     printAddress(braceStmt.stmt);
-    printRange();
-    break;
-
-  case ASTScopeKind::LocalDeclaration:
-    printScopeKind("LocalDeclaration");
-    printAddress(localDeclaration);
     printRange();
     break;
 

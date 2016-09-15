@@ -102,7 +102,7 @@ FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") 
 FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}") {
   // Test that we check if we return nil when an integer would be truncated in conversion.
   let input = get${Other}(${testValue})
-  expectEmpty(${Self}(exactly: input))
+  expectNil(${Self}(exactly: input))
 }
 %       end
 
@@ -134,7 +134,7 @@ FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${test
 
 FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
-  expectEmpty(${Self}(exactly: input))
+  expectNil(${Self}(exactly: input))
 }
 
 %       else:
@@ -158,7 +158,7 @@ FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${test
 
 FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValue}") {
   let input = get${Other}(${testValue})
-  expectEmpty(${Self}(exactly: input))
+  expectNil(${Self}(exactly: input))
 }
 %       end
 %     end # for in testValues
@@ -174,7 +174,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/negative")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/negative") {
-  expectEmpty(${Self}(exactly: get${Other}(-123.0)))
+  expectNil(${Self}(exactly: get${Other}(-123.0)))
 }
 
 %     end
@@ -186,7 +186,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/+inf")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/+inf") {
-  expectEmpty(${Self}(exactly: get${Other}(${Other}.infinity)))
+  expectNil(${Self}(exactly: get${Other}(${Other}.infinity)))
 }
 
 FloatingPointConversionTraps.test("${Self}/${Other}/-inf")
@@ -196,7 +196,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/-inf")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/-inf") {
-  expectEmpty(${Self}(exactly: get${Other}(-${Other}.infinity)))
+  expectNil(${Self}(exactly: get${Other}(-${Other}.infinity)))
 }
 
 FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
@@ -206,7 +206,7 @@ FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
 }
 
 FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
-  expectEmpty(${Self}(exactly: get${Other}(${Other}.nan)))
+  expectNil(${Self}(exactly: get${Other}(${Other}.nan)))
 }
 
 %     if Other == 'Float80':

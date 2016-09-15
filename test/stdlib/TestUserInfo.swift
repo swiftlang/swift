@@ -63,17 +63,17 @@ class TestUserInfo : TestUserInfoSuper {
             AnyHashable(userInfoKey) : testStructure
         ]
         let note = Notification(name: notifName, userInfo: info)
-        expectNotEmpty(note.userInfo)
+        expectNotNil(note.userInfo)
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(TestUserInfo.notification(_:)), name: notifName, object: nil)
         nc.post(note)
-        expectNotEmpty(posted)
+        expectNotNil(posted)
         if let notification = posted {
             let postedInfo = notification.userInfo
-            expectNotEmpty(postedInfo)
+            expectNotNil(postedInfo)
             if let userInfo = postedInfo {
                 let postedValue = userInfo[AnyHashable(userInfoKey)] as? SomeStructure
-                expectNotEmpty(postedValue)
+                expectNotNil(postedValue)
                 if let value = postedValue {
                     validate(testStructure, value)
                 }

@@ -5076,6 +5076,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
+            key.usr: "s:FPs9OptionSetcFT8rawValuewx8RawValue_x"
+          },
+          {
+            key.kind: source.lang.swift.ref.function.constructor,
+            key.name: "init(rawValue:)",
             key.usr: "s:FPs16RawRepresentablecFT8rawValuewx8RawValue_GSqx_"
           }
         ],

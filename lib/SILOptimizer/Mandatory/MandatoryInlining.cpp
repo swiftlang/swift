@@ -14,7 +14,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/GenericEnvironment.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -426,22 +425,11 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       else
         I = ApplyBlock->end();
 
-      TypeSubstitutionMap ContextSubs;
-      ArchetypeConformanceMap ConformanceMap;
-
       std::vector<Substitution> ApplySubs(InnerAI.getSubstitutions());
 
       if (PAI) {
         auto PAISubs = PAI->getSubstitutions();
         ApplySubs.insert(ApplySubs.end(), PAISubs.begin(), PAISubs.end());
-      }
-
-      if (auto *params = CalleeFunction->getGenericEnvironment()) {
-        auto sig = CalleeFunction->getLoweredFunctionType()
-            ->getGenericSignature();
-        params->getSubstitutionMap(F->getModule().getSwiftModule(),
-                                   sig, ApplySubs,
-                                   ContextSubs, ConformanceMap);
       }
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(*F);
@@ -452,7 +440,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       OpenedArchetypesTracker.registerUsedOpenedArchetypes(InnerAI.getInstruction());
 
       SILInliner Inliner(*F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline, ContextSubs,
+                         SILInliner::InlineKind::MandatoryInline,
                          ApplySubs, OpenedArchetypesTracker);
       if (!Inliner.inlineFunction(InnerAI, FullArgs)) {
         I = InnerAI.getInstruction()->getIterator();

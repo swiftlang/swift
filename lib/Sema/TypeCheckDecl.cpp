@@ -736,7 +736,8 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     revertGenericParamList(genericParams);
 
     ArchetypeBuilder builder(*DC->getParentModule(), Diags);
-    checkGenericParamList(&builder, genericParams, parentSig);
+    checkGenericParamList(&builder, genericParams, parentSig, parentEnv,
+                          nullptr);
     parentEnv = finalizeGenericParamList(builder, genericParams,
                                          genericSig, DC);
     parentSig = genericSig;
@@ -2069,7 +2070,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // A witness to an @objc protocol requirement is implicitly @objc.
   else if (!TC.findWitnessedObjCRequirements(
              VD,
-             /*onlyFirstRequirement=*/true).empty())
+             /*anySingleRequirement=*/true).empty())
     return ObjCReason::WitnessToObjC;
   else if (VD->isInvalid())
     return None;
@@ -2280,8 +2281,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   // requirements for which this declaration is a witness.
   Optional<ObjCSelector> requirementObjCName;
   ValueDecl *firstReq = nullptr;
-  for (auto req : tc.findWitnessedObjCRequirements(decl,
-                                                   /*onlyFirst=*/false)) {
+  for (auto req : tc.findWitnessedObjCRequirements(decl)) {
     // If this is the first requirement, take its name.
     if (!requirementObjCName) {
       requirementObjCName = req->getObjCRuntimeName();
@@ -3058,7 +3058,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   auto sig = behaviorProto->getGenericSignatureOfContext();
   auto map = sig->getSubstitutionMap(interfaceSubs);
   auto substValueTy = behavior->ValueDecl->getInterfaceType()
-    .subst(decl->getModuleContext(), map, SubstOptions());
+    .subst(map, SubstOptions());
   
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
@@ -4236,7 +4236,7 @@ public:
   }
 
   bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
-                             GenericTypeResolver *resolver = nullptr) {
+                             GenericTypeResolver *resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
       hadError |= TC.typeCheckParameterList(paramList, fd,
@@ -4720,7 +4720,8 @@ public:
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
         auto *parentSig = FD->getDeclContext()->getGenericSignatureOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig);
+        auto *parentEnv = FD->getDeclContext()->getGenericEnvironmentOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getParameterLists()) {
@@ -4737,7 +4738,8 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, FD);
+        auto *env = TC.finalizeGenericParamList(builder, gp,
+                                                FD->getGenericSignature(), FD);
         FD->setGenericEnvironment(env);
       }
     } else if (FD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -6365,8 +6367,16 @@ public:
     // extensions thereof.
     if (CD->isConvenienceInit()) {
       if (auto extType = CD->getExtensionType()) {
-        if (!extType->getClassOrBoundGenericClass() &&
-            !extType->is<ErrorType>()) {
+        auto extClass = extType->getClassOrBoundGenericClass();
+
+        // Forbid convenience inits on Foreign CF types, as Swift does not yet
+        // support user-defined factory inits.
+        if (extClass &&
+            extClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+          TC.diagnose(CD->getLoc(), diag::cfclass_convenience_init);
+        }
+
+        if (!extClass && !extType->is<ErrorType>()) {
           auto ConvenienceLoc =
             CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
@@ -6410,7 +6420,8 @@ public:
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
         auto *parentSig = CD->getDeclContext()->getGenericSignatureOfContext();
-        TC.checkGenericParamList(&builder, gp, parentSig);
+        auto *parentEnv = CD->getDeclContext()->getGenericEnvironmentOfContext();
+        TC.checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getParameterList(1), gp);
@@ -6420,7 +6431,8 @@ public:
         TC.revertGenericFuncSignature(CD);
 
         // Assign archetypes.
-        auto *env = TC.finalizeGenericParamList(builder, gp, nullptr, CD);
+        auto *env = TC.finalizeGenericParamList(builder, gp,
+                                                CD->getGenericSignature(), CD);
         CD->setGenericEnvironment(env);
       }
     } else if (CD->getDeclContext()->getGenericSignatureOfContext()) {
@@ -6437,7 +6449,8 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
+    GenericTypeToArchetypeResolver resolver;
+    if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
@@ -6586,7 +6599,8 @@ public:
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
-    if (semaFuncParamPatterns(DD)) {
+    GenericTypeToArchetypeResolver resolver;
+    if (semaFuncParamPatterns(DD, &resolver)) {
       DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();
@@ -7423,9 +7437,13 @@ static Type checkExtensionGenericParams(
 
   // Validate the generic type signature.
   bool invalid = false;
+  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
+  auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
   GenericSignature *sig = tc.validateGenericSignature(
-      genericParams, ext->getDeclContext(),
-      nullptr, inferExtendedTypeReqs, invalid);
+      genericParams,
+      ext->getDeclContext(),
+      parentSig,
+      inferExtendedTypeReqs, invalid);
   ext->setGenericSignature(sig);
 
   if (invalid) {
@@ -7437,11 +7455,10 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
-  tc.checkGenericParamList(&builder, genericParams, parentSig);
+  tc.checkGenericParamList(&builder, genericParams, parentSig, parentEnv, nullptr);
   inferExtendedTypeReqs(builder);
 
-  auto *env = tc.finalizeGenericParamList(builder, genericParams, nullptr, ext);
+  auto *env = tc.finalizeGenericParamList(builder, genericParams, sig, ext);
   ext->setGenericEnvironment(env);
 
   if (isa<ProtocolDecl>(nominal)) {

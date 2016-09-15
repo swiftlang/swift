@@ -537,7 +537,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto &keyConv = E->getKeyConversion()) {
-      if (Expr *E2 = doIt(keyConv.Conversion)) {
+      auto kConv = keyConv.Conversion;
+      if (!kConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(kConv)) {
         E->setKeyConversion({keyConv.OrigValue, E2});
       } else {
         return nullptr;
@@ -545,7 +548,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto &valueConv = E->getValueConversion()) {
-      if (Expr *E2 = doIt(valueConv.Conversion)) {
+      auto vConv = valueConv.Conversion;
+      if (!vConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(vConv)) {
         E->setValueConversion({valueConv.OrigValue, E2});
       } else {
         return nullptr;
@@ -799,14 +805,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitDefaultValueExpr(DefaultValueExpr *E) {
-    Expr *sub = doIt(E->getSubExpr());
-    if (!sub) return nullptr;
-
-    E->setSubExpr(sub);
-    return E;
-  }
-  
   Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     Pattern *sub = doIt(E->getSubPattern());
     if (!sub) return nullptr;

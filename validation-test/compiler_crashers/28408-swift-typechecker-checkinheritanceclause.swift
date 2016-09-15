@@ -6,9 +6,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -parse
-protocol A{associatedtype f:A
-typealias e:a
-protocol a
-}extension A
-protocol c:A{
-struct A{let c=g
+// REQUIRES: asserts
+class A{{
+{
+}}
+var _=
+{func<a}class A{
+protocol A{typealias d
+extension{
+protocol a{
+struct g:d{
+func<

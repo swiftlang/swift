@@ -69,6 +69,7 @@ add_swift_library(swiftBasic STATIC
   FileSystem.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LLVMContext.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp

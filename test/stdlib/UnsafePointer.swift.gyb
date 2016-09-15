@@ -65,12 +65,12 @@ ${SelfName}TestSuite.test("initFromOpaquePointer") {
 
   let optionalOther: Optional = other
   let optionalPointer = ${SelfType}(optionalOther)
-  expectNotEmpty(optionalPointer)
+  expectNotNil(optionalPointer)
   expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
 
   let nilOther: Optional<OpaquePointer> = nil
   let nilPointer = ${SelfType}(nilOther)
-  expectEmpty(nilPointer)
+  expectNil(nilPointer)
 }
 
 % end
@@ -85,12 +85,12 @@ UnsafeMutableRawPointerTestSuite.test("initFromMutating") {
 
   let optionalOther: Optional = other
   let optionalPointer = UnsafeMutableRawPointer(mutating: optionalOther)
-  expectNotEmpty(optionalPointer)
+  expectNotNil(optionalPointer)
   expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
 
   let nilOther: Optional<UnsafeRawPointer> = nil
   let nilPointer = UnsafeMutableRawPointer(mutating: nilOther)
-  expectEmpty(nilPointer)
+  expectNil(nilPointer)
 }
 % end
 
@@ -110,13 +110,13 @@ ${SelfName}TestSuite.test("initFromInteger") {
   do {
     let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
-    expectNotEmpty(ptr)
+    expectNotNil(ptr)
     expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
   do {
     let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
-    expectNotEmpty(ptr)
+    expectNotNil(ptr)
     expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
   }
 }
@@ -125,13 +125,13 @@ ${SelfName}TestSuite.test("initFromNilBitPattern") {
   do {
     let word = unsafeBitCast(nil as ${SelfType}?, to: Int.self)
     let ptr = ${SelfType}(bitPattern: word)
-    expectEmpty(ptr)
+    expectNil(ptr)
     expectEqual(word, unsafeBitCast(ptr, to: Int.self))
   }
   do {
     let uword = unsafeBitCast(nil as ${SelfType}?, to: UInt.self)
     let ptr = ${SelfType}(bitPattern: uword)
-    expectEmpty(ptr)
+    expectNil(ptr)
     expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
   }
 }
@@ -185,12 +185,12 @@ ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
 
   let optionalOther: Optional = other
   let optionalPointer = ${SelfType}(optionalOther)
-  expectNotEmpty(optionalPointer)
+  expectNotNil(optionalPointer)
   expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
 
   let nilOther: Optional<UnsafeMutablePointer<Float>> = nil
   let nilPointer = ${SelfType}(nilOther)
-  expectEmpty(nilPointer)
+  expectNil(nilPointer)
 }
 
 % end
@@ -206,12 +206,12 @@ ${SelfName}TestSuite.test("initFromUnsafePointer") {
 
   let optionalOther: Optional = other
   let optionalPointer = ${SelfType}(optionalOther)
-  expectNotEmpty(optionalPointer)
+  expectNotNil(optionalPointer)
   expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
 
   let nilOther: Optional<UnsafePointer<Float>> = nil
   let nilPointer = ${SelfType}(nilOther)
-  expectEmpty(nilPointer)
+  expectNil(nilPointer)
 }
 
 % end
@@ -223,12 +223,12 @@ UnsafeRawPointerTestSuite.test("initFromUnsafeMutableRawPointer") {
 
   let optionalOther: Optional = other
   let optionalPointer = UnsafeRawPointer(optionalOther)
-  expectNotEmpty(optionalPointer)
+  expectNotNil(optionalPointer)
   expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
 
   let nilOther: Optional<UnsafeMutableRawPointer> = nil
   let nilPointer = UnsafeRawPointer(nilOther)
-  expectEmpty(nilPointer)
+  expectNil(nilPointer)
 }
 
 enum Check {

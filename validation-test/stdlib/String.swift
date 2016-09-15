@@ -874,23 +874,23 @@ StringTests.test("reserveCapacity") {
 }
 
 StringTests.test("toInt") {
-  expectEmpty(Int(""))
-  expectEmpty(Int("+"))
-  expectEmpty(Int("-"))
+  expectNil(Int(""))
+  expectNil(Int("+"))
+  expectNil(Int("-"))
   expectOptionalEqual(20, Int("+20"))
   expectOptionalEqual(0, Int("0"))
   expectOptionalEqual(-20, Int("-20"))
-  expectEmpty(Int("-cc20"))
-  expectEmpty(Int("  -20"))
-  expectEmpty(Int("  \t 20ddd"))
+  expectNil(Int("-cc20"))
+  expectNil(Int("  -20"))
+  expectNil(Int("  \t 20ddd"))
 
   expectOptionalEqual(Int.min, Int("\(Int.min)"))
   expectOptionalEqual(Int.min + 1, Int("\(Int.min + 1)"))
   expectOptionalEqual(Int.max, Int("\(Int.max)"))
   expectOptionalEqual(Int.max - 1, Int("\(Int.max - 1)"))
 
-  expectEmpty(Int("\(Int.min)0"))
-  expectEmpty(Int("\(Int.max)0"))
+  expectNil(Int("\(Int.min)0"))
+  expectNil(Int("\(Int.max)0"))
 
   // Make a String from an Int, mangle the String's characters,
   // then print if the new String is or is not still an Int.
@@ -901,7 +901,7 @@ StringTests.test("toInt") {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
     let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
-    expectEmpty(Int(str))
+    expectNil(Int(str))
   }
 
   testConvertabilityOfStringWithModification(Int.min) {
@@ -918,7 +918,7 @@ StringTests.test("toInt") {
     expectOptionalEqual(Int.min + 1, Int("-\(base)"))
     expectOptionalEqual(Int.min, Int("-\(base + 1)"))
     for i in 2..<20 {
-      expectEmpty(Int("-\(base + UInt(i))"))
+      expectNil(Int("-\(base + UInt(i))"))
     }
   }
 
@@ -935,7 +935,7 @@ StringTests.test("toInt") {
     let base = UInt(Int.max)
     expectOptionalEqual(Int.max, Int("\(base)"))
     for i in 1..<20 {
-      expectEmpty(Int("\(base + UInt(i))"))
+      expectNil(Int("\(base + UInt(i))"))
     }
   }
 

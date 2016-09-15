@@ -982,7 +982,7 @@ void performBasicLayout(BasicLayout &layout,
                                     .withPOD(isPOD)
                                     .withBitwiseTakable(isBitwiseTakable)
                                     .withInlineStorage(isInline);
-  layout.stride = roundUpToAlignMask(size, alignMask);
+  layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 } // end anonymous namespace
 

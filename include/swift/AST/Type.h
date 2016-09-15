@@ -42,6 +42,7 @@ class NormalProtocolConformance;
 enum OptionalTypeKind : unsigned;
 class ProtocolDecl;
 class StructDecl;
+class SubstitutionMap;
 class TypeBase;
 class Type;
 class TypeWalker;
@@ -159,7 +160,7 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param module The module in which the substitution occurs.
+  /// \param module The module to use for conformance lookups.
   ///
   /// \param substitutions The mapping from substitutable types to their
   /// replacements.
@@ -169,6 +170,18 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(ModuleDecl *module,
              const TypeSubstitutionMap &substitutions,
+             SubstOptions options) const;
+
+  /// Replace references to substitutable types with new, concrete types and
+  /// return the substituted result.
+  ///
+  /// \param substitutions The mapping from substitutable types to their
+  /// replacements and conformances.
+  ///
+  /// \param options Options that affect the substitutions.
+  ///
+  /// \returns the substituted type, or a null type if an error occurred.
+  Type subst(const SubstitutionMap &substitutions,
              SubstOptions options) const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;

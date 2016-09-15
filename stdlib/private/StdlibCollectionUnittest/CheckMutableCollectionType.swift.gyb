@@ -175,7 +175,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .none {
     c[index] = wrapValue(OpaqueValue(9999))
   }
 
-  let tests = _product(
+  let tests = cartesianProduct(
     subscriptRangeTests,
     _SubSequenceSubscriptOnIndexMode.all)
 
@@ -328,7 +328,7 @@ if isFixedLengthCollection {
 }
 
 if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
-  let tests = _product(
+  let tests = cartesianProduct(
     subscriptRangeTests,
     _SubSequenceSubscriptOnRangeMode.all)
 
@@ -455,7 +455,7 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
     if withUnsafeMutableBufferPointerIsSupported {
       expectEqualSequence(test.collection, result!.value) { $0.value == $1.value }
     } else {
-      expectEmpty(result)
+      expectNil(result)
     }
   }
 }

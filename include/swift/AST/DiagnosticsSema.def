@@ -82,14 +82,18 @@ NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
 
 ERROR(expected_argument_in_contextual_member,none,
-      "contextual member %0 expects argument of type %1", (DeclName, Type))
+      "member %0 expects argument of type %1", (DeclName, Type))
+ERROR(expected_parens_in_contextual_member,none,
+      "member %0 is a function; did you mean to call it?", (DeclName))
 
 ERROR(expected_result_in_contextual_member,none,
       "member %0 in %2 produces result of type %1, but context expects %2",
       (DeclName, Type, Type))
 
 ERROR(unexpected_argument_in_contextual_member,none,
-      "contextual member %0 has no associated value", (DeclName))
+      "member %0 takes no arguments", (DeclName))
+ERROR(unexpected_parens_in_contextual_member,none,
+      "member %0 is not a function", (DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
@@ -1313,9 +1317,10 @@ ERROR(protocol_property_must_be_computed,none,
 NOTE(inherited_protocol_does_not_conform,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,none,
-     "protocol requires %select{initializer %1|function %1|property %1|"
-     "subscript}0 with type %2; do you want to add a stub?",
-     (RequirementKind, DeclName, Type))
+     "protocol requires "
+     "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
+     "%select{|; do you want to add a stub?}3",
+     (RequirementKind, DeclName, Type, bool))
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
@@ -1328,8 +1333,8 @@ NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; do you want to add it?", (Identifier))
 NOTE(default_associated_type_req_fail,none,
      "default type %0 for associated type %1 (from protocol %2) "
-     "does not conform to %3",
-     (Type, DeclName, Type, Type))
+     "does not %select{inherit from|conform to}4 %3",
+     (Type, DeclName, Type, Type, bool))
 ERROR(associated_type_access,none,
       "associated type in "
       "%select{PRIVATE|a fileprivate|an internal|a public}0 protocol uses "
@@ -1342,8 +1347,8 @@ NOTE(bad_associated_type_deduction,none,
      (DeclName, DeclName))
 NOTE(associated_type_deduction_witness_failed,none,
      "inferred type %1 (by matching requirement %0) is invalid: "
-     "does not conform to %2",
-     (DeclName, Type, DeclName))
+     "does not %select{inherit from|conform to}3 %2",
+     (DeclName, Type, DeclName, bool))
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1401,7 +1406,8 @@ NOTE(protocol_witness_not_objc,none,
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,none,
-     "possibly intended match %0 does not conform to %1", (Type, Type))
+     "possibly intended match %0 does not "
+     "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
 NOTE(protocol_requirement_here,none,
      "requirement %0 declared here", (DeclName))
@@ -1883,6 +1889,11 @@ ERROR(noescape_conflicts_escaping_autoclosure,none,
 
 ERROR(escaping_function_type,none,
       "@escaping may only be applied to parameters of function type", ())
+ERROR(escaping_non_function_parameter,none,
+      "@escaping attribute may only be used in function parameter position", ())
+
+NOTE(escaping_optional_type_argument, none,
+     "closure is already escaping in optional type argument", ())
 
 // NSManaged attribute
 ERROR(attr_NSManaged_not_instance_member,none,
@@ -2045,6 +2056,9 @@ ERROR(enumstruct_convenience_init,none,
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))
+ERROR(cfclass_convenience_init,none,
+      "convenience initializers are not supported in extensions of CF types",
+      ())
 
 ERROR(dynamic_construct_class,none,
       "constructing an object of class type %0 with a metatype value must use "
@@ -2705,6 +2719,8 @@ ERROR(sil_function_multiple_error_results,PointsToFirstBadToken,
       "SIL function types cannot have multiple @error results", ())
 ERROR(unsupported_sil_convention,none,
       "convention '%0' not supported in SIL", (StringRef))
+ERROR(illegal_sil_type,none,
+      "type %0 is not a legal SIL value type", (Type))
 
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
