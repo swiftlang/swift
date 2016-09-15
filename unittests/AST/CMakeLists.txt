@@ -1,5 +1,6 @@
 add_swift_unittest(SwiftASTTests
   OverrideTests.cpp
+  TestContext.cpp
   VersionRangeLattice.cpp
 )
 
