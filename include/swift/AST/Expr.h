@@ -4270,7 +4270,7 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return Src->getEndLoc();
+    return (Src->isImplicit() ? Dest->getEndLoc() : Src->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.
