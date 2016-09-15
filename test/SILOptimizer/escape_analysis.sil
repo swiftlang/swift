@@ -1310,3 +1310,24 @@ bb(%0 : $X, %1: $@callee_owned (X, X) -> (@out X, @error ErrorType)):
   %7 = tuple()
 	return %7 : $()
 }
+
+// CHECK-LABEL: CG of check_dealloc_ref
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_dealloc_ref : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  dealloc_ref %0 : $X
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: CG of check_set_deallocating
+// CHECK-NEXT:   Arg %0 Esc: A, Succ:
+// CHECK-NEXT:  End
+sil @check_set_deallocating : $@convention(thin) (@owned X) -> () {
+bb0(%0 : $X):
+  set_deallocating %0 : $X
+  %1 = tuple ()
+  return %1 : $()
+}
+

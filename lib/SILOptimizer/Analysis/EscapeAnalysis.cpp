@@ -1298,6 +1298,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::ExistentialMetatypeInst:
+    case ValueKind::DeallocRefInst:
+    case ValueKind::SetDeallocatingInst:
       // These instructions don't have any effect on escaping.
       return;
     case ValueKind::StrongReleaseInst:
