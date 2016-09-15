@@ -346,10 +346,6 @@ public:
                                   GenericEnvironment *genericEnv,
                                   Type type);
 
-  using SameTypeRequirement
-    = std::pair<PotentialArchetype *,
-                PointerUnion<Type, PotentialArchetype*>>;
-
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(),

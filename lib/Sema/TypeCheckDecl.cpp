@@ -4236,7 +4236,7 @@ public:
   }
 
   bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
-                             GenericTypeResolver *resolver = nullptr) {
+                             GenericTypeResolver *resolver) {
     bool hadError = false;
     for (auto paramList : fd->getParameterLists()) {
       hadError |= TC.typeCheckParameterList(paramList, fd,
@@ -6449,7 +6449,8 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
+    GenericTypeToArchetypeResolver resolver;
+    if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInterfaceType(ErrorType::get(TC.Context));
       CD->setInvalid();
@@ -6598,7 +6599,8 @@ public:
           DD->getDeclContext()->getGenericEnvironmentOfContext());
     }
 
-    if (semaFuncParamPatterns(DD)) {
+    GenericTypeToArchetypeResolver resolver;
+    if (semaFuncParamPatterns(DD, &resolver)) {
       DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInterfaceType(ErrorType::get(TC.Context));
       DD->setInvalid();

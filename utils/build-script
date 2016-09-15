@@ -811,6 +811,9 @@ class BuildScriptInvocation(object):
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
+        if args.coverage_db:
+            impl_args += ["--coverage-db=%s" % args.coverage_db]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -2008,6 +2011,11 @@ details of the setups of other systems or automated environments.""")
         help="lit args to use when testing",
         metavar="LITARGS",
         default="-sv")
+
+    parser.add_argument(
+        "--coverage-db",
+        help="coverage database to use when prioritizing testing",
+        metavar="PATH")
 
     args = migration.parse_args(parser, sys.argv[1:])
 

@@ -214,8 +214,9 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
       return std::max(alignof(void*), alignof(ValueBuffer));
     }
     static size_t getSize(unsigned numWitnessTables) {
-      return sizeof(OpaqueExistentialContainer)
-           + numWitnessTables * sizeof(void*);
+      constexpr size_t base = sizeof(OpaqueExistentialContainer);
+      static_assert(base > 0, "stride needs base size > 0");
+      return base + numWitnessTables * sizeof(void*);
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
@@ -348,8 +349,9 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedClassExistentialBox
       return alignof(void*);
     }
     static size_t getSize(unsigned numWitnessTables) {
-      return sizeof(ClassExistentialContainer)
-             + numWitnessTables * sizeof(void*);
+      constexpr size_t base = sizeof(ClassExistentialContainer);
+      static_assert(base > 0, "stride needs base size > 0");
+      return base + numWitnessTables * sizeof(void*);
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
@@ -469,8 +471,9 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
       return alignof(void*);
     }
     static size_t getSize(unsigned numWitnessTables) {
-      return sizeof(ExistentialMetatypeContainer)
-             + numWitnessTables * sizeof(void*);
+      constexpr size_t base = sizeof(ExistentialMetatypeContainer);
+      static_assert(base > 0, "stride needs base size > 0");
+      return base + numWitnessTables * sizeof(void*);
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
