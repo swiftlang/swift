@@ -316,6 +316,17 @@ class RetainCodeMotionContext : public CodeMotionContext {
     return false;
   }
 
+  /// Return the previous instruction if it happens to be a retain with the
+  /// given RC root, nullptr otherwise.
+  SILInstruction *getPrevReusableInst(SILInstruction *I, SILValue Root) {
+    if (&*I->getParent()->begin() == I)
+      return nullptr;
+    auto Prev = &*std::prev(SILBasicBlock::iterator(I));
+    if (isRetainInstruction(Prev) && getRCRoot(Prev) == Root)
+      return Prev;
+    return nullptr;
+  }
+
 public:
   /// Constructor.
   RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
@@ -463,6 +474,13 @@ bool RetainCodeMotionContext::performCodeMotion() {
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
+      // we are about to insert a new retain instruction before the insertion
+      // point. Check if the previous instruction is reuseable, reuse it, do
+      // not insert new instruction and delete old one.
+      if (auto I = getPrevReusableInst(IP, Iter->first)) {
+        RCInstructions.erase(I);
+        continue;
+      }
       createIncrementBefore(Iter->first, IP);
       Changed = true;
     }
@@ -643,6 +661,17 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
       return true;
     // This instruction does not block the release.
     return false;
+  }
+
+  /// Return the successor instruction if it happens to be a release with the
+  /// given RC root, nullptr otherwise.
+  SILInstruction *getPrevReusableInst(SILInstruction *I, SILValue Root) {
+    if (&*I->getParent()->begin() == I)
+      return nullptr;
+    auto Prev = &*std::prev(SILBasicBlock::iterator(I));
+    if (isReleaseInstruction(Prev) && getRCRoot(Prev) == Root)
+      return Prev;
+    return nullptr;
   }
 
 public:
@@ -829,6 +858,13 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
+      // we are about to insert a new release instruction before the insertion
+      // point. Check if the successor instruction is reuseable, reuse it, do
+      // not insert new instruction and delete old one.
+      if (auto I = getPrevReusableInst(IP, Iter->first)) {
+        RCInstructions.erase(I);
+        continue;
+      }
       createDecrementBefore(Iter->first, IP);
       Changed = true;
     }
