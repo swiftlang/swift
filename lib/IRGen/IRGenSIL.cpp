@@ -824,7 +824,6 @@ public:
   void visitStructExtractInst(StructExtractInst *i);
   void visitStructElementAddrInst(StructElementAddrInst *i);
   void visitRefElementAddrInst(RefElementAddrInst *i);
-  void visitRefTailAddrInst(RefTailAddrInst *i);
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
@@ -909,7 +908,6 @@ public:
   void visitIsNonnullInst(IsNonnullInst *i);
 
   void visitIndexAddrInst(IndexAddrInst *i);
-  void visitTailAddrInst(TailAddrInst *i);
   void visitIndexRawPointerInst(IndexRawPointerInst *i);
   
   void visitUnreachableInst(UnreachableInst *i);
@@ -3162,15 +3160,6 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   setLoweredAddress(i, field);
 }
 
-void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
-  SILValue Ref = i->getOperand();
-  llvm::Value *RefValue = getLoweredExplosion(Ref).claimNext();
-
-  Address TailAddr = emitTailProjection(*this, RefValue, Ref->getType(),
-                                            i->getTailType());
-  setLoweredAddress(i, TailAddr);
-}
-
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered;
   Address source = getLoweredAddress(i->getOperand());
@@ -3557,17 +3546,8 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     // Is there enough space for stack allocation?
     StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
-  SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-
-  auto Types = i->getTailAllocatedTypes();
-  auto Counts = i->getTailAllocatedCounts();
-  for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
-    llvm::Value *ElemCount = getLoweredExplosion(Counts[Idx].get()).claimNext();
-    TailArrays.push_back({Types[Idx], ElemCount});
-  }
-
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
-                                             StackAllocSize, TailArrays);
+                                             StackAllocSize);
   if (StackAllocSize >= 0) {
     // Remember that this alloc_ref allocates the object on the stack.
 
@@ -4290,22 +4270,6 @@ void IRGenSILFunction::visitIndexAddrInst(swift::IndexAddrInst *i) {
   auto &ti = getTypeInfo(baseTy);
   
   Address dest = ti.indexArray(*this, base, index, baseTy);
-  setLoweredAddress(i, dest);
-}
-
-void IRGenSILFunction::visitTailAddrInst(swift::TailAddrInst *i) {
-  Address base = getLoweredAddress(i->getBase());
-  Explosion indexValues = getLoweredExplosion(i->getIndex());
-  llvm::Value *index = indexValues.claimNext();
-
-  SILType baseTy = i->getBase()->getType();
-  const TypeInfo &baseTI = getTypeInfo(baseTy);
-
-  Address dest = baseTI.indexArray(*this, base, index, baseTy);
-  const TypeInfo &TailTI = getTypeInfo(i->getTailType());
-  dest = TailTI.roundUpToTypeAlignment(*this, dest, i->getTailType());
-  llvm::Type *destType = TailTI.getStorageType()->getPointerTo();
-  dest = Builder.CreateBitCast(dest, destType);
   setLoweredAddress(i, dest);
 }
 
