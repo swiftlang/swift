@@ -163,19 +163,17 @@ class TestMeasurement : TestMeasurementSuper {
     }
 
     func test_AnyHashableCreatedFromNSMeasurement() {
-        if #available(iOS 8.0, *) {
-            let values: [NSMeasurement] = [
-                NSMeasurement(doubleValue: 100, unit: UnitLength.meters),
-                NSMeasurement(doubleValue: 100, unit: UnitLength.kilometers),
-                NSMeasurement(doubleValue: 100, unit: UnitLength.kilometers),
-            ]
-            let anyHashables = values.map(AnyHashable.init)
-            expectEqual(Measurement.self, type(of: anyHashables[0].base))
-            expectEqual(Measurement.self, type(of: anyHashables[1].base))
-            expectEqual(Measurement.self, type(of: anyHashables[2].base))
-            expectNotEqual(anyHashables[0], anyHashables[1])
-            expectEqual(anyHashables[1], anyHashables[2])
-        }
+        let values: [NSMeasurement] = [
+            NSMeasurement(doubleValue: 100, unit: UnitLength.meters),
+            NSMeasurement(doubleValue: 100, unit: UnitLength.kilometers),
+            NSMeasurement(doubleValue: 100, unit: UnitLength.kilometers),
+        ]
+        let anyHashables = values.map(AnyHashable.init)
+        expectEqual(Measurement<Unit>.self, type(of: anyHashables[0].base))
+        expectEqual(Measurement<Unit>.self, type(of: anyHashables[1].base))
+        expectEqual(Measurement<Unit>.self, type(of: anyHashables[2].base))
+        expectNotEqual(anyHashables[0], anyHashables[1])
+        expectEqual(anyHashables[1], anyHashables[2])
     }
 }
 
