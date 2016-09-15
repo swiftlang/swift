@@ -2225,6 +2225,10 @@ ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclName))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclName))
+NOTE(ambiguous_because_of_trailing_closure,none,
+     "%select{use an explicit argument label instead of a trailing closure|"
+     "avoid using a trailing closure}0 to call %1",
+     (bool, DeclName))
 
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
