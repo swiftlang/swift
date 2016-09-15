@@ -32,6 +32,7 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
+  class AccessScope;
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;
@@ -2065,7 +2066,7 @@ public:
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
-  const DeclContext *
+  AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr) const;
 
   /// Returns the access level that actually controls how a declaration should

@@ -12,6 +12,7 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -926,4 +927,16 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
         static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
 #include "swift/AST/DeclNodes.def"
   }
+}
+
+Accessibility AccessScope::accessibilityForDiagnostics() const {
+  if (isPublic())
+    return Accessibility::Public;
+  if (isa<ModuleDecl>(getDeclContext()))
+    return Accessibility::Internal;
+  if (getDeclContext()->isModuleScopeContext()) {
+    return Accessibility::FilePrivate;
+  }
+
+  return Accessibility::Private;
 }
