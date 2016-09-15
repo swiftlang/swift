@@ -1,4 +1,4 @@
-//===--- ClangAdapter.cpp - Interfaces with Clang entities ------*- C++ -*-===//
+//===--- ClangAdapter.cpp - Interfaces with Clang entities ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

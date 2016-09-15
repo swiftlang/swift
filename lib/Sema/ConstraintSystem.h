@@ -2397,10 +2397,8 @@ public:
   }
 };
 
-/**
- * Count the number of overload sets present
- * in the expression and all of the children.
- */
+// Count the number of overload sets present
+// in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
   unsigned &NumOverloads;
 
