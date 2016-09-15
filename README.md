@@ -56,7 +56,7 @@ For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloa
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev postfix dh-autoreconf libkqueue-dev
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -67,6 +67,8 @@ compiler for C++14 support and create a symlink:
     sudo apt-get install clang-3.6
     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
     sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
+
+If you are building in a Virtual Machine, then make sure to setup memory to be at least 2GB and Disk space to be at least 20GB
 
 ### Getting Sources for Swift and Related Projects
 
@@ -101,6 +103,19 @@ bundled as an application, copy it to `/Applications`, and add the embedded
 command line tools to your `PATH`:
 
     export PATH=/Applications/CMake.app/Contents/bin:$PATH
+
+To install cmake 3.4.3 from source in Linux:
+
+```
+sudo apt-get install build-essential
+wget http://www.cmake.org/files/v3.4/cmake-3.4.3.tar.gz
+tar xf cmake-3.4.3.tar.gz
+cd cmake-3.4.3
+./configure
+make
+sudo apt-get install checkinstall
+sudo checkinstall
+```
 
 #### Ninja
 [Ninja](https://ninja-build.org) is the current recommended build system
@@ -150,6 +165,12 @@ Ninja:
 
     utils/build-script -r -t
 
+If you get error about SwiftGlibc is missing:
+
+    Download and unzip the swift 3.0 package from https://swift.org/download
+    find -name "glibc.modulemap"
+    cp /path/to/glibc.modulemap ./build/Ninja-DebugAssert/swift-linux-x86_64/lib/swift/linux/x86_64
+            
 ## Developing Swift in Xcode
 
 `build-script` can also generate Xcode projects:
@@ -178,3 +199,10 @@ To give clarity of what is expected of our members, Swift has adopted the
 code of conduct defined by the Contributor Covenant. This document is used
 across many open source communities, and we think it articulates our values
 well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-conduct).
+
+## See also
+
+* [Foundation](../swift-corelibs-foundation/README.md)
+* [Grand Central Dispatch](../swift-corelibs-libdispatch/README.md)
+* [XCTest](../swift-corelibs-xctest/README.md)
+* [Package Manager](../swiftpm/README.md)
