@@ -322,18 +322,20 @@ static void maybeAddSameTypeRequirementForNestedType(
 
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
+       bool updateExistingSource,
        const RequirementSource &source,
        ArchetypeBuilder &builder) {
   auto rep = getRepresentative();
   if (rep != this)
-    return rep->addConformance(proto, source, builder);
+    return rep->addConformance(proto, updateExistingSource, source, builder);
 
   // Check whether we already know about this conformance.
   auto known = ConformsTo.find(proto);
   if (known != ConformsTo.end()) {
     // We already have this requirement. Update the requirement source
     // appropriately.
-    updateRequirementSource(known->second, source);
+    if (updateExistingSource)
+      updateRequirementSource(known->second, source);
     return false;
   }
 
@@ -963,7 +965,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   auto T = PAT->getRepresentative();
 
   // Add the requirement, if we haven't done so already.
-  if (!T->addConformance(Proto, Source, *this))
+  if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
   RequirementSource InnerSource(RequirementSource::Protocol, Source.getLoc());
@@ -1159,7 +1161,20 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     T1->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete2);
     T1->SameTypeSource = T2->SameTypeSource;
   }
-  
+
+  // Don't mark requirements as redundant if they come from one of our
+  // child archetypes. This is a targeted fix -- more general cases
+  // continue to break. In general, we need to detect cycles in the
+  // archetype graph and not propagate requirement source information
+  // along back edges.
+  bool creatingCycle = false;
+  auto T2Parent = T2;
+  while(T2Parent != nullptr) {
+    if (T2Parent->getRepresentative() == T1)
+      creatingCycle = true;
+    T2Parent = T2Parent->getParent();
+  }
+
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
   T2->SameTypeSource = Source;
@@ -1175,7 +1190,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
-    T1->addConformance(conforms.first, conforms.second, *this);
+    T1->addConformance(conforms.first, /*updateExistingSource=*/!creatingCycle,
+                       conforms.second, *this);
   }
 
   // Recursively merge the associated types of T2 into T1.
@@ -1331,7 +1347,8 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
     assocType->setInvalid();
 
     // FIXME: Drop this protocol.
-    pa->addConformance(proto, RequirementSource(kind, loc), *this);
+    pa->addConformance(proto, /*updateExistingSource=*/true,
+                       RequirementSource(kind, loc), *this);
   };
 
   // If the abstract type parameter already has an archetype assigned,
