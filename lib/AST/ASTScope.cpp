@@ -1247,6 +1247,8 @@ bool ASTScope::canStealContinuation() const {
   case ASTScopeKind::ForStmt:
   case ASTScopeKind::ForStmtInitializer:
   case ASTScopeKind::Closure:
+  case ASTScopeKind::TypeDecl:
+  case ASTScopeKind::AbstractFunctionDecl:
     // These node kinds don't introduce names that would be visible in a
     // continuation.
     return false;
@@ -1261,8 +1263,6 @@ bool ASTScope::canStealContinuation() const {
     return getParent()->getKind() == ASTScopeKind::TopLevelCode;
 
   case ASTScopeKind::AfterPatternBinding:
-  case ASTScopeKind::TypeDecl:
-  case ASTScopeKind::AbstractFunctionDecl:
   case ASTScopeKind::PatternBinding:
     // Declarations always steal continuations.
     return true;
@@ -1789,11 +1789,12 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   switch (getKind()) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
+  case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::TypeDecl:
   case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
@@ -1804,11 +1805,6 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
   case ASTScopeKind::Accessors:
   case ASTScopeKind::TopLevelCode:
     // No local declarations.
-    break;
-
-  case ASTScopeKind::TypeDecl:
-    if (getHistoricalContinuation())
-      result.push_back(typeDecl);
     break;
 
   case ASTScopeKind::ExtensionGenericParams:
@@ -1840,20 +1836,20 @@ SmallVector<ValueDecl *, 4> ASTScope::getLocalBindings() const {
     handlePattern(patternBinding.decl->getPattern(patternBinding.entry));
     break;
 
-  case ASTScopeKind::AbstractFunctionDecl:
-    // FIXME: This allows overloading to work in top-level code, but is probably
-    // incorrect. We should likely use
-    //
-    //   if (getHistoricalContext())
-    //
-    // and name lookup should apply the normal name-hiding rules.
-    if (abstractFunction->getDeclContext()->isLocalContext())
-      result.push_back(abstractFunction);
-    break;
-
   case ASTScopeKind::ConditionalClause:
     handlePattern(conditionalClause.stmt->getCond()[conditionalClause.index]
                     .getPatternOrNull());
+    break;
+
+  case ASTScopeKind::BraceStmt:
+    // All types and functions are visible anywhere within their brace
+    // statements. It's up to capture analysis to determine what is usable.
+    for (auto element : braceStmt.stmt->getElements()) {
+      if (auto decl = element.dyn_cast<Decl *>()) {
+        if (isa<AbstractFunctionDecl>(decl) || isa<TypeDecl>(decl))
+          result.push_back(cast<ValueDecl>(decl));
+      }
+    }
     break;
 
   case ASTScopeKind::ForEachPattern:
