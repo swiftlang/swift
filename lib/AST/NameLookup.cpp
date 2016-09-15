@@ -457,7 +457,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   SmallVector<UnqualifiedLookupResult, 4> UnavailableInnerResults;
 
-  if (Loc.isValid() && Ctx.LangOpts.EnableASTScopeLookup) {
+  if (Loc.isValid() &&
+      DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
+      Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
     SourceFile &sourceFile = *DC->getParentSourceFile();
 
@@ -599,6 +601,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
+
+        // FIXME: Hack to deal with missing 'Self' archetypes.
+        if (!lookupType) {
+          if (auto proto = dc->getAsProtocolOrProtocolExtensionContext())
+            lookupType = proto->getDeclaredType();
+        }
+
         if (!lookupType || lookupType->is<ErrorType>()) continue;
 
         // If we're performing a static lookup, use the metatype.

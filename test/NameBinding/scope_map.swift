@@ -366,13 +366,14 @@ class LazyProperties {
 
 // CHECK-EXPANDED: {{^}}  `-AbstractFunctionParams {{.*}} funcWithComputedProperties(i:) param 0:0 [142:36 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}  `-BraceStmt {{.*}} [142:41 - 155:1] expanded
-// CHECK-EXPANDED: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
+// CHECK-EXPANDED-NEXT: {{^}} `-PatternBinding {{.*}} entry 0 [143:7 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [143:17 - 155:1] expanded
+// CHECK-EXPANDED-NEXT: {{^}}      |-Accessors {{.*}} scope_map.(file).func decl.computed@{{.*}}scope_map.swift:143:7 [143:21 - 149:3] expanded
 // CHECK-EXPANDED-NEXT: {{^}}       |-AbstractFunctionDecl {{.*}} _ [144:5 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}        `-AbstractFunctionParams {{.*}} _ param 0:0 [144:5 - 145:5] expanded
 // CHECK-EXPANDED: {{^}}          `-BraceStmt {{.*}} [144:9 - 145:5] expanded
 // CHECK-EXPANDED-NEXT: {{^}}    `-AbstractFunctionDecl {{.*}} _ [146:5 - 148:5] expanded
 // CHECK-EXPANDED: {{^}}        `-BraceStmt {{.*}} [146:9 - 148:5] expanded
-// CHECK-EXPANDED: {{^}}    `-AfterPatternBinding {{.*}} entry 0 [149:3 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}      `-AfterPatternBinding {{.*}} entry 1 [149:36 - 155:1] expanded
 // CHECK-EXPANDED: {{^}}        `-AfterPatternBinding {{.*}} entry 2 [150:21 - 155:1] expanded
 // CHECK-EXPANDED-NEXT: {{^}}           `-AbstractFunctionDecl {{.*}} _ [150:25 - 155:1] expanded
@@ -493,6 +494,5 @@ class LazyProperties {
 // CHECK-SEARCHES: -TypeOrExtensionBody {{.*}} 'LazyProperties' [190:22 - 194:1] expanded
 // CHECK-SEARCHES-NEXT:   |-PatternBinding {{.*}} entry 0 [191:7 - 191:20] unexpanded
 // CHECK-SEARCHES-NEXT:   `-PatternBinding {{.*}} entry 0 [193:12 - 193:29] expanded
-// CHECK-SEARCHES-NEXT:     |-Accessors {{.*}} scope_map.(file).LazyProperties.prop@{{.*}}scope_map.swift:193:12 [193:12 - 193:12] unexpanded
 // CHECK-SEARCHES-NEXT:     `-PatternInitializer {{.*}} entry 0 [193:24 - 193:29] expanded
 // CHECK-SEARCHES-NOT: {{ expanded}}

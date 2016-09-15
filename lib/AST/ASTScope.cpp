@@ -277,6 +277,18 @@ void ASTScope::expand() const {
     return stoleContinuation;
   };
 
+  // Local function to add the accessors of the variables in the given pattern
+  // as children.
+  auto addAccessors = [&](Pattern *pattern) {
+    // Create children for the accessors of any variables in the pattern that
+    // have them.
+    pattern->forEachVariable([&](VarDecl *var) {
+      if (hasAccessors(var)) {
+        addChild(new (ctx) ASTScope(this, var));
+      }
+    });
+  };
+
   if (!parentAndExpanded.getInt()) {
   // Expand the children in the current scope.
   switch (getKind()) {
@@ -365,39 +377,20 @@ void ASTScope::expand() const {
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
     // Create a child for the initializer, if present.
-    ASTScope *initChild = nullptr;
     if (patternEntry.getInitAsWritten() &&
         patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
-      initChild = new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
-                                     patternBinding.decl, patternBinding.entry);
+      addChild(new (ctx) ASTScope(ASTScopeKind::PatternInitializer, this,
+                                  patternBinding.decl, patternBinding.entry));
     }
-
-    // Create children for the accessors of any variables in the pattern that
-    // have them.
-    patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
-      if (hasAccessors(var)) {
-        // If there is an initializer child that precedes this node (the
-        // normal case), add teh initializer child first.
-        if (initChild &&
-            ctx.SourceMgr.isBeforeInBuffer(
-                                 patternEntry.getInitAsWritten()->getEndLoc(),
-                                 var->getBracesRange().Start)) {
-          addChild(initChild);
-          initChild = nullptr;
-        }
-
-        addChild(new (ctx) ASTScope(this, var));
-      }
-    });
-
-    // If an initializer child remains, add it now.
-    if (initChild)
-      addChild(initChild);
 
     // If there is an active continuation, nest the remaining pattern bindings.
     if (getActiveContinuation()) {
+      // Note: the accessors will follow the pattern binding.
       addChild(new (ctx) ASTScope(ASTScopeKind::AfterPatternBinding, this,
                                   patternBinding.decl, patternBinding.entry));
+    } else {
+      // Otherwise, add the accessors immediately.
+      addAccessors(patternEntry.getPattern());
     }
     break;
   }
@@ -413,6 +406,12 @@ void ASTScope::expand() const {
   }
 
   case ASTScopeKind::AfterPatternBinding: {
+    const auto &patternEntry =
+      patternBinding.decl->getPatternList()[patternBinding.entry];
+
+    // Add accessors for the variables in this pattern.
+    addAccessors(patternEntry.getPattern());
+
     // Create a child for the next pattern binding.
     if (auto child = createIfNeeded(this, patternBinding.decl))
       addChild(child);
@@ -1504,10 +1503,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    // We expect a continuation here.
-    assert(!patternBinding.decl->getDeclContext()->isLocalContext() ||
-           getHistoricalContinuation());
-
     return patternEntry.getSourceRange();
   }
 
@@ -1522,11 +1517,8 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     const auto &patternEntry =
       patternBinding.decl->getPatternList()[patternBinding.entry];
 
-    // We expect a continuation here.
-    assert(getHistoricalContinuation());
-
-    // The scope of the binding begins at the end of the binding.
-    return SourceRange(patternEntry.getSourceRange().End);
+    return SourceRange(patternEntry.getSourceRange(/*omitAccessors*/true).End,
+                       patternEntry.getSourceRange().End);
   }
 
   case ASTScopeKind::BraceStmt:
@@ -1546,8 +1538,6 @@ SourceRange ASTScope::getSourceRangeImpl() const {
     // For a guard continuation, the scope extends from the end of the 'else'
     // to the end of the continuation.
     if (conditionalClause.isGuardContinuation) {
-      // We expect a continuation here.
-      assert(getHistoricalContinuation());
       const ASTScope *guard = this;
       do {
         guard = guard->getParent();
