@@ -921,23 +921,13 @@ extension Set : _ObjectiveCBridgeable {
   }
 }
 
-/*
-FIXME(id-as-any): uncomment this when we can cast NSSet to Set<AnyHashable>.
 extension NSSet : _HasCustomAnyHashableRepresentation {
   // Must be @nonobjc to avoid infinite recursion during bridging
   @nonobjc
   public func _toCustomAnyHashable() -> AnyHashable? {
-    var builder = _SetBuilder<Element>(count: s!.count)
-    // FIXME(id-as-any): how to get the Hashable conformance here?
-    s!.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyMember as AnyObject, Element.self))
-    })
-    return AnyHashable(self as Set<AnyHashable>)
+    return AnyHashable(self as! Set<AnyHashable>)
   }
 }
-*/
 
 extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
