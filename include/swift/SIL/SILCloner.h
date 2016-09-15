@@ -473,23 +473,10 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  SILInstruction *NewInst = nullptr;
-  if (Inst->isObjC()) {
-    NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
-                                          getOpType(Inst->getType()),
-                                          true, Inst->canAllocOnStack());
-  } else {
-    auto CountArgs = getOpValueArray<8>(OperandValueArrayRef(Inst->getTailAllocatedCounts()));
-    SmallVector<SILType, 4> ElemTypes;
-    for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
-      ElemTypes.push_back(getOpType(OrigElemType));
-    }
-    NewInst = getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
-                                          getOpType(Inst->getType()),
-                                          Inst->canAllocOnStack(),
-                                          ElemTypes, CountArgs);
-  }
-  doPostProcess(Inst, NewInst);
+  doPostProcess(Inst,
+    getBuilder().createAllocRef(getOpLocation(Inst->getLoc()),
+                                getOpType(Inst->getType()),
+                                Inst->isObjC(), Inst->canAllocOnStack()));
 }
 
 template<typename ImplClass>
@@ -1306,16 +1293,6 @@ SILCloner<ImplClass>::visitRefElementAddrInst(RefElementAddrInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitRefTailAddrInst(RefTailAddrInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createRefTailAddr(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()),
-                                   getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitClassMethodInst(ClassMethodInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1738,17 +1715,6 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
     getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                  getOpValue(Inst->getBase()),
                                  getOpValue(Inst->getIndex())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitTailAddrInst(TailAddrInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createTailAddr(getOpLocation(Inst->getLoc()),
-                                getOpValue(Inst->getBase()),
-                                getOpValue(Inst->getIndex()),
-                                getOpType(Inst->getType())));
 }
 
 template<typename ImplClass>

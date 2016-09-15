@@ -2724,7 +2724,6 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst: {
         auto *Inst = cast<SILInstruction>(V);
         // We are done once the current projection dominates the insert point.
