@@ -23,17 +23,17 @@
 namespace swift {
   class SourceManager;
 
-  /// enableDiagnosticVerifier - Set up the specified source manager so that
-  /// diagnostics are captured instead of being printed.
+  /// Set up the specified source manager so that diagnostics are captured
+  /// instead of being printed.
   void enableDiagnosticVerifier(SourceManager &SM);
 
-  /// verifyDiagnostics - Verify that captured diagnostics meet with the
-  /// expectations of the source files corresponding to the specified BufferIDs
-  /// and tear down our support for capturing and verifying diagnostics.
+  /// Verify that captured diagnostics meet with the expectations of the source
+  /// files corresponding to the specified \p BufferIDs and tear down our
+  /// support for capturing and verifying diagnostics.
   ///
   /// This returns true if there are any mismatches found.
-  ///
-  bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs);
+  bool verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
+                         bool autoApplyFixes);
 }
 
 #endif

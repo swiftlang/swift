@@ -1269,7 +1269,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
+  const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance.getSourceMgr());
   }
 
@@ -1298,9 +1299,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
-  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
-    HadError = verifyDiagnostics(Instance.getSourceMgr(),
-                                 Instance.getInputBufferIDs());
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
+    HadError = verifyDiagnostics(
+        Instance.getSourceMgr(),
+        Instance.getInputBufferIDs(),
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes);
+
     DiagnosticEngine &diags = Instance.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

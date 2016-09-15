@@ -24,7 +24,11 @@ public:
   /// Indicates whether the diagnostics produced during compilation should be
   /// checked against expected diagnostics, indicated by markers in the
   /// input source file.
-  bool VerifyDiagnostics = false;
+  enum {
+    NoVerify,
+    Verify,
+    VerifyAndApplyFixes
+  } VerifyMode = NoVerify;
 
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
