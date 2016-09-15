@@ -232,6 +232,12 @@ class _SwiftNativeNSArrayWithContiguousStorage {}
 internal class _ContiguousArrayStorageBase
   : _SwiftNativeNSArrayWithContiguousStorage {
 
+  final var countAndCapacity: _ArrayBody
+
+  init(_doNotCallMeBase: ()) {
+    _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
+  }
+  
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R

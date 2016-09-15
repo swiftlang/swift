@@ -511,6 +511,8 @@ ERROR(sil_too_many_substitutions,none,
       "too many substitutions", ())
 ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
+ERROR(sil_objc_with_tail_elements,none,
+      "alloc_ref [objc] cannot have tail allocated elements", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,

@@ -209,7 +209,7 @@ class LinkEntity {
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
-    /// A reflection metadata descriptor for an struct, enum, class or protocol.
+    /// A reflection metadata descriptor for a struct, enum, class or protocol.
     ReflectionFieldDescriptor,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
