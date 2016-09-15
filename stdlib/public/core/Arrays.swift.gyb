@@ -1756,7 +1756,7 @@ extension ${Self} {
       "${Self} replace: subrange start is negative")
 % else:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
-      "${Self} replace: subrange start is before the start")
+      "${Self} replace: subrange start is before the startIndex")
 % end
 
     _precondition(subrange.upperBound <= self._buffer.endIndex,
