@@ -145,7 +145,8 @@ func checkStringComparison(
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
-    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
+    expectedEqual: expected.isEQ(),
+    lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
@@ -167,7 +168,8 @@ func checkStringComparison(
     !expectedEqualUnicodeScalars, lhsNSString != rhsNSString,
     stackTrace: stackTrace)
   checkHashable(
-    expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
+    expectedEqual: expectedEqualUnicodeScalars,
+    lhsNSString, rhsNSString,
     stackTrace: stackTrace.withCurrentLoc())
 #endif
 }
@@ -215,7 +217,8 @@ func checkCharacterComparison(
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
-    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
+    expectedEqual: expected.isEQ(),
+    lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
