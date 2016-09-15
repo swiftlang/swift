@@ -15,6 +15,188 @@
 import StdlibUnittest
 import StdlibCollectionUnittest
 
+import Darwin // for sqrt()
+
+extension Collection {
+  func _nth(_ i: Int) -> Iterator.Element {
+    return self[self.index(self.startIndex, offsetBy: numericCast(i))]
+  }
+}
+
+% for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
+/// A type that can be used to trigger constraint inference to pick up all
+/// extra constraints for sequence or collection types that we can't express in
+/// protocols now.
+public struct InferExtra${Kind}Constraints<
+  S : ${Kind}
+  where
+  S.SubSequence : ${Kind},
+  S.SubSequence.Iterator.Element == S.Iterator.Element,
+  S.SubSequence.SubSequence == S.SubSequence
+%   if Kind != 'Sequence':
+  ,
+  S.SubSequence.Index == S.Index,
+  S.SubSequence.Indices : ${Kind},
+  S.SubSequence.Indices.Iterator.Element == S.Index,
+  S.SubSequence.Indices.Index == S.Index,
+  S.SubSequence.Indices.SubSequence == S.SubSequence.Indices,
+  S.Indices : ${Kind},
+  S.Indices.Iterator.Element == S.Index,
+  S.Indices.Index == S.Index,
+  S.Indices.SubSequence == S.Indices
+%   end
+> {}
+% end
+
+public protocol CollectionInstanceTestAdapter {
+  associatedtype Collection : Swift.Collection
+
+  var elements: [Collection.Iterator.Element] { get }
+
+  /// Create a new instance of the collection.
+  ///
+  /// Should return equal collection instances (with the same elements) on each
+  /// call.
+  func make() -> Collection
+
+  /// Returns all valid indices for the collection instance and corresponding
+  /// 0-based index.
+  ///
+  /// Element is `nil` for the one-past-end index.
+  func validIndices(into: Collection)
+    -> [(Collection.Index, Int)]
+
+  var validIndicesCount: Int { get }
+
+  /// Returns invalid indices for the collection instance and corresponding
+  /// 0-based indices.
+  func invalidIndices(into: Collection) -> [(Collection.Index, Int)]
+
+  var invalidIndicesCount: Int { get }
+}
+extension CollectionInstanceTestAdapter {
+  public var validSubrangeCount: Int {
+    // Number of indices such that start is less than end: $\sum_{i=1}^n i$.
+    let n = validIndicesCount + invalidIndicesCount
+    return n * (n - 1) / 2
+  }
+
+  /// The `i`th test subrange composed of valid indices, valid for subscripting.
+  public func validSubrange(_ i: Int, of c: Collection)
+    -> Range<Collection.Index> {
+    // The smallest $n$ such that $i > n (n-1) / 2$.
+    let start = Int((1 + sqrt(8 * (Double(i) - 1) + 1)) / 2)
+    let end = i - start * (start - 1) / 2
+    let indices = validIndices(into: c)
+    return indices[start].0..<indices[end].0
+  }
+
+  public var invalidSubrangeCount: Int {
+    let n = validIndicesCount + invalidIndicesCount
+    return n * n
+  }
+
+  /// Returns an invalid subrange and the length it could have if it was
+  /// valid.
+  public func invalidSubrange(_ i: Int, of c: Collection)
+    -> (Range<Collection.Index>, count: Int)? {
+    let validIndices = self.validIndices(into: c).map { $0.0 }
+    let invalidIndices = self.invalidIndices(into: c).map { $0.0 }
+    let indices = [validIndices, invalidIndices].flatten()
+    var start = i % indices.count
+    var end = i - start * indices.count
+    if start < validIndices.count && end < validIndices.count && start <= end {
+      // Skip over valid ranges.
+      return nil
+    }
+    return (indices._nth(start)..<indices._nth(end), end - start)
+  }
+}
+
+public protocol MutableCollectionInstanceTestAdapter {
+  var subscriptOnRangeCanChangeCount: Bool { get }
+}
+extension MutableCollectionInstanceTestAdapter {
+  public var subscriptOnRangeCanChangeCount: Bool { return false }
+}
+
+extension TestSuite {
+  public func addCollectionInstanceTests<
+    TestAdapter : CollectionInstanceTestAdapter
+  >(
+    _ testNamePrefix: String = "",
+    testAdapter: TestAdapter,
+    _: InferExtraCollectionConstraints<TestAdapter.Collection>? = nil
+  ) {
+    self.test("\(testNamePrefix).subscript(Range<Index>)/Get/Trap")
+      .forEach(in: Array(0..<testAdapter.invalidSubrangeCount)) {
+      testIndex in
+      var c = testAdapter.make()
+      if let (r, _) = testAdapter.invalidSubrange(testIndex, of: c) {
+        expectCrashLater()
+        _ = c[r]
+      }
+    }
+  }
+
+  public func addMutableCollectionInstanceTests<
+    TestAdapter : MutableCollectionInstanceTestAdapter
+  >(
+    _ testNamePrefix: String = "",
+    testAdapter: TestAdapter,
+    _: InferExtraCollectionConstraints<TestAdapter.Collection>? = nil
+  ) {
+    /*
+    self.test("\(testNamePrefix).subscript(Range<Index>)/Set/SameLength/Trap")
+      .forEach(in: Array(0..<testAdapter.invalidSubrangeCount)) {
+      testIndex in
+      var c = testAdapter.make()
+      if let (r, count) = testAdapter.invalidSubrange(testIndex, of: c) {
+        let slice = c[
+          c.startIndex..<c.index(c.startIndex, offsetBy: numericCast(count))]
+        expectCrashLater()
+        c[r] = slice
+      }
+    }
+    */
+  }
+}
+
+struct CollectionOfOneTest : CollectionInstanceTestAdapter {
+  typealias Collection = CollectionOfOne<OpaqueValue<Int>>
+
+  var elements: [Collection.Iterator.Element] {
+    return [OpaqueValue(43)]
+  }
+
+  func make() -> Collection {
+    return CollectionOfOne(OpaqueValue(42))
+  }
+
+  func validIndices(into: Collection) -> [(Collection.Index, Int)] {
+    return [ 0, 1 ].map { ($0, $0) }
+  }
+
+  var validIndicesCount: Int { return 3 }
+
+  func invalidIndices(into: Collection) -> [(Collection.Index, Int)] {
+    return [ -2, -1, 2, 3 ].map { ($0, $0) }
+  }
+
+  var invalidIndicesCount: Int { return 4 }
+}
+
+var CollectionOfOneTestSuite = TestSuite("CollectionOfOne")
+
+CollectionOfOneTestSuite.addCollectionInstanceTests(
+  testAdapter: CollectionOfOneTest())
+
+runAllTests()
+
+
+
+
+
 
 % from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
