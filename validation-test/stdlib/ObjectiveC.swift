@@ -29,21 +29,15 @@ class NSObjectWithCustomHashable : NSObject {
 }
 
 ObjectiveCTests.test("NSObject/Hashable") {
-  let objects = [
-    NSObjectWithCustomHashable(value: 10, hashValue: 100),
-    NSObjectWithCustomHashable(value: 10, hashValue: 100),
-    NSObjectWithCustomHashable(value: 20, hashValue: 100),
-    NSObjectWithCustomHashable(value: 30, hashValue: 300),
+  let instances: [(order: Int, object: NSObject)] = [
+    (10, NSObjectWithCustomHashable(value: 10, hashValue: 100)),
+    (10, NSObjectWithCustomHashable(value: 10, hashValue: 100)),
+    (20, NSObjectWithCustomHashable(value: 20, hashValue: 100)),
+    (30, NSObjectWithCustomHashable(value: 30, hashValue: 300)),
   ]
-  for (i, object1) in objects.enumerated() {
-    for (j, object2) in objects.enumerated() {
-      checkHashable(
-        object1._value == object2._value,
-        object1,
-        object2,
-        "i=\(i), j=\(j)")
-    }
-  }
+  checkHashable(
+    instances.map { $0.object },
+    equalityOracle: { instances[$0].order == instances[$1].order })
 }
 
 runAllTests()

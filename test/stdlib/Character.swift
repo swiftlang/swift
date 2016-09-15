@@ -154,13 +154,7 @@ CharacterTests.test("Hashable") {
     continuingScalars.map { String($0) },
     testCharacters
   ] {
-    for i in characters.indices {
-      for j in characters.indices {
-        var ci = Character(characters[i])
-        var cj = Character(characters[j])
-        checkHashable(i == j, ci, cj, "i=\(i), j=\(j)")
-      }
-    }
+    checkHashable(characters, equalityOracle: { $0 == $1 })
   }
 }
 
