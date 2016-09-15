@@ -106,8 +106,6 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   }
 }
 
-extern ssize_t getline(char **linep, size_t *linecapp, FILE *stream);
-
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
