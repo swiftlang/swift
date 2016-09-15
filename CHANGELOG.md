@@ -96,7 +96,7 @@ Swift 3.0
 
   The collection methods `partition()` and `partition(isOrderedBefore:)` have
   been removed from Swift. They were replaced by the method `partition(by:)`
-  which takes an unary predicate.
+  which takes a unary predicate.
 
   Calls to the `partition()` method can be replaced by the following code.
 

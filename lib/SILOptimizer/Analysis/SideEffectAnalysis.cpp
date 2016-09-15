@@ -94,7 +94,6 @@ static SILValue skipAddrProjections(SILValue V) {
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
       case ValueKind::ProjectBoxInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst:
       case ValueKind::PointerToAddressInst:

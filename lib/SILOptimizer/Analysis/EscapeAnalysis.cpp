@@ -1314,7 +1314,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::LoadWeakInst:
     // We treat ref_element_addr like a load (see NodeType::Content).
     case ValueKind::RefElementAddrInst:
-    case ValueKind::RefTailAddrInst:
     case ValueKind::ProjectBoxInst:
     case ValueKind::InitExistentialAddrInst:
     case ValueKind::OpenExistentialAddrInst:
