@@ -23,7 +23,7 @@ var LazyTestSuite = TestSuite("Lazy")
 protocol TestProtocol1 {}
 
 //===----------------------------------------------------------------------===//
-// Repeated
+// repeatElement(), Repeated<Element>
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Element'.
@@ -33,20 +33,40 @@ extension Repeated where Element : TestProtocol1 {
   }
 }
 
-LazyTestSuite.test("Repeated") {
-  checkRandomAccessCollection(
-    [] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 0))
-    { $0.value == $1.value }
+LazyTestSuite.test("Repeated/AssociatedTypes") {
+  typealias Subject = Repeated<OpaqueValue<Int>>
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: IndexingIterator<Subject>.self,
+    subSequenceType: RandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
-  checkRandomAccessCollection(
-    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 1))
-    { $0.value == $1.value }
+LazyTestSuite.test("repeatedValue()/TypeInference") {
+  var r = repeatElement(OpaqueValue(42), count: 42)
+  expectType(Repeated<OpaqueValue<Int>>.self, &r)
+}
 
+LazyTestSuite.test("repeatedValue()/NegativeCount") {
+  expectCrashLater()
+  _ = repeatElement(OpaqueValue(42), count: -1)
+}
+
+LazyTestSuite.test("Repeated")
+  .forEach(in: [ 0, 1, 3 ]) {
+  count in
+
+  let c = repeatElement(OpaqueValue(42), count: count)
+  expectEqual(0, c.startIndex)
+  expectEqual(count, c.endIndex)
+  expectEqual(count, c.count)
+  expectEqual(42, c.repeatedValue.value)
+
+  let expected = (0..<count).map { _ in OpaqueValue(42) }
   checkRandomAccessCollection(
-    [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    repeatElement(OpaqueValue(42), count: 3))
+    expected, c)
     { $0.value == $1.value }
 }
 
