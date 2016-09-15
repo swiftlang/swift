@@ -1362,6 +1362,32 @@ bb0:
   return %1 : $()
 }
 
+// Check that escape analysis can look through bb arguments and figure
+// out that all objects are local. By analyzing a destructor implicitly
+// invoked by strong_release it would also determine that these objects
+// do not escape from the function.
+// CHECK-LABEL: CG of check_is_local_object_through_bb_args
+// CHECK-LABEL:  Val %2 Esc: %6,%7, Succ: 
+// CHECK-LABEL:  Val %4 Esc: %6,%7, Succ: 
+// CHECK-LABEL:  Val %6 Esc: %6,%7, Succ: %2, %4
+// CHECK-LABEL: End
+sil @check_is_local_object_through_bb_args: $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = alloc_ref $X
+  br bb3(%2 : $X)
+
+bb2:
+  %4 = alloc_ref $X
+  br bb3(%4 : $X)
+
+bb3(%6: $X):
+  strong_release %6 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
 
 // X.deinit
 sil @_TFC4main1XD: $@convention(method) (@owned X) -> () {
