@@ -1636,22 +1636,24 @@ public struct Dictionary<Key : Hashable, Value> :
 
 #if _runtime(_ObjC)
   /// Private initializer used for bridging.
-  ///
-  /// - Precondition: * `Key` and `Value` are bridged verbatim to Objective-C
-  ///   (i.e., are reference types).
-  public init(_ source: _NSDictionary) {
-    _sanityCheck(
-      _isBridgedVerbatimToObjectiveC(Key.self) &&
-      _isBridgedVerbatimToObjectiveC(Value.self),
-      "Expecting both key and value to be bridged verbatim to Objective-C")
+  public init?(_ source: _NSDictionary, by mode: _CastingMode) {
     self.init(minimumCapacity: source.count)
-    source._forEachBatch { b in
+    let success: Void? = try? source._forEachBatch { b in
       for k in b {
         // FIXME: Use objectsForKeys as an optimization
         // FIXME: Use unsafeDowncasts as an optimization?
-        self[k as! Key] = (source.objectFor(k)! as! Value)
+        
+        guard
+          let key = _cast(k, to: Key.self, by: mode),
+          let value = _cast(
+            source.objectFor(k)!, to: Value.self, by: mode
+          )
+        else { throw _StopIteration.stop }
+        
+        self[key] = value
       }
     }
+    if success == nil { return nil }
   }
 #endif
 
@@ -2236,7 +2238,9 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
       // Note: it is safe to treat the storage as immutable here because
       // Dictionary will not mutate storage with reference count greater than 1.
       return Dictionary(
-        _unsafeReferenceCast(nativeOwner, to: _NSDictionary.self))
+        _unsafeReferenceCast(nativeOwner, to: _NSDictionary.self),
+        by: .Forced
+      ).unsafelyUnwrapped
     }
   }
 #endif
