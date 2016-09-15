@@ -1117,6 +1117,25 @@ static bool onlyUsedInTupleExtract(SILInstruction *I) {
   return true;
 }
 
+bool EscapeAnalysis::buildConnectionGraphForCallees(
+    SILInstruction *Caller, CalleeList Callees, FunctionInfo *FInfo,
+    FunctionOrder &BottomUpOrder, int RecursionDepth) {
+  if (Callees.allCalleesVisible()) {
+    // Derive the connection graph of the apply from the known callees.
+    for (SILFunction *Callee : Callees) {
+      FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
+      CalleeInfo->addCaller(FInfo, Caller);
+      if (!CalleeInfo->isVisited()) {
+        // Recursively visit the called function.
+        buildConnectionGraph(CalleeInfo, BottomUpOrder, RecursionDepth + 1);
+        BottomUpOrder.tryToSchedule(CalleeInfo);
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                                         FunctionInfo *FInfo,
                                         FunctionOrder &BottomUpOrder,
@@ -1239,19 +1258,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
 
     if (RecursionDepth < MaxRecursionDepth) {
       CalleeList Callees = BCA->getCalleeList(FAS);
-      if (Callees.allCalleesVisible()) {
-        // Derive the connection graph of the apply from the known callees.
-        for (SILFunction *Callee : Callees) {
-          FunctionInfo *CalleeInfo = getFunctionInfo(Callee);
-          CalleeInfo->addCaller(FInfo, FAS);
-          if (!CalleeInfo->isVisited()) {
-            // Recursively visit the called function.
-            buildConnectionGraph(CalleeInfo, BottomUpOrder, RecursionDepth + 1);
-            BottomUpOrder.tryToSchedule(CalleeInfo);
-          }
-        }
+      if (buildConnectionGraphForCallees(FAS.getInstruction(), Callees, FInfo,
+                                         BottomUpOrder, RecursionDepth))
         return;
-      }
     }
 
     if (auto *Fn = FAS.getReferencedFunction()) {
@@ -1612,7 +1621,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         for (const auto &E : FInfo->getCallers()) {
           assert(E.isValid());
           if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-            setAllEscaping(E.FAS.getInstruction(), &E.Caller->Graph);
+            setAllEscaping(E.FAS, &E.Caller->Graph);
             E.Caller->NeedUpdateSummaryGraph = true;
             NeedAnotherIteration = true;
           }
@@ -1631,14 +1640,15 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
   }
 }
 
-bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
+bool EscapeAnalysis::mergeCalleeGraph(SILInstruction *AS,
                                       ConnectionGraph *CallerGraph,
                                       ConnectionGraph *CalleeGraph) {
   CGNodeMap Callee2CallerMapping;
 
   // First map the callee parameters to the caller arguments.
   SILFunction *Callee = CalleeGraph->F;
-  unsigned numCallerArgs = FAS.getNumArguments();
+  auto FAS = FullApplySite::isa(AS);
+  unsigned numCallerArgs = FAS ? FAS.getNumArguments() : 1;
   unsigned numCalleeArgs = Callee->getArguments().size();
   assert(numCalleeArgs >= numCallerArgs);
   for (unsigned Idx = 0; Idx < numCalleeArgs; ++Idx) {
@@ -1647,8 +1657,13 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
     // function also references the boxed partially applied arguments.
     // Therefore we map all the extra callee parameters to the callee operand
     // of the apply site.
-    SILValue CallerArg = (Idx < numCallerArgs ? FAS.getArgument(Idx) :
-                          FAS.getCallee());
+    SILValue CallerArg;
+    if (FAS)
+      CallerArg =
+          (Idx < numCallerArgs ? FAS.getArgument(Idx) : FAS.getCallee());
+    else
+      CallerArg = (Idx < numCallerArgs ? AS->getOperand(Idx) : SILValue());
+
     CGNode *CalleeNd = CalleeGraph->getNode(Callee->getArgument(Idx), this);
     if (!CalleeNd)
       continue;
@@ -1666,10 +1681,10 @@ bool EscapeAnalysis::mergeCalleeGraph(FullApplySite FAS,
   // Map the return value.
   if (CGNode *RetNd = CalleeGraph->getReturnNodeOrNull()) {
     ValueBase *CallerReturnVal = nullptr;
-    if (auto *TAI = dyn_cast<TryApplyInst>(FAS.getInstruction())) {
+    if (auto *TAI = dyn_cast<TryApplyInst>(AS)) {
       CallerReturnVal = TAI->getNormalBB()->getBBArg(0);
     } else {
-      CallerReturnVal = FAS.getInstruction();
+      CallerReturnVal = AS;
     }
     CGNode *CallerRetNd = CallerGraph->getNode(CallerReturnVal, this);
     Callee2CallerMapping.add(RetNd, CallerRetNd);
