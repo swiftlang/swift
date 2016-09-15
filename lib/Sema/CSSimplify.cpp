@@ -3937,54 +3937,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    // If the bridged value type is generic, the generic arguments
-    // must either match or be bridged.
-    // FIXME: This should be an associated type of the protocol.
-    if (auto bgt1 = type2->getAs<BoundGenericType>()) {
-      if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
-        // [AnyObject]
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                        ->getDeclaredType(),
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-      } else if (bgt1->getDecl() == TC.Context.getDictionaryDecl()) {
-        // [NSObject : AnyObject]
-        auto NSObjectType = TC.getNSObjectType(DC);
-        if (!NSObjectType) {
-          // Not a bridging case. Should we detect this earlier?
-          return SolutionKind::Error;
-        }
-
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      NSObjectType,
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[1],
-                      TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                        ->getDeclaredType(),
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(1))));
-      } else if (bgt1->getDecl() == TC.Context.getSetDecl()) {
-        auto NSObjectType = TC.getNSObjectType(DC);
-        if (!NSObjectType) {
-          // Not a bridging case. Should we detect this earlier?
-          return SolutionKind::Error;
-        }
-        addConstraint(ConstraintKind::Bind, bgt1->getGenericArgs()[0],
-                      NSObjectType,
-                      getConstraintLocator(
-                        locator.withPathElement(
-                          LocatorPathElt::getGenericArgument(0))));
-      } else {
-        // Nothing special to do; matchTypes will match generic arguments.
-      }
-    }
-
     // Make sure we have the bridged value type.
     if (matchTypes(type2, bridgedValueType, TypeMatchKind::SameType, subFlags,
                    locator) == ConstraintSystem::SolutionKind::Error)
