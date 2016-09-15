@@ -681,6 +681,14 @@ private:
                                       FunctionOrder &BottomUpOrder,
                                       int RecursionDepth);
 
+  /// Build a connection graph for the destructor invoked for a provided
+  /// SILValue.
+  bool buildConnectionGraphForDestructor(SILValue V,
+                                         SILInstruction *Caller,
+                                         FunctionInfo *FInfo,
+                                         FunctionOrder &BottomUpOrder,
+                                         int RecursionDepth);
+
   /// Builds the connection graph for a function, including called functions.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.

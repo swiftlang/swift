@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/DebugUtils.h"
 #include "llvm/Support/GraphWriter.h"
@@ -1136,6 +1137,45 @@ bool EscapeAnalysis::buildConnectionGraphForCallees(
   return false;
 }
 
+/// Build the connection graph for destructors that may be called
+/// by a given instruction \I for the object \V.
+/// Returns true if V is a local object and destructors called by a given
+/// instruction could be determined. In all other cases returns false.
+bool EscapeAnalysis::buildConnectionGraphForDestructor(
+    SILValue V, SILInstruction *I, FunctionInfo *FInfo,
+    FunctionOrder &BottomUpOrder, int RecursionDepth) {
+  // It should be a locally allocated object.
+  if (!pointsToLocalObject(V))
+    return false;
+  SILModule &M = I->getFunction()->getModule();
+  // Determine the exact type of the value.
+  auto Ty = getExactDynamicTypeOfUnderlyingObject(V, M, nullptr);
+  if (!Ty) {
+    // The object is local, but we cannot determine its type.
+    return false;
+  }
+  // If Ty is a an optional, its deallocation is equivalent to the deallocation
+  // of its payload.
+  // TODO: Generalize it. Destructor of an aggrgate type is equivalent to calling
+  // destructors for its components.
+  while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
+    Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
+                                    ->getAnyOptionalObjectType()
+                                    .getCanonicalTypeOrNull());
+  auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
+  if (!Class || !Class->hasDestructor())
+    return false;
+  auto Destructor = Class->getDestructor();
+  SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
+  // Find a SILFunction for destructor.
+  SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
+  if (!Dealloc)
+    return false;
+  CalleeList Callees(Dealloc);
+  return buildConnectionGraphForCallees(I, Callees, FInfo, BottomUpOrder,
+                                        RecursionDepth);
+}
+
 void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                                         FunctionInfo *FInfo,
                                         FunctionOrder &BottomUpOrder,
@@ -1269,6 +1309,19 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
     }
   }
+
+  if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
+    // Treat the release instruction as if it is the invocation
+    // of a deinit funciton.
+    if (RecursionDepth < MaxRecursionDepth) {
+      // Check if the destructor is known.
+      auto OpV = cast<RefCountingInst>(I)->getOperand(0);
+      if (buildConnectionGraphForDestructor(OpV, I, FInfo, BottomUpOrder,
+                                            RecursionDepth))
+        return;
+    }
+  }
+
   if (isProjection(I))
     return;
 
