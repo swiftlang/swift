@@ -3879,22 +3879,18 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
        known->second.getGeneration() < CurrentGeneration)) {
     Optional<ForeignRepresentationInfo> result;
 
-    // Look for a conformance to _ObjectiveCBridgeable (other than Optional's--
-    // we don't want to allow exposing APIs with double-optional types like
-    // NSObject??, even though Optional is bridged to its underlying type).
+    // Look for a conformance to _ObjectiveCBridgeable.
     //
     // FIXME: We're implicitly depending on the fact that lookupConformance
     // is global, ignoring the module we provide for it.
-    if (nominal != dc->getASTContext().getOptionalDecl()) {
-      if (auto objcBridgeable
-            = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
-        if (auto conformance
-              = dc->getParentModule()->lookupConformance(
-                  nominal->getDeclaredType(), objcBridgeable,
-                  getLazyResolver())) {
-          result =
-              ForeignRepresentationInfo::forBridged(conformance->getConcrete());
-        }
+    if (auto objcBridgeable
+          = getProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
+      if (auto conformance
+            = dc->getParentModule()->lookupConformance(
+                nominal->getDeclaredType(), objcBridgeable,
+                getLazyResolver())) {
+        result =
+            ForeignRepresentationInfo::forBridged(conformance->getConcrete());
       }
     }
 
@@ -3990,11 +3986,6 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Try to find a conformance that will enable bridging.
   auto findConformance =
     [&](KnownProtocolKind known) -> Optional<ProtocolConformanceRef> {
-      // Don't ascribe any behavior to Optional other than what we explicitly
-      // give it. We don't want things like AnyObject?? to work.
-      if (type->getAnyNominal() == getOptionalDecl())
-        return None;
-      
       // Find the protocol.
       auto proto = getProtocol(known);
       if (!proto) return None;
