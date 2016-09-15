@@ -839,8 +839,12 @@ public struct ${Self}<Element>
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   internal func _checkIndex(_ index: Int) {
-    _precondition(index <= endIndex, "${Self} index out of range")
+    _precondition(index <= endIndex, "${Self} index is out of range")
+% if Self in ['Array', 'ContiguousArray']:
     _precondition(index >= startIndex, "Negative ${Self} index is out of range")
+% else:
+    _precondition(index >= startIndex, "${Self} index is out of range (before startIndex)")
+% end
   }
 
   @_semantics("array.get_element")
@@ -1353,7 +1357,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     // FIXME(performance): if `self` is uniquely referenced, we should remove
     // the element as shown below (this will deallocate the element and
-    // decrease memory use).  If `self` is not uniquely refeneced, the code
+    // decrease memory use).  If `self` is not uniquely referenced, the code
     // below will make a copy of the storage, which is wasteful.  Instead, we
     // should just shrink the view without allocating new storage.
     let i = endIndex
@@ -1740,8 +1744,13 @@ extension ${Self} {
     _ subrange: Range<Int>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+% if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
+% else:
+    _precondition(subrange.lowerBound >= self._buffer.startIndex,
+      "${Self} replace: subrange start is before the startIndex")
+% end
 
     _precondition(subrange.upperBound <= self._buffer.endIndex,
       "${Self} replace: subrange extends past the end")
