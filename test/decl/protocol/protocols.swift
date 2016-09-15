@@ -235,7 +235,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to '<<error type>>'}}
+  var x = e.makeIterator() // expected-error{{type 'Sequence' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
 }
