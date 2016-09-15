@@ -1828,16 +1828,24 @@ alloc_ref
 `````````
 ::
 
-  sil-instruction ::= 'alloc_ref' ('[' 'objc' ']')? ('[' 'stack' ']')? sil-type
+  sil-instruction ::= 'alloc_ref'
+                        ('[' 'objc' ']')?
+                        ('[' 'stack' ']')?
+                        ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                        sil-type
 
   %1 = alloc_ref [stack] $T
+  %1 = alloc_ref [tail_elems $E * %2 : Builtin.Word] $T
   // $T must be a reference type
   // %1 has type $T
+  // $E is the type of the tail-allocated elements
+  // %2 must be of a builtin integer type
 
 Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The
 optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
+
 The optional ``stack`` attribute indicates that the object can be allocated
 on the stack instead on the heap. In this case the instruction must have
 balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
@@ -1846,6 +1854,15 @@ Note that the ``stack`` attribute only specifies that stack allocation is
 possible. The final decision on stack allocation is done during llvm IR
 generation. This is because the decision also depends on the object size,
 which is not necessarily known at SIL level.
+
+The optional ``tail_elems`` attributes specifies the amount of space to be
+reserved for tail-allocated arrays of given element types and element counts.
+If there are more than one ``tail_elems`` attributes then the tail arrays are
+allocated in the specified order.
+The count-operand must be of a builtin integer type.
+The instructions ``ref_tail_addr`` and ``tail_addr`` can be used to project
+the tail elements.
+The ``objc`` attribute cannot be used together with ``tail_elems``.
 
 alloc_ref_dynamic
 `````````````````
@@ -2328,6 +2345,31 @@ bytes within a value, using ``index_addr``. (``Int8`` address types have no
 special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
 also undefined behavior to index out of bounds of an array, except to index
 the "past-the-end" address of the array.
+
+tail_addr
+`````````
+::
+
+  sil-instruction ::= 'tail_addr' sil-operand ',' sil-operand ',' sil-type
+
+  %2 = tail_addr %0 : $*T, %1 : $Builtin.Int<n>, $E
+  // %0 must be of an address type $*T
+  // %1 must be of a builtin integer type
+  // %2 will be of type $*E
+
+Given an address of an array of ``%1`` values, returns the address of an
+element which is tail-allocated after the array.
+This instruction is equivalent to ``index_addr`` except that the resulting
+address is aligned-up to the tail-element type ``$E``.
+
+This instruction is used to project the N-th tail-allocated array from an
+object which is created by an ``alloc_ref`` with multiple ``tail_elems``.
+The first operand is the address of an element of the (N-1)-th array, usually
+the first element. The second operand is the number of elements until the end
+of that array. The result is the address of the first element of the N-th array.
+
+It is undefined behavior if the provided address, count and type do not match
+the actual layout of tail-allocated arrays of the underlying object.
 
 index_raw_pointer
 `````````````````
@@ -3255,6 +3297,23 @@ ref_element_addr
 Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
+
+ref_tail_addr
+`````````````
+::
+
+  sil-instruction ::= 'ref_tail_addr' sil-operand ',' sil-type
+
+  %1 = ref_tail_addr %0 : $C, $E
+  // %0 must be a value of class type $C with tail-allocated elements $E
+  // %1 will be of type $*E
+
+Given an instance of a class, which is created with tail-allocated array(s),
+derives the address of the first element of the first tail-allocated array.
+This instruction is used to project the first tail-allocated element from an
+object which is created by an ``alloc_ref`` with ``tail_elems``.
+It is undefined behavior if the class instance does not have tail-allocated
+arrays or if the element-types do not match.
 
 Enums
 ~~~~~

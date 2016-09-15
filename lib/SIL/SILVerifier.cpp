@@ -679,7 +679,18 @@ public:
 
   void checkAllocRefInst(AllocRefInst *AI) {
     requireReferenceValue(AI, "Result of alloc_ref");
+    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+            "alloc_ref must allocate class");
     verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
+    auto Types = AI->getTailAllocatedTypes();
+    auto Counts = AI->getTailAllocatedCounts();
+    unsigned NumTypes = Types.size();
+    require(NumTypes == Counts.size(), "Mismatching types and counts");
+    for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
+      verifyOpenedArchetype(AI, Types[Idx].getSwiftRValueType());
+      require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
+              "count needs integer type");
+    }
   }
 
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
@@ -1596,6 +1607,12 @@ public:
             "index_addr index must be of a builtin integer type");
   }
 
+  void checkTailAddrInst(TailAddrInst *IAI) {
+    require(IAI->getType().isAddress(), "tail_addr must produce an address");
+    require(IAI->getIndex()->getType().is<BuiltinIntegerType>(),
+            "tail_addr index must be of a builtin integer type");
+  }
+
   void checkIndexRawPointerInst(IndexRawPointerInst *IAI) {
     require(IAI->getType().is<BuiltinRawPointerType>(),
             "index_raw_pointer must produce a RawPointer");
@@ -1701,6 +1718,15 @@ public:
     EI->getFieldNo();  // Make sure we can access the field without crashing.
   }
 
+  void checkRefTailAddrInst(RefTailAddrInst *RTAI) {
+    requireReferenceValue(RTAI->getOperand(), "Operand of ref_tail_addr");
+    require(RTAI->getType().isAddress(),
+            "result of ref_tail_addr must be lvalue");
+    SILType operandTy = RTAI->getOperand()->getType();
+    ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
+    require(cd, "ref_tail_addr operand must be a class instance");
+  }
+  
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return ft->getParameters().back().getSILType();
   }

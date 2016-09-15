@@ -238,6 +238,15 @@ namespace {
     }
 
     bool visitAllocRefInst(const AllocRefInst *RHS) {
+      auto *LHSInst = cast<AllocRefInst>(LHS);
+      auto LHSTypes = LHSInst->getTailAllocatedTypes();
+      auto RHSTypes = RHS->getTailAllocatedTypes();
+      unsigned NumTypes = LHSTypes.size();
+      assert(NumTypes == RHSTypes.size());
+      for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
+        if (LHSTypes[Idx] != RHSTypes[Idx])
+          return false;
+      }
       return true;
     }
 
@@ -348,6 +357,13 @@ namespace {
       return true;
     }
 
+    bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
+      auto *X = cast<RefTailAddrInst>(LHS);
+      if (X->getTailType() != RHS->getTailType())
+        return false;
+      return true;
+    }
+
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
       // We have already checked that the operands of our struct_element_addrs
       // match. Thus we only need to check the field/struct decl which are not
@@ -416,6 +432,13 @@ namespace {
     bool visitIndexAddrInst(IndexAddrInst *RHS) {
       // We have already compared the operands/types, so we should have equality
       // at this point.
+      return true;
+    }
+
+    bool visitTailAddrInst(TailAddrInst *RHS) {
+      auto *X = cast<TailAddrInst>(LHS);
+      if (X->getTailType() != RHS->getTailType())
+        return false;
       return true;
     }
 

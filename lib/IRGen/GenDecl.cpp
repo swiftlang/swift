@@ -2898,6 +2898,17 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   return Address(alloca, alignment);
 }
 
+/// Create an allocation of an array on the stack.
+Address IRGenFunction::createAlloca(llvm::Type *type,
+                                    llvm::Value *ArraySize,
+                                    Alignment alignment,
+                                    const llvm::Twine &name) {
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(type, ArraySize,
+                                                  alignment.getValue(), name,
+                                                  AllocaIP);
+  return Address(alloca, alignment);
+}
+
 /// Allocate a fixed-size buffer on the stack.
 Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
   return createAlloca(IGM.getFixedBufferTy(),
