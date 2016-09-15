@@ -29,7 +29,7 @@ def bounds_trap(index, expr_to_write):
 % for ArrayTy in array_types:
 
 var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps" + testSuiteSuffix)
-var ${ArrayTy}_lower_bound_out_of_range_error_msg = (
+var ${ArrayTy}LowerBoundOutOfRangeErrorMsg = (
 % if ArrayTy in ['Array', 'ContiguousArray']:
     "Negative ${ArrayTy} index is out of range"
 % else:
@@ -37,7 +37,7 @@ var ${ArrayTy}_lower_bound_out_of_range_error_msg = (
 % end
 )
 
-var ${ArrayTy}_bounds_error_msg = (
+var ${ArrayTy}BoundsErrorMsg = (
 % if ArrayTy in ['Array', 'ContiguousArray']:
     "Index out of range"
 % else:
@@ -52,7 +52,7 @@ ${ArrayTy}Traps.test("bounds1/${io}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_bounds_error_msg : "")
+    ${ArrayTy}BoundsErrorMsg : "")
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='0', expr_to_write='1')}
@@ -63,7 +63,7 @@ ${ArrayTy}Traps.test("bounds2/${io}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_bounds_error_msg : "")
+    ${ArrayTy}BoundsErrorMsg : "")
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='100', expr_to_write='1')}
@@ -74,7 +74,7 @@ ${ArrayTy}Traps.test("bounds3/${io}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_bounds_error_msg : "")
+    ${ArrayTy}BoundsErrorMsg : "")
   .code {
   var a: ${ArrayTy} = [ 10, 20, 30 ]
   ${bounds_trap(index='3', expr_to_write='1')}
@@ -85,7 +85,7 @@ ${ArrayTy}Traps.test("sliceBounds0/${io}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_lower_bound_out_of_range_error_msg : "")
+    ${ArrayTy}LowerBoundOutOfRangeErrorMsg : "")
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
@@ -96,7 +96,7 @@ ${ArrayTy}Traps.test("sliceBounds1/${io}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_lower_bound_out_of_range_error_msg : "")
+    ${ArrayTy}LowerBoundOutOfRangeErrorMsg : "")
   .code {
   var a: ${ArrayTy} = [ 1 ]
   ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
@@ -142,7 +142,7 @@ ${ArrayTy}Traps.test("${'insert(_:at:)/%s' % index}")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
 % if index < 0:
-    ${ArrayTy}_lower_bound_out_of_range_error_msg
+    ${ArrayTy}LowerBoundOutOfRangeErrorMsg
 % else:
     "${ArrayTy} index is out of range"
 %end
@@ -160,7 +160,7 @@ ${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    ${ArrayTy}_bounds_error_msg : "")
+    ${ArrayTy}BoundsErrorMsg : "")
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
