@@ -216,7 +216,7 @@ public:
 static bool isPromotableAllocInst(SILInstruction *I) {
   // Check for swift object allocation.
   if (auto *ARI = dyn_cast<AllocRefInst>(I)) {
-    if (!ARI->isObjC())
+    if (!ARI->isObjC() && !ARI->canAllocOnStack())
       return true;
     return false;
   }
