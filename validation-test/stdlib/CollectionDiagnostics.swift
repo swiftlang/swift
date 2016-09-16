@@ -115,3 +115,27 @@ struct BadBidirectionalIndexable : BidirectionalIndexable {
   // expected-error@+1 {{'index(after:)' has different argument names from those required by protocol 'BidirectionalIndexable' ('index(before:)'}}
   func index(after i: Int) -> Int { return 0 }
 }
+
+//
+// Check that RangeReplaceableCollection.SubSequence is defaulted.
+//
+
+struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableCollection {
+  var startIndex: Int { fatalError() }
+  var endIndex: Int { fatalError() }
+
+  subscript(pos: Int) -> Int { return 0 }
+
+  func index(after: Int) -> Int { fatalError() }
+  func index(before: Int) -> Int { fatalError() }
+  func index(_: Int, offsetBy: Int) -> Int { fatalError() }
+  func distance(from: Int, to: Int) -> Int { fatalError() }
+
+  mutating func replaceSubrange<C>(
+    _ subrange: Range<Int>,
+    with newElements: C
+  ) where C : Collection, C.Iterator.Element == Int {
+    fatalError()
+  }
+}
+
