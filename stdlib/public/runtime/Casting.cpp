@@ -2513,18 +2513,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     // unwrapping the target. This handles an optional source wrapped within an
     // existential that Optional conforms to (Any).
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
-#if SWIFT_OBJC_INTEROP
-      // If coming from AnyObject, we may want to bridge.
-      if (srcExistentialType->Flags.getSpecialProtocol()
-            == SpecialProtocol::AnyObject) {
-        if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
-          return _dynamicCastClassToValueViaObjCBridgeable(dest, src, srcType,
-                                                           targetType,
-                                                           targetBridgeWitness,
-                                                           flags);
-        }
-      }
-#endif
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
     }
