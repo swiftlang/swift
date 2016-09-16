@@ -2501,84 +2501,124 @@ internal struct _HashedContainerStorageHeader {
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-final internal class _Native${Self}StorageImpl<${TypeParameters}> {
+final internal class _Native${Self}StorageImpl<${TypeParameters}> :
+  ManagedBuffer<_HashedContainerStorageHeader, UInt8> {
   // Note: It is intended that ${TypeParameters}
   // (without : Hashable) is used here - this storage must work
   // with non-Hashable types.
 
+  internal typealias BufferPointer =
+    ManagedBufferPointer<_HashedContainerStorageHeader, UInt8>
   internal typealias StorageImpl = _Native${Self}StorageImpl
 
 %if Self == 'Set': # Set needs these to keep signatures simple.
   internal typealias Key = ${TypeParameters}
 %end
 
-  internal var _body: _HashedContainerStorageHeader
+  /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
+  /// padding to align the start to word alignment.
+  internal static func bytesForBitMap(capacity: Int) -> Int {
+    let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
+    return numWords * MemoryLayout<UInt>.stride + MemoryLayout<UInt>.alignment
+  }
+
+  /// Returns the bytes necessary to store 'capacity' keys and padding to align
+  /// the start to the alignment of the 'Key' type assuming a word aligned base
+  /// address.
+  internal static func bytesForKeys(capacity: Int) -> Int {
+    let padding = max(0, MemoryLayout<Key>.alignment - MemoryLayout<UInt>.alignment)
+    return MemoryLayout<Key>.stride * capacity + padding
+  }
+
+%if Self == 'Dictionary':
+  /// Returns the bytes necessary to store 'capacity' values and padding to
+  /// align the start to the alignment of the 'Value' type assuming a base
+  /// address aligned to the maximum of the alignment of the 'Key' type and the
+  /// alignment of a word.
+  internal static func bytesForValues(capacity: Int) -> Int {
+    let maxPrevAlignment = max(MemoryLayout<Key>.alignment, MemoryLayout<UInt>.alignment)
+    let padding = max(0, MemoryLayout<Value>.alignment - maxPrevAlignment)
+    return MemoryLayout<Value>.stride * capacity + padding
+  }
+%end
+
+  internal var buffer: BufferPointer {
+    return BufferPointer(self)
+  }
+
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
+  internal var _body: _HashedContainerStorageHeader {
+    unsafeAddress {
+      return UnsafePointer(buffer._headerPointer)
+    }
+    unsafeMutableAddress {
+      return buffer._headerPointer
+    }
+  }
 
   @_versioned
   internal var _capacity: Int {
+    defer { _fixLifetime(self) }
     return _body.capacity
   }
 
   @_versioned
   internal var _count: Int {
     set {
+      defer { _fixLifetime(self) }
       _body.count = newValue
     }
     get {
+      defer { _fixLifetime(self) }
       return _body.count
     }
   }
 
   internal var _maxLoadFactorInverse: Double {
+    defer { _fixLifetime(self) }
     return _body.maxLoadFactorInverse
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
-    return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
-  }
-
-  internal var _keysRawAddr : Builtin.RawPointer {
-    let bitmapAddr = Builtin.projectTailElems(self, UInt.self)
-    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity)
-    return Builtin.getTailAddr_Word(bitmapAddr,
-           numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
+    return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _keys: UnsafeMutablePointer<Key> {
-    return UnsafeMutablePointer(_keysRawAddr)
+    let bitMapSizeInBytes =
+      _unsafeMultiply(
+        _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
+        MemoryLayout<UInt>.stride)
+    let start =
+      UnsafeMutableRawPointer(_initializedHashtableEntriesBitMapStorage)
+      + bitMapSizeInBytes
+    return _roundUp(start, toAlignmentOf: Key.self)
   }
 
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
-    let valuesAddr = Builtin.getTailAddr_Word(_keysRawAddr,
-        _capacity._builtinWordValue, Key.self, Value.self)
-    return UnsafeMutablePointer(valuesAddr)
+    let keysSizeInBytes = _unsafeMultiply(_body.capacity, MemoryLayout<Key>.stride)
+    let start = UnsafeMutableRawPointer(_keys) + keysSizeInBytes
+    return _roundUp(start, toAlignmentOf: Value.self)
   }
 %end
 
   /// Create a storage instance with room for 'capacity' entries and all entries
   /// marked invalid.
   internal class func create(capacity: Int) -> StorageImpl {
-    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
+    let requiredCapacity =
+      bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
 %if Self == 'Dictionary':
-    let storage = Builtin.allocWithTailElems_3(StorageImpl.self,
-        numWordsForBitmap._builtinWordValue, UInt.self,
-        capacity._builtinWordValue, Key.self,
-        capacity._builtinWordValue, Value.self)
-%else:
-    let storage = Builtin.allocWithTailElems_2(StorageImpl.self,
-        numWordsForBitmap._builtinWordValue, UInt.self,
-        capacity._builtinWordValue, Key.self)
+      + bytesForValues(capacity: capacity)
 %end
-    
-    // We can initialize by assignment because _HashedContainerStorageHeader
-    // is a trivial type, i.e. contains no references.
-    storage._body = _HashedContainerStorageHeader(capacity: capacity)
- 
+
+    let r = super.create(minimumCapacity: requiredCapacity) { _ in
+      return _HashedContainerStorageHeader(capacity: capacity)
+    }
+    let storage = r as! StorageImpl
     let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
@@ -2612,11 +2652,8 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
       }
     }
 %end
+    buffer._headerPointer.deinitialize()
     _fixLifetime(self)
-  }
-
-  internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only initialize these by calling create")
   }
 }
 

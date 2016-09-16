@@ -485,7 +485,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_ONE_TYPE_ONE_OPERAND);
   BLOCK_RECORD(sil_block, SIL_ONE_TYPE_VALUES);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS);
-  BLOCK_RECORD(sil_block, SIL_TAIL_ADDR);
   BLOCK_RECORD(sil_block, SIL_INST_APPLY);
   BLOCK_RECORD(sil_block, SIL_INST_NO_OPERAND);
   BLOCK_RECORD(sil_block, SIL_VTABLE);

@@ -543,7 +543,8 @@ public:
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, const RequirementSource &source,
+  bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
+                      const RequirementSource &source,
                       ArchetypeBuilder &builder);
 
   /// Retrieve the superclass of this archetype.

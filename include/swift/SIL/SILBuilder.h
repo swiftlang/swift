@@ -255,26 +255,13 @@ public:
                                          Var));
   }
 
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool objc, bool canAllocOnStack) {
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc,
+                               bool canAllocOnStack) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(AllocRefInst::create(getSILDebugLocation(Loc), F, ObjectType,
+    return insert(AllocRefInst::create(getSILDebugLocation(Loc), elementType, F,
                                        objc, canAllocOnStack,
-                                       {}, {}, OpenedArchetypes));
-  }
-
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
-                               bool canAllocOnStack,
-                               ArrayRef<SILType> ElementTypes,
-                               ArrayRef<SILValue> ElementCountOperands) {
-    // AllocRefInsts expand to function calls and can therefore not be
-    // counted towards the function prologue.
-    assert(!Loc.isInPrologue());
-    return insert(AllocRefInst::create(getSILDebugLocation(Loc),
-                                       F, ObjectType, false, canAllocOnStack,
-                                       ElementTypes, ElementCountOperands,
                                        OpenedArchetypes));
   }
 
@@ -911,12 +898,6 @@ public:
     return createRefElementAddr(Loc, Operand, Field, ResultTy);
   }
 
-  RefTailAddrInst *createRefTailAddr(SILLocation Loc, SILValue Ref,
-                                     SILType ResultTy) {
-    return insert(new (F.getModule()) RefTailAddrInst(getSILDebugLocation(Loc),
-                                                      Ref, ResultTy));
-  }
-
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy,
                                      bool Volatile = false) {
@@ -1260,12 +1241,6 @@ public:
                                  SILValue Index) {
     return insert(new (F.getModule()) IndexAddrInst(getSILDebugLocation(Loc),
                                                     Operand, Index));
-  }
-
-  TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,
-                               SILValue Count, SILType ResultTy) {
-    return insert(new (F.getModule()) TailAddrInst(getSILDebugLocation(Loc),
-                                                   Operand, Count, ResultTy));
   }
 
   IndexRawPointerInst *createIndexRawPointer(SILLocation Loc, SILValue Operand,

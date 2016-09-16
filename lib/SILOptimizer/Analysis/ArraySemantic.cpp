@@ -90,7 +90,8 @@ bool swift::ArraySemanticsCall::isValidSignature() {
         return false;
 
       StringRef AllocFuncName = AllocFn->getName();
-      if (AllocFuncName != "swift_bufferAllocate")
+      if (AllocFuncName != "swift_bufferAllocate" &&
+          AllocFuncName != "swift_bufferAllocateOnStack")
         return false;
 
       if (!hasOneNonDebugUse(AllocBufferAI))
@@ -578,8 +579,7 @@ SILValue swift::ArraySemanticsCall::getInitializationCount() const {
     // argument. The count is the second argument.
     // A call to _allocateUninitialized has the count as first argument.
     SILValue Arg0 = SemanticsCall->getArgument(0);
-    if (Arg0->getType().isExistentialType() ||
-        Arg0->getType().hasReferenceSemantics())
+    if (Arg0->getType().isExistentialType())
       return SemanticsCall->getArgument(1);
     else return SemanticsCall->getArgument(0);
   }

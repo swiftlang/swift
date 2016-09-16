@@ -844,12 +844,6 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
-    auto Types = ARI->getTailAllocatedTypes();
-    auto Counts = ARI->getTailAllocatedCounts();
-    for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
-      *this << "[tail_elems " << Types[Idx] << " * "
-            << getIDAndType(Counts[Idx].get()) << "] ";
-    }
     *this << ARI->getType();
   }
 
@@ -1324,11 +1318,6 @@ public:
     *this << EI->getField()->getName().get();
   }
 
-  void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
-    *this << "ref_tail_addr " << getIDAndType(RTAI->getOperand()) << ", "
-          << RTAI->getTailType();
-  }
-
   void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {
     *this << Name << " ";
     if (I->isVolatile())
@@ -1515,11 +1504,6 @@ public:
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     *this << "index_addr " << getIDAndType(IAI->getBase()) << ", "
        << getIDAndType(IAI->getIndex());
-  }
-
-  void visitTailAddrInst(TailAddrInst *TAI) {
-    *this << "tail_addr " << getIDAndType(TAI->getBase()) << ", "
-          << getIDAndType(TAI->getIndex()) << ", " << TAI->getTailType();
   }
 
   void visitIndexRawPointerInst(IndexRawPointerInst *IAI) {

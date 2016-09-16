@@ -5188,7 +5188,7 @@ public:
     DiagnosticTransaction tentativeDiags(TC.Diags);
 
     {
-      Type baseTy = base->getType();
+      Type baseTy = base->getInterfaceType();
       if (baseTy->is<ErrorType>())
         return false;
 

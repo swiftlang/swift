@@ -127,3 +127,18 @@ func testModuloOptionalness() {
     deepOptionalClosure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
   }
 }
+
+// Check that functions in vararg position are @escaping
+func takesEscapingFunction(fn: @escaping () -> ()) {}
+func takesArrayOfFunctions(array: [() -> ()]) {}
+
+func takesVarargsOfFunctions(fns: () -> ()...) {
+  takesArrayOfFunctions(array: fns)
+  for fn in fns {
+    takesEscapingFunction(fn: fn)
+  }
+}
+
+func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  takesVarargsOfFunctions(fns: fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+}

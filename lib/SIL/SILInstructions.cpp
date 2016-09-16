@@ -156,46 +156,27 @@ VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
-AllocRefInst::AllocRefInst(SILDebugLocation Loc, SILFunction &F,
-                           SILType ObjectType,
-                           bool objc, bool canBeOnStack,
-                           ArrayRef<SILType> ElementTypes,
-                           ArrayRef<SILValue> AllOperands)
-    : AllocationInst(ValueKind::AllocRefInst, Loc, ObjectType),
+AllocRefInst::AllocRefInst(SILDebugLocation Loc, SILType elementType,
+                           SILFunction &F, bool objc, bool canBeOnStack,
+                           ArrayRef<SILValue> TypeDependentOperands)
+    : AllocationInst(ValueKind::AllocRefInst, Loc, elementType),
       StackPromotable(canBeOnStack),
-      NumTailTypes(ElementTypes.size()),
-      ObjC(objc),
-      Operands(this, AllOperands) {
-  static_assert(IsTriviallyCopyable<SILType>::value,
-                "assuming SILType is trivially copyable");
-  assert(!objc || ElementTypes.size() == 0);
-  assert(AllOperands.size() >= ElementTypes.size());
-
-  memcpy(getTypeStorage(), ElementTypes.begin(),
-         sizeof(SILType) * ElementTypes.size());
+      NumOperands(TypeDependentOperands.size()), ObjC(objc) {
+  TrailingOperandsList::InitOperandsList(getAllOperands().begin(), this,
+                                         TypeDependentOperands);
 }
 
-AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
-                                   SILType ObjectType,
-                                   bool objc, bool canBeOnStack,
-                                   ArrayRef<SILType> ElementTypes,
-                                   ArrayRef<SILValue> ElementCountOperands,
-                                   SILOpenedArchetypesState &OpenedArchetypes) {
-  assert(ElementTypes.size() == ElementCountOperands.size());
-  assert(!objc || ElementTypes.size() == 0);
-  SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
-                                       ElementCountOperands.end());
-  for (SILType ElemType : ElementTypes) {
-    collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
-                                 ElemType.getSwiftRValueType());
-  }
+AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILType elementType,
+                           SILFunction &F, bool objc, bool canBeOnStack,
+                           SILOpenedArchetypesState &OpenedArchetypes) {
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               elementType.getSwiftRValueType());
   void *Buffer = F.getModule().allocateInst(
-                      sizeof(AllocRefInst)
-                        + decltype(Operands)::getExtraSize(AllOperands.size())
-                        + sizeof(SILType) * ElementTypes.size(),
-                      alignof(AllocRefInst));
-  return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack,
-                                     ElementTypes, AllOperands);
+      sizeof(AllocRefInst) + sizeof(Operand) * (TypeDependentOperands.size()),
+      alignof(AllocRefInst));
+  return ::new (Buffer) AllocRefInst(Loc, elementType, F, objc, canBeOnStack,
+                                     TypeDependentOperands);
 }
 
 AllocRefDynamicInst::AllocRefDynamicInst(

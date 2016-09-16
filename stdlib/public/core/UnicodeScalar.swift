@@ -346,16 +346,12 @@ extension UInt8 {
 }
 extension UInt32 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt32.
   public init(_ v: UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt64.
   public init(_ v: UnicodeScalar) {
     self = UInt64(v.value)
   }
