@@ -14,7 +14,7 @@
 
 extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
-  /// Binds the the buffer's memory type to `Element`.
+  /// Binds the buffer's memory type to `Element`.
   public init(_ audioBuffer: AudioBuffer) {
     let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(
