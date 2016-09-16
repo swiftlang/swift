@@ -42,7 +42,7 @@ WHERE src_string.string = '{0}'
 def worker(args):
     i, (coverage_db, (filename, (rstart, rend))) = args
     logging.info('[%s] Finding covering tests for: %s %s',
-                 i+1, filename, (rstart, rend))
+                 i + 1, filename, (rstart, rend))
     tmp_covering_tests = subprocess.check_output(
         ['sqlite3',
          coverage_db,
@@ -79,8 +79,8 @@ def main():
     args = parser.parse_args()
 
     for path in [args.swift_dir, args.coverage_db]:
-        assert os.path.exists(path), "Unable to find %s. Try absolute paths." \
-                                      % path
+        assert(os.path.exists(path), "Unable to find %s. Try absolute paths." %
+               path)
 
     console.setLevel(level=args.log.upper())
     logging.debug(args)
@@ -108,15 +108,15 @@ def main():
                     (args.coverage_db, (filename, changed_range)))
             else:
                 start_line = int(start_line)
-                logging.debug('Found changed line: %s %s',
-                              filename, start_line)
+                logging.debug(
+                    'Found changed line: %s %s', filename, start_line)
                 changed_ranges.append(
                     (args.coverage_db, (filename, (start_line, start_line))))
 
     logging.info('Found %s changed ranges/lines', len(changed_ranges))
     relevant_changes = [
-         cr for cr in changed_ranges
-         if cr[1][0].endswith('.cpp') or cr[1][0].endswith('.h')
+        cr for cr in changed_ranges
+        if cr[1][0].endswith('.cpp') or cr[1][0].endswith('.h')
     ]
     relevant_changes_count = len(relevant_changes)
     logging.info('Finding covering tests for %s relevant ranges/lines...',
