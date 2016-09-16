@@ -2553,38 +2553,57 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (options & TR_ImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
   }
-  
-  for (auto tyR : repr->getElements()) {
-    NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR);
-    if (namedTyR && !(options & TR_ImmediateFunctionInput)) {
-      Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
-      if (!ty || ty->is<ErrorType>()) return ty;
 
-      elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
-    } else {
-      // FIXME: Preserve and serialize parameter names in function types, maybe
-      // with a new sugar type.
-      Type ty = resolveType(namedTyR ? namedTyR->getTypeRepr() : tyR,
-                            elementOptions);
-      if (!ty || ty->is<ErrorType>()) return ty;
+  bool complained = false;
 
-      elements.push_back(TupleTypeElt(ty));
-    }
+  // Variadic tuples are not permitted.
+  if (repr->hasEllipsis() &&
+      !(options & TR_ImmediateFunctionInput)) {
+    TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
+    repr->removeEllipsis();
+    complained = true;
   }
 
-  // Tuple representations are limited outside of function inputs.
+  for (auto tyR : repr->getElements()) {
+    NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR);
+    Type ty;
+    Identifier name;
+    bool variadic = false;
+
+    // If the element has a label, stash the label and get the underlying type.
+    if (namedTyR) {
+      // FIXME: Preserve and serialize parameter names in function types, maybe
+      // with a new sugar type.
+      if (!(options & TR_ImmediateFunctionInput))
+        name = namedTyR->getName();
+
+      tyR = namedTyR->getTypeRepr();
+    }
+
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    auto thisElementOptions = elementOptions;
+    if (repr->hasEllipsis() &&
+        elements.size() == repr->getEllipsisIndex()) {
+      thisElementOptions = withoutContext(elementOptions);
+      variadic = true;
+    }
+
+    ty = resolveType(tyR, thisElementOptions);
+    if (!ty || ty->is<ErrorType>()) return ty;
+
+    // If the element is a variadic parameter, the underlying type is actually
+    // an ArraySlice of the element type.
+    if (variadic)
+      ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
+
+    elements.push_back(TupleTypeElt(ty, name, variadic));
+  }
+
+  // Single-element labeled tuples are not permitted outside of declarations
+  // or SIL, either.
   if (!(options & TR_ImmediateFunctionInput)) {
-    bool complained = false;
-
-    // Variadic tuples are not permitted.
-    if (repr->hasEllipsis()) {
-      TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
-      repr->removeEllipsis();
-      complained = true;
-    } 
-
-    // Single-element labeled tuples are not permitted outside of declarations
-    // or SIL, either.
     if (elements.size() == 1 && elements[0].hasName()
         && !(options & TR_SILType)
         && !(options & TR_EnumCase)) {
@@ -2598,14 +2617,6 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
       elements[0] = TupleTypeElt(elements[0].getType());
     }
-  }
-
-  if (repr->hasEllipsis()) {
-    auto &element = elements[repr->getEllipsisIndex()];
-    Type baseTy = element.getType();
-    Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
-    Identifier name = element.getName();
-    element = TupleTypeElt(fullTy, name, true);
   }
 
   return TupleType::get(elements, Context);
