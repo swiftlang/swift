@@ -135,5 +135,12 @@ RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   expectCustomizable(tester, tester.log.reserveCapacity)
 }
 
+struct CustomRemoveFirstLastDispatchTester
+  : BidirectionalCollection,
+    RangeReplaceableCollection {
+
+
+}
+
 runAllTests()
 

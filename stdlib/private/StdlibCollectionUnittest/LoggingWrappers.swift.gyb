@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 %{
+from gyb_stdlib_unittest_support import TRACE
 from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
@@ -132,6 +133,8 @@ public class BidirectionalCollectionLog : SequenceLog {
   public static var predecessor = TypeIndexed(0)
   public static var formPredecessor = TypeIndexed(0)
   public static var last = TypeIndexed(0)
+  public static var _customRemoveLast = TypeIndexed(0)
+  public static var _customRemoveLastN = TypeIndexed(0)
 }
 
 public class MutableCollectionLog : CollectionLog {
@@ -487,16 +490,6 @@ public struct ${Self}<
     Log.initWithSequence[selfType] += 1
   }
 
-  public mutating func _customRemoveLast() -> Base.Iterator.Element? {
-    Log._customRemoveLast[selfType] += 1
-    return base._customRemoveLast()
-  }
-
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    Log._customRemoveLastN[selfType] += 1
-    return base._customRemoveLast(n)
-  }
-
   public mutating func append(_ newElement: Base.Iterator.Element) {
     Log.append[selfType] += 1
     base.append(newElement)
@@ -577,6 +570,27 @@ public struct ${Self}<
   public var last: Iterator.Element? {
     BidirectionalCollectionLog.last[selfType] += 1
     return base.last
+  }
+%     end
+%     if (Traversal in ['Bidirectional', 'RandomAccess']) or (Kind == 'RangeReplaceableCollection'):
+  public mutating func _customRemoveLast() -> Base.Iterator.Element? {
+%       if Traversal in ['Bidirectional', 'RandomAccess']:
+    BidirectionalCollectionLog._customRemoveLast[selfType] += 1
+%       end
+%       if Kind == 'RangeReplaceableCollection':
+    RangeReplaceableCollectionLog._customRemoveLast[selfType] += 1
+%       end
+    return base._customRemoveLast()
+  }
+
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+%       if Traversal in ['Bidirectional', 'RandomAccess']:
+    BidirectionalCollectionLog._customRemoveLastN[selfType] += 1
+%       end
+%       if Kind == 'RangeReplaceableCollection':
+    RangeReplaceableCollectionLog._customRemoveLastN[selfType] += 1
+%       end
+    return base._customRemoveLast(n)
   }
 %     end
 }
@@ -680,7 +694,8 @@ public func expectCustomizable<T : Wrapper>(
 ) where
   T : LoggingType,
   T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log {
+  T.Log == T.Base.Log
+{
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(
@@ -692,7 +707,8 @@ public func expectNotCustomizable<T : Wrapper>(
 ) where
   T : LoggingType,
   T.Base : Wrapper, T.Base : LoggingType,
-  T.Log == T.Base.Log {
+  T.Log == T.Base.Log
+{
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(0, counters[T.Base.self], message(), stackTrace: newTrace)
