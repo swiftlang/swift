@@ -813,6 +813,15 @@ extension RangeReplaceableCollection {
   /// - Parameter n: The requested number of elements to store.
   public mutating func reserveCapacity(_ n: IndexDistance) {}
 
+  public mutating func _customRemoveFirst() -> Iterator.Element? {
+    return removeFirst()
+  }
+
+  public mutating func _customRemoveFirst(_ n: Int) -> Bool {
+    removeFirst(n)
+    return true
+  }
+
   public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil
   }

@@ -858,6 +858,18 @@ public protocol Collection : _Indexable, Sequence {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  /// Customization point for `removeFirst()`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: A non-nil value if the operation was performed.
+  mutating func _customRemoveFirst() -> Iterator.Element?
+
+  /// Customization point for `removeFirst(_:)`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: `true` if the operation was performed.
+  mutating func _customRemoveFirst(_ n: Int) -> Bool
 }
 
 /// Default implementation for forward collections.
@@ -1222,6 +1234,14 @@ extension Collection {
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
     return nil
+  }
+
+  public mutating func _customRemoveFirst() -> Iterator.Element? {
+    return nil
+  }
+
+  public mutating func _customRemoveFirst(_ n: Int) -> Bool {
+    return false
   }
 }
 
@@ -1657,6 +1677,17 @@ extension Collection where Iterator.Element : Equatable {
 }
 
 extension Collection where SubSequence == Self {
+  public mutating func _customRemoveFirst() -> Iterator.Element? {
+    let element = first!
+    self = self[index(after: startIndex)..<endIndex]
+    return element
+  }
+
+  public mutating func _customRemoveFirst(_ n: Int) -> Bool {
+    self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
+    return true
+  }
+
   /// Removes and returns the first element of the collection.
   ///
   /// The collection must not be empty.
@@ -1667,8 +1698,10 @@ extension Collection where SubSequence == Self {
   /// - SeeAlso: `popFirst()`
   @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
-    // TODO: swift-3-indexing-model - review the following
     _precondition(!isEmpty, "can't remove items from an empty collection")
+    if let result = _customRemoveFirst() {
+      return result
+    }
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
@@ -1688,6 +1721,9 @@ extension Collection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
+    if _customRemoveFirst(n) {
+      return
+    }
     self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
   }
 }
