@@ -655,6 +655,9 @@ public struct Set<Element : Hashable> :
   /// be the first element that was added to the set. The set must not be
   /// empty.
   ///
+  /// - Complexity: Amortized O(1) if the set does not wrap a bridged `NSSet`.
+  ///   If the set wraps a bridged `NSSet`, the performance is unspecified.
+  ///
   /// - Returns: A member of the set.
   @discardableResult
   public mutating func removeFirst() -> Element {
