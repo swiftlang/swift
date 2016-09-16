@@ -623,7 +623,7 @@ private:
     if (Info.ID == diag::init_not_instance_member.ID)
       return false;
     // Renaming enum cases interacts poorly with the swift migrator by
-    // reverting changes made by the mgirator.
+    // reverting changes made by the migrator.
     if (Info.ID == diag::could_not_find_enum_case.ID)
       return false;
 

@@ -2133,8 +2133,8 @@ ERROR(discard_expr_outside_of_assignment,none,
       ())
 ERROR(inout_expr_outside_of_call,none,
       "'&' can only appear immediately in a call argument list", ())
-ERROR(collection_literal_heterogenous,none,
-      "heterogenous collection literal could only be inferred to %0; add"
+ERROR(collection_literal_heterogeneous,none,
+      "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))
 ERROR(collection_literal_empty,none,
       "empty collection literal requires an explicit type", ())

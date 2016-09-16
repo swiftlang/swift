@@ -198,7 +198,7 @@ public:
   /// Return the array of mutable operands for this instruction.
   MutableArrayRef<Operand> getAllOperands();
 
-  /// Return the array of mutable type depedent operands for this instruction.
+  /// Return the array of mutable type dependent operands for this instruction.
   MutableArrayRef<Operand> getTypeDependentOperands();
 
   unsigned getNumOperands() const { return getAllOperands().size(); }

@@ -1514,7 +1514,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     assert(pa && "Re-introducing invalid requirement");
     // FIXME: defensively return if assertions are disabled until we figure out
-    // how this sitatuaion can occur and fix it properly.
+    // how this situation can occur and fix it properly.
     if (!pa)
       return;
 

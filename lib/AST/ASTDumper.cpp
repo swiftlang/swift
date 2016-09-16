@@ -1521,7 +1521,7 @@ public:
     Indent -= 2;
   }
 
-  void printRecLabelled(Expr *E, StringRef label) {
+  void printRecLabeled(Expr *E, StringRef label) {
     Indent += 2;
     OS.indent(Indent);
     OS << '(' << label << '\n';
@@ -1943,11 +1943,11 @@ public:
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {
       OS << '\n';
-      printRecLabelled(keyConversion.Conversion, "key_conversion");
+      printRecLabeled(keyConversion.Conversion, "key_conversion");
     }
     if (auto valueConversion = E->getValueConversion()) {
       OS << '\n';
-      printRecLabelled(valueConversion.Conversion, "value_conversion");
+      printRecLabeled(valueConversion.Conversion, "value_conversion");
     }
     OS << ')';
   }

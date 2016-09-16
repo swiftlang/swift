@@ -242,7 +242,7 @@ class TypeDecoder {
         if (element->getKind() != NodeKind::TupleElement)
           return BuiltType();
 
-        // If the tuple element is labelled, add its label to 'labels'.
+        // If the tuple element is labeled, add its label to 'labels'.
         unsigned typeChildIndex = 0;
         if (element->getChild(0)->getKind() == NodeKind::TupleElementName) {
           // Add spaces to terminate all the previous labels if this

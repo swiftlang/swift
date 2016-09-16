@@ -1678,7 +1678,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   }
 
   // Compensate different owning conventions of the replaced cast instruction
-  // and the inserted convertion function.
+  // and the inserted conversion function.
   bool needRetainBeforeCall = false;
   bool needReleaseAfterCall = false;
   bool needReleaseInSucc = false;

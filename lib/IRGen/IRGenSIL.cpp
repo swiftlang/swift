@@ -606,7 +606,7 @@ public:
                   DVI->getValue(), 0, DVI->getVariable(), DVI->getExpression(),
                   DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
             else
-              // Found all dbg.value instrinsics describing this location.
+              // Found all dbg.value intrinsics describing this location.
               break;
         }
       }

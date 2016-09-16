@@ -123,11 +123,11 @@ class C : A { }
 /// Check for defaulting the element type to 'Any'.
 func defaultToAny(i: Int, s: String) {
   let a1 = [1, "a", 3.5]
-  // expected-error@-1{{heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: Int = a1  // expected-error{{value of type '[Any]'}}
 
   let a2: Array = [1, "a", 3.5]
-  // expected-error@-1{{heterogenous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   let _: Int = a2  // expected-error{{value of type '[Any]'}}
 

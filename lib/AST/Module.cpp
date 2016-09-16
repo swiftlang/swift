@@ -673,7 +673,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
     // The archetype builder drops conformance requirements that are made
-    // redundant by a superclass requirement, so check for a cocnrete
+    // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
     // able to be resolved by a substitution that makes the archetype
     // concrete.
