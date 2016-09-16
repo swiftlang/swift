@@ -633,7 +633,10 @@ public:
   MetadataSourceMap getMetadataSourceMap() {
     MetadataSourceMap SourceMap;
 
-    if (!OrigCalleeType->isPolymorphic())
+    // Generic parameters of pseudogeneric functions do not have
+    // runtime metadata.
+    if (!OrigCalleeType->isPolymorphic() ||
+        OrigCalleeType->isPseudogeneric())
       return SourceMap;
 
     // Any generic parameters that are not fulfilled are passed in via the
@@ -703,6 +706,19 @@ public:
 
     for (auto ElementType : getElementTypes()) {
       auto SwiftType = ElementType.getSwiftRValueType();
+
+      // Erase pseudogeneric captures down to AnyObject.
+      if (OrigCalleeType->isPseudogeneric()) {
+        SwiftType = SwiftType.transform([&](Type t) -> Type {
+          if (auto *archetype = t->getAs<ArchetypeType>()) {
+            assert(archetype->requiresClass() && "don't know what to do");
+            return IGM.Context.getProtocol(KnownProtocolKind::AnyObject)
+                ->getDeclaredType();
+          }
+          return t;
+        })->getCanonicalType();
+      }
+
       auto InterfaceType = Caller.mapTypeOutOfContext(SwiftType);
       CaptureTypes.push_back(InterfaceType->getCanonicalType());
     }

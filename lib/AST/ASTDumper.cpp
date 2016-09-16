@@ -539,20 +539,22 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      OS << " type='";
-      if (VD->hasType())
-        VD->getType().print(OS);
-      else
-        OS << "<null type>";
+      if (!VD->hasType() || !VD->getType()->is<PolymorphicFunctionType>()) {
+        OS << " type='";
+        if (VD->hasType())
+          VD->getType().print(OS);
+        else
+          OS << "<null type>";
+        OS << '\'';
+      }
 
       if (VD->hasInterfaceType() &&
           (!VD->hasType() ||
            VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
-        OS << "' interface type='";
+        OS << " interface type='";
         VD->getInterfaceType()->getCanonicalType().print(OS);
+        OS << '\'';
       }
-
-      OS << '\'';
 
       if (VD->hasAccessibility()) {
         OS << " access=";

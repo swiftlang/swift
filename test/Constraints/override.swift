@@ -28,5 +28,5 @@ class Base2 {
 }
 
 class Sub2 : Base2 {
-  override func foo<T>(a : (T) ->()) {} // expected-error {{method does not override any method from its superclass}} expected-note{{type does not match superclass instance method with type '<T> (a: (T) -> ()) -> ()'}}{{28-28=@escaping }}
+  override func foo<T>(a : (T) ->()) {} // expected-error {{method does not override any method from its superclass}} expected-note{{type does not match superclass instance method with type '(@escaping (T) -> ()) -> ()'}}{{28-28=@escaping }}
 }

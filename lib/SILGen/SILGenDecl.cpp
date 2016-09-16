@@ -2083,7 +2083,7 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
     // makes the actual thunk.
     mangler.append("_TTR");
     if (auto generics = thunkType->getGenericSignature()) {
-      mangler.append('G');
+      mangler.append(thunkType->isPseudogeneric() ? 'g' : 'G');
       mangler.setModuleContext(M.getSwiftModule());
       mangler.mangleGenericSignature(generics);
     }
