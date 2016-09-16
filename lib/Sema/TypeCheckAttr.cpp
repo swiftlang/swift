@@ -1469,6 +1469,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   //   checked and diagnosed.
   // - This does not make use of Archetypes since it is directly substituting
   //   in place of GenericTypeParams.
+  //
+  // FIXME: Refactor to use GenericSignature->getSubstitutions()?
   SmallVector<Substitution, 4> substitutions;
   auto currentModule = FD->getParentModule();
   Type currentFromTy;
@@ -1521,7 +1523,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto superTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
         TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
-                    FD->getType(), firstTy, superTy);
+                    FD->getInterfaceType(), firstTy, superTy);
       }
       break;
     }
@@ -1531,8 +1533,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
       auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!firstTy->isEqual(sameTy)) {
-        TC.diagnose(attr->getLocation(), diag::types_not_equal, FD->getType(),
-                    firstTy, sameTy);
+        TC.diagnose(attr->getLocation(), diag::types_not_equal,
+                    FD->getInterfaceType(), firstTy, sameTy);
 
         return;
       }
