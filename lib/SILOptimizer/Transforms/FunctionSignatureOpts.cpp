@@ -313,7 +313,7 @@ public:
         // Currently we require that all dead parameters have trivial types.
         // The reason is that it's very hard to find places where we can release
         // those parameters (as a replacement for the removed partial_apply).
-        // TODO: maybe we can skip this restrication when we have semantic ARC.
+        // TODO: maybe we can skip this restriction when we have semantic ARC.
         if (!ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
           return false;
       }
