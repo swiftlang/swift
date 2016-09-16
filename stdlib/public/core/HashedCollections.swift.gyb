@@ -2542,7 +2542,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
   }
 
-  internal var _keysRawAddr : Builtin.RawPointer {
+  internal var _keysRawAddr: Builtin.RawPointer {
     let bitmapAddr = Builtin.projectTailElems(self, UInt.self)
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity)
     return Builtin.getTailAddr_Word(bitmapAddr,
