@@ -812,6 +812,14 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter n: The requested number of elements to store.
   public mutating func reserveCapacity(_ n: IndexDistance) {}
+
+  public mutating func _customRemoveLast() -> Iterator.Element? {
+    return nil
+  }
+
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+    return false
+  }
 }
 
 extension RangeReplaceableCollection where SubSequence == Self {
@@ -946,16 +954,6 @@ extension RangeReplaceableCollection
 }
 % end
 
-extension RangeReplaceableCollection {
-  public mutating func _customRemoveLast() -> Iterator.Element? {
-    return nil
-  }
-
-  public mutating func _customRemoveLast(_ n: Int) -> Bool {
-    return false
-  }
-}
-
 extension RangeReplaceableCollection
   where
   Self : BidirectionalCollection,
@@ -974,6 +972,16 @@ extension RangeReplaceableCollection
 }
 
 extension RangeReplaceableCollection where Self : BidirectionalCollection {
+  public mutating func _customRemoveLast() -> Iterator.Element? {
+    return remove(at: index(before: endIndex))
+  }
+
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+    let end = endIndex
+    removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
+    return true
+  }
+
   /// Removes and returns the last element of the collection.
   ///
   /// The collection must not be empty.

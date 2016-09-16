@@ -128,6 +128,18 @@ public protocol BidirectionalCollection
   ///     
   /// - Complexity: O(1)
   var last: Iterator.Element? { get }
+
+  /// Customization point for `removeLast()`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: A non-nil value if the operation was performed.
+  mutating func _customRemoveLast() -> Iterator.Element?
+
+  /// Customization point for `removeLast(_:)`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: `true` if the operation was performed.
+  mutating func _customRemoveLast(_ n: Int) -> Bool
 }
 
 /// Default implementation for bidirectional collections.
@@ -186,6 +198,16 @@ extension _BidirectionalIndexable {
   }
 }
 
+extension BidirectionalCollection {
+  public mutating func _customRemoveLast() -> Iterator.Element? {
+    return nil
+  }
+
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+    return false
+  }
+}
+
 /// Supply the default "slicing" `subscript` for `BidirectionalCollection`
 /// models that accept the default associated `SubSequence`,
 /// `BidirectionalSlice<Self>`.
@@ -211,6 +233,17 @@ extension BidirectionalCollection where SubSequence == Self {
     return element
   }
 
+  public mutating func _customRemoveLast() -> Iterator.Element? {
+    let element = last!
+    self = self[startIndex..<index(before: endIndex)]
+    return element
+  }
+
+  public mutating func _customRemoveLast(_ n: Int) -> Bool {
+    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    return true
+  }
+
   /// Removes and returns the last element of the collection.
   ///
   /// The collection must not be empty.
@@ -221,6 +254,10 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - SeeAlso: `popLast()`
   @discardableResult
   public mutating func removeLast() -> Iterator.Element {
+    _precondition(!isEmpty, "can't remove last element from an empty collection")
+    if let result = _customRemoveLast() {
+      return result
+    }
     let element = last!
     self = self[startIndex..<index(before: endIndex)]
     return element
@@ -240,6 +277,9 @@ extension BidirectionalCollection where SubSequence == Self {
     _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it contains")
+    if _customRemoveLast(n) {
+      return
+    }
     self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
   }
 }
