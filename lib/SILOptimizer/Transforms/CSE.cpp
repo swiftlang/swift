@@ -133,6 +133,10 @@ public:
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getField());
   }
 
+  hash_code visitRefTailAddrInst(RefTailAddrInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
   hash_code visitProjectBoxInst(ProjectBoxInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand());
   }
@@ -867,6 +871,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::ValueMetatypeInst:
     case ValueKind::ObjCProtocolInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefTailAddrInst:
     case ValueKind::ProjectBoxInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::IndexAddrInst:

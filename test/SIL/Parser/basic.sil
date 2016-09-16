@@ -726,6 +726,27 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @test_tail_elems
+sil @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
+  // CHECK: alloc_ref  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $Class1
+  %2 = alloc_ref [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $Class1
+  // CHECK: dealloc_ref %2 : $Class1
+  dealloc_ref %2 : $Class1
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_tail_addr
+sil @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1 {
+bb0(%0 : $Class1, %1 : $Builtin.Word):
+  // CHECK: [[T:%[0-9]+]] = ref_tail_addr %0 : $Class1, $Val
+  %2 = ref_tail_addr %0 : $Class1, $Val
+  // CHECK: tail_addr [[T]] : $*Val, %1 : $Builtin.Word, $Aleph
+  %3 = tail_addr %2 : $*Val, %1 : $Builtin.Word, $Aleph
+  return %0 : $Class1
+}
+
 
 // CHECK-LABEL: closure_test
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
