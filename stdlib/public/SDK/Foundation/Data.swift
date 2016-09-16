@@ -613,9 +613,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Data> {
+    public subscript(bounds: Range<Index>) -> MutableRangeReplaceableRandomAccessSlice<Data> {
         get {
-            return MutableRandomAccessSlice(base: self, bounds: bounds)
+            return MutableRangeReplaceableRandomAccessSlice(base: self, bounds: bounds)
         }
         set {
             replaceSubrange(bounds, with: newValue.base)
