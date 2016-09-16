@@ -137,8 +137,8 @@ private class PrivateBox<T> { // expected-note 2 {{type declared here}}
   typealias AlwaysFloat = Float
 }
 
-let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
-let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared fileprivate because its type uses a fileprivate type}}
+let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
+let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private or fileprivate because its type uses a private type}}
 #endif
 
 

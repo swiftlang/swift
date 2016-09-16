@@ -1208,9 +1208,9 @@ class TypeAccessScopeChecker : private TypeWalker {
     // Types.
     auto cached = Cache.find(ty);
     if (cached != Cache.end()) {
-      auto last = &RawScopeStack.back();
-      if (last->hasValue())
-        *last = last->getValue().intersectWith(cached->second);
+      Optional<AccessScope> &last = RawScopeStack.back();
+      if (last.hasValue())
+        last = last.getValue().intersectWith(cached->second);
       return Action::SkipChildren;
     }
 
@@ -1225,13 +1225,13 @@ class TypeAccessScopeChecker : private TypeWalker {
   }
 
   Action walkToTypePost(Type ty) override {
-    auto last = RawScopeStack.pop_back_val();
+    Optional<AccessScope> last = RawScopeStack.pop_back_val();
     if (last.hasValue()) {
       Cache.insert(std::make_pair(ty, *last));
 
-      auto prev = &RawScopeStack.back();
-      if (prev->hasValue())
-        *prev = prev->getValue().intersectWith(*last);
+      Optional<AccessScope> &prev = RawScopeStack.back();
+      if (prev.hasValue())
+        prev = prev.getValue().intersectWith(*last);
     }
 
     return Action::Continue;
@@ -1601,7 +1601,8 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
                                [&](AccessScope typeAccessScope,
                                    const TypeRepr *thisComplainRepr) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr && typeAccessScope == minAccessScope)) {
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Parameter;
@@ -1613,7 +1614,8 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     auto callback = [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr && typeAccessScope == minAccessScope)) {
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_Requirement;
@@ -1651,6 +1653,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     auto diag = TC.diagnose(owner, diagID,
                             owner->getDescriptiveKind(), isExplicit,
                             contextAccess, minAccess,
+                            isa<FileUnit>(owner->getDeclContext()),
                             accessibilityErrorKind);
     highlightOffendingType(TC, diag, complainRepr);
   }
@@ -1719,6 +1722,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
           auto typeAccess = typeAccessScope.accessibilityForDiagnostics();
           bool isExplicit =
             theVar->getAttrs().hasAttribute<AccessibilityAttr>();
+          auto theVarAccess = isExplicit
+            ? theVar->getFormalAccess()
+            : typeAccessScope.requiredAccessibilityForDiagnostics();
           auto diagID = diag::pattern_type_access_inferred;
           if (downgradeToWarning == DowngradeToWarning::Yes)
             diagID = diag::pattern_type_access_inferred_warn;
@@ -1726,7 +1732,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                   theVar->isLet(),
                                   isTypeContext,
                                   isExplicit,
-                                  theVar->getFormalAccess(),
+                                  theVarAccess,
+                                  isa<FileUnit>(theVar->getDeclContext()),
                                   typeAccess,
                                   theVar->getType());
         });
@@ -1759,11 +1766,15 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::pattern_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::pattern_type_access_warn;
+        auto anyVarAccess = isExplicit
+          ? anyVar->getFormalAccess()
+          : typeAccessScope.requiredAccessibilityForDiagnostics();
         auto diag = TC.diagnose(P->getLoc(), diagID,
                                 anyVar->isLet(),
                                 isTypeContext,
                                 isExplicit,
-                                anyVar->getFormalAccess(),
+                                anyVarAccess,
+                                isa<FileUnit>(anyVar->getDeclContext()),
                                 typeAccess);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -1785,7 +1796,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         diagID = diag::type_alias_underlying_type_access_warn;
       auto diag = TC.diagnose(TAD, diagID,
                               isExplicit, TAD->getFormalAccess(),
-                              typeAccess);
+                              typeAccess, isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     });
 
@@ -1812,7 +1823,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
         if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr && typeAccessScope == minAccessScope)) {
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           accessibilityErrorKind = AEK_Requirement;
@@ -1825,7 +1837,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                const TypeRepr *thisComplainRepr,
                                DowngradeToWarning downgradeDiag) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr && typeAccessScope ==  minAccessScope)) {
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         accessibilityErrorKind = AEK_DefaultDefinition;
@@ -1871,9 +1884,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::enum_raw_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::enum_raw_type_access_warn;
-        auto diag = TC.diagnose(ED, diagID,
-                                isExplicit, ED->getFormalAccess(),
-                                typeAccess);
+        auto diag = TC.diagnose(ED, diagID, isExplicit,
+                                ED->getFormalAccess(), typeAccess,
+                                isa<FileUnit>(ED->getDeclContext()));
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
@@ -1912,9 +1925,9 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
-        auto diag = TC.diagnose(CD, diagID,
-                                isExplicit, CD->getFormalAccess(),
-                                typeAccess);
+        auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
+                                typeAccess,
+                                isa<FileUnit>(CD->getDeclContext()));
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
@@ -1937,7 +1950,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
         if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr && typeAccessScope == minAccessScope)) {
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
@@ -1952,7 +1966,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_refine_access_warn;
       auto diag = TC.diagnose(proto, diagID,
-                              isExplicit, proto->getFormalAccess(), minAccess);
+                              isExplicit, proto->getFormalAccess(), minAccess,
+                              isa<FileUnit>(proto->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     }
     return;
@@ -1972,7 +1987,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
         if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr && typeAccessScope == minAccessScope)) {
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
@@ -1985,7 +2001,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                const TypeRepr *thisComplainRepr,
                                DowngradeToWarning downgradeDiag) {
       if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr && typeAccessScope == minAccessScope)) {
+          (!complainRepr &&
+           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
         minAccessScope = typeAccessScope;
         complainRepr = thisComplainRepr;
         downgradeToWarning = downgradeDiag;
@@ -2001,9 +2018,12 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
       auto diagID = diag::subscript_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::subscript_type_access_warn;
+      auto subscriptDeclAccess = isExplicit
+        ? SD->getFormalAccess()
+        : minAccessScope.requiredAccessibilityForDiagnostics();
       auto diag = TC.diagnose(SD, diagID,
                               isExplicit,
-                              SD->getFormalAccess(),
+                              subscriptDeclAccess,
                               minAccess,
                               problemIsElement);
       highlightOffendingType(TC, diag, complainRepr);
@@ -2039,7 +2059,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                    const TypeRepr *thisComplainRepr,
                                    DowngradeToWarning downgradeDiag) {
           if (typeAccessScope.isChildOf(minAccessScope) ||
-              (!complainRepr && typeAccessScope == minAccessScope)) {
+              (!complainRepr &&
+               typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
             minAccessScope = typeAccessScope;
             complainRepr = thisComplainRepr;
             downgradeToWarning = downgradeDiag;
@@ -2055,7 +2076,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
         if (typeAccessScope.isChildOf(minAccessScope) ||
-            (!complainRepr && typeAccessScope == minAccessScope)) {
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
@@ -2066,18 +2088,24 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessibilityForDiagnostics();
+      auto functionKind = isa<ConstructorDecl>(fn)
+        ? FK_Initializer
+        : isTypeContext ? FK_Method : FK_Function;
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessibilityAttr>() ||
-        D->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+        fn->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
       auto diagID = diag::function_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::function_type_access_warn;
+      auto fnAccess = isExplicit
+        ? fn->getFormalAccess()
+        : minAccessScope.requiredAccessibilityForDiagnostics();
       auto diag = TC.diagnose(fn, diagID,
                               isExplicit,
-                              fn->getFormalAccess(),
+                              fnAccess,
+                              isa<FileUnit>(fn->getDeclContext()),
                               minAccess,
-                              isa<ConstructorDecl>(fn) ? FK_Initializer :
-                                isTypeContext ? FK_Method : FK_Function,
+                              functionKind,
                               problemIsResult);
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -5689,10 +5717,10 @@ public:
         }
         if (shouldDiagnose || shouldDiagnoseSetter) {
           bool overriddenForcesAccess =
-              (requiredAccessScope == matchAccessScope &&
-               matchAccess != Accessibility::Open);
+            (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
+             matchAccess != Accessibility::Open);
           Accessibility requiredAccess =
-            requiredAccessScope->accessibilityForDiagnostics();
+            requiredAccessScope->requiredAccessibilityForDiagnostics();
           {
             auto diag = TC.diagnose(decl, diag::override_not_accessible,
                                     shouldDiagnoseSetter,

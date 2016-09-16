@@ -1437,8 +1437,11 @@ checkWitnessAccessibility(AccessScope &requiredAccessScope,
                           bool *isSetter) {
   *isSetter = false;
 
-  requiredAccessScope =
-    *requiredAccessScope.intersectWith(Proto->getFormalAccessScope(DC));
+  auto scopeIntersection =
+    requiredAccessScope.intersectWith(Proto->getFormalAccessScope(DC));
+  assert(scopeIntersection.hasValue());
+
+  requiredAccessScope = *scopeIntersection;
 
   AccessScope actualScopeToCheck = requiredAccessScope;
   if (!witness->isAccessibleFrom(actualScopeToCheck.getDeclContext())) {
@@ -2134,7 +2137,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
         [DC, typeDecl, requiredAccessScope, assocType](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
         Accessibility requiredAccess =
-            requiredAccessScope.accessibilityForDiagnostics();
+          requiredAccessScope.requiredAccessibilityForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2424,9 +2427,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       diagnoseOrDefer(requirement, false,
         [DC, witness, check, requirement](
           TypeChecker &tc, NormalProtocolConformance *conformance) {
+        auto requiredAccessScope = check.RequiredAccessScope;
         Accessibility requiredAccess =
-            check.RequiredAccessScope.accessibilityForDiagnostics();
-
+          requiredAccessScope.requiredAccessibilityForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
@@ -2441,6 +2444,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                                 witness->getFullName(),
                                 isSetter,
                                 requiredAccess,
+                                protoAccessScope.accessibilityForDiagnostics(),
                                 proto->getName());
         fixItAccessibility(diag, witness, requiredAccess, isSetter);
       });

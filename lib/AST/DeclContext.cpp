@@ -929,13 +929,24 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
+AccessScope::AccessScope(const DeclContext *DC, bool isPrivate)
+    : Value(DC, isPrivate) {
+  if (!DC || isa<ModuleDecl>(DC))
+    assert(!isPrivate && "public or internal scope can't be private");
+}
+
+bool AccessScope::isFileScope() const {
+  auto DC = getDeclContext();
+  return DC && isa<FileUnit>(DC);
+}
+
 Accessibility AccessScope::accessibilityForDiagnostics() const {
   if (isPublic())
     return Accessibility::Public;
   if (isa<ModuleDecl>(getDeclContext()))
     return Accessibility::Internal;
   if (getDeclContext()->isModuleScopeContext()) {
-    return Accessibility::FilePrivate;
+    return isPrivate() ? Accessibility::Private : Accessibility::FilePrivate;
   }
 
   return Accessibility::Private;

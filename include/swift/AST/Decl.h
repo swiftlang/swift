@@ -17,6 +17,7 @@
 #ifndef SWIFT_DECL_H
 #define SWIFT_DECL_H
 
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -32,7 +33,6 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
-  class AccessScope;
   enum class AccessSemantics : unsigned char;
   class ApplyExpr;
   class ArchetypeBuilder;

@@ -15,7 +15,6 @@
 
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Module.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -27,11 +26,7 @@ class AccessScope {
   /// whether this scope is private (or not).
   llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
 public:
-  AccessScope(const DeclContext *DC, bool isPrivate = false)
-    : Value(DC, isPrivate) {
-        if (!DC || isa<ModuleDecl>(DC))
-          assert(!isPrivate && "public or internal scope can't be private");
-      }
+  AccessScope(const DeclContext *DC, bool isPrivate = false);
 
   static AccessScope getPublic() { return AccessScope(nullptr); }
 
@@ -46,10 +41,7 @@ public:
 
   bool isPublic() const { return !Value.getPointer(); }
   bool isPrivate() const { return Value.getInt(); }
-  bool isFileScope() const {
-    auto DC = getDeclContext();
-    return DC && isa<FileUnit>(DC);
-  }
+  bool isFileScope() const;
 
   /// Returns true if this is a child scope of the specified other access scope.
   ///
@@ -57,11 +49,21 @@ public:
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
       return getDeclContext()->isChildContextOf(AS.getDeclContext());
+    if (isPublic() && AS.isPublic())
+      return false;
     return AS.isPublic();
   }
 
   /// Returns the associated access level for diagnostic purposes.
   Accessibility accessibilityForDiagnostics() const;
+
+  /// Returns the minimum access level required to access
+  /// associated DeclContext for diagnostic purposes.
+  Accessibility requiredAccessibilityForDiagnostics() const {
+    return isFileScope()
+      ? Accessibility::FilePrivate
+      : accessibilityForDiagnostics();
+  }
 
   /// Returns the narrowest access scope if this and the specified access scope
   /// have common intersection, or None if scopes don't intersect.
