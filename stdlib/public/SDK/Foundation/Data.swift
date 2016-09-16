@@ -774,7 +774,7 @@ extension NSData : _HasCustomAnyHashableRepresentation {
     }
 }
 
-/// A NSData subclass that uses Swift reference counting.
+/// An NSData subclass that uses Swift reference counting.
 ///
 /// This subclass implements the API of NSData by holding an instance and forwarding all implementation to that object.
 /// Since it uses Swift reference counting, we can do correct uniqueness checks even if we pass this instance back to Objective-C. In Objective-C, it looks like an instance of NSData.
