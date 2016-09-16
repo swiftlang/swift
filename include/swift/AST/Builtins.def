@@ -259,7 +259,7 @@ BUILTIN_SIL_OPERATION(GepRaw, "gepRaw", Integer)
 
 /// Gep (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
 ///
-/// Like the GepRaw-bultin, but multiplies the index by stride-of type 'T'.
+/// Like the GepRaw-builtin, but multiplies the index by stride-of type 'T'.
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 
 /// getTailAddr(Builtin.RawPointer,

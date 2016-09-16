@@ -575,7 +575,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
 
 /// Try to stack promote a class instance with possible tail allocated arrays.
 ///
-/// Returns the alloca if successfull, or nullptr otherwise.
+/// Returns the alloca if successful, or nullptr otherwise.
 static llvm::Value *stackPromote(IRGenFunction &IGF,
                       const StructLayout &ClassLayout,
                       int &StackAllocSize,
