@@ -468,7 +468,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
   /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
-    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
+    return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 

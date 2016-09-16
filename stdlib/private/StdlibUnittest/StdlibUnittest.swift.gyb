@@ -2073,7 +2073,7 @@ public func checkHashable<Instances : Collection>(
 }
 
 public func checkHashable<T : Hashable>(
-  _ expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
   checkHashable(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})

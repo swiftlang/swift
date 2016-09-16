@@ -109,8 +109,8 @@ class NestedGeneric<U> {
   }
 
   // CHECK-LABEL: sil hidden @_TFC16generic_closures13NestedGeneric20nested_reabstraction{{.*}}
-  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRG__rXFo___XFo_iT__iT__
-  //   CHECK:       partial_apply [[REABSTRACT]]<U, T>
+  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @_TTRXFo___XFo_iT__iT__
+  //   CHECK:       partial_apply [[REABSTRACT]]
   func nested_reabstraction<T>(_ x: T) -> Optionable<() -> ()> {
     return .some({})
   }
@@ -213,8 +213,8 @@ func outer_generic<T>(t: T, i: Int) {
   let _: () -> () = inner_generic_nocapture
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_23inner_generic_nocaptureu__rFT1uqd___qd__ : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>() : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTRGrXFo_iT__iT__XFo___
-  // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]<T>([[CLOSURE]])
+  // CHECK: [[THUNK:%.*]] = function_ref @_TTRXFo_iT__iT__XFo___
+  // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: strong_release [[THUNK_CLOSURE]]
 
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_23inner_generic_nocaptureu__rFT1uqd___qd__ : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0) -> @out τ_1_0
@@ -223,8 +223,8 @@ func outer_generic<T>(t: T, i: Int) {
 
   // CHECK: [[FN:%.*]] = function_ref @_TFF16generic_closures13outer_genericurFT1tx1iSi_T_L_14inner_generic1u__rfT1uqd___Si : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
   // CHECK: [[CLOSURE:%.*]] = partial_apply [[FN]]<T, ()>(%1) : $@convention(thin) <τ_0_0><τ_1_0> (@in τ_1_0, Int) -> Int
-  // CHECK: [[THUNK:%.*]] = function_ref @_TTRGrXFo_iT__dSi_XFo__dSi_
-  // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]<T>([[CLOSURE]])
+  // CHECK: [[THUNK:%.*]] = function_ref @_TTRXFo_iT__dSi_XFo__dSi_
+  // CHECK: [[THUNK_CLOSURE:%.*]] = partial_apply [[THUNK]]([[CLOSURE]])
   // CHECK: strong_release [[THUNK_CLOSURE]]
   let _: () -> Int = inner_generic1
 

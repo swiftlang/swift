@@ -117,6 +117,8 @@ public protocol _IndexableBase {
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>)
 
+  func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>)
+
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -879,6 +881,16 @@ extension _Indexable {
     _precondition(
       index < bounds.upperBound,
       "out of bounds: index >= endIndex")
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
+    _precondition(
+      bounds.lowerBound <= index,
+      "out of bounds: index < startIndex")
+    _precondition(
+      index <= bounds.upperBound,
+      "out of bounds: index > endIndex")
   }
 
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {

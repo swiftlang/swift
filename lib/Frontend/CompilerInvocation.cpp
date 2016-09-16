@@ -981,7 +981,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   using namespace options;
 
-  Opts.VerifyDiagnostics |= Args.hasArg(OPT_verify);
+  if (Args.hasArg(OPT_verify))
+    Opts.VerifyMode = DiagnosticOptions::Verify;
+  if (Args.hasArg(OPT_verify_apply_fixes))
+    Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);

@@ -1678,7 +1678,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   }
 
   // Compensate different owning conventions of the replaced cast instruction
-  // and the inserted convertion function.
+  // and the inserted conversion function.
   bool needRetainBeforeCall = false;
   bool needReleaseAfterCall = false;
   bool needReleaseInSucc = false;
@@ -2724,6 +2724,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst: {
         auto *Inst = cast<SILInstruction>(V);
         // We are done once the current projection dominates the insert point.

@@ -22,10 +22,10 @@ Swift 3.1
 
 * [SE-0045][]:
 
-  The `Sequence` protocol now includes two new members, `prefix(while:)` and
-  `drop(while:)`.  `prefix(while:)` is used to request the longest subsequence
-  satisfying a predicate.  `drop(while:)` is used to request the subsequence
-  remaining after dropping the longest subsequence satisfying a predicate.
+  The `Sequence` protocol adds new members `prefix(while:)` and
+  `drop(while:)`.  `prefix(while:)` requests the longest subsequence
+  satisfying a predicate.  `drop(while:)` requests the remaining subsequence
+  after dropping the longest subsequence satisfying a predicate.
 
 Swift 3.0
 ---------
@@ -34,25 +34,24 @@ Swift 3.0
 
 * [SE-0101][]:
 
-  The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
-  Instead, these memory layout properties for a type `T` are now spelled
+ The functions `sizeof()`, `strideof()`, and `alignof()` have been removed.
+  Memory layout properties for a type `T` are now spelled
   `MemoryLayout<T>.size`, `MemoryLayout<T>.stride`, and
   `MemoryLayout<T>.alignment`, respectively.
 
 * [SE-0136][]:
 
-  The functions `sizeofValue()`, `strideofValue()`, and `alignofValue()` have
-  been renamed `MemoryLayout.size(ofValue:)`, `MemoryLayout.stride(ofValue:)`,
+  The functions `sizeofValue()`, `strideofValue()`, and `alignofValue()` have been renamed to `MemoryLayout.size(ofValue:)`, `MemoryLayout.stride(ofValue:)`,
   and `MemoryLayout.alignment(ofValue:)`.
 
 * [SE-0125][]:
 
   The functions `isUniquelyReferenced()` and `isUniquelyReferencedNonObjC()`
-  have been removed. The function `isKnownUniquelyReferenced()` should be called
-  instead. The class `NonObjectiveCBase` which classes using
-  `isUniquelyReferenced()` needed to inherit from was removed.
+  have been removed. Call the function `isKnownUniquelyReferenced()` instead. 
+  
+  Classes using `isUniquelyReferenced()` needed to inherit from `NonObjectiveCBase`. The `NonObjectiveCBase` class has been removed. 
 
-  The method `ManagedBufferPointer.holdsUniqueReference` was renamed to
+  The method `ManagedBufferPointer.holdsUniqueReference` has been renamed to
   `ManagedBufferPointer.isUniqueReference`.
 
   ```swift
@@ -77,8 +76,7 @@ Swift 3.0
 
 * [SE-0124][]:
 
-  The initializers on `Int` and `UInt` accepting an `ObjectIdentifier` now need
-  to be spelled with an explicit `bitPattern` label.
+ Initializers on `Int` and `UInt` that accept an `ObjectIdentifier` must now use an explicit `bitPattern` label.
 
   ```swift
   let x: ObjectIdentifier = ...
@@ -94,9 +92,7 @@ Swift 3.0
 
 * [SE-0120][]:
 
-  The collection methods `partition()` and `partition(isOrderedBefore:)` have
-  been removed from Swift. They were replaced by the method `partition(by:)`
-  which takes a unary predicate.
+  The collection methods `partition()` and `partition(isOrderedBefore:)` have been removed from Swift. They are replaced by the method `partition(by:)` which takes a unary predicate.
 
   Calls to the `partition()` method can be replaced by the following code.
 
@@ -112,16 +108,11 @@ Swift 3.0
 
 * [SE-0103][]:
 
-  Closure parameters are non-escaping by default, rather than explicitly being
-  annotated `@noescape`. Use `@escaping` to say that a closure parameter may
-  escape. `@autoclosure(escaping)` is now spelled `@autoclosure @escaping`.
-  `@noescape` and `@autoclosure(escaping)` are deprecated.
+  Closure parameters are now non-escaping by default and do not require `@noescape` annotation. Use `@escaping` to indicate that a closure parameter can escape. `@autoclosure(escaping)` is now spelled `@autoclosure @escaping`. `@noescape` and `@autoclosure(escaping)` are deprecated.
 
 * [SE-0115][]:
 
-  To clarify the role of `*LiteralConvertible` protocols, they have
-  been renamed to `ExpressibleBy*Literal`.  No requirements of these
-  protocols have changed.
+  To clarify their roles, `*LiteralConvertible` protocols have been renamed to `ExpressibleBy*Literal`.  The protocol requirements are unchanged.
 
 * [SE-0107][]:
 
@@ -130,17 +121,14 @@ Swift 3.0
   to `UnsafePointer<U>` has been disallowed. `Unsafe[Mutable]RawPointer`
   provides an API for untyped memory access, and an API for binding memory
   to a type. Binding memory allows for safe conversion between pointer types.
-  See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
-  `withMemoryRebound(to:capacity:)`.
+  
+  For detailed instructions on how to migrate your code to the new API refer to the [UnsafeRawPointer migration guide](https://swift.org/migration-guide/se-0107-migrate.html). See also: See `bindMemory(to:capacity:)`, `assumingMemoryBound(to:)`, and
+  `withMemoryRebound(to:capacity:)`. 
 
 * [SE-0096][]:
 
-  The `dynamicType` keyword has been removed from Swift.  In its place a new
-  primitive function `type(of:)` has been added to the language.  Existing code
-  that uses the `.dynamicType` member to retrieve the type of an expression
-  should migrate to this new primitive.  Code that is using `.dynamicType` in
-  conjunction with `sizeof` should migrate to the `MemoryLayout` structure
-  provided by [SE-0101][].
+  The `dynamicType` keyword has been removed from Swift.  It's replaced by a new primitive function `type(of:)`.  Existing code
+using the `.dynamicType` member to retrieve the type of an expression should migrate to this new primitive.  Code using `.dynamicType` in conjunction with `sizeof` should migrate to the `MemoryLayout` structure introduced by [SE-0101][].
 
 * [SE-0113][]:
 
@@ -151,32 +139,26 @@ Swift 3.0
   mutating func round( _ rule: FloatingPointRoundingRule)
   ```
 
-  These bind the IEEE 754 roundToIntegral operations. They provide the
-  functionality of the C / C++ `round()`, `ceil()`, `floor()`, and `trunc()`
-  functions and other rounding operations as well.
+  These methods bind the IEEE 754 roundToIntegral operations. They provide the functionality of the C / C++ `round()`, `ceil()`, `floor()`, and `trunc()` functions along with other rounding operations.
 
-  As a follow-on to the work of [SE-0113][] and [SE-0067][], the following
-  mathematical operations in the `Darwin.C` and `glibc` modules now operate
-  on any type conforming to `FloatingPoint`: `fabs`, `sqrt`, `fma`,
+  Following onto [SE-0113][] and [SE-0067][], the following `Darwin.C` and `glibc` module mathematical operations now operate on any type conforming to `FloatingPoint`: `fabs`, `sqrt`, `fma`,
   `remainder`, `fmod`, `ceil`, `floor`, `round`, and `trunc`.
 
-  See also the changes associated with [SE-0067][].
+  See also: the changes associated with [SE-0067][].
 
 * [SE-0067][]:
 
   The `FloatingPoint` protocol has been expanded to include most IEEE 754
   required operations. A number of useful properties have been added to the
-  protocol as well, representing quantities like the largest finite value or
+  protocol, representing quantities like the largest finite value or
   the smallest positive normal value (these correspond to the macros such as
   FLT_MAX defined in C).
 
-  While almost all of the changes are additive, there are four changes that
-  will impact existing code:
+  While almost all of the changes are additive, four changes impact existing code:
 
   - The `%` operator is no longer available for `FloatingPoint` types. It
-  was difficult to use correctly, and its semantics did not actually match
-  those of the corresponding integer operation, making it something of an
-  attractive nuisance. The new method `formTruncatingRemainder(dividingBy:)`
+  was difficult to use correctly and its semantics did not match
+  those of the corresponding integer operation. This made it something of an attractive nuisance. The new method `formTruncatingRemainder(dividingBy:)`
   provides the old semantics if they are needed.
 
   - The static property `.NaN` has been renamed `.nan`.
@@ -186,30 +168,25 @@ Swift 3.0
 
   - The predicate `isSignaling` has been renamed `isSignalingNaN`.
 
-  See also the changes associated with [SE-0113][].
+  See also: the changes associated with [SE-0113][].
 
 * [SE-0111][]:
 
-  Argument labels have been removed from Swift function types. Instead, they are
-  part of the name of a function, subscript, or initializer. Calls to a function
-  or initializer, or uses of a subscript, still require argument labels, as they
-  always have:
+  Argument labels have been removed from Swift function types. They are now
+  part of the name of a function, subscript, or initializer. Calls to a function or initializer, and subscript uses, still require argument labels as they always have:
 
   ```swift
   func doSomething(x: Int, y: Int) { }
   doSomething(x: 0, y: 0)     // argument labels are required
   ```
 
-  However, unapplied references to functions or initializers no longer carry
-  argument labels. For example:
+ Unapplied references to functions or initializers no longer carry argument labels. For example:
 
   ```swift
   let f = doSomething(x:y:)     // inferred type is now (Int, Int) -> Void
   ```
 
-  Additionally, explicitly-written function types can no longer carry argument
-  labels, although one can still provide parameter name for documentation
-  purposes using the '_' in the argument label position:
+  Explicitly-written function types can no longer carry argument labels. You can still provide parameter names for documentation purposes using the '_' in the argument label position:
 
   ```swift
   typealias CompletionHandler =
@@ -229,7 +206,7 @@ Swift 3.0
 
 * [SE-0131][]:
 
-  The standard library provides a new type `AnyHashable` for use in heterogenous
+  The standard library provides a new type `AnyHashable` for use in heterogeneous
   hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
   now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
 
@@ -584,7 +561,7 @@ Swift 3.0
 
 * [SE-0046][]:
 
-  Function parameters now have consistent labelling across all function
+  Function parameters now have consistent labeling across all function
   parameters. With this update the first parameter declarations will
   now match the existing behavior of the second and later parameters.
   This change makes the language simpler.

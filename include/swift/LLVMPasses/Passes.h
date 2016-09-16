@@ -87,14 +87,6 @@ namespace swift {
     SwiftARCContract() : llvm::FunctionPass(ID) {}
   };
 
-  class SwiftStackPromotion : public llvm::FunctionPass {
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
-    virtual bool runOnFunction(llvm::Function &F) override;
-  public:
-    static char ID;
-    SwiftStackPromotion() : llvm::FunctionPass(ID) {}
-  };
-
   class InlineTreePrinter : public llvm::ModulePass {
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
     virtual bool runOnModule(llvm::Module &M) override;

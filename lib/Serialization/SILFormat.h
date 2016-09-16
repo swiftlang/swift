@@ -125,6 +125,7 @@ namespace sil_block {
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
     SIL_TWO_OPERANDS,
+    SIL_TAIL_ADDR,
     SIL_INST_APPLY,
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
@@ -372,6 +373,17 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
+  >;
+
+  // The tail_addr instruction.
+  using SILTailAddrLayout = BCRecordLayout<
+    SIL_TAIL_ADDR,
+    SILInstOpCodeField,
+    TypeIDField,          // Base operand
+    ValueIDField,
+    TypeIDField,          // Count operand
+    ValueIDField,
+    TypeIDField           // Result type
   >;
 
   using SILGenericOuterParamsLayout = BCRecordLayout<

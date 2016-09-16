@@ -1,4 +1,4 @@
-//===--- RCIdentityAnalysis.h -----------------------------------*- C++ -*-===//
+//===--- EpilogueARCAnalysis.h ----------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -87,7 +87,7 @@ private:
   /// The exit blocks of the function.
   llvm::SmallPtrSet<SILBasicBlock *, 2> ExitBlocks;
 
-  /// Return true if this is a function exitting block this epilogue ARC
+  /// Return true if this is a function exiting block this epilogue ARC
   /// matcher is interested in. 
   bool isInterestedFunctionExitingBlock(SILBasicBlock *BB) {
     if (EpilogueARCKind::Release == Kind)  

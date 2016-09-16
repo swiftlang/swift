@@ -450,7 +450,11 @@ public:
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      SILType T) const;
-  
+
+  /// Round up the address value \p base to the alignment of type \p T. 
+  Address roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
+                                 SILType T) const;
+
   /// Destroy an array of objects of this type in memory.
   virtual void destroyArray(IRGenFunction &IGF, Address base,
                             llvm::Value *count, SILType T) const;

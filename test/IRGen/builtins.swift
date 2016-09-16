@@ -120,9 +120,9 @@ func !=(lhs: Int, rhs: Int) -> Bool {
   // CHECK: icmp ne i32
 }
 
-func gep_test(_ ptr: Builtin.RawPointer, offset: Builtin.Int64)
+func gepRaw_test(_ ptr: Builtin.RawPointer, offset: Builtin.Int64)
    -> Builtin.RawPointer {
-  return Builtin.gep_Int64(ptr, offset)
+  return Builtin.gepRaw_Int64(ptr, offset)
   // CHECK: getelementptr inbounds i8, i8*
 }
 

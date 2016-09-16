@@ -1,4 +1,4 @@
-//===--- TypeJoinjoin.cpp - Swift Type "join" and "meet"  -----------------===//
+//===--- TypeJoinMeet.cpp - Swift Type "join" and "meet"  -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
