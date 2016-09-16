@@ -45,8 +45,8 @@
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      startIndex[#String.Index#]; name=startIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]; name=endIndex{{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]; name=append(c: Character){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#contentsOf: S#})[#Void#]; name=append(contentsOf: S){{$}}
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insert({#contentsOf: S#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf: S, at: String.Index){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   append({#contentsOf: Sequence#})[#Void#]; name=append(contentsOf: Sequence){{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   insert({#contentsOf: Collection#}, {#at: String.Index#})[#Void#]; name=insert(contentsOf: Collection, at: String.Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   remove({#at: String.Index#})[#Character#]; name=remove(at: String.Index){{$}}
 // LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:      lowercased()[#String#]; name=lowercased(){{$}}
 
@@ -59,7 +59,7 @@ func giveMeAString() -> Int {
 // LITERAL5-DAG:     Decl[InstanceVar]/CurrNominal:      endIndex[#String.Index#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: reserveCapacity({#(n): Int#})[#Void#]{{; name=.+$}}
 // LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#(c): Character#})[#Void#]{{; name=.+$}}
-// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: S#})[#Void#]{{; name=.+$}}
+// LITERAL5-DAG:     Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: append({#contentsOf: Sequence#})[#Void#]{{; name=.+$}}
 
 struct MyColor: _ExpressibleByColorLiteral {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) { red = colorLiteralRed }

@@ -2105,9 +2105,9 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
       Type SelfType = Adopter->getSelfTypeInContext();
       if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType, Adopter);
+        Options.setArchetypeSelfTransform(SelfType);
       else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+        Options.setArchetypeAndDynamicSelfTransform(SelfType);
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in

@@ -1966,7 +1966,7 @@ public:
       OS.indent(IndentLevel * 2);
       OS << Decl::getKindName(VD->getKind()) << "Decl '''"
          << VD->getName().str() << "''' ";
-      VD->getType().print(OS, Options);
+      VD->getInterfaceType().print(OS, Options);
       OS << "\n";
     }
     IndentLevel++;
