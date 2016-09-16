@@ -776,8 +776,13 @@ class RefCounts {
   
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
-  // FIXME: inline fast path when there are no weak references outstanding
-  uint32_t getWeakCount() const;
+  uint32_t getWeakCount() const {
+    auto bits = refCounts.load(relaxed);
+    if (bits.hasSideTable())
+      return bits.getSideTable()->getWeakCount();
+    else 
+      return 0;
+  }
 
 
  private:
@@ -803,6 +808,10 @@ class HeapObjectSideTableEntry {
   HeapObjectSideTableEntry(HeapObject *newObject)
     : object(newObject), refCounts()
   { }
+
+  static ptrdiff_t refCountsOffset() {
+    return offsetof(HeapObjectSideTableEntry, refCounts);
+  }
 
   HeapObject* tryRetain() {
     if (refCounts.tryIncrement())
@@ -881,6 +890,10 @@ class HeapObjectSideTableEntry {
     // Weak ref count is now zero. Maybe delete the side table entry.
     abort();
   }
+
+  uint32_t getWeakCount() const {
+    return refCounts.getWeakCount();
+  }
 };
 
 
@@ -925,7 +938,7 @@ doDecrementNonAtomic(uint32_t dec) {
   return doDecrement<clearPinnedFlag, performDeinit>(dec);
 }
 
-// SideTableRefCountBits specialization intentionally does not exist.
+
 template <>
 template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
 inline bool RefCounts<InlineRefCountBits>::
@@ -934,15 +947,25 @@ doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec) {
   return side->decrementStrong<clearPinnedFlag, performDeinit>(dec);
 }
 
+template <>
+template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+inline bool RefCounts<SideTableRefCountBits>::
+doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
+  abort();
+}
+
+
 template <> inline
 HeapObject* RefCounts<InlineRefCountBits>::getHeapObject() const {
-  auto prefix = ((char *)this - sizeof(void*));
+  auto offset = sizeof(void *);
+  auto prefix = ((char *)this - offset);
   return (HeapObject *)prefix;
 }
 
 template <> inline
 HeapObject* RefCounts<SideTableRefCountBits>::getHeapObject() const {
-  auto prefix = ((char *)this - sizeof(void*));
+  auto offset = HeapObjectSideTableEntry::refCountsOffset();
+  auto prefix = ((char *)this - offset);
   return *(HeapObject **)prefix;
 }
 
