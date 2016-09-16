@@ -135,3 +135,21 @@ func bridgeNoescapeBlock() {
   // CHECK: function_ref @_TTRXFo___XFdCb___
   noescapeNonnullBlockAlias { }
 }
+
+class ObjCClass : NSObject {}
+
+extension ObjCClass {
+  func someDynamicMethod(closure: (() -> ()) -> ()) {}
+}
+
+struct GenericStruct<T> {
+  let closure: (() -> ()) -> ()
+
+  func doStuff(o: ObjCClass) {
+    o.someDynamicMethod(closure: closure)
+  }
+}
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRgrXFo_oXFo_____XFdCb_dXFdCb_____ : $@convention(c) @pseudogeneric <T> (@inout_aliasable @block_storage @callee_owned (@owned @callee_owned () -> ()) -> (), @convention(block) () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRgrXFdCb___XFo___ : $@convention(thin) @pseudogeneric <T> (@owned @convention(block) () -> ()) -> ()
+
