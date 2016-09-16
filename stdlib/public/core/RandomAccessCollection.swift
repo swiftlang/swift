@@ -200,18 +200,16 @@ where Index : Strideable,
     return startIndex..<endIndex
   }
 
-  internal func _validityChecked(_ i: Index) -> Index {
-    _precondition(i >= startIndex && i <= endIndex, "index out of range")
-    return i
-  }
-  
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    return _validityChecked(i.advanced(by: 1))
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      i, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
+    return i.advanced(by: 1)
   }
 
   /// Returns the position immediately after the given index.
@@ -220,7 +218,11 @@ where Index : Strideable,
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    return _validityChecked(i.advanced(by: -1))
+    let result = i.advanced(by: -1)
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      result, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
+    return result
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -249,7 +251,15 @@ where Index : Strideable,
   ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
   /// - Complexity: O(1)
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
-    return _validityChecked(i.advanced(by: n))
+    let result = i.advanced(by: n)
+    // This range check is not precise, tighter bounds exist based on `n`.
+    // Unfortunately, we would need to perform index manipulation to
+    // compute those bounds, which is probably too slow in the general
+    // case.
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      result, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+    return result
   }
   
   /// Returns the distance between two indices.
@@ -262,6 +272,11 @@ where Index : Strideable,
   ///
   /// - Complexity: O(1)
   public func distance(from start: Index, to end: Index) -> Index.Stride {
+    // FIXME: swift-3-indexing-model: tests for traps.
+    _failEarlyRangeCheck(
+      start, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+    _failEarlyRangeCheck(
+      end, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return start.distance(to: end)
   }
 }
