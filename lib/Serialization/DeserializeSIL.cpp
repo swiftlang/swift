@@ -765,6 +765,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
+  case ValueKind::DebugValueInst:
+  case ValueKind::DebugValueAddrInst:
+    llvm_unreachable("not supported");
+
 #define ONETYPE_INST(ID)                      \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
