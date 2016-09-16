@@ -20,10 +20,20 @@
 namespace swift {
 namespace hashable_support {
 
+extern "C" const ProtocolDescriptor EquatableProtocolDescriptor
+  __asm__(SWIFT_QUOTED_SYMBOL_NAME(_TMps9Equatable));
+
 extern "C" const ProtocolDescriptor HashableProtocolDescriptor
   __asm__(SWIFT_QUOTED_SYMBOL_NAME(_TMps8Hashable));
 
+struct EquatableWitnessTable;
 struct HashableWitnessTable;
+
+/// Calls `Equatable.==` through an `Equatable` witness table.
+SWIFT_CC(swift)
+extern "C" bool swift_stdlib_Equatable_isEqual_indirect(
+    const void *lhsValue, const void *rhsValue, const Metadata *type,
+    const EquatableWitnessTable *wt);
 
 /// Calls `Equatable.==` through a `Hashable` (not Equatable!) witness
 /// table.

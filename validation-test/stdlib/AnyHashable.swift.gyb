@@ -828,12 +828,10 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
   // errors with payloads don't compare equal when payloads differ.
   checkHashable(
     nsErrors,
-    equalityOracle: equalityOracle,
-    allowBrokenTransitivity: true)
+    equalityOracle: equalityOracle)
   checkHashable(
     nsErrors.map(AnyHashable.init),
-    equalityOracle: equalityOracle,
-    allowBrokenTransitivity: true)
+    equalityOracle: equalityOracle)
 
   // FIXME(id-as-any): run `checkHashable` on an array of mixed
   // `AnyHashable(MinimalHashableRCSwiftError)` and

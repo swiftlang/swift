@@ -262,4 +262,13 @@ public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
 
+extension _RuntimeHelpers {
+  @_silgen_name("swift_stdlib_Equatable_isEqual_indirect")
+  public static func Equatable_isEqual_indirect<T : Equatable>(
+    _ lhs: UnsafePointer<T>,
+    _ rhs: UnsafePointer<T>
+  ) -> Bool {
+    return lhs.pointee == rhs.pointee
+  }
+}
 
