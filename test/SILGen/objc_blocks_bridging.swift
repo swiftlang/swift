@@ -150,6 +150,6 @@ struct GenericStruct<T> {
   }
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRgrXFo_oXFo_____XFdCb_dXFdCb_____ : $@convention(c) @pseudogeneric <T> (@inout_aliasable @block_storage @callee_owned (@owned @callee_owned () -> ()) -> (), @convention(block) () -> ()) -> ()
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRgrXFdCb___XFo___ : $@convention(thin) @pseudogeneric <T> (@owned @convention(block) () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oXFo_____XFdCb_dXFdCb_____ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@owned @callee_owned () -> ()) -> (), @convention(block) () -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb___XFo___ : $@convention(thin) (@owned @convention(block) () -> ()) -> ()
 

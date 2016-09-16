@@ -128,5 +128,5 @@ func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
 // CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTR
-// CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]<F>([[F1]])
+// CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]([[F1]])
 // CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], [[PB]])
