@@ -163,7 +163,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       if (!decl->hasType())
         continue;
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-        if (!assocType->getArchetype())
+        if (!assocType->getProtocol()->isValidGenericContext())
           continue;
     }
     

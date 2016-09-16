@@ -92,16 +92,6 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
       const Substitution &substitution = substitutions[arg_idx];
       return substitution.getReplacement().getPointer();
     }
-    case TypeKind::PolymorphicFunction: {
-      PolymorphicFunctionType *polymorphic_func_type =
-          swift_can_type->getAs<PolymorphicFunctionType>();
-      if (!polymorphic_func_type)
-        break;
-      if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
-        break;
-      return polymorphic_func_type->getGenericParameters()[arg_idx]
-          ->getArchetype();
-    } break;
     default:
       break;
     }

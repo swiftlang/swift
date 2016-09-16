@@ -2935,7 +2935,7 @@ public:
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols(nullptr))
+        for (auto *protocol : GP->getConformingProtocols())
           addConstructorCallsForType(protocol->getType(), GP->getName(),
                                      Reason);
         return;
@@ -3003,7 +3003,7 @@ public:
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols(nullptr))
+        for (auto *protocol : GP->getConformingProtocols())
           addConstructorCallsForType(protocol->getType(), GP->getName(),
                                      Reason);
         return;

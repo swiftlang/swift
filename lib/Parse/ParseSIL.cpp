@@ -101,7 +101,7 @@ namespace {
     Parser &P;
     SILModule &SILMod;
     SILParserTUState &TUState;
-    SILFunction *F;
+    SILFunction *F = nullptr;
   private:
     /// HadError - Have we seen an error parsing this function?
     bool HadError = false;
@@ -119,7 +119,8 @@ namespace {
     llvm::function_ref<void(Type)> ParsedTypeCallback;
 
 
-    bool performTypeLocChecking(TypeLoc &T, bool IsSILType = true);
+    bool performTypeLocChecking(TypeLoc &T, bool IsSILType,
+                                GenericEnvironment *GenericEnv=nullptr);
     bool parseSpecConformanceSubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
@@ -789,13 +790,18 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
   return false;
 }
 
-bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType) {
+bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
+                                       GenericEnvironment *GenericEnv) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
+
+  if (GenericEnv == nullptr && F != nullptr)
+    GenericEnv = F->getGenericEnvironment();
+
   return swift::performTypeLocChecking(P.Context, T,
-                                       /*isSILMode=*/true,
-                                       IsSILType, &P.SF);
+                                       /*isSILMode=*/true, IsSILType,
+                                       GenericEnv, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -883,7 +889,7 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
-  if (performTypeLocChecking(Ty))
+  if (performTypeLocChecking(Ty, /*isSILType=*/true, GenericEnv))
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),
@@ -2939,12 +2945,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     TypeLoc Ty = TyR.get();
 
     // The type can be polymorphic.
+    GenericEnvironment *genericEnv = nullptr;
     if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
       if (auto generics = fnType->getGenericParams()) {
         assert(!Ty.wasValidated() && Ty.getType().isNull());
 
         GenericSignature *genericSig;
-        GenericEnvironment *genericEnv;
         std::tie(genericSig, genericEnv) =
             handleSILGenericParams(P.Context, generics, &P.SF);
         fnType->setGenericSignature(genericSig);
@@ -2952,7 +2958,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       }
     }
 
-    if (performTypeLocChecking(Ty, /*isSILType=*/ false))
+    if (performTypeLocChecking(Ty, /*isSILType=*/ false, genericEnv))
       return true;
 
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -4515,13 +4521,13 @@ bool Parser::parseSILWitnessTable() {
 
   // Parse the protocol conformance.
   ProtocolDecl *proto;
-  GenericSignature *dummySig;
-  GenericEnvironment *dummyEnv;
-  GenericParamList *dummyParams;
+  GenericSignature *witnessSig;
+  GenericEnvironment *witnessEnv;
+  GenericParamList *witnessParams;
   auto conf = WitnessState.parseProtocolConformance(proto,
-                                                    dummySig,
-                                                    dummyEnv,
-                                                    dummyParams,
+                                                    witnessSig,
+                                                    witnessEnv,
+                                                    witnessParams,
                                                     false/*localScope*/);
 
   NormalProtocolConformance *theConformance = conf ?
@@ -4629,8 +4635,10 @@ bool Parser::parseSILWitnessTable() {
           return true;
         TypeLoc Ty = TyR.get();
         if (swift::performTypeLocChecking(Context, Ty,
-                                          /*isSILMode=*/ false,
-                                          /*isSILType=*/ false, &SF))
+                                          /*isSILMode=*/false,
+                                          /*isSILType=*/false,
+                                          witnessEnv,
+                                          &SF))
           return true;
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{

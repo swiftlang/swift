@@ -1056,12 +1056,11 @@ public:
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
 
-  /// Finalize the given generic parameter list, assigning archetypes to
-  /// the generic parameters.
-  GenericEnvironment *finalizeGenericParamList(ArchetypeBuilder &builder,
-                                               GenericParamList *genericParams,
-                                               GenericSignature *genericSig,
-                                               DeclContext *dc);
+  /// Perform any final semantic checks on the given generic parameter list.
+  void finalizeGenericParamList(GenericParamList *genericParams,
+                                GenericSignature *genericSig,
+                                GenericEnvironment *genericEnv,
+                                DeclContext *dc);
 
   /// Validate the signature of a generic type.
   ///

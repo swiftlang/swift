@@ -16,6 +16,8 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
@@ -65,11 +67,12 @@ Type GenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   auto gpDecl = gp->getDecl();
   assert(gpDecl && "Missing generic parameter declaration");
 
-  auto archetype = gpDecl->getArchetype();
-  if (!archetype)
-    return ErrorType::get(gp->getASTContext());
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid())
+    return ErrorType::get(gpDecl->getASTContext());
 
-  return archetype;
+  return GenericEnv->mapTypeIntoContext(gp);
 }
 
 Type GenericTypeToArchetypeResolver::resolveDependentMemberType(
@@ -92,6 +95,13 @@ Type GenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
 }
 
 Type GenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  // Hack for 'out of context' GenericTypeParamDecls when resolving
+  // a generic typealias
+  if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
+    return decl->getDeclContext()->getGenericEnvironmentOfContext()
+        ->mapTypeIntoContext(paramDecl->getDeclaredType()
+            ->castTo<GenericTypeParamType>());
+  }
   return decl->getDeclaredType();
 }
 
@@ -101,14 +111,15 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   if (!gpDecl)
     return Type(gp);
 
-
-  auto archetype = gpDecl->getArchetype();
-  if (!archetype)
+  // Hack: See parseGenericParameters(). When the issue there is fixed,
+  // we won't need the isInvalid() check anymore.
+  if (gpDecl->isInvalid() ||
+      !gpDecl->getDeclContext()->isValidGenericContext())
     return Type(gp);
 
-  return archetype;
+  auto *genericEnv = gpDecl->getDeclContext()->getGenericEnvironmentOfContext();
+  return genericEnv->mapTypeIntoContext(gp);
 }
-
 
 Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               Type baseTy,
@@ -117,7 +128,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               ComponentIdentTypeRepr *ref) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(baseTy, ref->getIdentifier(), TC.Context);
+  return DependentMemberType::get(baseTy, ref->getIdentifier(), DC->getASTContext());
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
@@ -126,7 +137,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(selfTy, assocType, TC.Context);
+  return DependentMemberType::get(selfTy, assocType, DC->getASTContext());
 }
 
 Type
@@ -136,6 +147,13 @@ PartialGenericTypeToArchetypeResolver::resolveTypeOfContext(DeclContext *dc) {
 
 Type
 PartialGenericTypeToArchetypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
+  // Hack for 'out of context' GenericTypeParamDecls when resolving
+  // a generic typealias
+  if (auto *paramDecl = dyn_cast<GenericTypeParamDecl>(decl)) {
+    return decl->getDeclContext()->getGenericEnvironmentOfContext()
+        ->mapTypeIntoContext(paramDecl->getDeclaredType()
+            ->castTo<GenericTypeParamType>());
+  }
   return decl->getDeclaredType();
 }
 
@@ -493,9 +511,6 @@ TypeChecker::markInvalidGenericSignature(DeclContext *DC) {
     // Visit each of the generic parameters.
     for (auto param : *genericParams)
       builder.addGenericParameter(param);
-
-    for (auto GP : *genericParams)
-      GP->setArchetype(builder.getArchetype(GP));
   }
 
   // Wire up the archetypes.
@@ -783,10 +798,10 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 
 /// Finalize the given generic parameter list, assigning archetypes to
 /// the generic parameters.
-GenericEnvironment *
-TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
-                                      GenericParamList *genericParams,
+void
+TypeChecker::finalizeGenericParamList(GenericParamList *genericParams,
                                       GenericSignature *genericSig,
+                                      GenericEnvironment *genericEnv,
                                       DeclContext *dc) {
   Accessibility access;
   if (auto *fd = dyn_cast<FuncDecl>(dc))
@@ -797,12 +812,7 @@ TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
     access = Accessibility::Internal;
   access = std::max(access, Accessibility::Internal);
 
-  // Wire up the archetypes.
-  auto genericEnv = builder.getGenericEnvironment(
-      genericSig->getGenericParams());
-
   for (auto GP : *genericParams) {
-    GP->setArchetype(builder.getArchetype(GP));
     checkInheritanceClause(GP);
     if (!GP->hasAccessibility())
       GP->setAccessibility(access);
@@ -810,10 +820,11 @@ TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
 
 #ifndef NDEBUG
   // Record archetype contexts.
-  for (auto *param : genericParams->getParams()) {
-    auto *archetype = param->getArchetype();
-    if (Context.ArchetypeContexts.count(archetype) == 0)
-      Context.ArchetypeContexts[archetype] = dc;
+  for (auto *paramTy : genericSig->getInnermostGenericParams()) {
+    auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      if (Context.ArchetypeContexts.count(archetype) == 0)
+        Context.ArchetypeContexts[archetype] = dc;
   }
 #endif
 
@@ -856,8 +867,6 @@ TypeChecker::finalizeGenericParamList(ArchetypeBuilder &builder,
       break;
     }
   }
-
-  return genericEnv;
 }
 
 /// Revert the dependent types within the given generic parameter list.
@@ -902,6 +911,14 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *gp = typeDecl->getGenericParams();
   auto *dc = typeDecl->getDeclContext();
 
+  if (!gp) {
+    auto *parentSig = dc->getGenericSignatureOfContext();
+    auto *parentEnv = dc->getGenericEnvironmentOfContext();
+    typeDecl->setGenericSignature(parentSig);
+    typeDecl->setGenericEnvironment(parentEnv);
+    return invalid;
+  }
+
   auto *sig = validateGenericSignature(gp, dc, dc->getGenericSignatureOfContext(),
                                        nullptr, invalid);
   assert(sig->getInnermostGenericParams().size()
@@ -922,8 +939,10 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *parentEnv = dc->getGenericEnvironmentOfContext();
   checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-  auto *env = finalizeGenericParamList(builder, gp, sig, typeDecl);
+  auto *env = builder.getGenericEnvironment(sig->getGenericParams());
   typeDecl->setGenericEnvironment(env);
+
+  finalizeGenericParamList(gp, sig, env, typeDecl);
 
   return invalid;
 }

@@ -1569,7 +1569,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
 
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
-  auto selfTy = GenericTypeParamType::get(0, 0, tc.Context);
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
   type = type.transform([&](Type type) -> Type {
     // If a dependent member refers to an associated type, replace it.
     if (auto member = type->getAs<DependentMemberType>()) {
@@ -2013,10 +2013,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  Conformance->setTypeWitness(
-    assocType,
-    getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
-    typeDecl);
+  auto *archetype = ArchetypeBuilder::mapTypeIntoContext(
+      Conformance->getProtocol(), assocType->getDeclaredInterfaceType())
+          ->getAs<ArchetypeType>();
+  if (archetype)
+    Conformance->setTypeWitness(
+        assocType,
+        getArchetypeSubstitution(TC, DC, archetype, type),
+        typeDecl);
 }
 
 /// Generates a note for a protocol requirement for which no witness was found
@@ -2533,7 +2537,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   }
 
   // Check protocol conformances.
-  for (auto reqProto : assocType->getConformingProtocols(&tc)) {
+  for (auto reqProto : assocType->getConformingProtocols()) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
   }
@@ -3004,21 +3008,29 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (assocType->getDefaultDefinitionLoc().isNull())
       return Type();
 
+    auto selfType = Proto->getSelfInterfaceType();
+
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->getSelfTypeInContext().getPointer()] = Adoptee;
+    substitutions[ArchetypeBuilder::mapTypeIntoContext(Proto, selfType)
+        ->getCanonicalType().getPointer()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        auto archetype = ArchetypeBuilder::mapTypeIntoContext(
+            Proto, assocType->getDeclaredInterfaceType())
+                ->getAs<ArchetypeType>();
+        if (!archetype)
+          continue;
         if (Conformance->hasTypeWitness(assocType)) {
-          substitutions[assocType->getArchetype()]
+          substitutions[archetype]
             = Conformance->getTypeWitness(assocType, nullptr).getReplacement();
         } else {
           auto known = typeWitnesses.begin(assocType);
           if (known != typeWitnesses.end())
-            substitutions[assocType->getArchetype()] = known->first;
+            substitutions[archetype] = known->first;
           else
-            substitutions[assocType->getArchetype()] = ErrorType::get(TC.Context);
+            substitutions[archetype] = ErrorType::get(TC.Context);
         }
       }
     }

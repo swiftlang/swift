@@ -1512,7 +1512,10 @@ Identifier GenericTypeParamType::getName() const {
 }
 
 TypeBase *AssociatedTypeType::getSinglyDesugaredType() {
-  return getDecl()->getArchetype();
+  auto protocolSelf = getDecl()->getProtocol()->getSelfTypeInContext();
+  assert(protocolSelf);
+  auto *selfArchetype = protocolSelf->castTo<ArchetypeType>();
+  return selfArchetype->getNestedTypeValue(getDecl()->getName()).getPointer();
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {

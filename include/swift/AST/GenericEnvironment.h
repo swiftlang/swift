@@ -23,6 +23,7 @@
 namespace swift {
 
 class ASTContext;
+class GenericTypeParamType;
 
 /// Describes the mapping between archetypes and interface types for the
 /// generic parameters of a DeclContext.
@@ -57,6 +58,9 @@ public:
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+
+  /// Map an generic parameter type to a contextual type.
+  Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
   /// Derive a contextual type substitution map from a substitution array.
   /// This is just like GenericSignature::getSubstitutionMap(), except
