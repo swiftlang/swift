@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Creates a sequence of pairs built out of two underyling sequences.
+/// Creates a sequence of pairs built out of two underlying sequences.
 ///
 /// In the `Zip2Sequence` instance returned by this function, the elements of
 /// the *i*th pair are the *i*th elements of each underlying sequence. The

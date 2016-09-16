@@ -278,7 +278,7 @@ public:
   RetainBlockState(bool IsEntry, unsigned size, bool MultiIteration) {
     // Iterative forward data flow.
     BBSetIn.resize(size, false);
-    // Initilize to true if we are running optimistic data flow, i.e.
+    // Initialize to true if we are running optimistic data flow, i.e.
     // MultiIteration is true.
     BBSetOut.resize(size, MultiIteration);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
@@ -475,7 +475,7 @@ bool RetainCodeMotionContext::performCodeMotion() {
       continue;
     for (auto IP : Iter->second) {
       // we are about to insert a new retain instruction before the insertion
-      // point. Check if the previous instruction is reuseable, reuse it, do
+      // point. Check if the previous instruction is reusable, reuse it, do
       // not insert new instruction and delete old one.
       if (auto I = getPrevReusableInst(IP, Iter->first)) {
         RCInstructions.erase(I);
@@ -620,7 +620,7 @@ public:
   /// constructor.
   ReleaseBlockState(bool IsExit, unsigned size, bool MultiIteration) {
     // backward data flow.
-    // Initilize to true if we are running optimistic data flow, i.e.
+    // Initialize to true if we are running optimistic data flow, i.e.
     // MultiIteration is true.
     BBSetIn.resize(size, MultiIteration);
     BBSetOut.resize(size, false);
@@ -859,7 +859,7 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
       continue;
     for (auto IP : Iter->second) {
       // we are about to insert a new release instruction before the insertion
-      // point. Check if the successor instruction is reuseable, reuse it, do
+      // point. Check if the successor instruction is reusable, reuse it, do
       // not insert new instruction and delete old one.
       if (auto I = getPrevReusableInst(IP, Iter->first)) {
         RCInstructions.erase(I);

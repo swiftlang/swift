@@ -440,7 +440,7 @@ number of ways:
     parameter.
 
 - A SIL function type declares the conventions for its parameters.
-  The parameters are written as an unlabelled tuple; the elements of that
+  The parameters are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.
 
@@ -482,7 +482,7 @@ number of ways:
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the conventions for its results.
-  The results are written as an unlabelled tuple; the elements of that
+  The results are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.  Indirect and direct results may
   be interleaved.

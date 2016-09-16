@@ -1034,13 +1034,13 @@ private:
               ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
         : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
 
-    /// \brief Return underlaying expression.
+    /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
 
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
     ///
-    /// \returs true on solver failure, false otherwise.
+    /// \returns true on solver failure, false otherwise.
     bool solve();
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
@@ -2033,7 +2033,7 @@ private:
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
-  /// expression, this is achived to solving individual sub-expressions
+  /// expression, this is achieved to solving individual sub-expressions
   /// and combining resolving types. Such algorithm is called directional
   /// path consistency because it goes from children to parents for all
   /// related sub-expressions taking union of their domains.
@@ -2052,7 +2052,7 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns Error is an error occured, Solved is system is consistent
+  /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
   SolutionKind solve(Expr *&expr,
                      Type convertType,

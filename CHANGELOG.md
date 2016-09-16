@@ -206,7 +206,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0131][]:
 
-  The standard library provides a new type `AnyHashable` for use in heterogenous
+  The standard library provides a new type `AnyHashable` for use in heterogeneous
   hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
   now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
 
@@ -561,7 +561,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0046][]:
 
-  Function parameters now have consistent labelling across all function
+  Function parameters now have consistent labeling across all function
   parameters. With this update the first parameter declarations will
   now match the existing behavior of the second and later parameters.
   This change makes the language simpler.
