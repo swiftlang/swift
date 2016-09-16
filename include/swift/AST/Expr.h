@@ -1421,7 +1421,11 @@ protected:
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
-  
+
+  void setDecls(ArrayRef<ValueDecl *> domain) {
+    Decls = domain;
+  }
+
   /// getBaseType - Determine the type of the base object provided for the
   /// given overload set, which is only non-null when dealing with an overloaded
   /// member reference.
@@ -4295,29 +4299,6 @@ public:
   }
 };
 
-/// \brief An expression that describes the use of a default value, which may
-/// come from the default argument of a function type or member initializer.
-///
-/// This expression is synthesized by type checking and cannot be written
-/// directly by the user.
-class DefaultValueExpr : public Expr {
-  Expr *subExpr;
-
-public:
-  explicit DefaultValueExpr(Expr *subExpr)
-    : Expr(ExprKind::DefaultValue, /*Implicit=*/true, subExpr->getType()),
-      subExpr(subExpr) { }
-
-  Expr *getSubExpr() const { return subExpr; }
-  void setSubExpr(Expr *sub) { subExpr = sub; }
-  
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::DefaultValue;
-  }
-};
-  
 /// \brief A pattern production that has been parsed but hasn't been resolved
 /// into a complete pattern. Name binding converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid
