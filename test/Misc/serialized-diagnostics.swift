@@ -6,7 +6,7 @@
 // RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s
 
 // Test swift_driver integrated frontend
-// RUN: %target-swift-frontend -parse -serialize-diagnostics -serialize-diagnostics-path %t.integrated_frontend.dia %s -verify
+// RUN: %target-swift-frontend -parse -serialize-diagnostics-path %t.integrated_frontend.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.integrated_frontend.dia > %t.integrated_frontend.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck --input-file=%t.integrated_frontend.deserialized_diagnostics.txt %s
 
