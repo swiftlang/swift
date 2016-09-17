@@ -535,7 +535,7 @@ To gather documentation, SourceKit must be given either the name of a module (ke
     <key.name>:                  (string) // Displayed name for the token.
     <key.usr>:                   (string) // USR string for the token.
     <key.filepath>:              (string) // Path to the file.
-    <key.offset>:                (int64)  // Byte offset of the token inside the souce contents.
+    <key.offset>:                (int64)  // Byte offset of the token inside the source contents.
     <key.length>:                (ist64)  // Length of the token.
     <key.typename>:              (string) // Text describing the type of the result.
     <key.annotated_decl>:        (string) // XML representing how the token was declared.

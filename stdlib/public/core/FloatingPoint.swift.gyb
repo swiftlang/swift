@@ -183,7 +183,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x == 0.375
   ///
   /// This initializer is equivalent to the following calculation, where `**`
-  /// is exponentation, computed as if by a single, correctly rounded,
+  /// is exponentiation, computed as if by a single, correctly rounded,
   /// floating-point operation:
   ///
   ///     let sign: FloatingPointSign = .plus
@@ -240,7 +240,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   init(signOf: Self, magnitudeOf: Self)
 
 % for src_ty in all_integer_types(word_bits):
-  /// Creates a new value, rounded to the closest possible representatation.
+  /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
   /// with more trailing zeros in its significand bit pattern.
@@ -1607,7 +1607,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// A binary floating-point type's `exponentBitCount` imposes a limit on the
   /// range of the exponent for normal, finite values. The *exponent bias* of
   /// a type `F` can be calculated as the following, where `**` is
-  /// exponentation:
+  /// exponentiation:
   ///
   ///     let bias = 2 ** (F.exponentBitCount - 1) - 1
   ///

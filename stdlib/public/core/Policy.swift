@@ -162,17 +162,17 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// Swift's `String` type.
 ///
 ///     if let message = s as? String {
-///         print("Succesful cast to String: \(message)")
+///         print("Successful cast to String: \(message)")
 ///     }
-///     // Prints "Succesful cast to String: This is a bridged string."
+///     // Prints "Successful cast to String: This is a bridged string."
 ///
 /// If you have prior knowledge that an `AnyObject` instance has a particular
 /// type, you can use the unconditional downcast operator (`as!`). Performing
 /// an invalid cast triggers a runtime error.
 ///
 ///     let message = s as! String
-///     print("Succesful cast to String: \(message)")
-///     // Prints "Succesful cast to String: This is a bridged string."
+///     print("Successful cast to String: \(message)")
+///     // Prints "Successful cast to String: This is a bridged string."
 ///
 ///     let badCase = v as! String
 ///     // Runtime error

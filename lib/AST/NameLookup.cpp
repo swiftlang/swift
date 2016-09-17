@@ -580,7 +580,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           continue;
         }
 
-        // Top-level declarations have no lokup of their own.
+        // Top-level declarations have no lookup of their own.
         if (isa<TopLevelCodeDecl>(dc)) continue;
 
         // Typealiases have no lookup of their own.

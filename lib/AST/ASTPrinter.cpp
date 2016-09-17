@@ -3358,7 +3358,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   ASTPrinter &Printer;
   const PrintOptions &Options;
-  Optional<std::vector<GenericParamList *>> UnwrappedGenericParams;
 
   /// Whether we are printing something in a function parameter position, and
   /// thus want to print @escaping if it escapes.

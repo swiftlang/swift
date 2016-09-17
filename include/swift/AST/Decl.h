@@ -1702,7 +1702,7 @@ public:
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
 
-  // Retrieve the declaration context for the intializer.
+  // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const { return InitContext; }
 
   /// Override the initializer context.

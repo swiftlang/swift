@@ -30,5 +30,5 @@ public class C {}
 }
 
 @_transparent public func gep32(p p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer {
-  return Builtin.gep_Int32(p, i)
+  return Builtin.gepRaw_Int32(p, i)
 }

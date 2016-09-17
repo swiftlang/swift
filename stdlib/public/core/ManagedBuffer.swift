@@ -453,7 +453,7 @@ public func == <Header, Element>(
 /// Returns a Boolean value indicating whether the given object is a
 /// class instance known to have a single strong reference.
 ///
-/// The `isKnownUniquelyReferenced(_:)` function is useful for implementating
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing
 /// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {
@@ -486,7 +486,7 @@ internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout 
 /// Returns a Boolean value indicating whether the given object is a
 /// class instance known to have a single strong reference.
 ///
-/// The `isKnownUniquelyReferenced(_:)` function is useful for implementating
+/// The `isKnownUniquelyReferenced(_:)` function is useful for implementing
 /// the copy-on-write optimization for the deep storage of value types:
 ///
 ///     mutating func modifyMe(_ arg: X) {

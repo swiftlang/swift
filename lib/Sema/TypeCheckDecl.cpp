@@ -3290,7 +3290,7 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
   if (group) {
     validateDecl(group);
   } else if (nameLoc.isValid()) {
-    // FIXME: avoid dignosing this multiple times per source file.
+    // FIXME: avoid diagnosing this multiple times per source file.
     diagnose(nameLoc, diag::unknown_precedence_group, name);
   }
   return group;
