@@ -2876,8 +2876,17 @@ static Type getMemberForBaseType(ConformanceSource conformances,
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
       return Type();
 
-    return conformance->getConcrete()->getTypeWitness(assocType, resolver)
-             .getReplacement();
+    auto witness = conformance->getConcrete()
+        ->getTypeWitness(assocType, resolver).getReplacement();
+
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (options & SubstFlags::DesugarMemberTypes)
+      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer()))
+        if (!aliasType->is<ErrorType>())
+          witness = aliasType->getSinglyDesugaredType();
+
+    return witness;
   }
 
   // FIXME: This is a fallback. We want the above, conformance-based

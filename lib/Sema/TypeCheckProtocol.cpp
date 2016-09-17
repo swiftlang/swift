@@ -1976,9 +1976,13 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
     aliasDecl->setImplicit();
-    if (type->is<ErrorType>())
+    if (type->is<ErrorType>()) {
       aliasDecl->setInvalid();
-    if (type->hasArchetype()) {
+
+      // If we're recording a failed type witness, keep the sugar around for
+      // code completion.
+      type = aliasDecl->getDeclaredType();
+    } else if (type->hasArchetype()) {
       Type metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
