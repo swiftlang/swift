@@ -1422,9 +1422,22 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   assert(Src->getType().isAddress() && "Source should have an address type");
   assert(Dest->getType().isAddress() && "Source should have an address type");
 
-  if (!Src->getType().isLoadable(M) || !Dest->getType().isLoadable(M)) {
-    // TODO: Handle address only types.
-    return nullptr;
+  // AnyHashable is a special case - it does not conform to NSObject -
+  // If AnyHashable - Bail out of the optimization
+  if (auto DT = Target.getNominalOrBoundGenericNominal()) {
+    if (DT == M.getASTContext().getAnyHashableDecl()) {
+      return nullptr;
+    }
+  }
+
+  // If this is a conditional cast:
+  // We need a new fail BB in order to add a dealloc_stack to it
+  SILBasicBlock *ConvFailBB = nullptr;
+  if (isConditional) {
+    auto CurrInsPoint = Builder.getInsertionPoint();
+    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
+                                          nullptr, nullptr);
+    Builder.setInsertionPoint(CurrInsPoint);
   }
 
   if (SILBridgedTy != Src->getType()) {
@@ -1432,6 +1445,13 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
     // - then convert _ObjectiveCBridgeable._ObjectiveCType to
     // a Swift type using _forceBridgeFromObjectiveC.
+
+    if (!Src->getType().isLoadable(M)) {
+      // We have to convert from an ObjC Any* to a loadable type
+      // Use check_addr before making a source we can actually load
+      // TODO Joe handle this
+      return nullptr;
+    }
 
     // Generate a load for the source argument.
     auto *Load = Builder.createLoad(Loc, Src);
@@ -1454,9 +1474,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
       CastSuccessBB->createBBArg(SILBridgedTy);
-      NewI = Builder.createCheckedCastBranch(Loc, false, Load,
-                                             SILBridgedTy, CastSuccessBB,
-                                             FailureBB);
+      NewI = Builder.createCheckedCastBranch(Loc, false, Load, SILBridgedTy,
+                                             CastSuccessBB, ConvFailBB);
       Builder.setInsertionPoint(CastSuccessBB);
       SrcOp = CastSuccessBB->getBBArg(0);
     } else {
@@ -1573,10 +1592,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     Builder.setInsertionPoint(ConvSuccessBB);
     auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
                                                         SomeDecl);
-    auto LoadFromOptional = Builder.createLoad(Loc, Addr);
 
-    // Store into Dest
-    Builder.createStore(Loc, LoadFromOptional, Dest);
+    Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
 
     Builder.createDeallocStack(Loc, Tmp);
     SmallVector<SILValue, 1> SuccessBBArgs;
