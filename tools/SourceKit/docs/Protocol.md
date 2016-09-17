@@ -578,7 +578,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
   key.request: source.request.cursorinfo,
   key.sourcefile: "/path/to/file.swift",
   key.offset: 7,
-  key.compilerargs: [ "/path/to/file.swift" ]
+  key.compilerargs: ["/path/to/file.swift"]
 }
 ```
 

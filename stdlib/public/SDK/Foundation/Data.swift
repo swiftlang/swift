@@ -363,7 +363,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
 
-        // Avoid a crash that happens on OSX 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
+        // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
         if !options.contains(.atomic) {
             #if os(OSX)
                 return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber10_11_Max)

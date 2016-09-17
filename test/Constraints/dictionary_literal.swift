@@ -78,9 +78,9 @@ func testDefaultExistentials() {
 
   let _: Int = d2 // expected-error{{value of type 'Dictionary<AnyHashable, Any>'}}
 
-  let _ = ["a" : 1, 
-            "b" : [ "a", 2, 3.14159 ],
-            "c" : [ "a" : 2, "b" : 3.5] ]
+  let _ = ["a": 1,
+           "b": ["a", 2, 3.14159],
+           "c": ["a": 2, "b": 3.5]]
   // expected-error@-3{{heterogeneous collection literal could only be inferred to 'Dictionary<String, Any>'; add explicit type annotation if this is intentional}}
 
   let d3 = ["b" : B(), "c" : C()]

@@ -32,13 +32,13 @@ struct StoresClosure {
     closure = fn // expected-error{{assigning non-escaping parameter 'fn' to an @escaping closure}}
   }
 
-  func arrayPack(_ fn: () -> Int) -> [()->Int] {
+  func arrayPack(_ fn: () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{24-24=@escaping }}
 
     return [fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
-  func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [()->Int] {
+  func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 
     return [fn, fn2] // expected-error{{using non-escaping parameter 'fn2' in a context expecting an @escaping closure}}
