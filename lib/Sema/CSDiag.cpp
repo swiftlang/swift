@@ -4074,10 +4074,11 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 
   // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
   // the expr with brackets.
-  if (auto *contextDecl = contextualType->getAnyNominal()) {
+  auto *genericType = contextualType->getAs<BoundGenericType>();
+  if (genericType) {
+    auto *contextDecl = genericType->getDecl();
     if (contextDecl == CS->TC.Context.getArrayDecl()) {
-      SmallVector<Type, 4> scratch;
-      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+      for (Type arg : genericType->getGenericArgs()) {
         if (arg->isEqual(exprType)) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "[").fixItInsert(
@@ -4090,8 +4091,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                contextDecl == CS->TC.Context.getUnsafeMutablePointerDecl() ||
                contextDecl == CS->TC.Context.getUnsafeRawPointerDecl() ||
                contextDecl == CS->TC.Context.getUnsafeMutableRawPointerDecl()) {
-      SmallVector<Type, 4> scratch;
-      for (Type arg : contextualType->getAllGenericArgs(scratch)) {
+      for (Type arg : genericType->getGenericArgs()) {
         if (arg->isEqual(exprType) && expr->getType()->isLValueType()) {
           diagnose(expr->getLoc(), diagID, exprType, contextualType).
             fixItInsert(expr->getStartLoc(), "&");
