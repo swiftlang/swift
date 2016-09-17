@@ -261,7 +261,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // MARK: - Properties and Functions
     
     /// The number of bytes in the data.
-    public var count : Int {
+    public var count: Int {
         get {
             return _mapUnmanaged { $0.length }
         }
@@ -521,7 +521,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
       where ByteCollection.Iterator.Element == Data.Iterator.Element {
         
         // Calculate this once, it may not be O(1)
-        let replacementCount : Int = numericCast(newElements.count)
+        let replacementCount: Int = numericCast(newElements.count)
         let currentCount = self.count
         let subrangeCount = subrange.count
         
@@ -686,7 +686,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     //
     
     @available(*, unavailable, renamed: "count")
-    public var length : Int {
+    public var length: Int {
         get { fatalError() }
         set { fatalError() }
     }
@@ -783,7 +783,7 @@ extension _SwiftNSData {
     // -----
     
     @objc(length)
-    var length : Int {
+    var length: Int {
         get {
             return _mapUnmanaged { $0.length }
         }
