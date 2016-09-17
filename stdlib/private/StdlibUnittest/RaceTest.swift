@@ -392,7 +392,7 @@ class _RaceTestWorkerState<RT : RaceTestWithPerTrialData> {
 
 class _RaceTestSharedState<RT : RaceTestWithPerTrialData> {
   var racingThreadCount: Int
-  var stopNow = false
+  var stopNow = _stdlib_AtomicInt(0)
 
   var trialBarrier: _stdlib_Barrier
   var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
@@ -417,7 +417,7 @@ func _masterThreadStopWorkers<RT : RaceTestWithPerTrialData>(
     _ sharedState: _RaceTestSharedState<RT>
 ) {
   // Workers are proceeding to the first barrier in _workerThreadOneTrial.
-  sharedState.stopNow = true
+  sharedState.stopNow.store(1)
   // Allow workers to proceed past that first barrier. They will then see
   // stopNow==true and stop.
   sharedState.trialBarrier.wait()
@@ -489,7 +489,7 @@ func _workerThreadOneTrial<RT : RaceTestWithPerTrialData>(
   _ tid: Int, _ sharedState: _RaceTestSharedState<RT>
 ) -> Bool {
   sharedState.trialBarrier.wait()
-  if sharedState.stopNow {
+  if sharedState.stopNow.load() == 1 {
     return true
   }
   let racingThreadCount = sharedState.racingThreadCount
@@ -533,7 +533,7 @@ class _InterruptibleSleep {
       return
     }
 
-    var timeout = timeval(tv_sec:duration, tv_usec:0)
+    var timeout = timeval(tv_sec: duration, tv_usec: 0)
 
     var readFDs = _stdlib_fd_set()
     var writeFDs = _stdlib_fd_set()
