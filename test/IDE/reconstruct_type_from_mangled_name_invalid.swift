@@ -24,7 +24,7 @@ protocol P {
   associatedtype T
 // CHECK: decl: FAILURE for 'T'
   func foo() -> T
-// CHECK: decl: FAILURE for 'foo'
+// CHECK: decl: func foo() -> Self.T	for 'foo' usr=s:FP14swift_ide_test1P3fooFT_wx1T
 }
 struct SP: P {
 // CHECK: decl: struct SP : P for 'SP'
