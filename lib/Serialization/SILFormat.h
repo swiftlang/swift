@@ -157,7 +157,6 @@ namespace sil_block {
     GENERIC_PARAM_LIST = decls_block::GENERIC_PARAM_LIST,
     GENERIC_PARAM = decls_block::GENERIC_PARAM,
     GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
-    LAST_GENERIC_REQUIREMENT = decls_block::LAST_GENERIC_REQUIREMENT,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
