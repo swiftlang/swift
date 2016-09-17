@@ -2976,25 +2976,25 @@ namespace {
       if (arg.isRValue()) {
         if (CanTupleType substArgType =
                 dyn_cast<TupleType>(arg.getSubstType())) {
-	  // The original type isn't necessarily a tuple.
-	  assert(origParamType.matchesTuple(substArgType));
+          // The original type isn't necessarily a tuple.
+          assert(origParamType.matchesTuple(substArgType));
 
-	  auto loc = arg.getKnownRValueLocation();
-	  SmallVector<RValue, 4> elts;
-	  std::move(arg).asKnownRValue().extractElements(elts);
-	  for (auto i : indices(substArgType.getElementTypes())) {
-	    emit({ loc, std::move(elts[i]) },
-		 origParamType.getTupleElementType(i));
-	  }
-	  return;
-	}
+          auto loc = arg.getKnownRValueLocation();
+          SmallVector<RValue, 4> elts;
+          std::move(arg).asKnownRValue().extractElements(elts);
+          for (auto i : indices(substArgType.getElementTypes())) {
+            emit({ loc, std::move(elts[i]) },
+                 origParamType.getTupleElementType(i));
+          }
+          return;
+        }
 
-	auto loc = arg.getKnownRValueLocation();
-	SmallVector<RValue, 1> elts;
-	std::move(arg).asKnownRValue().extractElements(elts);
-	emit({ loc, std::move(elts[0]) },
-  	       origParamType.getTupleElementType(0));
-	return;
+        auto loc = arg.getKnownRValueLocation();
+        SmallVector<RValue, 1> elts;
+        std::move(arg).asKnownRValue().extractElements(elts);
+        emit({ loc, std::move(elts[0]) },
+             origParamType.getTupleElementType(0));
+        return;
       }
 
       // Otherwise, we're working with an expression.

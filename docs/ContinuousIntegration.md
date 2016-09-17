@@ -35,8 +35,8 @@ We describe each in detail below:
 
         Platform     | Comment | Check Status
         ------------ | ------- | ------------
-        All supported platforms     | @swift-ci Please smoke test       		 | Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)
-        All supported platforms     | @swift-ci Please smoke test and merge		 | Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)
+        All supported platforms     | @swift-ci Please smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
+        All supported platforms     | @swift-ci Please smoke test and mere       | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
         OS X platform               | @swift-ci Please smoke test OS X platform  | Swift Test OS X Platform (smoke test)
         Linux platform              | @swift-ci Please smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
@@ -66,14 +66,14 @@ A smoke test on Linux does the following:
 
         Platform     | Comment | Check Status
         ------------ | ------- | ------------
-        All supported platforms     | @swift-ci Please test							| Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
-        All supported platforms     | @swift-ci Please clean test					| Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
-        All supported platforms     | @swift-ci Please test and merge				| Swift Test Linux Platform (smoke test) <br> Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
-        OS X platform               | @swift-ci Please test OS X platform 			| Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
+        All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
         OS X platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
         OS X platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform
-        Linux platform              | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test) <br> Swift Test Linux Platform
-        Linux platform              | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test) <br> Swift Test Linux Platform
+        Linux platform              | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
+        Linux platform              | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 
 The core principles of validation testing is that:
 

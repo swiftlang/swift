@@ -647,7 +647,7 @@ extension BidirectionalCollection
       start..<m, distance: d, choosingStartGroupBy: p)
     
     // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
-	  let e = _stablyPartitionSubrange(
+    let e = _stablyPartitionSubrange(
       m..<end, distance: n - d, choosingStartGroupBy: p)
     
     // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF
