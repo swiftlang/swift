@@ -979,9 +979,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
     return depMem->getAssocType();
 
   if (auto archetype = dyn_cast<ArchetypeType>(this)) {
-    if (auto proto = archetype->getSelfProtocol())
-      return proto->getProtocolSelf();
-
     if (auto assoc = archetype->getAssocType())
       return assoc;
 

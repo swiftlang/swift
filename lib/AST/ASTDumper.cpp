@@ -2800,8 +2800,6 @@ namespace {
         printField("parent", static_cast<void *>(parent));
       if (auto assocType = T->getAssocType())
         printField("assoc_type", assocType->printRef());
-      if (auto selfProto = T->getSelfProtocol())
-        printField("self_proto", selfProto->printRef());
 
       // FIXME: This is ugly.
       OS << "\n";

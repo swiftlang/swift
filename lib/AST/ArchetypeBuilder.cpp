@@ -439,13 +439,11 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
           if (!containingProtocol) continue;
           
           // Go up archetype parents until we find our containing protocol.
-          while (archetype->getSelfProtocol() != containingProtocol) {
+          while (archetype->getParent()) {
             identifiers.push_back(archetype->getName());
             archetype = archetype->getParent();
-            if (!archetype)
-              break;
           }
-          if (!archetype)
+          if (!archetype->isEqual(containingProtocol->getSelfTypeInContext()))
             continue;
         } else if (auto dependent = type->getAs<DependentMemberType>()) {
           do {

@@ -4702,8 +4702,8 @@ public:
     // Check that member operators reference the type of 'Self'.
     if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
 
-    auto selfNominal =
-      FD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *DC = FD->getDeclContext();
+    auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     if (!selfNominal) return;
 
     // Check the parameters for a reference to 'Self'.
@@ -4725,12 +4725,13 @@ public:
       if (isProtocol) {
         // For a protocol, is it the 'Self' type parameter?
         if (auto genericParam = paramType->getAs<GenericTypeParamType>())
-          if (genericParam->getDepth() == 0 && genericParam->getIndex() == 0)
+          if (genericParam->isEqual(DC->getSelfInterfaceType()))
             return;
 
         // ... or the 'Self' archetype?
         if (auto archetype = paramType->getAs<ArchetypeType>())
-          if (archetype->getSelfProtocol() == selfNominal) return;
+          if (archetype->isEqual(DC->getSelfTypeInContext()))
+            return;
       }
     }
 
