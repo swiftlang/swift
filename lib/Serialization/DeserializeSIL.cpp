@@ -1187,8 +1187,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty2 = MF->getType(TyID2);
     auto ResultTy = MF->getType(TyID3);
     ResultVal = Builder.createTailAddr(Loc,
-        getLocalValue(ValID, getSILType(Ty,  SILValueCategory::Address)),
-        getLocalValue(ValID2, getSILType(Ty2,  SILValueCategory::Object)),
+        getLocalValue(ValID, getSILType(Ty, SILValueCategory::Address)),
+        getLocalValue(ValID2, getSILType(Ty2, SILValueCategory::Object)),
         getSILType(ResultTy, SILValueCategory::Address));
     break;
   }

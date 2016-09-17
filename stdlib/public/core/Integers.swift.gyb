@@ -67,7 +67,7 @@ infix operator &>>= : AssignmentPrecedence
 //===----------------------------------------------------------------------===//
 
 
-//FIXME(integers): This should go in the stdlib separately, probably.
+// FIXME(integers): This should go in the stdlib separately, probably.
 extension ExpressibleByIntegerLiteral
   where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.

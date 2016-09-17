@@ -190,7 +190,7 @@ extension r25271859 {
   func map<U>(f: (T) -> U) -> r25271859<U> {
   }
 
-  func andThen<U>(f: (T)->r25271859<U>) {
+  func andThen<U>(f: (T) -> r25271859<U>) {
   }
 }
 

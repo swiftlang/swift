@@ -103,7 +103,7 @@ bool EpilogueARCContext::convergeDataflow() {
       Changed |= (BS->BBSetIn != BBSetOut);
       BS->BBSetIn = BBSetOut;
     }
-  } while(Changed);
+  } while (Changed);
   return true;
 }
 

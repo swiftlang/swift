@@ -132,7 +132,7 @@ ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
 
   // Add child nodes, reparenting them to this node.
   storedChildren.reserve(children.size());
-  for (auto child : children ) {
+  for (auto child : children) {
     child->parentAndExpanded.setPointer(this);
     storedChildren.push_back(child);
   }
