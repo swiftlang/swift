@@ -1057,7 +1057,7 @@ extension Sequence {
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element? = nil
+    var foundElement: Iterator.Element?
     do {
       try self.forEach {
         if try predicate($0) {

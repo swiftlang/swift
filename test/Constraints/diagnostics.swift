@@ -766,7 +766,7 @@ struct SR1752 {
   func foo() {}
 }
 
-let sr1752: SR1752? = nil
+let sr1752: SR1752?
 
 true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
 

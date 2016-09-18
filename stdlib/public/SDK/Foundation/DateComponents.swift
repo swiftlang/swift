@@ -339,7 +339,7 @@ extension DateComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateComponents?) -> DateComponents {
-        var result: DateComponents? = nil
+        var result: DateComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

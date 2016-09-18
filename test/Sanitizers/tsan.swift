@@ -9,8 +9,8 @@
 // Test ThreadSanitizer execution end-to-end.
 
 import Darwin
-var user_interactive_thread: pthread_t? = nil
-var user_interactive_thread2: pthread_t? = nil
+var user_interactive_thread: pthread_t?
+var user_interactive_thread2: pthread_t?
 var racey_x: Int;
 
 pthread_create(&user_interactive_thread, nil, { _ in

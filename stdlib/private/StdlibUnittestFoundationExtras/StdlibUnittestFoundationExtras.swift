@@ -13,7 +13,7 @@
 import ObjectiveC
 import Foundation
 
-internal var _temporaryLocaleCurrentLocale: NSLocale? = nil
+internal var _temporaryLocaleCurrentLocale: NSLocale?
 
 extension NSLocale {
   @objc

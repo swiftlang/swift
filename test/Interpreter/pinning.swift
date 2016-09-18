@@ -9,7 +9,7 @@ import SwiftShims
 typealias _HeapObject = SwiftShims.HeapObject
 
 class C {
-  var value: AnyObject? = nil
+  var value: AnyObject?
   deinit { print("deallocated") }
 }
 

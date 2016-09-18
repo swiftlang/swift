@@ -72,7 +72,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	public func withUnsafeBytes<Result, ContentType>(
 		body: (UnsafePointer<ContentType>) throws -> Result) rethrows -> Result
 	{
-		var ptr: UnsafeRawPointer? = nil
+		var ptr: UnsafeRawPointer?
 		var size = 0
 		let data = __dispatch_data_create_map(__wrapped, &ptr, &size)
         let contentPtr = ptr!.bindMemory(
@@ -183,7 +183,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 		var offset = 0
 		let subdata = __dispatch_data_copy_region(__wrapped, index, &offset)
 
-		var ptr: UnsafeRawPointer? = nil
+		var ptr: UnsafeRawPointer?
 		var size = 0
 		let map = __dispatch_data_create_map(subdata, &ptr, &size)
 		defer { _fixLifetime(map) }
@@ -280,7 +280,7 @@ extension DispatchData {
 	}
 
 	public static func _unconditionallyBridgeFromObjectiveC(_ source: __DispatchData?) -> DispatchData {
-		var result: DispatchData? = nil
+		var result: DispatchData?
 		_forceBridgeFromObjectiveC(source!, result: &result)
 		return result!
 	}

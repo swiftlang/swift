@@ -3250,7 +3250,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   // operations on it.
   //
   // Do not access this property directly.
-  internal var _heapBufferBridged_DoNotUse: AnyObject? = nil
+  internal var _heapBufferBridged_DoNotUse: AnyObject?
 
   internal var nativeStorage: NativeStorage
 

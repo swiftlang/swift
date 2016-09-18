@@ -291,7 +291,7 @@ typealias AliasForNSRect = NSRect
   func cf(_ x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
-    let _ : NSResponder? = nil
+    let _ : NSResponder?
   }
 
   func returnsURL() -> NSURL? { return nil }
@@ -379,18 +379,18 @@ class MyObject : NSObject {}
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner2 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 
-  var ref2: Inner2? = nil
-  var ref3: Inner3? = nil
+  var ref2: Inner2?
+  var ref3: Inner3?
 
   // CHECK-LABEL: @interface Inner3
   // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * _Nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner3 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 }
 

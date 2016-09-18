@@ -49,7 +49,7 @@
   #endif
 
   #if TESTABLE || DEBUG
-    let x: Sub? = nil
+    let x: Sub?
   #endif
 
   unrelated()

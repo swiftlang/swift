@@ -247,7 +247,7 @@ public struct StringComparisonTest {
   public let collationElements: [UInt64]
   public let loc: SourceLoc
 
-  public var order: Int? = nil
+  public var order: Int?
 
   public init(
     _ string: String,

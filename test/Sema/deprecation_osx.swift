@@ -123,7 +123,7 @@ func annotatedHasReturnDeprecatedIn10_51() -> ClassDeprecatedIn10_51 {
 var globalWithDeprecatedType : ClassDeprecatedIn10_51? = nil // expected-warning {{ClassDeprecatedIn10_51' was deprecated in OS X 10.51}}
 
 @available(OSX, introduced: 10.8, deprecated: 10.51)
-var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_51? = nil
+var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_51?
 
 
 enum EnumWithDeprecatedCasePayload {

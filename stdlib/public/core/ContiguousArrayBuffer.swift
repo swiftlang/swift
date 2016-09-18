@@ -76,7 +76,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   final override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
-    var result: R? = nil
+    var result: R?
     try self._withVerbatimBridgedUnsafeBufferImpl {
       result = try body($0)
     }

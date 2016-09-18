@@ -97,7 +97,7 @@ struct ${Self} {
   internal var dataTail: UInt64 = 0
   internal var dataTailByteCount: Int = 0
 
-  internal var finalizedHash: UInt64? = nil
+  internal var finalizedHash: UInt64?
 
   public init(key: (UInt64, UInt64)) {
     v3 ^= key.1

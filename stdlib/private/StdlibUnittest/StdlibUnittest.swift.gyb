@@ -681,7 +681,7 @@ func _childProcess() {
 }
 
 struct _ParentProcess {
-  internal var _pid: pid_t? = nil
+  internal var _pid: pid_t?
   internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
   internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
   internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
@@ -849,7 +849,7 @@ struct _ParentProcess {
 
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
-      var status: ProcessTerminationStatus? = nil
+      var status: ProcessTerminationStatus?
       if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
         status = _waitForChild()
         switch status! {
@@ -937,7 +937,7 @@ struct _ParentProcess {
     print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
 
     var expectCrash = false
-    var childTerminationStatus: ProcessTerminationStatus? = nil
+    var childTerminationStatus: ProcessTerminationStatus?
     var crashStdout: [String] = []
     var crashStderr: [String] = []
     if _runTestsInProcess {
@@ -1145,7 +1145,7 @@ public func runAllTests() {
     _childProcess()
   } else {
     var runTestsInProcess: Bool = false
-    var filter: String? = nil
+    var filter: String?
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
@@ -1331,10 +1331,10 @@ public final class TestSuite {
     internal final class _Data {
       var _xfail: [TestRunPredicate] = []
       var _skip: [TestRunPredicate] = []
-      var _stdinText: String? = nil
+      var _stdinText: String?
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
-      var _testLoc: SourceLoc? = nil
+      var _testLoc: SourceLoc?
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1507,7 +1507,7 @@ func _getOSVersion() -> OSVersion {
 }
 
 var _runningOSVersion: OSVersion = _getOSVersion()
-var _overrideOSVersion: OSVersion? = nil
+var _overrideOSVersion: OSVersion?
 
 /// Override the OS version for testing.
 public func _setOverrideOSVersion(_ v: OSVersion) {

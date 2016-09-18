@@ -134,7 +134,7 @@ extension UUID : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSUUID?) -> UUID {
-        var result: UUID? = nil
+        var result: UUID?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }
