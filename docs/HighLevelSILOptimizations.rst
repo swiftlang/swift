@@ -165,6 +165,7 @@ array.uninitialized(count: Builtin.Word) -> (Array<Element>, Builtin.RawPointer)
   The caller is responsible for writing the elements to the element storage.
 
 array.props.isCocoa/needsElementTypeCheck -> Bool
+
   Reads storage descriptors properties (isCocoa, needsElementTypeCheck).
   This is not control dependent or guarded. The optimizer has
   semantic knowledge of the state transfer those properties cannot make:
