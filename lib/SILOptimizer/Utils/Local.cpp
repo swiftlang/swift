@@ -2685,7 +2685,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   case Accessibility::Public:
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->isRequired())
-	return false;
+        return false;
     }
     SWIFT_FALLTHROUGH;
   case Accessibility::Internal:

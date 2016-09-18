@@ -1196,7 +1196,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // along back edges.
   bool creatingCycle = false;
   auto T2Parent = T2;
-  while(T2Parent != nullptr) {
+  while (T2Parent != nullptr) {
     if (T2Parent->getRepresentative() == T1)
       creatingCycle = true;
     T2Parent = T2Parent->getParent();
