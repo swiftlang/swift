@@ -71,6 +71,9 @@ MARKDOWN_DETAIL = """
 PAIN_DETAIL = """
 {0}: {1}"""
 
+RATIO_MIN = None
+RATIO_MAX = None
+
 
 def main():
     global RATIO_MIN
@@ -146,11 +149,11 @@ def main():
 
     ratio_total = 0
     for key in new_results.keys():
-            ratio = (old_results[key]+0.001)/(new_results[key]+0.001)
+            ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
             ratio_total *= ratio
-            delta = (((float(new_results[key]+0.001) /
-                      (old_results[key]+0.001)) - 1) * 100)
+            delta = (((float(new_results[key] + 0.001) /
+                      (old_results[key] + 0.001)) - 1) * 100)
             delta_list[key] = round(delta, 2)
             if ((old_results[key] < new_results[key] and
                 new_results[key] < old_max_results[key]) or
@@ -174,17 +177,17 @@ def main():
     delta_width = max_width(delta_list, title='DELTA (%)')
 
     markdown_table_header = "\n" + MARKDOWN_ROW.format(
-                                        "TEST".ljust(test_name_width),
-                                        old_branch.ljust(old_time_width),
-                                        new_branch.ljust(new_time_width),
-                                        "DELTA (%)".ljust(delta_width),
-                                        "SPEEDUP".ljust(2))
+        "TEST".ljust(test_name_width),
+        old_branch.ljust(old_time_width),
+        new_branch.ljust(new_time_width),
+        "DELTA (%)".ljust(delta_width),
+        "SPEEDUP".ljust(2))
     markdown_table_header += MARKDOWN_ROW.format(
-                                         HEADER_SPLIT.ljust(test_name_width),
-                                         HEADER_SPLIT.ljust(old_time_width),
-                                         HEADER_SPLIT.ljust(new_time_width),
-                                         HEADER_SPLIT.ljust(delta_width),
-                                         HEADER_SPLIT.ljust(2))
+        HEADER_SPLIT.ljust(test_name_width),
+        HEADER_SPLIT.ljust(old_time_width),
+        HEADER_SPLIT.ljust(new_time_width),
+        HEADER_SPLIT.ljust(delta_width),
+        HEADER_SPLIT.ljust(2))
     markdown_regression = ""
     for i, key in enumerate(decreased_perf_list):
         ratio = "{0:.2f}x".format(ratio_list[key])

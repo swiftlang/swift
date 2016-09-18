@@ -73,6 +73,7 @@ def call_without_sleeping(command, env=None, dry_run=False, echo=False):
 
 
 class HostSpecificConfiguration(object):
+
     """Configuration information for an individual host."""
 
     def __init__(self, host_target, invocation):
@@ -89,7 +90,7 @@ class HostSpecificConfiguration(object):
             else:
                 stdlib_targets_to_build = set(
                     args.build_stdlib_deployment_targets).intersection(
-                        set(args.stdlib_deployment_targets))
+                    set(args.stdlib_deployment_targets))
         else:
             # Otherwise, this is a host we are building as part of
             # cross-compiling, so we only need the target itself.
@@ -185,6 +186,7 @@ class HostSpecificConfiguration(object):
 
 
 class BuildScriptInvocation(object):
+
     """Represent a single build script invocation."""
 
     @staticmethod
@@ -1483,7 +1485,7 @@ details of the setups of other systems or automated environments.""")
         const=False,
         dest="lldb_assertions")
 
-    # FIXME: This should be one option using a choices.
+    # FIXME: This should be one option using choices=[...]
     cmake_generator_group = parser.add_argument_group(
         title="Select the CMake generator")
     cmake_generator_group.add_argument(

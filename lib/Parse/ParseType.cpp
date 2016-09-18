@@ -464,7 +464,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       SmallString<32> replacement;
       auto Begin = Protocols.begin();
       replacement += extractText(*Begin);
-      while(++Begin != Protocols.end()) {
+      while (++Begin != Protocols.end()) {
         replacement += " & ";
         replacement += extractText(*Begin);
       }

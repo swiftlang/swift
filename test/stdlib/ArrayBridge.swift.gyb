@@ -134,7 +134,7 @@ class Thunks : NSObject {
   @objc func acceptSubclassArray(
     _ x: [Subclass],
     expecting expected: NSArray
-  )  {
+  ) {
     expectEqualSequence(
       expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
       x.lazy.map { ObjectIdentifier($0 as AnyObject) }

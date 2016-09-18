@@ -1505,7 +1505,7 @@ void ConstraintSystem::shrink(Expr *expr) {
       if (expr == PrimaryExpr) {
         // If this is primary expression and there are no candidates
         // to be solved, let's not record it, because it's going to be
-        // solved irregardless.
+        // solved regardless.
         if (Candidates.empty())
           return expr;
 

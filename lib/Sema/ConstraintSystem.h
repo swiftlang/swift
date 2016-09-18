@@ -1017,7 +1017,7 @@ public:
 
 private:
   /// \brief Describe the candidate expression for partial solving.
-  /// This class used used by shrink & solve methods which apply
+  /// This class used by shrink & solve methods which apply
   /// variation of directional path consistency algorithm in attempt
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {

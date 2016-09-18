@@ -81,7 +81,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     guard let value = _baseHashable as? T else { return false }
     result.initialize(to: value)
-    return true;
+    return true
   }
 }
 

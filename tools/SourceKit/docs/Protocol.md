@@ -475,7 +475,7 @@ SourceKit can provide information about the version of the protocol that is bein
 
 ```
 {
-	<key.request>: (UID) <source.request.protocol_version>
+    <key.request>: (UID) <source.request.protocol_version>
 }
 ```
 
@@ -483,8 +483,8 @@ SourceKit can provide information about the version of the protocol that is bein
 
 ```
 {
-	<key.version_major>: (int64) // The major version number in a version string
-	<key.version_minor>: (int64) // The minor version number in a version string
+    <key.version_major>: (int64) // The major version number in a version string
+    <key.version_minor>: (int64) // The minor version number in a version string
 }
 ```
 
@@ -500,7 +500,7 @@ or
 $ sourcekitd-repl
 Welcome to SourceKit.  Type ':help' for assistance.
 (SourceKit) {
-	key.request: source.request.protocol_version
+    key.request: source.request.protocol_version
 }
 ```
 
@@ -514,14 +514,14 @@ To gather documentation, SourceKit must be given either the name of a module (ke
 
 ```
 {
-	<key.request>:            (UID)     <source.request.cursorinfo>,
-	[opt] <key.sourcetext>:   (string)  // Source contents.
-	[opt] <key.sourcefile>:   (string)  // Absolute path to the file.
-	                                    // **Require**: key.sourcetext or key.sourcefile
-	[opt] <key.offset>:       (int64)   // Byte offset of code point inside the source contents.
-	[opt] <key.usr>:          (string)  // USR string for the entity.
-	                                    // **Require**: key.offset or key.usr
-	[opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
+    <key.request>:            (UID)     <source.request.cursorinfo>,
+    [opt] <key.sourcetext>:   (string)  // Source contents.
+    [opt] <key.sourcefile>:   (string)  // Absolute path to the file.
+                                        // **Require**: key.sourcetext or key.sourcefile
+    [opt] <key.offset>:       (int64)   // Byte offset of code point inside the source contents.
+    [opt] <key.usr>:          (string)  // USR string for the entity.
+                                        // **Require**: key.offset or key.usr
+    [opt] <key.compilerargs>: [string*] // Array of zero or more strings for the compiler arguments,
                                         // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
                                         // these must include the path to that file.
 }
@@ -535,7 +535,7 @@ To gather documentation, SourceKit must be given either the name of a module (ke
     <key.name>:                  (string) // Displayed name for the token.
     <key.usr>:                   (string) // USR string for the token.
     <key.filepath>:              (string) // Path to the file.
-    <key.offset>:                (int64)  // Byte offset of the token inside the souce contents.
+    <key.offset>:                (int64)  // Byte offset of the token inside the source contents.
     <key.length>:                (ist64)  // Length of the token.
     <key.typename>:              (string) // Text describing the type of the result.
     <key.annotated_decl>:        (string) // XML representing how the token was declared.
@@ -578,7 +578,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
   key.request: source.request.cursorinfo,
   key.sourcefile: "/path/to/file.swift",
   key.offset: 7,
-  key.compilerargs: [ "/path/to/file.swift" ]
+  key.compilerargs: ["/path/to/file.swift"]
 }
 ```
 

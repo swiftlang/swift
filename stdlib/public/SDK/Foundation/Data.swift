@@ -261,7 +261,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // MARK: - Properties and Functions
     
     /// The number of bytes in the data.
-    public var count : Int {
+    public var count: Int {
         get {
             return _mapUnmanaged { $0.length }
         }
@@ -363,7 +363,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
 
-        // Avoid a crash that happens on OSX 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
+        // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
         if !options.contains(.atomic) {
             #if os(OSX)
                 return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber10_11_Max)
@@ -521,7 +521,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
       where ByteCollection.Iterator.Element == Data.Iterator.Element {
         
         // Calculate this once, it may not be O(1)
-        let replacementCount : Int = numericCast(newElements.count)
+        let replacementCount: Int = numericCast(newElements.count)
         let currentCount = self.count
         let subrangeCount = subrange.count
         
@@ -686,7 +686,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     //
     
     @available(*, unavailable, renamed: "count")
-    public var length : Int {
+    public var length: Int {
         get { fatalError() }
         set { fatalError() }
     }
@@ -774,7 +774,7 @@ extension NSData : _HasCustomAnyHashableRepresentation {
     }
 }
 
-/// A NSData subclass that uses Swift reference counting.
+/// An NSData subclass that uses Swift reference counting.
 ///
 /// This subclass implements the API of NSData by holding an instance and forwarding all implementation to that object.
 /// Since it uses Swift reference counting, we can do correct uniqueness checks even if we pass this instance back to Objective-C. In Objective-C, it looks like an instance of NSData.
@@ -783,7 +783,7 @@ extension _SwiftNSData {
     // -----
     
     @objc(length)
-    var length : Int {
+    var length: Int {
         get {
             return _mapUnmanaged { $0.length }
         }

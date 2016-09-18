@@ -132,7 +132,7 @@ ASTScope::ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children)
 
   // Add child nodes, reparenting them to this node.
   storedChildren.reserve(children.size());
-  for (auto child : children ) {
+  for (auto child : children) {
     child->parentAndExpanded.setPointer(this);
     storedChildren.push_back(child);
   }
@@ -592,7 +592,7 @@ void ASTScope::expand() const {
     break;
 
   case ASTScopeKind::Accessors: {
-    // Add children for all of the the explicitly-written accessors.
+    // Add children for all of the explicitly-written accessors.
     SmallVector<ASTScope *, 4> accessors;
     auto addAccessor = [&](FuncDecl *accessor) {
       if (!accessor) return;

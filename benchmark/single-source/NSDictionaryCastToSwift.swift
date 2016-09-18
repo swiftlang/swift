@@ -14,7 +14,7 @@
 // rdar://problem/18539730
 //
 // Description:
-//     Create a NSDictionary instance and cast it to [String: NSObject].
+//     Create an NSDictionary instance and cast it to [String: NSObject].
 import Foundation
 import TestsUtils
 
