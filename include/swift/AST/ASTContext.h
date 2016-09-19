@@ -510,9 +510,9 @@ public:
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
   
   /// Determine whether the given nominal type is one of the standard
-  /// library types that is known a priori to be bridged to a
-  /// Foundation.
-  bool isStandardLibraryTypeBridgedInFoundation(NominalTypeDecl *nominal) const;
+  /// library or Cocoa framework types that is known to be bridged by another
+  /// module's overlay, for layering or implementation detail reasons.
+  bool isTypeBridgedInExternalModule(NominalTypeDecl *nominal) const;
 
   /// Get the Objective-C type that a Swift type bridges to, if any.
   /// 
