@@ -3982,7 +3982,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   }
 }
 
-bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
+bool ASTContext::isTypeBridgedInExternalModule(
      NominalTypeDecl *nominal) const {
   return (nominal == getBoolDecl() ||
           nominal == getIntDecl() ||
@@ -3995,8 +3995,18 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getStringDecl() ||
           nominal == getErrorDecl() ||
           nominal == getAnyHashableDecl() ||
-          // Weird one-off case where CGFloat is bridged to NSNumber.
-          nominal->getName() == Id_CGFloat);
+          // Foundation's overlay depends on the CoreGraphics overlay, but
+          // CoreGraphics value types bridge to Foundation objects such as
+          // NSValue and NSNumber, so to avoid circular dependencies, the
+          // bridging implementations of CG types appear in the Foundation
+          // module.
+          nominal->getParentModule()->getName() == Id_CoreGraphics ||
+          // CoreMedia is a dependency of AVFoundation, but the bridged
+          // NSValue implementations for CMTime, CMTimeRange, and
+          // CMTimeMapping are provided by AVFoundation, and AVFoundation
+          // gets upset if you don't use the NSValue subclasses its factory
+          // methods instantiate.
+          nominal->getParentModule()->getName() == Id_CoreMedia);
 }
 
 Optional<Type>
@@ -4018,7 +4028,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // optimizer will be guaranteed to see the conformance if it exists.
   bool knownBridgedToObjC = false;
   if (auto ntd = type->getAnyNominal())
-    knownBridgedToObjC = isStandardLibraryTypeBridgedInFoundation(ntd);
+    knownBridgedToObjC = isTypeBridgedInExternalModule(ntd);
 
   // TODO: Under id-as-any, container bridging is unconstrained. This check can
   // go away.

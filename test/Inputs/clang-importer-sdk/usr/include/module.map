@@ -112,3 +112,8 @@ module objc_generics {
   header "objc_generics.h"
   export *
 }
+
+module CoreMedia {
+  header "CoreMedia.h"
+  export *
+}
