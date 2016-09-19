@@ -1522,8 +1522,7 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
   Size stride(1);
   
   // TODO: Arrays currently lower-bound the stride to 1.
-  if (!fixedTI
-      || std::max(Size(1), fixedTI->getFixedStride()) != fixedTI->getFixedSize()) {
+  if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
     llvm::Value *byteAddr = IGF.Builder.CreateBitCast(base.getAddress(),
                                                       IGF.IGM.Int8PtrTy);
     llvm::Value *size = getStride(IGF, T);
