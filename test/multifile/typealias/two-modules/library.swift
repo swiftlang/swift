@@ -1,5 +1,3 @@
-// RUN: true
-
 public enum Result<T, U>
 {
     case success(T)

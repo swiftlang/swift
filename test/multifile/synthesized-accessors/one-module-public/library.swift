@@ -1,5 +1,3 @@
-// RUN: true
-
 public struct FishAndChips {
   public var costPounds: Float
   public var costEuros: Float {
