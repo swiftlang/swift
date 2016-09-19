@@ -262,6 +262,10 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 
 //===--- Hacks and workarounds --------------------------------------------===//
 
+// FIXME(ABI)#158 (Performance)
+// There used to be a now-fixed optimizer bug that prevented using 
+// UnsafePointer<Unmanaged<AnyObject>> in Dictionary implementation.
+// rdar://problem/16861508
 /// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
 /// __unsafe_unretained *` in Objective-C ARC.
 internal struct _UnmanagedAnyObjectArray {
@@ -4581,8 +4585,9 @@ elif Self == 'Dictionary':
 ${SubscriptingWithIndexDoc}
 public struct ${Self}Index<${TypeParametersDecl}> :
   Comparable {
-  // FIXME(ABI)(compiler limitation): `DictionaryIndex` and `SetIndex` should
+  // FIXME(ABI)#34 (Nesting types in generics): `DictionaryIndex` and `SetIndex` should
   // be nested types.
+  // rdar://problem/17002096
 
   // Index for native storage is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving

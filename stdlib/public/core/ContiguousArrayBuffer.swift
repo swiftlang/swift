@@ -32,7 +32,7 @@ internal final class _EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  // FIXME(ABI): remove 'Void' arguments here and elsewhere in this file, they
+  // FIXME(ABI)#26 (Type Checker): remove 'Void' arguments here and elsewhere in this file, they
   // are a workaround for an old compiler limitation.
   override func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
     return 0
@@ -63,11 +63,12 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
 
-// FIXME: This whole class is a workaround for
+// FIXME(ABI)#141 : This whole class is a workaround for
 // <rdar://problem/18560464> Can't override generic method in generic
 // subclass.  If it weren't for that bug, we'd override
 // _withVerbatimBridgedUnsafeBuffer directly in
 // _ContiguousArrayStorage<Element>.
+// rdar://problem/19341002
 class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 #if _runtime(_ObjC)
   /// If the `Element` is bridged verbatim, invoke `body` on an

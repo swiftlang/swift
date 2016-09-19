@@ -23,7 +23,7 @@ from gyb_stdlib_support import (
 %   Self = defaultIndicesForTraversal(Traversal)
 %   collection = documentationNameForTraversal(Traversal)
 
-// FIXME(ABI)(compiler limitation): There should be just one default
+// FIXME(ABI)#42 (Conditional Conformance): There should be just one default
 // indices type that has conditional conformances to
 // `BidirectionalCollection` and `RandomAccessCollection`.
 // <rdar://problem/17144340>
@@ -31,7 +31,7 @@ from gyb_stdlib_support import (
 /// A collection of indices for an arbitrary ${collection}.
 public struct ${Self}<
   Elements : _${collectionForTraversal(Traversal).replace('Collection', 'Indexable')}
-  // FIXME(ABI)(compiler limitation):
+  // FIXME(ABI)#43 (Recursive Protocol Constraints):
   // Elements : Collection
   // rdar://problem/20531108
 > : ${collectionForTraversal(Traversal)} {

@@ -215,7 +215,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where
     C.Iterator.Element == Child,
-    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#47 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == Child,
@@ -276,7 +276,7 @@ public struct Mirror {
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where
-    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#48 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.SubSequence == C.SubSequence,
@@ -385,7 +385,7 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 ///
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
-// FIXME(ABI): this protocol should be "non-open" and you shouldn't be able to
+// FIXME(ABI)#49 (Sealed Protocols): this protocol should be "non-open" and you shouldn't be able to
 // create conformances.
 public protocol MirrorPath {}
 extension IntMax : MirrorPath {}
@@ -715,8 +715,8 @@ public protocol CustomPlaygroundQuickLookable {
 }
 
 
-// A workaround for <rdar://problem/25971264>
-// FIXME(ABI)
+// A workaround for <rdar://problem/26182650>
+// FIXME(ABI)#50 (Dynamic Dispatch for Class Extensions) though not if it moves out of stdlib.
 public protocol _DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }

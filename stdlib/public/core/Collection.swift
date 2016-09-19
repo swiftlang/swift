@@ -18,7 +18,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
 public typealias IndexableBase = _IndexableBase
 public protocol _IndexableBase {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#24 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -359,7 +359,8 @@ public protocol _Indexable : _IndexableBase {
 ///     // Prints "20.0"
 public struct IndexingIterator<
   Elements : _IndexableBase
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#97 (Recursive Protocol Constraints):
+  // Should be written as:
   // Elements : Collection
 > : IteratorProtocol, Sequence {
 
@@ -560,7 +561,8 @@ public protocol Collection : _Indexable, Sequence {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#98 (Recursive Protocol Constraints):
+  // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -620,7 +622,8 @@ public protocol Collection : _Indexable, Sequence {
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#68 (Associated Types with where clauses):
+  // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where
   //   Indices.Iterator.Element == Index,
