@@ -3903,10 +3903,8 @@ public:
     if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(tupleTy->getNumElements());
-      for (const auto &elt : tupleTy->getElements()) {
-        elements.push_back(TupleTypeElt(elt.getType(), Identifier(),
-                                        elt.isVararg()));
-      }
+      for (const auto &elt : tupleTy->getElements())
+        elements.push_back(elt.getWithName());
       inputType = TupleType::get(elements, inputType->getASTContext());
     }
 

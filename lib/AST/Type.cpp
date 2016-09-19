@@ -755,8 +755,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tuple->getElement(i);
             Identifier newName = stripLabels? Identifier() : elt.getName();
-            elements.push_back(TupleTypeElt(elt.getType(), newName,
-                                            elt.isVararg()));
+            elements.push_back(elt.getWithName(newName));
           }
           anyChanged = true;
         }
@@ -1208,9 +1207,7 @@ CanType TypeBase::getCanonicalType() {
     for (const TupleTypeElt &field : TT->getElements()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
-      CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
-                                     field.getName(),
-                                     field.isVararg()));
+      CanElts.push_back(field.getWithType(field.getType()->getCanonicalType()));
     }
 
     const ASTContext &C = CanElts[0].getType()->getASTContext();
@@ -3394,17 +3391,13 @@ case TypeKind::Id:
       // elements.
       if (!anyChanged) {
         // Copy all of the previous elements.
-        for (unsigned I = 0; I != Index; ++I) {
-          const TupleTypeElt &FromElt =tuple->getElement(I);
-          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.isVararg()));
-        }
-
+        elements.append(tuple->getElements().begin(),
+                        tuple->getElements().begin() + Index);
         anyChanged = true;
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      elements.push_back(TupleTypeElt(eltTy, elt.getName(), elt.isVararg()));
+      elements.push_back(elt.getWithType(eltTy));
       ++Index;
     }
 

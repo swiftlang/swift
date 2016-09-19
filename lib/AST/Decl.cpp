@@ -1471,17 +1471,12 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       Type eltTy = mapSignatureParamType(ctx, elt.getType());
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer()) {
         if (!anyChanged) {
-          elements.reserve(tupleTy->getNumElements());
-          for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tupleTy->getElement(i);
-            elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
-                                            elt.isVararg()));
-          }
+          elements.append(tupleTy->getElements().begin(),
+                          tupleTy->getElements().begin() + idx);
           anyChanged = true;
         }
 
-        elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                        elt.isVararg()));
+        elements.push_back(elt.getWithType(eltTy));
       }
       ++idx;
     }
