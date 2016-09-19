@@ -6448,18 +6448,23 @@ public:
       }
     }
 
-    // Type check the constructor parameters.
-    GenericTypeToArchetypeResolver resolver;
-    if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
-      CD->overwriteType(ErrorType::get(TC.Context));
-      CD->setInterfaceType(ErrorType::get(TC.Context));
-      CD->setInvalid();
-    } else {
-      configureConstructorType(CD, SelfTy,
-                               CD->getParameterList(1)->getType(TC.Context));
+    {
+      CD->setIsBeingTypeChecked(true);
+      SWIFT_DEFER { CD->setIsBeingTypeChecked(false); };
 
-      if (!CD->getGenericSignatureOfContext())
-        TC.configureInterfaceType(CD);
+      // Type check the constructor parameters.
+      GenericTypeToArchetypeResolver resolver;
+      if (CD->isInvalid() || semaFuncParamPatterns(CD, &resolver)) {
+        CD->overwriteType(ErrorType::get(TC.Context));
+        CD->setInterfaceType(ErrorType::get(TC.Context));
+        CD->setInvalid();
+      } else {
+        configureConstructorType(CD, SelfTy,
+                                 CD->getParameterList(1)->getType(TC.Context));
+
+        if (!CD->getGenericSignatureOfContext())
+          TC.configureInterfaceType(CD);
+      }
     }
 
     validateAttributes(TC, CD);
