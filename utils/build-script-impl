@@ -328,6 +328,17 @@ function is_swift_lto_enabled() {
     fi
 }
 
+# Enable module-builds of llvm only when asan is disabled.
+# FIXME: rdar://problem/28356072
+function is_llvm_module_build_enabled() {
+    if [[ "$(true_false ${LLVM_ENABLE_MODULES})" == "TRUE" ]] &&
+       [[ "$(true_false ${ENABLE_ASAN})" == "FALSE" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
+}
+
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -636,7 +647,7 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
-                -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
+                -DLLVM_ENABLE_MODULES:BOOL="$(is_llvm_module_build_enabled)"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
