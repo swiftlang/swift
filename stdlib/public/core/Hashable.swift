@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): This protocol exists to identify
+// FIXME(ABI)#33 (Generic subscripts): This protocol exists to identify
 // hashable types.  It is used for defining an imitation of a generic
 // subscript on `Dictionary<AnyHashable, *>`.
 public protocol _Hashable {

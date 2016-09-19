@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): Remove `_Strideable`.
+// FIXME(ABI)#69 (Overload Resolution): Remove `_Strideable`.
 // WORKAROUND rdar://25214598 - should be:
 // protocol Strideable : Comparable {...}
 

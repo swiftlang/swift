@@ -18,7 +18,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
 public typealias RandomAccessIndexable = _RandomAccessIndexable
 public protocol _RandomAccessIndexable : _BidirectionalIndexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#54 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -53,14 +53,14 @@ public protocol RandomAccessCollection :
   /// elements.
   associatedtype SubSequence : _RandomAccessIndexable, BidirectionalCollection
     = RandomAccessSlice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#102 (Recursive Protocol Constraints):
   // associatedtype SubSequence : RandomAccessCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _RandomAccessIndexable, BidirectionalCollection
     = DefaultRandomAccessIndices<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#103 (Recursive Protocol Constraints):
   // associatedtype Indices : RandomAccessCollection
 
   /// The indices that are valid for subscripting the collection, in ascending

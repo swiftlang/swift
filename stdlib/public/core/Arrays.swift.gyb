@@ -779,7 +779,7 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI): move to an initializer on _Buffer.
+  // FIXME(ABI)#12 : move to an initializer on _Buffer.
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -1306,7 +1306,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   // An overload of `append(contentsOf:)` that uses the += that is optimized for
   // collections.
-  // FIXME(ABI): remove this entrypoint.  The overload for `Sequence` should be
+  // FIXME(ABI)#13 (Performance): remove this entrypoint.  The overload for `Sequence` should be
   // made optimal for this case, too.
   /// Adds the elements of a collection to the end of the array.
   ///
@@ -1666,7 +1666,7 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
-// FIXME(ABI): add argument labels.
+// FIXME(ABI)#14 : add argument labels.
 @inline(never)
 internal func _arrayOutOfPlaceReplace<B, C>(
   _ source: inout B,
@@ -1694,7 +1694,7 @@ internal func _arrayOutOfPlaceReplace<B, C>(
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-// FIXME(ABI): add argument labels.
+// FIXME(ABI)#15 : add argument labels.
 internal func _expectEnd<C : Collection>(_ i: C.Index, _ s: C) {
   _debugPrecondition(
     i == s.endIndex,
@@ -1772,7 +1772,7 @@ extension ${Self} {
   }
 }
 
-// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// FIXME(ABI)#16 : remove this entrypoint.  The functionality should be provided by
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Appends the elements of a sequence to ${a_Self}.
 ///
@@ -1796,7 +1796,7 @@ public func += <
   lhs.append(contentsOf: rhs)
 }
 
-// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// FIXME(ABI)#17 : remove this entrypoint.  The functionality should be provided by
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Appends the elements of a collection to ${a_Self}.
 ///
