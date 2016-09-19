@@ -499,8 +499,12 @@ ERROR(sil_witness_method_not_protocol,none,
       "witness_method is not a protocol method", ())
 ERROR(sil_witness_method_type_does_not_conform,none,
       "witness_method type does not conform to protocol", ())
-ERROR(sil_member_decl_not_found,none,
-      "member not found in method instructions", ())
+ERROR(sil_member_decl_not_found,none, "member not found", ())
+ERROR(sil_named_member_decl_not_found,none,
+      "member %0 not found in type %1", (DeclName, Type))
+ERROR(sil_member_lookup_bad_type,none,
+      "cannot lookup member %0 in non-nominal, non-module type %1",
+      (DeclName, Type))
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
