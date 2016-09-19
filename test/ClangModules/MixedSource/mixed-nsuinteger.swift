@@ -9,8 +9,8 @@ import user
 
 var ui: UInt = 5
 var i: Int = 56
-var p: UnsafeMutablePointer<NSFastEnumerationState>? = nil
-var pp: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
+var p: UnsafeMutablePointer<NSFastEnumerationState>?
+var pp: AutoreleasingUnsafeMutablePointer<AnyObject?>?
 
 var userTypedObj = NSUIntTest()
 
@@ -40,8 +40,8 @@ var rr: UInt = userTypedObj.countByEnumerating(with: p!, objects: pp!, count: ui
 // Check exercising protocol conformance.
 func gen<T:NSFastEnumeration>(_ t:T) {
   let i: Int = 56
-  let p: UnsafeMutablePointer<NSFastEnumerationState>? = nil
-  let pp: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
+  let p: UnsafeMutablePointer<NSFastEnumerationState>?
+  let pp: AutoreleasingUnsafeMutablePointer<AnyObject?>?
   t.countByEnumerating(with: p!, objects: pp!, count: i)
 }
 

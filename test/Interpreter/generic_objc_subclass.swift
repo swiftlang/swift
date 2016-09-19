@@ -25,7 +25,7 @@ protocol PP {
 
 class A<T> : HasHiddenIvars, P {
   var first: Int = 16
-  var second: T? = nil
+  var second: T?
   var third: Int = 61
 
   override var description: String {

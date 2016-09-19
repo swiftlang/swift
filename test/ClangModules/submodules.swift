@@ -22,7 +22,7 @@ public var x : DWORD = MY_INT
 public var y : CInt = x
 
 let _: ctypes.DWORD = ctypes.MY_INT
-let _: ctypes.Color? = nil
+let _: ctypes.Color?
 
 // Error: "bits" should not be a valid name in this scope.
 #if !NO_ERRORS

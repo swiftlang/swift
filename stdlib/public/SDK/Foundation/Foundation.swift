@@ -1416,7 +1416,7 @@ extension NSCoder {
 
   @nonobjc
   public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> Any? {
-    var classesAsNSObjects: NSSet? = nil
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
@@ -1474,8 +1474,8 @@ extension NSCoder {
   @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
-    var error: NSError? = nil
-    var classesAsNSObjects: NSSet? = nil
+    var error: NSError?
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }

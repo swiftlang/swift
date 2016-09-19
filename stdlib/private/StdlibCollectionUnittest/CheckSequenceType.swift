@@ -1937,8 +1937,8 @@ self.test("\(testNamePrefix)._preprocessingPass/semantics") {
   for test in forEachTests {
     let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     var wasInvoked = false
-    var caughtError: Error? = nil
-    var result: OpaqueValue<Int>? = nil
+    var caughtError: Error?
+    var result: OpaqueValue<Int>?
     do {
       result = try s._preprocessingPass {
         (sequence) -> OpaqueValue<Int> in

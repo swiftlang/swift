@@ -116,7 +116,7 @@ So if you have a function declared::
 
 You can call it as any of::
 
-  var x: NSBas? = nil
+  var x: NSBas?
   var p: AutoreleasingUnsafeMutablePointer<NSBas?> = nil
   bas(nil)
   bas(p)

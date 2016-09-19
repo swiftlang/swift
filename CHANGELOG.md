@@ -3663,7 +3663,7 @@ Swift 1.0
   accepts inouts or `nil`:
 
     ```swift
-    var error: NSError? = nil
+    var error: NSError?
     let words = NSString.stringWithContentsOfFile("/usr/share/dict/words",
       encoding: .UTF8StringEncoding,
       error: &error)

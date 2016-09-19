@@ -965,7 +965,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// This method synchronously checks if the resource's backing store is reachable. Checking reachability is appropriate when making decisions that do not require other immediate operations on the resource, e.g. periodic maintenance of UI state that depends on the existence of a specific document. When performing operations such as opening a file or copying resource properties, it is more efficient to simply try the operation and handle failures. This method is currently applicable only to URLs for file system resources. For other URL types, `false` is returned.
     public func checkResourceIsReachable() throws -> Bool {
-        var error : NSError? = nil
+        var error : NSError?
         let result = _url.checkResourceIsReachableAndReturnError(&error)
         if let e = error {
             throw e
@@ -979,7 +979,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// This method synchronously checks if the resource's backing store is reachable. Checking reachability is appropriate when making decisions that do not require other immediate operations on the resource, e.g. periodic maintenance of UI state that depends on the existence of a specific document. When performing operations such as opening a file or copying resource properties, it is more efficient to simply try the operation and handle failures. This method is currently applicable only to URLs for file system resources. For other URL types, `false` is returned.
     @available(OSX 10.10, iOS 8.0, *)
     public func checkPromisedItemIsReachable() throws -> Bool {
-        var error : NSError? = nil
+        var error : NSError?
         let result = _url.checkPromisedItemIsReachableAndReturnError(&error)
         if let e = error {
             throw e
@@ -1151,7 +1151,7 @@ extension URL : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURL?) -> URL {
-        var result: URL? = nil
+        var result: URL?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

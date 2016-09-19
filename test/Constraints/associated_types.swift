@@ -35,5 +35,5 @@ func owl3() {
 // "Can't access associated types through class-constrained generic parameters"
 // (https://bugs.swift.org/browse/SR-726)
 func spoon<S: Spoon>(_ s: S) {
-  let _: S.Runcee? = nil
+  let _: S.Runcee?
 }
