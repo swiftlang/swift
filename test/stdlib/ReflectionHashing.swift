@@ -2,7 +2,12 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
-// XFAIL: linux
+// This test expects consistent hash code generation. However String instance
+// generate different values on Linux depending on which version of libicu is
+// installed. Therefore we run this test only on non-linux OSes, which is
+// best described as having objc_interop.
+
+// REQUIRES: objc_interop
 
 //
 // This file contains reflection tests that depend on hash values.
