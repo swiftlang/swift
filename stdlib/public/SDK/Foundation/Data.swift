@@ -81,7 +81,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Base64DecodingOptions = NSData.Base64DecodingOptions
     
     public typealias Index = Int
-    public typealias Indices = DefaultRandomAccessIndices<Data>
+    public typealias Indices = CountableRange<Int>
     
     internal var _wrapped : _SwiftNSData
     
@@ -613,9 +613,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Data> {
+    public subscript(bounds: Range<Index>) -> MutableRangeReplaceableRandomAccessSlice<Data> {
         get {
-            return MutableRandomAccessSlice(base: self, bounds: bounds)
+            return MutableRangeReplaceableRandomAccessSlice(base: self, bounds: bounds)
         }
         set {
             replaceSubrange(bounds, with: newValue.base)
@@ -640,6 +640,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
     public func index(after i: Index) -> Index {
         return i + 1
+    }
+
+    public var indices: CountableRange<Int> {
+        return startIndex..<endIndex
     }
 
     /// An iterator over the contents of the data.
