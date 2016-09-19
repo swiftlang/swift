@@ -1341,6 +1341,11 @@ public:
   TupleTypeElt getWithType(Type T) const {
     return TupleTypeElt(T, getName(), isVararg());
   }
+
+  /// Retrieve a copy of this tuple type element with the name replaced.
+  TupleTypeElt getWithName(Identifier name = Identifier()) const {
+    return TupleTypeElt(getType(), name, isVararg());
+  }
 };
 
 inline Type getTupleEltType(const TupleTypeElt &elt) {

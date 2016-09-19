@@ -4277,9 +4277,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       if (fromTupleExpr)
         fromEltType = fromTupleExpr->getElement(sources[i])->getType();
 
-      toSugarFields.push_back(TupleTypeElt(fromEltType,
-                                           toElt.getName(),
-                                           toElt.isVararg()));
+      toSugarFields.push_back(toElt.getWithType(fromEltType));
       fromTupleExprFields[sources[i]] = fromElt;
       continue;
     }
@@ -4314,12 +4312,9 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setElement(sources[i], convertedElt);
 
     // Record the sugared field name.
-    toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
-                                         toElt.getName(),
-                                         toElt.isVararg()));
-    fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
-                                                   fromElt.getName(),
-                                                   fromElt.isVararg());
+    toSugarFields.push_back(toElt.getWithType(convertedElt->getType()));
+    fromTupleExprFields[sources[i]] =
+        fromElt.getWithType(convertedElt->getType());
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -4356,10 +4351,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       fromTupleExpr->setElement(fromFieldIdx, convertedElt);
 
-      fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
-                                            convertedElt->getType(),
-                                            fromElt.getName(),
-                                            fromElt.isVararg());
+      fromTupleExprFields[fromFieldIdx] =
+          fromElt.getWithType(convertedElt->getType());
     }
 
     // Find the appropriate injection function.
@@ -4452,15 +4445,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
         assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
                "scalar field is not equivalent to dest vararg field?!");
 
-        sugarFields.push_back(TupleTypeElt(field.getType(),
-                                           field.getName(),
-                                           true));
+        sugarFields.push_back(field);
       }
       else {
         assert(expr->getType()->isEqual(field.getType()) &&
                "scalar field is not equivalent to dest tuple field?!");
-        sugarFields.push_back(TupleTypeElt(expr->getType(),
-                                           field.getName()));
+        sugarFields.push_back(field.getWithType(expr->getType()));
       }
 
       // Record the
