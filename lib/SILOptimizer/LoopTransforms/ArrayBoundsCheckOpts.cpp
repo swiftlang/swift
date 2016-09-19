@@ -1010,6 +1010,10 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     if (!ArrayIndex)
       continue;
 
+    // Make sure we know how-to hoist the array call.
+    if (!ArrayCall.canHoist(Preheader->getTerminator(), DT))
+      continue;
+
     // Invariant check.
     if (blockAlwaysExecutes && dominates(DT, ArrayIndex, Preheader)) {
       assert(ArrayCall.canHoist(Preheader->getTerminator(), DT) &&
