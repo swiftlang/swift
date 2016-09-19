@@ -27,6 +27,5 @@ add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_stubs_unicode_normalization_sources}
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS} -DswiftCore_EXPORTS
   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
-  LINK_LIBRARIES ${swift_stubs_link_libraries}
   INSTALL_IN_COMPONENT stdlib)
 
