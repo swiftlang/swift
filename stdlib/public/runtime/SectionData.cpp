@@ -49,6 +49,13 @@ swift::_swift_initializeCallbacksForSectionData(
 }
 #elif defined(__ELF__) || defined(__ANDROID__)
 
+#if defined(SUPPORTS_STATIC_BINARIES)
+// If creating a static binary using --static-executable,
+// gold will set these to the data sections via --defsym
+const void *__swift2_protocol_conformances_start = nullptr;
+const void *__swift2_type_metadata_start = nullptr;
+#endif // SUPPORTS_STATIC_BINARIES
+
 static int
 _addImageSectionData(struct dl_phdr_info *info, size_t size, void *data) {
   // inspectArgs contains addImage*Block function and the section name
@@ -79,6 +86,18 @@ _addImageSectionData(struct dl_phdr_info *info, size_t size, void *data) {
 
 void
 swift::_swift_initializeCallbacksForSectionData(InspectArgs *inspectArgs) {
+#if defined(SUPPORTS_STATIC_BINARIES)
+  const void **sectionDataAddr = inspectArgs->sectionDataAddr;
+  assert(sectionDataAddr != nullptr );
+  if (*sectionDataAddr) {
+    auto blockAddr = reinterpret_cast<const uint8_t*>(sectionDataAddr);
+    auto blockSize = *reinterpret_cast<const uint64_t*>(blockAddr);
+    blockAddr += sizeof(blockSize);
+    inspectArgs->fnAddImageBlock(blockAddr, blockSize);
+    return;
+  }
+#endif // SUPPORTS_STATIC_BINARIES
+
   // Search the loaded dls. Unlike the above, this only searches the already
   // loaded ones.
   // FIXME: Find a way to have this continue to happen after.

@@ -36,6 +36,14 @@
 #elif defined(__ELF__)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
 #define SWIFT_TYPE_METADATA_SECTION ".swift2_type_metadata_start"
+
+#if defined(__linux__)
+#define SUPPORTS_STATIC_BINARIES
+// Add a declaration for each section
+extern const void *__swift2_protocol_conformances_start;
+extern const void *__swift2_type_metadata_start;
+#endif // __linux__
+
 #elif defined(__CYGWIN__) || defined(_MSC_VER)
 #define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".sw2prtc"
 #define SWIFT_TYPE_METADATA_SECTION ".sw2tymd"
@@ -47,6 +55,9 @@ namespace swift {
   struct InspectArgs {
     void (*fnAddImageBlock)(const uint8_t *, size_t);
     const char *sectionName;
+#if defined(SUPPORTS_STATIC_BINARIES)
+    const void **sectionDataAddr;
+#endif
   };
 
 #if defined(__APPLE__) && defined(__MACH__)

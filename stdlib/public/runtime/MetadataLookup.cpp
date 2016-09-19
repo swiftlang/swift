@@ -80,7 +80,10 @@ static void _addImageTypeMetadataRecordsBlock(const uint8_t *records,
 
 static InspectArgs metadataSectionArgs = {
   _addImageTypeMetadataRecordsBlock,
-  SWIFT_TYPE_METADATA_SECTION
+  SWIFT_TYPE_METADATA_SECTION,
+#if defined(SUPPORTS_STATIC_BINARIES)
+  &__swift2_type_metadata_start
+#endif
 };
 
 #if defined(__APPLE__) && defined(__MACH__)

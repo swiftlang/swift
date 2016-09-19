@@ -217,7 +217,10 @@ static void _addImageProtocolConformancesBlock(const uint8_t *conformances,
 
 static InspectArgs conformanceSectionArgs = {
   _addImageProtocolConformancesBlock,
-  SWIFT_PROTOCOL_CONFORMANCES_SECTION
+  SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+#if defined(SUPPORTS_STATIC_BINARIES)
+  &__swift2_protocol_conformances_start
+#endif
 };
 
 #if defined(__APPLE__) && defined(__MACH__)
