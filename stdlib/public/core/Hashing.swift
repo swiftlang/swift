@@ -147,8 +147,8 @@ func _mixInt(_ value: Int) -> Int {
 #endif
 }
 
-/// Given a hash value, returns an integer value between 0 and `upperBound`
-/// that corresponds to a hash value.
+/// Given a hash value, returns an integer value in the range of
+/// 0..<`upperBound` that corresponds to a hash value.
 ///
 /// The `upperBound` must be positive and a power of 2.
 ///
@@ -169,6 +169,9 @@ public // @testable
 func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
   _sanityCheck(_isPowerOf2(upperBound))
   let mixedHashValue = _mixInt(hashValue)
+
+  // As `upperBound` is a power of two we can do a bitwise-and to calculate
+  // mixedHashValue % upperBound.
   return mixedHashValue & (upperBound &- 1)
 }
 
