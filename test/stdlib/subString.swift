@@ -5,11 +5,10 @@ import StdlibUnittest
 
 var SubstringTests = TestSuite("SubstringTests")
 
-func checkMatch<S: Collection, T: Collection
+func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   where S.Index == T.Index, S.Iterator.Element == T.Iterator.Element,
-  S.Iterator.Element: Equatable>(
-  _ x: S, _ y: T, _ i: S.Index) {
-  
+  S.Iterator.Element: Equatable
+{
   expectEqual(x[i], y[i])
 }
 
@@ -71,9 +70,7 @@ SubstringTests.test("UnicodeScalars")
   expectEqual(s, "abcdefg")
 }
 
-SubstringTests.test("UTF16View")
-  .xfail(.always("UTF16View slices don't share indices"))
-  .code {
+SubstringTests.test("UTF16View") {
   let s = "abcdefg"
   let t = s.utf16.dropFirst(2)
   let u = t.dropFirst(2)
