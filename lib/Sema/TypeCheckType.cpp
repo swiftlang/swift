@@ -624,42 +624,9 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
     InFlightDiagnostic diag = tc.diagnose(loc,
         diag::generic_type_requires_arguments, ty);
     if (auto *genericD = unbound->getDecl()) {
-
-      // Tries to infer the type arguments to pass.
-      // Currently it only works if all the generic arguments have a super type,
-      // or it requires a class, in which case it infers 'AnyObject'.
-      auto inferGenericArgs = [](GenericTypeDecl *genericD)->std::string {
-        auto *mod = genericD->getParentModule();
-        auto *genericSig = genericD->getGenericSignature();
-        if (!genericSig)
-          return std::string();
-
-        auto params = genericSig->getInnermostGenericParams();
-        if (params.empty())
-          return std::string();
-        std::string argsToAdd = "<";
-        for (unsigned i = 0, e = params.size(); i != e; ++i) {
-          auto param = params[i];
-          if (auto superTy = genericSig->getSuperclassBound(param, *mod)) {
-            if (superTy->hasTypeParameter())
-              return std::string(); // give up
-            argsToAdd += superTy.getString();
-          } else if (genericSig->requiresClass(param, *mod)) {
-            argsToAdd += "AnyObject";
-          } else {
-            return std::string(); // give up.
-          }
-          if (i < e-1)
-            argsToAdd += ", ";
-        }
-        argsToAdd += ">";
-        return argsToAdd;
-      };
-
-      std::string genericArgsToAdd = inferGenericArgs(genericD);
-      if (!genericArgsToAdd.empty()) {
+      SmallString<64> genericArgsToAdd;
+      if (tc.getDefaultGenericArgumentsString(genericArgsToAdd, genericD))
         diag.fixItInsertAfter(loc, genericArgsToAdd);
-      }
     }
   }
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,

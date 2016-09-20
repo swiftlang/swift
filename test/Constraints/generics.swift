@@ -54,7 +54,7 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 // Inferring a variable's type from a call to a generic.
 struct Pair<T, U> { } // expected-note 5 {{'T' declared as parameter to type 'Pair'}}
 
-func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
+func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { } // expected-note 3 {{in call to function 'pair'}}
 
 var i : Int, f : Float
 var p = pair(i, f)
@@ -260,21 +260,21 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 2 {{'Foo' declared as parameter to type 'FullyGeneric'}}
+struct FullyGeneric<Foo> {} // expected-note 3 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 6 {{generic type 'FullyGeneric' declared here}}
 
-struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}}
+struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
 
-struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}}
+struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic type 'ProtoBound' declared here}}
 struct ProtoBound2<Foo> where Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound2'}}
 
-struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}}
+struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic type 'ObjCProtoBound' declared here}}
 struct ObjCProtoBound2<Foo> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound2'}}
 
 struct ClassBound<Foo: X> {} // expected-note {{generic type 'ClassBound' declared here}}
 struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic type 'ClassBound2' declared here}}
 
-struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}}
+struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic type 'ProtosBound' declared here}}
 struct ProtosBound2<Foo: SubProto & NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound2'}}
 struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound3'}}
 
@@ -359,4 +359,46 @@ func testFixItContextualKnowledge() {
   // FIXME: These could propagate backwards.
   let _: Int = Pair().first // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
   let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
+}
+
+func testFixItTypePosition() {
+  let _: FullyGeneric // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{22-22=<Any>}}
+  let _: ProtoBound // expected-error {{reference to generic type 'ProtoBound' requires arguments in <...>}} {{20-20=<<#Foo: SubProto#>>}}
+  let _: ObjCProtoBound // expected-error {{reference to generic type 'ObjCProtoBound' requires arguments in <...>}} {{24-24=<NSCopyish>}}
+  let _: AnyClassBound // expected-error {{reference to generic type 'AnyClassBound' requires arguments in <...>}} {{23-23=<AnyObject>}}
+  let _: ProtosBound // expected-error {{reference to generic type 'ProtosBound' requires arguments in <...>}} {{21-21=<<#Foo: NSCopyish & SubProto#>>}}
+}
+
+func testFixItNested() {
+  _ = Array<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{25-25=<Any>}}
+  _ = [FullyGeneric]() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any>}}
+
+  _ = FullyGeneric<FullyGeneric>() // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{32-32=<Any>}}
+
+  _ = Pair<
+    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+    FullyGeneric // FIXME: We could diagnose both of these, but we don't.
+  >()
+  _ = Pair<
+    FullyGeneric<Any>,
+    FullyGeneric // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+  >()
+  _ = Pair<
+    FullyGeneric, // expected-error {{reference to generic type 'FullyGeneric' requires arguments in <...>}} {{17-17=<Any>}}
+    FullyGeneric<Any>
+  >()
+
+  // FIXME: These errors could be improved.
+  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
+    FullyGeneric(),
+    FullyGeneric()
+  )
+  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
+    FullyGeneric<Any>(),
+    FullyGeneric()
+  )
+  _ = pair( // expected-error {{generic parameter 'T' could not be inferred}} {{none}}
+    FullyGeneric(),
+    FullyGeneric<Any>()
+  )
 }
