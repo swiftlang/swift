@@ -698,8 +698,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
     options |= TR_SILMode;
   if (isSILType)
     options |= TR_SILType;
-
-  if (ProduceDiagnostics) {
+  if (Ctx.getLazyResolver()) {
+    auto *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
+    return TC->validateType(T, DC, options);
+  } else if (ProduceDiagnostics) {
     return TypeChecker(Ctx).validateType(T, DC, options);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
@@ -718,12 +720,15 @@ swift::handleSILGenericParams(ASTContext &Ctx,
 
 bool swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
-
-  // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine Diags(Ctx.SourceMgr);
-  TypeChecker TC(Ctx, Diags);
-
-  TC.typeCheckDecl(D, true);
+  if (Ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
+    TC->typeCheckDecl(D, true);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    TypeChecker TC(Ctx, Diags);
+    TC.typeCheckDecl(D, true);
+  }
   return true;
 }
 
@@ -763,22 +768,8 @@ Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
 static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,
-                        CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
-  switch (kind) {
-  case CompletionTypeCheckKind::Normal:
-    // Handle below.
-    break;
-
-  case CompletionTypeCheckKind::ObjCKeyPath:
-    referencedDecl = nullptr;
-    if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(parsedExpr))
-      return TC.checkObjCKeyPathExpr(DC, keyPath, /*requireResulType=*/true);
-
-    return None;
-  }
-
   CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
   if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
                  referencedDecl, FreeTypeVariableBinding::GenericParameters))
@@ -794,26 +785,38 @@ static Optional<Type> getTypeOfCompletionContextExpr(
   return None;
 }
 
+Optional<Type> swift::getTypeOfObjCKeyPath(DeclContext *DC,
+                                           ObjCKeyPathExpr *E) {
+  auto &ctx = DC->getASTContext();
+  if (ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
+    return TC->checkObjCKeyPathExpr(DC, E, /*requireResultType=*/true);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine diags(ctx.SourceMgr);
+    TypeChecker TC(ctx, diags);
+    return TC.checkObjCKeyPathExpr(DC, E, /*requireResultType=*/true);
+  }
+}
+
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
 Optional<Type> swift::getTypeOfCompletionContextExpr(
                         ASTContext &Ctx,
                         DeclContext *DC,
-                        CompletionTypeCheckKind kind,
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
 
   if (Ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr,
+    return ::getTypeOfCompletionContextExpr(*TC, DC, parsedExpr,
                                             referencedDecl);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(Ctx.SourceMgr);
     TypeChecker TC(Ctx, diags);
     // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
-                                            referencedDecl);
+    return ::getTypeOfCompletionContextExpr(TC, DC, parsedExpr, referencedDecl);
   }
 }
 
@@ -845,23 +848,29 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
 
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
-  auto &Ctx = AFD->getASTContext();
-
-  // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine Diags(Ctx.SourceMgr);
-
-  TypeChecker TC(Ctx, Diags);
-  return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  auto &ctx = AFD->getASTContext();
+  if (ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
+    return !TC->typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine Diags(ctx.SourceMgr);
+    TypeChecker TC(ctx, Diags);
+    return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+  }
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-  auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
-
-  // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine Diags(Ctx.SourceMgr);
-
-  TypeChecker TC(Ctx, Diags);
-  TC.typeCheckTopLevelCodeDecl(TLCD);
+  auto &ctx = static_cast<Decl *>(TLCD)->getASTContext();
+  if (ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
+    TC->typeCheckTopLevelCodeDecl(TLCD);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine Diags(ctx.SourceMgr);
+    TypeChecker TC(ctx, Diags);
+    TC.typeCheckTopLevelCodeDecl(TLCD);
+  }
   return true;
 }
 
@@ -871,10 +880,13 @@ static void deleteTypeCheckerAndDiags(LazyResolver *resolver) {
   delete &diags;
 }
 
-OwnedResolver swift::createLazyResolver(ASTContext &Ctx) {
+OwnedResolver
+swift::createLazyResolver(ASTContext &Ctx,
+                          CodeCompletionTypeCheckingCallbacks *ccCallbacks) {
   auto diags = new DiagnosticEngine(Ctx.SourceMgr);
-  return OwnedResolver(new TypeChecker(Ctx, *diags),
-                       &deleteTypeCheckerAndDiags);
+  auto *TC = new TypeChecker(Ctx, *diags);
+  TC->CodeCompletion = ccCallbacks;
+  return OwnedResolver(TC, &deleteTypeCheckerAndDiags);
 }
 
 void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,

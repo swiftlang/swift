@@ -1669,8 +1669,7 @@ namespace {
     }
 
     Expr *visitCodeCompletionExpr(CodeCompletionExpr *expr) {
-      // Do nothing with code completion expressions.
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
@@ -2306,7 +2305,14 @@ namespace {
       // Find the selected member.
       auto memberLocator = cs.getConstraintLocator(
                              expr, ConstraintLocator::UnresolvedMember);
-      auto selected = getOverloadChoice(memberLocator);
+      auto selectedOpt = getOverloadChoiceIfAvailable(memberLocator);
+      if (!selectedOpt) {
+        assert(tc.CodeCompletion && "missing unresolved-member overload");
+        expr->setType(resultTy);
+        return expr;
+      }
+
+      auto selected = *selectedOpt;
       auto member = selected.choice.getDecl();
       
       // If the member came by optional unwrapping, then unwrap the base type.

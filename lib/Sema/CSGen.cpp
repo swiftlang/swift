@@ -996,6 +996,7 @@ namespace {
 namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
+    bool forCodeCompletion;
 
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
@@ -1136,7 +1137,8 @@ namespace {
     }
 
   public:
-    ConstraintGenerator(ConstraintSystem &CS) : CS(CS) { }
+    ConstraintGenerator(ConstraintSystem &CS, bool forCodeCompletion = false)
+        : CS(CS), forCodeCompletion(forCodeCompletion) {}
     virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
@@ -1147,8 +1149,10 @@ namespace {
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
-      // If the expression has already been assigned a type; just use that type.
-      return E->getType();
+      return forCodeCompletion
+                 ? CS.createTypeVariable(CS.getConstraintLocator(E),
+                                         TVO_CanBindToLValue)
+                 : E->getType();
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {
@@ -1618,7 +1622,6 @@ namespace {
     virtual Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
-      
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
         CS.setFavoredType(expr, favoredTy);
       }
@@ -2801,22 +2804,37 @@ namespace {
 
   class ConstraintWalker : public ASTWalker {
     ConstraintGenerator &CG;
+    bool forCodeCompletion;
+    Expr *interestingExpr = nullptr;
+    bool interestingExprOverrideCSGen = false;
 
   public:
-    ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
+    ConstraintWalker(ConstraintGenerator &CG, bool forCodeCompletion)
+        : CG(CG), forCodeCompletion(forCodeCompletion) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      auto &cs = CG.getConstraintSystem();
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
-        CG.getConstraintSystem().UnevaluatedRootExprs.insert(sel->getSubExpr());
+        cs.UnevaluatedRootExprs.insert(sel->getSubExpr());
       }
 
       // Check a key-path expression, which fills in its semantic
       // expression as a string literal.
       if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(expr)) {
-        auto &cs = CG.getConstraintSystem();
         (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+      }
+
+      if (forCodeCompletion) {
+        auto *callbacks = cs.getTypeChecker().CodeCompletion;
+        assert(callbacks && "CodeCompletion callbacks missing");
+        bool skipCSGen = false;
+        if (callbacks->isInterestingExpr(expr, skipCSGen)) {
+          interestingExpr = expr;
+          interestingExprOverrideCSGen = skipCSGen;
+        }
       }
 
       // For closures containing only a single expression, the body participates
@@ -2860,6 +2878,27 @@ namespace {
                              .getConstraintLocator(
                                expr,
                                ConstraintLocator::ClosureResult));
+          return expr;
+        }
+      }
+
+      if (interestingExpr && interestingExpr == expr) {
+        interestingExpr = nullptr;
+        auto &CS = CG.getConstraintSystem();
+        auto *locator = CS.getConstraintLocator(expr);
+        auto *TV = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+        CS.InterestingExprs[expr] = TV;
+        if (interestingExprOverrideCSGen) {
+          // Override CSGen's normal behaviour, and just assign a type variable.
+          expr->setType(TV);
+          return expr;
+        } else if (auto type = CG.visit(expr)) {
+          auto simple = CG.getConstraintSystem().simplifyType(type);
+          CS.addConstraint(ConstraintKind::Equal, TV, simple, locator);
+          expr->setType(simple);
+          return expr;
+        } else {
+          expr->setType(TV);
           return expr;
         }
       }
@@ -2935,7 +2974,8 @@ namespace {
 
 } // end anonymous namespace
 
-Expr *ConstraintSystem::generateConstraints(Expr *expr) {
+Expr *ConstraintSystem::generateConstraints(Expr *expr,
+                                            bool forCodeCompletion) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(getTypeChecker()));
 
@@ -2943,9 +2983,9 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
-  ConstraintGenerator cg(*this);
-  ConstraintWalker cw(cg);
-  
+  ConstraintGenerator cg(*this, forCodeCompletion);
+  ConstraintWalker cw(cg, forCodeCompletion);
+
   Expr* result = expr->walk(cw);
   
   if (result)
@@ -3077,7 +3117,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   ConstraintSystem CS(*TC, &DC, Options);
   CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
-  ConstraintWalker cw(MCG);
+  ConstraintWalker cw(MCG, false);
   Parent->walk(cw);
 
   if (TC->getLangOpts().DebugConstraintSolver) {

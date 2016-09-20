@@ -17,8 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
-#include "TypeChecker.h"
 #include "MiscDiagnostics.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
@@ -27,6 +27,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -35,13 +36,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <iterator>
 #include <map>
 #include <memory>
-#include <utility>
 #include <tuple>
+#include <utility>
 
 using namespace swift;
 using namespace constraints;
@@ -1347,6 +1348,78 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
+static ConcreteDeclRef locateReferencedDecl(Expr *expr, Solution &solution) {
+  // Dig the declaration out of the solution.
+  auto &cs = solution.getConstraintSystem();
+  auto semanticExpr = expr->getSemanticsProvidingExpr();
+  auto topLocator = cs.getConstraintLocator(semanticExpr);
+  if (auto referencedDecl = solution.resolveLocatorToDecl(topLocator))
+    return referencedDecl;
+
+  // Do another check in case we have a curried call from binding a function
+  // reference to a variable, for example:
+  //
+  //   class C {
+  //     func instanceFunc(p1: Int, p2: Int) {}
+  //   }
+  //   func t(c: C) {
+  //     C.instanceFunc(c)#^COMPLETE^#
+  //   }
+  //
+  // We need to get the referenced function so we can complete the argument
+  // labels. (Note that the requirement to have labels in the curried call
+  // seems inconsistent with the removal of labels from function types.
+  // If this changes the following code could be removed).
+  if (auto *CE = dyn_cast<CallExpr>(semanticExpr)) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(CE->getFn())) {
+      if (isa<TypeExpr>(UDE->getBase())) {
+        auto udeLocator = cs.getConstraintLocator(UDE);
+        auto udeRefDecl = solution.resolveLocatorToDecl(udeLocator);
+        if (auto *FD = dyn_cast_or_null<FuncDecl>(udeRefDecl.getDecl())) {
+          if (FD->isInstanceMember())
+            return udeRefDecl;
+        }
+      }
+    }
+  }
+  return ConcreteDeclRef();
+}
+
+static bool
+containsInterestingExpr(Expr *E, bool &overrrideCSGen,
+                        CodeCompletionTypeCheckingCallbacks *codeCompletion) {
+  struct ExprFinder : public ASTWalker {
+    llvm::function_ref<bool(Expr *, bool &)> predicate;
+    bool found = false;
+    bool useFreeTV = false;
+    ExprFinder(llvm::function_ref<bool(Expr *, bool &)> predicate)
+        : predicate(predicate) {}
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      bool b = false;
+      if (predicate(E, b)) {
+        useFreeTV |= b;
+        found = true;
+        return {false, E};
+      }
+      return {true, E};
+    }
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return {false, S};
+    }
+    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+      return {false, P};
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+  };
+
+  ExprFinder finder([=](Expr *E, bool &freeTV) {
+    return codeCompletion->isInterestingExpr(E, freeTV);
+  });
+  E->walk(finder);
+  overrrideCSGen = finder.useFreeTV;
+  return finder.found;
+}
+
 bool TypeChecker::
 solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
                    FreeTypeVariableBinding allowFreeTypeVariables,
@@ -1358,12 +1431,21 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
   if (preCheckExpression(*this, expr, dc))
     return true;
 
+  bool forCodeCompletion = false;
+  auto origFreeTypeBinding = allowFreeTypeVariables;
+  bool overrideCSGen = false;
+  if (CodeCompletion) {
+    // Does this expression contain an expression for code-completion?
+    forCodeCompletion =
+        containsInterestingExpr(expr, overrideCSGen, CodeCompletion);
+    if (forCodeCompletion &&
+        allowFreeTypeVariables == FreeTypeVariableBinding::Disallow)
+      allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
+  }
+
   // Attempt to solve the constraint system.
-  auto solution = cs.solve(expr,
-                           convertType,
-                           listener,
-                           viable,
-                           allowFreeTypeVariables);
+  auto solution = cs.solve(expr, convertType, listener, viable,
+                           allowFreeTypeVariables, forCodeCompletion);
 
   // The constraint system has failed
   if (solution == ConstraintSystem::SolutionKind::Error)
@@ -1371,10 +1453,12 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
 
   // If the system is unsolved or there are multiple solutions present but
   // type checker options do not allow unresolved types, let's try to salvage
-  if (solution == ConstraintSystem::SolutionKind::Unsolved
-      || (viable.size() != 1 &&
-          !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
-    if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (solution == ConstraintSystem::SolutionKind::Unsolved ||
+      (viable.size() != 1 &&
+       // FIXME: should we allow ambiguous answers for code-completion?
+       !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
+    if (options.contains(TypeCheckExprFlags::SuppressDiagnostics) ||
+        forCodeCompletion)
       return true;
 
     // Try to provide a decent diagnostic.
@@ -1397,6 +1481,33 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
         log << "--- Solution #" << i << " ---\n";
         viable[i].dump(log);
       }
+    }
+  }
+
+  if (forCodeCompletion) {
+    // Report any code-completion expressions resolved along the way.
+    for (auto &solution : viable) {
+      for (auto &pair : cs.InterestingExprs) {
+        Expr *E = pair.getFirst();
+        Type T = solution.simplifyType(*this, pair.getSecond());
+        if (!T->hasUnresolvedType() && !T->hasTypeVariable()) {
+          auto referencedDecl = locateReferencedDecl(E, solution);
+          CodeCompletion->resolvedInterestingExpr(E, T, referencedDecl);
+        }
+      }
+    }
+
+    if (origFreeTypeBinding != FreeTypeVariableBinding::Disallow)
+      return false;
+
+    // Don't apply solutions unless we could have completely solved it outside
+    // of code-completion.
+    if (viable.size() != 1 || overrideCSGen)
+      return true;
+    for (auto *TV : cs.getTypeVariables()) {
+      auto T = viable[0].getFixedType(TV);
+      if (!T || T->hasUnresolvedType())
+        return true;
     }
   }
 
@@ -1631,45 +1742,11 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   // Get the expression's simplified type.
   auto &solution = viable[0];
   Type exprType = solution.simplifyType(*this, expr->getType());
-
   assert(exprType && !exprType->is<ErrorType>() && "erroneous solution?");
   assert(!exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
 
-  // Dig the declaration out of the solution.
-  auto semanticExpr = expr->getSemanticsProvidingExpr();
-  auto topLocator = cs.getConstraintLocator(semanticExpr);
-  referencedDecl = solution.resolveLocatorToDecl(topLocator);
-
-  if (!referencedDecl.getDecl()) {
-    // Do another check in case we have a curried call from binding a function
-    // reference to a variable, for example:
-    //
-    //   class C {
-    //     func instanceFunc(p1: Int, p2: Int) {}
-    //   }
-    //   func t(c: C) {
-    //     C.instanceFunc(c)#^COMPLETE^#
-    //   }
-    //
-    // We need to get the referenced function so we can complete the argument
-    // labels. (Note that the requirement to have labels in the curried call
-    // seems inconsistent with the removal of labels from function types.
-    // If this changes the following code could be removed).
-    if (auto *CE = dyn_cast<CallExpr>(semanticExpr)) {
-      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(CE->getFn())) {
-        if (isa<TypeExpr>(UDE->getBase())) {
-          auto udeLocator = cs.getConstraintLocator(UDE);
-          auto udeRefDecl = solution.resolveLocatorToDecl(udeLocator);
-          if (auto *FD = dyn_cast_or_null<FuncDecl>(udeRefDecl.getDecl())) {
-            if (FD->isInstanceMember())
-              referencedDecl = udeRefDecl;
-          }
-        }
-      }
-    }
-  }
-
+  referencedDecl = locateReferencedDecl(expr, solution);
   // Recover the original type if needed.
   recoverOriginalType();
   return exprType;

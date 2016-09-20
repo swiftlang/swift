@@ -1731,12 +1731,10 @@ void ConstraintSystem::shrink(Expr *expr) {
   }
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::solve(Expr *&expr,
-                        Type convertType,
-                        ExprTypeCheckListener *listener,
-                        SmallVectorImpl<Solution> &solutions,
-                        FreeTypeVariableBinding allowFreeTypeVariables) {
+ConstraintSystem::SolutionKind ConstraintSystem::solve(
+    Expr *&expr, Type convertType, ExprTypeCheckListener *listener,
+    SmallVectorImpl<Solution> &solutions,
+    FreeTypeVariableBinding allowFreeTypeVariables, bool forCodeCompletion) {
   assert(!solverState && "use solveRec for recursive calls");
 
   // Try to shrink the system by reducing disjunction domains. This
@@ -1745,7 +1743,7 @@ ConstraintSystem::solve(Expr *&expr,
   shrink(expr);
 
   // Generate constraints for the main system.
-  if (auto generatedExpr = generateConstraints(expr))
+  if (auto generatedExpr = generateConstraints(expr, forCodeCompletion))
     expr = generatedExpr;
   else {
     return SolutionKind::Error;
