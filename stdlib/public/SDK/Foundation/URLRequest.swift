@@ -290,7 +290,7 @@ extension URLRequest : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLRequest?) -> URLRequest {
-        var result: URLRequest? = nil
+        var result: URLRequest?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

@@ -764,7 +764,7 @@ extension Data : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
-        var result: Data? = nil
+        var result: Data?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

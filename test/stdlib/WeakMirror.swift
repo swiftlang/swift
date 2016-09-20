@@ -149,7 +149,7 @@ class ObjCClassHasObjCClassBoundExistential : NSObject {
 }
 
 struct StructHasObjCWeakReference {
-  weak var weakProperty: ObjCClass? = nil
+  weak var weakProperty: ObjCClass?
   let x: Int
   init(x: Int) {
     self.x = x
@@ -157,7 +157,7 @@ struct StructHasObjCWeakReference {
 }
 
 struct StructHasObjCClassBoundExistential {
-  weak var weakProperty: ObjCClassExistential? = nil
+  weak var weakProperty: ObjCClassExistential?
   let x: Int
   init(x: Int) {
     self.x = x

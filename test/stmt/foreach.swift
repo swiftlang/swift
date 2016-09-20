@@ -167,7 +167,7 @@ func testMatchingPatterns() {
 
 // <rdar://problem/21662365> QoI: diagnostic for for-each over an optional sequence isn't great
 func testOptionalSequence() {
-  let array : [Int]? = nil
+  let array : [Int]?
   for x in array {  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
   }
 }

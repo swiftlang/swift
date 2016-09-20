@@ -86,11 +86,11 @@ def get_slice_doc_comment(Self):
 """ % {"SliceType": Self}
 }%
 
-// FIXME(ABI)(compiler limitation): There should be just one slice type
+// FIXME(ABI)#66 (Conditional Conformance): There should be just one slice type
 // that has conditional conformances to `BidirectionalCollection`,
 // `RandomAccessCollection`, `RangeReplaceableCollection`, and
 // `MutableCollection`.
-// rdar://problem/17144340
+// rdar://problem/21935030
 
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
@@ -161,7 +161,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
 %     end
   }
 
-  // FIXME(ABI)(compiler limitation):
+  // FIXME(ABI)#67 (Associated Types with where clauses):
   //
   //   public typealias Indices = Base.Indices
   //   public var indices: Indices { ... }

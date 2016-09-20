@@ -101,6 +101,7 @@ public:
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitUnownedReleaseInst(UnownedReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
+  MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we cannot prove such a thing, return the relevant memory
@@ -294,6 +295,10 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   if (!EA->canEscapeTo(V, SI))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
+  return MemBehavior::None;
 }
 
 //===----------------------------------------------------------------------===//

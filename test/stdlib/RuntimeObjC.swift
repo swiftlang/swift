@@ -83,7 +83,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
       -> BridgedValueType {
-    var result: BridgedValueType? = nil
+    var result: BridgedValueType?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -132,7 +132,7 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
       -> BridgedLargeValueType {
-    var result: BridgedLargeValueType? = nil
+    var result: BridgedLargeValueType?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -736,7 +736,7 @@ Reflection.test("CGRect") {
 
 Reflection.test("Unmanaged/nil") {
   var output = ""
-  var optionalURL: Unmanaged<CFURL>? = nil
+  var optionalURL: Unmanaged<CFURL>?
   dump(optionalURL, to: &output)
 
   let expected = "- nil\n"

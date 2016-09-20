@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): remove this type, it creates an ABI burden
+// FIXME(ABI)#55 (Statically Unavailable/Dynamically Available): remove this type, it creates an ABI burden
 // on the library.
 //
 // A dummy type that we can use when we /don't/ want to create an
@@ -200,7 +200,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
 // such as x = r[0], which will trap unless 0 happens to be contained in the
 // range r.
 //
-// FIXME(ABI)(compiler limitation): remove this code, it creates an ABI burden
+// FIXME(ABI)#56 (Statically Unavailable/Dynamically Available): remove this code, it creates an ABI burden
 // on the library.
 extension CountableRange {
   /// Accesses the element at specified position.
@@ -533,7 +533,7 @@ extension ${Self} : Equatable {
 %   ('Range', 'CountableRange'),
 %   ('ClosedRange', 'CountableClosedRange'),
 % ]:
-// FIXME(ABI)(compiler limitation): replace this extension with a conditional
+// FIXME(ABI)#57 (Conditional Conformance): replace this extension with a conditional
 // conformance.
 // rdar://problem/17144340
 /// Ranges whose `Bound` is `Strideable` with `Integer` `Stride` have all

@@ -104,7 +104,7 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: Subclass?)
       -> BridgeableValue {
-    var result: BridgeableValue? = nil
+    var result: BridgeableValue?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

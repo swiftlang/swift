@@ -22,7 +22,7 @@
 #include <stdlib.h>
 
 namespace swift {
-// FIXME(ABI): does this declaration need SWIFT_RUNTIME_STDLIB_INTERFACE?
+// FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_INTERFACE?
 // _direct type metadata for Swift._EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" ClassMetadata _TMCs18_EmptyArrayStorage;

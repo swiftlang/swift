@@ -766,7 +766,7 @@ tests.test("String.UTF8View/Collection")
   .forEach(in: utfTests) {
   test in
 
-  // FIXME(ABI): should be `checkBidirectionalCollection`.
+  // FIXME(ABI)#72 : should be `checkBidirectionalCollection`.
   checkForwardCollection(test.utf8, test.string.utf8) { $0 == $1 }
 }
 

@@ -334,7 +334,8 @@ public protocol Sequence {
 
   /// A type that represents a subsequence of some of the sequence's elements.
   associatedtype SubSequence
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#104 (Recursive Protocol Constraints):
+  // FIXME(ABI)#105 (Associated Types with where clauses):
   // associatedtype SubSequence : Sequence
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -1057,7 +1058,7 @@ extension Sequence {
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element? = nil
+    var foundElement: Iterator.Element?
     do {
       try self.forEach {
         if try predicate($0) {

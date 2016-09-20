@@ -1012,7 +1012,7 @@ extension NSRange {
     length = x.count
   }
 
-  // FIXME(ABI)(compiler limitation): this API should be an extension on Range.
+  // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
   // Can't express it now because the compiler does not support conditional
   // extensions with type equality constraints.
   public func toRange() -> Range<Int>? {
@@ -1416,7 +1416,7 @@ extension NSCoder {
 
   @nonobjc
   public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> Any? {
-    var classesAsNSObjects: NSSet? = nil
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
@@ -1474,8 +1474,8 @@ extension NSCoder {
   @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
-    var error: NSError? = nil
-    var classesAsNSObjects: NSSet? = nil
+    var error: NSError?
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }

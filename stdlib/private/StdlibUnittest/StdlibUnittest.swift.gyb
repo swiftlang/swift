@@ -357,12 +357,12 @@ public func expectSequenceType<X : Sequence>(_ x: X) -> X
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -389,11 +389,11 @@ public func expectSequenceAssociatedTypes<X : Sequence>(
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#4 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Sequence,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#5 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence {}
 
 /// Check that all associated types of a `Collection` are what we expect them
@@ -406,13 +406,13 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -429,13 +429,13 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : BidirectionalCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : BidirectionalCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -452,13 +452,13 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : RandomAccessCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : RandomAccessCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -681,7 +681,7 @@ func _childProcess() {
 }
 
 struct _ParentProcess {
-  internal var _pid: pid_t? = nil
+  internal var _pid: pid_t?
   internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
   internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
   internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
@@ -849,7 +849,7 @@ struct _ParentProcess {
 
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
-      var status: ProcessTerminationStatus? = nil
+      var status: ProcessTerminationStatus?
       if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
         status = _waitForChild()
         switch status! {
@@ -937,7 +937,7 @@ struct _ParentProcess {
     print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
 
     var expectCrash = false
-    var childTerminationStatus: ProcessTerminationStatus? = nil
+    var childTerminationStatus: ProcessTerminationStatus?
     var crashStdout: [String] = []
     var crashStderr: [String] = []
     if _runTestsInProcess {
@@ -1145,7 +1145,7 @@ public func runAllTests() {
     _childProcess()
   } else {
     var runTestsInProcess: Bool = false
-    var filter: String? = nil
+    var filter: String?
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
@@ -1331,10 +1331,10 @@ public final class TestSuite {
     internal final class _Data {
       var _xfail: [TestRunPredicate] = []
       var _skip: [TestRunPredicate] = []
-      var _stdinText: String? = nil
+      var _stdinText: String?
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
-      var _testLoc: SourceLoc? = nil
+      var _testLoc: SourceLoc?
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1507,7 +1507,7 @@ func _getOSVersion() -> OSVersion {
 }
 
 var _runningOSVersion: OSVersion = _getOSVersion()
-var _overrideOSVersion: OSVersion? = nil
+var _overrideOSVersion: OSVersion?
 
 /// Override the OS version for testing.
 public func _setOverrideOSVersion(_ v: OSVersion) {
@@ -1952,7 +1952,7 @@ public func checkEquatable<Instances : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Equatable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#89 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 {
@@ -2048,7 +2048,7 @@ public func checkHashable<Instances : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Hashable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#90 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
 
@@ -2143,7 +2143,7 @@ public func checkComparable<Instances : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Comparable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#91 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
   
@@ -2253,7 +2253,7 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
 ) where
   Instances.Iterator.Element : Strideable,
   Instances.Iterator.Element.Stride == Strides.Iterator.Element,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#92 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index,
   Strides.Indices.Iterator.Element == Strides.Index {

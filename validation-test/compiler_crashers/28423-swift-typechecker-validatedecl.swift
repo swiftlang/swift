@@ -7,4 +7,11 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-assert((n:String{
+protocol a
+protocol a{
+typealias e:A
+{{
+}
+}
+protocol A{let:A
+var e:e

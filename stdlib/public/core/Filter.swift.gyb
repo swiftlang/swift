@@ -157,7 +157,7 @@ extension LazyFilterIndex : Comparable {
   }
 }
 
-// FIXME(ABI)(compiler limitation): `LazyFilter*Collection` types should be
+// FIXME(ABI)#27 (Conditional Conformance): `LazyFilter*Collection` types should be
 // collapsed into one `LazyFilterCollection` using conditional conformances.
 // Maybe even combined with `LazyFilterSequence`.
 // rdar://problem/17144340
@@ -268,7 +268,7 @@ public struct ${Self}<
     return ${Slice}(base: self, bounds: bounds)
   }
 
-  // FIXME(ABI)(compiler limitation): we actually want to add:
+  // FIXME(ABI)#28 (Associated Types with where clauses): we actually want to add:
   //
   //   typealias SubSequence = ${Self}<Base.SubSequence>
   //

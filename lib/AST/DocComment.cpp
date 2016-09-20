@@ -423,10 +423,6 @@ getProtocolRequirementDocComment(swift::markup::MarkupContext &MC,
     if (auto Requirement = getSingleRequirementWithNonemptyDoc(ProtoExt, VD))
       RequirementsWithDocs.push_back(Requirement);
 
-    for (auto Proto : ProtoExt->getInheritedProtocols(/*resolver=*/nullptr))
-      if (auto Requirement = getSingleRequirementWithNonemptyDoc(Proto, VD))
-        RequirementsWithDocs.push_back(Requirement);
-
     if (RequirementsWithDocs.size() == 1)
       return getSingleDocComment(MC, RequirementsWithDocs.front());
   }

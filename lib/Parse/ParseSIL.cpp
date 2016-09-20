@@ -818,14 +818,23 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
-  NLOptions options = NL_QualifiedDefault;
-  // FIXME: a bit of a hack.
-  if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
-    options = options & ~NL_VisitSupertypes;
-  P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
+  Type CheckTy = Ty;
+  if (auto MetaTy = CheckTy->getAs<AnyMetatypeType>())
+    CheckTy = MetaTy->getInstanceType();
+
+  if (auto nominal = CheckTy->getAnyNominal()) {
+    auto found = nominal->lookupDirect(Name);
+    Lookup.append(found.begin(), found.end());
+  } else if (auto moduleTy = CheckTy->getAs<ModuleType>()) {
+    moduleTy->getModule()->lookupValue({ }, Name, NLKind::QualifiedLookup,
+                                       Lookup);
+  } else {
+    P.diagnose(Loc, diag::sil_member_lookup_bad_type, Name, Ty);
+    return nullptr;
+  }
 
   if (Lookup.empty() || (!ExpectMultipleResults && Lookup.size() != 1)) {
-    P.diagnose(Loc, diag::sil_member_decl_not_found);
+    P.diagnose(Loc, diag::sil_named_member_decl_not_found, Name, Ty);
     return nullptr;
   }
   return Lookup[0];

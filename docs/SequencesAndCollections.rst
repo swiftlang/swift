@@ -142,7 +142,7 @@ implement a generic `for`\ …\ `in` loop.
         latest = _baseIterator.next() ?? latest
         return latest 
       }
-      public private(set) var latest: I.Element? = nil
+      public private(set) var latest: I.Element?
       private var _baseIterator: I
     }
 

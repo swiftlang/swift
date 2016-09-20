@@ -410,7 +410,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The specified date.
     /// - returns: `true` if the starting time and duration of a component could be calculated, otherwise `false`.
     public func dateInterval(of component: Component, start: inout Date, interval: inout TimeInterval, for date: Date) -> Bool {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(of: Calendar._toCalendarUnit([component]), start: &nsDate, interval: &ti, for: date) }) {
             start = nsDate as! Date
@@ -688,7 +688,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - returns: `true` if a date range could be found, and `false` if the date is not in a weekend.
     @available(iOS 8.0, *)
     public func dateIntervalOfWeekend(containing date: Date, start: inout Date, interval: inout TimeInterval) -> Bool {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
             start = nsDate as! Date
@@ -705,7 +705,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - returns: A `DateInterval`, or nil if the date is not in a weekend.
     @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateIntervalOfWeekend(containing date: Date) -> DateInterval? {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
             return DateInterval(start: nsDate as! Date, duration: ti)
@@ -729,7 +729,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     @available(iOS 8.0, *)
     public func nextWeekend(startingAfter date: Date, start: inout Date, interval: inout TimeInterval, direction: SearchDirection = .forward) -> Bool {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             start = nsDate as! Date
@@ -751,7 +751,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func nextWeekend(startingAfter date: Date, direction: SearchDirection = .forward) -> DateInterval? {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             /// WARNING: searching backwards is totally broken! 26643365
@@ -1122,7 +1122,7 @@ extension Calendar : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCalendar?) -> Calendar {
-        var result: Calendar? = nil
+        var result: Calendar?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

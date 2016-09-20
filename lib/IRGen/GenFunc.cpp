@@ -841,6 +841,13 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (origType->hasSelfParam() &&
        isSelfContextParameter(origType->getSelfParameter()));
 
+  // Witness method calls expect self, followed by the self type followed by,
+  // the witness table at the end of the parameter list. But polymorphic
+  // arguments come before this.
+  bool isWitnessMethodCallee = origType->getRepresentation() ==
+      SILFunctionTypeRepresentation::WitnessMethod;
+  Explosion witnessMethodSelfValue;
+
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
   if (!layout) {
@@ -993,9 +1000,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         emitApplyArgument(subIGF, origParamInfo,
                           substType->getParameters()[origParamI],
                           param, origParam);
-
-        needsAllocas |=
-          addNativeArgument(subIGF, origParam, origParamInfo, args);
+        bool isWitnessMethodCalleeSelf = (isWitnessMethodCallee &&
+            origParamI + 1 == origType->getParameters().size());
+        needsAllocas |= addNativeArgument(
+            subIGF, origParam, origParamInfo,
+            isWitnessMethodCalleeSelf ? witnessMethodSelfValue : args);
         ++origParamI;
       } else {
         args.add(param.claimAll());
@@ -1043,8 +1052,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // witness table. Metadata for Self is derived inside the partial
   // application thunk and doesn't need to be stored in the outer
   // context.
-  if (origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod) {
+  if (isWitnessMethodCallee) {
     assert(fnContext->getType() == IGM.Int8PtrTy);
     llvm::Value *wtable = subIGF.Builder.CreateBitCast(
         fnContext, IGM.WitnessTablePtrTy);
@@ -1061,6 +1069,11 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     args.add(llvm::UndefValue::get(IGM.RefCountedPtrTy));
   }
 
+  // Add the witness methods self argument before the error parameter after the
+  // polymorphic arguments.
+  if (isWitnessMethodCallee)
+    witnessMethodSelfValue.transferInto(args, witnessMethodSelfValue.size());
+
   // Pass down the error result.
   if (origType->hasErrorResult()) {
     llvm::Value *errorResultPtr = origParams.claimNext();
@@ -1070,8 +1083,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
   assert(origParams.empty());
 
-  if (origType->getRepresentation() ==
-      SILFunctionTypeRepresentation::WitnessMethod) {
+  if (isWitnessMethodCallee) {
     assert(witnessMetadata.SelfMetadata->getType() == IGM.TypeMetadataPtrTy);
     args.add(witnessMetadata.SelfMetadata);
     assert(witnessMetadata.SelfWitnessTable->getType() == IGM.WitnessTablePtrTy);
