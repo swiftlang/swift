@@ -73,16 +73,15 @@ HashingTestSuite.test("_mixInt/GoldenValues") {
 HashingTestSuite.test("_squeezeHashValue/Int") {
   // Check that the function can return values that cover the whole range.
   func checkRange(_ r: Int) {
-    var results = [Int : Void]()
+    var results = Set<Int>()
     for _ in 0..<(14 * r) {
       let v = _squeezeHashValue(randInt(), r)
       expectTrue(v < r)
-      if results[v] == nil {
-        results[v] = Void()
-      }
+      results.insert(v)
     }
     expectEqual(r, results.count)
   }
+  checkRange(1)
   checkRange(2)
   checkRange(4)
   checkRange(8)
