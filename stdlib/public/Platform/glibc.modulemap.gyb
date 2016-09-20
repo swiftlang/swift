@@ -380,6 +380,12 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/types.h"
         export *
       }
+% if CMAKE_SDK != "FREEBSD":
+      module event {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/event.h"
+        export *
+      }
+% end
       module uio {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/uio.h"
         export *

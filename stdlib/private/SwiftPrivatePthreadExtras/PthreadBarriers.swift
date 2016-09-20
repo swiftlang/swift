@@ -16,6 +16,7 @@ import Darwin
 import Glibc
 #endif
 
+// FIXME: On FreeBSD, code in this file doesn't compile
 #if !os(FreeBSD)
 //
 // Implement pthread barriers.

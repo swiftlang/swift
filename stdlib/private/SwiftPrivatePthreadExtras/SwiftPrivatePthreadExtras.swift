@@ -21,6 +21,7 @@ import Darwin
 import Glibc
 #endif
 
+// FIXME: On FreeBSD, code in this file doesn't compile
 #if !os(FreeBSD)
 /// An abstract base class to encapsulate the context necessary to invoke
 /// a block from pthread_create.
