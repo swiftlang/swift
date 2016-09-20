@@ -1689,6 +1689,43 @@ function set_swiftpm_bootstrap_command() {
     fi
 }
 
+# Construct the appropriate options to pass to an Xcode
+# build of any LLDB target.
+function set_lldb_xcodebuild_options() {
+    llvm_build_dir=$(build_directory ${host} llvm)
+    cmark_build_dir=$(build_directory ${host} cmark)
+    lldb_build_dir=$(build_directory ${host} lldb)
+    swift_build_dir=$(build_directory ${host} swift)
+
+    lldb_xcodebuild_options=(
+        LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
+        LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
+        LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
+        LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
+        LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
+        LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+        LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
+        SYMROOT="${lldb_build_dir}"
+        OBJROOT="${lldb_build_dir}"
+        ${LLDB_EXTRA_XCODEBUILD_ARGS}
+    )
+    if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_DISABLE_CODESIGN="1"
+            DEBUGSERVER_DELETE_AFTER_BUILD="1"
+        )
+    fi
+    if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_USE_FROM_SYSTEM="1"
+        )
+    fi
+}
+
 #
 # Configure and build each product
 #
@@ -2169,33 +2206,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     macosx-*)
                         # Set up flags to pass to xcodebuild
-                        lldb_xcodebuild_options=(
-                            LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
-                            LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
-                            LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
-                            LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
-                            LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
-                            LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
-                            SYMROOT="${lldb_build_dir}"
-                            OBJROOT="${lldb_build_dir}"
-                            ${LLDB_EXTRA_XCODEBUILD_ARGS}
-                        )
-                        if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_DISABLE_CODESIGN="1"
-                                DEBUGSERVER_DELETE_AFTER_BUILD="1"
-                            )
-                        fi
-                        if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_USE_FROM_SYSTEM="1"
-                            )
-                        fi
+                        set_lldb_xcodebuild_options
                         set_lldb_build_mode
                         with_pushd ${source_dir} \
                             call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
@@ -2506,6 +2517,24 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
+
+                # Run the gtests.
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    set_lldb_xcodebuild_options
+                    # Run the LLDB unittests (gtests).
+                    with_pushd ${LLDB_SOURCE_DIR} \
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                    rc=$?
+                    if [[ "$rc" -ne 0 ]] ; then
+                        >&2 echo "error: LLDB gtests failed"
+                        exit 1
+                    fi
+                else
+                    # FIXME run the gtests on other platforms.
+                    # There should be a CMake target for this already.
+                    echo Run LLDB gtests here.
+                fi
+
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
