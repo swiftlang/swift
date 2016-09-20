@@ -24,9 +24,7 @@ SubstringTests.test("String") {
   expectEqual(s3, "cd")
 }
 
-SubstringTests.test("CharacterView")
-  .xfail(.always("CharacterView slices don't share indices"))
-  .code {
+SubstringTests.test("CharacterView") {
   let s = "abcdefg"
   var t = s.characters.dropFirst(2)
   var u = t.dropFirst(2)
