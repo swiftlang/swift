@@ -6425,17 +6425,22 @@ public:
       }
     }
 
-    // Type check the constructor parameters.
-    if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
-      CD->overwriteType(ErrorType::get(TC.Context));
-      CD->setInterfaceType(ErrorType::get(TC.Context));
-      CD->setInvalid();
-    } else {
-      configureConstructorType(CD, SelfTy,
-                               CD->getParameterList(1)->getType(TC.Context));
+    {
+      CD->setIsBeingTypeChecked(true);
+      SWIFT_DEFER { CD->setIsBeingTypeChecked(false); };
 
-      if (!CD->isGenericContext())
-        TC.configureInterfaceType(CD);
+      // Type check the constructor parameters.
+      if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
+        CD->overwriteType(ErrorType::get(TC.Context));
+        CD->setInterfaceType(ErrorType::get(TC.Context));
+        CD->setInvalid();
+      } else {
+        configureConstructorType(CD, SelfTy,
+                                 CD->getParameterList(1)->getType(TC.Context));
+
+        if (!CD->isGenericContext())
+          TC.configureInterfaceType(CD);
+      }
     }
 
     validateAttributes(TC, CD);
