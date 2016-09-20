@@ -30,7 +30,6 @@
 
 // EXTRACT-TEST-LABEL:  sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {
 // EXTRACT-TEST:        bb0(%0 : $X):
-// EXTRACT-TEST-NEXT:     debug_value
 // EXTRACT-TEST-NEXT:     function_ref
 // EXTRACT-TEST-NEXT:     function_ref @_TF5basic3fooFT_Si : $@convention(thin) () -> Int
 // EXTRACT-TEST-NEXT:     apply
@@ -44,8 +43,6 @@
 
 // EXTRACT-INIT-LABEL:   sil hidden @_TFC5basic7VehiclecfT1nSi_S0_ : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
-// EXTRACT-INIT-NEXT:      debug_value
-// EXTRACT-INIT-NEXT:      debug_value
 // EXTRACT-INIT-NEXT:      ref_element_addr
 // EXTRACT-INIT-NEXT:      store
 // EXTRACT-INIT-NEXT:      return
@@ -57,7 +54,6 @@
 
 // EXTRACT-NOW-LABEL:   sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
-// EXTRACT-NOW-NEXT:      debug_value
 // EXTRACT-NOW-NEXT:      ref_element_addr
 // EXTRACT-NOW-NEXT:      load
 // EXTRACT-NOW-NEXT:      return

@@ -104,7 +104,7 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: Subclass?)
       -> BridgeableValue {
-    var result: BridgeableValue? = nil
+    var result: BridgeableValue?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -134,7 +134,7 @@ class Thunks : NSObject {
   @objc func acceptSubclassArray(
     _ x: [Subclass],
     expecting expected: NSArray
-  )  {
+  ) {
     expectEqualSequence(
       expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
       x.lazy.map { ObjectIdentifier($0 as AnyObject) }

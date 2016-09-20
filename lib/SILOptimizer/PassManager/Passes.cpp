@@ -308,7 +308,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
   
-  // Specialy partially applied functions with dead arguments as a preparation
+  // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
   PM.addDeadArgSignatureOpt();
 

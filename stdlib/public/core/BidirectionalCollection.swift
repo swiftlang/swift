@@ -19,7 +19,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
 public typealias BidirectionalIndexable = _BidirectionalIndexable
 public protocol _BidirectionalIndexable : _Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#22 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -86,14 +86,20 @@ public protocol BidirectionalCollection
   /// elements.
   associatedtype SubSequence : _BidirectionalIndexable, Collection
     = BidirectionalSlice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#93 (Recursive Protocol Constraints):
+  // FIXME(ABI)#94 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype SubSequence : BidirectionalCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _BidirectionalIndexable, Collection
     = DefaultBidirectionalIndices<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#95 (Recursive Protocol Constraints):
+  // FIXME(ABI)#96 (Associated Types with where clauses):
+  // This is dependent on both recursive protocol constraints AND associated 
+  // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
 
   /// The indices that are valid for subscripting the collection, in ascending

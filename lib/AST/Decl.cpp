@@ -918,26 +918,20 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-SourceRange PatternBindingEntry::getSourceRange() const {
-  ASTContext *ctx = nullptr;
+SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
+  // Patterns end at the initializer, if present.
+  SourceLoc endLoc = getOrigInitRange().End;
 
-  SourceLoc endLoc;
-  getPattern()->forEachVariable([&](VarDecl *var) {
-    auto accessorsEndLoc = var->getBracesRange().End;
-    if (accessorsEndLoc.isValid()) {
-      endLoc = accessorsEndLoc;
-      if (!ctx) ctx = &var->getASTContext();
-    }
-  });
+  // If we're not banned from handling accessors, they follow the initializer.
+  if (!omitAccessors) {
+    getPattern()->forEachVariable([&](VarDecl *var) {
+      auto accessorsEndLoc = var->getBracesRange().End;
+      if (accessorsEndLoc.isValid())
+        endLoc = accessorsEndLoc;
+    });
+  }
 
-  // Check the initializer.
-  SourceLoc initEndLoc = getOrigInitRange().End;
-  if (initEndLoc.isValid() &&
-      (endLoc.isInvalid() ||
-       (ctx && ctx->SourceMgr.isBeforeInBuffer(endLoc, initEndLoc))))
-    endLoc = initEndLoc;
-
-  // Check the pattern.
+  // If we didn't find an end yet, check the pattern.
   if (endLoc.isInvalid())
     endLoc = getPattern()->getEndLoc();
 

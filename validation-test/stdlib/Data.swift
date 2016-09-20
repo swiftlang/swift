@@ -29,4 +29,17 @@ DataTestSuite.test("Data.Iterator semantics") {
   }
   checkSequence((0..<65535).lazy.map({ UInt8($0 % 23) }), data)
 }
+
+DataTestSuite.test("associated types") {
+  typealias Subject = Data
+  expectRandomAccessCollectionAssociatedTypes(
+    collectionType: Subject.self,
+    iteratorType: Data.Iterator.self,
+    subSequenceType: MutableRangeReplaceableRandomAccessSlice<Subject>.self,
+    indexType: Int.self,
+    indexDistanceType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
+
 runAllTests()

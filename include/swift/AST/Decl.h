@@ -1702,14 +1702,17 @@ public:
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
 
-  // Retrieve the declaration context for the intializer.
+  // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const { return InitContext; }
 
   /// Override the initializer context.
   void setInitContext(DeclContext *dc) { InitContext = dc; }
 
   /// Retrieve the source range covered by this pattern binding.
-  SourceRange getSourceRange() const;
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceRange getSourceRange(bool omitAccessors = false) const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set

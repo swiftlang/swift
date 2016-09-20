@@ -445,7 +445,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   memcpy(temporaryValue->getWitnessTables(), weakContainer->getWitnessTables(),
          valueWitnessesSize);
 
-  // This MagicMirror constructor creates a box to hold the loaded refernce
+  // This MagicMirror constructor creates a box to hold the loaded reference
   // value, which becomes the new owner for the value.
   new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
                               type, /*take*/ true);

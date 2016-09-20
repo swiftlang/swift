@@ -25,7 +25,7 @@ public protocol _HasCustomAnyHashableRepresentation {
   ///     class Derived1 : Base {}
   ///     class Derived2 : Base, _HasCustomAnyHashableRepresentation {
   ///       func _toCustomAnyHashable() -> AnyHashable? {
-  ///         // `Derived2` is canonicalized to `Devired1`.
+  ///         // `Derived2` is canonicalized to `Derived1`.
   ///         let customRepresentation = Derived1()
   ///
   ///         // Wrong:
@@ -81,7 +81,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     guard let value = _baseHashable as? T else { return false }
     result.initialize(to: value)
-    return true;
+    return true
   }
 }
 
@@ -233,7 +233,7 @@ extension Hashable {
 /// as `AnyHashable`.
 ///
 /// Completely ignores the `_HasCustomAnyHashableRepresentation`
-/// conformance, if it exstis.
+/// conformance, if it exists.
 @_silgen_name("_swift_stdlib_makeAnyHashableUsingDefaultRepresentation")
 public // COMPILER_INTRINSIC (actually, called from the runtime)
 func _stdlib_makeAnyHashableUsingDefaultRepresentation<H : Hashable>(

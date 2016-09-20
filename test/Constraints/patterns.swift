@@ -162,7 +162,7 @@ default: break
 
 
 // Test some value patterns.
-let x : Int? = nil
+let x : Int?
 
 extension Int {
   func method() -> Int { return 42 }
@@ -245,6 +245,6 @@ enum SR2057 {
   case foo
 }
 
-let sr2057: SR2057? = nil
+let sr2057: SR2057?
 if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
 

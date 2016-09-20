@@ -234,7 +234,6 @@ int main(int argc, char **argv) {
   initializeSwiftRCIdentityPass(Registry);
   initializeSwiftARCOptPass(Registry);
   initializeSwiftARCContractPass(Registry);
-  initializeSwiftStackPromotionPass(Registry);
   initializeInlineTreePrinterPass(Registry);
   initializeSwiftMergeFunctionsPass(Registry);
 

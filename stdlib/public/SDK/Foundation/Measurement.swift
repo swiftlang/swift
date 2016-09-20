@@ -227,10 +227,6 @@ extension Measurement : _ObjectiveCBridgeable {
     }
 }
 
-/*
-FIXME(id-as-any): can't write this code because of:
-<rdar://problem/27539951> "unhandled generic bridged type" when bridging NSMeasurement
-
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension NSMeasurement : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
@@ -239,7 +235,6 @@ extension NSMeasurement : _HasCustomAnyHashableRepresentation {
         return AnyHashable(self as Measurement)
     }
 }
-*/
 
 // This workaround is required for the time being, because Swift doesn't support covariance for Measurement (26607639)
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)

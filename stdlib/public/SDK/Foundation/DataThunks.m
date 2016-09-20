@@ -38,16 +38,16 @@ void __NSDataInvokeDeallocatorFree(void *mem, NSUInteger length) {
 static int __NSFileProtectionClassForOptions(NSUInteger options) {
     int result;
     switch (options & NSDataWritingFileProtectionMask) {
-        case NSDataWritingFileProtectionComplete:	// Class A
+        case NSDataWritingFileProtectionComplete:  // Class A
             result = 1;
             break;
-        case NSDataWritingFileProtectionCompleteUnlessOpen:	// Class B
+        case NSDataWritingFileProtectionCompleteUnlessOpen:  // Class B
             result = 2;
             break;
-        case NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication:	// Class C
+        case NSDataWritingFileProtectionCompleteUntilFirstUserAuthentication:  // Class C
             result = 3;
             break;
-        case NSDataWritingFileProtectionNone:	// Class D
+        case NSDataWritingFileProtectionNone:  // Class D
             result = 4;
             break;
         default:

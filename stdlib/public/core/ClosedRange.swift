@@ -22,7 +22,7 @@ internal enum _ClosedRangeIndexRepresentation<Bound>
   case inRange(Bound)
 }
 
-// FIXME(ABI)(compiler limitation): should be a nested type in
+// FIXME(ABI)#23 (Nesting types in generics): should be a nested type in
 // `ClosedRange`.
 /// A position in a `CountableClosedRange` instance.
 public struct ClosedRangeIndex<Bound>

@@ -155,7 +155,7 @@ library, but are compatible with the Cocoa guidelines.
       func toInt() -> Int // OK
     }
 
-* Even unlabelled parameter names should be meaningful as they'll be
+* Even unlabeled parameter names should be meaningful as they'll be
   referred to in comments and visible in "generated headers"
   (cmd-click in Xcode):
 

@@ -1,4 +1,4 @@
-//===--- RCIdentityAnalysis.cpp -------------------------------------------===//
+//===--- EpilogueARCAnalysis.cpp ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -72,7 +72,7 @@ bool EpilogueARCContext::convergeDataflow() {
         BBSetOut = EpilogueARCBlockStates[*Iter]->BBSetIn;
         Iter = std::next(Iter);
         for (auto E = B->succ_end(); Iter != E; ++Iter) {
-	   BBSetOut &= EpilogueARCBlockStates[*Iter]->BBSetIn;
+          BBSetOut &= EpilogueARCBlockStates[*Iter]->BBSetIn;
         }
       } else if (isExitBlock(B)) {
         // We set the BBSetOut for exit blocks.
@@ -103,7 +103,7 @@ bool EpilogueARCContext::convergeDataflow() {
       Changed |= (BS->BBSetIn != BBSetOut);
       BS->BBSetIn = BBSetOut;
     }
-  } while(Changed);
+  } while (Changed);
   return true;
 }
 

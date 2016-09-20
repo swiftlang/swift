@@ -7,4 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-assert((n:String{
+class a{deinit{{if(x:false

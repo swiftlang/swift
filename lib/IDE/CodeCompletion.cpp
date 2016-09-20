@@ -3066,16 +3066,6 @@ public:
     return false;
   }
 
-  bool isOptionSetDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
-    if (!optionSetType)
-      return false;
-
-    SmallVector<ProtocolConformance *, 1> conformances;
-    return D->lookupConformance(CurrDeclContext->getParentModule(),
-                                optionSetType, conformances);
-  }
-
   void getTupleExprCompletions(TupleType *ExprType) {
     unsigned Index = 0;
     for (auto TupleElt : ExprType->getElements()) {

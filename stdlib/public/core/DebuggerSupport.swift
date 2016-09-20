@@ -47,8 +47,8 @@ public enum _DebuggerSupport {
   
   internal static func checkValue<T>(
     _ value: Any,
-    ifClass: (AnyObject)->T,
-    otherwise: ()->T
+    ifClass: (AnyObject) -> T,
+    otherwise: () -> T
   ) -> T {
     if isClass(value) {
       return ifClass(_unsafeDowncastToAnyObject(fromAny: value))

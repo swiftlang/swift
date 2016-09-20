@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI): The character string view should have a custom iterator type to
+// FIXME(ABI)#70 : The character string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
 extension String {
@@ -236,12 +236,12 @@ extension String.CharacterView : BidirectionalCollection {
     )
   }
 
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   //
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never)
+  @inline(never) // Don't remove, see above.
   internal func _measureExtendedGraphemeClusterForward(
     from start: UnicodeScalarView.Index
   ) -> Int {
@@ -279,12 +279,12 @@ extension String.CharacterView : BidirectionalCollection {
     return start._position - startIndexUTF16
   }
 
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   //
   /// Returns the length of the previous extended grapheme cluster in UTF-16
   /// code units.
-  @inline(never)
+  @inline(never) // Don't remove, see above.
   internal func _measureExtendedGraphemeClusterBackward(
     from end: UnicodeScalarView.Index
   ) -> Int {

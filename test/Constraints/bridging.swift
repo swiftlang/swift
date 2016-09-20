@@ -62,7 +62,7 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedClass?)
       -> BridgedStruct {
-    var result: BridgedStruct? = nil
+    var result: BridgedStruct?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

@@ -78,7 +78,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
 
 //===--- Collections ------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): `LazyMap*Collection` types should be
+// FIXME(ABI)#45 (Conditional Conformance): `LazyMap*Collection` types should be
 // collapsed into one `LazyMapCollection` using conditional conformances.
 // Maybe even combined with `LazyMapSequence`.
 // rdar://problem/17144340
@@ -127,7 +127,7 @@ public struct ${Self}<
     return ${Slice}(base: self, bounds: bounds)
   }
 
-  // FIXME(ABI)(compiler limitation): we actually want to add:
+  // FIXME(ABI)#46 (Associated Types with where clauses): we actually want to add:
   //
   //   typealias SubSequence = ${Self}<Base.SubSequence, Element>
   //

@@ -3727,14 +3727,13 @@ SetTestSuite.test("misc") {
 SetTestSuite.test("Hashable") {
   let s1 = Set([1010])
   let s2 = Set([2020])
-  checkHashable(s1 == s2, s1, s2)
+  checkHashable([s1, s2], equalityOracle: { $0 == $1 })
 
   // Explicit types help the type checker quite a bit.
   let ss1 = Set([Set([1010] as [Int]), Set([2020] as [Int]), Set([3030] as [Int])])
   let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
-  checkHashable(ss1 == ss11, ss1, ss11)
-  checkHashable(ss1 == ss2, ss1, ss2)
+  checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
 }
 
 SetTestSuite.test("Operator.Precedence") {

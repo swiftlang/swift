@@ -42,3 +42,19 @@ public class GenericKlazz<T: DataType, R: E> : E where R.Data == T
      d = Dict()
   }
 }
+
+// This used to hit an infinite loop - <rdar://problem/27018457>
+public protocol CodingType {
+    associatedtype ValueType
+}
+
+public protocol ValueCoding {
+    associatedtype Coder: CodingType
+}
+
+func foo<Self>(s: Self)
+where Self : CodingType,
+      Self.ValueType: ValueCoding,
+      Self.ValueType.Coder == Self {
+  print(Self.ValueType.self)
+}

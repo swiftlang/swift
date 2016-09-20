@@ -106,9 +106,9 @@ def dump_coverage_data(merged_file):
         testname = os.path.basename(os.path.dirname(merged_file))
         logging.info('Searching for covered files: %s', testname)
         (returncode, output) = check_output(
-                [llvm_cov, 'report', '-instr-profile=%s' % merged_file, swift],
-                verbose=False,
-                show_cmd=False
+            [llvm_cov, 'report', '-instr-profile=%s' % merged_file, swift],
+            verbose=False,
+            show_cmd=False
         )
         output = [line.split()[0]
                   for line in output.split()

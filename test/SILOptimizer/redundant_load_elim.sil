@@ -1155,3 +1155,14 @@ bb0(%0 : $*Builtin.Int64, %1 : $Builtin.NativeObject):
   %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
+
+sil @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> Int {
+bb0(%0 : $Builtin.RawPointer):
+  %3 = integer_literal $Builtin.Word, 4294967295
+  %4 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
+  // Just check if we can handle an index_addr projection with the special value of 0xffffffff
+  %5 = index_addr %4 : $*Int, %3 : $Builtin.Word
+  %6 = load %5 : $*Int
+  return %6 : $Int
+}
+

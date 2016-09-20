@@ -135,7 +135,7 @@ CharacterTests.test("literal") {
 }
 
 CharacterTests.test("sizeof") {
-  // FIXME: should be 8.
+  // FIXME(ABI): should be 8.
   // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
   let size1 = MemoryLayout<Character>.size
@@ -154,13 +154,7 @@ CharacterTests.test("Hashable") {
     continuingScalars.map { String($0) },
     testCharacters
   ] {
-    for i in characters.indices {
-      for j in characters.indices {
-        var ci = Character(characters[i])
-        var cj = Character(characters[j])
-        checkHashable(i == j, ci, cj, "i=\(i), j=\(j)")
-      }
-    }
+    checkHashable(characters, equalityOracle: { $0 == $1 })
   }
 }
 

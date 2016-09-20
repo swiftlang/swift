@@ -2075,7 +2075,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
         if (!CD->isFinal() && Adopter->isExtensionContext()) {
           // In this case, user should mark class as 'final' or define 
-          // 'required' intializer directly in the class definition.
+          // 'required' initializer directly in the class definition.
           AddFixit = false;
         } else if (!CD->isFinal()) {
           Printer << "required ";
@@ -4019,8 +4019,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
-	if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-		enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
+    if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
+        enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
 
       TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                   diag::enum_raw_type_nonconforming_and_nonsynthable,

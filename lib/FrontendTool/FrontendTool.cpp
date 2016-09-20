@@ -623,7 +623,7 @@ private:
     if (Info.ID == diag::init_not_instance_member.ID)
       return false;
     // Renaming enum cases interacts poorly with the swift migrator by
-    // reverting changes made by the mgirator.
+    // reverting changes made by the migrator.
     if (Info.ID == diag::could_not_find_enum_case.ID)
       return false;
 
@@ -1269,7 +1269,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
+  const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance.getSourceMgr());
   }
 
@@ -1298,9 +1299,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                        Invocation.getFrontendOptions().DumpAPIPath);
   }
 
-  if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
-    HadError = verifyDiagnostics(Instance.getSourceMgr(),
-                                 Instance.getInputBufferIDs());
+  if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
+    HadError = verifyDiagnostics(
+        Instance.getSourceMgr(),
+        Instance.getInputBufferIDs(),
+        diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes);
+
     DiagnosticEngine &diags = Instance.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

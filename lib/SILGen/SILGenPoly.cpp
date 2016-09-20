@@ -2331,7 +2331,12 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   
   auto extInfo = expectedType->getExtInfo()
     .withRepresentation(SILFunctionType::Representation::Thin);
-  
+
+  // If our parent function was pseudogeneric, this thunk must also be
+  // pseudogeneric, since we have no way to pass generic parameters.
+  if (F.getLoweredFunctionType()->isPseudogeneric())
+    extInfo = extInfo.withIsPseudogeneric();
+
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;

@@ -1753,7 +1753,7 @@ public:
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
     : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr>  {
+      public TrailingCallArguments<UnresolvedMemberExpr> {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
@@ -4270,7 +4270,7 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return Src->getEndLoc();
+    return (Src->isImplicit() ? Dest->getEndLoc() : Src->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.

@@ -818,14 +818,23 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
                                SourceLoc Loc,
                                SmallVectorImpl<ValueDecl *> &Lookup,
                                bool ExpectMultipleResults) {
-  NLOptions options = NL_QualifiedDefault;
-  // FIXME: a bit of a hack.
-  if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
-    options = options & ~NL_VisitSupertypes;
-  P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
+  Type CheckTy = Ty;
+  if (auto MetaTy = CheckTy->getAs<AnyMetatypeType>())
+    CheckTy = MetaTy->getInstanceType();
+
+  if (auto nominal = CheckTy->getAnyNominal()) {
+    auto found = nominal->lookupDirect(Name);
+    Lookup.append(found.begin(), found.end());
+  } else if (auto moduleTy = CheckTy->getAs<ModuleType>()) {
+    moduleTy->getModule()->lookupValue({ }, Name, NLKind::QualifiedLookup,
+                                       Lookup);
+  } else {
+    P.diagnose(Loc, diag::sil_member_lookup_bad_type, Name, Ty);
+    return nullptr;
+  }
 
   if (Lookup.empty() || (!ExpectMultipleResults && Lookup.size() != 1)) {
-    P.diagnose(Loc, diag::sil_member_decl_not_found);
+    P.diagnose(Loc, diag::sil_named_member_decl_not_found, Name, Ty);
     return nullptr;
   }
   return Lookup[0];
@@ -1261,6 +1270,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
+    .Case("ref_tail_addr", ValueKind::RefTailAddrInst)
     .Case("ref_to_bridge_object", ValueKind::RefToBridgeObjectInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
@@ -1290,6 +1300,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("switch_enum_addr",
           ValueKind::SwitchEnumAddrInst)
     .Case("switch_value", ValueKind::SwitchValueInst)
+    .Case("tail_addr", ValueKind::TailAddrInst)
     .Case("try_apply", ValueKind::TryApplyInst)
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
@@ -2562,20 +2573,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
   case ValueKind::AllocStackInst:
-  case ValueKind::AllocRefInst:
   case ValueKind::MetatypeInst: {
-    bool IsObjC = false;
-    bool OnStack = false;
-    StringRef Optional;
-    while (parseSILOptional(Optional, *this)) {
-      if (Optional == "objc") {
-        IsObjC = true;
-      } else if (Optional == "stack") {
-        OnStack = true;
-      } else {
-        return true;
-      }
-    }
 
     SILType Ty;
     if (parseSILType(Ty))
@@ -2587,15 +2585,64 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
           parseSILDebugLocation(InstLoc, B))
         return true;
       ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo);
-    } else if (Opcode == ValueKind::AllocRefInst) {
-      if (parseSILDebugLocation(InstLoc, B))
-        return true;
-      ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC, OnStack);
     } else {
       assert(Opcode == ValueKind::MetatypeInst);
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       ResultVal = B.createMetatype(InstLoc, Ty);
+    }
+    break;
+  }
+  case ValueKind::AllocRefInst: {
+    bool IsObjC = false;
+    bool OnStack = false;
+    SmallVector<SILType, 2> ElementTypes;
+    SmallVector<SILValue, 2> ElementCounts;
+    StringRef Optional;
+    while (P.consumeIf(tok::l_square)) {
+      Identifier Id;
+      parseSILIdentifier(Id, diag::expected_in_attribute_list);
+      StringRef Optional = Id.str();
+      if (Optional == "objc") {
+        IsObjC = true;
+      } else if (Optional == "stack") {
+        OnStack = true;
+      } else if (Optional == "tail_elems") {
+        SILType ElemTy;
+        if (parseSILType(ElemTy) ||
+            !P.Tok.isAnyOperator() ||
+            P.Tok.getText() != "*")
+          return true;
+        P.consumeToken();
+
+        SILValue ElemCount;
+        if (parseTypedValueRef(ElemCount, B))
+          return true;
+
+        ElementTypes.push_back(ElemTy);
+        ElementCounts.push_back(ElemCount);
+      } else {
+        return true;
+      }
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    }
+
+    SILType ObjectType;
+    if (parseSILType(ObjectType))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (ElementTypes.size() == 0) {
+      ResultVal = B.createAllocRef(InstLoc, ObjectType, IsObjC, OnStack);
+    } else {
+      if (IsObjC) {
+        P.diagnose(P.Tok, diag::sil_objc_with_tail_elements);
+        return true;
+      }
+      ResultVal = B.createAllocRef(InstLoc, ObjectType, OnStack,
+                                   ElementTypes, ElementCounts);
     }
     break;
   }
@@ -3165,6 +3212,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
+  case ValueKind::RefTailAddrInst: {
+    SourceLoc NameLoc;
+    SILType ResultObjTy;
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(ResultObjTy) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    SILType ResultTy = ResultObjTy.getAddressType();
+    ResultVal = B.createRefTailAddr(InstLoc, Val, ResultTy);
+    break;
+  }
   case ValueKind::IsNonnullInst: {
     SourceLoc Loc;
     if (parseTypedValueRef(Val, Loc, B) ||
@@ -3181,6 +3240,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal);
+    break;
+  }
+  case ValueKind::TailAddrInst: {
+    SILValue IndexVal;
+    SILType ResultObjTy;
+    if (parseTypedValueRef(Val, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(IndexVal, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(ResultObjTy) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    SILType ResultTy = ResultObjTy.getAddressType();
+    ResultVal = B.createTailAddr(InstLoc, Val, IndexVal, ResultTy);
     break;
   }
   case ValueKind::IndexRawPointerInst: {

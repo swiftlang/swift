@@ -312,12 +312,113 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
 
 /// \brief Determine the name of the overload in a set of overload choices.
 static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+  DeclName name;
   for (auto choice : choices) {
-    if (choice.isDecl())
-      return choice.getDecl()->getFullName();
+    if (!choice.isDecl())
+      continue;
+
+    DeclName nextName = choice.getDecl()->getFullName();
+    if (!name) {
+      name = nextName;
+      continue;
+    }
+
+    if (name != nextName) {
+      // Assume all choices have the same base name and only differ in
+      // argument labels. This may not be a great assumption, but we don't
+      // really have a way to recover for diagnostics otherwise.
+      return name.getBaseName();
+    }
   }
 
-  return DeclName();
+  return name;
+}
+
+/// Returns true if any diagnostics were emitted.
+static bool
+tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
+                                    ArrayRef<OverloadChoice> choices) {
+  auto *callExpr = dyn_cast<CallExpr>(expr);
+  if (!callExpr)
+    return false;
+  if (!callExpr->hasTrailingClosure())
+    return false;
+
+  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
+  for (const OverloadChoice &choice : choices) {
+    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
+    if (!callee)
+      return false;
+
+    const ParameterList *paramList = callee->getParameterLists().back();
+    const ParamDecl *param = paramList->getArray().back();
+
+    // Sanity-check that the trailing closure corresponds to this parameter.
+    if (!param->getType()->is<AnyFunctionType>())
+      return false;
+
+    Identifier trailingClosureLabel = param->getArgumentName();
+    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
+
+    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
+    // appear more than once?
+    if (choiceForLabel == callee)
+      continue;
+
+    // If just providing the trailing closure label won't solve the ambiguity,
+    // don't bother offering the fix-it.
+    if (choiceForLabel != nullptr)
+      return false;
+
+    choiceForLabel = callee;
+  }
+
+  // If we got here, then all of the choices have unique labels. Offer them in
+  // order.
+  SourceManager &sourceMgr = tc.Context.SourceMgr;
+  SourceLoc replaceStartLoc;
+  SourceLoc closureStartLoc;
+  bool hasOtherArgs, needsParens;
+  if (auto tupleArgs = dyn_cast<TupleExpr>(callExpr->getArg())) {
+    assert(tupleArgs->getNumElements() >= 2);
+    const Expr *lastBeforeClosure = tupleArgs->getElements().drop_back().back();
+    replaceStartLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, lastBeforeClosure->getEndLoc());
+    closureStartLoc = tupleArgs->getElements().back()->getStartLoc();
+    hasOtherArgs = true;
+    needsParens = false;
+  } else {
+    auto parenArgs = cast<ParenExpr>(callExpr->getArg());
+    replaceStartLoc = parenArgs->getRParenLoc();
+    closureStartLoc = parenArgs->getSubExpr()->getStartLoc();
+    hasOtherArgs = false;
+    needsParens = parenArgs->getRParenLoc().isInvalid();
+  }
+  if (!replaceStartLoc.isValid()) {
+    assert(callExpr->getFn()->getEndLoc().isValid());
+    replaceStartLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, callExpr->getFn()->getEndLoc());
+  }
+
+  for (const auto &choicePair : choicesByLabel) {
+    SmallString<64> insertionString;
+    if (needsParens)
+      insertionString += "(";
+    else if (hasOtherArgs)
+      insertionString += ", ";
+
+    if (!choicePair.first.empty()) {
+      insertionString += choicePair.first.str();
+      insertionString += ": ";
+    }
+
+    tc.diagnose(expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
+                choicePair.first.empty(), choicePair.second->getFullName())
+      .fixItReplaceChars(replaceStartLoc, closureStartLoc, insertionString)
+      .fixItInsertAfter(callExpr->getEndLoc(), ")");
+  }
+
+  return true;
 }
 
 static bool diagnoseAmbiguity(ConstraintSystem &cs,
@@ -410,9 +511,12 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
                                   : diag::ambiguous_decl_ref,
                 name);
 
+    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, overload.choices))
+      return true;
+
     // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
     // candidate once.  FIXME: Why is one candidate getting into the overload
-    // set multiple times?
+    // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
     SmallPtrSet<Decl*, 8> EmittedDecls;
     for (auto choice : overload.choices) {
       switch (choice.getKind()) {
@@ -4022,6 +4126,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   if (tryDiagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
                                                 CS))
     return true;
+
+  // Don't attempt fixits if we have an unsolved type variable, since
+  // the recovery path's recursion into the type checker via typeCheckCast()
+  // will confuse matters.
+  if (exprType->hasTypeVariable())
+    return false;
 
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".

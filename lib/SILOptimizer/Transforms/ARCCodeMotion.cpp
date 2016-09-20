@@ -1,4 +1,4 @@
-//===------------------------ ARCCodeMotion.cpp - SIL ARC Code Motion ----===//
+//===--- ARCCodeMotion.cpp - SIL ARC Code Motion --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -278,7 +278,7 @@ public:
   RetainBlockState(bool IsEntry, unsigned size, bool MultiIteration) {
     // Iterative forward data flow.
     BBSetIn.resize(size, false);
-    // Initilize to true if we are running optimistic data flow, i.e.
+    // Initialize to true if we are running optimistic data flow, i.e.
     // MultiIteration is true.
     BBSetOut.resize(size, MultiIteration);
     BBMaxSet.resize(size, !IsEntry && MultiIteration);
@@ -314,6 +314,17 @@ class RetainCodeMotionContext : public CodeMotionContext {
       return true;
     // This instruction does not block the retain code motion.
     return false;
+  }
+
+  /// Return the previous instruction if it happens to be a retain with the
+  /// given RC root, nullptr otherwise.
+  SILInstruction *getPrevReusableInst(SILInstruction *I, SILValue Root) {
+    if (&*I->getParent()->begin() == I)
+      return nullptr;
+    auto Prev = &*std::prev(SILBasicBlock::iterator(I));
+    if (isRetainInstruction(Prev) && getRCRoot(Prev) == Root)
+      return Prev;
+    return nullptr;
   }
 
 public:
@@ -463,6 +474,13 @@ bool RetainCodeMotionContext::performCodeMotion() {
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
+      // we are about to insert a new retain instruction before the insertion
+      // point. Check if the previous instruction is reusable, reuse it, do
+      // not insert new instruction and delete old one.
+      if (auto I = getPrevReusableInst(IP, Iter->first)) {
+        RCInstructions.erase(I);
+        continue;
+      }
       createIncrementBefore(Iter->first, IP);
       Changed = true;
     }
@@ -602,7 +620,7 @@ public:
   /// constructor.
   ReleaseBlockState(bool IsExit, unsigned size, bool MultiIteration) {
     // backward data flow.
-    // Initilize to true if we are running optimistic data flow, i.e.
+    // Initialize to true if we are running optimistic data flow, i.e.
     // MultiIteration is true.
     BBSetIn.resize(size, MultiIteration);
     BBSetOut.resize(size, false);
@@ -643,6 +661,17 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
       return true;
     // This instruction does not block the release.
     return false;
+  }
+
+  /// Return the successor instruction if it happens to be a release with the
+  /// given RC root, nullptr otherwise.
+  SILInstruction *getPrevReusableInst(SILInstruction *I, SILValue Root) {
+    if (&*I->getParent()->begin() == I)
+      return nullptr;
+    auto Prev = &*std::prev(SILBasicBlock::iterator(I));
+    if (isReleaseInstruction(Prev) && getRCRoot(Prev) == Root)
+      return Prev;
+    return nullptr;
   }
 
 public:
@@ -829,6 +858,13 @@ bool ReleaseCodeMotionContext::performCodeMotion() {
     if (Iter == InsertPoints.end())
       continue;
     for (auto IP : Iter->second) {
+      // we are about to insert a new release instruction before the insertion
+      // point. Check if the successor instruction is reusable, reuse it, do
+      // not insert new instruction and delete old one.
+      if (auto I = getPrevReusableInst(IP, Iter->first)) {
+        RCInstructions.erase(I);
+        continue;
+      }
       createDecrementBefore(Iter->first, IP);
       Changed = true;
     }

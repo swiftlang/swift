@@ -73,8 +73,6 @@ Rename with a non-`stdlib` naming scheme.
 000000000001cb30 T _swift_allocBox
 000000000001c990 T _swift_allocObject
 000000000001ca60 T _swift_bufferAllocate
-000000000001ca70 T _swift_bufferAllocateOnStack
-000000000001ca80 T _swift_bufferDeallocateFromStack
 000000000001ca90 T _swift_bufferHeaderSize
 000000000001cd30 T _swift_deallocBox
 000000000001d490 T _swift_deallocClassInstance

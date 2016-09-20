@@ -387,7 +387,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(c->getLoc(), diag::collection_literal_empty)
           .highlight(c->getSourceRange());
       else {
-        TC.diagnose(c->getLoc(), diag::collection_literal_heterogenous,
+        TC.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
                     c->getType())
           .highlight(c->getSourceRange())
           .fixItInsertAfter(c->getEndLoc(), " as " + c->getType()->getString());
@@ -956,7 +956,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
       // This is probably a conversion from a value of labeled tuple type to
       // a scalar.
       // FIXME: We want this issue to disappear completely when single-element
-      // labelled tuples go away.
+      // labeled tuples go away.
       if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
         int scalarFieldIdx = tupleTy->getElementForScalarInit();
         if (scalarFieldIdx >= 0) {
@@ -1197,7 +1197,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
     if (overrideFnTy && baseFnTy &&
         // The overriding function type should be no escaping.
         overrideFnTy->getExtInfo().isNoEscape() &&
-        // The overriden function type should be escaping.
+        // The overridden function type should be escaping.
         !baseFnTy->getExtInfo().isNoEscape()) {
       diag.fixItInsert(typeRange.Start, "@escaping ");
       return true;

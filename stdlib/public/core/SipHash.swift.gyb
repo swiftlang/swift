@@ -97,7 +97,7 @@ struct ${Self} {
   internal var dataTail: UInt64 = 0
   internal var dataTailByteCount: Int = 0
 
-  internal var finalizedHash: UInt64? = nil
+  internal var finalizedHash: UInt64?
 
   public init(key: (UInt64, UInt64)) {
     v3 ^= key.1
@@ -106,13 +106,13 @@ struct ${Self} {
     v0 ^= key.0
   }
 
-  // FIXME(ABI): Use UnsafeRawBufferPointer.
+  // FIXME(ABI)#62 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
   public // @testable
   mutating func append(_ data: UnsafeRawPointer, byteCount: Int) {
     _append_alwaysInline(data, byteCount: byteCount)
   }
 
-  // FIXME(ABI): Use UnsafeRawBufferPointer.
+  // FIXME(ABI)#63 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
   @inline(__always)
   internal mutating func _append_alwaysInline(
     _ data: UnsafeRawPointer,
@@ -224,7 +224,7 @@ struct ${Self} {
 #endif
   }
 
-  // FIXME(ABI): Use UnsafeRawBufferPointer.
+  // FIXME(ABI)#64 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
   public // @testable
   static func hash(
     data: UnsafeRawPointer,
@@ -237,7 +237,7 @@ struct ${Self} {
       key: key)
   }
 
-  // FIXME(ABI): Use UnsafeRawBufferPointer.
+  // FIXME(ABI)#65 (UnsafeRawBufferPointer): Use UnsafeRawBufferPointer.
   @inline(__always)
   public // @testable
   static func _hash_alwaysInline(
