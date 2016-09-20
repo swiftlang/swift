@@ -2104,14 +2104,27 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     return;
 
   // Only introduce 'dynamic' on declarations...
+  bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
   if (!isa<ExtensionDecl>(D->getDeclContext())) {
     // ...and in classes on decls marked @NSManaged.
-    if (!D->getAttrs().hasAttribute<NSManagedAttr>())
+    if (!isNSManaged)
       return;
   }
 
   // The presence of 'dynamic' or 'final' blocks the inference of 'dynamic'.
   if (D->isDynamic() || D->isFinal())
+    return;
+
+  // Variables declared with 'let' cannot be 'dynamic'.
+  if (auto VD = dyn_cast<VarDecl>(D)) {
+    if (VD->isLet() && !isNSManaged) return;
+  }
+
+  // The presence of 'final' on a class prevents 'dynamic'.
+  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) return;
+  if (!isNSManaged && classDecl->isFinal() &&
+      !classDecl->requiresStoredPropertyInits())
     return;
 
   // Add the 'dynamic' attribute.
