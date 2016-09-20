@@ -1451,16 +1451,14 @@ bool DeclContext::lookupQualified(Type type,
       if (visited.insert(proto).second)
         stack.push_back(proto);
 
-    // If requested, look into the superclasses of this archetype.
-    if (options & NL_VisitSupertypes) {
-      if (auto superclassTy = archetypeTy->getSuperclass()) {
-        if (auto superclassDecl = superclassTy->getAnyNominal()) {
-          if (visited.insert(superclassDecl).second) {
-            stack.push_back(superclassDecl);
+    // Look into the superclasses of this archetype.
+    if (auto superclassTy = archetypeTy->getSuperclass()) {
+      if (auto superclassDecl = superclassTy->getAnyNominal()) {
+        if (visited.insert(superclassDecl).second) {
+          stack.push_back(superclassDecl);
 
-            wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                                  !isa<ProtocolDecl>(superclassDecl);
-          }
+          wantProtocolMembers = (options & NL_ProtocolMembers) &&
+                                !isa<ProtocolDecl>(superclassDecl);
         }
       }
     }
@@ -1563,10 +1561,6 @@ bool DeclContext::lookupQualified(Type type,
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
     }
-
-    // If we're not supposed to visit our supertypes, we're done.
-    if ((options & NL_VisitSupertypes) == 0)
-      continue;
 
     // Visit superclass.
     if (auto classDecl = dyn_cast<ClassDecl>(current)) {
