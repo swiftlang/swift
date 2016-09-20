@@ -47,9 +47,7 @@ SubstringTests.test("CharacterView")
   expectEqual(s, "abcdefg")
 }
 
-SubstringTests.test("UnicodeScalars")
-  .xfail(.always("UnicodeScalarsView slices don't share indices"))
-  .code {
+SubstringTests.test("UnicodeScalars") {
   let s = "abcdefg"
   var t = s.unicodeScalars.dropFirst(2)
   var u = t.dropFirst(2)
