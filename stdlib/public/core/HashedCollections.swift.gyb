@@ -2805,7 +2805,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_versioned
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, 0..<capacity)
+    return _squeezeHashValue(k.hashValue, capacity)
   }
 
   @_versioned
