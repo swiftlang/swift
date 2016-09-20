@@ -1683,7 +1683,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
       if (!versionRequirement.hasValue())
         return ConditionalCompilationExprState::error();
 
-      auto thisVersion = version::Version::getCurrentLanguageVersion();
+      auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
 
       if (!prefix->getName().getBaseName().str().equals(">=")) {
         diagnose(PUE->getFn()->getLoc(),

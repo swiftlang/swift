@@ -315,7 +315,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
-  auto languageVersion = swift::version::Version::getCurrentLanguageVersion();
+  auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
@@ -2670,7 +2670,8 @@ getExtensionMetadata() const {
   metadata.BlockName = "swift.lookup";
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
-  metadata.UserInfo = version::getSwiftFullVersion();
+  metadata.UserInfo = version::getSwiftFullVersion(
+    Impl.SwiftContext.LangOpts.EffectiveLanguageVersion);
   return metadata;
 }
 
