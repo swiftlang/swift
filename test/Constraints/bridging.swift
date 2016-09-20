@@ -171,7 +171,7 @@ func dictionaryToNSDictionary() {
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
-  nsd = [BridgedStruct() : bcOpt]
+  nsd = [BridgedStruct() : bcOpt as Any]
   bcOpt = nil
   _ = nsd
 }
