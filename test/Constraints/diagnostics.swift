@@ -780,3 +780,18 @@ struct rdar27891805 {
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
 // expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
 // expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
+
+// Make sure RawRepresentable fix-its don't crash in the presence of type variables
+class NSCache<K, V> {
+  func object(forKey: K) -> V? {}
+}
+
+class CacheValue {
+  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
+  func value(y: String) -> String {} // expected-note {{found this candidate}}
+}
+
+func valueForKey<K>(_ key: K) -> CacheValue? {
+  let cache = NSCache<K, CacheValue>()
+  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+}

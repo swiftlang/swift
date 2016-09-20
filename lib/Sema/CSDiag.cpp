@@ -4127,6 +4127,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                                                 CS))
     return true;
 
+  // Don't attempt fixits if we have an unsolved type variable, since
+  // the recovery path's recursion into the type checker via typeCheckCast()
+  // will confuse matters.
+  if (exprType->hasTypeVariable())
+    return false;
+
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||
