@@ -193,8 +193,12 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   };
 
   using compilation_record::TopLevelKey;
+  // NB: We calculate effective version from getCurrentLanguageVersion()
+  // here because any -swift-version argument is handled in the
+  // argsHash that follows.
   out << compilation_record::getName(TopLevelKey::Version) << ": \""
-      << llvm::yaml::escape(version::getSwiftFullVersion())
+      << llvm::yaml::escape(version::getSwiftFullVersion(
+                              swift::version::Version::getCurrentLanguageVersion()))
       << "\"\n";
   out << compilation_record::getName(TopLevelKey::Options) << ": \""
       << llvm::yaml::escape(argsHash) << "\"\n";

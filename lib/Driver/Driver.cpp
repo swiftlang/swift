@@ -269,8 +269,14 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
-      versionValid =
-          (value->getValue(scratch) == version::getSwiftFullVersion());
+
+      // NB: We check aginst
+      // swift::version::Version::getCurrentLanguageVersion() here because any
+      // -swift-version argument is handled in the argsHashStr check that
+      // follows.
+      versionValid = (value->getValue(scratch)
+                      == version::getSwiftFullVersion(
+                        version::Version::getCurrentLanguageVersion()));
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
@@ -2007,7 +2013,8 @@ void Driver::printJobs(const Compilation &C) const {
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
-  OS << version::getSwiftFullVersion() << '\n';
+  OS << version::getSwiftFullVersion(
+    version::Version::getCurrentLanguageVersion()) << '\n';
   OS << "Target: " << TC.getTriple().str() << '\n';
 }
 

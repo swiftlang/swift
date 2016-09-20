@@ -583,7 +583,8 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     llvm::raw_svector_ostream versionString(versionStringBuf);
     versionString << Version::getCurrentLanguageVersion();
     size_t shortVersionStringLength = versionString.tell();
-    versionString << '/' << version::getSwiftFullVersion();
+    versionString << '/' << version::getSwiftFullVersion(
+      M->getASTContext().LangOpts.EffectiveLanguageVersion);
     Metadata.emit(ScratchRecord,
                   VERSION_MAJOR, VERSION_MINOR, shortVersionStringLength,
                   versionString.str());
@@ -626,12 +627,14 @@ void Serializer::writeDocHeader() {
     control_block::MetadataLayout Metadata(Out);
     control_block::TargetLayout Target(Out);
 
+    auto& LangOpts = M->getASTContext().LangOpts;
     Metadata.emit(ScratchRecord,
                   VERSION_MAJOR, VERSION_MINOR,
                   /*short version string length*/0,
-                  version::getSwiftFullVersion());
+                  version::getSwiftFullVersion(
+                    LangOpts.EffectiveLanguageVersion));
 
-    Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
+    Target.emit(ScratchRecord, LangOpts.Target.str());
   }
 }
 
