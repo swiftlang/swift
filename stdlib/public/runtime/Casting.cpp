@@ -285,9 +285,26 @@ static void _buildNameForMetadata(const Metadata *type,
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     result += "(";
     auto elts = tuple->getElements();
+    const char *labels = tuple->Labels;
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       if (i > 0)
         result += ", ";
+
+      // If we have any labels, add the label.
+      if (labels) {
+        // Labels are space-separated.
+        if (const char *space = strchr(labels, ' ')) {
+          if (labels != space) {
+            result.append(labels, space - labels);
+            result += ": ";
+          }
+
+          labels = space + 1;
+        } else {
+          labels = nullptr;
+        }
+      }
+
       _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type, qualified,
                             result);
     }
