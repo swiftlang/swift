@@ -194,8 +194,8 @@ public:
                         const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::Constant *Storage, StringRef Name,
-                                     StringRef LinkageName,
+  void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
+                                     StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);
