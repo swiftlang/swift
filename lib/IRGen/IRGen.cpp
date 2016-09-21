@@ -274,14 +274,15 @@ public:
 /// and options which influence the compilation.
 static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
                             llvm::Module *Module,
-                            llvm::TargetMachine *TargetMachine) {
+                            llvm::TargetMachine *TargetMachine,
+                            version::Version const& effectiveLanguageVersion) {
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
   llvm::WriteBitcodeToFile(Module, HashStream);
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
-  HashStream << version::getSwiftFullVersion();
+  HashStream << version::getSwiftFullVersion(effectiveLanguageVersion);
 
   // Add all options which influence the llvm compilation but are not yet
   // reflected in the llvm module itself.
@@ -347,12 +348,14 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
+                        version::Version const& effectiveLanguageVersion,
                         StringRef OutputFilename) {
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
     MD5::MD5Result Result;
-    getHashOfModule(Result, Opts, Module, TargetMachine);
+    getHashOfModule(Result, Opts, Module, TargetMachine,
+                    effectiveLanguageVersion);
 
     DEBUG(
       if (DiagMutex) DiagMutex->lock();
@@ -663,7 +666,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   embedBitcode(IGM.getModule(), Opts);
 
   if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
-                  IGM.getModule(), IGM.TargetMachine.get(), IGM.OutputFilename))
+                  IGM.getModule(), IGM.TargetMachine.get(),
+                  IGM.Context.LangOpts.EffectiveLanguageVersion,
+                  IGM.OutputFilename))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
@@ -679,7 +684,9 @@ static void ThreadEntryPoint(IRGenerator *irgen,
     );
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
-                IGM->getModule(), IGM->TargetMachine.get(), IGM->OutputFilename);
+                IGM->getModule(), IGM->TargetMachine.get(),
+                IGM->Context.LangOpts.EffectiveLanguageVersion,
+                IGM->OutputFilename);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -940,7 +947,9 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(), OutputPath);
+                IGM.TargetMachine.get(),
+                Ctx.LangOpts.EffectiveLanguageVersion,
+                OutputPath);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
@@ -952,7 +961,9 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(), Opts.getSingleOutputFilename()))
+                    TargetMachine.get(),
+                    Ctx.LangOpts.EffectiveLanguageVersion,
+                    Opts.getSingleOutputFilename()))
     return true;
   return false;
 }
