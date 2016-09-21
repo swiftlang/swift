@@ -24,7 +24,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
 
 # E402 means module level import not at top of file
 from swift_build_support import diagnostics  # noqa (E402)
-from swift_build_support import shell  # noqa (E402)
 
 
 HOME = os.environ.get("HOME", "/")

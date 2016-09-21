@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!
@@ -18,7 +18,7 @@ class D: C {}
 // CHECK:       [[NO_BAR]]:
 // CHECK:         br [[TRAP:bb[0-9]+]]
 // CHECK:       [[SOME_BAR]]:
-// CHECK:         [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*ImplicitlyUnwrappedOptional<Bar>
+// CHECK:         [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
 // CHECK:         [[BAR:%.*]] = load [[PAYLOAD_ADDR]]
 // CHECK:         class_method {{%.*}} : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C! , $@convention(method) (@guaranteed Bar) ->
 // CHECK:         unconditional_checked_cast {{%.*}} : $C to $D

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
@@ -6,12 +6,9 @@ import Foundation
 import CoreGraphics
 
 class Colors {
-	// TODO: when issue is fixed, migrate these to CGColor class properties
-	static var black = CGColor.constantColor(for: CGColor.black)!
-	static var white = CGColor.constantColor(for: CGColor.white)!
-
-	// FIXME: this triggers an assert in SILVerifier
-	static var clear = CGColor.constantColor(for: CGColor.clear)!
+	static var black = CGColor.black
+	static var white = CGColor.white
+	static var clear = CGColor.clear
 
 	class func printColors() {
 		print("Colors") // CHECK: Colors

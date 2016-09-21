@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -rc-id-dumper %s -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -rc-id-dumper %s -o /dev/null | %FileCheck %s
 
 import Builtin
 

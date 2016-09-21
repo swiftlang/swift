@@ -150,6 +150,14 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable>(
   expectEqualTest(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
 }
 
+public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatable>(
+  _ expected: (T, U, V, W), _ actual: (T, U, V, W), ${TRACE}) {
+  expectEqualTest(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.2, actual.2, ${trace}, showFrame: false) {$0 == $1}
+  expectEqualTest(expected.3, actual.3, ${trace}, showFrame: false) {$0 == $1}
+}
+
 public func expectationFailure(
   _ reason: String,
   trace message: String,
@@ -168,8 +176,8 @@ public func expectEqualTest<T>(
 ) {
   if !equal(expected, actual) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -178,7 +186,7 @@ public func expectEqualTest<T>(
 public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T, ${TRACE}) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace}
     )
   }
@@ -197,8 +205,8 @@ public func expectOptionalEqual<T>(
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -206,8 +214,8 @@ public func expectOptionalEqual<T>(
 public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?, ${TRACE}) {
   if expected != actual {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -217,7 +225,7 @@ public func expectNotEqual<T : Equatable>(
 ) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -240,13 +248,19 @@ public func expectOptionalEqual${Generic}(
     _ expected: ${EquatableType}, _ actual: ${EquatableType}?, ${TRACE}) {
   if (actual == nil) || expected != actual! {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
 
 %end
+
+public func expectEqual(
+  _ expected: Any.Type, _ actual: Any.Type, ${TRACE}
+) {
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
+}
 
 public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T, ${TRACE}) {
   if !(lhs < rhs) {
@@ -343,12 +357,12 @@ public func expectSequenceType<X : Sequence>(_ x: X) -> X
 public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
   _ x: X.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME: can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -375,11 +389,11 @@ public func expectSequenceAssociatedTypes<X : Sequence>(
   iteratorType: X.Iterator.Type,
   subSequenceType: X.SubSequence.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#4 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X.SubSequence : Sequence,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#5 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence {}
 
 /// Check that all associated types of a `Collection` are what we expect them
@@ -392,13 +406,13 @@ public func expectCollectionAssociatedTypes<X : Collection>(
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : Collection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection,
   X.Indices.Iterator.Element == X.Index,
@@ -415,13 +429,13 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : BidirectionalCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : BidirectionalCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -438,13 +452,13 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
   indexDistanceType: X.IndexDistance.Type,
   indicesType: X.Indices.Type
 ) where
-  // FIXME(ABI)(compiler limitation): there should be no constraints in
+  // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
   X._Element == X.Iterator.Element,
   X.SubSequence : RandomAccessCollection,
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
-  // X.SubSequence.Indices == X.Indices, // FIXME(ABI): can't have this constraint now.
+  // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : RandomAccessCollection,
   X.Indices.Iterator.Element == X.Index,
@@ -508,17 +522,17 @@ public func expectFalse(_ actual: Bool, ${TRACE}) {
   }
 }
 
-public func expectEmpty<T>(_ value: T?, ${TRACE}) {
+public func expectNil<T>(_ value: T?, ${TRACE}) {
   if value != nil {
     expectationFailure(
-      "expected optional to be empty\nactual: \"\(value)\"", trace: ${trace})
+      "expected optional to be nil\nactual: \"\(value)\"", trace: ${trace})
   }
 }
 
 @discardableResult
-public func expectNotEmpty<T>(_ value: T?, ${TRACE}) -> T? {
+public func expectNotNil<T>(_ value: T?, ${TRACE}) -> T? {
   if value == nil {
-    expectationFailure("expected optional to be non-empty", trace: ${trace})
+    expectationFailure("expected optional to be non-nil", trace: ${trace})
   }
   return value
 }
@@ -667,7 +681,7 @@ func _childProcess() {
 }
 
 struct _ParentProcess {
-  internal var _pid: pid_t? = nil
+  internal var _pid: pid_t?
   internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
   internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
   internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
@@ -835,7 +849,7 @@ struct _ParentProcess {
 
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
-      var status: ProcessTerminationStatus? = nil
+      var status: ProcessTerminationStatus?
       if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
         status = _waitForChild()
         switch status! {
@@ -923,7 +937,7 @@ struct _ParentProcess {
     print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
 
     var expectCrash = false
-    var childTerminationStatus: ProcessTerminationStatus? = nil
+    var childTerminationStatus: ProcessTerminationStatus?
     var crashStdout: [String] = []
     var crashStderr: [String] = []
     if _runTestsInProcess {
@@ -1131,7 +1145,7 @@ public func runAllTests() {
     _childProcess()
   } else {
     var runTestsInProcess: Bool = false
-    var filter: String? = nil
+    var filter: String?
     var args = [String]()
     var i = 0
     i += 1 // Skip the name of the executable.
@@ -1317,10 +1331,10 @@ public final class TestSuite {
     internal final class _Data {
       var _xfail: [TestRunPredicate] = []
       var _skip: [TestRunPredicate] = []
-      var _stdinText: String? = nil
+      var _stdinText: String?
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
-      var _testLoc: SourceLoc? = nil
+      var _testLoc: SourceLoc?
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1493,7 +1507,7 @@ func _getOSVersion() -> OSVersion {
 }
 
 var _runningOSVersion: OSVersion = _getOSVersion()
-var _overrideOSVersion: OSVersion? = nil
+var _overrideOSVersion: OSVersion?
 
 /// Override the OS version for testing.
 public func _setOverrideOSVersion(_ v: OSVersion) {
@@ -1934,22 +1948,26 @@ public enum TestRunPredicate : CustomStringConvertible {
 public func checkEquatable<Instances : Collection>(
   _ instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> Bool,
+  allowBrokenTransitivity: Bool = false,
   ${TRACE}
 ) where
   Instances.Iterator.Element : Equatable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#89 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index
 {
   let indices = Array(instances.indices)
   _checkEquatableImpl(
     Array(instances),
-    oracle: { oracle(indices[$0], indices[$1]) })
+    oracle: { oracle(indices[$0], indices[$1]) },
+    allowBrokenTransitivity: allowBrokenTransitivity,
+    ${trace})
 }
 
 internal func _checkEquatableImpl<Instance : Equatable>(
   _ instances: [Instance],
   oracle: (Int, Int) -> Bool,
+  allowBrokenTransitivity: Bool = false,
   ${TRACE}
 ) {
   // For each index (which corresponds to an instance being tested) track the
@@ -1968,36 +1986,44 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let predictedXY = oracle(i, j)
       expectEqual(
         predictedXY, oracle(j, i),
-        "bad oracle: broken symmetry between indices \(i), \(j)")
+        "bad oracle: broken symmetry between indices \(i), \(j)",
+        stackTrace: ${stackTrace})
 
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        (predictedXY
+           ? "expected equal, found not equal\n"
+           : "expected not equal, found equal\n") +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
         stackTrace: ${stackTrace})
 
-      // Check transitivity of the predicate represented by the oracle.
-      // If we are adding the instance `j` into an equivalence set, check that
-      // it is equal to every other instance in the set.
-      if predictedXY && i < j && transitivityScoreboard[i].value.insert(j).inserted {
-        if transitivityScoreboard[i].value.count == 1 {
-          transitivityScoreboard[i].value.insert(i)
+      if !allowBrokenTransitivity {
+        // Check transitivity of the predicate represented by the oracle.
+        // If we are adding the instance `j` into an equivalence set, check that
+        // it is equal to every other instance in the set.
+        if predictedXY && i < j && transitivityScoreboard[i].value.insert(j).inserted {
+          if transitivityScoreboard[i].value.count == 1 {
+            transitivityScoreboard[i].value.insert(i)
+          }
+          for k in transitivityScoreboard[i].value {
+            expectTrue(
+              oracle(j, k),
+              "bad oracle: broken transitivity at indices \(i), \(j), \(k)",
+              stackTrace: ${stackTrace})
+              // No need to check equality between actual values, we will check
+              // them with the checks above.
+          }
+          precondition(transitivityScoreboard[j].value.isEmpty)
+          transitivityScoreboard[j] = transitivityScoreboard[i]
         }
-        for k in transitivityScoreboard[i].value {
-          expectTrue(
-            oracle(j, k),
-            "bad oracle: broken transitivity at indices \(i), \(j), \(k)")
-            // No need to check equality between actual values, we will check
-            // them with the checks above.
-        }
-        precondition(transitivityScoreboard[j].value.isEmpty)
-        transitivityScoreboard[j] = transitivityScoreboard[i]
       }
     }
   }
@@ -2018,15 +2044,20 @@ public func checkEquatable<T : Equatable>(
 public func checkHashable<Instances : Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
+  allowBrokenTransitivity: Bool = false,
   ${TRACE}
 ) where
   Instances.Iterator.Element : Hashable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#90 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
-  
-  checkEquatable(instances, oracle: equalityOracle, ${trace})
-  
+
+  checkEquatable(
+    instances,
+    oracle: equalityOracle,
+    allowBrokenTransitivity: allowBrokenTransitivity,
+    ${trace})
+
   for i in instances.indices {
     let x = instances[i]
     for j in instances.indices {
@@ -2042,7 +2073,7 @@ public func checkHashable<Instances : Collection>(
 }
 
 public func checkHashable<T : Hashable>(
-  _ expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
   checkHashable(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
@@ -2112,7 +2143,7 @@ public func checkComparable<Instances : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Comparable,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#91 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index {
   
@@ -2123,11 +2154,28 @@ public func checkComparable<Instances : Collection>(
   for i in instances.indices {
     let x = instances[i]
 
-    expectFalse(x < x, ${trace})
-    expectFalse(x > x, ${trace})
-    expectTrue(x <= x, ${trace})
-    expectTrue(x >= x, ${trace})
-    
+    expectFalse(
+      x < x,
+      "found 'x < x'\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectFalse(
+      x > x,
+      "found 'x > x'\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectTrue(x <= x,
+      "found 'x <= x' to be false\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
+    expectTrue(x >= x,
+      "found 'x >= x' to be false\n" +
+      "at index \(i): \(String(reflecting: x))",
+      stackTrace: ${stackTrace})
+
     for j in instances.indices where i != j {
       let y = instances[j]
       
@@ -2139,11 +2187,30 @@ public func checkComparable<Instances : Collection>(
         + "(\(String(reflecting: i)), \(String(reflecting: j)))",
         stackTrace: ${stackTrace})
       
-      expectEqual(expected.isLT(), x < y, ${trace})
-      expectEqual(expected.isLE(), x <= y, ${trace})
-      expectEqual(expected.isGE(), x >= y, ${trace})
-      expectEqual(expected.isGT(), x > y, ${trace})
-      
+      expectEqual(expected.isLT(), x < y,
+        "x < y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isLE(), x <= y,
+        "x <= y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isGE(), x >= y,
+        "x >= y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
+      expectEqual(expected.isGT(), x > y,
+        "x > y\n" +
+        "lhs (at index \(i)): \(String(reflecting: x))\n" +
+        "rhs (at index \(j)): \(String(reflecting: y))",
+        stackTrace: ${stackTrace})
+
       for k in instances.indices {
         let expected2 = oracle(j, k)
         if expected == expected2 {
@@ -2186,7 +2253,7 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
 ) where
   Instances.Iterator.Element : Strideable,
   Instances.Iterator.Element.Stride == Strides.Iterator.Element,
-  // FIXME(compiler limitation): these constraints should be applied to
+  // FIXME(ABI)#92 (Associated Types with where clauses): these constraints should be applied to
   // associated types of Collection.
   Instances.Indices.Iterator.Element == Instances.Index,
   Strides.Indices.Iterator.Element == Strides.Index {
@@ -2270,7 +2337,7 @@ public func expectEqualSequence<
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
 }
@@ -2333,7 +2400,7 @@ public func expectEqualsUnordered<T : Strideable>(
 ) {
   if numericCast(expected.count) != actual.count {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+      + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
       trace: ${trace})
   }
   let r = Range(uncheckedBounds:
@@ -2341,7 +2408,7 @@ public func expectEqualsUnordered<T : Strideable>(
   for e in actual {
     if !r.contains(e) {
       expectationFailure("expected elements: \"\(expected)\"\n"
-        + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
+        + "actual: \"\(actual)\" (of type \(String(reflecting: type(of: actual))))",
         trace: ${trace})
     }
   }

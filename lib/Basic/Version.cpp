@@ -269,25 +269,38 @@ raw_ostream &operator<<(raw_ostream &os, const Version &version) {
   return os;
 }
 
-std::string Version::preprocessorDefinition() const {
-  SmallString<64> define("-D__SWIFT_COMPILER_VERSION=");
-  llvm::raw_svector_ostream OS(define);
+std::string
+Version::preprocessorDefinition(StringRef macroName,
+                                ArrayRef<uint64_t> componentWeights) const {
   uint64_t versionConstant = 0;
 
-  auto NumComponents = Components.size();
+  for (size_t i = 0, e = std::min(componentWeights.size(), Components.size());
+       i < e; ++i) {
+    versionConstant += componentWeights[i] * Components[i];
+  }
 
-  if (NumComponents > 0)
-    versionConstant += Components[0] * 1000 * 1000 * 1000;
-  // Component 2 is not used.
-  if (NumComponents > 2)
-    versionConstant += Components[2] * 1000 * 1000;
-  if (NumComponents > 3)
-    versionConstant += Components[3] * 1000;
-  if (NumComponents > 4)
-    versionConstant += Components[4];
+  std::string define("-D");
+  llvm::raw_string_ostream(define) << macroName << '=' << versionConstant;
+  // This isn't using stream.str() so that we get move semantics.
+  return define;
+}
 
-  OS << versionConstant;
-  return OS.str().str();
+bool
+Version::isValidEffectiveLanguageVersion() const
+{
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  char const *whitelist[] = {
+    "3",
+    "3.0",
+  };
+  for (auto const i : whitelist) {
+    auto v = parseVersionString(i, SourceLoc(), nullptr);
+    assert(v.hasValue());
+    if (v == *this)
+      return true;
+  }
+  return false;
 }
 
 bool operator>=(const class Version &lhs,
@@ -309,11 +322,22 @@ bool operator>=(const class Version &lhs,
   return lhs.size() >= rhs.size();
 }
 
+bool operator==(const class Version &lhs,
+                const class Version &rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    if (lhs[i] != rhs[i])
+      return false;
+  }
+  return true;
+}
+
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
 
-std::string getSwiftFullVersion() {
+std::string getSwiftFullVersion(Version effectiveVersion) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 
@@ -325,6 +349,10 @@ std::string getSwiftFullVersion() {
 #ifndef SWIFT_COMPILER_VERSION
   OS << "-dev";
 #endif
+
+  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+    OS << " effective-" << effectiveVersion;
+  }
 
 #if defined(SWIFT_COMPILER_VERSION)
   OS << " (swiftlang-" SWIFT_COMPILER_VERSION;

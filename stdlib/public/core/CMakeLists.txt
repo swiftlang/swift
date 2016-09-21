@@ -44,6 +44,8 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  DropWhile.swift.gyb
+  Dump.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -83,20 +85,23 @@ set(SWIFTLIB_ESSENTIAL
   MutableCollection.swift
   NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
+  ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  PrefixWhile.swift.gyb
   Print.swift
   RandomAccessCollection.swift
   Range.swift.gyb
   RangeReplaceableCollection.swift.gyb
-  Reflection.swift
+  ReflectionLegacy.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
   Runtime.swift.gyb
+  SipHash.swift.gyb
   Sequence.swift
   SequenceAlgorithms.swift.gyb
   SequenceWrapper.swift
@@ -111,7 +116,9 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringBuffer.swift
+  StringComparable.swift
   StringCore.swift
+  StringHashable.swift
   StringInterpolation.swift.gyb
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
@@ -149,10 +156,10 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-set(swift_core_link_flags)
+set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
 set(swift_core_framework_depends)
 set(swift_core_private_link_libraries)
-set(swift_stdlib_compile_flags)
+set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
@@ -174,7 +181,7 @@ else()
       ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "CYGWIN")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
   execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
       OUTPUT_VARIABLE ENV_SYSTEMROOT)
 

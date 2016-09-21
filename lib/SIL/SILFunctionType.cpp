@@ -570,8 +570,11 @@ enum class ConventionsKind : uint8_t {
           NextOrigParamIndex != ForeignError->getErrorParameterIndex())
         return;
 
+      auto foreignErrorTy =
+        M.Types.getLoweredType(ForeignError->getErrorParameterType());
+
       // Assume the error parameter doesn't have interesting lowering.
-      Inputs.push_back(SILParameterInfo(ForeignError->getErrorParameterType(),
+      Inputs.push_back(SILParameterInfo(foreignErrorTy.getSwiftRValueType(),
                                         ParameterConvention::Direct_Unowned));
       NextOrigParamIndex++;
     }
@@ -737,6 +740,12 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // from the function to which the argument is attached.
   if (constant && !constant->isDefaultArgGenerator())
   if (auto function = constant->getAnyFunctionRef()) {
+    auto getCanonicalType = [&](Type t) -> CanType {
+      if (genericSig)
+        return genericSig->getCanonicalTypeInContext(t, *M.getSwiftModule());
+      return t->getCanonicalType();
+    };
+
     auto &Types = M.Types;
     auto loweredCaptures = Types.getLoweredLocalCaptures(*function);
     
@@ -745,22 +754,21 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
         auto selfMetatype = MetatypeType::get(
             loweredCaptures.getDynamicSelfType()->getSelfType(),
-            MetatypeRepresentation::Thick)
-                ->getCanonicalType();
-        SILParameterInfo param(selfMetatype, convention);
+            MetatypeRepresentation::Thick);
+        auto canSelfMetatype = getCanonicalType(selfMetatype);
+        SILParameterInfo param(canSelfMetatype, convention);
         inputs.push_back(param);
 
         continue;
       }
 
       auto *VD = capture.getDecl();
-      auto type = VD->getType()->getCanonicalType();
-      
-      type = ArchetypeBuilder::mapTypeOutOfContext(
-          function->getAsDeclContext(), type)->getCanonicalType();
-      
+      auto type = ArchetypeBuilder::mapTypeOutOfContext(
+          function->getAsDeclContext(), VD->getType());
+      auto canType = getCanonicalType(type);
+
       auto &loweredTL = Types.getTypeLowering(
-                                    AbstractionPattern(genericSig, type), type);
+                              AbstractionPattern(genericSig, canType), canType);
       auto loweredTy = loweredTL.getLoweredType();
       switch (Types.getDeclCaptureKind(capture)) {
       case CaptureKind::None:
@@ -1003,6 +1011,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
     case SILDeclRef::Kind::EnumElement:
@@ -1472,6 +1481,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::IVarDestroyer:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::StoredPropertyInitializer:
     return SelectorFamily::None;
   }
 }
@@ -1653,6 +1663,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::GlobalGetter:
     case SILDeclRef::Kind::DefaultArgGenerator:
+    case SILDeclRef::Kind::StoredPropertyInitializer:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -1679,9 +1690,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
   auto formalInterfaceType = makeConstantInterfaceType(constant);
-  GenericParamList *contextGenerics, *innerGenerics;
-  std::tie(contextGenerics, innerGenerics)
-    = getConstantContextGenericParams(constant);
+  auto *genericEnv = getConstantGenericEnvironment(constant);
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
@@ -1711,8 +1720,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
     formalInterfaceType,
     loweredInterfaceType,
     silFnType,
-    contextGenerics,
-    innerGenerics,
+    genericEnv
   };
   ConstantTypes[constant] = result;
   return result;
@@ -2088,8 +2096,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   SILConstantInfo overrideInfo;
   overrideInfo.LoweredInterfaceType = overrideLoweredInterfaceTy;
   overrideInfo.SILFnType = fnTy;
-  overrideInfo.ContextGenericParams = derivedInfo.ContextGenericParams;
-  overrideInfo.InnerGenericParams = derivedInfo.InnerGenericParams;
+  overrideInfo.GenericEnv = derivedInfo.GenericEnv;
   ConstantOverrideTypes[{derived, base}] = overrideInfo;
 
   return overrideInfo;
@@ -2102,13 +2109,13 @@ namespace {
       public CanTypeVisitor<SILTypeSubstituter, CanType> {
     SILModule &TheSILModule;
     Module *TheASTModule;
-    TypeSubstitutionMap &Subs;
+    const TypeSubstitutionMap &Subs;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
 
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs)
+                       const TypeSubstitutionMap &subs)
       : TheSILModule(silModule), TheASTModule(astModule), Subs(subs)
     {}
 
@@ -2187,6 +2194,19 @@ namespace {
       return SILBoxType::get(substBoxedType);
     }
 
+    /// Optionals need to have their object types substituted by these rules.
+    CanType visitBoundGenericEnumType(CanBoundGenericEnumType origType) {
+      // Only use a special rule if it's Optional.
+      if (!origType->getDecl()->classifyAsOptionalType()) {
+        return visitType(origType);
+      }
+
+      CanType origObjectType = origType.getGenericArgs()[0];
+      CanType substObjectType = visit(origObjectType);
+      return CanType(BoundGenericType::get(origType->getDecl(), Type(),
+                                           substObjectType));
+    }
+
     /// Any other type is would be a valid type in the AST.  Just
     /// apply the substitution on the AST level and then lower that.
     CanType visitType(CanType origType) {
@@ -2216,19 +2236,19 @@ namespace {
 }
 
 SILType SILType::substType(SILModule &silModule, Module *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy) {
+                           const TypeSubstitutionMap &subs, SILType SrcTy) {
   return SrcTy.subst(silModule, astModule, subs);
 }
 
 SILType SILType::subst(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs) const {
+                       const TypeSubstitutionMap &subs) const {
   SILTypeSubstituter STST(silModule, astModule, subs);
   return STST.subst(*this);
 }
 
 CanSILFunctionType SILType::substFuncType(SILModule &silModule,
                                           Module *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics) {
   SILTypeSubstituter STST(silModule, astModule, subs);
@@ -2247,8 +2267,8 @@ SILFunctionType::substGenericArgs(SILModule &silModule, Module *astModule,
   }
 
   assert(isPolymorphic());
-  TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
-  SILTypeSubstituter substituter(silModule, astModule, map);
+  auto map = GenericSig->getSubstitutionMap(subs);
+  SILTypeSubstituter substituter(silModule, astModule, map.getMap());
 
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true);
@@ -2319,6 +2339,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::GlobalGetter:
   case SILDeclRef::Kind::DefaultArgGenerator:
+  case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return nullptr;

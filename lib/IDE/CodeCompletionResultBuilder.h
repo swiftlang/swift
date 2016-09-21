@@ -128,6 +128,11 @@ public:
           CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
           "public ");
       break;
+    case Accessibility::Open:
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword,
+          "open ");
+      break;
     }
   }
 
@@ -250,7 +255,7 @@ public:
                      DeclAttrParamKeyword, Name);
     if (NeedSpecify)
       addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
-                       DeclAttrParamEqual, "=");
+                       DeclAttrParamColon, ": ");
     if (!Annotation.empty())
       addTypeAnnotation(Annotation);
   }

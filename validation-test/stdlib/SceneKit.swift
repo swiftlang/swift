@@ -136,7 +136,7 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(vertices: [SCNVector3(1, 2, 3),
                                               SCNVector3(4, 5, 6)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticVertex)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.vertex)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
@@ -150,7 +150,7 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(normals: [SCNVector3(1, 2, 3),
                                              SCNVector3(4, 5, 6)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticNormal)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.normal)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 3)
 
@@ -164,7 +164,7 @@ if #available(iOS 8.0, *) {
     let source = SCNGeometrySource(textureCoordinates: [CGPoint(x: 1, y: 2),
                                                         CGPoint(x: 4, y: 5)])
 
-    expectEqual(source.semantic, SCNGeometrySourceSemanticTexcoord)
+    expectEqual(source.semantic, SCNGeometrySource.Semantic.texcoord)
     expectEqual(source.vectorCount, 2)
     expectEqual(source.componentsPerVector, 2)
 
@@ -354,10 +354,10 @@ if #available(iOS 8.0, *) {
       var unarchivedPlaneNode_nil =
         sceneSource.entryWithIdentifier("plane-node", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedPlaneGeometry)
+      expectNotNil(unarchivedPlaneGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedPlaneGeometry)
 
-      expectEmpty(unarchivedPlaneNode_nil)
+      expectNil(unarchivedPlaneNode_nil)
     }
 
     do {
@@ -366,10 +366,10 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxGeometry_nil =
         sceneSource.entryWithIdentifier("box-node", withClass: SCNGeometry.self)
 
-      expectNotEmpty(unarchivedBoxGeometry)
+      expectNotNil(unarchivedBoxGeometry)
       expectType(Optional<SCNGeometry>.self, &unarchivedBoxGeometry)
 
-      expectEmpty(unarchivedBoxGeometry_nil)
+      expectNil(unarchivedBoxGeometry_nil)
     }
 
     do {
@@ -378,10 +378,10 @@ if #available(iOS 8.0, *) {
       var unarchivedBoxNode_nil =
         sceneSource.entryWithIdentifier("box", withClass: SCNNode.self)
 
-      expectNotEmpty(unarchivedBoxNode)
+      expectNotNil(unarchivedBoxNode)
       expectType(Optional<SCNNode>.self, &unarchivedBoxNode)
 
-      expectEmpty(unarchivedBoxNode_nil)
+      expectNil(unarchivedBoxNode_nil)
     }
   }
 

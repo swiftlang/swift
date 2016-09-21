@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -dce | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -dce | %FileCheck %s
 
 sil_stage canonical
 
@@ -70,6 +70,36 @@ bb5:
   br bb6
 
 bb6:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @function_with_cm_with_dynamic_type_known_from_incoming_bb_args
+// CHECK-NOT: class_method
+// CHECK: bb3([[SELF:%.*]] : $Bar):
+// CHECK: [[REF:%.*]] = function_ref @_TFC4main3Bar4pingfS0_FT_T_
+// CHECK: apply [[REF]]([[SELF]])
+// CHECK: return
+sil @function_with_cm_with_dynamic_type_known_from_incoming_bb_args : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %1 = alloc_ref $Bar
+  br bb3(%1 : $Bar)
+
+bb2:
+  %2 = alloc_ref $Bar
+  br bb3(%2 : $Bar)
+
+bb3(%4 : $Bar):
+  // Devirtualizer should be able to figure out that the exact dynamic type of %4 is Bar.
+  %5 = class_method %4 : $Bar, #Bar.ping!1 : (Bar) -> () -> () , $@convention(method) (@guaranteed Bar) -> ()
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed Bar) -> ()
+  br bb4
+
+bb4:
+  strong_release %4 : $Bar
   %7 = tuple ()
   return %7 : $()
 }

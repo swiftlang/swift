@@ -69,6 +69,10 @@ module MissingHeader {
   header "this-header-does-not-exist.h"
 }
 
+module Newtype {
+  header "Newtype.h"
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *
@@ -96,6 +100,11 @@ module ObjCParseExtrasSystem [system] {
 
 module ObjCSubscripts {
   header "ObjCSubscripts.h"
+  export *
+}
+
+module PredefinedMacros {
+  header "PredefinedMacros.h"
   export *
 }
 

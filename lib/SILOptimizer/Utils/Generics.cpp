@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
 
@@ -55,13 +56,13 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
     return;
   }
 
-  TypeSubstitutionMap InterfaceSubs;
+  SubstitutionMap InterfaceSubs;
   if (OrigF->getLoweredFunctionType()->getGenericSignature())
     InterfaceSubs = OrigF->getLoweredFunctionType()->getGenericSignature()
       ->getSubstitutionMap(ParamSubs);
 
   // We do not support partial specialization.
-  if (hasUnboundGenericTypes(InterfaceSubs)) {
+  if (hasUnboundGenericTypes(InterfaceSubs.getMap())) {
     DEBUG(llvm::dbgs() <<
           "    Cannot specialize with unbound interface substitutions.\n");
     DEBUG(for (auto Sub : ParamSubs) {
@@ -69,7 +70,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
           });
     return;
   }
-  if (hasDynamicSelfTypes(InterfaceSubs)) {
+  if (hasDynamicSelfTypes(InterfaceSubs.getMap())) {
     DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
     return;
   }
@@ -89,7 +90,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   SILModule &M = OrigF->getModule();
   Module *SM = M.getSwiftModule();
 
-  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs,
+  SubstitutedType = SILType::substFuncType(M, SM, InterfaceSubs.getMap(),
                                            OrigF->getLoweredFunctionType(),
                                            /*dropGenerics = */ true);
 
@@ -187,10 +188,6 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
-  if (GenericFunc->getContextGenericParams())
-    ContextSubs = GenericFunc->getContextGenericParams()
-      ->getSubstitutionMap(ParamSubs);
-
   Mangle::Mangler Mangler;
   GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
                                               ParamSubs, Fragile);
@@ -230,7 +227,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
 
   // Create a new function.
   SILFunction * SpecializedF =
-    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo, ContextSubs,
+    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo,
                                  ParamSubs, ClonedName);
 
   // Check if this specialization should be linked for prespecialization.

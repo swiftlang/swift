@@ -24,6 +24,10 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
 
+namespace llvm {
+enum class AtomicOrdering;
+}
+
 namespace swift {
   class ASTContext;
   class Identifier;
@@ -108,6 +112,9 @@ struct IntrinsicInfo {
   bool hasAttribute(llvm::Attribute::AttrKind Kind) const;
 };
 
+/// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
+llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O);
+  
 }
 
 #endif

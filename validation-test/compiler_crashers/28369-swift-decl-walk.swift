@@ -8,6 +8,7 @@
 // Credits: https://twitter.com/kiliankoe/status/752090953977036800
 
 // RUN: not --crash %target-swift-frontend %s -parse
+// XFAIL: *
 protocol P {
 }
 struct A<T> {

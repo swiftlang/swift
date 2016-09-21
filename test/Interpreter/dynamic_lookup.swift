@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -40,7 +40,7 @@ func test_dynamic_lookup_f(_ obj: AnyObject) {
 }
 
 func test_dynamic_lookup_g(_ obj: AnyObject) {
-  var og = obj.dynamicType.g
+  var og = type(of: obj).g
   if og != nil {
     og!()
   } else {

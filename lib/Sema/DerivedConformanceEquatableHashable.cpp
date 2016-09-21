@@ -258,6 +258,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, Decl *parentDecl, EnumDecl *enumDecl) {
   Type selfIfaceTy = eqDecl->computeInterfaceSelfType(false);
   if (auto genericSig = parentDC->getGenericSignatureOfContext()) {
     eqDecl->setGenericSignature(genericSig);
+    eqDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
 
     Type enumIfaceTy = parentDC->getDeclaredInterfaceType();
     TupleTypeElt ifaceParamElts[] = {
@@ -411,6 +412,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = parentDC->getGenericSignatureOfContext()) {
     getterDecl->setGenericSignature(sig);
+    getterDecl->setGenericEnvironment(parentDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
   } else

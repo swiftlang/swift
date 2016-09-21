@@ -87,13 +87,11 @@ void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(
     const SILInstruction *I) {
   assert((!I->getParent() || I->getFunction() == &F) &&
          "Instruction does not belong to a proper SILFunction");
-  for (auto &Op : I->getOpenedArchetypeOperands()) {
+  for (auto &Op : I->getTypeDependentOperands()) {
     auto OpenedArchetypeDef = Op.get();
-    assert(isa<SILInstruction>(OpenedArchetypeDef) &&
-           "typedef operand should refer to a SILInstruction");
-    addOpenedArchetypeDef(
-        getOpenedArchetypeOf(cast<SILInstruction>(OpenedArchetypeDef)),
-        OpenedArchetypeDef);
+    if (auto *DefInst = dyn_cast<SILInstruction>(OpenedArchetypeDef)) {
+      addOpenedArchetypeDef(getOpenedArchetypeOf(DefInst), OpenedArchetypeDef);
+    }
   }
 }
 

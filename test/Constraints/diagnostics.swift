@@ -21,7 +21,7 @@ func f0(_ x: Int,
 
 func f1(_: @escaping (Int, Float) -> Int) { }
 
-func f2(_: (_: @escaping (Int) -> Int)) -> Int {}
+func f2(_: (_: (Int) -> Int)) -> Int {}
 
 func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 
@@ -146,7 +146,7 @@ public func myMap<C : Collection, T>(
 }
 
 @available(*, unavailable, message: "call the 'map()' method on the optional value")
-public func myMap<T, U>(_ x: T?, _ f: @noescape (T) -> U) -> U? {
+public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
   fatalError("unavailable function can't be called")
 }
 
@@ -163,7 +163,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'IndexDistance'}}{{24-26=}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'String.CharacterView.IndexDistance'}}{{24-26=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -326,24 +326,6 @@ func rdar19804707() {
 }
 
 
-// <rdar://problem/20789423> Unclear diagnostic for multi-statement closure with no return type
-func r20789423() {
-  class C {
-    func f(_ value: Int) { }
-  }
-
-  let p: C
-  print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
-
-  let _f = { (v: Int) in  // expected-error {{unable to infer closure return type in current context}}
-    print("a")
-    return "hi"
-  }
-
-}
-
-
-
 func f7(_ a: Int) -> (_ b: Int) -> Int {
   return { b in a+b }
 }
@@ -364,7 +346,7 @@ f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 class CurriedClass {
   func method1() {}
   func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
-  func method3(_ a: Int, b : Int) {}
+  func method3(_ a: Int, b : Int) {}  // expected-note 5 {{'method3(_:b:)' declared here}}
 }
 
 let c = CurriedClass()
@@ -428,73 +410,9 @@ CurriedClass.m2(12)  // expected-error {{use of instance member 'm2' on type 'Cu
 
 
 
-
-// <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")
-func ident<T>(_ t: T) -> T {}
-var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
-
-// <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
-var afterMessageCount : Int? = nil
-
-func uintFunc() -> UInt {}
-func takeVoidVoidFn(_ a : () -> ()) {}
-takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
-}
-
-// <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {}
-func f19997471(_ x: Int) {}
-
-func someGeneric19997471<T>(_ x: T) {
-  takeVoidVoidFn {
-    f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
-     // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (String), (Int)}}
-  }
-}
-
-// <rdar://problem/20371273> Type errors inside anonymous functions don't provide enough information
-func f20371273() {
-  let x: [Int] = [1, 2, 3, 4]
-  let y: UInt = 4
-  _ = x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists:}}
-}
-
-
-
-
-// <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-// FIXME: Should complain about not having a return type annotation in the closure.
-[0].map { _ in let r =  (1,2).0;  return r }
-// expected-error @-1 {{expression type '[_]' is ambiguous without more context}}
-
-// <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
-func rdar21078316() {
-  var foo : [String : String]?
-  var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
-}
-
-
-// <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
-var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
-
-
-
-// <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
-func foo20868864(_ callback: ([String]) -> ()) { }
-func rdar20868864(_ s: String) {
-  var s = s
-  foo20868864 { (strings: [String]) in
-    s = strings   // expected-error {{cannot assign value of type '[String]' to type 'String'}}
-  }
-}
-
 // <rdar://problem/20491794> Error message does not tell me what the problem is
 enum Color {
-  case Red // expected-note 2 {{did you mean 'Red'?}}
+  case Red
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
@@ -510,13 +428,13 @@ let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argu
 
 let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{48-48=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
-let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
+let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
-let _ : Color = .rainbow  // expected-error {{contextual member 'rainbow' expects argument of type '()'}}
+let _ : Color = .rainbow  // expected-error {{member 'rainbow' is a function; did you mean to call it?}} {{25-25=()}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
@@ -528,8 +446,8 @@ let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to a
 let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
 let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-var someColor : Color = .red // expected-error {{type 'Color' has no member 'red'}}
-someColor = .red  // expected-error {{type 'Color' has no member 'red'}}
+var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
+someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
 
 func testTypeSugar(_ a : Int) {
   typealias Stride = Int
@@ -706,13 +624,7 @@ func segfault23433271(_ a : UnsafeMutableRawPointer) {
   f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
 }
 
-// <rdar://problem/22058555> crash in cs diags in withCString
-func r22058555() {
-  var firstChar: UInt8 = 0
-  "abc".withCString { chars in
-    firstChar = chars[0]  // expected-error {{cannot assign value of type 'Int8' to type 'UInt8'}}
-  }
-}
+
 
 // <rdar://problem/23272739> Poor diagnostic due to contextual constraint
 func r23272739(_ contentType: String) {
@@ -857,6 +769,32 @@ struct SR1752 {
   func foo() {}
 }
 
-let sr1752: SR1752? = nil
+let sr1752: SR1752?
 
 true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
+
+// <rdar://problem/27891805> QoI: FailureDiagnosis doesn't look through 'try'
+struct rdar27891805 {
+  init(contentsOf: String, encoding: String) throws {}
+  init(contentsOf: String, usedEncoding: inout String) throws {}
+  init<T>(_ t: T) {}
+}
+
+try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
+// expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
+// expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
+
+// Make sure RawRepresentable fix-its don't crash in the presence of type variables
+class NSCache<K, V> {
+  func object(forKey: K) -> V? {}
+}
+
+class CacheValue {
+  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
+  func value(y: String) -> String {} // expected-note {{found this candidate}}
+}
+
+func valueForKey<K>(_ key: K) -> CacheValue? {
+  let cache = NSCache<K, CacheValue>()
+  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+}

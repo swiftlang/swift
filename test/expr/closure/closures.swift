@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-var func6 : (_ fn : (Int,Int) -> Int) -> ()
+var func6 : (_ fn : ((Int, Int)) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
 func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to parameters}}
@@ -36,7 +36,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({($0) + $0})    // // expected-error {{binary operator '+' cannot be applied to two '(Int, Int)' operands}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
 
-  var testfunc : ((), Int) -> Int
+  var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
 
   funcdecl5(1, 2) // recursion.
@@ -65,7 +65,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
   
   // TODO: This diagnostic can be improved: rdar://22128205
-  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
+  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '((Int, Int)) -> Int'}}
 
   
   
@@ -259,10 +259,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{type of expression is ambiguous without more context}}
-  // FIXME: This diagnostic should be improved, we can infer a type for the closure expr from
-  // its body (by trying really hard in diagnostic generation) and say that we need an explicit
-  // contextual result specified because we don't do cross-statement type inference or something.
+let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
           if (i > 10) { return true }
           else { return false }
         }()

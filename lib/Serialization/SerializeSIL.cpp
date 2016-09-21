@@ -374,15 +374,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
-    if (auto gp = F.getContextGenericParams()) {
-      // To help deserializing the context generic params, we serialize the
-      // outer-most list first. In most cases, we do not have decls associated
-      // with these parameter lists, so serialize the lists directly.
-      std::vector<GenericParamList *> paramLists;
-      for (; gp; gp = gp->getOuterParameters())
-        paramLists.push_back(gp);
-      for (unsigned i = 0, e = paramLists.size(); i < e; i++)
-        S.writeGenericParams(paramLists.rbegin()[i], SILAbbrCodes);
+    if (auto genericEnv = F.getGenericEnvironment()) {
+      auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
+      S.writeGenericEnvironment(genericSig, genericEnv, SILAbbrCodes);
     }
   }
 
@@ -521,7 +515,7 @@ void SILSerializer::writeOneTypeOneOperandLayout(ValueKind valueKind,
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
 void SILSerializer::writeConversionLikeInstruction(const SILInstruction *I) {
-  assert(I->getNumOperands() - I->getOpenedArchetypeOperands().size() == 1);
+  assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
   writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
                                I->getOperand(0));
 }
@@ -532,6 +526,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
 
+  case ValueKind::DebugValueInst:
+  case ValueKind::DebugValueAddrInst:
+    // Currently we don't serialize debug variable infos, so it doesn't make
+    // sense to write the instruction at all.
+    // TODO: decide if we want to serialize those instructions.
+    return;
+      
   case ValueKind::UnreachableInst: {
     unsigned abbrCode = SILAbbrCodes[SILInstNoOperandLayout::Code];
     SILInstNoOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -656,14 +657,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::AllocRefInst: {
     const AllocRefInst *ARI = cast<AllocRefInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
-    ValueID Args[1] = { (unsigned)ARI->isObjC() |
-                          ((unsigned)ARI->canAllocOnStack() << 1) };
+    SmallVector<ValueID, 4> Args;
+    Args.push_back((unsigned)ARI->isObjC() |
+                   ((unsigned)ARI->canAllocOnStack() << 1));
+    ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
+    ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
+    unsigned NumTailAllocs = TailTypes.size();
+    assert(TailCounts.size() == NumTailAllocs);
+    for (unsigned Idx = 0; Idx < NumTailAllocs; ++Idx) {
+      assert(TailTypes[Idx].isObject());
+      Args.push_back(S.addTypeRef(TailTypes[Idx].getSwiftRValueType()));
+      SILValue CountVal = TailCounts[Idx].get();
+      Args.push_back(addValueRef(CountVal));
+      SILType CountType = CountVal->getType();
+      assert(CountType.isObject());
+      Args.push_back(S.addTypeRef(CountType.getSwiftRValueType()));
+    }
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        (unsigned)SI.getKind(),
                                        S.addTypeRef(
                                          ARI->getType().getSwiftRValueType()),
                                        (unsigned)ARI->getType().getCategory(),
-                                       llvm::makeArrayRef(Args));
+                                       Args);
     break;
   }
   case ValueKind::AllocRefDynamicInst: {
@@ -1007,9 +1022,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::IsUniqueInst:
   case ValueKind::IsUniqueOrPinnedInst:
   case ValueKind::ReturnInst:
-  case ValueKind::ThrowInst:
-  case ValueKind::DebugValueInst:
-  case ValueKind::DebugValueAddrInst: {
+  case ValueKind::ThrowInst: {
     unsigned Attr = 0;
     if (auto *LWI = dyn_cast<LoadWeakInst>(&SI))
       Attr = LWI->isTake();
@@ -1072,6 +1085,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(operand2->getType().getSwiftRValueType()),
         (unsigned)operand2->getType().getCategory(),
         addValueRef(operand2));
+    break;
+  }
+  case ValueKind::TailAddrInst: {
+    const TailAddrInst *TAI = cast<TailAddrInst>(&SI);
+    SILTailAddrLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILTailAddrLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(TAI->getBase()->getType().getSwiftRValueType()),
+        addValueRef(TAI->getBase()),
+        S.addTypeRef(TAI->getIndex()->getType().getSwiftRValueType()),
+        addValueRef(TAI->getIndex()),
+        S.addTypeRef(TAI->getTailType().getSwiftRValueType()));
     break;
   }
   case ValueKind::StringLiteralInst: {
@@ -1170,7 +1195,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::PointerToAddressInst: {
-    assert(SI.getNumOperands() - SI.getOpenedArchetypeOperands().size() == 1);
+    assert(SI.getNumOperands() - SI.getTypeDependentOperands().size() == 1);
     unsigned attrs = cast<PointerToAddressInst>(SI).isStrict() ? 1 : 0;
     writeOneTypeOneOperandLayout(SI.getKind(), attrs, SI.getType(),
                                  SI.getOperand(0));
@@ -1348,6 +1373,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(operand->getType().getSwiftRValueType()),
         (unsigned)operand->getType().getCategory(),
         addValueRef(operand));
+    break;
+  }
+  case ValueKind::RefTailAddrInst: {
+    auto *RTAI = cast<RefTailAddrInst>(&SI);
+    writeOneTypeOneOperandLayout(RTAI->getKind(), 0,
+                                 RTAI->getType(),
+                                 RTAI->getOperand());
     break;
   }
   case ValueKind::StructInst: {
@@ -1819,6 +1851,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILTailAddrLayout>();
   registerSILAbbr<SILInstApplyLayout>();
   registerSILAbbr<SILInstNoOperandLayout>();
 
@@ -1850,10 +1883,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
-  registerSILAbbr<decls_block::GenericParamListLayout>();
-  registerSILAbbr<decls_block::GenericParamLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();
-  registerSILAbbr<decls_block::LastGenericRequirementLayout>();
+  registerSILAbbr<decls_block::GenericEnvironmentLayout>();
 
   for (const SILGlobalVariable &g : SILMod->getSILGlobals())
     writeSILGlobalVar(g);

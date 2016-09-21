@@ -1,8 +1,8 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
-// RUN: FileCheck %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
 // CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"
@@ -18,13 +18,22 @@
 // CHECK-NEXT: "ThreeTilde"
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "overloadedOnProto"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "FourTilde"
+// CHECK-NEXT: "FourTildeImpl"
+// CHECK-NEXT: "FiveTildeImpl"
 // CHECK-NEXT: "topLevelComputedProperty"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
+// CHECK-NEXT: "testOperators"
 // CHECK-NEXT: "TopLevelForMemberLookup"
 // CHECK-NEXT: "lookUpMembers"
 // CHECK-NEXT: "publicUseOfMember"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
+// CHECK-NEXT: "~~~"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "~~~~"
+// CHECK-NEXT: "~~~~~"
 
 // CHECK-LABEL: {{^provides-nominal:$}}
 // CHECK-NEXT: "V4main10IntWrapper"
@@ -46,6 +55,8 @@
 // CHECK: - ["Ps25ExpressibleByArrayLiteral", "useless"]
 // CHECK-NEXT: - ["Ps25ExpressibleByArrayLiteral", "useless2"]
 // CHECK-NEXT: - ["Sb", "InnerToBool"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FourTildeImpl", "~~~~"]
+// CHECK-NEXT: - ["{{.*[0-9]}}FiveTildeImpl", "~~~~~"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
 
@@ -129,6 +140,23 @@ func overloadedOnProto<T: ThreeTilde>(_: T) {}
 // CHECK-DAG: - "~~~"
 private prefix func ~~~(_: ThreeTildeTypeImpl) {}
 
+// CHECK-DAG: - "~~~~"
+prefix operator ~~~~ {}
+protocol FourTilde {
+  prefix static func ~~~~(arg: Self)
+}
+struct FourTildeImpl : FourTilde {}
+extension FourTildeImpl {
+  prefix static func ~~~~(arg: FourTildeImpl) {}
+}
+
+// CHECK-DAG: - "~~~~~"
+// ~~~~~ is declared in the other file.
+struct FiveTildeImpl {}
+extension FiveTildeImpl {
+  prefix static func ~~~~~(arg: FiveTildeImpl) {}
+}
+
 var topLevelComputedProperty: Bool {
   return true
 }
@@ -211,6 +239,19 @@ func lookUpManyTopLevelNames() {
   
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
+}
+
+func testOperators<T: Starry>(generic: T, specific: Flyswatter) {
+  // CHECK-DAG: !private "****"
+  // CHECK-DAG: !private "*****"
+  // CHECK-DAG: !private "******"
+  ****generic
+  generic*****0
+  0******generic
+
+  ****specific
+  specific*****0
+  0******specific
 }
 
 struct TopLevelForMemberLookup {
@@ -378,7 +419,6 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
-// CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
 // CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
 // CHECK-DAG: - !private ["Vs16IndexingIterator", "Element"]
@@ -418,7 +458,6 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "VV4main26OtherFileSecretTypeWrapper10SecretType"
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
-// CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
 // CHECK-DAG: !private "Vs13EmptyIterator"
 // CHECK-DAG: !private "Vs16IndexingIterator"
 // CHECK-DAG: - "O4main13OtherFileEnum"

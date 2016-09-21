@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: objc_interop
 
@@ -7,13 +7,17 @@
 import Foundation
 
 public class FixedLayoutObjCSubclass : NSObject {
-  // This field uses constant direct access because NSObject has fixed layout.
+  // This field could use constant direct access because NSObject has
+  // fixed layout, but we don't allow that right now.
   public final var field: Int32 = 0
 };
 
 // CHECK-LABEL: define hidden void @_TF21class_resilience_objc29testConstantDirectFieldAccessFCS_23FixedLayoutObjCSubclassT_(%C21class_resilience_objc23FixedLayoutObjCSubclass*)
-// CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %C21class_resilience_objc23FixedLayoutObjCSubclass, %C21class_resilience_objc23FixedLayoutObjCSubclass* %0, i32 0, i32 1
-// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* %1, i32 0, i32 0
+// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC21class_resilience_objc23FixedLayoutObjCSubclass5fieldVs5Int32
+// CHECK-NEXT: [[OBJECT:%.*]] = bitcast %C21class_resilience_objc23FixedLayoutObjCSubclass* %0 to i8*
+// CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[OFFSET]]
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = bitcast i8* [[ADDR]] to %Vs5Int32*
+// CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: store i32 10, i32* [[PAYLOAD_ADDR]]
 
 func testConstantDirectFieldAccess(_ o: FixedLayoutObjCSubclass) {

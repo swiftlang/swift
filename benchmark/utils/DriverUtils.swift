@@ -96,7 +96,7 @@ struct TestConfig {
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  var afterRunSleep: Int? = nil
+  var afterRunSleep: Int?
 
   /// The list of tests to run.
   var tests = [Test]()

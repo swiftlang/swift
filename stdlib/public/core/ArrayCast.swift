@@ -47,7 +47,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
     return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
   }
 #endif
-  return _arrayConditionalCast(source)!
+  return source.map { $0 as! TargetElement }
 }
 
 internal struct _UnwrappingFailed : Error {}

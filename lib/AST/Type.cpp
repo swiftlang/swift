@@ -89,12 +89,11 @@ bool TypeBase::hasReferenceSemantics() {
   return getCanonicalType().hasReferenceSemantics();
 }
 
-bool TypeBase::isNever() {
+bool TypeBase::isUninhabited() {
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
       if (enumDecl->getAllElements().empty())
         return true;
-
   return false;
 }
 
@@ -501,16 +500,34 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 }
 
 static bool isLegalSILType(CanType type) {
+  // L-values and inouts are not legal.
   if (!type->isMaterializable()) return false;
+
+  // Function types must be lowered.
   if (isa<AnyFunctionType>(type)) return false;
+
+  // Metatypes must have a representation.
   if (auto meta = dyn_cast<AnyMetatypeType>(type))
     return meta->hasRepresentation();
+
+  // Tuples are legal if all their elements are legal.
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
       if (!isLegalSILType(eltType)) return false;
     }
     return true;
   }
+
+  // Optionals are legal if their object type is legal and they're Optional.
+  OptionalTypeKind optKind;
+  if (auto objectType = type.getAnyOptionalObjectType(optKind)) {
+    return (optKind == OTK_Optional && isLegalSILType(objectType));
+  }
+
+  // Reference storage types are legal if their object type is legal.
+  if (auto refType = dyn_cast<ReferenceStorageType>(type))
+    return isLegalSILType(refType.getReferentType());
+
   return true;
 }
 
@@ -1684,7 +1701,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *sig = classDecl->getGenericSignatureOfContext();
   auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
 
-  return superclassTy.subst(module, subs, None);
+  return superclassTy.subst(subs, None);
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -2027,9 +2044,15 @@ static ForeignRepresentableKind
 getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   // @objc metatypes are representable when their instance type is.
   if (auto metatype = type->getAs<AnyMetatypeType>()) {
+    auto instanceType = metatype->getInstanceType();
+
+    // Consider metatype of any existential type as not Objective-C
+    // representable.
+    if (metatype->is<MetatypeType>() && instanceType->isAnyExistentialType())
+      return ForeignRepresentableKind::None;
+
     // If the instance type is not representable verbatim, the metatype is not
     // representable.
-    auto instanceType = metatype->getInstanceType();
     if (getObjCObjectRepresentable(instanceType, dc)
           != ForeignRepresentableKind::Object)
       return ForeignRepresentableKind::None;
@@ -2062,12 +2085,10 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Object;
   
   // Any can be bridged to id.
-  if (type->getASTContext().LangOpts.EnableIdAsAny) {
-    if (type->isAny()) {
-      return ForeignRepresentableKind::Bridged;
-    }
+  if (type->isAny()) {
+    return ForeignRepresentableKind::Bridged;
   }
-  
+
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
     if (auto clas = tyContext->getAsClassOrClassExtensionContext())
@@ -2189,33 +2210,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   if (type->isTypeParameter() && language == ForeignLanguage::ObjectiveC)
     return { ForeignRepresentableKind::Object, nullptr };
 
-  // In Objective-C, existentials involving Error are bridged
-  // to NSError.
-  if (language == ForeignLanguage::ObjectiveC &&
-      type->isExistentialWithError()) {
-    return { ForeignRepresentableKind::BridgedError, nullptr };
-  }
-
-  /// Determine whether the given type is a type that is bridged to NSError
-  /// because it conforms to the Error protocol.
-  auto isBridgedErrorViaConformance = [dc](Type type) -> bool {
-    ASTContext &ctx = type->getASTContext();
-    auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (!errorProto) return false;
-
-    return dc->getParentModule()->lookupConformance(type, errorProto,
-                                                    ctx.getLazyResolver())
-             .hasValue();
-  };
-
   auto nominal = type->getAnyNominal();
-  if (!nominal) {
-    /// It might still be a bridged Error via conformance to Error.
-    if (isBridgedErrorViaConformance(type))
-      return { ForeignRepresentableKind::BridgedError, nullptr };
-
-    return failure();
-  }
+  if (!nominal) return failure();
 
   ASTContext &ctx = nominal->getASTContext();
 
@@ -2249,12 +2245,19 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         // Optional structs are not representable in (Objective-)C if they
-        // originally came from C, whether or not they are bridged. If they
-        // are defined in Swift, they are only representable if they are
-        // bridged (checked below).
+        // originally came from C, whether or not they are bridged, unless they
+        // came from swift_newtype. If they are defined in Swift, they are only
+        // representable if they are bridged (checked below).
         if (wasOptional) {
-          if (nominal->hasClangNode())
+          if (nominal->hasClangNode()) {
+            Type underlyingType =
+                nominal->getDeclaredType()->getSwiftNewtypeUnderlyingType();
+            if (underlyingType) {
+              return getForeignRepresentable(OptionalType::get(underlyingType),
+                                             language, dc);
+            }
             return failure();
+          }
           break;
         }
       }
@@ -2300,13 +2303,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // Determine whether this nominal type is known to be representable
   // in this foreign language.
   auto result = ctx.getForeignRepresentationInfo(nominal, language, dc);
-  if (result.getKind() == ForeignRepresentableKind::None) {
-    /// It might still be a bridged Error via conformance to Error.
-    if (isBridgedErrorViaConformance(type))
-      return { ForeignRepresentableKind::BridgedError, nullptr };
-
-    return failure();
-  }
+  if (result.getKind() == ForeignRepresentableKind::None) return failure();
 
   if (wasOptional && !result.isRepresentableAsOptional())
     return failure();
@@ -2788,42 +2785,30 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-TypeSubstitutionMap
-GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
-  TypeSubstitutionMap map;
-  
-  for (auto arch : getAllNestedArchetypes()) {
-    auto sub = Subs.front();
-    Subs = Subs.slice(1);
-    
-    map.insert({arch, sub.getReplacement()});
-  }
-  
-  assert(Subs.empty() && "did not use all substitutions?!");
-  return map;
-}
-
 FunctionType *
-GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
+GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   auto params = getGenericParams();
   (void)params;
   
-  TypeSubstitutionMap subs
-    = getGenericSignature()->getSubstitutionMap(args);
+  auto subs = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
+  Type input = getInput().subst(subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
-static Type getMemberForBaseType(Module *module,
+using ConformanceSource =
+    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *>;
+
+static Type getMemberForBaseType(ConformanceSource conformances,
+                                 Type origBase,
                                  Type substBase,
                                  AssociatedTypeDecl *assocType,
                                  Identifier name,
                                  SubstOptions options) {
   // Error recovery path.
   if (substBase->isOpenedExistential())
-    return ErrorType::get(module->getASTContext());
+    return ErrorType::get(substBase->getASTContext());
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -2831,19 +2816,10 @@ static Type getMemberForBaseType(Module *module,
     if (archetypeParent->hasNestedType(name))
       return archetypeParent->getNestedTypeValue(name);
 
-    if (auto parent = archetypeParent->getParent()) {
-      // If the archetype doesn't have the requested type and the parent is not
-      // self derived, error out
-      return parent->isSelfDerived() ? parent->getNestedTypeValue(name)
-                                     : ErrorType::get(module->getASTContext());
-    }
-
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
-    if (!assocType || !archetypeParent->getSuperclass()) {
-      // else just error out
-      return ErrorType::get(module->getASTContext());
-    }
+    if (!assocType || !archetypeParent->getSuperclass())
+      return ErrorType::get(substBase->getASTContext());
   }
 
   // If the parent is a type variable, retrieve its member type
@@ -2876,7 +2852,15 @@ static Type getMemberForBaseType(Module *module,
   if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?
-    auto conformance = module->lookupConformance(substBase, proto, resolver);
+    Optional<ProtocolConformanceRef> conformance;
+    if (conformances.is<ModuleDecl *>()) {
+      conformance = conformances.get<ModuleDecl *>()->lookupConformance(
+          substBase, proto, resolver);
+    } else {
+      conformance = conformances.get<const SubstitutionMap *>()->lookupConformance(
+          origBase->getCanonicalType(), proto);
+    }
+
     if (!conformance)
       return Type();
 
@@ -2896,35 +2880,38 @@ static Type getMemberForBaseType(Module *module,
 
   // FIXME: This is a fallback. We want the above, conformance-based
   // result to be the only viable path.
-  if (resolver) {
-    if (Type memberType = resolver->resolveMemberType(module, substBase, name)){
-      return memberType;
-    }
+  if (resolver && conformances.is<ModuleDecl *>()) {
+    return resolver->resolveMemberType(
+        conformances.get<ModuleDecl *>(), substBase, name);
   }
 
   return Type();
 }
 
-Type DependentMemberType::substBaseType(Module *module,
+Type DependentMemberType::substBaseType(ModuleDecl *module,
                                         Type substBase,
                                         LazyResolver *resolver) {
   if (substBase.getPointer() == getBase().getPointer() &&
       substBase->hasTypeParameter())
     return this;
 
-  return getMemberForBaseType(module, substBase, getAssocType(), getName(),
+  return getMemberForBaseType(module, Type(), substBase,
+                              getAssocType(), getName(),
                               None);
 }
 
-Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
-                 SubstOptions options) const {
+static Type substType(
+    Type derivedType,
+    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
+    const TypeSubstitutionMap &substitutions,
+    SubstOptions options) {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
   auto failed = [&](Type t){
     return options.contains(SubstFlags::IgnoreMissing) ? t : Type();
   };
-  
-  return transform([&](Type type) -> Type {
+
+  return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
            "should not be doing AST type-substitution on a lowered SIL type;"
@@ -2941,14 +2928,16 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
         substitutions.find(depMemTy->getCanonicalType().getPointer());
       if (known != substitutions.end() && known->second) {
         return SubstitutedType::get(type, known->second,
-                                    module->getASTContext());
+                                    type->getASTContext());
       }
     
-      auto newBase = depMemTy->getBase().subst(module, substitutions, options);
+      auto newBase = substType(depMemTy->getBase(), conformances,
+                               substitutions, options);
       if (!newBase)
         return failed(type);
       
-      if (Type r = getMemberForBaseType(module, newBase,
+      if (Type r = getMemberForBaseType(conformances,
+                                        depMemTy->getBase(), newBase,
                                         depMemTy->getAssocType(),
                                         depMemTy->getName(), options))
         return r;
@@ -2965,7 +2954,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     auto known = substitutions.find(key);
     if (known != substitutions.end() && known->second)
       return SubstitutedType::get(type, known->second,
-                                  module->getASTContext());
+                                  type->getASTContext());
 
     // If we don't have a substitution for this type and it doesn't have a
     // parent, then we're not substituting it.
@@ -2974,7 +2963,7 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       return type;
 
     // Substitute into the parent type.
-    Type substParent = Type(parent).subst(module, substitutions, options);
+    Type substParent = substType(parent, conformances, substitutions, options);
     if (!substParent)
       return Type();
 
@@ -2989,11 +2978,40 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     }
     
     
-    if (Type r = getMemberForBaseType(module, substParent, assocType,
-                                      substOrig->getName(), options))
+    if (Type r = getMemberForBaseType(conformances, parent, substParent,
+                                      assocType, substOrig->getName(),
+                                      options))
       return r;
     return failed(type);
   });
+}
+
+Type Type::subst(Module *module,
+                 const TypeSubstitutionMap &substitutions,
+                 SubstOptions options) const {
+  return substType(*this, module, substitutions, options);
+}
+
+Type Type::subst(const SubstitutionMap &substitutions,
+                 SubstOptions options) const {
+  return substType(*this, &substitutions, substitutions.getMap(), options);
+}
+
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    LazyResolver *resolver) {
+  Type derivedType = this;
+
+  while (derivedType) {
+    auto *derivedClass = derivedType->getClassOrBoundGenericClass();
+    assert(derivedClass && "expected a class here");
+
+    if (derivedClass == baseClass)
+      return derivedType;
+
+    derivedType = derivedType->getSuperclass(resolver);
+  }
+
+  llvm_unreachable("no inheritance relationship between given classes");
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
@@ -3016,8 +3034,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
-                    ->getCanonicalType()
-                    ->castTo<GenericTypeParamType>()]
+                    ->getCanonicalType().getPointer()]
       = baseTy;
     return substitutions;
   }
@@ -3026,12 +3043,14 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
-  while (!baseTy->is<ErrorType>() &&
-         baseTy->getAnyNominal() &&
-         baseTy->getAnyNominal() != ownerNominal) {
-    baseTy = baseTy->getSuperclass(resolver);
-    assert(baseTy && "Couldn't find appropriate context");
+  //
+  // FIXME: Do this in the caller?
+  if (baseTy->getAnyNominal()) {
+    auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
+      baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
+
+    assert(ownerNominal == baseTy->getAnyNominal());
   }
 
   // If the base type isn't specialized, there's nothing to substitute.
@@ -3048,8 +3067,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(const DeclContext *dc) {
       auto args = boundGeneric->getGenericArgs();
       for (unsigned i = 0, n = args.size(); i != n; ++i) {
         substitutions[params[i]->getDeclaredType()->getCanonicalType()
-                        ->castTo<GenericTypeParamType>()]
-          = args[i];
+                        .getPointer()] = args[i];
       }
 
       // Continue looking into the parent.
@@ -3479,27 +3497,29 @@ case TypeKind::Id:
       if (!firstType)
         return Type();
 
+      if (firstType.getPointer() != req.getFirstType().getPointer())
+        anyChanges = true;
+
       Type secondType = req.getSecondType();
       if (secondType) {
         secondType = secondType.transform(fn);
         if (!secondType)
           return Type();
+
+        if (secondType.getPointer() != req.getSecondType().getPointer())
+          anyChanges = true;
       }
 
-      if (firstType->hasTypeParameter() ||
-          (secondType && secondType->hasTypeParameter())) {
-        if (firstType.getPointer() != req.getFirstType().getPointer() ||
-            secondType.getPointer() != req.getSecondType().getPointer())
-          anyChanges = true;
+      if (!firstType->isTypeParameter()) {
+        if (!secondType || !secondType->isTypeParameter())
+          continue;
+        std::swap(firstType, secondType);
+      }
 
-        requirements.push_back(Requirement(req.getKind(), firstType,
-                                           secondType));
-      } else
-        anyChanges = true;
+      requirements.push_back(Requirement(req.getKind(), firstType,
+                                         secondType));
     }
     
-    auto sig = GenericSignature::get(genericParams, requirements);
-
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);
     if (!inputTy)
@@ -3517,11 +3537,12 @@ case TypeKind::Id:
       return *this;
 
     // If no generic parameters remain, this is a non-generic function type.
-    if (genericParams.empty())
+    if (genericParams.empty()) {
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
+    }
 
     // Produce the new generic function type.
-    
+    auto sig = GenericSignature::get(genericParams, requirements);
     return GenericFunctionType::get(sig, inputTy, resultTy,
                                     function->getExtInfo());
   }

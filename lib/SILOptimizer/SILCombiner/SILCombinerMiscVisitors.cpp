@@ -12,21 +12,22 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/Basic/STLExtras.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -670,7 +671,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
     auto *Term = IEAI->getParent()->getTerminator();
     if (isa<CondBranchInst>(Term) || isa<SwitchValueInst>(Term)) {
-      auto BeforeTerm = prev(prev(IEAI->getParent()->end()));
+      auto BeforeTerm = std::prev(std::prev(IEAI->getParent()->end()));
       auto *SEAI = dyn_cast<SelectEnumAddrInst>(BeforeTerm);
       if (!SEAI)
         return nullptr;
@@ -781,67 +782,116 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // Ok, we have a payload enum, make sure that we have a store previous to
   // us...
-  SILBasicBlock::iterator II = IEAI->getIterator();
-  StoreInst *SI = nullptr;
-  InitEnumDataAddrInst *DataAddrInst = nullptr;
-  ApplyInst *AI = nullptr;
-  Operand *EnumInitOperand = nullptr;
-  for (;;) {
-    if (II == IEAI->getParent()->begin())
-      return nullptr;
-    --II;
-    SI = dyn_cast<StoreInst>(&*II);
-    if (SI) {
-      // Find a Store whose destination is taken from an init_enum_data_addr
-      // whose address is same allocation as our inject_enum_addr.
-      DataAddrInst = dyn_cast<InitEnumDataAddrInst>(SI->getDest());
-      if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand())
-        break;
-      SI = nullptr;
-    }
-    // Check whether we have an apply initializing the enum.
-    //  %iedai = init_enum_data_addr %enum_addr
-    //         = apply(%iedai,...)
-    //  inject_enum_addr %enum_addr
-    //
-    // We can localize the store to an alloc_stack.
-    // Allowing us to perform the same optimization as for the store.
-    //
-    //  %alloca = alloc_stack
-    //            apply(%alloca,...)
-    //  %load = load %alloca
-    //  %1 = enum $EnumType, $EnumType.case, %load
-    //  store %1 to %nopayload_addr
-    //
-    if ((AI = dyn_cast<ApplyInst>(&*II))) {
-      unsigned ArgIdx = 0;
-      for (auto &Opd : AI->getArgumentOperands()) {
-        // Found an apply that initializes the enum. We can optimize this by
-        // localizing the initialization to an alloc_stack and loading from it.
-        DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
-        if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
-            ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
-          EnumInitOperand = &Opd;
-          break;
-        }
-        ++ArgIdx;
-      }
-      // We found an enum initialization.
-      if (EnumInitOperand)
-        break;
-      AI = nullptr;
-    }
+  SILValue ASO = IEAI->getOperand();
+  if (!isa<AllocStackInst>(ASO)) {
+    return nullptr;
   }
-  // Found the store to this enum payload. Check if the store is the only use.
-  if (!DataAddrInst->hasOneUse())
+  InitEnumDataAddrInst *DataAddrInst = nullptr;
+  InjectEnumAddrInst *EnumAddrIns = nullptr;
+  llvm::SmallPtrSet<SILInstruction *, 32> WriteSet;
+  for (auto UsersIt : ASO->getUses()) {
+    SILInstruction *CurrUser = UsersIt->getUser();
+    if (CurrUser->isDeallocatingStack()) {
+      // we don't care about the dealloc stack instructions
+      continue;
+    }
+    if (isDebugInst(CurrUser) || isa<LoadInst>(CurrUser)) {
+      // These Instructions are a non-risky use we can ignore
+      continue;
+    }
+    if (auto *CurrInst = dyn_cast<InitEnumDataAddrInst>(CurrUser)) {
+      if (DataAddrInst) {
+        return nullptr;
+      }
+      DataAddrInst = CurrInst;
+      continue;
+    }
+    if (auto *CurrInst = dyn_cast<InjectEnumAddrInst>(CurrUser)) {
+      if (EnumAddrIns) {
+        return nullptr;
+      }
+      EnumAddrIns = CurrInst;
+      continue;
+    }
+    if (isa<StoreInst>(CurrUser)) {
+      // The only MayWrite Instruction we can safely handle
+      WriteSet.insert(CurrUser);
+      continue;
+    }
+    // It is too risky to continue if it is any other instruction.
+    return nullptr;
+  }
+
+  if (!DataAddrInst || !EnumAddrIns) {
+    return nullptr;
+  }
+  assert((EnumAddrIns == IEAI) &&
+         "Found InitEnumDataAddrInst differs from IEAI");
+  // Found the DataAddrInst to this enum payload. Check if it has only use.
+  if (!hasOneNonDebugUse(DataAddrInst))
     return nullptr;
 
+  StoreInst *SI = dyn_cast<StoreInst>(getSingleNonDebugUser(DataAddrInst));
+  ApplyInst *AI = dyn_cast<ApplyInst>(getSingleNonDebugUser(DataAddrInst));
+  if (!SI && !AI) {
+    return nullptr;
+  }
+
+  // Make sure the enum pattern instructions are the only ones which write to
+  // this location
+  if (!WriteSet.empty()) {
+    // Analyze the instructions (implicit dominator analysis)
+    // If we find any of MayWriteSet, return nullptr
+    SILBasicBlock *InitEnumBB = DataAddrInst->getParent();
+    assert(InitEnumBB && "DataAddrInst is not in a valid Basic Block");
+    llvm::SmallVector<SILInstruction *, 64> Worklist;
+    Worklist.push_back(IEAI);
+    llvm::SmallPtrSet<SILBasicBlock *, 16> Preds;
+    Preds.insert(IEAI->getParent());
+    while (!Worklist.empty()) {
+      SILInstruction *CurrIns = Worklist.pop_back_val();
+      SILBasicBlock *CurrBB = CurrIns->getParent();
+
+      if (CurrBB->isEntry() && CurrBB != InitEnumBB) {
+        // reached prologue without encountering the init bb
+        return nullptr;
+      }
+
+      for (llvm::iplist<SILInstruction>::reverse_iterator InsIt(
+               CurrIns->getIterator());
+           InsIt != CurrBB->rend(); ++InsIt) {
+        SILInstruction *Ins = &*InsIt;
+        if (Ins == DataAddrInst) {
+          // don't care about what comes before init enum in the basic block
+          break;
+        }
+        if (WriteSet.count(Ins) != 0) {
+          return nullptr;
+        }
+      }
+
+      if (CurrBB == InitEnumBB) {
+        continue;
+      }
+
+      // Go to predecessors and do all that again
+      for (SILBasicBlock *Pred : CurrBB->getPreds()) {
+        // If it's already in the set, then we've already queued and/or
+        // processed the predecessors.
+        if (Preds.insert(Pred).second) {
+          Worklist.push_back(&*Pred->rbegin());
+        }
+      }
+    }
+  }
+
   if (SI) {
+    assert((SI->getDest() == DataAddrInst) &&
+           "Can't find StoreInst with DataAddrInst as its destination");
     // In that case, create the payload enum/store.
-    EnumInst *E =
-      Builder.createEnum(DataAddrInst->getLoc(), SI->getSrc(),
-                         DataAddrInst->getElement(),
-                         DataAddrInst->getOperand()->getType().getObjectType());
+    EnumInst *E = Builder.createEnum(
+        DataAddrInst->getLoc(), SI->getSrc(), DataAddrInst->getElement(),
+        DataAddrInst->getOperand()->getType().getObjectType());
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand());
     // Cleanup.
     eraseInstFromFunction(*SI);
@@ -849,7 +899,39 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     return eraseInstFromFunction(*IEAI);
   }
 
+  // Check whether we have an apply initializing the enum.
+  //  %iedai = init_enum_data_addr %enum_addr
+  //         = apply(%iedai,...)
+  //  inject_enum_addr %enum_addr
+  //
+  // We can localize the store to an alloc_stack.
+  // Allowing us to perform the same optimization as for the store.
+  //
+  //  %alloca = alloc_stack
+  //            apply(%alloca,...)
+  //  %load = load %alloca
+  //  %1 = enum $EnumType, $EnumType.case, %load
+  //  store %1 to %nopayload_addr
+  //
   assert(AI && "Must have an apply");
+  unsigned ArgIdx = 0;
+  Operand *EnumInitOperand = nullptr;
+  for (auto &Opd : AI->getArgumentOperands()) {
+    // Found an apply that initializes the enum. We can optimize this by
+    // localizing the initialization to an alloc_stack and loading from it.
+    DataAddrInst = dyn_cast<InitEnumDataAddrInst>(Opd.get());
+    if (DataAddrInst && DataAddrInst->getOperand() == IEAI->getOperand() &&
+        ArgIdx < AI->getSubstCalleeType()->getNumIndirectResults()) {
+      EnumInitOperand = &Opd;
+      break;
+    }
+    ++ArgIdx;
+  }
+
+  if (!EnumInitOperand) {
+    return nullptr;
+  }
+
   // Localize the address access.
   Builder.setInsertionPoint(AI);
   auto *AllocStack = Builder.createAllocStack(DataAddrInst->getLoc(),
@@ -997,35 +1079,80 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     if (!CBI->getFalseBB()->getSinglePredecessor())
       return nullptr;
 
-    SILBasicBlock *Default = nullptr;
-
+    SILBasicBlock *DefaultBB = nullptr;
     match_integer<0> Zero;
 
     if (SEI->hasDefault()) {
+      // Default result should be an integer constant.
+      if (!isa<IntegerLiteralInst>(SEI->getDefaultResult()))
+        return nullptr;
       bool isFalse = match(SEI->getDefaultResult(), Zero);
-      Default = isFalse ? CBI->getFalseBB() : Default = CBI->getTrueBB();
+      // Pick the default BB.
+      DefaultBB = isFalse ? CBI->getFalseBB() : CBI->getTrueBB();
     }
 
-    // We can now convert cond_br(select_enum) into switch_enum
+    if (!DefaultBB) {
+      // Find the targets for the majority of cases and pick it
+      // as a default BB.
+      unsigned TrueBBCases = 0;
+      unsigned FalseBBCases = 0;
+      for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
+        auto Pair = SEI->getCase(i);
+        if (isa<IntegerLiteralInst>(Pair.second)) {
+          bool isFalse = match(Pair.second, Zero);
+          if (!isFalse) {
+            TrueBBCases++;
+          } else {
+            FalseBBCases++;
+          }
+          continue;
+        }
+        return nullptr;
+      }
+
+      if (FalseBBCases > TrueBBCases)
+        DefaultBB = CBI->getFalseBB();
+      else
+        DefaultBB = CBI->getTrueBB();
+    }
+
+    assert(DefaultBB && "Default should be defined at this point");
+
+    unsigned NumTrueBBCases = 0;
+    unsigned NumFalseBBCases = 0;
+
+    if (DefaultBB == CBI->getFalseBB())
+      NumFalseBBCases++;
+    else
+      NumTrueBBCases++;
+
+    // We can now convert cond_br(select_enum) into switch_enum.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
     for (int i = 0, e = SEI->getNumCases(); i < e; ++i) {
       auto Pair = SEI->getCase(i);
-      if (isa<IntegerLiteralInst>(Pair.second)) {
-        bool isFalse = match(Pair.second, Zero);
-        if (!isFalse && Default != CBI->getTrueBB()) {
-          Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
-        }
-        if (isFalse && Default != CBI->getFalseBB()) {
-          Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
-        }
-        continue;
-      }
 
-      return nullptr;
+      // Bail if one of the results is not an integer constant.
+      if (!isa<IntegerLiteralInst>(Pair.second))
+        return nullptr;
+
+      // Add a switch case.
+      bool isFalse = match(Pair.second, Zero);
+      if (!isFalse && DefaultBB != CBI->getTrueBB()) {
+        Cases.push_back(std::make_pair(Pair.first, CBI->getTrueBB()));
+        NumTrueBBCases++;
+      }
+      if (isFalse && DefaultBB != CBI->getFalseBB()) {
+        Cases.push_back(std::make_pair(Pair.first, CBI->getFalseBB()));
+        NumFalseBBCases++;
+      }
     }
 
+    // Bail if a switch_enum would introduce a critical edge.
+    if (NumTrueBBCases > 1 || NumFalseBBCases > 1)
+      return nullptr;
+
     return Builder.createSwitchEnum(SEI->getLoc(), SEI->getEnumOperand(),
-                                    Default, Cases);
+                                    DefaultBB, Cases);
   }
 
   return nullptr;
@@ -1150,10 +1277,9 @@ SILInstruction *SILCombiner::visitWitnessMethodInst(WitnessMethodInst *WMI) {
   // Many cases are handled by the inliner/devirtualizer, but certain
   // special cases are not covered there, e.g. partial_apply(witness_method)
   SILFunction *F;
-  ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
-  std::tie(F, WT, Subs) =
+  std::tie(F, WT) =
       WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                     WMI->getMember());
 

@@ -131,13 +131,14 @@ public protocol UnicodeCodec {
   ///     time.
   static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   )
 
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
   ///
   /// Is an equivalent of `strlen` for C-strings.
-  /// - Complexity: O(n)
+  ///
+  /// - Complexity: O(*n*)
   static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int
 }
 
@@ -374,7 +375,7 @@ public struct UTF8 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
@@ -571,7 +572,7 @@ public struct UTF16 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     let scalarValue: UInt32 = UInt32(input)
 
@@ -671,7 +672,7 @@ public struct UTF32 : UnicodeCodec {
   ///     time.
   public static func encode(
     _ input: UnicodeScalar,
-    into processCodeUnit: @noescape (CodeUnit) -> Void
+    into processCodeUnit: (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
   }
@@ -717,7 +718,7 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
   from inputEncoding: InputEncoding.Type,
   to outputEncoding: OutputEncoding.Type,
   stoppingOnError stopOnError: Bool,
-  into processCodeUnit: @noescape (OutputEncoding.CodeUnit) -> Void
+  into processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool
   where
   Input : IteratorProtocol,
@@ -839,7 +840,7 @@ internal func _transcodeSomeUTF16AsUTF8<Input>(
     nextIndex = input.index(nextIndex, offsetBy: utf16Length)
   }
   // FIXME: Annoying check, courtesy of <rdar://problem/16740169>
-  if utf8Count < MemoryLayout._ofInstance(result).size {
+  if utf8Count < MemoryLayout.size(ofValue: result) {
     result |= ~0 << numericCast(utf8Count * 8)
   }
   return (nextIndex, result)
@@ -1139,6 +1140,16 @@ extension UnicodeCodec {
 @available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
 
+extension UnicodeCodec {
+  @available(*, unavailable, renamed: "encode(_:into:)")
+  public static func encode(
+    _ input: UnicodeScalar,
+    output put: (CodeUnit) -> Void
+  ) {
+    Builtin.unreachable()
+  }
+}
+
 @available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:into:)'")
 public func transcode<Input, InputEncoding, OutputEncoding>(
   _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
@@ -1165,3 +1176,7 @@ extension UTF16 {
     Builtin.unreachable()
   }
 }
+
+/// A namespace for Unicode utilities.
+internal enum _Unicode {}
+

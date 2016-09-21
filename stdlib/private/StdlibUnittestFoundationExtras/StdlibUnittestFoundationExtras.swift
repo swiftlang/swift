@@ -13,7 +13,7 @@
 import ObjectiveC
 import Foundation
 
-internal var _temporaryLocaleCurrentLocale: NSLocale? = nil
+internal var _temporaryLocaleCurrentLocale: NSLocale?
 
 extension NSLocale {
   @objc
@@ -24,7 +24,7 @@ extension NSLocale {
 
 public func withOverriddenLocaleCurrentLocale<Result>(
   _ temporaryLocale: NSLocale,
-  _ body: @noescape () -> Result
+  _ body: () -> Result
 ) -> Result {
   let oldMethod = class_getClassMethod(
     NSLocale.self, #selector(getter: NSLocale.current))
@@ -48,7 +48,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 
 public func withOverriddenLocaleCurrentLocale<Result>(
   _ temporaryLocaleIdentifier: String,
-  _ body: @noescape () -> Result
+  _ body: () -> Result
 ) -> Result {
   precondition(
     NSLocale.availableLocaleIdentifiers.contains(temporaryLocaleIdentifier),
@@ -65,7 +65,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 /// return-autoreleased optimization.)
 @inline(never)
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
-  invoking body: @noescape () -> Void
+  invoking body: () -> Void
 ) {
 #if arch(i386) && (os(iOS) || os(watchOS))
   autoreleasepool(invoking: body)
@@ -82,6 +82,7 @@ internal func _stdlib_NSArray_getObjects(
   rangeLength: Int)
 
 extension NSArray {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?, range: NSRange
   ) {
@@ -101,6 +102,7 @@ func _stdlib_NSDictionary_getObjects(
 )
 
 extension NSDictionary {
+  @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
     andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 // import Foundation
+import SwiftShims
 
 public extension DispatchSourceProtocol {
 	typealias DispatchSourceHandler = @convention(block) () -> Void
@@ -20,15 +21,15 @@ public extension DispatchSourceProtocol {
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
-			__dispatch_source_set_event_handler(self as! DispatchSource, item._block)
+			_swift_dispatch_source_set_event_handler(self as! DispatchSource, item._block)
 		} else {
-			__dispatch_source_set_event_handler(self as! DispatchSource, handler)
+			_swift_dispatch_source_set_event_handler(self as! DispatchSource, handler)
 		}
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func setEventHandler(handler: DispatchWorkItem) {
-		__dispatch_source_set_event_handler(self as! DispatchSource, handler._block)
+		_swift_dispatch_source_set_event_handler(self as! DispatchSource, handler._block)
 	}
 
 	public func setCancelHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
@@ -36,15 +37,15 @@ public extension DispatchSourceProtocol {
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
-			__dispatch_source_set_cancel_handler(self as! DispatchSource, item._block)
+			_swift_dispatch_source_set_cancel_handler(self as! DispatchSource, item._block)
 		} else {
-			__dispatch_source_set_cancel_handler(self as! DispatchSource, handler)
+			_swift_dispatch_source_set_cancel_handler(self as! DispatchSource, handler)
 		}
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func setCancelHandler(handler: DispatchWorkItem) {
-		__dispatch_source_set_cancel_handler(self as! DispatchSource, handler._block)
+		_swift_dispatch_source_set_cancel_handler(self as! DispatchSource, handler._block)
 	}
 
 	public func setRegistrationHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
@@ -52,15 +53,15 @@ public extension DispatchSourceProtocol {
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
-			__dispatch_source_set_registration_handler(self as! DispatchSource, item._block)
+			_swift_dispatch_source_set_registration_handler(self as! DispatchSource, item._block)
 		} else {
-			__dispatch_source_set_registration_handler(self as! DispatchSource, handler)
+			_swift_dispatch_source_set_registration_handler(self as! DispatchSource, handler)
 		}
 	}
 
 	@available(OSX 10.10, iOS 8.0, *)
 	public func setRegistrationHandler(handler: DispatchWorkItem) {
-		__dispatch_source_set_registration_handler(self as! DispatchSource, handler._block)
+		_swift_dispatch_source_set_registration_handler(self as! DispatchSource, handler._block)
 	}
 
 	@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)

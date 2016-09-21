@@ -98,7 +98,7 @@ struct MaterializeForSetEmitter {
   ArrayRef<Substitution> WitnessSubs;
 
   CanGenericSignature GenericSig;
-  GenericParamList *GenericParams;
+  GenericEnvironment *GenericEnv;
 
   // Assume that we don't need to reabstract 'self'.  Right now,
   // that's always true; if we ever reabstract Optional (or other
@@ -128,7 +128,7 @@ private:
       WitnessStorage(witness->getAccessorStorageDecl()),
       WitnessStoragePattern(AbstractionPattern::getInvalid()),
       WitnessSubs(subs),
-      GenericParams(nullptr),
+      GenericEnv(nullptr),
       SelfInterfaceType(selfInterfaceType->getCanonicalType()),
       SubstSelfType(selfType->getCanonicalType()),
       TheAccessSemantics(AccessSemantics::Ordinary),
@@ -145,10 +145,12 @@ private:
       WitnessStorage->getInterfaceType()->getCanonicalType();
     if (isa<SubscriptDecl>(WitnessStorage))
       witnessIfaceType = cast<FunctionType>(witnessIfaceType).getResult();
-    SubstStorageType = getSubstWitnessInterfaceType(witnessIfaceType);
+    SubstStorageType = getSubstWitnessInterfaceType(
+                                witnessIfaceType.getReferenceStorageReferent());
 
     WitnessStoragePattern =
-      SGM.Types.getAbstractionPattern(WitnessStorage);
+      SGM.Types.getAbstractionPattern(WitnessStorage)
+               .getReferenceStorageReferentType();
     WitnessStorageType =
       SGM.Types.getLoweredType(WitnessStoragePattern, SubstStorageType)
                .getObjectType();
@@ -178,11 +180,11 @@ public:
     if (conformance) {
       if (auto signature = conformance->getGenericSignature())
         emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericParams = conformance->getGenericParams();
+      emitter.GenericEnv = conformance->getGenericEnvironment();
     } else {
       auto signature = requirement->getGenericSignatureOfContext();
       emitter.GenericSig = signature->getCanonicalSignature();
-      emitter.GenericParams = requirement->getGenericParamsOfContext();
+      emitter.GenericEnv = requirement->getGenericEnvironmentOfContext();
     }
 
     emitter.RequirementStorage = requirement->getAccessorStorageDecl();
@@ -190,7 +192,8 @@ public:
     // Determine the desired abstraction pattern of the storage type
     // in the requirement and the witness.
     emitter.RequirementStoragePattern =
-        SGM.Types.getAbstractionPattern(emitter.RequirementStorage);
+        SGM.Types.getAbstractionPattern(emitter.RequirementStorage)
+                 .getReferenceStorageReferentType();
     emitter.RequirementStorageType =
         SGM.Types.getLoweredType(emitter.RequirementStoragePattern,
                                  emitter.SubstStorageType)
@@ -218,7 +221,7 @@ public:
 
     if (auto signature = witness->getGenericSignatureOfContext())
       emitter.GenericSig = signature->getCanonicalSignature();
-    emitter.GenericParams = constantInfo.ContextGenericParams;
+    emitter.GenericEnv = constantInfo.GenericEnv;
 
     emitter.RequirementStorage = emitter.WitnessStorage;
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
@@ -383,7 +386,6 @@ public:
   CanType getSubstWitnessInterfaceType(CanType type) {
     return SubstSelfType->getTypeOfMember(SGM.SwiftModule, type,
                                           WitnessStorage->getDeclContext())
-                        ->getReferenceStorageReferent()
                         ->getCanonicalType();
   }
 
@@ -552,7 +554,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
                                 F.isTransparent(),
                                 F.isFragile());
 
-  callback->setContextGenericParams(GenericParams);
+  callback->setGenericEnvironment(GenericEnv);
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);

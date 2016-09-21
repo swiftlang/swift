@@ -406,6 +406,12 @@ public:
     SmallVector<Expr*, 4> args;
     auto fnRef = AbstractFunction::decomposeApply(E, args);
 
+    // If any of the arguments didn't type check, fail.
+    for (auto arg : args) {
+      if (!arg->getType() || arg->getType()->is<ErrorType>())
+        return Classification::forInvalidCode();
+    }
+
     // If we're applying more arguments than the natural argument
     // count, then this is a call to the opaque value returned from
     // the function.

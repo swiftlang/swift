@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -print-accessibility -source-filename=%s | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-SRC
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -print-accessibility -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-SRC
 // RUN: %target-swift-frontend -emit-module-path %t/accessibility_print.swiftmodule %s
-// RUN: %target-swift-ide-test -skip-deinit=false -print-module -print-accessibility -module-to-print=accessibility_print -I %t -source-filename=%s | FileCheck %s
+// RUN: %target-swift-ide-test -skip-deinit=false -print-module -print-accessibility -module-to-print=accessibility_print -I %t -source-filename=%s | %FileCheck %s
 
 // This file uses alphabetic prefixes on its declarations because swift-ide-test
 // sorts decls in a module before printing them.
@@ -122,9 +122,9 @@ public enum DC_PublicEnum {
 private protocol EA_PrivateProtocol {
   // CHECK: {{^}} associatedtype Foo
   associatedtype Foo
-  // CHECK: internal var Bar
+  // CHECK: fileprivate var Bar
   var Bar: Int { get }
-  // CHECK: internal func baz()
+  // CHECK: fileprivate func baz()
   func baz()
 } // CHECK: {{^[}]}}
 

@@ -21,7 +21,7 @@ extension String.UTF16View.Index : Strideable {
   }
 
   public func distance(to other: String.UTF16View.Index) -> Int {
-    return other._offset.distance(to: _offset)
+    return _offset.distance(to: other._offset)
   }
 
   public func advanced(by n: Int) -> String.UTF16View.Index {

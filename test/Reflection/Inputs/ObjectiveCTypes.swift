@@ -4,7 +4,7 @@ import CoreGraphics
 public class OC : NSObject {
   public let nsObject: NSObject = NSObject()
   public let nsString: NSString = ""
-  public let cfString: CFString = ""
+  public let cfString: CFString = "" as CFString
   public let aBlock: @convention(block) () -> () = {}
   public let ocnss: GenericOC<NSString> = GenericOC()
   public let occfs: GenericOC<CFString> = GenericOC()

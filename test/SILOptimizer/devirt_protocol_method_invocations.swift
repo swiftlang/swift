@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 public protocol Foo { 
   func foo(_ x:Int) -> Int
@@ -16,9 +16,9 @@ public extension Foo {
 
 var gg = 1111
 
-public class C : Foo {
+open class C : Foo {
   @inline(never)
-  public func foo(_ x:Int) -> Int {
+  open func foo(_ x:Int) -> Int {
     gg += 1
     return gg + x
   }

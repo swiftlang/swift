@@ -249,16 +249,8 @@ void DeclAttributes::print(ASTPrinter &Printer,
     if (!Options.PrintUserInaccessibleAttrs &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
-    if (std::find(Options.ExcludeAttrList.begin(),
-                  Options.ExcludeAttrList.end(),
-                  DA->getKind()) != Options.ExcludeAttrList.end())
+    if (Options.excludeAttrKind(DA->getKind()))
       continue;
-    if (!Options.ExclusiveAttrList.empty()) {
-      if (std::find(Options.ExclusiveAttrList.begin(),
-                    Options.ExclusiveAttrList.end(),
-                    DA->getKind()) == Options.ExclusiveAttrList.end())
-        continue;
-    }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isShortAvailable(DA) ? shortAvailableAttributes :
@@ -327,9 +319,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName());
     } else {
-      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-      Printer.printAttrName(getAttrName(), /*needAt=*/true);
-      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer.printSimpleAttr(getAttrName(), /*needAt=*/true);
     }
     return true;
 
@@ -420,33 +410,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
     Printer.printAttrName("@_swift_native_objc_runtime_base");
     Printer << "(" << attr->BaseClassName.str() << ")";
-    break;
-  }
-
-  case DAK_Swift3Migration: {
-    auto attr = cast<Swift3MigrationAttr>(this);
-    Printer.printAttrName("@swift3_migration");
-    Printer << "(";
-
-    bool printedAny = false;
-    auto printSeparator = [&] {
-      if (printedAny) Printer << ", ";
-      else printedAny = true;
-    };
-
-    if (attr->getRenamed()) {
-      printSeparator();
-      Printer << "renamed: \"" << attr->getRenamed() << "\"";
-    }
-
-    if (!attr->getMessage().empty()) {
-      printSeparator();
-      Printer << "message: \"";
-      Printer << attr->getMessage();
-      Printer << "\"";
-    }
-
-    Printer << ")";
     break;
   }
 
@@ -553,7 +516,10 @@ StringRef DeclAttribute::getAttrName() const {
       return "internal";
     case Accessibility::Public:
       return "public";
+    case Accessibility::Open:
+      return "open";
     }
+    llvm_unreachable("bad accessibility kind");
 
   case DAK_Ownership:
     switch (cast<OwnershipAttr>(this)->get()) {
@@ -562,14 +528,13 @@ StringRef DeclAttribute::getAttrName() const {
     case Ownership::Unowned:   return "unowned";
     case Ownership::Unmanaged: return "unowned(unsafe)";
     }
+    llvm_unreachable("bad ownership kind");
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:
     return "<<ObjC bridged>>";
   case DAK_SynthesizedProtocol:
     return "<<synthesized protocol>>";
-  case DAK_Swift3Migration:
-    return "swift3_migration";
   case DAK_Specialize:
     return "_specialize";
   }

@@ -119,3 +119,14 @@ func testVoidOptional() {
   let optNoop: (()?) -> ()? = { return $0 }
   voidOptional(optNoop)
 }
+
+func testTernaryWithNil(b: Bool, s: String, i: Int) {
+  let t1 = b ? s : nil
+  let _: Double = t1 // expected-error{{value of type 'String?'}}
+  let t2 = b ? nil : i
+  let _: Double = t2 // expected-error{{value of type 'Int?'}}
+  let t3 = b ? "hello" : nil
+  let _: Double = t3 // expected-error{{value of type 'String?'}}
+  let t4 = b ? nil : 1
+  let _: Double = t4 // expected-error{{value of type 'Int?'}}
+}

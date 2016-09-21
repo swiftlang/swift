@@ -320,7 +320,7 @@ internal struct _Buffer32 {
 % end
 
   mutating func withBytes<Result>(
-    _ body: @noescape (UnsafeMutablePointer<UInt8>) throws -> Result
+    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
     return try withUnsafeMutablePointer(to: &self) {
@@ -336,7 +336,7 @@ internal struct _Buffer72 {
 % end
 
   mutating func withBytes<Result>(
-    _ body: @noescape (UnsafeMutablePointer<UInt8>) throws -> Result
+    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
   {
     return try withUnsafeMutablePointer(to: &self) {
@@ -495,13 +495,15 @@ class _SwiftNativeNSSet {}
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 class _SwiftNativeNSEnumerator {}
 
+// FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
-public class _SwiftNativeNSData {
+open class _SwiftNativeNSData {
   public init() {}
 }
 
+// FIXME(ABI)#61 : move into the Foundation overlay and remove 'open'
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSCharacterSetBase)
-public class _SwiftNativeNSCharacterSet {
+open class _SwiftNativeNSCharacterSet {
   public init() {}
 }
 

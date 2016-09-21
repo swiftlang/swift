@@ -48,10 +48,7 @@ using namespace swift;
 SWIFT_RUNTIME_STDLIB_INTERFACE
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {
-  // TODO: Workaround for rdar://problem/18950072
-  // SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
-  uint32_t __magic_refCount;
-  uint32_t __magic_weakRefCount;
+  SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 @end
 

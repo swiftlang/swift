@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors.%target-dylib-extension
-// RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors.%target-dylib-extension | FileCheck %s
+// RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors.%target-dylib-extension | %FileCheck %s
 
 sil_stage canonical
 
@@ -93,17 +93,16 @@ bb0(%t: $*T):
 sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_owned () -> () {
 bb0:
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<(A) -> B>
+  %t = alloc_stack $Optional<@callee_owned (@in A) -> @out B>
   %c = partial_apply %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<(A) -> B>
+  dealloc_stack %t : $*Optional<@callee_owned (@in A) -> @out B>
   return %c : $@callee_owned () -> ()
 }
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=0)
-// CHECK-NEXT:     (generic_type_parameter depth=0 index=1)))
+// CHECK-NEXT:     (tuple)))
 // CHECK-NEXT: - Metadata sources:
 // CHECK-NEXT: (bound_generic_enum Swift.Optional
 // CHECK-NEXT:   (function
@@ -190,6 +189,28 @@ sil_vtable GenericClass {}
 // CHECK-NEXT:   (generic_type_parameter depth=0 index=2))
 // CHECK-NEXT: (generic_argument index=1
 // CHECK-NEXT:   (reference_capture index=0))
+
+
+// Pseudogeneric caller and pseudogeneric callee -- type parameters are
+// erased at runtime.
+
+sil @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> () {
+bb0(%t: $T, %u: $U):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+sil @pseudogeneric_caller : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject, C : AnyObject> (@owned A, @owned B) -> @owned @pseudogeneric @callee_owned () -> () {
+bb0(%a: $A, %b: $B):
+  %f = function_ref @pseudogeneric_callee : $@convention(thin) @pseudogeneric <T : AnyObject, U : AnyObject> (@owned T, @owned U) -> ()
+  %c = partial_apply %f<A, B>(%a, %b) : $@convention(thin) @pseudogeneric <A : AnyObject, B : AnyObject> (@owned A, @owned B) -> ()
+  return %c : $@pseudogeneric @callee_owned () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT:   (protocol Swift.AnyObject)
+// CHECK-NEXT:   (protocol Swift.AnyObject)
+// CHECK-NEXT: - Metadata sources:
 
 
 // Capturing lowered function types

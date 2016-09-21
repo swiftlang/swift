@@ -1601,6 +1601,14 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   // Exact equality is fine.
   if (type1 == type2) return true;
 
+  // Either both types should be optional or neither should be.
+  if (auto object1 = type1.getAnyOptionalObjectType()) {
+    auto object2 = type2.getAnyOptionalObjectType();
+    if (!object2) return false;
+    return areOnlyAbstractionDifferent(object1, object2);
+  }
+  if (type2.getAnyOptionalObjectType()) return false;
+
   // Either both types should be tuples or neither should be.
   if (auto tuple1 = dyn_cast<TupleType>(type1)) {
     auto tuple2 = dyn_cast<TupleType>(type2);
@@ -2307,9 +2315,8 @@ RValue SILGenFunction::emitApply(
       // type; we need to make our own make SILResultInfo array.
       case ForeignErrorConvention::NilResult: {
         assert(allResults.size() == 1);
-        OptionalTypeKind optKind;
         SILType objectType =
-          allResults[0].getSILType().getAnyOptionalObjectType(SGM.M, optKind);
+          allResults[0].getSILType().getAnyOptionalObjectType();
         optResult = allResults[0].getWithType(objectType.getSwiftRValueType());
         allResults = optResult;
         break;
@@ -2969,25 +2976,25 @@ namespace {
       if (arg.isRValue()) {
         if (CanTupleType substArgType =
                 dyn_cast<TupleType>(arg.getSubstType())) {
-	  // The original type isn't necessarily a tuple.
-	  assert(origParamType.matchesTuple(substArgType));
+          // The original type isn't necessarily a tuple.
+          assert(origParamType.matchesTuple(substArgType));
 
-	  auto loc = arg.getKnownRValueLocation();
-	  SmallVector<RValue, 4> elts;
-	  std::move(arg).asKnownRValue().extractElements(elts);
-	  for (auto i : indices(substArgType.getElementTypes())) {
-	    emit({ loc, std::move(elts[i]) },
-		 origParamType.getTupleElementType(i));
-	  }
-	  return;
-	}
+          auto loc = arg.getKnownRValueLocation();
+          SmallVector<RValue, 4> elts;
+          std::move(arg).asKnownRValue().extractElements(elts);
+          for (auto i : indices(substArgType.getElementTypes())) {
+            emit({ loc, std::move(elts[i]) },
+                 origParamType.getTupleElementType(i));
+          }
+          return;
+        }
 
-	auto loc = arg.getKnownRValueLocation();
-	SmallVector<RValue, 1> elts;
-	std::move(arg).asKnownRValue().extractElements(elts);
-	emit({ loc, std::move(elts[0]) },
-  	       origParamType.getTupleElementType(0));
-	return;
+        auto loc = arg.getKnownRValueLocation();
+        SmallVector<RValue, 1> elts;
+        std::move(arg).asKnownRValue().extractElements(elts);
+        emit({ loc, std::move(elts[0]) },
+             origParamType.getTupleElementType(0));
+        return;
       }
 
       // Otherwise, we're working with an expression.
@@ -3336,15 +3343,13 @@ namespace {
                                           emittedArg, param.getSILType(),
                                           doBridge);
       } else if (!nativeIsOptional && bridgedIsOptional) {
-        OptionalTypeKind otk;
-        auto paramObjTy = param.getSILType()
-          .getAnyOptionalObjectType(SGF.SGM.M, otk);
+        auto paramObjTy = param.getSILType().getAnyOptionalObjectType();
         auto transformed = doBridge(SGF, argExpr, emittedArg,
                                     paramObjTy);
         // Inject into optional.
         auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
-                                  SGF.getASTContext().getOptionalSomeDecl(otk),
-                                  param.getSILType());
+                                    SGF.getASTContext().getOptionalSomeDecl(),
+                                    param.getSILType());
         return ManagedValue(opt, transformed.getCleanup());
       } else {
         return doBridge(SGF, argExpr, emittedArg, param.getSILType());
@@ -3806,6 +3811,8 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
                                             SILType enumTy,
                                             EnumElementDecl *element,
                                             SGFContext C) {
+  element = SGM.getLoweredEnumElementDecl(element);
+
   // Easy case -- no payload
   if (!payload) {
     if (enumTy.isLoadable(SGM.M)) {
@@ -3823,7 +3830,9 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 
   ManagedValue payloadMV;
   AbstractionPattern origFormalType =
-      SGM.M.Types.getAbstractionPattern(element);
+    (element == getASTContext().getOptionalSomeDecl()
+      ? AbstractionPattern(payload.getSubstType())
+      : SGM.M.Types.getAbstractionPattern(element));
   auto &payloadTL = getTypeLowering(origFormalType,
                                     payload.getSubstType());
 
@@ -4284,7 +4293,7 @@ namespace {
         assert(substFnType->getNumAllResults() == 1);
         ManagedValue resultMV =
           gen.emitInjectEnum(uncurriedLoc, std::move(payload),
-                             substFnType->getAllResults()[0].getSILType(),
+                             gen.getLoweredType(formalResultType),
                              element, uncurriedContext);
         result = RValue(gen, uncurriedLoc, formalResultType, resultMV);
 
@@ -4567,7 +4576,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto substFormalType = origFormalType;
   if (!subs.empty()) {
     auto genericFnType = cast<GenericFunctionType>(substFormalType);
-    auto applied = genericFnType->substGenericArgs(SGM.SwiftModule, subs);
+    auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
   }
 
@@ -4629,7 +4638,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   auto subs = init.getSubstitutions();
   if (!subs.empty()) {
     auto genericFnType = cast<GenericFunctionType>(substFormalType);
-    auto applied = genericFnType->substGenericArgs(SGF.SGM.SwiftModule, subs);
+    auto applied = genericFnType->substGenericArgs(subs);
     substFormalType = cast<FunctionType>(applied->getCanonicalType());
   }
 
@@ -4941,7 +4950,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   CanAnyFunctionType substAccessorType = constantInfo.FormalInterfaceType;
   if (!substitutions.empty()) {
     auto genericFn = cast<GenericFunctionType>(substAccessorType);
-    auto substFn = genericFn->substGenericArgs(gen.SGM.SwiftModule, substitutions);
+    auto substFn = genericFn->substGenericArgs(substitutions);
     substAccessorType = cast<FunctionType>(substFn->getCanonicalType());
   }
 

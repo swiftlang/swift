@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -167,7 +167,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
-  c.dynamicType.static_method(i)
+  type(of: c).static_method(i)
 
   // -- Curry property accesses.
 
@@ -227,7 +227,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // FIXME: [[I:%[0-9]+]] = load [[IADDR]]
   // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
   // Needs existential metatypes
-  //p.dynamicType.static_method(i)
+  //type(of: p).static_method(i)
 
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
@@ -411,8 +411,8 @@ final class r17828355Class {
 
 
 
-// <rdar://problem/19981118> Swift 1.2 beta 2: Closures nested in @noescape closures copy, rather than reference, captured vars.
-func noescapefunc(f: @noescape () -> ()) {}
+// <rdar://problem/19981118> Swift 1.2 beta 2: Closures nested in closures copy, rather than reference, captured vars.
+func noescapefunc(f: () -> ()) {}
 func escapefunc(_ f : @escaping () -> ()) {}
 
 func testNoescape() {

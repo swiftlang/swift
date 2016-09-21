@@ -29,7 +29,7 @@ func testArrays() {
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  let cfstr: CFString? = nil
+  let cfstr: CFString?
   _ = cfstr as CFTypeRef?
 }
 

@@ -125,6 +125,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
+    SwiftFormat      // swift-format
   };
 
   class InputInfoMap;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -primary-file %s | %FileCheck %s
 
 struct Buh<T> {
   var x: Int {
@@ -406,9 +406,8 @@ class Foo<T> {
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
     // initialization for y
-    // CHECK: [[INTCTOR:%[0-9]+]] = function_ref @_TFSiC{{.*}} : $@convention(method) (@thin Int.Type) -> Int
-    // CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
-    // CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCTOR]]([[INTMETA]])
+    // CHECK: [[Y_INIT:%[0-9]+]] = function_ref @_TIvC8lifetime3Foo1yTSiCS_3Ref_i : $@convention(thin) <τ_0_0> () -> (Int, @owned Ref)
+    // CHECK: [[Y_VALUE:%[0-9]+]] = apply [[Y_INIT]]<T>()
 
     x = bar()
     // CHECK: function_ref @_TF8lifetime3barFT_Si : $@convention(thin) () -> Int

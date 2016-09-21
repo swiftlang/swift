@@ -54,6 +54,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     
     __ https://developer.apple.com/swift/blog/?id=28
 
+  dup
+    From "duplicate". As a noun, refers to another filed issue that describes
+    the same bug ("I have a dup of this"); as a verb, the act of marking a bug
+    *as* a duplicate ("Please dup this to the underlying issue"). Sometimes
+    written "dupe". Pronounced the same way as the first syllable of
+    "duplicate", which for most American English speakers is "doop".
+
   existential
     A value whose type is a protocol composition (including a single protocol
     and *zero* protocols; the latter is the ``Any`` type).
@@ -88,6 +95,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     Doing so prevents compilation errors when header files are included in a
     different order, or when header files are modified to use forward
     declarations instead of direct includes.
+
+  LGTM
+    "Looks good to me." Used in code review to indicate approval with no further
+    comments.
 
   main module
     The module for the file or files currently being compiled.

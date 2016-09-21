@@ -94,9 +94,23 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
 
       switch(Tok.getKind()) {
-#define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
+#define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
 #undef KEYWORD
+        if (Tok.getKind() != tok::kw__ &&
+            0 < I && I < Tokens.size() - 1 &&
+            (Tokens[I-1].getKind() == tok::l_paren ||
+             Tokens[I-1].getKind() == tok::comma) &&
+            (Tokens[I+1].getKind() == tok::colon ||
+             Tokens[I+1].getKind() == tok::identifier ||
+             Tokens[I+1].isKeyword())) {
+          // Keywords are allowed as argument labels and should be treated as
+          // identifiers.  The exception is '_' which is not a name.
+          Kind = SyntaxNodeKind::Identifier;
+        } else {
+          Kind = SyntaxNodeKind::Keyword;
+        }
+        break;
 
 #define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
       case tok::pound_##Name:
@@ -453,9 +467,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                                                                   E->getEndLoc()));
         passTokenNodesUntil(NR.getStart(),
                             PassNodesBehavior::ExcludeNodeAtLocation);
-        if (!TokenNodes.empty())
-          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
-            Identifier;
       }
       else
         SN.Range = SN.BodyRange;
@@ -524,13 +535,8 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
     for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
       SourceLoc NameLoc = Tup->getElementNameLoc(I);
-      if (NameLoc.isValid()) {
+      if (NameLoc.isValid())
         passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
-        if (!TokenNodes.empty()) {
-          const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
-            Identifier;
-        }
-      }
     }
   }
 
@@ -860,8 +866,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SourceLoc ArgStart = PD->getSourceRange().Start;
       SN.NameRange = CharSourceRange(ArgStart, PD->getArgumentName().getLength());
       passTokenNodesUntil(ArgStart, PassNodesBehavior::ExcludeNodeAtLocation);
-      const_cast<SyntaxNode&>(TokenNodes.front()).Kind = SyntaxNodeKind::
-        Identifier;
     }
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();

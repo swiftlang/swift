@@ -70,9 +70,6 @@ public:
 
   /// If true ignore the swift bridged attribute.
   bool DisableSwiftBridgeAttr = false;
-
-  /// Whether we should honor the swift_newtype attribute.
-  bool HonorSwiftNewtypeAttr = true;
 };
 
 } // end namespace swift

@@ -1,9 +1,9 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -o %t/main.out
-// RUN: %target-run %t/main.out | FileCheck -check-prefix=CHECK-EMPTY %s
-// RUN: %target-run %t/main.out --abc | FileCheck -check-prefix=CHECK-1 %s
-// RUN: %target-run %t/main.out --abc def | FileCheck -check-prefix=CHECK-2 %s
-// RUN: %target-run %t/main.out a --bcd efghijk | FileCheck -check-prefix=CHECK-3 %s
+// RUN: %target-run %t/main.out | %FileCheck -check-prefix=CHECK-EMPTY %s
+// RUN: %target-run %t/main.out --abc | %FileCheck -check-prefix=CHECK-1 %s
+// RUN: %target-run %t/main.out --abc def | %FileCheck -check-prefix=CHECK-2 %s
+// RUN: %target-run %t/main.out a --bcd efghijk | %FileCheck -check-prefix=CHECK-3 %s
 // REQUIRES: executable_test
 
 import StdlibUnittest

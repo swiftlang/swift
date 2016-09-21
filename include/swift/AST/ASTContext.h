@@ -120,10 +120,6 @@ enum class KnownFoundationEntity {
 /// entity name.
 Optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 
-/// Determine with the non-prefixed name of the given known Foundation
-/// entity conflicts with the Swift standard library.
-bool nameConflictsWithStandardLibrary(KnownFoundationEntity entity);
-
 /// Callback function used when referring to a type member of a given
 /// type variable.
 typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
@@ -210,8 +206,8 @@ public:
   /// The name of the SwiftShims module "SwiftShims".
   Identifier SwiftShimsModuleName;
 
-  /// Note: in non-NDEBUG builds, tracks the context of each archetype
-  /// type, which can be very useful for debugging.
+  /// Note: in non-NDEBUG builds, tracks the context of each primary
+  /// archetype type, which can be very useful for debugging.
   llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
 
   // Define the set of known identifiers.
@@ -234,10 +230,6 @@ public:
 
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
-  
-  /// Cache for generic mangling signatures.
-  llvm::DenseMap<std::pair<GenericSignature*, ModuleDecl*>,
-                 CanGenericSignature> ManglingSignatures;
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -368,7 +360,7 @@ public:
                                         PrecedenceGroupDecl *right) const;
 
   /// Retrieve the declaration of Swift.Error.
-  NominalTypeDecl *getErrorDecl() const;
+  ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
   /// Retrieve the declaration of Swift.Bool.
@@ -526,13 +518,10 @@ public:
   /// 
   /// \param dc The context in which bridging is occurring.
   /// \param type The Swift for which we are querying bridging behavior.
-  /// \param resolver The lazy resolver.
   /// \param bridgedValueType The specific value type that is bridged,
   /// which will usually by the same as \c type.
-  Optional<Type> getBridgedToObjC(const DeclContext *dc,
-                                  Type type,
-                                  LazyResolver *resolver,
-                                  Type *bridgedValueType = nullptr) const;
+  Type getBridgedToObjC(const DeclContext *dc, Type type,
+                        Type *bridgedValueType = nullptr) const;
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
@@ -555,21 +544,6 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
-
-  /// Create a context for the initializer of a non-local variable,
-  /// like a global or a field.  To reduce memory usage, if the
-  /// context goes unused, it should be returned to the ASTContext
-  /// with destroyPatternBindingContext.
-  PatternBindingInitializer *createPatternBindingContext(DeclContext *parent);
-  void destroyPatternBindingContext(PatternBindingInitializer *DC);
-
-  /// Create a context for the initializer of the nth default argument
-  /// of the given function.  To reduce memory usage, if the context
-  /// goes unused, it should be returned to the ASTContext with
-  /// destroyDefaultArgumentContext.
-  DefaultArgumentInitializer *createDefaultArgumentContext(DeclContext *fn,
-                                                           unsigned index);
-  void destroyDefaultArgumentContext(DefaultArgumentInitializer *DC);
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -859,12 +833,6 @@ public:
   /// canonical generic signature and module.
   ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
                                                 ModuleDecl *mod);
-
-  /// Set the stored archetype builder for the given canonical generic
-  /// signature and module.
-  void setArchetypeBuilder(CanGenericSignature sig,
-                           ModuleDecl *mod,
-                           std::unique_ptr<ArchetypeBuilder> builder);
 
   /// Retrieve the inherited name set for the given class.
   const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,

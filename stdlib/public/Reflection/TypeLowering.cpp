@@ -421,6 +421,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
 
   // Calculate the stride
   unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+  if (Stride == 0)
+    Stride = 1;
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
@@ -528,7 +530,7 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 0, 0);
+  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 1, 0);
   return EmptyTI;
 }
 
@@ -908,19 +910,23 @@ public:
       Kind = RecordKind::SinglePayloadEnum;
       addCase(PayloadCases[0].Name, CaseTR, CaseTI);
 
-      // Below logic should match the runtime function
-      // swift_initEnumValueWitnessTableSinglePayload().
-      NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
-      if (NumExtraInhabitants >= NoPayloadCases) {
-        // Extra inhabitants can encode all no-payload cases.
-        NumExtraInhabitants -= NoPayloadCases;
-      } else {
-        // Not enough extra inhabitants for all cases. We have to add an
-        // extra tag field.
-        NumExtraInhabitants = 0;
-        Size += getNumTagBytes(Size,
-                               NoPayloadCases - NumExtraInhabitants,
-                               /*payloadCases=*/1);
+      // If we were unable to lower the payload type, do not proceed
+      // further.
+      if (CaseTI != nullptr) {
+        // Below logic should match the runtime function
+        // swift_initEnumValueWitnessTableSinglePayload().
+        NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+        if (NumExtraInhabitants >= NoPayloadCases) {
+          // Extra inhabitants can encode all no-payload cases.
+          NumExtraInhabitants -= NoPayloadCases;
+        } else {
+          // Not enough extra inhabitants for all cases. We have to add an
+          // extra tag field.
+          NumExtraInhabitants = 0;
+          Size += getNumTagBytes(Size,
+                                 NoPayloadCases - NumExtraInhabitants,
+                                 /*payloadCases=*/1);
+        }
       }
 
     // MultiPayloadEnumImplStrategy
@@ -958,6 +964,8 @@ public:
 
     // Calculate the stride
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    if (Stride == 0)
+      Stride = 1;
 
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
@@ -1213,27 +1221,29 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    unreachable("Can't lower opaque TypeRef");
+    DEBUG(std::cerr << "Can't lower opaque TypeRef");
     return nullptr;
   }
 };
 
 const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
+  // See if we already computed the result
   auto found = Cache.find(TR);
-  if (found != Cache.end()) {
-    auto *TI = found->second;
-    assert(TI != nullptr && "TypeRef recursion detected");
-    return TI;
+  if (found != Cache.end())
+    return found->second;
+
+  // Detect invalid recursive value types (IRGen should not emit
+  // them in the first place, but there might be bugs)
+  if (!RecursionCheck.insert(TR).second) {
+    DEBUG(std::cerr << "TypeRef recursion detected");
+    return nullptr;
   }
 
-  // Detect recursion
-  Cache[TR] = nullptr;
-
+  // Compute the result and cache it
   auto *TI = LowerType(*this).visit(TR);
+  Cache[TR] = TI;
 
-  // Cache the result
-  if (TI != nullptr)
-    Cache[TR] = TI;
+  RecursionCheck.erase(TR);
 
   return TI;
 }

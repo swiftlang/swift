@@ -4,6 +4,7 @@ add_swift_library(swiftAST STATIC
   ASTDumper.cpp
   ASTNode.cpp
   ASTPrinter.cpp
+  ASTScope.cpp
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
@@ -21,6 +22,7 @@ add_swift_library(swiftAST STATIC
   DiagnosticList.cpp
   DocComment.cpp
   Expr.cpp
+  GenericEnvironment.cpp
   GenericSignature.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp
@@ -37,7 +39,9 @@ add_swift_library(swiftAST STATIC
   Stmt.cpp
   SourceEntityWalker.cpp
   Substitution.cpp
+  SubstitutionMap.cpp
   Type.cpp
+  TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
   TypeWalker.cpp
@@ -67,10 +71,10 @@ add_swift_library(swiftAST STATIC
     clangAPINotes
     clangBasic
 
-  COMPONENT_DEPENDS
-    bitreader bitwriter irreader debuginfoDWARF
+  LLVM_COMPONENT_DEPENDS
+    bitreader bitwriter coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter ipo option core support ${LLVM_TARGETS_TO_BUILD}
+    bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
   )
 
 if(NOT SWIFT_BUILT_STANDALONE)

@@ -45,6 +45,24 @@ internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
+extension AnyHashable : _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSObject {
+    return NSObject()
+  }
+  public static func _forceBridgeFromObjectiveC(_ x: NSObject,
+                                                result: inout AnyHashable?) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSObject,
+    result: inout AnyHashable?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(_ x: NSObject?) -> AnyHashable {
+    return AnyHashable("")
+ }
+}
+
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
@@ -82,6 +100,28 @@ extension Int : _ObjectiveCBridgeable {
     _ x: NSNumber?
   ) -> Int {
     return 0
+  }
+}
+
+extension Bool: _ObjectiveCBridgeable {
+  public func _bridgeToObjectiveC() -> NSNumber {
+    return NSNumber()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSNumber, 
+    result: inout Bool?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSNumber,
+    result: inout Bool?
+  ) -> Bool {
+    return true
+  }
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ x: NSNumber?
+  ) -> Bool {
+    return false
   }
 }
 
@@ -236,3 +276,90 @@ func _convertNSErrorToError(_ string: NSError?) -> Error
 
 @_silgen_name("swift_convertErrorToNSError")
 func _convertErrorToNSError(_ string: Error) -> NSError
+
+/// An internal protocol to represent Swift error enums that map to standard
+/// Cocoa NSError domains.
+public protocol _ObjectiveCBridgeableError : Error {
+  /// Produce a value of the error type corresponding to the given NSError,
+  /// or return nil if it cannot be bridged.
+  init?(_bridgedNSError: NSError)
+}
+
+/// Describes a bridged error that stores the underlying NSError, so
+/// it can be queried.
+public protocol _BridgedStoredNSError : _ObjectiveCBridgeableError {
+  /// The type of an error code.
+  associatedtype Code: _ErrorCodeProtocol
+
+  /// The error code for the given error.
+  var code: Code { get }
+
+  //// Retrieves the embedded NSError.
+  var _nsError: NSError { get }
+
+  /// Create a new instance of the error type with the given embedded
+  /// NSError.
+  ///
+  /// The \c error must have the appropriate domain for this error
+  /// type.
+  init(_nsError error: NSError)
+}
+
+public protocol _ErrorCodeProtocol {
+  /// The corresponding error code.
+  associatedtype _ErrorType
+}
+
+public extension _BridgedStoredNSError {
+  public init?(_bridgedNSError error: NSError) {
+    self.init(_nsError: error)
+  }
+}
+
+/// Various helper implementations for _BridgedStoredNSError
+public extension _BridgedStoredNSError
+    where Code: RawRepresentable, Code.RawValue: SignedInteger {
+  // FIXME: Generalize to Integer.
+  public var code: Code {
+    return Code(rawValue: numericCast(_nsError.code))!
+  }
+
+  /// Initialize an error within this domain with the given ``code``
+  /// and ``userInfo``.
+  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+    self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
+  }
+
+  /// The user-info dictionary for an error that was bridged from
+  /// NSError.
+  var userInfo: [String : Any] { return [:] }
+}
+
+/// Various helper implementations for _BridgedStoredNSError
+public extension _BridgedStoredNSError
+    where Code: RawRepresentable, Code.RawValue: UnsignedInteger {
+  // FIXME: Generalize to Integer.
+  public var code: Code {
+    return Code(rawValue: numericCast(_nsError.code))!
+  }
+
+  /// Initialize an error within this domain with the given ``code``
+  /// and ``userInfo``.
+  public init(_ code: Code, userInfo: [String : Any] = [:]) {
+    self.init(_nsError: NSError(domain: "", code: 0, userInfo: [:]))
+  }
+}
+
+extension NSDictionary {
+  public subscript(_: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
+    get { fatalError() }
+  }
+}
+extension NSMutableDictionary {
+  public override subscript(_: Any) -> Any? {
+    get { fatalError() }
+    @objc(_swift_setObject:forKeyedSubscript:)
+    set { }
+  }
+}

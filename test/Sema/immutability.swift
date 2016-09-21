@@ -563,3 +563,11 @@ func testConditional(b : Bool) {
 
   (b ? x : z.t).mutatingfunc() // expected-error {{cannot use mutating member on immutable value: result of conditional operator '? :' is never mutable}}
 }
+
+
+
+// <rdar://problem/27384685> QoI: Poor diagnostic when assigning a value to a method
+func f(a : FooClass, b : LetStructMembers) {
+  a.baz = 1 // expected-error {{cannot assign to property: 'baz' is a method}}
+  b.f = 42     // expected-error {{cannot assign to property: 'f' is a method}}
+}

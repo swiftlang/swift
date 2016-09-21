@@ -178,9 +178,6 @@ Expr *Expr::getSemanticsProvidingExpr() {
   if (TryExpr *TE = dyn_cast<TryExpr>(this))
     return TE->getSubExpr()->getSemanticsProvidingExpr();
 
-  if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
-    return DE->getSubExpr()->getSemanticsProvidingExpr();
-  
   return this;
 }
 
@@ -343,7 +340,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(OptionalEvaluation)
     NON_LVALUE_EXPR(If)
     NON_LVALUE_EXPR(Assign)
-    NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
@@ -462,6 +458,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(MetatypeConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(CollectionUpcastConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(Erasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(AnyHashableErasure, getSubExpr);
   PASS_THROUGH_REFERENCE(DerivedToBase, getSubExpr);
   PASS_THROUGH_REFERENCE(ArchetypeToSuper, getSubExpr);
   PASS_THROUGH_REFERENCE(InjectIntoOptional, getSubExpr);
@@ -484,7 +481,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(If);
   NO_REFERENCE(EnumIsCase);
   NO_REFERENCE(Assign);
-  NO_REFERENCE(DefaultValue);
   NO_REFERENCE(CodeCompletion);
   NO_REFERENCE(UnresolvedPattern);
   NO_REFERENCE(EditorPlaceholder);
@@ -564,22 +560,6 @@ void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
   };
 
   this->walk(ChildWalker(callback));
-}
-
-Initializer *Expr::findExistingInitializerContext() {
-  struct FindExistingInitializer : ASTWalker {
-    Initializer *TheInitializer = nullptr;
-    std::pair<bool,Expr*> walkToExprPre(Expr *E) override {
-      assert(!TheInitializer && "continuing to walk after finding context?");
-      if (auto closure = dyn_cast<AbstractClosureExpr>(E)) {
-        TheInitializer = cast<Initializer>(closure->getParent());
-        return { false, nullptr };
-      }
-      return { true, E };
-    }
-  } finder;
-  walk(finder);
-  return finder.TheInitializer;
 }
 
 bool Expr::isTypeReference() const {
@@ -754,6 +734,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::MetatypeConversion:
   case ExprKind::CollectionUpcastConversion:
   case ExprKind::Erasure:
+  case ExprKind::AnyHashableErasure:
   case ExprKind::DerivedToBase:
   case ExprKind::ArchetypeToSuper:
   case ExprKind::InjectIntoOptional:
@@ -782,7 +763,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Arrow:
   case ExprKind::If:
   case ExprKind::Assign:
-  case ExprKind::DefaultValue:
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
     return false;

@@ -477,18 +477,42 @@ namespace {
         llvm_unreachable("bare void type in ABI lowering");
 
       // We should never see the OpenCL builtin types at all.
-      case clang::BuiltinType::OCLImage1d:
-      case clang::BuiltinType::OCLImage1dArray:
-      case clang::BuiltinType::OCLImage1dBuffer:
-      case clang::BuiltinType::OCLImage2d:
-      case clang::BuiltinType::OCLImage2dArray:
-      case clang::BuiltinType::OCLImage2dDepth:
-      case clang::BuiltinType::OCLImage2dArrayDepth:
-      case clang::BuiltinType::OCLImage2dMSAA:
-      case clang::BuiltinType::OCLImage2dArrayMSAA:
-      case clang::BuiltinType::OCLImage2dMSAADepth:
-      case clang::BuiltinType::OCLImage2dArrayMSAADepth:
-      case clang::BuiltinType::OCLImage3d:
+      case clang::BuiltinType::OCLImage1dRO:
+      case clang::BuiltinType::OCLImage1dRW:
+      case clang::BuiltinType::OCLImage1dWO:
+      case clang::BuiltinType::OCLImage1dArrayRO:
+      case clang::BuiltinType::OCLImage1dArrayRW:
+      case clang::BuiltinType::OCLImage1dArrayWO:
+      case clang::BuiltinType::OCLImage1dBufferRO:
+      case clang::BuiltinType::OCLImage1dBufferRW:
+      case clang::BuiltinType::OCLImage1dBufferWO:
+      case clang::BuiltinType::OCLImage2dRO:
+      case clang::BuiltinType::OCLImage2dRW:
+      case clang::BuiltinType::OCLImage2dWO:
+      case clang::BuiltinType::OCLImage2dArrayRO:
+      case clang::BuiltinType::OCLImage2dArrayRW:
+      case clang::BuiltinType::OCLImage2dArrayWO:
+      case clang::BuiltinType::OCLImage2dDepthRO:
+      case clang::BuiltinType::OCLImage2dDepthRW:
+      case clang::BuiltinType::OCLImage2dDepthWO:
+      case clang::BuiltinType::OCLImage2dArrayDepthRO:
+      case clang::BuiltinType::OCLImage2dArrayDepthRW:
+      case clang::BuiltinType::OCLImage2dArrayDepthWO:
+      case clang::BuiltinType::OCLImage2dMSAARO:
+      case clang::BuiltinType::OCLImage2dMSAARW:
+      case clang::BuiltinType::OCLImage2dMSAAWO:
+      case clang::BuiltinType::OCLImage2dArrayMSAARO:
+      case clang::BuiltinType::OCLImage2dArrayMSAARW:
+      case clang::BuiltinType::OCLImage2dArrayMSAAWO:
+      case clang::BuiltinType::OCLImage2dMSAADepthRO:
+      case clang::BuiltinType::OCLImage2dMSAADepthRW:
+      case clang::BuiltinType::OCLImage2dMSAADepthWO:
+      case clang::BuiltinType::OCLImage2dArrayMSAADepthRO:
+      case clang::BuiltinType::OCLImage2dArrayMSAADepthRW:
+      case clang::BuiltinType::OCLImage2dArrayMSAADepthWO:
+      case clang::BuiltinType::OCLImage3dRO:
+      case clang::BuiltinType::OCLImage3dRW:
+      case clang::BuiltinType::OCLImage3dWO:
       case clang::BuiltinType::OCLSampler:
       case clang::BuiltinType::OCLEvent:
       case clang::BuiltinType::OCLClkEvent:

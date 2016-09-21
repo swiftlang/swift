@@ -158,11 +158,6 @@ internal func _swift_Foundation_TypePreservingNSNumberWithCGFloat(
   _ value: CGFloat
 ) -> NSNumber
 
-@_silgen_name("_swift_Foundation_TypePreservingNSNumberWithBool")
-internal func _swift_Foundation_TypePreservingNSNumberWithBool(
-  _ value: Bool
-) -> NSNumber
-
 @_silgen_name("_swift_Foundation_TypePreservingNSNumberGetKind")
 internal func _swift_Foundation_TypePreservingNSNumberGetKind(
   _ value: NSNumber
@@ -203,11 +198,6 @@ internal func _swift_Foundation_TypePreservingNSNumberGetAsDouble(
 internal func _swift_Foundation_TypePreservingNSNumberGetAsCGFloat(
   _ value: NSNumber
 ) -> CGFloat
-
-@_silgen_name("_swift_Foundation_TypePreservingNSNumberGetAsBool")
-internal func _swift_Foundation_TypePreservingNSNumberGetAsBool(
-  _ value: NSNumber
-) -> Bool
 
 // Conversions between NSNumber and various numeric types. The
 // conversion to NSNumber is automatic (auto-boxing), while conversion
@@ -348,7 +338,7 @@ extension Bool: _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    return _swift_Foundation_TypePreservingNSNumberWithBool(self)
+    return NSNumber(value: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
@@ -456,7 +446,7 @@ extension NSNumber : _HasCustomAnyHashableRepresentation {
     case .CoreGraphicsCGFloat:
       return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsCGFloat(self))
     case .SwiftBool:
-      return AnyHashable(_swift_Foundation_TypePreservingNSNumberGetAsBool(self))
+      return AnyHashable(self.boolValue)
     }
   }
 }
@@ -501,17 +491,13 @@ extension Array : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSArray {
-    return unsafeBitCast(self._buffer._asCocoaArray() as AnyObject, to: NSArray.self)
+    return unsafeBitCast(self._bridgeToObjectiveCImpl(), to: NSArray.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     _ source: NSArray,
     result: inout Array?
   ) {
-    _precondition(
-      Swift._isBridgedToObjectiveC(Element.self),
-      "array element type is not bridged to Objective-C")
-
     // If we have the appropriate native storage already, just adopt it.
     if let native =
         Array._bridgeFromObjectiveCAdoptingNativeStorageOf(source) {
@@ -567,11 +553,12 @@ extension Array : _ObjectiveCBridgeable {
 
 extension NSDictionary : ExpressibleByDictionaryLiteral {
   public required convenience init(
-    dictionaryLiteral elements: (NSCopying, AnyObject)...
+    dictionaryLiteral elements: (Any, Any)...
   ) {
+    // FIXME: Unfortunate that the `NSCopying` check has to be done at runtime.
     self.init(
-      objects: elements.map { $0.1 },
-      forKeys: elements.map { $0.0 },
+      objects: elements.map { $0.1 as AnyObject },
+      forKeys: elements.map { $0.0 as AnyObject as! NSCopying },
       count: elements.count)
   }
 }
@@ -934,23 +921,13 @@ extension Set : _ObjectiveCBridgeable {
   }
 }
 
-/*
-FIXME(id-as-any): uncomment this when we can cast NSSet to Set<AnyHashable>.
 extension NSSet : _HasCustomAnyHashableRepresentation {
   // Must be @nonobjc to avoid infinite recursion during bridging
   @nonobjc
   public func _toCustomAnyHashable() -> AnyHashable? {
-    var builder = _SetBuilder<Element>(count: s!.count)
-    // FIXME(id-as-any): how to get the Hashable conformance here?
-    s!.enumerateObjects({
-      (anyMember: Any, stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyMember as AnyObject, Element.self))
-    })
-    return AnyHashable(self as Set<AnyHashable>)
+    return AnyHashable(self as! Set<AnyHashable>)
   }
 }
-*/
 
 extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
@@ -976,11 +953,43 @@ extension NSDictionary : Sequence {
     }
   }
 
+  // Bridging subscript.
+  @objc
+  public subscript(key: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
+    get {
+      // Deliberately avoid the subscript operator in case the dictionary
+      // contains non-copyable keys. This is rare since NSMutableDictionary
+      // requires them, but we don't want to paint ourselves into a corner.
+      return self.object(forKey: key)
+    }
+  }
+
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func makeIterator() -> Iterator {
     return Iterator(self)
+  }
+}
+
+extension NSMutableDictionary {
+  // Bridging subscript.
+  override public subscript(key: Any) -> Any? {
+    get {
+      return self.object(forKey: key)
+    }
+    @objc(_swift_setObject:forKeyedSubscript:)
+    set {
+      // FIXME: Unfortunate that the `NSCopying` check has to be done at
+      // runtime.
+      let copyingKey = key as AnyObject as! NSCopying
+      if let newValue = newValue {
+        self.setObject(newValue, forKey: copyingKey)
+      } else {
+        self.removeObject(forKey: copyingKey)
+      }
+    }
   }
 }
 
@@ -1003,7 +1012,7 @@ extension NSRange {
     length = x.count
   }
 
-  // FIXME(ABI)(compiler limitation): this API should be an extension on Range.
+  // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
   // Can't express it now because the compiler does not support conditional
   // extensions with type equality constraints.
   public func toRange() -> Range<Int>? {
@@ -1242,8 +1251,28 @@ extension NSSet {
   ///   receiver.
   @nonobjc
   public convenience init(set anSet: NSSet) {
-    // FIXME: This is a bit weird. Maybe there's a better way?
-    self.init(set: anSet as Set<NSObject> as Set<AnyHashable>)
+    // FIXME(performance)(compiler limitation): we actually want to do just
+    // `self = anSet.copy()`, but Swift does not have factory
+    // initializers right now.
+    let numElems = anSet.count
+    let stride = MemoryLayout<Optional<UnsafeRawPointer>>.stride
+    let alignment = MemoryLayout<Optional<UnsafeRawPointer>>.alignment
+    let bufferSize = stride * numElems
+    assert(stride == MemoryLayout<AnyObject>.stride)
+    assert(alignment == MemoryLayout<AnyObject>.alignment)
+
+    let rawBuffer = UnsafeMutableRawPointer.allocate(
+      bytes: bufferSize, alignedTo: alignment)
+    defer {
+      rawBuffer.deallocate(bytes: bufferSize, alignedTo: alignment)
+      _fixLifetime(anSet)
+    }
+    let valueBuffer = rawBuffer.bindMemory(
+     to: Optional<UnsafeRawPointer>.self, capacity: numElems)
+
+    CFSetGetValues(anSet, valueBuffer)
+    let valueBufferForInit = rawBuffer.assumingMemoryBound(to: AnyObject.self)
+    self.init(objects: valueBufferForInit, count: numElems)
   }
 }
 
@@ -1256,11 +1285,46 @@ extension NSDictionary {
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)
   public convenience init(dictionary otherDictionary: NSDictionary) {
-    // FIXME: This is a bit weird. Maybe there's a better way?
-    self.init(dictionary: otherDictionary as [NSObject: AnyObject]
-                                          as [AnyHashable: Any])
+    // FIXME(performance)(compiler limitation): we actually want to do just
+    // `self = otherDictionary.copy()`, but Swift does not have factory
+    // initializers right now.
+    let numElems = otherDictionary.count
+    let stride = MemoryLayout<AnyObject>.stride
+    let alignment = MemoryLayout<AnyObject>.alignment
+    let singleSize = stride * numElems
+    let totalSize = singleSize * 2
+    _sanityCheck(stride == MemoryLayout<NSCopying>.stride)
+    _sanityCheck(alignment == MemoryLayout<NSCopying>.alignment)
+
+    // Allocate a buffer containing both the keys and values.
+    let buffer = UnsafeMutableRawPointer.allocate(
+      bytes: totalSize, alignedTo: alignment)
+    defer {
+      buffer.deallocate(bytes: totalSize, alignedTo: alignment)
+      _fixLifetime(otherDictionary)
+    }
+
+    let valueBuffer = buffer.bindMemory(to: AnyObject.self, capacity: numElems)
+    let buffer2 = buffer + singleSize
+    let keyBuffer = buffer2.bindMemory(to: AnyObject.self, capacity: numElems)
+
+    _stdlib_NSDictionary_getObjects(
+      nsDictionary: otherDictionary,
+      objects: valueBuffer,
+      andKeys: keyBuffer)
+
+    let keyBufferCopying = buffer2.assumingMemoryBound(to: NSCopying.self)
+    self.init(objects: valueBuffer, forKeys: keyBufferCopying, count: numElems)
   }
 }
+
+@_silgen_name("__NSDictionaryGetObjects")
+func _stdlib_NSDictionary_getObjects(
+  nsDictionary: NSDictionary,
+  objects: UnsafeMutablePointer<AnyObject>?,
+  andKeys keys: UnsafeMutablePointer<AnyObject>?
+)
+
 
 //===----------------------------------------------------------------------===//
 // NSUndoManager
@@ -1352,7 +1416,7 @@ extension NSCoder {
 
   @nonobjc
   public func decodeObject(of classes: [AnyClass]?, forKey key: String) -> Any? {
-    var classesAsNSObjects: NSSet? = nil
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
@@ -1410,8 +1474,8 @@ extension NSCoder {
   @nonobjc
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject(of classes: [AnyClass]?, forKey key: String) throws -> Any? {
-    var error: NSError? = nil
-    var classesAsNSObjects: NSSet? = nil
+    var error: NSError?
+    var classesAsNSObjects: NSSet?
     if let theClasses = classes {
       classesAsNSObjects = NSSet(array: theClasses.map { $0 as AnyObject })
     }
@@ -1550,3 +1614,20 @@ extension AnyHashable : _ObjectiveCBridgeable {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// CVarArg for bridged types
+//===----------------------------------------------------------------------===//
+
+extension CVarArg where Self: _ObjectiveCBridgeable {
+  /// Default implementation for bridgeable types.
+  public var _cVarArgEncoding: [Int] {
+    let object = self._bridgeToObjectiveC()
+    _autorelease(object)
+    return _encodeBitsAsWords(object)
+  }
+}
+
+extension String: CVarArg {}
+extension Array: CVarArg {}
+extension Dictionary: CVarArg {}
+extension Set: CVarArg {}

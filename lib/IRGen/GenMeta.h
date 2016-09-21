@@ -85,6 +85,10 @@ namespace irgen {
                                                    CanType type,
                                                    SymbolReferenceKind refKind);
 
+  /// Get the type as it exists in Swift's runtime type system, removing any
+  /// erased generic parameters.
+  CanType getRuntimeReifiedType(IRGenModule &IGM, CanType type);
+
   /// Emit a reference to a compile-time constant piece of heap metadata, or
   /// return a null pointer if the type's heap metadata cannot be represented
   /// by a constant.

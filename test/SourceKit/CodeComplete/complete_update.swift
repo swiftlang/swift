@@ -13,7 +13,7 @@ func foo() {
 // RUN: %sourcekitd-test -req=complete.open -pos=8:5 %s -- %s \
 // RUN:   == -req=complete.update -pos=8:5 %s -- %s \
 // RUN:   == -req=complete.update -pos=8:5 %s -- %s > %t.update
-// RUN: FileCheck %s < %t.update
+// RUN: %FileCheck %s < %t.update
 // CHECK:   key.name: "advancedFeatures
 // CHECK: key.kind: source.lang.swift.codecomplete.group
 // CHECK:   key.name: "advancedFeatures
@@ -38,7 +38,7 @@ func test(x: X) {
 // RUN: %sourcekitd-test -req=complete.open -pos=34:5 -req-opts=group.stems=0,group.overloads=0 %s -- %s \
 // RUN:   == -req=complete.update -pos=34:5 -req-opts=group.stems=1 %s -- %s \
 // RUN:   == -req=complete.update -pos=34:5 -req-opts=group.stems=0,group.overloads=0 %s -- %s > %t.update.groupings
-// RUN: FileCheck %s -check-prefix=ONE_GROUP < %t.update.groupings
+// RUN: %FileCheck %s -check-prefix=ONE_GROUP < %t.update.groupings
 // ONE_GROUP-NOT: key.name: "aaa"
 // ONE_GROUP: key.kind: source.lang.swift.codecomplete.group,
 // ONE_GROUP-NEXT: key.name: ""

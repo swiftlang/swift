@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // RUN: not %target-swift-frontend -parse -debug-generic-signatures %s > %t.dump 2>&1 
-// RUN: FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
+// RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
 
 protocol P1 {
   associatedtype Assoc
@@ -41,8 +41,10 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 // CHECK-GENERIC-NEXT:   T : P2 [explicit
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 witness marker
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T.AssocP2 [redundant]
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc witness marker
 // CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
+// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2.Assoc [redundant]
 // CHECK-GENERIC-NEXT: Generic signature
 
 

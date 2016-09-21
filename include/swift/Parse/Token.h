@@ -167,7 +167,7 @@ public:
     case 'n':
       return Text == "nonmutating";
     case 'o':
-      return Text == "optional" || Text == "override";
+      return Text == "open" || Text == "override" || Text == "optional";
     case 'p':
       return Text == "prefix" || Text == "postfix";
     case 'r':

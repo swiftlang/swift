@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // FIXME: This test could use %clang-importer-sdk, but the compiler crashes.
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // XFAIL: linux
@@ -255,7 +255,7 @@ class SomeSwiftClass {
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds void (%swift.type*)*, void (%swift.type*)** [[T2]], i64 10
 // CHECK-NEXT: load void (%swift.type*)*, void (%swift.type*)** [[T3]], align 8
 func class_bounded_metatype<T: SomeSwiftClass>(_ t : T) {
-  t.dynamicType.foo()
+  type(of: t).foo()
 }
 
 class WeakRef<T: AnyObject> {

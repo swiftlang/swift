@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 import Swift
 
@@ -328,7 +328,7 @@ func closeOverLetLValue() {
 
 // Use an external function so inout deshadowing cannot see its body.
 @_silgen_name("takesNoEscapeClosure")
-func takesNoEscapeClosure(fn : @noescape () -> Int)
+func takesNoEscapeClosure(fn : () -> Int)
 
 struct StructWithMutatingMethod {
   var x = 42

@@ -1,22 +1,22 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=AFTER_POUND | FileCheck -check-prefix=CHECK-AFTER_POUND %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=AFTER_POUND | %FileCheck -check-prefix=CHECK-AFTER_POUND %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_BASIC | FileCheck -check-prefix=CHECK-SELECTOR_BASIC %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_BASIC | %FileCheck -check-prefix=CHECK-SELECTOR_BASIC %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG1 | FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG1 | %FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG2 | FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=SELECTOR_ARG2 | %FileCheck -check-prefix=CHECK-SELECTOR_ARG %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR1 | FileCheck -check-prefix=CHECK-IN_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR1 | %FileCheck -check-prefix=CHECK-IN_SELECTOR %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR2 | FileCheck -check-prefix=CHECK-IN_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR2 | %FileCheck -check-prefix=CHECK-IN_SELECTOR %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR3 | FileCheck -check-prefix=CHECK-IN_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR3 | %FileCheck -check-prefix=CHECK-IN_SELECTOR %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR4 | FileCheck -check-prefix=CHECK-IN_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR4 | %FileCheck -check-prefix=CHECK-IN_SELECTOR %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR5 | FileCheck -check-prefix=CHECK-IN_SUPER_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR5 | %FileCheck -check-prefix=CHECK-IN_SUPER_SELECTOR %s
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR6 | FileCheck -check-prefix=CHECK-IN_SUPER_SELECTOR %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=IN_SELECTOR6 | %FileCheck -check-prefix=CHECK-IN_SUPER_SELECTOR %s
 
 // REQUIRES: objc_interop
 

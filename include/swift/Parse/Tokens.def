@@ -130,7 +130,6 @@ STMT_KEYWORD(catch)
 // Expression keywords.
 KEYWORD(as)
 KEYWORD(Any)
-KEYWORD(dynamicType)
 KEYWORD(false)
 KEYWORD(is)
 KEYWORD(nil)

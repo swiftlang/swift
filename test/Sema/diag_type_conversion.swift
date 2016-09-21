@@ -1,4 +1,8 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift %clang-importer-sdk
+
+// REQUIRES: objc_interop
+
+import Foundation
 
 func foo1(_ a: [Int]) {}
 func foo2(_ a : UnsafePointer<Int>) {}
@@ -33,4 +37,14 @@ struct S1 : P1 {}
 func foo9(s : S1) {}
 func foo10(p : P1) {
   foo9(s : p) // expected-error {{cannot convert value of type 'P1' to expected argument type 'S1'}} {{13-13= as! S1}}
+}
+
+func foo11(a : [AnyHashable]) {}
+func foo12(b : [NSObject]) {
+  foo11(a : b)
+}
+
+func foo13(a : [AnyHashable : Any]) {}
+func foo14(b : [NSObject : AnyObject]) {
+  foo13(a : b)
 }

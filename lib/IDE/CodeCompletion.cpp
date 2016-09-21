@@ -466,7 +466,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::CallParameterName:
     case ChunkKind::CallParameterInternalName:
     case ChunkKind::CallParameterColon:
-    case ChunkKind::DeclAttrParamEqual:
+    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallParameterType:
     case ChunkKind::CallParameterClosureType:
     case ChunkKind::GenericParameterName:
@@ -1148,7 +1148,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case ChunkKind::RethrowsKeyword:
     case ChunkKind::DeclIntroducer:
     case ChunkKind::CallParameterColon:
-    case ChunkKind::DeclAttrParamEqual:
+    case ChunkKind::DeclAttrParamColon:
     case ChunkKind::CallParameterType:
     case ChunkKind::CallParameterClosureType:
     case ChunkKind::OptionalBegin:
@@ -1185,7 +1185,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       switch (C.getKind()) {
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterClosureType:
-      case ChunkKind::DeclAttrParamEqual:
+      case ChunkKind::DeclAttrParamColon:
         continue;
       case ChunkKind::ThrowsKeyword:
       case ChunkKind::RethrowsKeyword:
@@ -1387,7 +1387,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
-    return !performTypeLocChecking(P.Context, ParsedTypeLoc, /*SIL*/ false,
+    return !performTypeLocChecking(P.Context, ParsedTypeLoc,
                                    CurDeclContext, false);
   }
 
@@ -1450,71 +1450,114 @@ void CodeCompletionCallbacksImpl::completeExpr() {
   deliverCompletionResults();
 }
 
-ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
-    DC(DC), BaseTy(Ty->getRValueType()){
-  auto D = BaseTy->getNominalOrBoundGenericNominal();
-  if (!D)
-    return;
-  SmallVector<Type, 3> Scrach;
-  auto Params = D->getInnermostGenericParamTypes();
-  auto Args = BaseTy->getAllGenericArgs(Scrach);
-  assert(Params.size() == Args.size());
-  for (unsigned I = 0, N = Params.size(); I < N; I++) {
-    Map[Params[I]->getCanonicalType()->castTo<GenericTypeParamType>()] = Args[I];
+struct ArchetypeTransformer::Implementation {
+  DeclContext *DC;
+  Type BaseTy;
+  std::function<Type(Type)> TheFunc;
+  TypeSubstitutionMap Map;
+
+  Implementation(DeclContext *DC, Type Ty) : DC(DC),
+                                             BaseTy(Ty->getRValueType()),
+                                             TheFunc(nullptr) {
+    auto D = BaseTy->getNominalOrBoundGenericNominal();
+    if (!D)
+      return;
+    SmallVector<Type, 3> Scrach;
+    auto Params = D->getInnermostGenericParamTypes();
+    auto Args = BaseTy->getAllGenericArgs(Scrach);
+    assert(Params.size() == Args.size());
+    for (unsigned I = 0, N = Params.size(); I < N; I++) {
+      Map[Params[I]->getCanonicalType()->castTo<GenericTypeParamType>()] = Args[I];
+    }
   }
+
+  Type mapGenericTypeParam(Type Ty) {
+    if (auto GTP = Ty->getAs<GenericTypeParamType>()) {
+      for (auto It : Map) {
+        auto Known = It.getFirst()->getAs<GenericTypeParamType>();
+        if (GTP->getIndex() == Known->getIndex() &&
+            GTP->getDepth() == Known->getDepth()) {
+          return It.getSecond();
+        }
+      }
+    }
+    return Type();
+  }
+};
+
+ArchetypeTransformer::ArchetypeTransformer(DeclContext *DC, Type Ty) :
+  Impl(*new Implementation(DC, Ty)){}
+
+ArchetypeTransformer::~ArchetypeTransformer() { delete &Impl; }
+
+static Type
+resolveAssociatedType(DeclContext *DC, Type BaseTy, SubstitutableType *SubTy) {
+  llvm::SmallVector<Identifier, 1> Names;
+  for (auto *AT = SubTy; AT; AT = AT->getParent()) {
+    if (AT->getName().str() != "Self")
+      Names.insert(Names.begin(), AT->getName());
+  }
+  if (auto MT = checkMemberType(*DC, BaseTy, Names)) {
+    if (auto NAT = dyn_cast<NameAliasType>(MT.getPointer()))
+      return Type(NAT->getSinglyDesugaredType());
+    else
+      return MT;
+  }
+  return Type();
 }
 
-llvm::function_ref<Type(Type)> ArchetypeTransformer::getTransformerFunc() {
-  if (TheFunc)
-    return TheFunc;
-  TheFunc = [&](Type Ty) {
-    if (Ty->getKind() != TypeKind::Archetype)
+static Type
+getConformedProtocols(DeclContext *DC, ArchetypeType *ATT) {
+  auto Conformances = ATT->getConformsTo();
+  if (Conformances.size() == 1) {
+    return Conformances[0]->getDeclaredType();
+  } else if (!Conformances.empty()) {
+    llvm::SmallVector<Type, 3> ConformedTypes;
+    for (auto PD : Conformances) {
+      ConformedTypes.push_back(PD->getDeclaredType());
+    }
+    return ProtocolCompositionType::get(DC->getASTContext(), ConformedTypes);
+  }
+  return Type();
+}
+
+llvm::function_ref<Type(Type)>
+ArchetypeTransformer::getTransformerFunc() {
+  if (Impl.TheFunc)
+    return Impl.TheFunc;
+  Impl.TheFunc = [&](Type Ty) {
+    if (!Ty->is<SubstitutableType>())
       return Ty;
-    if (Cache.count(Ty.getPointer()) > 0) {
-      return Cache[Ty.getPointer()];
-    }
-    Type Result = Ty;
-    auto *RootArc = cast<ArchetypeType>(Result.getPointer());
-    llvm::SmallVector<Identifier, 1> Names;
-    bool SelfDerived = false;
-    for (auto *AT = RootArc; AT; AT = AT->getParent()) {
-      if (!AT->getSelfProtocol())
-        Names.insert(Names.begin(), AT->getName());
-      else
-        SelfDerived = true;
-    }
-    if (SelfDerived) {
-      if (auto MT = checkMemberType(*DC, BaseTy, Names)) {
-        if (auto NAT = dyn_cast<NameAliasType>(MT.getPointer())) {
-          Result = NAT->getSinglyDesugaredType();
-        } else {
-          Result =  MT;
+    auto OriginalTy = Ty;
+    Ty = Ty->getCanonicalType();
+
+    // Try to resolve generic type params.
+    if (Type Result = Impl.mapGenericTypeParam(Ty))
+      return Result;
+
+    // Try to translate associated type with the concrete base type.
+    if (Type Result = resolveAssociatedType(Impl.DC, Impl.BaseTy,
+                                            Ty->getAs<SubstitutableType>())) {
+      return Result.transform([&](Type Input) {
+        if (auto *ATT = Input->getAs<ArchetypeType>()) {
+          if (auto Conform = getConformedProtocols(Impl.DC, ATT))
+            return Conform;
         }
-      }
-    } else {
-      Result = Ty.subst(DC->getParentModule(), Map, SubstFlags::IgnoreMissing);
+        return Input;
+      });
     }
 
-    auto ATT = dyn_cast<ArchetypeType>(Result.getPointer());
-    if (ATT && !ATT->getParent()) {
-      auto Conformances = ATT->getConformsTo();
-      if (Conformances.size() == 1) {
-        Result = Conformances[0]->getDeclaredType();
-      } else if (!Conformances.empty()) {
-        llvm::SmallVector<Type, 3> ConformedTypes;
-        for (auto PD : Conformances) {
-          ConformedTypes.push_back(PD->getDeclaredType());
-        }
-        Result = ProtocolCompositionType::get(DC->getASTContext(),
-                                              ConformedTypes);
+    // For those archetypes that cannot be translated, use the conformances to
+    // provide users' some insight.
+    if (auto *ATT = Ty->getAs<ArchetypeType>()) {
+      if (Type Result = getConformedProtocols(Impl.DC, ATT)) {
+        return Result;
       }
     }
-    if (Result->getKind() != TypeKind::Archetype)
-      Result = Result.transform(getTransformerFunc());
-    Cache[Ty.getPointer()] = Result;
-    return Result;
+
+    return OriginalTy;
   };
-  return TheFunc;
+  return Impl.TheFunc;
 }
 
 namespace {
@@ -1535,11 +1578,15 @@ static bool isTopLevelContext(const DeclContext *DC) {
 
 static Type getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (auto FT = FD->getType()->getAs<FunctionType>()) {
-      return FT->getResult();
+    if (FD->hasType()) {
+      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+        return FT->getResult();
+      }
     }
   } else if (auto CE = dyn_cast<AbstractClosureExpr>(DC)) {
-    return CE->getResultType();
+    if (CE->getType()) {
+      return CE->getResultType();
+    }
   }
   return Type();
 }
@@ -1633,6 +1680,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool HaveLParen = false;
   bool HaveRParen = false;
   bool IsSuperRefExpr = false;
+  bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
   bool IsDynamicLookup = false;
   bool PreferFunctionReferencesToCalls = false;
@@ -1786,6 +1834,8 @@ public:
   void setIsSuperRefExpr() {
     IsSuperRefExpr = true;
   }
+
+  void setIsSelfRefExpr(bool value) { IsSelfRefExpr = value; }
 
   void setIsKeyPathExpr() {
     IsKeyPathExpr = true;
@@ -2225,8 +2275,9 @@ public:
           Builder.addComma();
         if (BodyParams) {
           // If we have a local name for the parameter, pass in that as well.
-          auto name = BodyParams->get(i)->getName();
-          Builder.addCallParameter(Name, name, ParamType, TupleElt.isVararg(),
+          auto argName = BodyParams->get(i)->getArgumentName();
+          auto bodyName = BodyParams->get(i)->getName();
+          Builder.addCallParameter(argName, bodyName, ParamType, TupleElt.isVararg(),
                                    true);
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(), true);
@@ -2244,8 +2295,9 @@ public:
 
       modifiedBuilder = true;
       if (BodyParams) {
-        auto name = BodyParams->get(0)->getName();
-        Builder.addCallParameter(Identifier(), name, T,
+        auto argName = BodyParams->get(0)->getArgumentName();
+        auto bodyName = BodyParams->get(0)->getName();
+        Builder.addCallParameter(argName, bodyName, T,
                                  /*IsVarArg*/false, true);
       } else
         Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false, true);
@@ -2319,7 +2371,10 @@ public:
 
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
-    foundFunction(AFT);
+    if (AFD)
+      foundFunction(AFD);
+    else
+      foundFunction(AFT);
 
     // Add the pattern, possibly including any default arguments.
     auto addPattern = [&](bool includeDefaultArgs = true) {
@@ -2481,7 +2536,7 @@ public:
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
-                          Optional<Type> Result,
+                          Optional<Type> Result, bool IsOnMetatype = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD);
@@ -2492,7 +2547,7 @@ public:
                             ->castTo<AnyFunctionType>();
 
     bool needInit = false;
-    if (IsSuperRefExpr) {
+    if (!IsOnMetatype) {
       assert(addName.empty());
       assert(isa<ConstructorDecl>(CurrDeclContext) &&
              "can call super.init only inside a constructor");
@@ -2574,7 +2629,8 @@ public:
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
-        addConstructorCall(cast<ConstructorDecl>(init), Reason, None, name);
+        addConstructorCall(cast<ConstructorDecl>(init), Reason, None,
+                           /*IsOnMetatype=*/true, name);
       }
     }
   }
@@ -2821,16 +2877,17 @@ public:
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
           if (auto AT = MT->getInstanceType()) {
-            if (AT->getKind() == TypeKind::NameAlias &&
+            if (!CD->getType()->is<ErrorType>() &&
+                AT->getKind() == TypeKind::NameAlias &&
                 AT->getDesugaredType() == CD->getResultType().getPointer())
               Result = AT;
           }
           addConstructorCall(CD, Reason, Result);
         }
-        if (IsSuperRefExpr) {
+        if (IsSuperRefExpr || IsSelfRefExpr) {
           if (!isa<ConstructorDecl>(CurrDeclContext))
             return;
-          addConstructorCall(CD, Reason, None);
+          addConstructorCall(CD, Reason, None, /*IsOnMetatype=*/false);
         }
         return;
       }
@@ -3007,22 +3064,6 @@ public:
       return true;
     }
     return false;
-  }
-
-  bool isOptionSetDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
-    if (!optionSetType)
-      return false;
-
-    SmallVector<ProtocolConformance *, 1> conformances;
-    return D->lookupConformance(CurrDeclContext->getParentModule(),
-                                optionSetType, conformances);
-  }
-
-  bool isOptionSet(Type Ty) {
-    return Ty &&
-           Ty->getNominalOrBoundGenericNominal() &&
-           isOptionSetDecl(Ty->getNominalOrBoundGenericNominal());
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {
@@ -3940,6 +3981,21 @@ public:
     addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
 
+  static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
+                                    Optional<DeclKind> DK) {
+    if (DeclAttribute::isUserInaccessible(DAK))
+      return false;
+    if (DeclAttribute::isDeclModifier(DAK))
+      return false;
+    if (DeclAttribute::shouldBeRejectedByParser(DAK))
+      return false;
+    if (!IsInSil && DeclAttribute::isSilOnly(DAK))
+      return false;
+    if (!DK.hasValue())
+      return true;
+    return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.getValue());
+  }
+
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
     // FIXME: also include user-defined attribute keywords
     StringRef TargetName = "Declaration";
@@ -3954,14 +4010,8 @@ public:
     }
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (!DeclAttribute::isUserInaccessible(DAK_##NAME) &&                     \
-        !DeclAttribute::isDeclModifier(DAK_##NAME) &&                         \
-        !DeclAttribute::shouldBeRejectedByParser(DAK_##NAME) &&               \
-        (!DeclAttribute::isSilOnly(DAK_##NAME) || IsInSil)) {                 \
-          if (!DK.hasValue() || DeclAttribute::canAttributeAppearOnDeclKind   \
-            (DAK_##NAME, DK.getValue()))                                      \
-              addDeclAttrKeyword(#KEYWORD, Description);                      \
-    }
+    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, DK))                       \
+      addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
   }
 
@@ -4033,6 +4083,11 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
 
   bool hasFuncIntroducer = false;
   bool hasVarIntroducer = false;
+  bool hasTypealiasIntroducer = false;
+  bool hasInitializerModifier = false;
+  bool hasAccessModifier = false;
+  bool hasOverride = false;
+  bool hasOverridabilityModifier = false;
 
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
@@ -4041,7 +4096,19 @@ public:
       : Sink(Sink), TypeResolver(createLazyResolver(Ctx)),
         CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
     hasFuncIntroducer = isKeywordSpecified("func");
-    hasVarIntroducer = isKeywordSpecified("var") || isKeywordSpecified("let");
+    hasVarIntroducer = isKeywordSpecified("var") ||
+                       isKeywordSpecified("let");
+    hasTypealiasIntroducer = isKeywordSpecified("typealias");
+    hasInitializerModifier = isKeywordSpecified("required") ||
+                             isKeywordSpecified("convenience");
+    hasAccessModifier = isKeywordSpecified("private") ||
+                        isKeywordSpecified("fileprivate") ||
+                        isKeywordSpecified("internal") ||
+                        isKeywordSpecified("public") ||
+                        isKeywordSpecified("open");
+    hasOverride = isKeywordSpecified("override");
+    hasOverridabilityModifier = isKeywordSpecified("final") ||
+                                isKeywordSpecified("open");
   }
 
   bool isKeywordSpecified(StringRef Word) {
@@ -4049,9 +4116,21 @@ public:
       != ParsedKeywords.end();
   }
 
+  void addAccessControl(const ValueDecl *VD,
+                        CodeCompletionResultBuilder &Builder) {
+    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
+    auto AccessibilityOfContext =
+      CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
+        ->getFormalAccess();
+    auto Access = std::min(VD->getFormalAccess(), AccessibilityOfContext);
+    // Only emit 'public', not needed otherwise.
+    if (Access >= Accessibility::Public)
+      Builder.addAccessControlKeyword(Access);
+  }
+
   void addValueOverride(const ValueDecl *VD, DeclVisibilityKind Reason,
                         CodeCompletionResultBuilder &Builder,
-                        StringRef DeclIntroducer = "") {
+                        bool hasDeclIntroducer) {
 
     class DeclNameOffsetLocatorPrinter : public StreamPrinter {
     public:
@@ -4075,41 +4154,25 @@ public:
         Options.setArchetypeSelfTransform(transformType, VD->getDeclContext());
       Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
-      Options.SkipAttributes = true;
+      Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
 
-    assert(CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext());
-    Accessibility AccessibilityOfContext =
-        CurrDeclContext->getAsGenericTypeOrGenericTypeExtensionContext()
-            ->getFormalAccess();
-
-    bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
-    bool missingAccess = !isKeywordSpecified("private") &&
-                         !isKeywordSpecified("fileprivate") &&
-                         !isKeywordSpecified("internal") &&
-                         !isKeywordSpecified("public");
-    bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
-                           !isKeywordSpecified("override");
-
-    if (missingDeclIntroducer && missingAccess)
-      Builder.addAccessControlKeyword(
-          std::min(VD->getFormalAccess(), AccessibilityOfContext));
+    if (!hasDeclIntroducer && !hasAccessModifier)
+      addAccessControl(VD, Builder);
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    if (missingDeclIntroducer && missingOverride)
+    bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
+                           !hasOverride;
+    if (!hasDeclIntroducer && missingOverride)
       Builder.addOverrideKeyword();
 
-    if (missingDeclIntroducer) {
-      if (DeclIntroducer.empty())
-        Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
-      else
-        Builder.addDeclIntroducer(DeclIntroducer);
-    }
+    if (!hasDeclIntroducer)
+      Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
 
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
   }
@@ -4119,7 +4182,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(FD);
-    addValueOverride(FD, Reason, Builder);
+    addValueOverride(FD, Reason, Builder, hasFuncIntroducer);
     Builder.addBraceStmtWithCursor();
   }
 
@@ -4128,7 +4191,7 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(VD);
-    addValueOverride(VD, Reason, Builder);
+    addValueOverride(VD, Reason, Builder, hasVarIntroducer);
   }
 
   void addTypeAlias(const AssociatedTypeDecl *ATD, DeclVisibilityKind Reason) {
@@ -4136,19 +4199,46 @@ public:
       CodeCompletionResult::ResultKind::Declaration,
       SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(ATD);
-    addValueOverride(ATD, Reason, Builder, "typealias ");
+    if (!hasTypealiasIntroducer && !hasAccessModifier)
+      addAccessControl(ATD, Builder);
+    if (!hasTypealiasIntroducer)
+      Builder.addDeclIntroducer("typealias ");
+    Builder.addTextChunk(ATD->getName().str());
     Builder.addTextChunk(" = ");
     Builder.addSimpleNamedParameter("Type");
   }
 
-  void addConstructor(const ConstructorDecl *CD) {
+  void addConstructor(const ConstructorDecl *CD, DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
     Builder.setAssociatedDecl(CD);
 
+    if (!hasAccessModifier)
+      addAccessControl(CD, Builder);
+
+    if (!hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+        CD->isDesignatedInit() && !CD->isRequired())
+      Builder.addOverrideKeyword();
+
+    // Emit 'required' if we're in class context, 'required' is not specified,
+    // and 1) this is a protocol conformance and the class is not final, or 2)
+    // this is subclass and the initializer is marked as required.
+    bool needRequired = false;
+    auto C = CurrDeclContext->getAsClassOrClassExtensionContext();
+    if (C && !isKeywordSpecified("required")) {
+      if (Reason ==
+            DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal &&
+          !C->isFinal())
+        needRequired = true;
+      else if (Reason == DeclVisibilityKind::MemberOfSuper && CD->isRequired())
+        needRequired = true;
+    }
+
     llvm::SmallString<256> DeclStr;
+    if (needRequired)
+      DeclStr += "required ";
     {
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
@@ -4182,7 +4272,9 @@ public:
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
 
-    bool hasIntroducer = hasFuncIntroducer || hasVarIntroducer;
+    bool hasIntroducer = hasFuncIntroducer ||
+                         hasVarIntroducer ||
+                         hasTypealiasIntroducer;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       // We cannot override operators as members.
@@ -4193,30 +4285,31 @@ public:
       if (FD->isAccessor())
         return;
 
-      if (!hasIntroducer || hasFuncIntroducer)
+      if (hasFuncIntroducer || (!hasIntroducer && !hasInitializerModifier))
         addMethodOverride(FD, Reason);
       return;
     }
 
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (!hasIntroducer || hasVarIntroducer) {
+      if (hasVarIntroducer || (!hasIntroducer && !hasInitializerModifier))
         addVarOverride(VD, Reason);
-      }
+      return;
     }
 
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
-      if (hasIntroducer || isKeywordSpecified("override"))
+      if (hasIntroducer || hasOverride || hasOverridabilityModifier)
         return;
       if (CD->isRequired() || CD->isDesignatedInit())
-        addConstructor(CD);
+        addConstructor(CD, Reason);
       return;
     }
   }
 
   void addDesignatedInitializers(Type CurrTy) {
-    if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
+    if (hasFuncIntroducer || hasVarIntroducer || hasTypealiasIntroducer ||
+        hasOverridabilityModifier)
       return;
 
     assert(CurrTy);
@@ -4233,12 +4326,14 @@ public:
       if (Constructor->hasStubImplementation())
         continue;
       if (Constructor->isDesignatedInit())
-        addConstructor(Constructor);
+        addConstructor(Constructor, DeclVisibilityKind::MemberOfSuper);
     }
   }
 
   void addAssociatedTypes(Type CurrTy) {
-    if (hasFuncIntroducer || hasVarIntroducer || isKeywordSpecified("override"))
+    if (!hasTypealiasIntroducer &&
+        (hasFuncIntroducer || hasVarIntroducer || hasInitializerModifier ||
+         hasOverride || hasOverridabilityModifier))
       return;
 
     NominalTypeDecl *NTD = CurrTy->getAnyNominal();
@@ -5002,6 +5097,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (ExprType) {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
+  if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(ParsedExpr)) {
+    Lookup.setIsSelfRefExpr(DRE->getDecl()->getName() == Context.Id_self);
+  }
+
   if (isInsideObjCSelector())
     Lookup.includeInstanceMembers();
   if (PreferFunctionReferencesToCalls)

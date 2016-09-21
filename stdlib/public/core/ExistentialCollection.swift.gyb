@@ -43,32 +43,47 @@ internal func _abstract(
 ///
 /// - SeeAlso: `AnySequence`
 public struct AnyIterator<Element> : IteratorProtocol {
-  /// Creates an iterator that wraps `base` but whose type depends only on the
-  /// type of `I.Element`.
+  /// Creates an iterator that wraps a base iterator but whose type depends
+  /// only on the base iterator's element type.
   ///
-  /// Example:
+  /// You can use `AnyIterator` to hide the type signature of a more complex
+  /// iterator. For example, the `digits()` function in the following example
+  /// creates an iterator over a collection that lazily maps the elements of a
+  /// `CountableRange<Int>` instance to strings. Instead of returning an
+  /// iterator with a type that encapsulates the implementation of the
+  /// collection, the `digits()` function first wraps the iterator in an
+  /// `AnyIterator` instance.
   ///
   ///     func digits() -> AnyIterator<String> {
-  ///       let lazyStrings = (0..<10).lazy.map { String($0) }
+  ///         let lazyStrings = (0..<10).lazy.map { String($0) }
+  ///         let iterator:
+  ///             LazyMapIterator<IndexingIterator<CountableRange<Int>>, String>
+  ///             = lazyStrings.makeIterator()
   ///
-  ///       // This is a really complicated type of no interest to our
-  ///       // clients.
-  ///       let iterator: MapSequenceIterator<RangeIterator<Int>, String>
-  ///         = lazyStrings.makeIterator()
-  ///       return AnyIterator(iterator)
+  ///         return AnyIterator(iterator)
   ///     }
+  ///
+  /// - Parameter base: An iterator to type-erase.
   public init<I : IteratorProtocol>(_ base: I) where I.Element == Element {
     self._box = _IteratorBox(base)
   }
 
-  /// Creates an iterator whose `next` method invokes `body` and returns the
-  /// result.
+  /// Creates an iterator that wraps the given closure in its `next()` method.
   ///
-  /// Example:
+  /// The following example creates an iterator that counts up from the initial
+  /// value of an integer `x` to 15:
   ///
   ///     var x = 7
-  ///     let iterator = AnyIterator { x < 15 ? x++ : nil }
-  ///     let a = Array(iterator) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+  ///     let iterator: AnyIterator<Int> = AnyIterator {
+  ///         defer { x += 1 }
+  ///         return x < 15 ? x : nil
+  ///     }
+  ///     let a = Array(iterator)
+  ///     // a == [7, 8, 9, 10, 11, 12, 13, 14]
+  ///
+  /// - Parameter body: A closure that returns an optional element. `body` is
+  ///   executed each time the `next()` method is called on the resulting
+  ///   iterator.
   public init(_ body: @escaping () -> Element?) {
     self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
@@ -144,19 +159,19 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal var _underestimatedCount: Int { _abstract() }
 
   internal func _map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     _abstract()
   }
 
   internal func _filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     _abstract()
   }
 
   internal func _forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     _abstract()
   }
@@ -168,7 +183,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   internal func __preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     _abstract()
   }
@@ -185,6 +200,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   end
 
 %   override = 'override' if Kind != 'Sequence' else ''
+  internal ${override} func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
+  
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
@@ -196,6 +217,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
+  
+  internal ${override} func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    _abstract()
+  }
 
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
@@ -203,7 +230,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     _abstract()
   }
@@ -333,17 +360,17 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return _base.underestimatedCount
   }
   internal override func _map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
   internal override func _filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(isIncluded)
   }
   internal override func _forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     return try _base.forEach(body)
   }
@@ -353,7 +380,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return _base._customContainsEquatableElement(element)
   }
   internal override func __preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
@@ -364,11 +391,21 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     -> UnsafeMutablePointer<Element> {
     return _base._copyContents(initializing: ptr)
   }
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
+  }
   internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
   internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
+  }
+  internal override func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _${Kind}Box<S.SubSequence>(_base: _base.prefix(while: predicate))
   }
   internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
@@ -379,7 +416,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   for ResultKind in EqualAndWeakerKinds:
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${ResultKind}<Element>] {
     return try _base.split(
       maxSplits: maxSplits,
@@ -522,14 +559,14 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingIterator: @escaping () -> Iterator
+  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
 ///
-/// Forwards operations to an arbitrary underlying sequence having the
-/// same `Element` type, hiding the specifics of the underlying
-/// `Sequence`.
+/// An instance of `AnySequence` forwards its operations to an underlying base
+/// sequence having the same `Element` type, hiding the specifics of the
+/// underlying sequence.
 ///
 /// - SeeAlso: `AnyIterator`
 public struct AnySequence<Element> : Sequence {
@@ -565,8 +602,6 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
-  ///
-  /// - Complexity: O(1).
   public func makeIterator() -> AnyIterator<Element> {
     return _box._makeIterator()
   }
@@ -576,21 +611,27 @@ extension Any${Kind} {
   }
 
   public func map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _box._map(transform)
   }
 
   public func filter(
-    _ isIncluded: @noescape (Element) throws -> Bool
+    _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _box._filter(isIncluded)
   }
 
   public func forEach(
-    _ body: @noescape (Element) throws -> Void
+    _ body: (Element) throws -> Void
   ) rethrows {
     return try _box._forEach(body)
+  }
+
+  public func drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._drop(while: predicate))
   }
 
   public func dropFirst(_ n: Int) -> Any${Kind}<Element> {
@@ -599,6 +640,12 @@ extension Any${Kind} {
 
   public func dropLast(_ n: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropLast(n))
+  }
+
+  public func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._prefix(while: predicate))
   }
 
   public func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
@@ -612,7 +659,7 @@ extension Any${Kind} {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Element) throws -> Bool
+    whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [Any${Kind}<Element>] {
     return try _box._split(
       maxSplits: maxSplits,
@@ -620,8 +667,14 @@ extension Any${Kind} {
       whereSeparator: isSeparator)
   }
 
+  public func _customContainsEquatableElement(
+    _ element: Element
+  ) -> Bool? {
+    return _box.__customContainsEquatableElement(element)
+  }
+
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _box.__preprocessingPass(preprocess)
   }
@@ -664,7 +717,7 @@ internal final class _IndexBox<
   }
 
   internal var _typeID: ObjectIdentifier {
-    return ObjectIdentifier(self.dynamicType)
+    return ObjectIdentifier(type(of: self))
   }
 
   internal func _unbox<T : Comparable>() -> T? {
@@ -680,8 +733,7 @@ internal final class _IndexBox<
   }
 }
 
-/// A wrapper over an underlying index that hides
-/// the specific underlying type.
+/// A wrapper over an underlying index that hides the specific underlying type.
 ///
 /// - SeeAlso: `AnyCollection`
 public struct AnyIndex {
@@ -702,15 +754,27 @@ public struct AnyIndex {
 }
 
 extension AnyIndex : Comparable {
-  /// Returns `true` iff `lhs` and `rhs` wrap equal underlying indices.
+  /// Returns a Boolean value indicating whether two indices wrap equal
+  /// underlying indices.
   ///
-  /// - Precondition: The types of indices wrapped by `lhs` and `rhs` are
-  ///   identical.
+  /// The types of the two underlying indices must be identical.
+  ///
+  /// - Parameters:
+  ///   - lhs: An index to compare.
+  ///   - rhs: Another index to compare.
   public static func == (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
     _precondition(lhs._typeID == rhs._typeID, "base index types differ")
     return lhs._box._isEqual(to: rhs._box)
   }
 
+  /// Returns a Boolean value indicating whether the first argument represents a
+  /// position before the second argument.
+  ///
+  /// The types of the two underlying indices must be identical.
+  ///
+  /// - Parameters:
+  ///   - lhs: An index to compare.
+  ///   - rhs: Another index to compare.
   public static func < (lhs: AnyIndex, rhs: AnyIndex) -> Bool {
     _precondition(lhs._typeID == rhs._typeID, "base index types differ")
     return lhs._box._isLess(than: rhs._box)
@@ -733,29 +797,33 @@ protocol _AnyCollectionProtocol : Collection {
 /// A type-erased wrapper over any collection with indices that
 /// support ${Traversal.lower().replace('omacc', 'om acc')} traversal.
 ///
-/// Forwards operations to an arbitrary underlying collection having the
+/// An `${Self}` instance forwards its operations to a base collection having the
 /// same `Element` type, hiding the specifics of the underlying
-/// `Collection`.
+/// collection.
 ///
 /// - SeeAlso: ${', '.join('`Any%sCollection`' % t for t in (2 * TRAVERSALS)[ti + 1 : ti + 3]) }
 public struct ${Self}<Element>
   : _AnyCollectionProtocol, ${SelfProtocol} {
 
+//  public typealias Indices
+//    = Default${Traversal.replace('Forward', '')}Indices<${Self}>
+  
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box
   }
 
 %   for SubTraversal in TRAVERSALS[ti:]:
 %     SubProtocol = collectionForTraversal(SubTraversal)
-  /// Creates an `${Self}` that
-  /// stores `base` as its underlying collection.
+  /// Creates a type-erased collection that wraps the given collection.
+  ///
+  /// - Parameter base: The collection to wrap.
   ///
   /// - Complexity: O(1).
   public init<C : ${SubProtocol}>(_ base: C)
     where
     C.Iterator.Element == Element,
 
-    // FIXME(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
@@ -775,12 +843,9 @@ public struct ${Self}<Element>
       _base: base)
   }
 
-  /// Creates an `Any${Traversal}Collection` having the same underlying
-  /// collection as `other`.
+  /// Creates an `${Self}` having the same underlying collection as `other`.
   ///
-  /// - Postcondition: The result is `===` to `other`.
-  ///
-  /// - Complexity: O(1).
+  /// - Complexity: O(1)
   public init(
     _ other: Any${SubProtocol}<Element>
   ) {
@@ -789,12 +854,12 @@ public struct ${Self}<Element>
 %   end
 
 %   for SuperTraversal in TRAVERSALS[:ti]:
-  /// If the underlying collection stored by `other` satisfies
-  /// `${SelfProtocol}`, creates an `${Self}` having the same
-  /// underlying collection as `other`.  Otherwise, the result is
-  /// `nil`.
+  /// Creates an `${Self}` having the same underlying collection as `other`.
   ///
-  /// - Complexity: O(1).
+  /// If the underlying collection stored by `other` does not satisfy
+  /// `${SelfProtocol}`, the result is `nil`.
+  ///
+  /// - Complexity: O(1)
   public init?(
     _ other: Any${collectionForTraversal(SuperTraversal)}<Element>
   ) {
@@ -906,7 +971,7 @@ public struct ${Self}<Element>
 
   /// The number of elements.
   ///
-  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
+  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(*n*)'}
   public var count: IntMax {
     return _box._count
   }
@@ -957,7 +1022,7 @@ extension AnyIterator {
 % for Kind in ['Sequence', 'Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 extension Any${Kind} {
 
-  @available(*, unavailable, message: "Please use underestimatedCount property instead.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }

@@ -187,7 +187,7 @@ func __pushAutoreleasePool() -> OpaquePointer
 func __popAutoreleasePool(_ pool: OpaquePointer)
 
 public func autoreleasepool<Result>(
-  invoking body: @noescape () throws -> Result
+  invoking body: () throws -> Result
 ) rethrows -> Result {
   let pool = __pushAutoreleasePool()
   defer {
@@ -225,7 +225,7 @@ extension NSObject : Equatable, Hashable {
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
-  public var hashValue: Int {
+  open var hashValue: Int {
     return hash
   }
 }

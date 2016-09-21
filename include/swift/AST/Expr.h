@@ -81,13 +81,8 @@ enum class CheckedCastKind : unsigned {
   ArrayDowncast,
   // A downcast from a dictionary type to another dictionary type.
   DictionaryDowncast,
-  // A downcast from a dictionary type to another dictionary type that
-  // requires bridging.
-  DictionaryDowncastBridged,
   // A downcast from a set type to another set type.
   SetDowncast,
-  // A downcast from a set type to another set type that requires bridging.
-  SetDowncastBridged,
   /// A downcast from an object of class or Objective-C existential
   /// type to its bridged value type.
   BridgeFromObjectiveC,
@@ -392,9 +387,8 @@ class alignas(8) Expr {
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
     unsigned : NumExprBits;
-    unsigned BridgesToObjC : 1;
   };
-  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 1 };
+  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 0 };
   static_assert(NumCollectionUpcastConversionExprBits <= 32, "fits in an unsigned");
 
   class ObjCSelectorExprBitfields {
@@ -544,11 +538,6 @@ public:
   /// children, and if there is a closure within the expression, this does not
   /// walk into the body of it (unless it is single-expression).
   void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
-
-  /// findExistingInitializerContext - Given that this expression is
-  /// an initializer that belongs in some sort of Initializer
-  /// context, look through it for any existing context object.
-  Initializer *findExistingInitializerContext();
 
   /// Determine whether this expression refers to a type by name.
   ///
@@ -989,6 +978,7 @@ public:
 /// "[\(min)..\(max)]"
 /// \endcode
 class InterpolatedStringLiteralExpr : public LiteralExpr {
+  /// Points at the beginning quote.
   SourceLoc Loc;
   MutableArrayRef<Expr *> Segments;
   Expr *SemanticExpr;
@@ -1007,10 +997,12 @@ public:
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
   
   SourceLoc getStartLoc() const {
-    return Segments.front()->getStartLoc();
+    return Loc;
   }
   SourceLoc getEndLoc() const {
-    return Segments.back()->getEndLoc();
+    // SourceLocs are token based, and the interpolated string is one string
+    // token, so the range should be (Start == End).
+    return Loc;
   }
   
   static bool classof(const Expr *E) {
@@ -1418,7 +1410,11 @@ protected:
 
 public:
   ArrayRef<ValueDecl*> getDecls() const { return Decls; }
-  
+
+  void setDecls(ArrayRef<ValueDecl *> domain) {
+    Decls = domain;
+  }
+
   /// getBaseType - Determine the type of the base object provided for the
   /// given overload set, which is only non-null when dealing with an overloaded
   /// member reference.
@@ -1757,7 +1753,7 @@ public:
 /// bar.foo.  These always have unresolved type.
 class UnresolvedMemberExpr final
     : public Expr,
-      public TrailingCallArguments<UnresolvedMemberExpr>  {
+      public TrailingCallArguments<UnresolvedMemberExpr> {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
@@ -2140,6 +2136,10 @@ class CollectionExpr : public Expr {
 
   Expr *SemanticExpr = nullptr;
 
+  /// True if the type of this collection expr was inferred by the collection
+  /// fallback type, like [Any].
+  bool IsTypeDefaulted = false;
+
 protected:
   CollectionExpr(ExprKind Kind, SourceLoc LBracketLoc,
                  MutableArrayRef<Expr*> Elements,
@@ -2156,6 +2156,9 @@ public:
   Expr *getElement(unsigned i) const { return Elements[i]; }
   void setElement(unsigned i, Expr *E) { Elements[i] = E; }
   unsigned getNumElements() const { return Elements.size(); }
+
+  bool isTypeDefaulted() const { return IsTypeDefaulted; }
+  void setIsTypeDefaulted(bool value = true) { IsTypeDefaulted = value; }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
@@ -2928,19 +2931,12 @@ private:
 public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
                                  ConversionPair keyConversion,
-                                 ConversionPair valueConversion,
-                                 bool bridgesToObjC)
+                                 ConversionPair valueConversion)
     : ImplicitConversionExpr(
         ExprKind::CollectionUpcastConversion, subExpr, type),
       KeyConversion(keyConversion), ValueConversion(valueConversion) {
     assert((!KeyConversion || ValueConversion)
            && "key conversion without value conversion");
-    CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
-  }
-
-  /// Whether this upcast bridges the source elements to Objective-C.
-  bool bridgesToObjC() const {
-    return CollectionUpcastConversionExprBits.BridgesToObjC;
   }
 
   /// Returns the expression that should be used to perform a
@@ -3010,12 +3006,36 @@ public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return Conformances;
   }
-  
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Erasure;
   }
 };
 
+/// AnyHashableErasureExpr - Perform type erasure by converting a value
+/// to AnyHashable type.
+///
+/// The type of the sub-expression should always be a type that implements
+/// the Hashable protocol.
+class AnyHashableErasureExpr : public ImplicitConversionExpr {
+  ProtocolConformanceRef Conformance;
+
+public:
+  AnyHashableErasureExpr(Expr *subExpr, Type type,
+                         ProtocolConformanceRef conformance)
+    : ImplicitConversionExpr(ExprKind::AnyHashableErasure, subExpr, type),
+      Conformance(conformance) {}
+
+  /// \brief Retrieve the mapping specifying how the type of the
+  /// subexpression conforms to the Hashable protocol.
+  ProtocolConformanceRef getConformance() const {
+    return Conformance;
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AnyHashableErasure;
+  }
+};
 /// UnresolvedSpecializeExpr - Represents an explicit specialization using
 /// a type parameter list (e.g. "Vector<Int>") that has not been resolved.
 class UnresolvedSpecializeExpr : public Expr {
@@ -3517,30 +3537,36 @@ public:
   }
 };
 
-/// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
+/// DynamicTypeExpr - "type(of: base)" - Produces a metatype value.
 ///
-/// The metatype value can comes from evaluating an expression and then
-/// getting its metatype.
+/// The metatype value comes from evaluating an expression then retrieving the
+/// metatype of the result.
 class DynamicTypeExpr : public Expr {
+  SourceLoc KeywordLoc;
+  SourceLoc LParenLoc;
   Expr *Base;
-  SourceLoc MetatypeLoc;
+  SourceLoc RParenLoc;
 
 public:
-  explicit DynamicTypeExpr(Expr *Base, SourceLoc MetatypeLoc, Type Ty)
+  explicit DynamicTypeExpr(SourceLoc KeywordLoc, SourceLoc LParenLoc,
+                           Expr *Base, SourceLoc RParenLoc, Type Ty)
     : Expr(ExprKind::DynamicType, /*Implicit=*/false, Ty),
-      Base(Base), MetatypeLoc(MetatypeLoc) { }
+      KeywordLoc(KeywordLoc), LParenLoc(LParenLoc), Base(Base),
+      RParenLoc(RParenLoc) { }
 
   Expr *getBase() const { return Base; }
   void setBase(Expr *base) { Base = base; }
 
-  SourceLoc getLoc() const { return MetatypeLoc; }
-  SourceLoc getMetatypeLoc() const { return MetatypeLoc; }
-
+  SourceLoc getLoc() const { return KeywordLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(KeywordLoc, RParenLoc);
+  }
+  
   SourceLoc getStartLoc() const {
-    return getBase()->getStartLoc();
+    return KeywordLoc;
   }
   SourceLoc getEndLoc() const {
-    return (MetatypeLoc.isValid() ? MetatypeLoc : getBase()->getEndLoc());
+    return RParenLoc;
   }
 
   static bool classof(const Expr *E) {
@@ -4244,7 +4270,7 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return Src->getEndLoc();
+    return (Src->isImplicit() ? Dest->getEndLoc() : Src->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.
@@ -4255,29 +4281,6 @@ public:
   }
 };
 
-/// \brief An expression that describes the use of a default value, which may
-/// come from the default argument of a function type or member initializer.
-///
-/// This expression is synthesized by type checking and cannot be written
-/// directly by the user.
-class DefaultValueExpr : public Expr {
-  Expr *subExpr;
-
-public:
-  explicit DefaultValueExpr(Expr *subExpr)
-    : Expr(ExprKind::DefaultValue, /*Implicit=*/true, subExpr->getType()),
-      subExpr(subExpr) { }
-
-  Expr *getSubExpr() const { return subExpr; }
-  void setSubExpr(Expr *sub) { subExpr = sub; }
-  
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::DefaultValue;
-  }
-};
-  
 /// \brief A pattern production that has been parsed but hasn't been resolved
 /// into a complete pattern. Name binding converts these into standalone pattern
 /// nodes or raises an error if a pattern production appears in an invalid

@@ -24,9 +24,10 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -259,9 +260,9 @@ bool swift::immediate::IRGenImportedModules(
 
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto SubModule = performIRGeneration(IRGenOpts, import, SILMod.get(),
-                                         import->getName().str(),
-                                         llvm::getGlobalContext());
+    auto SubModule =
+        performIRGeneration(IRGenOpts, import, SILMod.get(),
+                            import->getName().str(), getGlobalLLVMContext());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -297,9 +298,9 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   auto *swiftModule = CI.getMainModule();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto ModuleOwner = performIRGeneration(
-      IRGenOpts, swiftModule, CI.getSILModule(), swiftModule->getName().str(),
-      llvm::getGlobalContext());
+  auto ModuleOwner =
+      performIRGeneration(IRGenOpts, swiftModule, CI.getSILModule(),
+                          swiftModule->getName().str(), getGlobalLLVMContext());
   auto *Module = ModuleOwner.get();
 
   if (Context.hadError())

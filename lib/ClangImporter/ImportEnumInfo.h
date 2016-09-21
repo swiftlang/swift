@@ -67,6 +67,8 @@ class EnumInfo {
 public:
   EnumInfo() = default;
 
+  // TODO: wean ourselves off of the ASTContext, we just want a slab that will
+  // outlive us to store our strings on.
   EnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
            clang::Preprocessor &pp) {
     classifyEnum(ctx, decl, pp);
@@ -92,6 +94,60 @@ private:
   void determineConstantNamePrefix(ASTContext &ctx, const clang::EnumDecl *);
   void classifyEnum(ASTContext &ctx, const clang::EnumDecl *,
                     clang::Preprocessor &);
+};
+
+/// Provide a cache of enum infos, so that we don't have to re-calculate their
+/// information.
+class EnumInfoCache {
+  // TODO: reference a single preprocessor, that is different Clangs get
+  // different caches. This will then have the advantage that we can instead of
+  // caching names, cache Decls.
+
+  /// Cache enum infos, referenced with a dotted Clang name
+  /// "ModuleName.EnumName".
+  llvm::StringMap<importer::EnumInfo> enumInfos;
+
+  /// Retrieve the key to use when looking for enum information.
+  StringRef getEnumInfoKey(const clang::EnumDecl *decl,
+                           SmallVectorImpl<char> &scratch);
+
+  // Never copy
+  EnumInfoCache(const EnumInfoCache &) = delete;
+  EnumInfoCache &operator=(const EnumInfoCache &) = delete;
+
+public:
+  EnumInfoCache() = default;
+
+  importer::EnumInfo getEnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
+                                 clang::Preprocessor &preprocessor) {
+    // If there is no name for linkage, the computation is trivial and we
+    // wouldn't be able to perform name-based caching anyway.
+    if (!decl->hasNameForLinkage())
+      return importer::EnumInfo(ctx, decl, preprocessor);
+
+    SmallString<32> keyScratch;
+    auto key = getEnumInfoKey(decl, keyScratch);
+    auto known = enumInfos.find(key);
+    if (known != enumInfos.end())
+      return known->second;
+
+    importer::EnumInfo enumInfo(ctx, decl, preprocessor);
+    enumInfos[key] = enumInfo;
+    return enumInfo;
+  }
+
+  importer::EnumKind getEnumKind(ASTContext &ctx, const clang::EnumDecl *decl,
+                                 clang::Preprocessor &preprocessor) {
+    return getEnumInfo(ctx, decl, preprocessor).getKind();
+  }
+
+  /// The prefix to be stripped from the names of the enum constants within the
+  /// given enum.
+  StringRef getEnumConstantNamePrefix(ASTContext &ctx,
+                                      const clang::EnumDecl *decl,
+                                      clang::Preprocessor &preprocessor) {
+    return getEnumInfo(ctx, decl, preprocessor).getConstantNamePrefix();
+  }
 };
 
 // Utility functions of primary interest to enum constant naming

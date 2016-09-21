@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt %s -aa=typed-access-tb-aa -aa-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -974,6 +974,20 @@ sil @test_project_box : $@convention(thin) (@box Builtin.Int32, @box Builtin.Int
 bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int64):
   %2 = project_box %0 : $@box Builtin.Int32
   %3 = project_box %1 : $@box Builtin.Int64
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: @test_ref_tail_addr
+// CHECK:      PAIR #10.
+// CHECK-NEXT:   %2 = ref_element_addr %0 : $CTest_C1, #CTest_C1.x
+// CHECK-NEXT:   %3 = ref_tail_addr %1 : $CTest_C1, $Builtin.Int16
+// CHECK-NEXT: NoAlias
+sil @test_ref_tail_addr : $@convention(thin) (CTest_C1, CTest_C1) -> () {
+bb0(%0 : $CTest_C1, %1 : $CTest_C1):
+  %2 = ref_element_addr %0 : $CTest_C1, #CTest_C1.x
+  %3 = ref_tail_addr %1 : $CTest_C1, $Builtin.Int16
 
   %r = tuple()
   return %r : $()

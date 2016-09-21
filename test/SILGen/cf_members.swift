@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -243,21 +243,6 @@ public func bar(_ x: Double) {
   b(fridge)()
   let c = fridge.open
   c()
-}
-
-// CHECK-LABEL: sil @_TF10cf_members16importAsProtocolFPSo8IAMProto_T_
-public func importAsProtocol(_ x: IAMProto_t) {
-  // CHECK: function_ref @mutateSomeState : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> ()
-  x.mutateSomeState()
-  // CHECK: function_ref @mutateSomeStateWithParameter : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0, Int) -> ()
-  x.mutateSomeState(withParameter: 0)
-  // CHECK: function_ref @mutateSomeStateWithFirstParameter : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (Int, τ_0_0) -> ()
-  x.mutateSomeState(withFirstParameter: 0)
-
-  // CHECK: function_ref @getSomeValue : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0) -> Int32
-  let y = x.someValue
-  // CHECK: function_ref @setSomeValue : $@convention(c) <τ_0_0 where τ_0_0 : IAMProto> (τ_0_0, Int32) -> Int32
-  x.someValue = y
 }
 
 // CHECK-LABEL: sil @_TF10cf_members28importGlobalVarsAsProperties

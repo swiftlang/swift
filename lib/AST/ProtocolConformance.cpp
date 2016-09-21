@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Substitution.h"
@@ -180,18 +181,20 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
-GenericParamList *ProtocolConformance::getGenericParams() const {
+GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
   case ProtocolConformanceKind::Normal:
     // If we have a normal or inherited protocol conformance, look for its
     // generic parameters.
-    return getDeclContext()->getGenericParamsOfContext();
+    return getDeclContext()->getGenericEnvironmentOfContext();
 
   case ProtocolConformanceKind::Specialized:
     // If we have a specialized protocol conformance, since we do not support
     // currently partial specialization, we know that it cannot have any open
     // type variables.
+    //
+    // FIXME: We could return a meaningful GenericEnvironment here
     return nullptr;
   }
 }
@@ -333,13 +336,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
 }
 
-SubstitutionIterator
-SpecializedProtocolConformance::getGenericSubstitutionIterator() const {
-  return SubstitutionIterator(
-          GenericConformance->getDeclContext()->getGenericParamsOfContext(),
-                              GenericSubstitutions);
-}
-
 bool SpecializedProtocolConformance::hasTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
@@ -358,19 +354,24 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  TypeSubstitutionMap substitutionMap = GenericConformance->getGenericParams()
-    ->getSubstitutionMap(GenericSubstitutions);
+  auto conformingDC = getDeclContext();
+  auto conformingModule = conformingDC->getParentModule();
+
+  auto *genericEnv = GenericConformance->getGenericEnvironment();
+  auto *genericSig = GenericConformance->getGenericSignature();
+
+  auto substitutionMap = genericEnv->getSubstitutionMap(
+      conformingModule, genericSig, GenericSubstitutions);
 
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
 
   auto &genericWitness = genericWitnessAndDecl.first;
   auto *typeDecl = genericWitnessAndDecl.second;
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
+
+  // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(conformingModule, substitutionMap,
-                                            None);
+    = genericWitness.getReplacement().subst(substitutionMap, None);
 
   // If the type witness was unchanged, just copy it directly.
   if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
@@ -379,6 +380,9 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   }
 
   // Gather the conformances for the type witness. These should never fail.
+  // FIXME: We should just be able to use the SubstitutionMap from above,
+  // but we have no way to force inherited conformances to be filled in
+  // through that mechanism.
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : assocType->getConformingProtocols(resolver)) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
@@ -435,11 +439,9 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
                                       Type substType,
-                                      ArrayRef<Substitution> subs,
-                                      TypeSubstitutionMap &subMap,
-                                      ArchetypeConformanceMap &conformanceMap) {
+                                      const SubstitutionMap &subMap) const {
   if (getType()->isEqual(substType))
-    return this;
+    return const_cast<ProtocolConformance *>(this);
   
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
@@ -450,12 +452,13 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
       return module->getASTContext()
-        .getSpecializedConformance(substType, this,
+        .getSpecializedConformance(substType,
+                           const_cast<ProtocolConformance *>(this),
                            substType->gatherAllSubstitutions(module, nullptr));
     }
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
-    return this;
+    return const_cast<ProtocolConformance *>(this);
       
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
@@ -463,8 +466,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType, subs, subMap,
-                                            conformanceMap);
+      newBase = inheritedConformance->subst(module, substType, subMap);
     } else {
       newBase = inheritedConformance;
     }
@@ -478,7 +480,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subs, subMap, conformanceMap));
+      newSubs.push_back(sub.subst(module, subMap));
     
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
     
@@ -503,20 +505,17 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
     assert(inherited->getType()->isEqual(spec->getGenericConformance()->getType())
            && "inherited conformance doesn't match type?!");
     
-    TypeSubstitutionMap subMap;
-    ArchetypeConformanceMap conformanceMap;
-    
-    // Fill in the substitution and conformance maps.
-    for (auto archAndSub : spec->getGenericSubstitutionIterator()) {
-      auto arch = archAndSub.first;
-      auto sub = archAndSub.second;
-      conformanceMap[arch] = sub.getConformances();
-      if (arch->isPrimary())
-        subMap[arch] = sub.getReplacement();
-    }
-    auto r = inherited->subst(getDeclContext()->getParentModule(),
-                            getType(), spec->getGenericSubstitutions(),
-                            subMap, conformanceMap);
+    auto subs = spec->getGenericSubstitutions();
+
+    auto *conformingDC = spec->getDeclContext();
+    auto *conformingModule = conformingDC->getParentModule();
+
+    auto *sig = conformingDC->getGenericSignatureOfContext();
+    auto *env = conformingDC->getGenericEnvironmentOfContext();
+
+    auto subMap = env->getSubstitutionMap(conformingModule, sig, subs);
+
+    auto r = inherited->subst(conformingModule, getType(), subMap);
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;
@@ -593,10 +592,14 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      if (auto rawRepresentable = getASTContext().getProtocol(
-                                    KnownProtocolKind::RawRepresentable)) {
-        ConformanceTable->addSynthesizedConformance(mutableThis,
-                                                    rawRepresentable);
+      if (auto rawRepresentable = ctx.getProtocol(KnownProtocolKind::RawRepresentable)) {
+
+        // The presence of a raw type is an explicit declaration that
+        // the compiler should derive a RawRepresentable conformance.
+        auto conformance = ctx.getConformance(mutableThis->getDeclaredTypeInContext(), rawRepresentable,
+                                              mutableThis->getNameLoc(), mutableThis->getInnermostDeclContext(),
+                                              ProtocolConformanceState::Incomplete);
+        ConformanceTable->registerProtocolConformance(conformance);
       }
     }
   }

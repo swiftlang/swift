@@ -15,9 +15,12 @@
 ///
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
-public protocol IndexableBase {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
+public typealias IndexableBase = _IndexableBase
+public protocol _IndexableBase {
+  // FIXME(ABI)#24 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library; it is used to deduce things like the `SubSequence` and
@@ -114,6 +117,8 @@ public protocol IndexableBase {
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>)
 
+  func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>)
+
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -156,7 +161,9 @@ public protocol IndexableBase {
 ///
 /// In most cases, it's best to ignore this protocol and use the `Collection`
 /// protocol instead, because it has a more complete interface.
-public protocol Indexable : IndexableBase {
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
+public typealias Indexable = _Indexable
+public protocol _Indexable : _IndexableBase {
   /// A type used to represent the number of steps between two indices, where
   /// one value is reachable from the other.
   ///
@@ -174,9 +181,8 @@ public protocol Indexable : IndexableBase {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -197,9 +203,9 @@ public protocol Indexable : IndexableBase {
   /// unless that distance is beyond a given limiting index.
   ///
   /// The following example obtains an index advanced four positions from a
-  /// string's starting index and then prints the character at that position. The
-  /// operation doesn't require going beyond the limiting `s.endIndex` value,
-  /// so it succeeds.
+  /// string's starting index and then prints the character at that position.
+  /// The operation doesn't require going beyond the limiting `s.endIndex`
+  /// value, so it succeeds.
   ///
   ///     let s = "Swift"
   ///     if let i = s.index(s.startIndex, offsetBy: 4, limitedBy: s.endIndex) {
@@ -215,17 +221,17 @@ public protocol Indexable : IndexableBase {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -240,11 +246,10 @@ public protocol Indexable : IndexableBase {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
-  /// - Parameters
+  /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
@@ -258,9 +263,9 @@ public protocol Indexable : IndexableBase {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -353,8 +358,9 @@ public protocol Indexable : IndexableBase {
 ///     // Prints "15.0"
 ///     // Prints "20.0"
 public struct IndexingIterator<
-  Elements : IndexableBase
-  // FIXME(compiler limitation):
+  Elements : _IndexableBase
+  // FIXME(ABI)#97 (Recursive Protocol Constraints):
+  // Should be written as:
   // Elements : Collection
 > : IteratorProtocol, Sequence {
 
@@ -528,8 +534,8 @@ public struct IndexingIterator<
 /// able to calculate its `count` property in O(1) time. Conversely, because a
 /// forward or bidirectional collection must traverse the entire collection to
 /// count the number of contained elements, accessing its `count` property is
-/// an O(N) operation.
-public protocol Collection : Indexable, Sequence {
+/// an O(*n*) operation.
+public protocol Collection : _Indexable, Sequence {
   /// A type that can represent the number of steps between a pair of
   /// indices.
   associatedtype IndexDistance : SignedInteger = Int
@@ -554,8 +560,9 @@ public protocol Collection : Indexable, Sequence {
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence : IndexableBase, Sequence = Slice<Self>
-  // FIXME(compiler limitation):
+  associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
+  // FIXME(ABI)#98 (Recursive Protocol Constraints):
+  // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -613,9 +620,10 @@ public protocol Collection : Indexable, Sequence {
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : IndexableBase, Sequence = DefaultIndices<Self>
+  associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
 
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#68 (Associated Types with where clauses):
+  // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where
   //   Indices.Iterator.Element == Index,
@@ -645,8 +653,10 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the start of the collection up to, but not
   /// including, the specified position.
   ///
-  /// The resulting subsequence *does not include* the element at the
-  /// position `end`.
+  /// The resulting subsequence *does not include* the element at the position
+  /// `end`. The following example searches for the index of the number `40`
+  /// in an array of integers, and then prints the prefix of the array up to,
+  /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -671,7 +681,9 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
   ///
-  /// For example:
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the suffix of the array starting at
+  /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -695,7 +707,10 @@ public protocol Collection : Indexable, Sequence {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the prefix of the array up to, and
+  /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -744,7 +759,7 @@ public protocol Collection : Indexable, Sequence {
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
-  /// - Complexity: O(N).
+  /// - Complexity: O(*n*)
   func _customIndexOfEquatableElement(_ element: Iterator.Element) -> Index??
 
   /// The first element of the collection.
@@ -768,9 +783,8 @@ public protocol Collection : Indexable, Sequence {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -809,17 +823,17 @@ public protocol Collection : Indexable, Sequence {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -852,7 +866,7 @@ public protocol Collection : Indexable, Sequence {
 }
 
 /// Default implementation for forward collections.
-extension Indexable {
+extension _Indexable {
   /// Replaces the given index with its successor.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
@@ -870,6 +884,16 @@ extension Indexable {
     _precondition(
       index < bounds.upperBound,
       "out of bounds: index >= endIndex")
+  }
+
+  public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
+    // FIXME: swift-3-indexing-model: tests.
+    _precondition(
+      bounds.lowerBound <= index,
+      "out of bounds: index < startIndex")
+    _precondition(
+      index <= bounds.upperBound,
+      "out of bounds: index > endIndex")
   }
 
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
@@ -898,9 +922,8 @@ extension Indexable {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -941,17 +964,17 @@ extension Indexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
   ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
+  ///     limit that is greater than `i` has no effect.
   /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
@@ -968,11 +991,10 @@ extension Indexable {
 
   /// Offsets the given index by the specified distance.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
-  /// - Parameters
+  /// - Parameters:
   ///   - i: A valid index of the collection.
   ///   - n: The distance to offset `i`. `n` must not be negative unless the
   ///     collection conforms to the `BidirectionalCollection` protocol.
@@ -988,9 +1010,9 @@ extension Indexable {
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. Make
-  /// sure the value passed as `n` does not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -1205,7 +1227,7 @@ extension Collection {
   /// Customization point for `Collection.index(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
-  /// O(N) by exploiting collection-specific knowledge.
+  /// O(*n*) by exploiting collection-specific knowledge.
   ///
   /// - Returns: `nil` if a linear search should be attempted instead,
   ///   `Optional(nil)` if the element was not found, or
@@ -1241,7 +1263,7 @@ extension Collection {
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
   public func map<T>(
-    _ transform: @noescape (Iterator.Element) throws -> T
+    _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     // TODO: swift-3-indexing-model - review the following
     let count: Int = numericCast(self.count)
@@ -1315,6 +1337,25 @@ extension Collection {
       offsetBy: numericCast(amount), limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
+  
+  /// Returns a subsequence by skipping elements while `predicate` returns
+  /// `true` and returning the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns `true` if the element should
+  ///   be skipped or `false` if it should be included. Once the predicate
+  ///   returns `false` it will not be called again.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var start = startIndex
+    while try start != endIndex && predicate(self[start]) {
+      formIndex(after: &start)
+    } 
+    return self[start..<endIndex]
+  }
 
   /// Returns a subsequence, up to the specified maximum length, containing
   /// the initial elements of the collection.
@@ -1338,6 +1379,25 @@ extension Collection {
       "Can't take a prefix of negative length from a collection")
     let end = index(startIndex,
       offsetBy: numericCast(maxLength), limitedBy: endIndex) ?? endIndex
+    return self[startIndex..<end]
+  }
+  
+  /// Returns a subsequence containing the initial elements until `predicate`
+  /// returns `false` and skipping the remaining elements.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns `true` if the element should
+  ///   be included or `false` if it should be excluded. Once the predicate
+  ///   returns `false` it will not be called again.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    var end = startIndex
+    while try end != endIndex && predicate(self[end]) {
+      formIndex(after: &end)
+    }
     return self[startIndex..<end]
   }
 
@@ -1372,8 +1432,10 @@ extension Collection {
   /// Returns a subsequence from the start of the collection up to, but not
   /// including, the specified position.
   ///
-  /// The resulting subsequence *does not include* the element at the
-  /// position `end`.
+  /// The resulting subsequence *does not include* the element at the position
+  /// `end`. The following example searches for the index of the number `40`
+  /// in an array of integers, and then prints the prefix of the array up to,
+  /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -1400,7 +1462,9 @@ extension Collection {
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
   ///
-  /// For example:
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the suffix of the array starting at
+  /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -1414,8 +1478,8 @@ extension Collection {
   ///     print(numbers.suffix(from: numbers.endIndex))
   ///     // Prints "[]"
   ///
-  /// - Parameter start: The index at which to start the resulting
-  ///   subsequence. `start` must be a valid index of the collection.
+  /// - Parameter start: The index at which to start the resulting subsequence.
+  ///   `start` must be a valid index of the collection.
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
@@ -1426,8 +1490,10 @@ extension Collection {
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
   ///
-  /// The resulting subsequence *includes* the element at the position
-  /// `end`.
+  /// The resulting subsequence *includes* the element at the position `end`. 
+  /// The following example searches for the index of the number `40` in an
+  /// array of integers, and then prints the prefix of the array up to, and
+  /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
   ///     if let i = numbers.index(of: 40) {
@@ -1500,7 +1566,7 @@ extension Collection {
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     // TODO: swift-3-indexing-model - review the following
     _precondition(maxSplits >= 0, "Must take zero or more splits")
@@ -1641,33 +1707,9 @@ extension Collection where SubSequence == Self {
   }
 }
 
-// TODO: swift-3-indexing-model - review the following
-extension Sequence
-  where Self : _ArrayProtocol, Self.Element == Self.Iterator.Element {
-  // A fast implementation for when you are backed by a contiguous array.
-  @discardableResult
-  public func _copyContents(
-    initializing ptr: UnsafeMutablePointer<Iterator.Element>
-  ) -> UnsafeMutablePointer<Iterator.Element> {
-    if let s = self._baseAddressIfContiguous {
-      let count = self.count
-      ptr.initialize(from: s, count: count)
-      _fixLifetime(self._owner)
-      return ptr + count
-    } else {
-      var p = ptr
-      for x in self {
-        p.initialize(to: x)
-        p += 1
-      }
-      return p
-    }
-  }
-}
-
 extension Collection {
   public func _preprocessingPass<R>(
-    _ preprocess: @noescape () throws -> R
+    _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
   }
@@ -1677,7 +1719,7 @@ extension Collection {
 public enum Bit {}
 
 @available(*, unavailable, renamed: "IndexingIterator")
-public struct IndexingGenerator<Elements : IndexableBase> {}
+public struct IndexingGenerator<Elements : _IndexableBase> {}
 
 @available(*, unavailable, renamed: "Collection")
 public typealias CollectionType = Collection
@@ -1691,7 +1733,7 @@ extension Collection {
     Builtin.unreachable()
   }
 
-  @available(*, unavailable, message: "Removed in Swift 3. Please use underestimatedCount property.")
+  @available(*, unavailable, renamed: "getter:underestimatedCount()")
   public func underestimateCount() -> Int {
     Builtin.unreachable()
   }
@@ -1700,7 +1742,7 @@ extension Collection {
   public func split(
     _ maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    whereSeparator isSeparator: @noescape (Iterator.Element) throws -> Bool
+    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Builtin.unreachable()
   }
@@ -1719,3 +1761,4 @@ extension Collection where Iterator.Element : Equatable {
 
 @available(*, unavailable, message: "PermutationGenerator has been removed in Swift 3")
 public struct PermutationGenerator<C : Collection, Indices : Sequence> {}
+

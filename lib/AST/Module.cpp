@@ -17,8 +17,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -558,9 +560,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
   // don't have access to the module. It will have to go away once we're
   // properly differentiating bound generic types based on the protocol
   // conformances visible from a given module.
-  if (!module) {
+  if (!module)
     module = getAnyNominal()->getParentModule();
-  }
 
   // Check the context, introducing the default if needed.
   if (!gpContext)
@@ -569,8 +570,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
   assert(gpContext->getAsNominalTypeOrNominalTypeExtensionContext()
          == getAnyNominal() && "not a valid context");
 
-  auto *genericParams = gpContext->getGenericParamsOfContext();
-  if (!genericParams)
+  auto *genericSig = gpContext->getGenericSignatureOfContext();
+  if (genericSig == nullptr)
     return { };
 
   // If we already have a cached copy of the substitutions, return them.
@@ -588,16 +589,15 @@ TypeBase::gatherAllSubstitutions(Module *module,
   auto *parentDC = gpContext;
   while (parent) {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(parent)) {
-      auto genericParams = parentDC->getGenericParamsOfContext();
+      auto genericSig = parentDC->getGenericSignatureOfContext();
       unsigned index = 0;
 
       assert(boundGeneric->getGenericArgs().size() ==
-             genericParams->getParams().size());
+             genericSig->getInnermostGenericParams().size());
 
       for (Type arg : boundGeneric->getGenericArgs()) {
-        auto gp = genericParams->getParams()[index++];
-        auto archetype = gp->getArchetype();
-        substitutions[archetype] = arg;
+        auto paramTy = genericSig->getInnermostGenericParams()[index++];
+        substitutions[paramTy->getCanonicalType().getPointer()] = arg;
       }
 
       parent = CanType(boundGeneric->getParent());
@@ -616,64 +616,36 @@ TypeBase::gatherAllSubstitutions(Module *module,
 
   // Add forwarding substitutions from the outer context if we have
   // a type nested inside a generic function.
-  if (auto *outerGenericParams = parentDC->getGenericParamsOfContext()) {
-    for (auto archetype : outerGenericParams->getAllNestedArchetypes())
-      substitutions[archetype] = archetype;
-  }
-
-  // Collect all of the archetypes.
-  SmallVector<ArchetypeType *, 2> allArchetypesList;
-  ArrayRef<ArchetypeType *> allArchetypes = genericParams->getAllArchetypes();
-  if (genericParams->getOuterParameters()) {
-    SmallVector<const GenericParamList *, 2> allGenericParams;
-    unsigned numArchetypes = 0;
-    for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-      allGenericParams.push_back(genericParams);
-      numArchetypes += genericParams->getAllArchetypes().size();
-    }
-    allArchetypesList.reserve(numArchetypes);
-    for (auto gp = allGenericParams.rbegin(), gpEnd = allGenericParams.rend();
-         gp != gpEnd; ++gp) {
-      allArchetypesList.append((*gp)->getAllArchetypes().begin(),
-                               (*gp)->getAllArchetypes().end());
-    }
-    allArchetypes = allArchetypesList;
-  }
-
-  // For each of the archetypes, compute the substitution.
-  bool hasTypeVariables = canon->hasTypeVariable();
-  SmallVector<Substitution, 4> resultSubstitutions;
-  resultSubstitutions.resize(allArchetypes.size());
-  unsigned index = 0;
-  for (auto archetype : allArchetypes) {
-    // Substitute into the type.
-    SubstOptions options;
-    if (hasTypeVariables)
-      options |= SubstFlags::IgnoreMissing;
-    auto type = Type(archetype).subst(module, substitutions, options);
-    if (!type)
-      type = ErrorType::get(module->getASTContext());
-
-    SmallVector<ProtocolConformanceRef, 4> conformances;
-    for (auto proto : archetype->getConformsTo()) {
-      // If the type is a type variable or is dependent, just fill in empty
-      // conformances.
-      if (type->is<TypeVariableType>() || type->isTypeParameter()) {
-        conformances.push_back(ProtocolConformanceRef(proto));
-
-      // Otherwise, find the conformances.
-      } else {
-        if (auto conforms = module->lookupConformance(type, proto, resolver))
-          conformances.push_back(*conforms);
-        else
-          conformances.push_back(ProtocolConformanceRef(proto));
-      }
+  if (auto *outerEnv = parentDC->getGenericEnvironmentOfContext())
+    for (auto pair : outerEnv->getInterfaceToArchetypeMap()) {
+      auto result = substitutions.insert(pair);
+      assert(result.second);
     }
 
-    // Record this substitution.
-    resultSubstitutions[index] = {type, ctx.AllocateCopy(conformances)};
-    ++index;
-  }
+  auto lookupConformanceFn =
+      [&](CanType original, Type replacement, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+
+    auto *proto = protoType->getDecl();
+
+    // If the type is a type variable or is dependent, just fill in empty
+    // conformances.
+    if (replacement->is<TypeVariableType>() || replacement->isTypeParameter())
+      return ProtocolConformanceRef(proto);
+
+    // Otherwise, find the conformance.
+    auto conforms = module->lookupConformance(replacement, proto, resolver);
+    if (conforms)
+      return *conforms;
+
+    // FIXME: Should we ever end up here?
+    return ProtocolConformanceRef(proto);
+  };
+
+  SmallVector<Substitution, 4> result;
+  genericSig->getSubstitutions(*module, substitutions,
+                               lookupConformanceFn,
+                               result);
 
   // Before recording substitutions, make sure we didn't end up doing it
   // recursively.
@@ -681,7 +653,8 @@ TypeBase::gatherAllSubstitutions(Module *module,
     return *known;
 
   // Copy and record the substitutions.
-  auto permanentSubs = ctx.AllocateCopy(resultSubstitutions,
+  bool hasTypeVariables = canon->hasTypeVariable();
+  auto permanentSubs = ctx.AllocateCopy(result,
                                         hasTypeVariables
                                           ? AllocationArena::ConstraintSolver
                                           : AllocationArena::Permanent);
@@ -695,8 +668,25 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
   ASTContext &ctx = getASTContext();
 
   // An archetype conforms to a protocol if the protocol is listed in the
-  // archetype's list of conformances.
+  // archetype's list of conformances, or if the archetype has a superclass
+  // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
+
+    // The archetype builder drops conformance requirements that are made
+    // redundant by a superclass requirement, so check for a concrete
+    // conformance first, since an abstract conformance might not be
+    // able to be resolved by a substitution that makes the archetype
+    // concrete.
+    if (auto super = archetype->getSuperclass()) {
+      if (auto inheritedConformance = lookupConformance(super, protocol,
+                                                        resolver)) {
+        return ProtocolConformanceRef(
+                 ctx.getInheritedConformance(
+                   type,
+                   inheritedConformance->getConcrete()));
+      }
+    }
+
     if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (archetype->requiresClass())
         return ProtocolConformanceRef(protocol);
@@ -709,8 +699,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
         return ProtocolConformanceRef(protocol);
     }
 
-    if (!archetype->getSuperclass())
-      return None;
+    return None;
   }
 
   // An existential conforms to a protocol if the protocol is listed in the
@@ -754,21 +743,6 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
     return None;
   }
 
-  // Check for protocol conformance of archetype via superclass requirement.
-  if (auto archetype = type->getAs<ArchetypeType>()) {
-    if (auto super = archetype->getSuperclass()) {
-      if (auto inheritedConformance = lookupConformance(super, protocol,
-                                                        resolver)) {
-        return ProtocolConformanceRef(
-                 ctx.getInheritedConformance(
-                   type,
-                   inheritedConformance->getConcrete()));
-      }
-
-      return None;
-    }
-  }
-
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have.
@@ -777,8 +751,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
              ctx.getConformance(type, protocol, protocol->getLoc(), this,
                                 ProtocolConformanceState::Complete));
   }
-  
-  
+
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
@@ -1512,6 +1485,11 @@ StringRef SourceFile::getFilename() const {
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
   return SM.getIdentifierForBuffer(BufferID);
+}
+
+ASTScope &SourceFile::getScope() {
+  if (!Scope) Scope = ASTScope::createRoot(this);
+  return *Scope;
 }
 
 Identifier

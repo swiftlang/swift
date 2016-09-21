@@ -19,6 +19,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/STLExtras.h"
@@ -310,17 +311,6 @@ namespace {
       }
       OS << ')';
     }
-    void visitNominalTypePattern(NominalTypePattern *P) {
-      printCommon(P, "pattern_nominal") << ' ';
-      P->getCastTypeLoc().getType().print(OS);
-      // FIXME: We aren't const-correct.
-      for (auto &elt : P->getMutableElements()) {
-        OS << '\n';
-        OS.indent(Indent) << elt.getPropertyName() << ": ";
-        printRec(elt.getSubPattern());
-      }
-      OS << ')';
-    }
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';
@@ -549,20 +539,22 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      OS << " type='";
-      if (VD->hasType())
-        VD->getType().print(OS);
-      else
-        OS << "<null type>";
+      if (!VD->hasType() || !VD->getType()->is<PolymorphicFunctionType>()) {
+        OS << " type='";
+        if (VD->hasType())
+          VD->getType().print(OS);
+        else
+          OS << "<null type>";
+        OS << '\'';
+      }
 
       if (VD->hasInterfaceType() &&
           (!VD->hasType() ||
            VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
-        OS << "' interface type='";
+        OS << " interface type='";
         VD->getInterfaceType()->getCanonicalType().print(OS);
+        OS << '\'';
       }
-
-      OS << '\'';
 
       if (VD->hasAccessibility()) {
         OS << " access=";
@@ -578,6 +570,9 @@ namespace {
           break;
         case Accessibility::Public:
           OS << "public";
+          break;
+        case Accessibility::Open:
+          OS << "open";
           break;
         }
       }
@@ -734,6 +729,7 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
       OS << " storage_kind=" << getStorageKindName(SD->getStorageKind());
+      OS << " element=" << SD->getElementType()->getCanonicalType();
       printAccessors(SD);
       OS << ')';
     }
@@ -838,7 +834,7 @@ namespace {
       
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
-        printRec(init->getExpr());
+        printRec(init);
       }
       
       OS << ')';
@@ -1525,7 +1521,7 @@ public:
     Indent -= 2;
   }
 
-  void printRecLabelled(Expr *E, StringRef label) {
+  void printRecLabeled(Expr *E, StringRef label) {
     Indent += 2;
     OS.indent(Indent);
     OS << '(' << label << '\n';
@@ -1924,6 +1920,13 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitAnyHashableErasureExpr(AnyHashableErasureExpr *E) {
+    printCommon(E, "any_hashable_erasure_expr") << '\n';
+    printRec(E->getConformance());
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());
@@ -1936,17 +1939,15 @@ public:
   }
   void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
     printCommon(E, "collection_upcast_expr");
-    if (E->bridgesToObjC())
-      OS << " bridges_to_objc";
     OS << '\n';
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {
       OS << '\n';
-      printRecLabelled(keyConversion.Conversion, "key_conversion");
+      printRecLabeled(keyConversion.Conversion, "key_conversion");
     }
     if (auto valueConversion = E->getValueConversion()) {
       OS << '\n';
-      printRecLabelled(valueConversion.Conversion, "value_conversion");
+      printRecLabeled(valueConversion.Conversion, "value_conversion");
     }
     OS << ')';
   }
@@ -2212,11 +2213,6 @@ public:
     printRec(E->getElseExpr());
     OS << ')';
   }
-  void visitDefaultValueExpr(DefaultValueExpr *E) {
-    printCommon(E, "default_value_expr") << ' ';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitAssignExpr(AssignExpr *E) {
     OS.indent(Indent) << "(assign_expr\n";
     printRec(E->getDest());
@@ -2477,7 +2473,13 @@ public:
     printRec(T->getBase());
     OS << ')';
   }
-  
+
+  void visitProtocolTypeRepr(ProtocolTypeRepr *T) {
+    printCommon(T, "type_protocol") << '\n';
+    printRec(T->getBase());
+    OS << ')';
+  }
+
   void visitInOutTypeRepr(InOutTypeRepr *T) {
     printCommon(T, "type_inout") << '\n';
     printRec(T->getBase());
@@ -2918,7 +2920,6 @@ namespace {
       printFlag(T->isAutoClosure(), "autoclosure");
 
       // Dump out either @noescape or @escaping
-      printFlag(T->isNoEscape(), "@noescape");
       printFlag(!T->isNoEscape(), "@escaping");
 
       printFlag(T->throws(), "throws");
@@ -3088,4 +3089,12 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   // Make sure to print type variables.
   llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
+}
+
+void GenericEnvironment::dump() const {
+  llvm::errs() << "Generic environment:\n";
+  for (auto pair : getInterfaceToArchetypeMap()) {
+    pair.first->dump();
+    pair.second->dump();
+  }
 }

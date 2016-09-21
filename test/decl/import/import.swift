@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
@@ -41,7 +41,7 @@ import var import_builtin.x
 import func Swift.min
 
 import var x // expected-error {{expected module name}}
-import struct Swift.nonexistent // expected-error {{no such decl in module}}
+import struct Swift.nonexistent // expected-error {{struct 'nonexistent' does not exist in module 'Swift'}}
 
 import Swift.import.abc // expected-error {{expected identifier in import declaration}}
 // expected-error @-1 {{keyword 'import' cannot be used as an identifier here}}

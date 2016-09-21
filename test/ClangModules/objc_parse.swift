@@ -5,6 +5,7 @@
 import AppKit
 import AVFoundation
 
+import Newtype
 import objc_ext
 import TestProtocols
 
@@ -119,7 +120,7 @@ func properties(_ b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'b' is a 'let' constant}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'informalMadeFormal' is a method}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -170,8 +171,8 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
-  let q = dict[nil]  // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
+  dict[nil] = a // expected-error {{ambiguous reference}}
+  let q = dict[nil]  // expected-error {{ambiguous subscript}}
   _ = q
 }
 
@@ -262,25 +263,25 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : Wobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   @objc func wobble() { }
 
-  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'Wobbling'}}{{none}}
+  func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{none}}
   // expected-error@-1{{method cannot be an implementation of an @objc requirement because its result type cannot be represented in Objective-C}}
 }
 
-extension Wobbler : MaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, Wobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }
 
-extension Wobbler2 : MaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'MaybeInitWobble'}}
+extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-func optionalMemberAccess(_ w: Wobbling) {
+func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
   let x = w[5]!!
@@ -315,7 +316,7 @@ func customAccessors(_ hive: Hive, bee: Bee) {
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
+func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
@@ -330,7 +331,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: Wobbling) {
 
   // Instance method on a protocol with instancetype result.
   var wobbler2 = wobbler.returnMyself()!
-  var wobbler: Wobbling = wobbler2
+  var wobbler: NSWobbling = wobbler2
   wobbler2 = wobbler
 
   // Instance method on a base class with instancetype result, called on the
@@ -382,20 +383,20 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   obj.object = nil
   obj.object(obj, doSomething:#selector(getter: NSMenuItem.action))
 
-  obj.dynamicType.classRef = nil
-  obj.dynamicType.classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: obj).classRef = nil
+  type(of: obj).classRef(obj, doSomething:#selector(getter: NSMenuItem.action))
 
   rev.object = nil
   rev.object(rev, doSomething:#selector(getter: NSMenuItem.action))
 
-  rev.dynamicType.classRef = nil
-  rev.dynamicType.classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
+  type(of: rev).classRef = nil
+  type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
   value = obj.protoProp()
   value = obj.protoPropRO()
-  value = obj.dynamicType.protoClassProp()
-  value = obj.dynamicType.protoClassPropRO()
+  value = type(of: obj).protoClassProp()
+  value = type(of: obj).protoClassPropRO()
   _ = value
 }
 
@@ -597,5 +598,12 @@ func testNSUInteger(_ obj: NSUIntegerTests, uint: UInt, int: Int) {
   // NSNumber
   let num = NSNumber(value: uint)
   let _: String = num.uintValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+}
+
+class NewtypeUser {
+  @objc func stringNewtype(a: SNTErrorDomain) {}
+  @objc func stringNewtypeOptional(a: SNTErrorDomain?) {}
+  @objc func intNewtype(a: MyInt) {}
+  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 

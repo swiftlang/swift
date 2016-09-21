@@ -1135,6 +1135,19 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
       
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();
+
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+    // Reflection descriptors for imported types have shared linkage,
+    // since we may emit them in other TUs in the same module.
+    if (getTypeLinkage(getType()) == FormalLinkage::PublicNonUnique)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    if (getConformanceLinkage(IGM, getProtocolConformance())
+          == SILLinkage::Shared)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1198,6 +1211,9 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::SILFunction:
   case Kind::SILGlobalVariable:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -1769,7 +1785,7 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       llvm::GlobalValue::PrivateLinkage,
                                       global,
                                       llvm::Twine("got.") + globalName);
-  gotEquivalent->setUnnamedAddr(true);
+  gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   return gotEquivalent;
 }
 
@@ -2000,7 +2016,7 @@ getTypeEntityInfo(IRGenModule &IGM, CanType conformingType) {
 
   auto nom = conformingType->getAnyNominal();
   auto clas = dyn_cast<ClassDecl>(nom);
-  if (nom->isGenericContext() ||
+  if ((nom->isGenericContext() && (!clas || !clas->usesObjCGenericsModel())) ||
       (clas && doesClassMetadataRequireDynamicInitialization(IGM, clas))) {
     // Conformances for generics and concrete subclasses of generics
     // are represented by referencing the nominal type descriptor.
@@ -2152,7 +2168,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   LinkEntity::forProtocolDescriptor(conformance->getProtocol()),
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
-                                        conformance->getType()->getCanonicalType());
+                                    conformance->getType()->getCanonicalType());
     auto flags = typeEntity.flags
         .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
 
@@ -2882,6 +2898,17 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   return Address(alloca, alignment);
 }
 
+/// Create an allocation of an array on the stack.
+Address IRGenFunction::createAlloca(llvm::Type *type,
+                                    llvm::Value *ArraySize,
+                                    Alignment alignment,
+                                    const llvm::Twine &name) {
+  llvm::AllocaInst *alloca = new llvm::AllocaInst(type, ArraySize,
+                                                  alignment.getValue(), name,
+                                                  AllocaIP);
+  return Address(alloca, alignment);
+}
+
 /// Allocate a fixed-size buffer on the stack.
 Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
   return createAlloca(IGM.getFixedBufferTy(),
@@ -2905,7 +2932,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data,
     // FIXME: Clear unnamed_addr if the global will be relative referenced
     // to work around an ld64 bug. rdar://problem/22674524
     if (willBeRelativelyAddressed)
-      entry.first->setUnnamedAddr(false);
+      entry.first->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
     return entry.second;
   }
 
@@ -2941,7 +2968,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   auto global = new llvm::GlobalVariable(Module, init->getType(), true,
                                          llvm::GlobalValue::PrivateLinkage,
                                          init);
-  global->setUnnamedAddr(true);
+  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   // Drill down to make an i16*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
@@ -2976,7 +3003,7 @@ bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion)
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
   if (decl->getModuleContext() == getSwiftModule() &&
-      decl->getEffectiveAccess() != Accessibility::Public)
+      decl->getEffectiveAccess() < Accessibility::Public)
     return ResilienceExpansion::Maximal;
   return ResilienceExpansion::Minimal;
 }

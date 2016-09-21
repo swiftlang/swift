@@ -29,6 +29,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
+using namespace importer;
 
 Optional<clang::Module *>
 ClangImporter::Implementation::getClangSubmoduleForMacro(
@@ -462,6 +463,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto firstMacroInfo = impl.getClangPreprocessor().getMacroInfo(firstID);
         auto secondMacroInfo = impl.getClangPreprocessor().getMacroInfo(
                                                                       secondID);
+        auto firstIdentifier = impl.importMacroName(firstID, firstMacroInfo,
+                                                    impl.getClangASTContext());
+        auto secondIdentifier = impl.importMacroName(secondID, secondMacroInfo,
+                                                    impl.getClangASTContext());
+        impl.importMacro(firstIdentifier, firstMacroInfo);
+        impl.importMacro(secondIdentifier, secondMacroInfo);
         auto firstIterator = impl.ImportedMacroConstants.find(firstMacroInfo);
         if (firstIterator == impl.ImportedMacroConstants.end()) {
           return nullptr;

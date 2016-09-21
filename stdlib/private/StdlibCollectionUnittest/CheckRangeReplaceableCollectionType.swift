@@ -456,7 +456,7 @@ extension TestSuite {
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -471,14 +471,18 @@ extension TestSuite {
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addCollectionTests(
       testNamePrefix,
@@ -1167,7 +1171,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
@@ -1181,14 +1185,18 @@ self.test("\(testNamePrefix).OperatorPlus") {
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addRangeReplaceableCollectionTests(
       testNamePrefix,
@@ -1295,7 +1303,7 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
 
     makeCollectionOfEquatable: @escaping ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
     wrapValueIntoEquatable: @escaping (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1
@@ -1309,14 +1317,18 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     C.Indices.Iterator.Element == C.Index,
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
-    CollectionWithEquatableElement.Iterator.Element : Equatable {
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addRangeReplaceableBidirectionalCollectionTests(
       testNamePrefix,

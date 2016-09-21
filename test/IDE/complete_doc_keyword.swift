@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE1 | FileCheck %s -check-prefix=TYPE1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | FileCheck %s -check-prefix=MEMBER1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | FileCheck %s -check-prefix=MEMBER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE1 | %FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
 
 /**
   - keyword: C1, Class

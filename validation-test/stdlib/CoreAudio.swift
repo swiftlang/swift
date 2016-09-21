@@ -172,7 +172,7 @@ CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.unsafeMutablePointer") {
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(nil)
-    expectEmpty(ablPtrWrapper)
+    expectNil(ablPtrWrapper)
   }
 
   do {
@@ -189,7 +189,7 @@ CoreAudioTestSuite.test(
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
       UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
-    expectNotEmpty(ablPtrWrapper)
+    expectNotNil(ablPtrWrapper)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper!.unsafePointer)
@@ -202,9 +202,9 @@ CoreAudioTestSuite.test(
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   let sizeInBytes = AudioBufferList.sizeInBytes(maximumBuffers: 16)
   let rawPtr = UnsafeMutableRawPointer.allocate(
-    bytes: sizeInBytes, alignedTo: alignof(AudioBufferList.self))
+    bytes: sizeInBytes, alignedTo: MemoryLayout<AudioBufferList>.alignment)
   let ablPtr = rawPtr.bindMemory(to: AudioBufferList.self,
-    capacity: sizeInBytes / strideof(AudioBufferList.self))
+    capacity: sizeInBytes / MemoryLayout<AudioBufferList>.stride)
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the 'count' property has a nonmutating setter.
@@ -219,7 +219,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.count") {
   expectEqual(0x7765_4321, rawPtr.load(as: UInt32.self))
 
   rawPtr.deallocate(
-    bytes: sizeInBytes, alignedTo: alignof(AudioBufferList.self))
+    bytes: sizeInBytes, alignedTo: MemoryLayout<AudioBufferList>.alignment)
 }
 
 CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)") {
@@ -230,7 +230,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer.subscript(_: Int)")
 
   let ablPtr = rawPtr.bindMemory(
     to: AudioBufferList.self,
-    capacity: sizeInBytes / sizeof(AudioBufferList.self))
+    capacity: sizeInBytes / MemoryLayout<AudioBufferList>.stride)
 
   // It is important that 'ablPtrWrapper' is a 'let'.  We are verifying that
   // the subscript has a nonmutating setter.

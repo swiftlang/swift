@@ -1,10 +1,10 @@
 // Please keep this file in alphabetical order!
 
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name local -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/local.h
+// RUN: %FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 
 // REQUIRES: objc_interop
@@ -40,7 +40,7 @@ class ANonObjCClass {}
 // CHECK-NEXT: - (void)d:(id <ZForwardProtocol1> _Nonnull)d;
 // CHECK-NEXT: - (void)e:(Class <ZForwardProtocol2> _Nonnull)e;
 // CHECK-NEXT: - (void)e2:(id <ZForwardProtocol2> _Nonnull)e;
-// CHECK-NEXT: - (void)f:(id <ZForwardProtocol5> _Nonnull (^ _Nonnull)(id <ZForwardProtocol3> _Nonnull, id <ZForwardProtocol4> _Nonnull))f;
+// CHECK-NEXT: - (void)f:(SWIFT_NOESCAPE id <ZForwardProtocol5> _Nonnull (^ _Nonnull)(id <ZForwardProtocol3> _Nonnull, id <ZForwardProtocol4> _Nonnull))f;
 // CHECK-NEXT: - (void)g:(id <ZForwardProtocol6, ZForwardProtocol7> _Nonnull)g;
 // CHECK-NEXT: - (void)i:(id <ZForwardProtocol8> _Nonnull)_;
 // CHECK-NEXT: @property (nonatomic, readonly, strong) ZForwardClass3 * _Nonnull j;
@@ -61,7 +61,7 @@ class ANonObjCClass {}
   func f(_ f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
   func g(_ g: ZForwardProtocol6 & ZForwardProtocol7) {}
 
-  func h(_ h: ANonObjCClass) -> ANonObjCClass.Type { return h.dynamicType }
+  func h(_ h: ANonObjCClass) -> ANonObjCClass.Type { return type(of: h) }
   func i(_: ZForwardProtocol8) {}
 
   var j: ZForwardClass3 { return ZForwardClass3() }

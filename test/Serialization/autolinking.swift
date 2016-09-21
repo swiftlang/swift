@@ -1,24 +1,24 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -I %t > %t/out.txt
-// RUN: FileCheck %s < %t/out.txt
-// RUN: FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/out.txt
+// RUN: %FileCheck %s < %t/out.txt
+// RUN: %FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/out.txt
 
 // RUN: mkdir -p %t/someModule.framework/Modules/someModule.swiftmodule/
 // RUN: mv %t/someModule.swiftmodule %t/someModule.framework/Modules/someModule.swiftmodule/%target-swiftmodule-name
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -F %t > %t/framework.txt
-// RUN: FileCheck -check-prefix=FRAMEWORK %s < %t/framework.txt
-// RUN: FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/framework.txt
+// RUN: %FileCheck -check-prefix=FRAMEWORK %s < %t/framework.txt
+// RUN: %FileCheck -check-prefix=NO-FORCE-LOAD %s < %t/framework.txt
 
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load
 // RUN: %target-swift-frontend -emit-ir -lmagic %s -I %t > %t/force-load.txt
-// RUN: FileCheck %s < %t/force-load.txt
-// RUN: FileCheck -check-prefix=FORCE-LOAD-CLIENT %s < %t/force-load.txt
+// RUN: %FileCheck %s < %t/force-load.txt
+// RUN: %FileCheck -check-prefix=FORCE-LOAD-CLIENT %s < %t/force-load.txt
 
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | FileCheck --check-prefix=NO-FORCE-LOAD %s
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD %s
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | FileCheck --check-prefix=FORCE-LOAD-HEX %s
+// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | %FileCheck --check-prefix=NO-FORCE-LOAD %s
+// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD %s
+// RUN: %target-swift-frontend -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.

@@ -11,17 +11,17 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=TAG_DECLS_AND_TYPEDEFS -strict-whitespace < %t.printed.txt
-// RUN: FileCheck %s -check-prefix=NEGATIVE -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=TAG_DECLS_AND_TYPEDEFS -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=NEGATIVE -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=Foundation -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes.bits -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=nullability -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
@@ -89,7 +89,7 @@
 // FOUNDATION-NEXT: subscript(idx: Int) -> Any { get }
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingMode.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}enum RuncingMode : UInt {{{$}}
+// FOUNDATION-NEXT: {{^}}enum NSRuncingMode : UInt {{{$}}
 // FOUNDATION-NEXT: {{^}}  init?(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case mince{{$}}
@@ -97,13 +97,13 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct RuncingOptions : OptionSet {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSet {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  @available(*, unavailable, message: "use [] to construct an empty option set"){{$}}
-// FOUNDATION-NEXT: {{^}}  static var none: RuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var enableMince: RuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var enableQuince: RuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var none: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableMince: NSRuncingOptions { get }{{$}}
+// FOUNDATION-NEXT: {{^}}  static var enableQuince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}

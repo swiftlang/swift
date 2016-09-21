@@ -1,5 +1,8 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
+
+// rdar://problem/27616753
+// XFAIL: *
 
 // REQUIRES: objc_interop
 

@@ -146,8 +146,8 @@ func SR2066(x: Int?) {
 // Test x???? patterns.
 switch (nil as Int???) {
 case let x???: print(x, terminator: "")
-case let x??: print(x, terminator: "")
-case let x?: print(x, terminator: "")
+case let x??: print(x as Any, terminator: "")
+case let x?: print(x as Any, terminator: "")
 case 4???: break
 case nil??: break
 case nil?: break
@@ -162,7 +162,7 @@ default: break
 
 
 // Test some value patterns.
-let x : Int? = nil
+let x : Int?
 
 extension Int {
   func method() -> Int { return 42 }
@@ -222,14 +222,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer closure return type in current context}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer closure return type in current context}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
     switch $0 {
     case .A:
       return 1
@@ -245,6 +245,6 @@ enum SR2057 {
   case foo
 }
 
-let sr2057: SR2057? = nil
+let sr2057: SR2057?
 if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
 

@@ -83,7 +83,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
     assert(!Member && "Type property cannot have a member");
     assert(Second.isNull() && "Type property with second type");
     break;
@@ -187,7 +186,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
     return create(cs, getKind(), getFirstType(), Type(), DeclName(),
                   FunctionRefKind::Compound, getLocator());
 
@@ -308,10 +306,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << " is a class";
     skipSecond = true;
     break;
-  case ConstraintKind::BridgedToObjectiveC:
-    Out << " is bridged to an Objective-C type";
-    skipSecond = true;
-    break;
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
@@ -404,6 +398,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[bridge-to-objc]";
   case ConversionRestrictionKind::BridgeFromObjC:
     return "[bridge-from-objc]";
+  case ConversionRestrictionKind::HashableToAnyHashable:
+    return "[hashable-to-anyhashable]";
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
     return "[cf-toll-free-bridge-to-objc]";
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
@@ -489,7 +485,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Archetype:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Class:
-  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     constraint->getFirstType()->getTypeVariables(typeVars);

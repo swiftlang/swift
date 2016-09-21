@@ -195,13 +195,8 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
 void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
   if (!Generics) return;
 
-  // Note that the canonical mangling signature will sometimes use
-  // different dependent type from Generics, apparently for no good
-  // reason.
-  auto minimized = Generics->getCanonicalManglingSignature(M);
-
   // Make a first pass to get all the type metadata.
-  for (auto &reqt : minimized->getRequirements()) {
+  for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
         // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -220,7 +215,7 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
   }
 
   // Make a second pass for all the protocol conformances.
-  for (auto &reqt : minimized->getRequirements()) {
+  for (auto &reqt : Generics->getRequirements()) {
     switch (reqt.getKind()) {
         // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -258,9 +253,6 @@ void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCa
 }
 
 void PolymorphicConvention::initGenerics() {
-  // The canonical mangling signature removes dependent types that are
-  // equal to concrete types, but isn't necessarily parallel with
-  // substitutions.
   Generics = FnType->getGenericSignature();
 }
 
@@ -669,10 +661,23 @@ static unsigned getDependentTypeIndex(CanGenericSignature generics,
 static unsigned
 getProtocolConformanceIndex(CanGenericSignature generics, ModuleDecl &M,
                             CanType type, ProtocolDecl *protocol) {
-  auto conformsTo = generics->getConformsTo(type, M);
-  auto it = std::find(conformsTo.begin(), conformsTo.end(), protocol);
-  assert(it != conformsTo.end() && "didn't find protocol in conformances");
-  return (it - conformsTo.begin());
+  assert(type->isTypeParameter());
+
+  // Make a pass over all the dependent types.
+  unsigned index = 0;
+  for (auto reqt : generics->getRequirements()) {
+    // Unfortunately, we can't rely on either depTy or type actually
+    // being the marked witness type in the generic signature, so we have
+    // to ask the generic signature whether the types are equal.
+    if (reqt.getKind() == RequirementKind::Conformance &&
+        generics->areSameTypeParameterInContext(reqt.getFirstType(), type, M)) {
+      if (reqt.getSecondType()->getAnyNominal() == protocol)
+        return index;
+      index++;
+    }
+  }
+
+  llvm_unreachable("didn't find dependent type in all-dependent-types list");
 }
 
 namespace {
@@ -1276,6 +1281,17 @@ public:
       }
       return *Fulfillments;
     }
+
+    void bindArchetypeAccessPathsInConformance(IRGenFunction &IGF) {
+      auto declCtx = Conformance.getDeclContext();
+      if (auto generics = declCtx->getGenericSignatureOfContext()) {
+        auto getInContext = [&](CanType type) -> CanType {
+          return ArchetypeBuilder::mapTypeIntoContext(declCtx, type)
+              ->getCanonicalType();
+        };
+        bindArchetypeAccessPaths(IGF, generics, getInContext);
+      }
+    }
   };
 }
 
@@ -1334,6 +1350,9 @@ getAssociatedTypeMetadataAccessFunction(AssociatedTypeDecl *requirement,
 
   // Bind local type data from the metadata argument.
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
+
+  // Bind archetype access paths.
+  bindArchetypeAccessPathsInConformance(IGF);
 
   // For now, assume that an associated type is cheap enough to access
   // that it doesn't need a new cache entry.
@@ -1458,6 +1477,9 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedTypeDecl *requirement,
                                         associatedTypeMetadata);
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self);
 
+  // Bind archetype access paths.
+  bindArchetypeAccessPathsInConformance(IGF);
+
   // For now, assume that finding an abstract conformance is always
   // fast enough that it's not worth caching.
   // TODO: provide an API to find the best metadata path to the conformance
@@ -1519,7 +1541,8 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
   // Store the fetched result back to the cache.
   // We need to transitively ensure that any stores initializing the result
   // that are visible to us are visible to callers.
-  IGF.Builder.CreateStore(fetchedResult, cache)->setOrdering(llvm::Release);
+  IGF.Builder.CreateStore(fetchedResult, cache)->setOrdering(
+    llvm::AtomicOrdering::Release);
 
   auto fetchedResultBB = IGF.Builder.GetInsertBlock();
   IGF.Builder.CreateBr(contBB);
@@ -1832,9 +1855,8 @@ void addPotentialArchetypeAccessPath(IRGenFunction &IGF,
                              {srcBaseArchetype, association});
 }
 
-static void bindArchetypeAccessPaths(IRGenFunction &IGF,
-                                     GenericSignature *Generics,
-                                     GetTypeParameterInContextFn getInContext) {
+void irgen::bindArchetypeAccessPaths(IRGenFunction &IGF, GenericSignature *Generics,
+                              GetTypeParameterInContextFn getInContext) {
   // Remember all the extra ways we have of reaching the parameter
   // archetypes due to type equality constraints.
   for (auto reqt : Generics->getRequirements()) {

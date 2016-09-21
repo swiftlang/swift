@@ -294,24 +294,9 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-Swift3Migration("swift3-migration",
-                   llvm::cl::desc("Enable Fix-It based migration aids for Swift 3"),
-                   llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::desc("Infer when a global could be imported as a member"),
                    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-HonorSwiftNewtypeAttr("enable-swift-newtype",
-                      llvm::cl::desc("Enable swift_newtype import"),
-                      llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
-StripNSPrefix("enable-strip-ns-prefix",
-              llvm::cl::desc("Strip the NS prefix from Foundation et al"),
-              llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
@@ -1113,6 +1098,7 @@ private:
     ValueDecl *Dcl = nullptr;
     TypeDecl *CtorTyRef = nullptr;
     ModuleEntity Mod;
+    Identifier ArgName;
     bool IsRef = true;
 
     SemanticSourceEntity(CharSourceRange Range,
@@ -1128,6 +1114,14 @@ private:
                          ModuleEntity Mod)
       : Range(Range),
         Mod(Mod) {}
+
+    SemanticSourceEntity(CharSourceRange Range,
+                         ValueDecl *Dcl,
+                         Identifier argName)
+      : Range(Range),
+        Dcl(Dcl),
+        ArgName(argName),
+        IsRef(true) {}
   };
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
@@ -1151,7 +1145,7 @@ private:
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override {
-    annotateSourceEntity({ Range, D, nullptr, /*IsRef=*/true });
+    annotateSourceEntity({ Range, D, Name });
     return true;
   }
 
@@ -1227,6 +1221,9 @@ private:
       if (Entity.Mod.isSystemModule())
         OS << 'i';
       OS << "Mod";
+    }
+    if (!Entity.ArgName.empty()) {
+      OS << "#" << Entity.ArgName.str();
     }
 
     OS << '>';
@@ -2576,7 +2573,9 @@ private:
     }
 
     if (Decl *reDecl = getDeclFromUSR(Ctx, USR, error)) {
-      reDecl->print(Stream, PrintOptions());
+      PrintOptions POpts;
+      POpts.PreferTypeRepr = false;
+      reDecl->print(Stream, POpts);
     } else {
       Stream << "FAILURE";
     }
@@ -2782,16 +2781,12 @@ int main(int argc, char *argv[]) {
     !options::DisableAccessControl;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
-  InitInvok.getLangOptions().Swift3Migration |= options::Swift3Migration;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
-  InitInvok.getLangOptions().StripNSPrefix |= options::StripNSPrefix;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=
     options::InferImportAsMember;
-  InitInvok.getClangImporterOptions().HonorSwiftNewtypeAttr |=
-    options::HonorSwiftNewtypeAttr;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

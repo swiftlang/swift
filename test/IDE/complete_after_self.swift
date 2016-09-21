@@ -1,32 +1,53 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_NONSELF_NO_DOT_1 > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_NONSELF_DOT_1 > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=DESTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
-// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_NO_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1 < %t.self.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_DOT_1 > %t.self.txt
-// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1 < %t.self.txt
+// RUN: %FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1 < %t.self.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_CONSTRUCTOR_SELF_DOT_1 > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=STRUCT_CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_CONSTRUCTOR_NONSELF_DOT_1 > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_FUNC_SELF_DOT_1 > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
 //===---
 //===--- Tests for code completion after 'self'.
@@ -145,14 +166,23 @@ class ThisDerived1 : ThisBase1 {
 
   init() {
     self#^CONSTRUCTOR_SELF_NO_DOT_1^#
-// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 20 items
+// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 23 items
+// CONSTRUCTOR_SELF_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal: .init()[#ThisDerived1#];
+// CONSTRUCTOR_SELF_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal: .init({#a: Int#})[#ThisDerived1#];
 // CONSTRUCTOR_SELF_NO_DOT_1: End completions
+    let d: ThisDerived1
+    d#^CONSTRUCTOR_NONSELF_NO_DOT_1^#
+// NO_INIT-NOT: init()
   }
 
   init(a : Int) {
     self.#^CONSTRUCTOR_SELF_DOT_1^#
-// CONSTRUCTOR_SELF_DOT_1: Begin completions, 15 items
+// CONSTRUCTOR_SELF_DOT_1: Begin completions, 18 items
+// CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#ThisDerived1#];
+// CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ThisDerived1#];
 // CONSTRUCTOR_SELF_DOT_1: End completions
+    let d: ThisDerived1
+    d.#^CONSTRUCTOR_NONSELF_DOT_1^#
   }
 
   deinit {
@@ -195,6 +225,7 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/CurrNominal:            .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Enum]/CurrNominal:             .DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        .DerivedExtNestedTypealias[#Int#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ({#someExtensionArg: Int#})[#ThisDerived1#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc0({#self: ThisBase1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/Super:              .baseStaticVar[#Int#]
@@ -266,4 +297,25 @@ extension ThisDerived1 {
   }
 
   typealias DerivedExtNestedTypealias = Int
+
+  convenience init(someExtensionArg: Int) {
+    self.#^EXTENSION_CONSTRUCTOR_SELF_DOT_1^#
+  }
+}
+
+struct S1 {
+  init() {}
+  init(x: Int) {
+    self.#^STRUCT_CONSTRUCTOR_SELF_DOT_1^#
+// STRUCT_CONSTRUCTOR_SELF_DOT_1: Begin completions, 3 items
+// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal:      init()[#S1#];
+// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#})[#S1#];
+// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   f()[#Void#];
+// STRUCT_CONSTRUCTOR_SELF_DOT_1: End completions
+    let s: S1
+    s.#^STRUCT_CONSTRUCTOR_NONSELF_DOT_1^#
+  }
+  func f() {
+    self.#^STRUCT_FUNC_SELF_DOT_1^#
+  }
 }

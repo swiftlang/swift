@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
@@ -15,8 +15,8 @@
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/classes.h
-// RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
+// RUN: %FileCheck %s < %t/classes.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
 // RUN: not %check-in-clang -fno-modules -Qunused-arguments %t/classes.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h
@@ -108,6 +108,8 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * _Nonnull)s boolean:(BOOL)b;
 // CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
 // CHECK-NEXT: - (nonnull instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithMoreFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -120,6 +122,39 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
   convenience init?(boolean b: ObjCBool) { self.init() }
 
   init(forFun: ()) { }
+
+  init(moreFun: ()) { }
+
+  init(evenMoreFun: ()) { }
+}
+
+// CHECK-LABEL: @interface InheritedInitializers
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithMoreFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initForFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun SWIFT_UNAVAILABLE;
+// CHECK-NEXT: @end
+@objc class InheritedInitializers : Initializers {
+  override init() {
+    super.init()
+  }
+
+  private convenience init(float f: Float) { self.init() }
+
+  private override init(moreFun: ()) { super.init() }
+}
+
+// CHECK-LABEL: @interface InheritedInitializersAgain
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+@objc class InheritedInitializersAgain : InheritedInitializers {
+  override init() {
+    super.init()
+  }
+
+  init(evenMoreFun: ()) { super.init() }
 }
 
 // NEGATIVE-NOT: NotObjC
@@ -248,7 +283,7 @@ typealias AliasForNSRect = NSRect
   func emptyArray() -> NSArray { return NSArray() }
   func maybeArray() -> NSArray? { return nil }
 
-  func someEnum() -> RuncingMode { return .mince }
+  func someEnum() -> NSRuncingMode { return .mince }
   func protocolClass() -> NSCoding.Type? { return nil }
 
   func zone() -> NSZone? { return nil }
@@ -256,7 +291,7 @@ typealias AliasForNSRect = NSRect
   func cf(_ x: CFTree, str: CFString, str2: CFMutableString, obj: CFAliasForType) -> CFTypeRef? { return nil }
 
   func appKitInImplementation() {
-    let _ : NSResponder? = nil
+    let _ : NSResponder?
   }
 
   func returnsURL() -> NSURL? { return nil }
@@ -292,6 +327,18 @@ class MyObject : NSObject {}
 // CHECK-LABEL: @protocol MyProtocol <NSObject>
 // CHECK-NEXT: @end
 @objc protocol MyProtocol : NSObjectProtocol {}
+
+// CHECK-LABEL: @protocol MyProtocolMetaOnly;
+// CHECK-LABEL: @interface MyProtocolMetaCheck
+// CHECK-NEXT: - (void)test:(Class <MyProtocolMetaOnly> _Nullable)x;
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class MyProtocolMetaCheck {
+  func test(_ x: MyProtocolMetaOnly.Type?) {}
+}
+// CHECK-LABEL: @protocol MyProtocolMetaOnly
+// CHECK-NEXT: @end
+@objc protocol MyProtocolMetaOnly {}
 
 // CHECK-LABEL: @interface Nested
 // CHECK-NEXT: init
@@ -332,18 +379,18 @@ class MyObject : NSObject {}
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner2 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 
-  var ref2: Inner2? = nil
-  var ref3: Inner3? = nil
+  var ref2: Inner2?
+  var ref3: Inner3?
 
   // CHECK-LABEL: @interface Inner3
   // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * _Nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner3 {
-    var ref: NestedMembers? = nil
+    var ref: NestedMembers?
   }
 }
 
@@ -643,7 +690,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * _Nullable * _Nullable)error;
 // CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * _Nonnull)string error:(NSError * _Nullable * _Nullable)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error fn:(NSInteger (^ _Nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * _Nullable * _Nullable)error fn:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Throwing1 {
   func method1() throws { }
@@ -664,6 +711,10 @@ public class NonObjCClass { }
   @objc func takeAndReturnGenericClass(_ x: GenericClass<NSString>?) -> GenericClass<AnyObject> { fatalError("") }
   // CHECK: - (FungibleContainer<id <Fungible>> * _Null_unspecified)takeAndReturnFungibleContainer:(FungibleContainer<Spoon *> * _Nonnull)x;
   @objc func takeAndReturnFungibleContainer(_ x: FungibleContainer<Spoon>) -> FungibleContainer<Fungible>! { fatalError("") }
+
+  typealias Dipper = Spoon
+  // CHECK: - (FungibleContainer<FungibleObject> * _Nonnull)fungibleContainerWithAliases:(FungibleContainer<Spoon *> * _Nullable)x;
+  @objc func fungibleContainerWithAliases(_ x: FungibleContainer<Dipper>?) -> FungibleContainer<FungibleObject> { fatalError("") }
 }
 // CHECK: @end
 

@@ -61,6 +61,8 @@ def emit_fixits_path
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
+def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
+  HelpText<"Like -verify, but updates the original source file">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
@@ -94,10 +96,6 @@ def disable_testable_attr_requires_testable_module :
   Flag<["-"], "disable-testable-attr-requires-testable-module">,
   HelpText<"Disable checking of @testable">;
 
-def suppress_argument_labels_in_types :
-  Flag<["-"], "suppress-argument-labels-in-types">,
-  HelpText<"SE-0111: Suppress argument labels in types">;
-
 def enable_target_os_checking :
   Flag<["-"], "enable-target-os-checking">,
   HelpText<"Enable checking the target OS of serialized modules">;
@@ -105,6 +103,9 @@ def enable_target_os_checking :
 def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
+
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -223,9 +224,6 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
-def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
-  HelpText<"Enable experimental 'switch' pattern matching features">;
-
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
@@ -233,10 +231,6 @@ def enable_experimental_property_behaviors :
 def enable_experimental_nested_generic_types :
   Flag<["-"], "enable-experimental-nested-generic-types">,
   HelpText<"Enable experimental support for nested generic types">;
-
-def enable_experimental_collection_casts :
-  Flag<["-"], "enable-experimental-collection-casts">,
-  HelpText<"Enable experimental support for general collection casting">;
 
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
@@ -246,27 +240,11 @@ def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
 
-def enable_swift_newtype :
-  Flag<["-"], "enable-swift-newtype">,
-  HelpText<"Enable the swift_newtype attribute">;
-
-def enable_strip_ns_prefix :
-  Flag<["-"], "enable-strip-ns-prefix">,
-  HelpText<"Strip 'NS' prefix from Foundation entities">;
-
-def swift3_migration :
-  Flag<["-"], "swift3-migration">,
-  HelpText<"Enable Fix-It based migration aids for Swift 3">;
-
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,
   HelpText<"Warns when type-checking a function takes longer than <n> ms">;
 def warn_long_function_bodies_EQ : Joined<["-"], "warn-long-function-bodies=">,
   Alias<warn_long_function_bodies>;
-
-def warn_omit_needless_words :
-  Flag<["-"], "Womit-needless-words">,
-  HelpText<"Warn about needless words in names">;
 
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
@@ -355,8 +333,5 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
-
-def enable_id_as_any: Flag<["-"], "enable-id-as-any">,
-  HelpText<"Enable importing ObjC 'id' as Swift 'Any' type">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

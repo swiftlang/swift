@@ -860,7 +860,7 @@ namespace {
     Expr *Guard = nullptr;
   };
   
-  /// Contexts in which a guarded pattern can appears.
+  /// Contexts in which a guarded pattern can appear.
   enum class GuardedPatternContext {
     Case,
     Catch,
@@ -1683,7 +1683,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
       if (!versionRequirement.hasValue())
         return ConditionalCompilationExprState::error();
 
-      auto thisVersion = version::Version::getCurrentLanguageVersion();
+      auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
 
       if (!prefix->getName().getBaseName().str().equals(">=")) {
         diagnose(PUE->getFn()->getLoc(),
@@ -2017,11 +2017,10 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
     return makeParserCodeCompletionResult<CatchStmt>();
   }
 
-  SourceLoc startOfBody = Tok.getLoc();
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
   status |= bodyResult;
   if (bodyResult.isNull()) {
-    bodyResult = makeParserErrorResult(BraceStmt::create(Context, startOfBody,
+    bodyResult = makeParserErrorResult(BraceStmt::create(Context, PreviousLoc,
                                                          {}, PreviousLoc,
                                                          /*implicit=*/ true));
   }
@@ -2213,6 +2212,9 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
   // If we're missing a semicolon, try to recover.
   if (Tok.isNot(tok::semi)) {
+    // Provide a reasonable default location for the first semicolon.
+    Semi1Loc = Tok.getLoc();
+
     if (auto *BS = ConvertClosureToBraceStmt(First.getPtrOrNull(), Context)) {
       // We have seen:
       //     for { ... }
@@ -2327,7 +2329,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
   Status |= Body;
   if (Body.isNull())
     Body = makeParserResult(
-        Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
+        Body, BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
       Status,

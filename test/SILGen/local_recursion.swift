@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_TF15local_recursion15local_recursionFTSi1ySi_T_ : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):

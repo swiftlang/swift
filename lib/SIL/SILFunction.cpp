@@ -16,8 +16,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
-// FIXME: For mapTypeInContext
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -41,7 +41,7 @@ SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
                                  CanSILFunctionType loweredType,
-                                 GenericParamList *contextGenericParams,
+                                 GenericEnvironment *genericEnv,
                                  Optional<SILLocation> loc,
                                  IsBare_t isBareSILFunction,
                                  IsTransparent_t isTrans,
@@ -62,7 +62,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
   }
 
   auto fn = new (M) SILFunction(M, linkage, name,
-                                loweredType, contextGenericParams, loc,
+                                loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isFragile, isThunk,
                                 classVisibility, inlineStrategy, E,
                                 insertBefore, debugScope, DC);
@@ -73,7 +73,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, CanSILFunctionType LoweredType,
-                         GenericParamList *contextGenericParams,
+                         GenericEnvironment *genericEnv,
                          Optional<SILLocation> Loc,
                          IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans,
@@ -87,8 +87,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
   : Module(Module),
     Name(Name),
     LoweredType(LoweredType),
-    // FIXME: Context params should be independent of the function type.
-    ContextGenericParams(contextGenericParams),
+    GenericEnv(genericEnv),
     DeclCtx(DC),
     DebugScope(DebugScope),
     Bare(isBareSILFunction),
@@ -188,7 +187,7 @@ bool SILFunction::shouldOptimize() const {
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
   return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
-                                              getContextGenericParams(),
+                                              getGenericEnvironment(),
                                               type);
 }
 
@@ -290,7 +289,7 @@ SILType ArchetypeBuilder::substDependentType(SILModule &M, SILType type) {
 
 Type SILFunction::mapTypeOutOfContext(Type type) const {
   return ArchetypeBuilder::mapTypeOutOfContext(getModule().getSwiftModule(),
-                                               getContextGenericParams(),
+                                               getGenericEnvironment(),
                                                type);
 }
 
@@ -555,8 +554,16 @@ void SILFunction::convertToDeclaration() {
 }
 
 ArrayRef<Substitution> SILFunction::getForwardingSubstitutions() {
-  auto *params = getContextGenericParams();
-  if (!params)
+  if (ForwardingSubs)
+    return *ForwardingSubs;
+
+  auto *env = getGenericEnvironment();
+  if (!env)
     return {};
-  return params->getForwardingSubstitutions(getASTContext());
+
+  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto *M = getModule().getSwiftModule();
+  ForwardingSubs = env->getForwardingSubstitutions(M, sig);
+
+  return *ForwardingSubs;
 }

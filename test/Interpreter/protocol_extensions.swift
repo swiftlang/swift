@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // Extend a protocol with a property.
@@ -44,7 +44,7 @@ for (index, element) in ["a", "b", "c"].myEnumerated() {
 
 extension Sequence {
   final public func myReduce<T>(
-    _ initial: T, combine: @noescape (T, Self.Iterator.Element) -> T
+    _ initial: T, combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
     for value in self {
@@ -241,7 +241,7 @@ print(hasP.p.extValue)
 
 // rdar://problem/20739719
 class Super: Init {
-  required init(x: Int) { print("\(x) \(self.dynamicType)") }
+  required init(x: Int) { print("\(x) \(type(of: self))") }
 }
 
 class Sub: Super {}

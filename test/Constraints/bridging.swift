@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify %s -enable-id-as-any
+// RUN: %target-swift-frontend -parse -verify %s
 
 // REQUIRES: objc_interop
 
@@ -62,7 +62,7 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: BridgedClass?)
       -> BridgedStruct {
-    var result: BridgedStruct? = nil
+    var result: BridgedStruct?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -171,7 +171,7 @@ func dictionaryToNSDictionary() {
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
-  nsd = [BridgedStruct() : bcOpt] // expected-error{{value of type 'BridgedStruct' does not conform to expected dictionary key type 'NSCopying'}}
+  nsd = [BridgedStruct() : bcOpt as Any]
   bcOpt = nil
   _ = nsd
 }
@@ -265,7 +265,7 @@ func rdar19831698() {
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
-  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[_]'}}
+  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }

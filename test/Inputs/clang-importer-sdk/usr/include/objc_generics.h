@@ -1,8 +1,18 @@
 #import <Foundation.h>
 
+#define _CF_TYPED_ENUM __attribute__((swift_wrapper(enum)))
+#define NS_STRING_ENUM _CF_TYPED_ENUM
+#define NS_SWIFT_NAME(Name) __attribute__((swift_name(#Name)))
+
+typedef NSString * GenericOption NS_STRING_ENUM;
+
+GenericOption const GenericOptionMultithreaded NS_SWIFT_NAME(multithreaded);
+
+
 @interface GenericClass<T> : NSObject
 - (id)initWithThing:(T)thing;
 - (id)initWithArrayOfThings:(NSArray<T> *__nonnull)things;
+- (id)initWithOptions:(nullable NSDictionary<GenericOption, id> *)options;
 - (void)dealloc;
 - (__nullable T)thing;
 - (int)count;
@@ -75,4 +85,6 @@ void takeGenericClass(__nullable GenericClass<NSString *> *thing);
 @interface TestConstrainedTypeParam<T> : NSObject
 - (void)doThing:(__nonnull T<Pettable>)thing;
 @end
+
+typedef id <Fungible> FungibleObject;
 

@@ -128,12 +128,12 @@ public:
 
   ///  Apply a substitution to the type to produce another lowered SIL type.
   static SILType substType(SILModule &silModule, ModuleDecl *astModule,
-                           TypeSubstitutionMap &subs, SILType SrcTy);
+                           const TypeSubstitutionMap &subs, SILType SrcTy);
 
   ///  Apply a substitution to the function type.
   static CanSILFunctionType substFuncType(SILModule &silModule,
                                           ModuleDecl *astModule,
-                                          TypeSubstitutionMap &subs,
+                                          const TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
@@ -385,18 +385,15 @@ public:
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
 
   /// True if the type is block-pointer-compatible, meaning it either is a block
-  /// or is an Optional or ImplicitlyUnwrappedOptional with a block payload.
+  /// or is an Optional with a block payload.
   bool isBlockPointerCompatible() const {
-    CanType ty = getSwiftRValueType();
-    if (auto optPayload = ty->getAnyOptionalObjectType()) {
-      // The object type of Optional<T> is an unlowered AST type.
-      auto fTy = optPayload->getAs<FunctionType>();
-      if (!fTy)
-        return false;
-      return fTy->getRepresentation() == FunctionType::Representation::Block;
+    // Look through one level of optionality.
+    SILType ty = *this;
+    if (auto optPayload = ty.getAnyOptionalObjectType()) {
+      ty = optPayload;
     }
       
-    auto fTy = dyn_cast<SILFunctionType>(ty);
+    auto fTy = ty.getAs<SILFunctionType>();
     if (!fTy)
       return false;
     return fTy->getRepresentation() == SILFunctionType::Representation::Block;
@@ -451,7 +448,7 @@ public:
                            ArrayRef<Substitution> Subs) const;
 
   SILType subst(SILModule &silModule, ModuleDecl *astModule,
-                TypeSubstitutionMap &subs) const;
+                const TypeSubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
@@ -474,24 +471,14 @@ public:
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
 
-  /// Returns the lowered type for T if this type is Optional<T> or
-  /// ImplicitlyUnwrappedOptional<T>; otherwise, return the null type.
-  SILType getAnyOptionalObjectType(SILModule &SILMod,
-                                   OptionalTypeKind &OTK) const;
+  /// Returns the lowered type for T if this type is Optional<T>;
+  /// otherwise, return the null type.
+  SILType getAnyOptionalObjectType() const;
 
   /// Unwraps one level of optional type.
-  /// Returns the lowered T if the given type is Optional<T> or IUO<T>.
+  /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
-  static SILType unwrapAnyOptionalType(SILType Ty, SILModule &SILMod,
-                                       OptionalTypeKind &OTK) {
-    if (auto unwrappedTy = Ty.getAnyOptionalObjectType(SILMod, OTK))
-      return unwrappedTy;
-
-    return Ty;
-  };
-
-  /// Classify this type as an optional type.
-  OptionalTypeKind getOptionalTypeKind() const;
+  SILType unwrapAnyOptionalType() const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }

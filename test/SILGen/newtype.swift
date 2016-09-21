@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-swift-newtype  %s | FileCheck %s -check-prefix=CHECK-RAW
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-RAW
 
-// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-swift-newtype  %s | FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 
@@ -38,4 +38,18 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: apply [[FORCE_BRIDGE]]<String, NSString>([[STRING_RESULT_ADDR]], [[STORED_VALUE]], [[STRING_META]])
 // CHECK-RAW: [[STRING_RESULT:%[0-9]+]] = load [[STRING_RESULT_ADDR]]
 // CHECK-RAW: return [[STRING_RESULT]]
+
+class ObjCTest {
+  // CHECK-RAW-LABEL: sil hidden @_TFC7newtype8ObjCTest19optionalPassThroughfGSqVSC11ErrorDomain_GSqS1__ : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] @_TToFC7newtype8ObjCTest19optionalPassThroughfGSqVSC11ErrorDomain_GSqS1__ : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
+  @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
+    return ed
+  }  
+
+  // CHECK-RAW-LABEL: sil hidden @_TFC7newtype8ObjCTest18integerPassThroughfVSC5MyIntS1_ : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
+  // CHECK-RAW: sil hidden [thunk] @_TToFC7newtype8ObjCTest18integerPassThroughfVSC5MyIntS1_ : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
+  @objc func integerPassThrough(_ ed: MyInt) -> MyInt {
+    return ed
+  }  
+}
 

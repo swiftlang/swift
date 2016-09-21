@@ -210,6 +210,7 @@ int main(int argc, char **argv) {
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
+  Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
@@ -353,7 +354,8 @@ int main(int argc, char **argv) {
   // If we're in -verify mode, we've buffered up all of the generated
   // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
-    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs());
+    HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
+                                 /*autoApplyFixes*/false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

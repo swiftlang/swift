@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -120,6 +121,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
   case SILDeclRef::Kind::IVarDestroyer:
@@ -813,8 +816,10 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   // Forward substitutions.
   ArrayRef<Substitution> subs;
-  if (auto gp = getConstantInfo(to).ContextGenericParams) {
-    subs = gp->getForwardingSubstitutions(getASTContext());
+  auto constantInfo = getConstantInfo(to);
+  if (auto *env = constantInfo.GenericEnv) {
+    auto sig = constantInfo.SILFnType->getGenericSignature();
+    subs = env->getForwardingSubstitutions(SGM.SwiftModule, sig);
   }
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,

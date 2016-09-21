@@ -13,7 +13,7 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ body: @noescape () throws -> Result
+  _ x: T, _ body: () throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body()
@@ -22,7 +22,7 @@ public func withExtendedLifetime<T, Result>(
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  _ x: T, _ body: @noescape (T) throws -> Result
+  _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
   defer { _fixLifetime(x) }
   return try body(x)
@@ -41,7 +41,7 @@ extension String {
   ///   it is used as the return value of the `withCString(_:)` method.
   /// - Returns: The return value of the `f` closure, if any.
   public func withCString<Result>(
-    _ body: @noescape (UnsafePointer<Int8>) throws -> Result
+    _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.utf8CString.withUnsafeBufferPointer {
       try body($0.baseAddress!)
@@ -61,7 +61,7 @@ public func _fixLifetime<T>(_ x: T) {
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
   to arg: inout T,
-  _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
@@ -72,7 +72,7 @@ public func withUnsafeMutablePointer<T, Result>(
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
   to arg: inout T,
-  _ body: @noescape (UnsafePointer<T>) throws -> Result
+  _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
@@ -81,7 +81,7 @@ public func withUnsafePointer<T, Result>(
 @available(*, unavailable, renamed: "withUnsafeMutablePointer(to:_:)")
 public func withUnsafeMutablePointer<T, Result>(
   _ arg: inout T,
-  _ body: @noescape (UnsafeMutablePointer<T>) throws -> Result
+  _ body: (UnsafeMutablePointer<T>) throws -> Result
 ) rethrows -> Result
 {
   Builtin.unreachable()
@@ -90,8 +90,55 @@ public func withUnsafeMutablePointer<T, Result>(
 @available(*, unavailable, renamed: "withUnsafePointer(to:_:)")
 public func withUnsafePointer<T, Result>(
   _ arg: inout T,
-  _ body: @noescape (UnsafePointer<T>) throws -> Result
+  _ body: (UnsafePointer<T>) throws -> Result
 ) rethrows -> Result
 {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: (
+    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafeMutablePointer(to:_:) instead")
+public func withUnsafeMutablePointers<A0, A1, A2, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: (
+    UnsafeMutablePointer<A0>,
+    UnsafeMutablePointer<A1>,
+    UnsafeMutablePointer<A2>
+  ) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
+public func withUnsafePointers<A0, A1, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
+) rethrows -> Result {
+  Builtin.unreachable()
+}
+
+@available(*, unavailable, message:"use nested withUnsafePointer(to:_:) instead")
+public func withUnsafePointers<A0, A1, A2, Result>(
+  _ arg0: inout A0,
+  _ arg1: inout A1,
+  _ arg2: inout A2,
+  _ body: (
+    UnsafePointer<A0>,
+    UnsafePointer<A1>,
+    UnsafePointer<A2>
+  ) throws -> Result
+) rethrows -> Result {
   Builtin.unreachable()
 }

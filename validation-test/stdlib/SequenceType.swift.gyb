@@ -27,7 +27,7 @@ extension SequenceLog {
 
 extension LoggingSequence {
   func nonCustomizableOperation() {
-    Log.nonCustomizableOperation[self.dynamicType] += 1
+    Log.nonCustomizableOperation[type(of: self)] += 1
     return base.nonCustomizableOperation()
   }
 }
@@ -74,10 +74,10 @@ SequenceTypeTests.test("${algorithmKind}/WhereElementIsComparable") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -106,10 +106,10 @@ SequenceTypeTests.test("${algorithmKind}/Predicate") {
         test.expected${AlgorithmKind}Index!, result.identity,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Value,
         stackTrace: SourceLocStack().with(test.loc))
-      expectEmpty(
+      expectNil(
         test.expected${AlgorithmKind}Index,
         stackTrace: SourceLocStack().with(test.loc))
     }
@@ -770,7 +770,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
   }
 
   func map<T>(
-    _ transform: @noescape (Element) throws -> T
+    _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     MinimalSequenceWithCustomMap.timesMapWasCalled += 1
     return try _data.map(transform)
@@ -783,7 +783,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : Sequence {
 
 func callStaticSequenceMap<T>(
   _ sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
   expectType([T].self, &result)
@@ -792,7 +792,7 @@ func callStaticSequenceMap<T>(
 
 func callStaticSequenceMap<T>(
   _ sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
-  transform: @noescape (OpaqueValue<Int>) -> T
+  transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = sequence.map(transform)
   expectType([T].self, &result)
@@ -801,7 +801,7 @@ func callStaticSequenceMap<T>(
 
 func callGenericSequenceMap<S : Sequence, T>(
   _ sequence: S,
-  transform: @noescape (S.Iterator.Element) -> T
+  transform: (S.Iterator.Element) -> T
 ) -> [T] {
   var result = sequence.map(transform)
   expectType([T].self, &result)
@@ -942,16 +942,6 @@ SequenceTypeTests.test("forEach/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// first()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("first/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first { $0.value == 1 }
-  expectCustomizable(tester, tester.log.first)
-}
-
-//===----------------------------------------------------------------------===//
 // dropFirst()
 //===----------------------------------------------------------------------===//
 
@@ -972,6 +962,16 @@ SequenceTypeTests.test("dropLast/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
+// drop(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("drop(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.drop { _ in return false }
+  expectCustomizable(tester, tester.log.dropWhile)
+}
+
+//===----------------------------------------------------------------------===//
 // prefix()
 //===----------------------------------------------------------------------===//
 
@@ -979,6 +979,16 @@ SequenceTypeTests.test("prefix/dispatch") {
   var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.prefix(1)
   expectCustomizable(tester, tester.log.prefixMaxLength)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix(while:)
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("prefix(while:)/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.prefix { _ in return false }
+  expectCustomizable(tester, tester.log.prefixWhile)
 }
 
 //===----------------------------------------------------------------------===//

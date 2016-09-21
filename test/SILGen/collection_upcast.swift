@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
@@ -9,7 +9,7 @@ import Foundation
 public extension _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
-    var result: Self? = nil
+    var result: Self?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

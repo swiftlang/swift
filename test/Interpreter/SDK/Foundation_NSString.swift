@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -135,8 +135,16 @@ testComparisons()
 // Test overlain variadic methods.
 // CHECK-LABEL: Variadic methods:
 print("Variadic methods:")
+// Check that it works with bridged Strings.
 // CHECK-NEXT: x y
 print(NSString(format: "%@ %@", "x", "y"))
+// Check that it works with bridged Arrays and Dictionaries.
+// CHECK-NEXT: (
+// CHECK-NEXT:   x
+// CHECK-NEXT: ) {
+// CHECK-NEXT:   y = z;
+// CHECK-NEXT: }
+print(NSString(format: "%@ %@", ["x"], ["y": "z"]))
 // CHECK-NEXT: 1{{.*}}024,25
 print(NSString(
   format: "%g",

@@ -1,10 +1,10 @@
-// RUN: %target-repl-run-simple-swift | FileCheck %s
+// RUN: %target-repl-run-simple-swift | %FileCheck %s
 
 // REQUIRES: swift_repl
 
 :print_decl String
 // CHECK: struct String
-// CHECK: extension String : ExpressibleByStringInterpolation
+// CHECK: extension String : _ExpressibleByStringInterpolation
 
 false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)
@@ -193,7 +193,7 @@ pr = "foo"
 // CHECK: String: foo
 pr.foo()
 
-var _ : ([Int]).Type = [4].dynamicType
+var _ : ([Int]).Type = type(of: [4])
 // CHECK: : ([Int]).Type
 var _ : ((Int) -> Int)? = .none
 // CHECK: : ((Int) -> Int)?

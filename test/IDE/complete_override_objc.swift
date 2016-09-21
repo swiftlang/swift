@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PA -code-completion-keywords=false -F %S/Inputs/mock-sdk > %t.txt
-// RUN: FileCheck %s -check-prefix=CHECK1 < %t.txt
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROPERTY -code-completion-keywords=false -F %S/Inputs/mock-sdk | FileCheck %s -check-prefix=PROPERTY
+// RUN: %FileCheck %s -check-prefix=CHECK1 < %t.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROPERTY -code-completion-keywords=false -F %S/Inputs/mock-sdk | %FileCheck %s -check-prefix=PROPERTY
 
 // REQUIRES: objc_interop
 
@@ -18,7 +18,7 @@ class Sub : FooClassBase {
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth2() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func nonInternalMeth() -> Any! {|}
 // CHECK1: Decl[InstanceMethod]/Super:         override func _internalMeth1() -> Any! {|}
-// CHECK1: Decl[Constructor]/Super:            init!() {|}
+// CHECK1: Decl[Constructor]/Super:            override init!() {|}
 // CHECK1: End completions
 
 class Sub : FooClassDerived {

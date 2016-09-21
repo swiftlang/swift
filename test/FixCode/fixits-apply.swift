@@ -78,6 +78,24 @@ func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
 
+struct Wrapper {
+  typealias InnerMask = MyEventMask2
+}
+func sendItInner(_: Wrapper.InnerMask) {}
+func testInnerMask(a: UInt64) {
+  sendItInner(a)
+}
+
+struct SomeName : RawRepresentable {
+  init(_ rawValue: String) {}
+  init(rawValue: String) {}
+  var rawValue: String { return "" }
+}
+func testPassSomeName(_: SomeName) {}
+func testConvertSomeName(s: String) {
+  testPassSomeName("\(s)}")
+}
+
 enum MyEnumType : UInt32 {
   case invalid
 }
@@ -100,7 +118,7 @@ func baz(var x: Int) {
   x += 10
 }
 func foo(let y: String, inout x: Int) {
-  
+
 }
 
 struct Test1 : OptionSet {
@@ -196,7 +214,7 @@ protocol NonObjCProtocol {}
 
 @IBDesignable extension SomeProt {}
 
-func attrNowOnType(@noescape foo: ()->()) {}
+func attrNowOnType(foo: ()->()) {}
 
 class InitDynType {
   init() {}
@@ -209,3 +227,51 @@ class NoSemi {
   enum Bar { case bar }
   var foo: .Bar = .bar
 }
+
+func fnWithClosure(c: @escaping ()->()) {}
+func testescape(rec: ()->()) {
+  fnWithClosure { rec() }
+}
+
+@warn_unused_result func testDeprecatedAttr() -> Int { return 0 }
+
+protocol Prot1 {}
+protocol Prot2 {
+  associatedtype Ty = Prot1
+}
+class Cls1 : Prot1 {}
+func testwhere<T: Prot2 where T.Ty == Cls1>(_: T) {}
+
+enum E {
+  case abc
+}
+func testEnumRename() { _ = E.Abc }
+
+func testAnyToAnyObject(x: Any) {
+  x.instMeth(p: 1)
+}
+
+func testProtocolCompositionSyntax() {
+  var _: protocol<>
+  var _: protocol<Prot1>
+  var _: protocol<Prot1, Prot2>
+}
+
+func disable_unnamed_param_reorder(p: Int, _: String) {}
+disable_unnamed_param_reorder(0, "") // no change.
+
+prefix operator ***** {}
+
+class BoolFoo : BooleanType {
+  var boolValue: Bool {return false}
+}
+func testBoolValue(a : BoolFoo) {
+  if a { }
+  guard a {}
+  if a as BoolFoo {}
+}
+
+protocol P1 {}
+protocol P2 {}
+var a : protocol<P1, P2>?
+var a2 : protocol<P1>= 17

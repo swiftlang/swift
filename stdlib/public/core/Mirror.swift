@@ -100,7 +100,7 @@ public struct Mirror {
     } else {
       self = Mirror(
         legacy: _reflect(subject),
-        subjectType: subject.dynamicType)
+        subjectType: type(of: subject))
     }
   }
 
@@ -147,7 +147,7 @@ public struct Mirror {
     _ subject: AnyObject, asClass targetSuperclass: AnyClass) -> _Mirror? {
     
     // get a legacy mirror and the most-derived type
-    var cls: AnyClass = subject.dynamicType
+    var cls: AnyClass = type(of: subject)
     var clsMirror = _reflect(subject)
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
@@ -215,7 +215,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where
     C.Iterator.Element == Child,
-    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#47 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == Child,
@@ -276,7 +276,7 @@ public struct Mirror {
     displayStyle: DisplayStyle? = nil,
     ancestorRepresentation: AncestorRepresentation = .generated
   ) where
-    // FIXME(ABI)(compiler limitation): these constraints should be applied to
+    // FIXME(ABI)#48 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.SubSequence == C.SubSequence,
@@ -385,6 +385,8 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 ///
 /// Do not declare new conformances to this protocol; they will not
 /// work as expected.
+// FIXME(ABI)#49 (Sealed Protocols): this protocol should be "non-open" and you shouldn't be able to
+// create conformances.
 public protocol MirrorPath {}
 extension Int : MirrorPath {}
 extension String : MirrorPath {}
@@ -489,7 +491,7 @@ extension _Mirror {
   internal func _superMirror() -> _Mirror? {
     if self.count > 0 {
       let childMirror = self[0].1
-      if _isClassSuperMirror(childMirror.dynamicType) {
+      if _isClassSuperMirror(type(of: childMirror)) {
         return childMirror
       }
     }
@@ -593,7 +595,7 @@ internal extension Mirror {
 
 //===--- QuickLooks -------------------------------------------------------===//
 
-/// The sum of types that can be used as a quick look representation.
+/// The sum of types that can be used as a Quick Look representation.
 public enum PlaygroundQuickLook {
   /// Plain text.
   case text(String)
@@ -677,7 +679,7 @@ extension PlaygroundQuickLook {
   /// - Note: If the dynamic type of `subject` has value semantics,
   ///   subsequent mutations of `subject` will not observable in
   ///   `Mirror`.  In general, though, the observability of such
-  /// mutations is unspecified.
+  ///   mutations is unspecified.
   public init(reflecting subject: Any) {
     if let customized = subject as? CustomPlaygroundQuickLookable {
       self = customized.customPlaygroundQuickLook
@@ -696,15 +698,15 @@ extension PlaygroundQuickLook {
   }
 }
 
-/// A type that explicitly supplies its own PlaygroundQuickLook.
+/// A type that explicitly supplies its own playground Quick Look.
 ///
-/// Instances of any type can be `PlaygroundQuickLook(reflect:)`'ed
-/// upon, but if you are not satisfied with the `PlaygroundQuickLook`
-/// supplied for your type by default, you can make it conform to
-/// `CustomPlaygroundQuickLookable` and return a custom
-/// `PlaygroundQuickLook`.
+/// A Quick Look can be created for an instance of any type by using the
+/// `PlaygroundQuickLook(reflecting:)` initializer. If you are not satisfied
+/// with the representation supplied for your type by default, you can make it
+/// conform to the `CustomPlaygroundQuickLookable` protocol and provide a
+/// custom `PlaygroundQuickLook` instance.
 public protocol CustomPlaygroundQuickLookable {
-  /// A custom playground quick look for this instance.
+  /// A custom playground Quick Look for this instance.
   ///
   /// If this type has value semantics, the `PlaygroundQuickLook` instance
   /// should be unaffected by subsequent mutations.
@@ -712,8 +714,8 @@ public protocol CustomPlaygroundQuickLookable {
 }
 
 
-// A workaround for <rdar://problem/25971264>
-// FIXME(ABI)
+// A workaround for <rdar://problem/26182650>
+// FIXME(ABI)#50 (Dynamic Dispatch for Class Extensions) though not if it moves out of stdlib.
 public protocol _DefaultCustomPlaygroundQuickLookable {
   var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
@@ -837,8 +839,9 @@ extension String {
   /// string representation of `instance` in one of the following ways,
   /// depending on its protocol conformance:
   ///
-  /// - If `instance` conforms to the `Streamable` protocol, the result is
-  ///   obtained by calling `instance.write(to: s)` on an empty string `s`.
+  /// - If `instance` conforms to the `TextOutputStreamable` protocol, the
+  ///   result is obtained by calling `instance.write(to: s)` on an empty
+  ///   string `s`.
   /// - If `instance` conforms to the `CustomStringConvertible` protocol, the
   ///   result is `instance.description`.
   /// - If `instance` conforms to the `CustomDebugStringConvertible` protocol,
@@ -887,8 +890,9 @@ extension String {
   ///   the result is `subject.debugDescription`.
   /// - If `subject` conforms to the `CustomStringConvertible` protocol, the
   ///   result is `subject.description`.
-  /// - If `subject` conforms to the `Streamable` protocol, the result is
-  ///   obtained by calling `subject.write(to: s)` on an empty string `s`.
+  /// - If `subject` conforms to the `TextOutputStreamable` protocol, the
+  ///   result is obtained by calling `subject.write(to: s)` on an empty
+  ///   string `s`.
   /// - An unspecified result is supplied automatically by the Swift standard
   ///   library.
   ///

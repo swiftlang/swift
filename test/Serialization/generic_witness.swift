@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_generic_witness.swift
-// RUN: llvm-bcanalyzer %t/has_generic_witness.swiftmodule | FileCheck %s
+// RUN: llvm-bcanalyzer %t/has_generic_witness.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -I %t %s -o /dev/null
 
 // We have to perform IRGen to actually check that the generic substitutions

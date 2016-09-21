@@ -46,10 +46,10 @@ public:
   };
 
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
-             TypeSubstitutionMap &ContextSubs, ArrayRef<Substitution> ApplySubs,
+             ArrayRef<Substitution> ApplySubs,
              SILOpenedArchetypesTracker &OpenedArchetypesTracker,
              CloneCollector::CallbackType Callback = nullptr)
-      : TypeSubstCloner<SILInliner>(To, From, ContextSubs, ApplySubs,
+      : TypeSubstCloner<SILInliner>(To, From, ApplySubs,
                                     OpenedArchetypesTracker, true),
         IKind(IKind), CalleeEntryBB(nullptr), CallSiteScope(nullptr),
         Callback(Callback) {

@@ -5,6 +5,8 @@ Parseable Driver Output
 .. contents::
    :local:
 
+.. highlight:: none
+
 Introduction
 ============
 

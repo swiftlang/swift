@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
@@ -11,6 +11,7 @@ protocol P {}
 protocol Q: P {}
 
 class A:P {}
+class AA:A {}
 
 class X {}
 
@@ -37,29 +38,29 @@ class E: CP1, CP2 {}
 
 func cast0<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return A().dynamicType is T.Type
+  return type(of: A()) is T.Type
 }
 
 
 func cast1<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return (A() as AnyObject).dynamicType is T.Type
+  return type(of: (A() as AnyObject)) is T.Type
 }
 
 func cast2<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:AnyObject = A() as AnyObject
-  return ao.dynamicType is T.Type
+  return type(of: ao) is T.Type
 }
 
 
 func cast3(_ p:AnyObject) -> Bool {
   // Always fails
-  return p.dynamicType is AnyObject.Protocol
+  return type(of: p) is AnyObject.Protocol
 }
 
 func cast4(_ p:AnyObject) -> Bool {
-  return p.dynamicType is A.Type
+  return type(of: p) is A.Type
 }
 
 func cast5(_ t:AnyObject.Type) -> Bool {
@@ -80,23 +81,23 @@ func cast7<T>(_ t:T.Type) -> Bool {
 
 func cast8<T>(_ a:T) -> Bool {
   // Succeeds if T is A
-  return (A() as P).dynamicType is T.Type
+  return type(of: (A() as P)) is T.Type
 }
 
 func cast9<T>(_ a:T) -> Bool {
   // Succeeds if T is A
   let ao:P = A() as P
-  return ao.dynamicType is T.Type
+  return type(of: ao) is T.Type
 }
 
 
 func cast10(_ p:P) -> Bool {
-  return p.dynamicType is P.Protocol
+  return type(of: p) is P.Protocol
 }
 
 func cast11(_ p:P) -> Bool {
   // Succeeds if p is of type A
-  return p.dynamicType is A.Type
+  return type(of: p) is A.Type
 }
 
 func cast12(_ t:P.Type) -> Bool {
@@ -202,6 +203,18 @@ func cast32(_ p: P) -> Bool {
 func cast33(_ p: P) -> Bool {
   // Same as above, but non-existential metatype
   return p is X.Type
+}
+
+func cast38<T>(_ t: T) -> Bool {
+  return t is (Int, Int)
+}
+
+func cast39<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: Int)
+}
+
+func cast40<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: A)
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
@@ -509,7 +522,7 @@ func test18_2() -> Bool {
 // CHECK-NEXT: return %1
 @inline(never)
 func test19() -> Bool {
-    let t: Any.Type = (1 as Any).dynamicType
+    let t: Any.Type = type(of: 1 as Any)
     return t is Int.Type
 }
 
@@ -772,7 +785,140 @@ public func test35() {
   }
 }
 
+// Check that we do not eliminate casts from AnyHashable to a type that
+// implements Hashable.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding6test36
+// CHECK: checked_cast_addr_br take_always AnyHashable in {{.*}} to Int
+@inline(never)
+public func test36(ah: AnyHashable) {
+  if let _ = ah as? Int {
+    print("success")
+  } else {
+    print("failure")
+  }
+}
 
+// Check that we do not eliminate casts to AnyHashable from an opaque type
+// that might implement Hashable.
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding6test37
+// CHECK: checked_cast_addr_br take_always T in {{.*}} to AnyHashable
+@inline(never)
+public func test37<T>(ah: T) {
+  if let _ = ah as? AnyHashable {
+    print("success")
+  } else {
+    print("failure")
+  }
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38a() -> Bool {
+  return cast38((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38b() -> Bool {
+  return cast38((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38c() -> Bool {
+  return cast38((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39a() -> Bool {
+  return cast39((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39b() -> Bool {
+  return cast39((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39c() -> Bool {
+  return cast39((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39d
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39d() -> Bool {
+  return cast39((1, 2, 3))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40a
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40a() -> Bool {
+  return cast40((1, A()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40b
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40b() -> Bool {
+  return cast40((1, AA()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test40c() -> Bool {
+  return cast40((1, S()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40d
+// CHECK: bb0
+// CHECK-NOT: return
+// CHECK: checked_cast_addr_br take_always (Int, Any) in
+@inline(never)
+public func test40d(_ a: Any) -> Bool {
+  return cast40((1, a))
+}
 
 print("test0=\(test0())")
 

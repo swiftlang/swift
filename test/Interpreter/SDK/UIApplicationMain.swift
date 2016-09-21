@@ -1,9 +1,9 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -o %t/main -parse-as-library
 
 // We aren't yet able to run tests that require a UI context, so just try
 // building with the real SDK for now.
-// DISABLED: %target-run %t/main | FileCheck %s
+// DISABLED: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: OS=ios
 

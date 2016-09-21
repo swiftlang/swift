@@ -65,13 +65,15 @@ public:
 
   /// Return a string to be used as an internal preprocessor define.
   ///
-  /// Assuming the project version is at most X.Y.Z.a.b, the integral constant
-  /// representing the version is:
+  /// The components of the version are multiplied element-wise by
+  /// \p componentWeights, then added together (a dot product operation).
+  /// If either array is longer than the other, the missing elements are
+  /// treated as zero.
   ///
-  /// X*1000*1000*1000 + Z*1000*1000 + a*1000 + b
-  ///
-  /// The second version component is not used.
-  std::string preprocessorDefinition() const;
+  /// The resulting string will have the form "-DMACRO_NAME=XYYZZ".
+  /// The combined value must fit in a uint64_t.
+  std::string preprocessorDefinition(StringRef macroName,
+                                     ArrayRef<uint64_t> componentWeights) const;
 
   /// Return the ith version component.
   unsigned operator[](size_t i) const {
@@ -86,6 +88,12 @@ public:
   bool empty() const {
     return Components.empty();
   }
+
+  /// Return whether this version is a valid Swift language version number
+  /// to set the compiler to using -swift-version; this is not the same as
+  /// the set of Swift versions that have ever existed, just those that we
+  /// are attempting to maintain backward-compatibility support for.
+  bool isValidEffectiveLanguageVersion() const;
 
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(StringRef VersionString,
@@ -111,6 +119,7 @@ public:
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
+bool operator==(const Version &lhs, const Version &rhs);
 
 raw_ostream &operator<<(raw_ostream &os, const Version &version);
 
@@ -118,8 +127,10 @@ raw_ostream &operator<<(raw_ostream &os, const Version &version);
 std::pair<unsigned, unsigned> getSwiftNumericVersion();
 
 /// Retrieves a string representing the complete Swift version, which includes
-/// the Swift version number, the repository version, and the vendor tag.
-std::string getSwiftFullVersion();
+/// the Swift supported and effective version numbers, the repository version,
+/// and the vendor tag.
+std::string getSwiftFullVersion(Version effectiveLanguageVersion =
+                                Version::getCurrentLanguageVersion());
 
 } // end namespace version
 } // end namespace swift

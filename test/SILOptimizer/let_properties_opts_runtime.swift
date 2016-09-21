@@ -1,8 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift -O  %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s -check-prefix=CHECK-OUTPUT
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // RUN: %target-build-swift -O -wmo %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s -check-prefix=CHECK-OUTPUT
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test
 
 // Check that in optimized builds the compiler generates correct code for

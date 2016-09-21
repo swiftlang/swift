@@ -12,7 +12,7 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-public protocol _ArrayBufferProtocol
+internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
   associatedtype Indices : RandomAccessCollection = CountableRange<Int>
@@ -24,7 +24,7 @@ public protocol _ArrayBufferProtocol
   init()
 
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
-  init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
+  init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
@@ -84,7 +84,7 @@ public protocol _ArrayBufferProtocol
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   func withUnsafeBufferPointer<R>(
-    _ body: @noescape (UnsafeBufferPointer<Element>) throws -> R
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -92,7 +92,7 @@ public protocol _ArrayBufferProtocol
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: @noescape (UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// The number of elements the buffer stores.
@@ -127,11 +127,11 @@ public protocol _ArrayBufferProtocol
 
 extension _ArrayBufferProtocol where Index == Int {
 
-  public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
+  internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  public mutating func replace<C>(
+  internal mutating func replace<C>(
     subRange: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C

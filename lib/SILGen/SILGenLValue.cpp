@@ -22,9 +22,8 @@
 #include "Initialization.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -392,12 +391,7 @@ static ManagedValue getAddressOfOptionalValue(SILGenFunction &gen,
                                               ManagedValue optAddr,
                                         const LValueTypeData &valueTypeData) {
   // Project out the 'Some' payload.
-  OptionalTypeKind otk;
-  auto valueTy
-    = optAddr.getType().getSwiftRValueType().getAnyOptionalObjectType(otk);
-  assert(valueTy && "base was not optional?"); (void) valueTy;
-
-  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl();
 
   // If the base is +1, we want to forward the cleanup.
   bool hadCleanup = optAddr.hasCleanup();
@@ -1584,10 +1578,12 @@ LValue SILGenLValue::visitExpr(Expr *e, AccessKind accessKind) {
 static ArrayRef<Substitution>
 getNonMemberVarDeclSubstitutions(SILGenModule &SGM, VarDecl *var) {
   ArrayRef<Substitution> substitutions;
-  if (auto genericParams
-      = var->getDeclContext()->getGenericParamsOfContext())
-    substitutions =
-        genericParams->getForwardingSubstitutions(SGM.getASTContext());
+  auto *dc = var->getDeclContext();
+  if (auto *genericEnv = dc->getGenericEnvironmentOfContext()) {
+    auto *genericSig = dc->getGenericSignatureOfContext();
+    substitutions = genericEnv->getForwardingSubstitutions(
+        SGM.SwiftModule, genericSig);
+  }
   return substitutions;
 }
 
@@ -1965,14 +1961,11 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
 static LValueTypeData
 getOptionalObjectTypeData(SILGenFunction &gen,
                           const LValueTypeData &baseTypeData) {
-  OptionalTypeKind otk;
-  CanType objectTy = baseTypeData.SubstFormalType.getAnyOptionalObjectType(otk);
-  assert(objectTy);
-  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl(otk);
+  EnumElementDecl *someDecl = gen.getASTContext().getOptionalSomeDecl();
   
   return {
-    gen.SGM.M.Types.getAbstractionPattern(someDecl),
-    objectTy,
+    baseTypeData.OrigFormalType.getAnyOptionalObjectType(),
+    baseTypeData.SubstFormalType.getAnyOptionalObjectType(),
     baseTypeData.TypeOfRValue.getEnumElementType(someDecl, gen.SGM.M),
   };
 }

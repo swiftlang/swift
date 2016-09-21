@@ -72,7 +72,6 @@ public:
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(Specialize)
-  IGNORED_ATTR(Swift3Migration)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
@@ -176,6 +175,15 @@ public:
   }
 
   void visitFinalAttr(FinalAttr *attr) {
+    // Reject combining 'final' with 'open'.
+    if (auto accessibility = D->getAttrs().getAttribute<AccessibilityAttr>()) {
+      if (accessibility->getAccess() == Accessibility::Open) {
+        TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
+                    D->getDescriptiveKind());
+        return;
+      }
+    }
+
     // Accept and remove the 'final' attribute from members of protocol
     // extensions.
     if (D->getDeclContext()->getAsProtocolExtensionContext()) {
@@ -334,7 +342,7 @@ void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
 
 static Optional<Diag<bool,Type>>
 isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
-  if (type->isObjCExistentialType())
+  if (type->isObjCExistentialType() || type->isAny())
     return None; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
@@ -672,7 +680,7 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     }
 
     if (!OnlyKind.empty())
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, OnlyKind);
     else if (attr->isDeclModifier())
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
@@ -730,7 +738,6 @@ public:
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Swift3Migration)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
@@ -791,8 +798,8 @@ static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
         .highlight(param->getSourceRange());
       return true;
     }
-  } else if (ty->isObjCExistentialType()) {
-    // @objc existential types are okay
+  } else if (ty->isObjCExistentialType() || ty->isAny()) {
+    // @objc existential types are okay, as is Any.
     // Nothing to do.
   } else {
     // No other types are permitted.
@@ -1336,6 +1343,13 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    if (attr->getAccess() == Accessibility::Open) {
+      TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
+      return;
+    }
+
     Type extendedTy = extension->getExtendedType();
     Accessibility typeAccess = extendedTy->getAnyNominal()->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
@@ -1351,12 +1365,7 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
     TC.computeDefaultAccessibility(extension);
     Accessibility maxAccess = extension->getMaxAccessibility();
-    if (attr->getAccess() > maxAccess) {
-      if (maxAccess == Accessibility::FilePrivate &&
-          !TC.Context.LangOpts.EnableSwift3Private) {
-        maxAccess = Accessibility::Private;
-      }
-
+    if (std::min(attr->getAccess(), Accessibility::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
       // end up being problematic.
       auto diag =
@@ -1378,6 +1387,15 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
                               extAttr->getAccess());
       swift::fixItAccessibility(diag, cast<ValueDecl>(D), extAttr->getAccess());
       return;
+    }
+  }
+
+  if (attr->getAccess() == Accessibility::Open) {
+    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+        !attr->isInvalid()) {
+      TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
     }
   }
 }
@@ -1451,6 +1469,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   //   checked and diagnosed.
   // - This does not make use of Archetypes since it is directly substituting
   //   in place of GenericTypeParams.
+  //
+  // FIXME: Refactor to use GenericSignature->getSubstitutions()?
   SmallVector<Substitution, 4> substitutions;
   auto currentModule = FD->getParentModule();
   Type currentFromTy;
@@ -1503,7 +1523,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto superTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
         TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
-                    FD->getType(), firstTy, superTy);
+                    FD->getInterfaceType(), firstTy, superTy);
       }
       break;
     }
@@ -1513,8 +1533,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
       auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!firstTy->isEqual(sameTy)) {
-        TC.diagnose(attr->getLocation(), diag::types_not_equal, FD->getType(),
-                    firstTy, sameTy);
+        TC.diagnose(attr->getLocation(), diag::types_not_equal,
+                    FD->getInterfaceType(), firstTy, sameTy);
 
         return;
       }
@@ -1552,7 +1572,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkAutoClosureAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
@@ -1561,7 +1581,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkNoEscapeAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
@@ -1584,7 +1604,7 @@ void TypeChecker::checkAutoClosureAttr(ParamDecl *PD, AutoClosureAttr *attr) {
     return;
 
   // This decl attribute has been moved to being a type attribute.
-  auto text = attr->isEscaping() ? "@autoclosure(escaping) " : "@autoclosure ";
+  auto text = attr->isEscaping() ? "@autoclosure @escaping " : "@autoclosure ";
   diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type,
            "@autoclosure")
     .fixItRemove(attr->getRangeWithAt())
@@ -1637,9 +1657,11 @@ void TypeChecker::checkNoEscapeAttr(ParamDecl *PD, NoEscapeAttr *attr) {
   }
   
   // This decl attribute has been moved to being a type attribute.
-  diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
-    .fixItRemove(attrRemovalRange) 
-    .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  if (!attr->isImplicit()) {
+    diagnose(attr->getLocation(), diag::attr_decl_attr_now_on_type, "@noescape")
+        .fixItRemove(attrRemovalRange)
+        .fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@noescape ");
+  }
 
   // Stop if we've already applied this attribute.
   if (FTy->isNoEscape())

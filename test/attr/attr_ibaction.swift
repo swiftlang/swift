@@ -63,6 +63,11 @@ protocol CP2 : class { }
   @IBAction func action5(_: AnyObject?) {}
   @IBAction func action6(_: AnyObject!) {}
 
+  // Any
+  @IBAction func action4a(_: Any) {}
+  @IBAction func action5a(_: Any?) {}
+  @IBAction func action6a(_: Any!) {}
+
   // Protocol types
   @IBAction func action7(_: P1) {} // expected-error{{argument to @IBAction method cannot have non-object type 'P1'}}
   // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}

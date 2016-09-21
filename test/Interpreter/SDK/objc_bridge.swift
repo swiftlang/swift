@@ -1,7 +1,7 @@
 // Test Objective-C bridging for a non-Foundation type that is
 // otherwise unknown to the compiler.
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // Build the Appliances module
 // RUN: %target-clang -fobjc-arc -I %S/../../Inputs/ObjCBridging %S/../../Inputs/ObjCBridging/Appliances.m -c -o %t/AppliancesObjC.o
@@ -9,7 +9,7 @@
 // RUN: %target-build-swift -c -parse-as-library -I %S/../../Inputs/ObjCBridging %S/../../Inputs/ObjCBridging/Appliances.swift -module-name Appliances -o %t/AppliancesSwift.o
 
 // RUN: %target-build-swift -I %t -I %S/../../Inputs/ObjCBridging %s %t/AppliancesSwift.o %t/AppliancesObjC.o -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -45,6 +45,13 @@ let obj: AnyObject = home.fridge as APPRefrigerator
 if let f2 = obj as? Refrigerator {
   // CHECK: Fridge has temperature 100
   print("Fridge has temperature \(f2.temperature)")
+}
+
+// Check improper nullability auditing of `id` interfaces. `nil` should come
+// through as a nonnull `Any` without crashing.
+autoreleasepool {
+  let broken = APPBroken()
+  let thing = broken.thing
 }
 
 // CHECK: DONE

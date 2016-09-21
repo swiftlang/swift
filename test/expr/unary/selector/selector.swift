@@ -15,6 +15,9 @@ class C1 {
   @objc class func method3(_ a: A, b: B) { } // expected-note{{found this candidate}}
   @objc class func method3(a: A, b: B) { } // expected-note{{found this candidate}}
 
+  @objc(ambiguous1:b:) class func ambiguous(a: A, b: A) { } // expected-note{{found this candidate}}
+  @objc(ambiguous2:b:) class func ambiguous(a: A, b: B) { } // expected-note{{found this candidate}}
+
   @objc func getC1() -> AnyObject { return self }
 
   @objc func testUnqualifiedSelector(_ a: A, b: B) {
@@ -65,8 +68,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
   _ = #selector(P1.method5(_:b:)) // expected-error{{static member 'method5(_:b:)' cannot be used on protocol metatype 'P1.Protocol'}}
   _ = #selector(p1.method4)
   _ = #selector(p1.method4(_:b:))
-  _ = #selector(p1.dynamicType.method5)
-  _ = #selector(p1.dynamicType.method5(_:b:))
+  _ = #selector(type(of: p1).method5)
+  _ = #selector(type(of: p1).method5(_:b:))
 
   // Interesting expressions that refer to methods.
   _ = #selector(Swift.AnyObject.method1)
@@ -83,7 +86,8 @@ func testSelector(_ c1: C1, p1: P1, obj: AnyObject) {
 }
 
 func testAmbiguity() {
-  _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3(_:b:)'}}
+  _ = #selector(C1.method3) // expected-error{{ambiguous use of 'method3'}}
+  _ = #selector(C1.ambiguous) // expected-error{{ambiguous use of 'ambiguous(a:b:)'}}
 }
 
 func testUnusedSelector() {

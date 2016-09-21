@@ -61,6 +61,9 @@ any = (label: 4)
 // Scalars don't have .0/.1/etc
 i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
 any.1 // expected-error{{value of type 'Any' has no member '1'}}
+// expected-note@-1{{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+any = (5.0, 6.0) as (Float, Float)
+_ = (any as! (Float, Float)).1
 
 // Fun with tuples
 protocol PosixErrorReturn {
@@ -187,15 +190,15 @@ extension r25271859 {
   func map<U>(f: (T) -> U) -> r25271859<U> {
   }
 
-  func andThen<U>(f: (T)->r25271859<U>) {
+  func andThen<U>(f: (T) -> r25271859<U>) {
   }
 }
 
 func f(a : r25271859<(Float, Int)>) {
   a.map { $0.0 }
-    .andThen { _ in   // expected-error {{generic parameter 'U' could not be inferred}}
+    .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
       print("hello") // comment this out and it runs, leave any form of print in and it doesn't
-      return Task<String>()
+      return r25271859<String>()
   }
 }
 

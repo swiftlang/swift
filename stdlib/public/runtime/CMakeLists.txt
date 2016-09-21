@@ -1,4 +1,5 @@
-set(swift_runtime_compile_flags ${SWIFT_CORE_CXX_FLAGS})
+set(swift_runtime_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
+set(swift_runtime_linker_flags ${SWIFT_RUNTIME_CORE_LINK_FLAGS})
 
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
@@ -33,12 +34,15 @@ else()
 endif()
 
 set(swift_runtime_sources
+    AnyHashableSupport.cpp
     Casting.cpp
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
+    ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp
+    ErrorDefaultImpls.cpp
     Heap.cpp
     HeapObject.cpp
     KnownMetadata.cpp
@@ -69,6 +73,7 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS ${swift_runtime_compile_flags} -DswiftCore_EXPORTS
+  LINK_FLAGS ${swift_runtime_linker_flags}
   INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)
@@ -82,10 +87,12 @@ add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_BEGIN"
     TARGET_SDKS "${ELFISH_SDKS}"
+    LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
     swift_sections.S
     C_COMPILE_FLAGS ${swift_runtime_compile_flags} "-DSWIFT_END"
+    LINK_FLAGS ${swift_runtime_linker_flags}
     TARGET_SDKS "${ELFISH_SDKS}"
     INSTALL_IN_COMPONENT never_install)
 

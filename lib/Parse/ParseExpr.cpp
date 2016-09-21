@@ -185,10 +185,6 @@ parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
     case tok::oper_binary_unspaced: {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        goto done;
-
       // If this is an "&& #available()" expression (or related things that
       // show up in a stmt-condition production), then don't eat it.
       //
@@ -950,6 +946,32 @@ getMagicIdentifierLiteralKind(tok Kind) {
   }
 }
 
+/// See if type(of: <expr>) can be parsed backtracking on failure.
+static bool canParseTypeOf(Parser &P) {
+  if (!(P.Tok.getText() == "type" && P.peekToken().is(tok::l_paren))) {
+    return false;
+  }
+  // Look ahead to parse the parenthesized expression.
+  Parser::BacktrackingScope Backtrack(P);
+  P.consumeToken(tok::identifier);
+  P.consumeToken(tok::l_paren);
+  // The first argument label must be 'of'.
+  if (!(P.Tok.getText() == "of" && P.peekToken().is(tok::colon))) {
+    return false;
+  }
+
+  // Parse to the closing paren.
+  while (!P.Tok.is(tok::r_paren) && !P.Tok.is(tok::eof)) {
+    // Anything that looks like another argument label is bogus.  It is
+    // sufficient to parse for a single trailing comma.  Backtracking will
+    // fall back to an unresolved decl.
+    if (P.Tok.is(tok::comma)) {
+      return false;
+    }
+    P.skipSingle();
+  }
+  return true;
+}
 
 /// parseExprPostfix
 ///
@@ -1095,6 +1117,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::identifier:  // foo
+    // Attempt to parse for 'type(of: <expr>)'.
+    if (canParseTypeOf(*this)) {
+      Result = parseExprTypeOf();
+      break;
+    }
+
     // If we are parsing a refutable pattern and are inside a let/var pattern,
     // the identifiers change to be value bindings instead of decl references.
     // Parse and return this as an UnresolvedPatternExpr around a binding.  This
@@ -1412,20 +1440,25 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         continue;
       }
 
-      // Handle "x.dynamicType" - A metatype expr.
-      if (Tok.is(tok::kw_dynamicType)) {
-        Result = makeParserResult(
-          new (Context) DynamicTypeExpr(Result.get(), consumeToken(), Type()));
-        continue;
-      }
-
       // Handle "x.self" expr.
       if (Tok.is(tok::kw_self)) {
         Result = makeParserResult(
           new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
         continue;
       }
-      
+
+      // Handle the deprecated 'x.dynamicType' and migrate it to `type(of: x)`
+      if (Tok.getText() == "dynamicType") {
+        BacktrackingScope backtrackScope(*this);
+        auto range = Result.get()->getSourceRange();
+        auto dynamicTypeExprRange = SourceRange(TokLoc, consumeToken());
+        diagnose(TokLoc, diag::expr_dynamictype_deprecated)
+          .highlight(dynamicTypeExprRange)
+          .fixItReplace(dynamicTypeExprRange, ")")
+          .fixItInsert(range.Start, "type(of: ");
+
+        // fallthrough to an UnresolvedDotExpr.
+      }
            
       // If we have '.<keyword><code_complete>', try to recover by creating
       // an identifier with the same spelling as the keyword.
@@ -1552,10 +1585,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        return Result;
-
       Expr *oper = parseExprOperator();
       Result = makeParserResult(
           new (Context) PostfixUnaryExpr(oper, Result.get()));
@@ -2432,7 +2461,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       rightLoc,
                                       trailingClosure);
 
-  // A tuple with a single, unlabelled element is just parentheses.
+  // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
       (subExprNames.empty() || subExprNames[0].empty())) {
     return makeParserResult(
@@ -2994,4 +3023,65 @@ Parser::parseVersionConstraintSpec() {
 
   return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
+}
+
+/// parseExprTypeOf
+///
+///   expr-dynamictype:
+///     'type' '(' 'of:' expr ')'
+///
+ParserResult<Expr> Parser::parseExprTypeOf() {
+  // Consume 'type'
+  SourceLoc keywordLoc = consumeToken();
+
+  // Parse the leading '('.
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  // Parse `of` label.
+  if (Tok.getText() == "of" && peekToken().is(tok::colon)) {
+    // Consume the label.
+    consumeToken();
+    consumeToken(tok::colon);
+  } else {
+    // There cannot be a richer diagnostic here because the user may have
+    // defined a function `type(...)` that conflicts with the magic expr.
+    diagnose(Tok, diag::expr_typeof_expected_label_of);
+  }
+
+  // Parse the subexpression.
+  ParserResult<Expr> subExpr = parseExpr(diag::expr_typeof_expected_expr);
+  if (subExpr.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+
+  // Parse the closing ')'
+  SourceLoc rParenLoc;
+  if (subExpr.isParseError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = Tok.getLoc();
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_typeof_expected_rparen, lParenLoc);
+  }
+
+  // If the subexpression was in error, just propagate the error.
+  if (subExpr.isParseError()) {
+    if (subExpr.hasCodeCompletion()) {
+      auto res = makeParserResult(
+                   new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
+                                                 subExpr.get(), rParenLoc,
+                                                 Type()));
+      res.setHasCodeCompletion();
+      return res;
+    } else {
+      return makeParserResult<Expr>(
+               new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+    }
+  }
+
+  return makeParserResult(
+           new (Context) DynamicTypeExpr(keywordLoc, lParenLoc,
+                                         subExpr.get(), rParenLoc, Type()));
 }

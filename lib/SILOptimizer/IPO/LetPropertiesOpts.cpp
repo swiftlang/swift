@@ -289,6 +289,7 @@ static bool isAssignableExternally(VarDecl *Property, SILModule *Module) {
     DEBUG(llvm::dbgs() << "Property " << *Property << " has internal access\n");
     break;
   case Accessibility::Public:
+  case Accessibility::Open:
     linkage = SILLinkage::Public;
     DEBUG(llvm::dbgs() << "Property " << *Property << " has public access\n");
     break;

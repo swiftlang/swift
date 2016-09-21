@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 class A {}
 class B : A {}
@@ -122,25 +122,25 @@ func baz(_ y : AnyObject?) {
 // CHECK-LABEL: sil hidden @_TF4main18opt_to_opt_trivialFGSqSi_GSQSi_
 // CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
-// CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
-// CHECK-NEXT:  return %2 : $ImplicitlyUnwrappedOptional<Int>
+// CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $Optional<Int>
+// CHECK-NEXT:  return %2 : $Optional<Int>
 // CHECK-NEXT:}
 func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
 // CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__
-// CHECK:       bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
-// CHECK-NEXT:  debug_value %0 : $ImplicitlyUnwrappedOptional<C>, let, name "x"
-// CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
+// CHECK:       bb0(%0 : $Optional<C>):
+// CHECK-NEXT:  debug_value %0 : $Optional<C>, let, name "x"
+// CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $Optional<C> to $Optional<C>
 // CHECK-NEXT:  return %2 : $Optional<C>
 // CHECK-NEXT:}
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
-// CHECK:       bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
-// CHECK-NEXT:  debug_value_addr %1 : $*ImplicitlyUnwrappedOptional<T>, let, name "x"
-// CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*ImplicitlyUnwrappedOptional<T>
+// CHECK:       bb0(%0 : $*Optional<T>, %1 : $*Optional<T>):
+// CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
+// CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*Optional<T>
 // CHECK-NEXT:  copy_addr [take] %1 to [initialization] %3
 func opt_to_opt_addressOnly<T>(_ x : T!) -> T? { return x }
 
@@ -150,7 +150,7 @@ public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
   
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
-  // CHECK: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
+  // CHECK: bb0(%0 : $*Optional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
   // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
@@ -163,11 +163,11 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT: [[X:%.*]] = alloc_box $ImplicitlyUnwrappedOptional<Int>, var, name "x"
+// CHECK-NEXT: [[X:%.*]] = alloc_box $Optional<Int>, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*ImplicitlyUnwrappedOptional<Int> to $*Optional<Int>
+// CHECK-NEXT: [[CAST:%.*]] = unchecked_addr_cast [[PB]] : $*Optional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to [[CAST]] : $*Optional<Int>
-// CHECK-NEXT: strong_release [[X]] : $@box ImplicitlyUnwrappedOptional<Int>
+// CHECK-NEXT: strong_release [[X]] : $@box Optional<Int>
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -154,7 +154,7 @@ extension Optional {
 }
 struct CloseOverAddressOnlyConstant<T> {
   func isError() {
-    let AOV: T? = nil
+    let AOV: T?
     takeClosure({ AOV.getLV() })
   }
   

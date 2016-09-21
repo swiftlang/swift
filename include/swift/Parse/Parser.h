@@ -121,12 +121,6 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  bool GreaterThanIsOperator = true;
-
-  /// FIXME: Temporary hack to keep the selector-style declaration
-  /// syntax working.
-  bool ArgumentIsParameter = false;
-
   bool InPoundLineEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
@@ -219,24 +213,6 @@ public:
 
     void pop() {
       CC.pop();
-    }
-  };
-
-  /// A RAII object for temporarily changing whether an operator starting with
-  /// '>' is an operator.
-  class GreaterThanIsOperatorRAII {
-    Parser &P;
-    bool OldValue;
-
-  public:
-    GreaterThanIsOperatorRAII(Parser &p, bool newValue)
-      : P(p), OldValue(p.GreaterThanIsOperator)
-    {
-      P.GreaterThanIsOperator = newValue;
-    }
-
-    ~GreaterThanIsOperatorRAII() {
-      P.GreaterThanIsOperator = OldValue;
     }
   };
 
@@ -541,6 +517,9 @@ public:
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
+    if (Context.LangOpts.EnableASTScopeLookup)
+      return nullptr;
+
     return getScopeInfo().lookupValueName(Name);
   }
 
@@ -825,18 +804,10 @@ public:
 
   ParserResult<OperatorDecl> parseDeclOperator(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
-  ParserResult<OperatorDecl> parseDeclPrefixOperator(SourceLoc OperatorLoc,
-                                                     Identifier Name,
-                                                     SourceLoc NameLoc,
-                                                     DeclAttributes &Attrs);
-  ParserResult<OperatorDecl> parseDeclPostfixOperator(SourceLoc OperatorLoc,
-                                                      Identifier Name,
-                                                      SourceLoc NameLoc,
-                                                      DeclAttributes &Attrs);
-  ParserResult<OperatorDecl> parseDeclInfixOperator(SourceLoc OperatorLoc,
-                                                    Identifier Name,
-                                                    SourceLoc NameLoc,
-                                                    DeclAttributes &Attrs);
+  ParserResult<OperatorDecl> parseDeclOperatorImpl(SourceLoc OperatorLoc,
+                                                   Identifier Name,
+                                                   SourceLoc NameLoc,
+                                                   DeclAttributes &Attrs);
 
   ParserResult<PrecedenceGroupDecl>
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
@@ -924,7 +895,7 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(DeclContext *DC);
+    void setFunctionContext(AbstractFunctionDecl *AFD);
     
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
@@ -970,7 +941,7 @@ public:
     TypeRepr *Type = nullptr;
 
     /// The default argument for this parameter.
-    ExprHandle *DefaultArg = nullptr;
+    Expr *DefaultArg = nullptr;
     
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
@@ -1118,6 +1089,7 @@ public:
   ParserResult<Expr> parseExprSuper(bool isExprBasic);
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
+  ParserResult<Expr> parseExprTypeOf();
 
   /// If the token is an escaped identifier being used as an argument
   /// label, but doesn't need to be, diagnose it.

@@ -12,14 +12,44 @@
 
 // Generate comparison functions for tuples up to some reasonable arity.
 
+%{
+
+comparableOperators = [
+  ('<', 'before'),
+  ('<=', 'before or the same as'),
+  ('>', 'after'),
+  ('>=', 'after or the same as')
+]
+
+}%
+
 % for arity in range(2,7):
 %   typeParams = [chr(ord("A") + i) for i in range(arity)]
 %   tupleT = "({})".format(",".join(typeParams))
-
 %   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
 
-/// Returns `true` iff each component of `lhs` is equal to the corresponding
-/// component of `rhs`.
+%   originalTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity))))
+%   greaterTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity - 1) + [arity])))
+
+/// Returns a Boolean value indicating whether the corresponding components of
+/// two tuples are equal.
+///
+/// For two tuples to compare as equal, each corresponding pair of components
+/// must be equal. The following example compares tuples made up of ${arity}
+/// components:
+///
+///     let a = ${originalTuple}
+///     let b = ${originalTuple}
+///     print(a == b)
+///     // Prints "true"
+///
+///     let c = ${greaterTuple}
+///     print(a == c)
+///     // Prints "false"
+///
+/// - Parameters:
+///   - lhs: A tuple of `Equatable` elements.
+///   - rhs: Another tuple of elements of the same type as `lhs`.
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return false }
   /*tail*/ return (
@@ -29,8 +59,25 @@ public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
   )
 }
 
-/// Returns `true` iff any component of `lhs` is not equal to the corresponding
-/// component of `rhs`.
+/// Returns a Boolean value indicating whether any corresponding components of
+/// the two tuples are not equal.
+///
+/// For two tuples to compare as equal, each corresponding pair of components
+/// must be equal. The following example compares tuples made up of ${arity}
+/// components:
+///
+///     let a = ${originalTuple}
+///     let b = ${originalTuple}
+///     print(a != b)
+///     // Prints "false"
+///
+///     let c = ${greaterTuple}
+///     print(a != c)
+///     // Prints "true"
+///
+/// - Parameters:
+///   - lhs: A tuple of `Equatable` elements.
+///   - rhs: Another tuple of elements of the same type as `lhs`.
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return true }
   /*tail*/ return (
@@ -41,22 +88,25 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 }
 
 %   comparableTypeParams = ", ".join(["{} : Comparable".format(c) for c in typeParams])
-%   for op in ["<", ">"]:
-%     for opeq in ["", "="]:
-/// A [lexicographical order](https://en.wikipedia.org/wiki/Lexicographical_order)
-/// over tuples of `Comparable` elements.
+%   for op, phrase in comparableOperators:
+/// Returns a Boolean value indicating whether the first tuple is ordered
+/// ${phrase} the second in a lexicographical ordering.
 ///
-/// Given two tuples `(a1, a2, ..., aN)` and `(b1, b2, ..., bN)`, the
-/// first tuple is `${op}${opeq}` the second tuple iff `a1 ${op} b1` or
-/// (`a1 == b1` and `(a2, ..., aN) ${op}${opeq} (b2, ..., bN)`).
-public func ${op}${opeq} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
-  if lhs.0 != rhs.0 { return lhs.0 ${op}${opeq} rhs.0 }
+/// Given two tuples `(a1, a2, ..., aN)` and `(b1, b2, ..., bN)`, the first
+/// tuple is ${phrase} the second tuple if and only if
+/// `a1 ${op.replace('=', '')} b1` or (`a1 == b1` and
+/// `(a2, ..., aN) ${op} (b2, ..., bN)`).
+///
+/// - Parameters:
+///   - lhs: A tuple of `Comparable` elements.
+///   - rhs: Another tuple of elements of the same type as `lhs`.
+public func ${op} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
+  if lhs.0 != rhs.0 { return lhs.0 ${op} rhs.0 }
   /*tail*/ return (
     ${", ".join("lhs.{}".format(i) for i in range(1, arity))}
-  ) ${op}${opeq} (
+  ) ${op} (
     ${", ".join("rhs.{}".format(i) for i in range(1, arity))}
   )
 }
-%     end
 %   end
 % end

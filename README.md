@@ -1,11 +1,11 @@
 <img src="https://swift.org/assets/images/swift.svg" alt="Swift logo" height="70" >
 # Swift Programming Language
 
-|| **Status** |
-|---|---|
-|**macOS**         |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|
-|**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|
-|**Ubuntu 15.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10)|
+|| **Swift** | **Package** |
+|---|---|---|
+|**macOS**         |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
+|**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
+|**Ubuntu 15.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-15_10)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-15_10/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-15_10)|
 
 **Welcome to Swift!**
 
@@ -25,9 +25,7 @@ modules, eliminating the need for headers and the code duplication they entail.
 To read the documentation, start by installing the
 [Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
 
-`easy_install -U Sphinx==1.3.4`
-
-More recent versions are currently **not supported.**
+`easy_install -U Sphinx`
 
 Once complete, you can build the Swift documentation by changing directory into
 [docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This compiles the `.rst` files in the [docs](https://github.com/apple/swift/tree/master/docs) directory
@@ -58,7 +56,7 @@ For macOS, you need [the latest Xcode](https://developer.apple.com/xcode/downloa
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -72,14 +70,14 @@ compiler for C++14 support and create a symlink:
 
 ### Getting Sources for Swift and Related Projects
 
-First create a directory for all of the swift sources:
+First create a directory for all of the Swift sources:
 
     mkdir swift-source
     cd swift-source
 
 **Note:** This is important since update-checkout (see below) checks out
-repositories next to the swift source directory. This means that if one clones
-swift and has other unrelated repositories, update-checkout may not clone those
+repositories next to the Swift source directory. This means that if one clones
+Swift and has other unrelated repositories, update-checkout may not clone those
 repositories and will update them instead.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
@@ -138,7 +136,7 @@ it next to the other projects and it will be bootstrapped automatically:
 The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for iOS, running tests after builds, and more. It also
-supports presets which you can define for common combinations of build options.
+supports presets, which you can define for common combinations of build options.
 
 To find out more:
 

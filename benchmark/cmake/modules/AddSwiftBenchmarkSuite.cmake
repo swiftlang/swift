@@ -315,7 +315,6 @@ function (swift_benchmark_compile_archopts)
       DEPENDS
         ${bench_library_objects} ${SWIFT_BENCH_OBJFILES}
         "${objcfile}"
-        "adhoc-sign-swift-stdlib-${BENCH_COMPILE_ARCHOPTS_PLATFORM}"
       COMMAND
         "${CLANG_EXEC}"
         "-fno-stack-protector"
@@ -355,19 +354,6 @@ function(swift_benchmark_compile)
       endif()
     endforeach()
   endif()
-
-  add_custom_target("copy-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
-      DEPENDS ${stdlib_dependencies}
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_directory"
-        "${SWIFT_LIBRARY_PATH}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
-        "${benchmark-lib-swift-dir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}")
-
-  add_custom_target("adhoc-sign-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
-      DEPENDS "copy-swift-stdlib-${SWIFT_BENCHMARK_COMPILE_PLATFORM}"
-      COMMAND
-        "codesign" "-f" "-s" "-"
-        "${benchmark-lib-swift-dir}/${SWIFT_BENCHMARK_COMPILE_PLATFORM}/*.dylib" "2>/dev/null")
 
   set(platform_executables)
   foreach(arch ${${SWIFT_BENCHMARK_COMPILE_PLATFORM}_arch})

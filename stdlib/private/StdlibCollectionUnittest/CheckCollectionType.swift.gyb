@@ -468,24 +468,15 @@ internal enum _SubSequenceSubscriptOnRangeMode {
   }
 }
 
-internal func _product<C1 : Collection, C2 : Collection>(
-  _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
-  for e1 in c1 {
-    for e2 in c2 {
-      result.append((e1, e2))
-    }
-  }
-  return result
-}
-
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
     return '''    
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
+    CollectionWithEquatableElement.SubSequence : Collection,
+    CollectionWithEquatableElement.SubSequence.Iterator.Element
+      == CollectionWithEquatableElement.Iterator.Element,
     C.SubSequence : %(protocol)s,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
     C.SubSequence.Index == C.Index,
@@ -511,8 +502,8 @@ internal func _product<C1 : Collection, C2 : Collection>(
     wrapValueIntoEquatable: @escaping (
       MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
 
-    extractValueFromEquatable:
-      ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+    extractValueFromEquatable: @escaping (
+      CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue,
 
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
     outOfBoundsIndexOffset: Int = 1,
@@ -536,10 +527,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addSequenceTests(
       testNamePrefix,
@@ -622,7 +614,7 @@ extension TestSuite {
         _blackHole(c[index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnIndexMode.all)
 
@@ -721,7 +713,7 @@ extension TestSuite {
         _blackHole(c[index..<index])
       }
 
-      let tests = _product(
+      let tests = cartesianProduct(
         subscriptRangeTests,
         _SubSequenceSubscriptOnRangeMode.all)
 
@@ -898,7 +890,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.first
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[0],
@@ -1183,7 +1175,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popFirst()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popFirst())
+      expectNil(slice.popFirst())
     }
 
     //===------------------------------------------------------------------===//
@@ -1198,10 +1190,12 @@ extension TestSuite {
     ${testConstraints('BidirectionalCollection')} {
 
     var testNamePrefix = testNamePrefix
-    if checksAdded.contains(#function) {
+
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addCollectionTests(${forwardTestArgs})
 
@@ -1231,7 +1225,7 @@ extension TestSuite {
         let c = makeWrappedCollection(test.collection)
         let result = c.last
         if test.isEmpty {
-          expectEmpty(result)
+          expectNil(result)
         } else {
           expectOptionalEqual(
             test.collection[test.count - 1],
@@ -1388,7 +1382,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).popLast()/slice/empty/semantics") {
       let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
       var slice = c[c.startIndex..<c.startIndex]
-      expectEmpty(slice.popLast())
+      expectNil(slice.popLast())
     }
 
 
@@ -1515,10 +1509,11 @@ extension TestSuite {
 
     var testNamePrefix = testNamePrefix
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     addBidirectionalCollectionTests(${forwardTestArgs})
     
@@ -1568,10 +1563,11 @@ extension TestSuite {
   ) where
     ${testConstraints(collectionForTraversal(Traversal))} {
 
-    if checksAdded.contains(#function) {
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
       return
     }
-    checksAdded.insert(#function)
 
     func toCollection(_ r: CountableRange<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
@@ -1694,7 +1690,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       }
     }
@@ -1735,7 +1731,7 @@ extension TestSuite {
           expectEqual(c.nthIndex(expectedOffset), new!,
             stackTrace: SourceLocStack().with(test.loc))
         } else {
-          expectEmpty(new)
+          expectNil(new)
         }
       } else {
         expectCrashLater()

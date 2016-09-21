@@ -127,11 +127,7 @@ public struct UnicodeScalar :
   ///       // Do something else
   ///     }
   public init?(_ v: UInt16) {
-    if let us = UnicodeScalar(UInt32(v)) {
-      self = us
-    } else {
-      return nil
-    }
+    self.init(UInt32(v))
   }
 
   /// Creates a Unicode scalar with the specified numeric value.
@@ -350,16 +346,12 @@ extension UInt8 {
 }
 extension UInt32 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt32.
   public init(_ v: UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
   /// Construct with value `v.value`.
-  ///
-  /// - Precondition: `v.value` can be represented as UInt64.
   public init(_ v: UnicodeScalar) {
     self = UInt64(v.value)
   }
@@ -404,10 +396,11 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
     return 0 + UTF16.width(value)
   }
 
-  /// Access the code unit at `position`.
+  /// Accesses the code unit at the specified position.
   ///
-  /// - Precondition: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
+  /// - Parameter position: The position of the element to access. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   `endIndex` property.
   subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)

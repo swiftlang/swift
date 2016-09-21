@@ -44,6 +44,7 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
+  class ASTScope;
   class ASTWalker;
   class BraceStmt;
   class Decl;
@@ -818,6 +819,9 @@ private:
   /// source file.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
+  /// The scope map that describes this source file.
+  ASTScope *Scope = nullptr;
+
   friend ASTContext;
   friend Impl;
 
@@ -948,7 +952,7 @@ public:
                                              SourceLoc diagLoc = {});
   /// @}
 
-  ReferencedNameTracker *getReferencedNameTracker() {
+  ReferencedNameTracker *getReferencedNameTracker() const {
     return ReferencedNames;
   }
   void setReferencedNameTracker(ReferencedNameTracker *Tracker) {
@@ -967,6 +971,9 @@ public:
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
+
+  /// Retrieve the scope that describes this source file.
+  ASTScope &getScope();
 
   void dump() const;
   void dump(raw_ostream &os) const;

@@ -13,7 +13,6 @@
 #ifndef SIL_TypeLowering_h
 #define SIL_TypeLowering_h
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -366,16 +365,9 @@ struct SILConstantInfo {
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
   
-  /// The context generic parameters used by the constant.
-  /// This will be the innermost generic parameter list that applies to the
-  /// constant, which may be the generic parameter list of an enclosing context.
-  GenericParamList *ContextGenericParams;
+  /// The generic environment used by the constant.
+  GenericEnvironment *GenericEnv;
   
-  /// The generic parameter list of the function.
-  /// If the function does not have any generic parameters of its own, this
-  /// will be null.
-  GenericParamList *InnerGenericParams;
-
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
@@ -384,8 +376,7 @@ struct SILConstantInfo {
     return lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType &&
-           lhs.ContextGenericParams == rhs.ContextGenericParams &&
-           lhs.InnerGenericParams == rhs.InnerGenericParams;
+           lhs.GenericEnv == rhs.GenericEnv;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -521,11 +512,8 @@ class TypeConverter {
   
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the context parameters for a constant. Returns a pair of the innermost
-  /// generic parameter list and the generic param list that directly applies
-  /// to the constant, if any.
-  std::pair<GenericParamList *, GenericParamList*>
-  getConstantContextGenericParams(SILDeclRef constant);
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
@@ -534,8 +522,6 @@ class TypeConverter {
 
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
-  const TypeLowering &getTypeLoweringForLoweredFunctionType(TypeKey key);
-  const TypeLowering &getTypeLoweringForUncachedLoweredFunctionType(TypeKey key);
 
 public:
   SILModule &M;
@@ -746,8 +732,8 @@ public:
                                     Type lvalueType);
 
   /// Retrieve the set of archetypes closed over by the given function.
-  GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,
-                                              CaptureInfo captureInfo);
+  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
+                                                     CaptureInfo captureInfo);
 
   /// Retrieve the set of generic parameters closed over by the given function.
   CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
@@ -798,7 +784,7 @@ public:
   /// The ABI compatible relation is not symmetric on function types -- while
   /// T and T! are both subtypes of each other, a calling convention conversion
   /// of T! to T always requires a thunk.
-  ABIDifference checkForABIDifferences(CanType type1, CanType type2);
+  ABIDifference checkForABIDifferences(SILType type1, SILType type2);
 
   /// \brief Same as above but for SIL function types.
   ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
@@ -812,6 +798,9 @@ public:
   getUncachedSILFunctionTypeForConstant(SILDeclRef constant,
                                   CanAnyFunctionType origInterfaceType);
 private:
+  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
+                               unsigned uncurryLevel);
+
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);

@@ -130,3 +130,18 @@ func testPlatforms() {
   let _: UnavailableOnOSXAppExt = 0
   let _: UnavailableOnMacOSAppExt = 0
 }
+
+struct VarToFunc {
+  @available(*, unavailable, renamed: "function()")
+  var variable: Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+
+  @available(*, unavailable, renamed: "function()")
+  func oldFunction() -> Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+
+  func function() -> Int {
+    _ = variable // expected-error{{'variable' has been renamed to 'function()'}}{{9-17=function()}}
+    _ = oldFunction() //expected-error{{'oldFunction()' has been renamed to 'function()'}}{{9-20=function}}
+    return 42
+  }
+}
+

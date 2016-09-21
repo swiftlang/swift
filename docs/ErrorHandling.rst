@@ -52,7 +52,7 @@ for developers to want to handle errors from different operations in
 the same basic way, either by reporting the error to the user or
 passing the error back to their own clients.
 
-These errors will be the focus on this proposal.
+These errors will be the focus of this proposal.
 
 The final two classes of error are outside the scope of this proposal.
 A **universal error** is theoretically recoverable, but by its nature
@@ -305,7 +305,7 @@ generalized ``do`` statement::
 As with ``switch`` statements, Swift makes an effort to understand
 whether catch clauses are exhaustive.  If it can determine it is, then
 the compiler considers the error to be handled.  If not, the error
-automatically propagates out out of scope, either to a lexically
+automatically propagates out of scope, either to a lexically
 enclosing ``catch`` clause or out of the containing function (which must
 be marked ``throws``).
 
@@ -691,7 +691,7 @@ can throw, and so it must also be marked with ``try``::
   }
 
 This marking feels redundant.  We want functions like
-``autoreleasepool`` to feel like statements, but marks inside builtin
+``autoreleasepool`` to feel like statements, but marks inside built-in
 statements like ``if`` don't require the outer statement to be marked.
 It would be better if the compiler didn't require the outer ``try``.
 

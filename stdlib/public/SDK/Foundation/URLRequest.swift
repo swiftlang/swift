@@ -25,7 +25,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     */
     internal var _handle: _MutableHandle<NSMutableURLRequest>
     
-    internal mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape (NSMutableURLRequest) -> ReturnType) -> ReturnType {
+    internal mutating func _applyMutation<ReturnType>(_ whatToDo : (NSMutableURLRequest) -> ReturnType) -> ReturnType {
         if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._uncopiedReference()
             _handle = _MutableHandle(reference: ref)
@@ -290,7 +290,7 @@ extension URLRequest : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLRequest?) -> URLRequest {
-        var result: URLRequest? = nil
+        var result: URLRequest?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

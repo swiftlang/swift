@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -117,3 +117,10 @@ twenty = Decimal(20)
 ten = Decimal(10)
 twenty.divide(by: ten)
 print(twenty) // CHECK: 2
+
+twenty = NSDecimalNumber(mantissa: 2, exponent: 1, isNegative: false) as Decimal
+print(twenty.significand) // CHECK: 2
+print(twenty.exponent) // CHECK: 1
+print(twenty.ulp) // CHECK: 10
+
+print(Decimal(sign: .plus, exponent: -2, significand: 100)) // CHECK: 1

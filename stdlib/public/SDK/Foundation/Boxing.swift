@@ -28,7 +28,7 @@ internal final class _MutableHandle<MutableType : NSObject>
     }
     
     /// Apply a closure to the reference type.
-    func map<ReturnType>(_ whatToDo : @noescape (MutableType) throws -> ReturnType) rethrows -> ReturnType {
+    func map<ReturnType>(_ whatToDo : (MutableType) throws -> ReturnType) rethrows -> ReturnType {
         return try whatToDo(_pointer)
     }
     
@@ -48,12 +48,12 @@ internal protocol _MutableBoxing : ReferenceConvertible {
     /// Apply a mutating closure to the reference type, regardless if it is mutable or immutable.
     ///
     /// This function performs the correct copy-on-write check for efficient mutation.
-    mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape (ReferenceType) -> ReturnType) -> ReturnType
+    mutating func _applyMutation<ReturnType>(_ whatToDo : (ReferenceType) -> ReturnType) -> ReturnType
 }
 
 extension _MutableBoxing {
     @inline(__always)
-    mutating func _applyMutation<ReturnType>(_ whatToDo : @noescape(ReferenceType) -> ReturnType) -> ReturnType {
+    mutating func _applyMutation<ReturnType>(_ whatToDo : (ReferenceType) -> ReturnType) -> ReturnType {
         // Only create a new box if we are not uniquely referenced
         if !isKnownUniquelyReferenced(&_handle) {
             let ref = _handle._pointer
@@ -89,7 +89,7 @@ internal protocol _SwiftNativeFoundationType : class {
 extension _SwiftNativeFoundationType {
     
     @inline(__always)
-    func _mapUnmanaged<ReturnType>(_ whatToDo : @noescape (ImmutableType) throws -> ReturnType) rethrows -> ReturnType {
+    func _mapUnmanaged<ReturnType>(_ whatToDo : (ImmutableType) throws -> ReturnType) rethrows -> ReturnType {
         defer { _fixLifetime(self) }
 
         switch __wrapped {
@@ -145,7 +145,7 @@ internal protocol _MutablePairBoxing {
 
 extension _MutablePairBoxing {
     @inline(__always)
-    func _mapUnmanaged<ReturnType>(_ whatToDo : @noescape (WrappedSwiftNSType.ImmutableType) throws -> ReturnType) rethrows -> ReturnType {
+    func _mapUnmanaged<ReturnType>(_ whatToDo : (WrappedSwiftNSType.ImmutableType) throws -> ReturnType) rethrows -> ReturnType {
         // We are using Unmanaged. Make sure that the owning container class
         // 'self' is guaranteed to be alive by extending the lifetime of 'self'
         // to the end of the scope of this function.
@@ -170,7 +170,7 @@ extension _MutablePairBoxing {
     }
 
     @inline(__always)
-    mutating func _applyUnmanagedMutation<ReturnType>(_ whatToDo : @noescape (WrappedSwiftNSType.MutableType) throws -> ReturnType) rethrows -> ReturnType {
+    mutating func _applyUnmanagedMutation<ReturnType>(_ whatToDo : (WrappedSwiftNSType.MutableType) throws -> ReturnType) rethrows -> ReturnType {
         // We are using Unmanaged. Make sure that the owning container class
         // 'self' is guaranteed to be alive by extending the lifetime of 'self'
         // to the end of the scope of this function.

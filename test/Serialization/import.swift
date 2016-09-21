@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %s -module-name Import
 // RUN: %target-swift-frontend -parse -I %t %s -module-name main -DMAIN -verify
 

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -119,7 +119,7 @@ func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
   // CHECK: call void @swift_unknownRelease(%objc_object* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processFooType(p.dynamicType)
+  let type = processFooType(type(of: p))
   return type
 } // CHECK: }
 
@@ -136,7 +136,7 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
   // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processComboType(p.dynamicType)
+  let type = processComboType(type(of: p))
   return type
 } // CHECK: }
 
@@ -149,7 +149,7 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
   // CHECK: call void bitcast (void (%swift.refcounted*)* @rt_swift_release to void (%C7objc_ir4Impl*)*)(%C7objc_ir4Impl* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
-  let type = processComboType2(p.dynamicType)
+  let type = processComboType2(type(of: p))
   return type
 } // CHECK: }
 

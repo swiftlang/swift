@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -enable-id-as-any %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -6,7 +6,7 @@ import Foundation
 func assertTypeIsAny(_: Any.Protocol) {}
 func staticType<T>(_: T) -> T.Type { return T.self }
 
-let idLover = IdLover()
+let idLover = NSIdLover()
 
 let t1 = staticType(idLover.makesId())
 assertTypeIsAny(t1)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 

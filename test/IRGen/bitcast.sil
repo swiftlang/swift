@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir| FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir| %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -46,10 +46,10 @@ entry(%c : $C):
 // CHECK-x86_64-NEXT:   %3 = insertvalue { i64, i1 } %2, i1 %1, 1
 // CHECK-x86_64-NEXT:   ret { i64, i1 } %3
 
-sil @bitcast_trivial_optional: $@convention(thin) (Optional<Int>) -> ImplicitlyUnwrappedOptional<Int> {
+sil @bitcast_trivial_optional: $@convention(thin) (Optional<Int>) -> Optional<Int> {
 entry(%c : $Optional<Int>):
-  %i = unchecked_trivial_bit_cast %c : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
-  return %i : $ImplicitlyUnwrappedOptional<Int>
+  %i = unchecked_trivial_bit_cast %c : $Optional<Int> to $Optional<Int>
+  return %i : $Optional<Int>
 }
 
 // CHECK-i386-LABEL: define{{( protected)?}} i32 @bitcast_ref(%C7bitcast1C*) {{.*}} {
@@ -78,9 +78,9 @@ entry(%c : $C):
 // CHECK-x86_64-NEXT: entry:
 // CHECK-x86_64-NEXT: ret i64 %0
 // CHECK-x86_64-NEXT: }
-sil hidden @bitcast_ref_optional : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<C>) -> @owned Optional<C> {
-bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
-  %o = unchecked_ref_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
+sil hidden @bitcast_ref_optional : $@convention(thin) (@owned Optional<C>) -> @owned Optional<C> {
+bb0(%0 : $Optional<C>):
+  %o = unchecked_ref_cast %0 : $Optional<C> to $Optional<C>
   return %o : $Optional<C>
 }
 

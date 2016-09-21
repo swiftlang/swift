@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -67,7 +67,7 @@ func testCFStringAnyObjectType() {
   let cfStr: CFString
     = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
-  let cfStrType = cfStr.dynamicType
+  let cfStrType = type(of: cfStr)
   // CHECK: [[STRING_CLASS:(NS|CF).*String]]
   print(cfStrType)
 

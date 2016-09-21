@@ -160,6 +160,10 @@ class LinkEntity {
     /// The index of the associated type declaration is stored in the data.
     AssociatedTypeWitnessTableAccessFunction,
 
+    /// A reflection metadata descriptor for the associated type witnesses of a
+    /// nominal type in a protocol conformance.
+    ReflectionAssociatedTypeDescriptor,
+
     // These are both type kinds and protocol-conformance kinds.
 
     /// A lazy protocol witness accessor function. The pointer is a
@@ -171,7 +175,7 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-        
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -201,6 +205,12 @@ class LinkEntity {
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
+
+    /// A reflection metadata descriptor for a builtin or imported type.
+    ReflectionBuiltinDescriptor,
+
+    /// A reflection metadata descriptor for a struct, enum, class or protocol.
+    ReflectionFieldDescriptor,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -225,8 +235,8 @@ class LinkEntity {
   }
   
   static bool isProtocolConformanceKind(Kind k) {
-    return k >= Kind::DirectProtocolWitnessTable
-      && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
+    return (k >= Kind::DirectProtocolWitnessTable &&
+            k <= Kind::ProtocolWitnessTableLazyCacheVariable);
   }
 
   void setForDecl(Kind kind, ValueDecl *decl, unsigned uncurryLevel) {
@@ -492,6 +502,26 @@ public:
     entity.setForProtocolConformanceAndAssociatedType(
                 Kind::AssociatedTypeWitnessTableAccessFunction, C, associate,
                                                       associateProtocol);
+    return entity;
+  }
+
+  static LinkEntity forReflectionBuiltinDescriptor(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::ReflectionBuiltinDescriptor, type);
+    return entity;
+  }
+
+  static LinkEntity forReflectionFieldDescriptor(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::ReflectionFieldDescriptor, type);
+    return entity;
+  }
+
+  static LinkEntity
+  forReflectionAssociatedTypeDescriptor(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(
+        Kind::ReflectionAssociatedTypeDescriptor, C);
     return entity;
   }
 

@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import SwiftShims
+
 public struct DispatchTime : Comparable {
 	public let rawValue: dispatch_time_t
 

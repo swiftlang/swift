@@ -242,7 +242,7 @@ void IterativeTypeChecker::processInheritedProtocols(
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
           if (!diagnosedCircularity &&
-			  !protocol->isInheritedProtocolsValid()) {
+              !protocol->isInheritedProtocolsValid()) {
             diagnose(protocol,
                      diag::circular_protocol_def, protocol->getName().str())
                     .fixItRemove(inherited.getSourceRange());

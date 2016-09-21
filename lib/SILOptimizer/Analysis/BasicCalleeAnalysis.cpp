@@ -137,11 +137,10 @@ void CalleeCache::computeMethodCallees() {
 SILFunction *
 CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
   SILFunction *CalleeFn;
-  ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
   // Attempt to find a specific callee for the given conformance and member.
-  std::tie(CalleeFn, WT, Subs) = WMI->getModule().lookUpFunctionInWitnessTable(
+  std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
       WMI->getConformance(), WMI->getMember());
 
   return CalleeFn;
@@ -213,4 +212,21 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 // site.
 CalleeList CalleeCache::getCalleeList(FullApplySite FAS) const {
   return getCalleeListForCalleeKind(FAS.getCallee());
+}
+
+// Return the list of functions that can be called via the given instruction.
+CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
+  // We support only deallocation instructions at the moment.
+  assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
+         "A deallocation instruction expected");
+  auto Ty = I->getOperand(0)->getType();
+  while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
+    Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
+                                    ->getAnyOptionalObjectType()
+                                    .getCanonicalTypeOrNull());
+  auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
+  if (!Class || !Class->hasDestructor())
+    return CalleeList();
+  auto Destructor = Class->getDestructor();
+  return getCalleeList(Destructor);
 }

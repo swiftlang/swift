@@ -52,6 +52,8 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "CompilationRecord.h"
+
 #include <memory>
 
 using namespace swift;
@@ -95,6 +97,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
+  .Case("swift-format", DriverKind::SwiftFormat)
   .Default(None);
   
   if (Kind.hasValue())
@@ -261,20 +264,27 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
     auto *key = cast<yaml::ScalarNode>(i->getKey());
     StringRef keyStr = key->getValue(scratch);
 
-    if (keyStr == "version") {
+    using compilation_record::TopLevelKey;
+    if (keyStr == compilation_record::getName(TopLevelKey::Version)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
-      versionValid =
-          (value->getValue(scratch) == version::getSwiftFullVersion());
 
-    } else if (keyStr == "options") {
+      // NB: We check aginst
+      // swift::version::Version::getCurrentLanguageVersion() here because any
+      // -swift-version argument is handled in the argsHashStr check that
+      // follows.
+      versionValid = (value->getValue(scratch)
+                      == version::getSwiftFullVersion(
+                        version::Version::getCurrentLanguageVersion()));
+
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
       optionsMatch = (argsHashStr == value->getValue(scratch));
 
-    } else if (keyStr == "build_time") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
       auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
       if (!value)
         return true;
@@ -283,7 +293,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         return true;
       map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
 
-    } else if (keyStr == "inputs") {
+    } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
       if (!inputMap)
         return true;
@@ -299,13 +309,9 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
         if (!value)
           return true;
 
+        using compilation_record::getInfoStatusForIdentifier;
         auto previousBuildState =
-            llvm::StringSwitch<Optional<InputInfo::Status>>(value->getRawTag())
-              .Case("", InputInfo::UpToDate)
-              .Case("!dirty", InputInfo::NeedsCascadingBuild)
-              .Case("!private", InputInfo::NeedsNonCascadingBuild)
-              .Default(None);
-
+          getInfoStatusForIdentifier(value->getRawTag());
         if (!previousBuildState)
           return true;
 
@@ -366,6 +372,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     !ArgList->hasArg(options::OPT_embed_bitcode);
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
+  bool ContinueBuildingAfterErrors =
+    ArgList->hasArg(options::OPT_continue_building_after_errors);
+  bool ShowDriverTimeCompilation =
+    ArgList->hasArg(options::OPT_driver_time_compilation);
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
@@ -500,15 +510,17 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  DriverSkipExecution,
-                                                 SaveTemps));
+                                                 SaveTemps,
+                                                 ShowDriverTimeCompilation));
 
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 
   // For updating code we need to go through all the files and pick up changes,
-  // even if they have compiler errors.
-  // Also for getting bulk fixits.
+  // even if they have compiler errors. Also for getting bulk fixits, or for when
+  // users explicitly request to continue building despite errors.
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
-      OI.ShouldGenerateFixitEdits)
+      OI.ShouldGenerateFixitEdits ||
+      ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions)
@@ -946,6 +958,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_ast:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
       OI.CompilerOutputType = types::TY_Nothing;
       break;
@@ -1316,7 +1329,8 @@ void Driver::buildActions(const ToolChain &TC,
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     auto *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
 
-    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+    if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+        TC.getTriple().isOSCygMing()) {
       // On ELF platforms there's no built in autolinking mechanism, so we
       // pull the info we need from the .o files directly and pass them as an
       // argument input file to the linker.
@@ -1604,36 +1618,40 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
     return;
   }
 
-  if (!alwaysRebuildDependents) {
-    // Default all non-newly added files to being rebuilt without cascading.
-    J->setCondition(Job::Condition::RunWithoutCascading);
-  }
-
+  bool hasValidModTime = false;
   llvm::sys::fs::file_status inputStatus;
-  if (llvm::sys::fs::status(input, inputStatus))
-    return;
-
-  J->setInputModTime(inputStatus.getLastModificationTime());
-  if (J->getInputModTime() != inputInfo.previousModTime)
-    return;
+  if (!llvm::sys::fs::status(input, inputStatus)) {
+    J->setInputModTime(inputStatus.getLastModificationTime());
+    hasValidModTime = true;
+  }
 
   Job::Condition condition;
-  switch (inputInfo.status) {
-  case CompileJobAction::InputInfo::UpToDate:
-    if (!llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+  if (hasValidModTime && J->getInputModTime() == inputInfo.previousModTime) {
+    switch (inputInfo.status) {
+    case CompileJobAction::InputInfo::UpToDate:
+      if (llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+        condition = Job::Condition::CheckDependencies;
+      else
+        condition = Job::Condition::RunWithoutCascading;
+      break;
+    case CompileJobAction::InputInfo::NeedsCascadingBuild:
+      condition = Job::Condition::Always;
+      break;
+    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
       condition = Job::Condition::RunWithoutCascading;
-    else
-      condition = Job::Condition::CheckDependencies;
-    break;
-  case CompileJobAction::InputInfo::NeedsCascadingBuild:
-    condition = Job::Condition::Always;
-    break;
-  case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
-    condition = Job::Condition::RunWithoutCascading;
-    break;
-  case CompileJobAction::InputInfo::NewlyAdded:
-    llvm_unreachable("handled above");
+      break;
+    case CompileJobAction::InputInfo::NewlyAdded:
+      llvm_unreachable("handled above");
+    }
+  } else {
+    if (alwaysRebuildDependents ||
+        inputInfo.status == CompileJobAction::InputInfo::NeedsCascadingBuild) {
+      condition = Job::Condition::Always;
+    } else {
+      condition = Job::Condition::RunWithoutCascading;
+    }
   }
+
   J->setCondition(condition);
 }
 
@@ -1995,7 +2013,8 @@ void Driver::printJobs(const Compilation &C) const {
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
-  OS << version::getSwiftFullVersion() << '\n';
+  OS << version::getSwiftFullVersion(
+    version::Version::getCurrentLanguageVersion()) << '\n';
   OS << "Target: " << TC.getTriple().str() << '\n';
 }
 
@@ -2009,6 +2028,7 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
+  case DriverKind::SwiftFormat:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

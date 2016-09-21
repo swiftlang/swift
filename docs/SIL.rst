@@ -1,4 +1,5 @@
 .. @raise litre.TestsAreMissing
+.. highlight:: none
 
 Swift Intermediate Language (SIL)
 =================================
@@ -346,9 +347,14 @@ A type ``T`` is a *legal SIL type* if:
 - it is a function type which satisfies the constraints (below) on
   function types in SIL,
 
+- it is a metatype type which describes its representation,
+
 - it is a tuple type whose element types are legal SIL types,
 
-- it is a legal Swift type that is not a function, tuple, or l-value type, or
+- it is ``Optional<U>``, where ``U`` is a legal SIL type,
+
+- it is a legal Swift type that is not a function, tuple, optional,
+  metatype, or l-value type, or
 
 - it is a ``@box`` containing a legal SIL type.
 
@@ -393,6 +399,22 @@ a box containing a mutable value of type ``T``. Boxes always use Swift-native
 reference counting, so they can be queried for uniqueness and cast to the
 ``Builtin.NativeObject`` type.
 
+Metatype Types
+``````````````
+
+A concrete or existential metatype in SIL must describe its representation.
+This can be:
+
+- ``@thin``, meaning that it requires no storage and thus necessarily
+  represents an exact type (only allowed for concrete metatypes);
+
+- ``@thick``, meaning that it stores a reference to a type or (if a
+  concrete class) a subclass of that type; or
+
+- ``@objc``, meaning that it stores a reference to a class type (or a
+  subclass thereof) using an Objective-C class object representation
+  rather than the native Swift type-object representation.
+
 Function Types
 ``````````````
 
@@ -418,7 +440,7 @@ number of ways:
     parameter.
 
 - A SIL function type declares the conventions for its parameters.
-  The parameters are written as an unlabelled tuple; the elements of that
+  The parameters are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.
 
@@ -460,7 +482,7 @@ number of ways:
   - Otherwise, the parameter is an unowned direct parameter.
 
 - A SIL function type declares the conventions for its results.
-  The results are written as an unlabelled tuple; the elements of that
+  The results are written as an unlabeled tuple; the elements of that
   tuple must be legal SIL types, optionally decorated with one of the
   following convention attributes.  Indirect and direct results may
   be interleaved.
@@ -1538,15 +1560,16 @@ Class TBAA
 
 Class instances and other *heap object references* are pointers at the
 implementation level, but unlike SIL addresses, they are first class values and
-can be ``capture``-d and alias. Swift, however, is memory-safe and statically
+can be ``capture``-d and aliased. Swift, however, is memory-safe and statically
 typed, so aliasing of classes is constrained by the type system as follows:
 
 * A ``Builtin.NativeObject`` may alias any native Swift heap object,
   including a Swift class instance, a box allocated by ``alloc_box``,
   or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A ``Builtin.UnknownObject`` may alias any class instance, whether Swift or
-  Objective-C, but may not alias non-class-instance heap objects.
+* A ``Builtin.UnknownObject`` or ``Builtin.BridgeObject`` may alias
+  any class instance, whether Swift or Objective-C, but may not alias
+  non-class-instance heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
   ``$B`` and ``$D``, may alias. Two values of unrelated class types may not
@@ -1560,6 +1583,15 @@ typed, so aliasing of classes is constrained by the type system as follows:
   potentially alias concrete instances of the generic type, such as
   ``$C<Int>``, because ``Int`` is a potential substitution for ``T``.
 
+A violation of the above aliasing rules only results in undefined
+behavior if the aliasing references are dereferenced within Swift code.
+For example,
+``_SwiftNativeNS[Array|Dictionary|String]`` classes alias with
+``NS[Array|Dictionary|String]`` classes even though they are not
+statically related. Since Swift never directly accesses stored
+properties on the Foundation classes, this aliasing does not pose a
+danger.
+
 Typed Access TBAA
 ~~~~~~~~~~~~~~~~~
 
@@ -1571,15 +1603,86 @@ Define a *typed access* of an address or reference as one of the following:
   typed projection operation (e.x. ``ref_element_addr``,
   ``tuple_element_addr``).
 
-It is undefined behavior to perform a typed access to an address or reference if
-the stored object or referent is not an allocated object of the relevant type.
+With limited exceptions, it is undefined behavior to perform a typed access to
+an address or reference addressed memory is not bound to the relevant type.
 
-This allows the optimizer to assume that two addresses cannot alias if there
-does not exist a substitution of archetypes that could cause one of the types to
-be the type of a subobject of the other. Additionally, this applies to the types
-of the values from which the addresses were derived, ignoring "blessed"
-alias-introducing operations such as ``pointer_to_address``, the ``bitcast``
-intrinsic, and the ``inttoptr`` intrinsic.
+This allows the optimizer to assume that two addresses cannot alias if
+there does not exist a substitution of archetypes that could cause one
+of the types to be the type of a subobject of the other. Additionally,
+this applies to the types of the values from which the addresses were
+derived via a typed projection.
+
+Consider the following SIL::
+
+  struct Element {
+    var i: Int
+  }
+  struct S1 {
+    var elt: Element
+  }   
+  struct S2 {
+    var elt: Element
+  }   
+  %adr1 = struct_element_addr %ptr1 : $*S1, #S.elt
+  %adr2 = struct_element_addr %ptr2 : $*S2, #S.elt
+
+The optimizer may assume that ``%adr1`` does not alias with ``%adr2``
+because the values that the addresses are derived from (``%ptr1`` and
+``%ptr2``) have unrelated types. However, in the following example,
+the optimizer cannot assume that ``%adr1`` does not alias with
+``%adr2`` because ``%adr2`` is derived from a cast, and any subsequent
+typed operations on the address will refer to the common ``Element`` type::
+
+  %adr1 = struct_element_addr %ptr1 : $*S1, #S.elt
+  %adr2 = pointer_to_address %ptr2 : $Builtin.RawPointer to $*Element
+
+Exceptions to typed access TBAA rules are only allowed for blessed
+alias-introducing operations. This permits limited type-punning. The only
+current exception is the non-struct ``pointer_to_address`` variant. The
+optimizer must be able to defensively determine that none of the *roots* of an
+address are alias-introducing operations. An address root is the operation that
+produces the address prior to applying any typed projections, indexing, or
+casts. The following are valid address roots:
+
+* Object allocation that generates an address, such as ``alloc_stack``
+  and ``alloc_box``.
+
+* Address-type function arguments. These are crucially *not* considered
+  alias-introducing operations. It is illegal for the SIL optimizer to
+  form a new function argument from an arbitrary address-type
+  value. Doing so would require the optimizer to guarantee that the
+  new argument is both has a non-alias-introducing address root and
+  can be properly represented by the calling convention (address types
+  do not have a fixed representation).
+
+* A strict cast from an untyped pointer, ``pointer_to_address [strict]``. It is
+  illegal for ``pointer_to_address [strict]`` to derive its address from an
+  alias-introducing operation's value. A type punned address may only be
+  produced from an opaque pointer via a non-strict ``pointer_to_address`` at the
+  point of conversion.
+
+Address-to-address casts, via ``unchecked_addr_cast``, transparently
+forward their source's address root, just like typed projections.
+
+Address-type basic block arguments can be conservatively considered
+aliasing-introducing operations; they are uncommon enough not to
+matter and may eventually be prohibited altogether.
+
+Although some pointer producing intrinsics exist, they do not need to be
+considered alias-introducing exceptions to TBAA rules. ``Builtin.inttoptr``
+produces a ``Builtin.RawPointer`` which is not interesting because by definition
+it may alias with everything. Similarly, the LLVM builtins ``Builtin.bitcast``
+and ``Builtin.trunc|sext|zextBitCast`` cannot produce typed pointers. These
+pointer values must be converted to an address via ``pointer_to_address`` before
+typed access can occur. Whether the ``pointer_to_address`` is strict determines
+whether aliasing may occur.
+
+Memory may be rebound to an unrelated type. Addresses to unrelated types may
+alias as long as typed access only occurs while memory is bound to the relevant
+type. Consequently, the optimizer cannot outright assume that addresses accessed
+as unrelated types are nonaliasing. For example, pointer comparison cannot be
+eliminated simply because the two addresses derived from those pointers are
+accessed as unrelated types at different program points.
 
 Value Dependence
 ----------------
@@ -1725,16 +1828,24 @@ alloc_ref
 `````````
 ::
 
-  sil-instruction ::= 'alloc_ref' ('[' 'objc' ']')? ('[' 'stack' ']')? sil-type
+  sil-instruction ::= 'alloc_ref'
+                        ('[' 'objc' ']')?
+                        ('[' 'stack' ']')?
+                        ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                        sil-type
 
   %1 = alloc_ref [stack] $T
+  %1 = alloc_ref [tail_elems $E * %2 : Builtin.Word] $T
   // $T must be a reference type
   // %1 has type $T
+  // $E is the type of the tail-allocated elements
+  // %2 must be of a builtin integer type
 
 Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The
 optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
+
 The optional ``stack`` attribute indicates that the object can be allocated
 on the stack instead on the heap. In this case the instruction must have
 balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
@@ -1743,6 +1854,15 @@ Note that the ``stack`` attribute only specifies that stack allocation is
 possible. The final decision on stack allocation is done during llvm IR
 generation. This is because the decision also depends on the object size,
 which is not necessarily known at SIL level.
+
+The optional ``tail_elems`` attributes specifies the amount of space to be
+reserved for tail-allocated arrays of given element types and element counts.
+If there are more than one ``tail_elems`` attributes then the tail arrays are
+allocated in the specified order.
+The count-operand must be of a builtin integer type.
+The instructions ``ref_tail_addr`` and ``tail_addr`` can be used to project
+the tail elements.
+The ``objc`` attribute cannot be used together with ``tail_elems``.
 
 alloc_ref_dynamic
 `````````````````
@@ -2225,6 +2345,31 @@ bytes within a value, using ``index_addr``. (``Int8`` address types have no
 special behavior in this regard, unlike ``char*`` or ``void*`` in C.) It is
 also undefined behavior to index out of bounds of an array, except to index
 the "past-the-end" address of the array.
+
+tail_addr
+`````````
+::
+
+  sil-instruction ::= 'tail_addr' sil-operand ',' sil-operand ',' sil-type
+
+  %2 = tail_addr %0 : $*T, %1 : $Builtin.Int<n>, $E
+  // %0 must be of an address type $*T
+  // %1 must be of a builtin integer type
+  // %2 will be of type $*E
+
+Given an address of an array of ``%1`` values, returns the address of an
+element which is tail-allocated after the array.
+This instruction is equivalent to ``index_addr`` except that the resulting
+address is aligned-up to the tail-element type ``$E``.
+
+This instruction is used to project the N-th tail-allocated array from an
+object which is created by an ``alloc_ref`` with multiple ``tail_elems``.
+The first operand is the address of an element of the (N-1)-th array, usually
+the first element. The second operand is the number of elements until the end
+of that array. The result is the address of the first element of the N-th array.
+
+It is undefined behavior if the provided address, count and type do not match
+the actual layout of tail-allocated arrays of the underlying object.
 
 index_raw_pointer
 `````````````````
@@ -3152,6 +3297,23 @@ ref_element_addr
 Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
+
+ref_tail_addr
+`````````````
+::
+
+  sil-instruction ::= 'ref_tail_addr' sil-operand ',' sil-type
+
+  %1 = ref_tail_addr %0 : $C, $E
+  // %0 must be a value of class type $C with tail-allocated elements $E
+  // %1 will be of type $*E
+
+Given an instance of a class, which is created with tail-allocated array(s),
+derives the address of the first element of the first tail-allocated array.
+This instruction is used to project the first tail-allocated element from an
+object which is created by an ``alloc_ref`` with ``tail_elems``.
+It is undefined behavior if the class instance does not have tail-allocated
+arrays or if the element-types do not match.
 
 Enums
 ~~~~~

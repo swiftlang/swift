@@ -217,6 +217,7 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
+  @_transparent
   @inline(__always)
   public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool{
@@ -256,6 +257,7 @@ extension Bool {
   /// - Parameters:
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
+  @_transparent
   @inline(__always)
   public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool {

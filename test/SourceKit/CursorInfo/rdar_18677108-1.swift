@@ -1,5 +1,5 @@
 // Checks that we don't crash.
-// RUN: %sourcekitd-test -req=cursor -pos=7:5 %s -- %s | FileCheck %s
+// RUN: %sourcekitd-test -req=cursor -pos=7:5 %s -- %s | %FileCheck %s
 // CHECK: <empty cursor info>
 
 class CameraViewController

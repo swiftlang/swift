@@ -1,6 +1,8 @@
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
    ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
 
+  add_subdirectory(LongTests)
+
   set(PLATFORM_SOURCES)
   set(PLATFORM_TARGET_LINK_LIBRARIES)
   if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
@@ -27,6 +29,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Mutex.cpp
     Enum.cpp
     Refcounting.cpp
+    Stdlib.cpp
     ${PLATFORM_SOURCES}
 
     # The runtime tests link to internal runtime symbols, which aren't exported

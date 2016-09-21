@@ -12,6 +12,9 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
+// FIXME: This test runs very slowly on watchOS.
+// UNSUPPORTED: OS=watchos
+
 public enum ApproximateCount {
   case Unknown
   case Precise(IntMax)
@@ -233,7 +236,7 @@ struct _ForkJoinMutex {
     _mutex.deallocate(capacity: 1)
   }
 
-  func withLock<Result>(_ body: @noescape () -> Result) -> Result {
+  func withLock<Result>(_ body: () -> Result) -> Result {
     if pthread_mutex_lock(_mutex) != 0 {
       fatalError("pthread_mutex_lock")
     }
@@ -423,7 +426,7 @@ final class _ForkJoinWorkerThread {
   }
 
   internal func startAsync() {
-    var queue: DispatchQueue? = nil
+    var queue: DispatchQueue?
     if #available(OSX 10.10, iOS 8.0, *) {
       queue = DispatchQueue.global(qos: .background)
     } else {
@@ -536,7 +539,7 @@ internal protocol _Future {
 }
 
 public class ForkJoinTaskBase {
-  final internal var _pool: ForkJoinPool? = nil
+  final internal var _pool: ForkJoinPool?
 
   // FIXME(performance): there is no need to create heavy-weight
   // synchronization primitives every time.  We could start with a lightweight
@@ -579,7 +582,7 @@ public class ForkJoinTaskBase {
 
 final public class ForkJoinTask<Result> : ForkJoinTaskBase, _Future {
   internal let _task: () -> Result
-  internal var _result: Result? = nil
+  internal var _result: Result?
 
   public init(_task: @escaping () -> Result) {
     self._task = _task
@@ -701,7 +704,7 @@ final public class ForkJoinPool {
   }
 
   internal func _tryCreateThread(
-    _ makeTask: @noescape () -> ForkJoinTaskBase?
+    _ makeTask: () -> ForkJoinTaskBase?
   ) -> Bool {
     var success = false
     var oldNumThreads = _totalThreads.load()

@@ -133,6 +133,10 @@ public:
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getField());
   }
 
+  hash_code visitRefTailAddrInst(RefTailAddrInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
   hash_code visitProjectBoxInst(ProjectBoxInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand());
   }
@@ -358,7 +362,7 @@ public:
                               X->getMember().getHashCode(),
                               X->getConformance(),
                               X->getType(),
-                              !X->getOpenedArchetypeOperands().empty(),
+                              !X->getTypeDependentOperands().empty(),
                               llvm::hash_combine_range(
                               Operands.begin(),
                               Operands.end()));
@@ -645,7 +649,7 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   // that need to be replaced.
   for (auto Use : Inst->getUses()) {
     auto User = Use->getUser();
-    if (User->mayHaveOpenedArchetypeOperands()) {
+    if (!User->getTypeDependentOperands().empty()) {
       if (canHandle(User)) {
         auto It = AvailableValues->begin(User);
         if (It != AvailableValues->end()) {
@@ -681,13 +685,48 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
   auto &Builder = Cloner.getBuilder();
   Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
+  llvm::SmallPtrSet<SILInstruction *, 16> Processed;
   // Now clone each candidate and replace the opened archetype
   // by a dominating one.
-  for (auto Candidate : Candidates) {
+  while (!Candidates.empty()) {
+    auto Candidate = Candidates.pop_back_val();
+    if (Processed.count(Candidate))
+      continue;
+    // True if a candidate depends on the old opened archetype.
+    bool DependsOnOldOpenedArchetype = !Candidate->getTypeDependentOperands().empty();
+    if (!Candidate->use_empty() &&
+        Candidate->getType().getSwiftRValueType()->hasOpenedExistential()) {
+      // Check if the result type of the candidate depends on the opened
+      // existential in question.
+      auto ResultDependsOnOldOpenedArchetype =
+          Candidate->getType().getSwiftRValueType().findIf(
+              [&OldOpenedArchetype](Type t) -> bool {
+                if (t.getCanonicalTypeOrNull() == OldOpenedArchetype)
+                  return true;
+                return false;
+              });
+      if (ResultDependsOnOldOpenedArchetype) {
+        DependsOnOldOpenedArchetype |= ResultDependsOnOldOpenedArchetype;
+        // We need to update uses of this candidate, because their types
+        // may be affected.
+        for (auto Use : Candidate->getUses()) {
+          Candidates.insert(Use->getUser());
+        }
+      }
+    }
+    // Remember that this candidate was processed already.
+    Processed.insert(Candidate);
+
+    // No need to clone if there is no dependency on the old opened archetype.
+    if (!DependsOnOldOpenedArchetype)
+      continue;
+
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        Candidate->getOpenedArchetypeOperands());
+        Candidate->getTypeDependentOperands());
     Builder.setInsertionPoint(Candidate);
     auto NewI = Cloner.clone(Candidate);
+    // Result types of candidate's uses instructions may be using this archetype.
+    // Thus, we need to try to replace it there.
     Candidate->replaceAllUsesWith(NewI);
     if (I == Candidate->getIterator())
       I = NewI->getIterator();
@@ -832,6 +871,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::ValueMetatypeInst:
     case ValueKind::ObjCProtocolInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefTailAddrInst:
     case ValueKind::ProjectBoxInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::IndexAddrInst:
@@ -884,7 +924,7 @@ static ApplyWitnessPair getOpenExistentialUsers(OpenExistentialAddrInst *OE) {
   for (auto *UI : getNonDebugUses(OE)) {
     auto *User = UI->getUser();
     if (!isa<WitnessMethodInst>(User) &&
-        User->isOpenedArchetypeOperand(UI->getOperandNumber()))
+        User->isTypeDependentOperand(UI->getOperandNumber()))
       continue;
     // Check that we have a single Apply user.
     if (auto *AA = dyn_cast<ApplyInst>(User)) {

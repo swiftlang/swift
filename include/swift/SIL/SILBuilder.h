@@ -135,6 +135,11 @@ public:
   void setInsertionPoint(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt) {
     this->BB = BB;
     this->InsertPt = InsertPt;
+    if (InsertPt == BB->end())
+      return;
+    // Set the opened archetype context from the instruction.
+    this->getOpenedArchetypes().addOpenedArchetypeOperands(
+        InsertPt->getTypeDependentOperands());
   }
 
   /// setInsertionPoint - Set the insertion point to insert before the specified
@@ -175,6 +180,14 @@ public:
 
   SmallVectorImpl<SILInstruction *> *getTrackingList() {
     return InsertedInstrs;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Opened archetypes handling
+  //===--------------------------------------------------------------------===//
+  void addOpenedArchetypeOperands(SILInstruction *I) {
+    getOpenedArchetypes().addOpenedArchetypeOperands(
+        I->getTypeDependentOperands());
   }
 
   //===--------------------------------------------------------------------===//
@@ -242,13 +255,26 @@ public:
                                          Var));
   }
 
-  AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc,
-                               bool canAllocOnStack) {
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
+                               bool objc, bool canAllocOnStack) {
     // AllocRefInsts expand to function calls and can therefore not be
     // counted towards the function prologue.
     assert(!Loc.isInPrologue());
-    return insert(AllocRefInst::create(getSILDebugLocation(Loc), elementType, F,
+    return insert(AllocRefInst::create(getSILDebugLocation(Loc), F, ObjectType,
                                        objc, canAllocOnStack,
+                                       {}, {}, OpenedArchetypes));
+  }
+
+  AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
+                               bool canAllocOnStack,
+                               ArrayRef<SILType> ElementTypes,
+                               ArrayRef<SILValue> ElementCountOperands) {
+    // AllocRefInsts expand to function calls and can therefore not be
+    // counted towards the function prologue.
+    assert(!Loc.isInPrologue());
+    return insert(AllocRefInst::create(getSILDebugLocation(Loc),
+                                       F, ObjectType, false, canAllocOnStack,
+                                       ElementTypes, ElementCountOperands,
                                        OpenedArchetypes));
   }
 
@@ -744,27 +770,13 @@ public:
 
   /// Inject a loadable value into the corresponding optional type.
   EnumInst *createOptionalSome(SILLocation Loc, SILValue operand, SILType ty) {
-    return createOptionalSome(Loc, operand, ty.getOptionalTypeKind(), ty);
-  }
-
-  /// Inject a loadable value into the corresponding optional type.
-  EnumInst *createOptionalSome(SILLocation Loc, SILValue operand,
-                               OptionalTypeKind optKind, SILType ty) {
-    assert(ty.getOptionalTypeKind() == optKind);
-    auto someDecl = F.getModule().getASTContext().getOptionalSomeDecl(optKind);
+    auto someDecl = F.getModule().getASTContext().getOptionalSomeDecl();
     return createEnum(Loc, operand, someDecl, ty);
   }
 
   /// Create the nil value of a loadable optional type.
   EnumInst *createOptionalNone(SILLocation Loc, SILType ty) {
-    return createOptionalNone(Loc, ty.getOptionalTypeKind(), ty);
-  }
-
-  /// Create the nil value of a loadable optional type.
-  EnumInst *createOptionalNone(SILLocation Loc, OptionalTypeKind optKind,
-                               SILType ty) {
-    assert(ty.getOptionalTypeKind() == optKind);
-    auto noneDecl = F.getModule().getASTContext().getOptionalNoneDecl(optKind);
+    auto noneDecl = F.getModule().getASTContext().getOptionalNoneDecl();
     return createEnum(Loc, nullptr, noneDecl, ty);
   }
 
@@ -899,6 +911,12 @@ public:
     return createRefElementAddr(Loc, Operand, Field, ResultTy);
   }
 
+  RefTailAddrInst *createRefTailAddr(SILLocation Loc, SILValue Ref,
+                                     SILType ResultTy) {
+    return insert(new (F.getModule()) RefTailAddrInst(getSILDebugLocation(Loc),
+                                                      Ref, ResultTy));
+  }
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy,
                                      bool Volatile = false) {
@@ -941,8 +959,9 @@ public:
   DynamicMethodInst *createDynamicMethod(SILLocation Loc, SILValue Operand,
                                          SILDeclRef Member, SILType MethodTy,
                                          bool Volatile = false) {
-    return insert(new (F.getModule()) DynamicMethodInst(
-        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile));
+    return insert(DynamicMethodInst::create(
+        getSILDebugLocation(Loc), Operand, Member, MethodTy, Volatile,
+        &F, OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *
@@ -1241,6 +1260,12 @@ public:
                                  SILValue Index) {
     return insert(new (F.getModule()) IndexAddrInst(getSILDebugLocation(Loc),
                                                     Operand, Index));
+  }
+
+  TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,
+                               SILValue Count, SILType ResultTy) {
+    return insert(new (F.getModule()) TailAddrInst(getSILDebugLocation(Loc),
+                                                   Operand, Count, ResultTy));
   }
 
   IndexRawPointerInst *createIndexRawPointer(SILLocation Loc, SILValue Operand,

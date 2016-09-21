@@ -31,7 +31,7 @@
 
 #if !swift(>=1.0)
   // This shouldn't emit any diagnostics.
-  $#%^*&
+  %#^*&
 #endif
 
 #if swift(">=7.1") // expected-error {{unexpected platform condition argument: expected a unary comparison, such as '>=2.2'}}
@@ -62,7 +62,7 @@ protocol P {
 
   // There should be no error here.
   adsf asdf asdf
-  $#%^*&
+  %#^*&
   func foo(sdfsdfdsf adsf adsf asdf adsf adsf)
 #endif
 }

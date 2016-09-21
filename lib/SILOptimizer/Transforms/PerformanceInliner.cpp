@@ -1128,7 +1128,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // We don't support inlining a function that binds dynamic self because we
   // have no mechanism to preserve the original function's local self metadata.
-  if (computeMayBindDynamicSelf(Callee)) {
+  if (mayBindDynamicSelf(Callee)) {
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
@@ -1483,11 +1483,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // the substitution list.
     OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
 
-    // Notice that we will skip all of the newly inlined ApplyInsts. That's
-    // okay because we will visit them in our next invocation of the inliner.
-    TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
-                       SILInliner::InlineKind::PerformanceInline, ContextSubs,
+                       SILInliner::InlineKind::PerformanceInline,
                        AI.getSubstitutions(),
                        OpenedArchetypesTracker);
 

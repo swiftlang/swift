@@ -9,5 +9,6 @@ target_link_libraries(SwiftParseTests
     swiftSema
     swiftClangImporter
     swiftParse
-    swiftAST)
+    swiftAST
+)
 

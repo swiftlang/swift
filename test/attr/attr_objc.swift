@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // RUN: not %target-swift-frontend -parse -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
-// RUN: FileCheck -check-prefix CHECK-DUMP %s < %t.dump
+// RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
 import Foundation
@@ -11,6 +11,9 @@ struct PlainStruct {}
 enum PlainEnum {}
 protocol PlainProtocol {} // expected-note {{protocol 'PlainProtocol' declared here}}
 
+enum ErrorEnum : Error {
+  case failed
+}
 
 @objc class Class_ObjC1 {}
 
@@ -313,6 +316,7 @@ class ConcreteContext2 {
 }
 
 class ConcreteContext3 {
+
   func dynamicSelf1() -> Self { return self }
 
   @objc func dynamicSelf1_() -> Self { return self }
@@ -320,6 +324,38 @@ class ConcreteContext3 {
 
   @objc func genericParams<T: NSObject>() -> [T] { return [] }
   // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
+
+  @objc func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias AnotherNSCoding = NSCoding
+  typealias MetaNSCoding1 = NSCoding.Protocol
+  typealias MetaNSCoding2 = AnotherNSCoding.Protocol
+
+  @objc func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias Composition = NSCopying & NSCoding
+
+  @objc func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  @objc func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+
+  typealias NSCodingExistential = NSCoding.Type
+
+  @objc func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+
+  @objc func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 func genericContext1<T>(_: T) {
@@ -1932,13 +1968,27 @@ class ClassThrows1 {
   @objc init?(radians: Double) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
 
   @objc init!(string: String) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+
+  @objc func fooWithErrorEnum1(x: ErrorEnum) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
+
+  // CHECK: {{^}} func fooWithErrorEnum2(x: ErrorEnum)
+  func fooWithErrorEnum2(x: ErrorEnum) {}
+
+  @objc func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{protocol composition involving 'Error' cannot be represented in Objective-C}}
+
+  // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1)
+  func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
 }
 
 
 // CHECK-DUMP-LABEL: class_decl "ImplicitClassThrows1"
 @objc class ImplicitClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
-  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodReturnsVoid() throws { }
 
   // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
@@ -1957,18 +2007,36 @@ class ClassThrows1 {
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
   // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int) throws { }
 
   // CHECK: @objc init(degrees: Double) throws
   // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
+
+  // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> NSRange
+  func methodReturnsBridgedValueType() throws -> NSRange { return NSRange() }
+
+  @objc func methodReturnsBridgedValueType2() throws -> NSRange {
+    return NSRange()
+  }
+  // expected-error@-3{{throwing method cannot be marked @objc because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
+
+  // CHECK: {{^}} @objc func methodReturnsError() throws -> Error
+  func methodReturnsError() throws -> Error { return ErrorEnum.failed }
+
+  // CHECK: @objc func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int)
+  func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
+    func add(x: Int) -> (Int) -> Int { 
+      return { x + $0 }
+    }
+  }
 }
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
   // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int))
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }
 }
 
@@ -2001,20 +2069,20 @@ class ThrowsObjCName {
 
   @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   @objc(method8:fn1:error:fn2:)
   func method8(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   @objc(method9AndReturnError:s:fn1:fn2:)
   func method9(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 }
 
 class SubclassThrowsObjCName : ThrowsObjCName {
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func method8(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=Bool
+  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func method9(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 }
 
@@ -2052,4 +2120,78 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
 
 func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
   return true
+}
+
+// CHECK-LABEL: @objc class OperatorInClass
+@objc class OperatorInClass {
+  // CHECK: {{^}} static func ==(lhs: OperatorInClass, rhs: OperatorInClass) -> Bool
+  static func ==(lhs: OperatorInClass, rhs: OperatorInClass) -> Bool {
+    return true
+  }
+  // CHECK: {{^}} @objc static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass
+  @objc static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared @objc}}
+    return lhs
+  }
+} // CHECK: {{^}$}}
+
+@objc protocol OperatorInProtocol {
+  static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols may not have operator requirements}}
+}
+
+//===--- @objc inference for witnesses
+
+@objc protocol InferFromProtocol {
+  @objc(inferFromProtoMethod1:)
+  optional func method1(value: Int)
+}
+
+// Infer when in the same declaration context.
+// CHECK-LABEL: ClassInfersFromProtocol1
+class ClassInfersFromProtocol1 : InferFromProtocol{
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Infer when in a different declaration context of the same class.
+// CHECK-LABEL: ClassInfersFromProtocol2a
+class ClassInfersFromProtocol2a {
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+extension ClassInfersFromProtocol2a : InferFromProtocol { }
+
+// Infer when in a different declaration context of the same class.
+class ClassInfersFromProtocol2b : InferFromProtocol { }
+
+// CHECK-LABEL: ClassInfersFromProtocol2b
+extension ClassInfersFromProtocol2b {
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+// Don't infer when there is a signature mismatch.
+// CHECK-LABEL: ClassInfersFromProtocol3
+class ClassInfersFromProtocol3 : InferFromProtocol {
+}
+
+extension ClassInfersFromProtocol3 {
+  // CHECK: {{^}} func method1(value: String)
+  func method1(value: String) { }
+}
+
+// Inference for subclasses.
+class SuperclassImplementsProtocol : InferFromProtocol { }
+
+class SubclassInfersFromProtocol1 : SuperclassImplementsProtocol {
+  // CHECK: {{^}} @objc func method1(value: Int)
+  func method1(value: Int) { }
+}
+
+class SubclassInfersFromProtocol2 : SuperclassImplementsProtocol {
+}
+
+extension SubclassInfersFromProtocol2 {
+  // CHECK: {{^}} @objc dynamic func method1(value: Int)
+  func method1(value: Int) { }
 }

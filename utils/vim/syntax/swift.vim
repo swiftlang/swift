@@ -28,7 +28,6 @@ syn keyword swiftKeyword
       \ switch
       \ throw
       \ try
-      \ typealias
       \ var
       \ where
       \ while
@@ -55,7 +54,6 @@ syn keyword swiftDefinitionModifier
 
 syn keyword swiftIdentifierKeyword
       \ Self
-      \ dynamicType
       \ metatype
       \ self
       \ super

@@ -1,7 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t
 
 // RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/objc_runtime_visible.m -fmodules -nodefaultlibs -lc -dynamiclib -o %t/libobjc_runtime_visible.dylib -install_name @executable_path/libobjc_runtime_visible.dylib
-// RUN: nm -g %t/libobjc_runtime_visible.dylib | FileCheck %s
+// RUN: codesign -f -s - %t/libobjc_runtime_visible.dylib
+// RUN: nm -g %t/libobjc_runtime_visible.dylib | %FileCheck %s
 // RUN: %target-build-swift -import-objc-header %S/Inputs/objc_runtime_visible.h %t/libobjc_runtime_visible.dylib %s -o %t/main
 // RUN: %target-run %t/main %t/libobjc_runtime_visible.dylib
 
@@ -46,7 +47,7 @@ ObjCRuntimeVisibleTestSuite.test("downcast") {
   let obj = HiddenClass.create()
   let opaque: AnyObject = obj
   let downcasted = opaque as? HiddenClass
-  expectNotEmpty(downcasted)
+  expectNotNil(downcasted)
   expectTrue(obj === downcasted)
 }
 
@@ -66,7 +67,7 @@ ObjCRuntimeVisibleTestSuite.test("protocols/downcast")
   let obj = HiddenClass.create()
   let opaque: AnyObject = obj
   let downcasted = opaque as? SwiftProto
-  expectNotEmpty(downcasted)
+  expectNotNil(downcasted)
   expectTrue(obj === downcasted!.doTheThing())
 }
 

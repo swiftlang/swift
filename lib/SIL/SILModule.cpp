@@ -12,6 +12,8 @@
 
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -274,6 +276,7 @@ static SILFunction::ClassVisibility_t getClassVisibility(SILDeclRef constant) {
     case Accessibility::Internal:
       return SILFunction::InternalClass;
     case Accessibility::Public:
+    case Accessibility::Open:
       return SILFunction::PublicClass;
   }
 }
@@ -408,13 +411,13 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
 
 SILFunction *SILModule::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
-    GenericParamList *contextGenericParams, Optional<SILLocation> loc,
+    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
     IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
     IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope, DeclContext *DC) {
   return SILFunction::create(*this, linkage, name, loweredType,
-                             contextGenericParams, loc, isBareSILFunction,
+                             genericEnv, loc, isBareSILFunction,
                              isTrans, isFragile, isThunk, classVisibility,
                              inlineStrategy, EK, InsertBefore, DebugScope, DC);
 }
@@ -460,6 +463,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicLoad;
   else if (OperationName.startswith("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
+  else if (OperationName.startswith("allocWithTailElems_"))
+    Info.ID = BuiltinValueKind::AllocWithTailElems;
   else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -640,52 +645,10 @@ SerializedSILLoader *SILModule::getSILLoader() {
   return SILLoader.get();
 }
 
-static ArrayRef<Substitution>
-getSubstitutionsForProtocolConformance(ProtocolConformanceRef CRef) {
-  if (CRef.isAbstract())
-    return {};
-  
-  auto C = CRef.getConcrete();
-
-  // Walk down to the base NormalProtocolConformance.
-  ArrayRef<Substitution> Subs;
-  const ProtocolConformance *ParentC = C;
-  while (!isa<NormalProtocolConformance>(ParentC)) {
-    switch (ParentC->getKind()) {
-    case ProtocolConformanceKind::Normal:
-      llvm_unreachable("should have exited the loop?!");
-    case ProtocolConformanceKind::Inherited:
-      ParentC = cast<InheritedProtocolConformance>(ParentC)
-        ->getInheritedConformance();
-      break;
-    case ProtocolConformanceKind::Specialized: {
-      auto SC = cast<SpecializedProtocolConformance>(ParentC);
-      ParentC = SC->getGenericConformance();
-      assert(Subs.empty() && "multiple conformance specializations?!");
-      Subs = SC->getGenericSubstitutions();
-      break;
-    }
-    }
-  }
-  const NormalProtocolConformance *NormalC
-    = cast<NormalProtocolConformance>(ParentC);
-
-  // If the normal conformance is for a generic type, and we didn't hit a
-  // specialized conformance, collect the substitutions from the generic type.
-  // FIXME: The AST should do this for us.
-  if (NormalC->getType()->isSpecialized() && Subs.empty()) {
-    Subs = NormalC->getType()
-      ->gatherAllSubstitutions(NormalC->getDeclContext()->getParentModule(),
-                               nullptr);
-  }
-  
-  return Subs;
-}
-
 /// \brief Given a conformance \p C and a protocol requirement \p Requirement,
 /// search the witness table for the conformance and return the witness thunk
-/// for the requirement, together with any substitutions for the conformance.
-std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
+/// for the requirement.
+std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Requirement) {
   // Look up the witness table associated with our protocol conformance from the
@@ -696,7 +659,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!Ret) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C.dump(); Requirement.dump());
-    return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+    return std::make_pair(nullptr, nullptr);
   }
 
   // Okay, we found the correct witness table. Now look for the method.
@@ -710,11 +673,10 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     if (MethodEntry.Requirement != Requirement)
       continue;
 
-    return std::make_tuple(MethodEntry.Witness, Ret,
-                           getSubstitutionsForProtocolConformance(C));
+    return std::make_pair(MethodEntry.Witness, Ret);
   }
 
-  return std::make_tuple(nullptr, nullptr, ArrayRef<Substitution>());
+  return std::make_pair(nullptr, nullptr);
 }
 
 /// \brief Given a protocol \p Protocol and a requirement \p Requirement,

@@ -31,7 +31,7 @@
 
 #if !_compiler_version("777.*.7")
   // This shouldn't emit any diagnostics.
-  $#%^*&
+  %#^*&
 #endif
 
 #if _compiler_version("700a.*.10") // expected-error {{version component contains non-numeric characters}}

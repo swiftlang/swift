@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): This protocol exists to identify
+// FIXME(ABI)#35 (Concrete Same Type Requirements): This protocol exists to identify
 // `AnyHashable` in conditional extensions.  Replace this protocol
 // with conditional extensions on `Set` and `Dictionary` "where Key ==
 // AnyHashable".
@@ -24,19 +24,9 @@ extension AnyHashable : _AnyHashableProtocol {}
 // Convenience APIs for Set<AnyHashable>
 //===----------------------------------------------------------------------===//
 
-// FIXME: remove these trampolines when extensions below can be
+// FIXME(ABI)#36 (Overload resolution): remove these trampolines when extensions below can be
 // properly expressed in the language.
 extension Set {
-  @inline(__always)
-  internal func _concreteElement_contains(_ member: Element) -> Bool {
-    return contains(member)
-  }
-
-  @inline(__always)
-  internal func _concreteElement_index(of member: Element) -> Index? {
-    return index(of: member)
-  }
-
   @inline(__always)
   internal mutating func _concreteElement_insert(
     _ newMember: Element
@@ -59,20 +49,8 @@ extension Set {
   }
 }
 
-// FIXME(ABI)(compiler limitation): replace with `where Element == AnyHashable`.
+// FIXME(ABI)#37 (Concrete Same Type Requirements): replace with `where Element == AnyHashable`.
 extension Set where Element : _AnyHashableProtocol {
-  public func contains<ConcreteElement : Hashable>(
-    _ member: ConcreteElement
-  ) -> Bool {
-    return _concreteElement_contains(AnyHashable(member) as! Element)
-  }
-
-  public func index<ConcreteElement : Hashable>(
-    of member: ConcreteElement
-  ) -> SetIndex<Element>? {
-    return _concreteElement_index(of: AnyHashable(member) as! Element)
-  }
-
   public mutating func insert<ConcreteElement : Hashable>(
     _ newMember: ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
@@ -104,14 +82,9 @@ extension Set where Element : _AnyHashableProtocol {
 // Convenience APIs for Dictionary<AnyHashable, *>
 //===----------------------------------------------------------------------===//
 
-// FIXME: remove these trampolines when extensions below can be
+// FIXME(ABI)#38 (Overload resolution): remove these trampolines when extensions below can be
 // properly expressed in the language.
 extension Dictionary {
-  @inline(__always)
-  internal func _concreteKey_index(forKey key: Key) -> Index? {
-    return index(forKey: key)
-  }
-
   internal subscript(_concreteKey key: Key) -> Value? {
     @inline(__always)
     get {
@@ -136,16 +109,10 @@ extension Dictionary {
   }
 }
 
-// FIXME(ABI)(compiler limitation): replace with `where Element == AnyHashable`.
+// FIXME(ABI)#39 (Concrete Same Type Requirements): replace with `where Element == AnyHashable`.
 extension Dictionary where Key : _AnyHashableProtocol {
-  public func index<ConcreteKey : Hashable>(forKey key: ConcreteKey)
-    -> DictionaryIndex<Key, Value>?
-  {
-    return _concreteKey_index(forKey: AnyHashable(key) as! Key)
-  }
-
   public subscript(_ key: _Hashable) -> Value? {
-    // FIXME(ABI)(compiler limitation): replace this API with a
+    // FIXME(ABI)#40 (Generic subscripts): replace this API with a
     // generic subscript.
     get {
       return self[_concreteKey: key._toAnyHashable() as! Key]

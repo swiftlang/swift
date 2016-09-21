@@ -1,4 +1,4 @@
-add_swift_executable(swift-llvm-opt
+add_swift_host_tool(swift-llvm-opt
   LLVMOpt.cpp
   LINK_LIBRARIES
   swiftIRGen
@@ -10,9 +10,9 @@ add_swift_executable(swift-llvm-opt
   # Clang libraries included to appease the linker on linux.
   clangBasic
   clangCodeGen
+
+  LLVM_COMPONENT_DEPENDS
+    DebugInfoCodeView
+
+  SWIFT_COMPONENT tools
 )
-
-swift_install_in_component(tools
-    TARGETS swift-llvm-opt
-    RUNTIME DESTINATION bin)
-

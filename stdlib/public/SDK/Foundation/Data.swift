@@ -81,7 +81,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Base64DecodingOptions = NSData.Base64DecodingOptions
     
     public typealias Index = Int
-    public typealias Indices = DefaultRandomAccessIndices<Data>
+    public typealias Indices = CountableRange<Int>
     
     internal var _wrapped : _SwiftNSData
     
@@ -261,7 +261,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // MARK: - Properties and Functions
     
     /// The number of bytes in the data.
-    public var count : Int {
+    public var count: Int {
         get {
             return _mapUnmanaged { $0.length }
         }
@@ -278,7 +278,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Access the bytes in the data.
     ///
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    public func withUnsafeBytes<ResultType, ContentType>(_ body: @noescape (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
+    public func withUnsafeBytes<ResultType, ContentType>(_ body: (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let bytes =  _getUnsafeBytesPointer()
         defer { _fixLifetime(self)}
         let contentPtr = bytes.bindMemory(to: ContentType.self, capacity: count / MemoryLayout<ContentType>.stride)
@@ -295,7 +295,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// This function assumes that you are mutating the contents.
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: @noescape (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
+    public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         let mutableBytes = _getUnsafeMutableBytesPointer()
         defer { _fixLifetime(self)}
         let contentPtr = mutableBytes.bindMemory(to: ContentType.self, capacity: count / MemoryLayout<ContentType>.stride)
@@ -363,7 +363,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
 
-        // Avoid a crash that happens on OSX 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
+        // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
         if !options.contains(.atomic) {
             #if os(OSX)
                 return NSFoundationVersionNumber <= Double(NSFoundationVersionNumber10_11_Max)
@@ -423,7 +423,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// In some cases, (for example, a `Data` backed by a `dispatch_data_t`, the bytes may be stored discontiguously. In those cases, this function invokes the closure for each contiguous region of bytes.
     /// - parameter block: The closure to invoke for each region of data. You may stop the enumeration by setting the `stop` parameter to `true`. 
-    public func enumerateBytes(_ block: @noescape (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Index, _ stop: inout Bool) -> Void) {
+    public func enumerateBytes(_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Index, _ stop: inout Bool) -> Void) {
         _mapUnmanaged {
             $0.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
@@ -521,7 +521,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
       where ByteCollection.Iterator.Element == Data.Iterator.Element {
         
         // Calculate this once, it may not be O(1)
-        let replacementCount : Int = numericCast(newElements.count)
+        let replacementCount: Int = numericCast(newElements.count)
         let currentCount = self.count
         let subrangeCount = subrange.count
         
@@ -613,9 +613,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Data> {
+    public subscript(bounds: Range<Index>) -> MutableRangeReplaceableRandomAccessSlice<Data> {
         get {
-            return MutableRandomAccessSlice(base: self, bounds: bounds)
+            return MutableRangeReplaceableRandomAccessSlice(base: self, bounds: bounds)
         }
         set {
             replaceSubrange(bounds, with: newValue.base)
@@ -640,6 +640,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
     public func index(after i: Index) -> Index {
         return i + 1
+    }
+
+    public var indices: CountableRange<Int> {
+        return startIndex..<endIndex
     }
 
     /// An iterator over the contents of the data.
@@ -669,7 +673,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         public mutating func next() -> UInt8? {
             guard _idx < _endIdx else { return nil }
             defer { _idx += 1 }
-            let bufferSize = sizeofValue(_buffer)
+            let bufferSize = MemoryLayout.size(ofValue: _buffer)
             return withUnsafeMutablePointer(to: &_buffer) { ptr_ in
                 let ptr = UnsafeMutableRawPointer(ptr_).assumingMemoryBound(to: UInt8.self)
                 let bufferIdx = _idx % bufferSize
@@ -686,7 +690,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     //
     
     @available(*, unavailable, renamed: "count")
-    public var length : Int {
+    public var length: Int {
         get { fatalError() }
         set { fatalError() }
     }
@@ -733,6 +737,13 @@ extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomRe
     }
 }
 
+extension Data {
+    @available(*, unavailable, renamed: "copyBytes(to:count:)")
+  public func getBytes<UnsafeMutablePointerVoid: _Pointer>(_ buffer: UnsafeMutablePointerVoid, length: Int) { }
+
+    @available(*, unavailable, renamed: "copyBytes(to:from:)")
+    public func getBytes<UnsafeMutablePointerVoid: _Pointer>(_ buffer: UnsafeMutablePointerVoid, range: NSRange) { }
+}
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.
 extension Data : _ObjectiveCBridgeable {
@@ -753,7 +764,7 @@ extension Data : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
-        var result: Data? = nil
+        var result: Data?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }
@@ -767,7 +778,7 @@ extension NSData : _HasCustomAnyHashableRepresentation {
     }
 }
 
-/// A NSData subclass that uses Swift reference counting.
+/// An NSData subclass that uses Swift reference counting.
 ///
 /// This subclass implements the API of NSData by holding an instance and forwarding all implementation to that object.
 /// Since it uses Swift reference counting, we can do correct uniqueness checks even if we pass this instance back to Objective-C. In Objective-C, it looks like an instance of NSData.
@@ -776,7 +787,7 @@ extension _SwiftNSData {
     // -----
     
     @objc(length)
-    var length : Int {
+    var length: Int {
         get {
             return _mapUnmanaged { $0.length }
         }
@@ -820,7 +831,7 @@ extension _SwiftNSData {
     }
     
     @objc(enumerateByteRangesUsingBlock:)
-    func enumerateByteRanges(using block: @noescape (UnsafeRawPointer, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
+    func enumerateByteRanges(using block: (UnsafeRawPointer, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void) {
         return _mapUnmanaged { $0.enumerateBytes(block) }
     }
     

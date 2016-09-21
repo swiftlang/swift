@@ -307,6 +307,11 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Run an iteration of the mid-level SSA passes.
   PM.setStageName("MidLevel");
   AddSSAPasses(PM, OptimizationLevelKind::MidLevel);
+  
+  // Specialize partially applied functions with dead arguments as a preparation
+  // for CapturePropagation.
+  PM.addDeadArgSignatureOpt();
+
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
 

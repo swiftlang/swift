@@ -1,4 +1,4 @@
-//===--- Algorithms.swift.gyb ---------------------------------------------===//
+//===--- Algorithms.swift.gyb ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -256,7 +256,7 @@ extension MutableCollection where Self: RandomAccessCollection,
   /// the source index for each movement.
   @inline(__always)
   internal mutating func _rotateCycle(start: Index,
-    transform sourceForIndex: @noescape (Index) -> Index)
+    transform sourceForIndex: (Index) -> Index)
   {
     let tmp = self[start]
     var (i, j) = (start, sourceForIndex(start))
@@ -647,7 +647,7 @@ extension BidirectionalCollection
       start..<m, distance: d, choosingStartGroupBy: p)
     
     // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
-	  let e = _stablyPartitionSubrange(
+    let e = _stablyPartitionSubrange(
       m..<end, distance: n - d, choosingStartGroupBy: p)
     
     // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF

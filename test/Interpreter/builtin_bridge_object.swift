@@ -1,6 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift -parse-stdlib %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -182,7 +182,7 @@ if true {
   print(MemoryLayout<Optional<Builtin.BridgeObject>>.size
             == MemoryLayout<Builtin.BridgeObject>.size)
 
-  var bo: Builtin.BridgeObject? = nil
+  var bo: Builtin.BridgeObject?
 
   // CHECK-NEXT: none
   hitOptionalSpecifically(bo)

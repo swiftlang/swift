@@ -46,6 +46,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -191,8 +192,7 @@ public:
 
   ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                 StringRef ClonedName,
-                TypeSubstitutionMap &InterfaceSubs,
-                TypeSubstitutionMap &ContextSubs,
+                SubstitutionMap &InterfaceSubs,
                 ArrayRef<Substitution> ApplySubs,
                 IndicesSet &PromotableIndices);
 
@@ -214,7 +214,7 @@ protected:
 private:
   static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
                                  StringRef ClonedName,
-                                 TypeSubstitutionMap &InterfaceSubs,
+                                 SubstitutionMap &InterfaceSubs,
                                  IndicesSet &PromotableIndices);
 
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
@@ -309,14 +309,13 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 
 ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
                              StringRef ClonedName,
-                             TypeSubstitutionMap &InterfaceSubs,
-                             TypeSubstitutionMap &ContextSubs,
+                             SubstitutionMap &InterfaceSubs,
                              ArrayRef<Substitution> ApplySubs,
                              IndicesSet &PromotableIndices)
   : TypeSubstCloner<ClosureCloner>(
                            *initCloned(Orig, Fragile, ClonedName, InterfaceSubs,
                                        PromotableIndices),
-                           *Orig, ContextSubs, ApplySubs),
+                           *Orig, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -413,7 +412,7 @@ static std::string getSpecializedName(SILFunction *F,
 SILFunction*
 ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                           StringRef ClonedName,
-                          TypeSubstitutionMap &InterfaceSubs,
+                          SubstitutionMap &InterfaceSubs,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
 
@@ -434,7 +433,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
                          OrigFTI->getOptionalErrorResult(),
                          M.getASTContext());
 
-  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs, ClonedTy,
+  auto SubstTy = SILType::substFuncType(M, SM, InterfaceSubs.getMap(), ClonedTy,
                                         /* dropGenerics = */ false);
   
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
@@ -444,7 +443,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *Fn = M.createFunction(
-      Orig->getLinkage(), ClonedName, SubstTy, Orig->getContextGenericParams(),
+      Orig->getLinkage(), ClonedName, SubstTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
@@ -663,7 +662,7 @@ isNonmutatingCapture(SILArgument *BoxArg) {
 static bool
 isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   auto *U = O->getUser();
-  if (U->isOpenedArchetypeOperand(*O))
+  if (U->isTypeDependentOperand(*O))
     return true;
   // Marking the boxed value as escaping is OK. It's just a DI annotation.
   if (isa<MarkFunctionEscapeInst>(U))
@@ -860,21 +859,11 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   SILFunction *F = PAI->getFunction();
 
   // Create the substitution maps.
-  TypeSubstitutionMap InterfaceSubs;
-  TypeSubstitutionMap ContextSubs;
+  auto ApplySubs = PAI->getSubstitutions();
 
-  ArrayRef<Substitution> ApplySubs = PAI->getSubstitutions();
-  auto genericSig = F->getLoweredFunctionType()->getGenericSignature();
-  auto *genericParams = F->getContextGenericParams();
-
-  if (!ApplySubs.empty()) {
+  SubstitutionMap InterfaceSubs;
+  if (auto genericSig = F->getLoweredFunctionType()->getGenericSignature())
     InterfaceSubs = genericSig->getSubstitutionMap(ApplySubs);
-    ContextSubs = genericParams->getSubstitutionMap(ApplySubs);
-  } else {
-    assert(!genericSig && "Function type has Unexpected generic signature!");
-    assert(!genericParams &&
-           "Function definition has unexpected generic params!");
-  }
 
   // Create the Cloned Name for the function.
   SILFunction *Orig = FRI->getReferencedFunction();
@@ -893,7 +882,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 
   // Otherwise, create a new clone.
   ClosureCloner cloner(Orig, Fragile, ClonedName, InterfaceSubs,
-                       ContextSubs, ApplySubs, PromotableIndices);
+                       ApplySubs, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }

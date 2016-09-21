@@ -20,7 +20,7 @@
 // Property Lists need to be properly bridged
 //
 
-func _toNSArray<T, U : AnyObject>(_ a: [T], f: @noescape (T) -> U) -> NSArray {
+func _toNSArray<T, U : AnyObject>(_ a: [T], f: (T) -> U) -> NSArray {
   let result = NSMutableArray(capacity: a.count)
   for s in a {
     result.add(f(s))
@@ -32,33 +32,6 @@ func _toNSRange(_ r: Range<String.Index>) -> NSRange {
   return NSRange(
     location: r.lowerBound._utf16Index,
     length: r.upperBound._utf16Index - r.lowerBound._utf16Index)
-}
-
-func _countFormatSpecifiers(_ a: String) -> Int {
-  // The implementation takes advantage of the fact that internal
-  // representation of String is UTF-16.  Because we only care about the ASCII
-  // percent character, we don't need to decode UTF-16.
-
-  let percentUTF16  = UTF16.CodeUnit(("%" as UnicodeScalar).value)
-  let notPercentUTF16: UTF16.CodeUnit = 0
-  var lastChar = notPercentUTF16 // anything other than % would work here
-  var count = 0
-
-  for c in a.utf16 {
-    if lastChar == percentUTF16 {
-      if c == percentUTF16 {
-        // a "%" following this one should not be taken as literal
-        lastChar = notPercentUTF16
-      }
-      else {
-        count += 1
-        lastChar = c
-      }
-    } else {
-      lastChar = c
-    }
-  }
-  return count
 }
 
 // We only need this for UnsafeMutablePointer, but there's not currently a way
@@ -77,7 +50,7 @@ extension Optional {
   internal func _withNilOrAddress<NSType : AnyObject, ResultType>(
     of object: inout NSType?,
     _ body:
-      @noescape (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
+      (AutoreleasingUnsafeMutablePointer<NSType?>?) -> ResultType
   ) -> ResultType {
     return self == nil ? body(nil) : body(&object)
   }
@@ -123,7 +96,7 @@ extension String {
   /// memory referred to by `index`
   func _withOptionalOutParameter<Result>(
     _ index: UnsafeMutablePointer<Index>?,
-    _ body: @noescape (UnsafeMutablePointer<Int>?) -> Result
+    _ body: (UnsafeMutablePointer<Int>?) -> Result
   ) -> Result {
     var utf16Index: Int = 0
     let result = (index != nil ? body(&utf16Index) : body(nil))
@@ -136,7 +109,7 @@ extension String {
   /// it into the memory referred to by `range`
   func _withOptionalOutParameter<Result>(
     _ range: UnsafeMutablePointer<Range<Index>>?,
-    _ body: @noescape (UnsafeMutablePointer<NSRange>?) -> Result
+    _ body: (UnsafeMutablePointer<NSRange>?) -> Result
   ) -> Result {
     var nsRange = NSRange(location: 0, length: 0)
     let result = (range != nil ? body(&nsRange) : body(nil))
@@ -978,10 +951,6 @@ extension String {
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
   public init(format: String, locale: Locale?, arguments: [CVarArg]) {
-    _precondition(
-      _countFormatSpecifiers(format) <= arguments.count,
-      "Too many format specifiers (%<letter>) provided for the argument list"
-    )
     self = withVaList(arguments) {
       NSString(format: format, locale: locale, arguments: $0) as String
     }

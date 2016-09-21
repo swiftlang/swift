@@ -121,7 +121,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
-  std::string Producer = version::getSwiftFullVersion();
+  std::string Producer = version::getSwiftFullVersion(
+    IGM.Context.LangOpts.EffectiveLanguageVersion);
   bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
@@ -999,13 +1000,9 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
     DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
 }
 
-
-void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
-                                                   StringRef Name,
-                                                   StringRef LinkageName,
-                                                   DebugTypeInfo DbgTy,
-                                                   bool IsLocalToUnit,
-                                                   Optional<SILLocation> Loc) {
+void IRGenDebugInfo::emitGlobalVariableDeclaration(
+    llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
@@ -1021,8 +1018,11 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::Constant *Var,
   auto File = getOrCreateFile(L.Filename);
 
   // Emit it as global variable of the current module.
-  DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File, L.Line, Ty,
-                                IsLocalToUnit, Var, nullptr);
+  auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
+  auto *GV = DBuilder.createGlobalVariable(MainModule, Name, LinkageName, File,
+                                           L.Line, Ty, IsLocalToUnit, Expr);
+  if (Var)
+    Var->addDebugInfo(GV);
 }
 
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
@@ -1209,7 +1209,7 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
     return IGM.DataLayout.getTypeSizeInBits(StorageType);
 
   // This type is too large to fit in a register.
-  assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSize());
+  assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSizeInBits());
   return BitWidth;
 }
 

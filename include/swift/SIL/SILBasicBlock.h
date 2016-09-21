@@ -20,10 +20,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILInstruction.h"
 
-namespace llvm {
-  template <class T> struct GraphTraits;
-};
-
 namespace swift {
 class SILFunction;
 class SILArgument;

@@ -173,6 +173,7 @@ namespace {
              CovariantReturnConversionExpr *E,
              SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
+    RValue visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, SGFContext C);
     RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
                                       SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
@@ -213,7 +214,6 @@ namespace {
                                              SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
-    RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
     RValue visitEnumIsCaseExpr(EnumIsCaseExpr *E, SGFContext C);
 
@@ -977,21 +977,15 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = cast<BoundGenericStructType>(
                         E->getType()->getCanonicalType());
 
-  bool bridgesToObjC = E->bridgesToObjC();
-  if (SGF.getASTContext().LangOpts.EnableExperimentalCollectionCasts)
-    bridgesToObjC = false;
-
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = bridgesToObjC ? SGF.SGM.getDictionaryBridgeToObjectiveC(loc)
-                       : SGF.SGM.getDictionaryUpCast(loc);
+    fn = SGF.SGM.getDictionaryUpCast(loc);
   } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
-    fn = bridgesToObjC ? SGF.SGM.getSetBridgeToObjectiveC(loc)
-                       : SGF.SGM.getSetUpCast(loc);
+    fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
@@ -999,14 +993,14 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   // This will have been diagnosed by the accessors above.
   if (!fn) return SGF.emitUndefRValue(E, E->getType());
   
-  auto fnArcheTypes = fn->getGenericParams()->getPrimaryArchetypes();
+  auto fnGenericParams = fn->getGenericParams()->getParams();
   auto fromSubsts = fromCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
   auto toSubsts = toCollection->gatherAllSubstitutions(
       SGF.SGM.SwiftModule, nullptr);
-  assert(fnArcheTypes.size() == fromSubsts.size() + toSubsts.size() &&
+  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
          "wrong number of generic collection parameters");
-  (void) fnArcheTypes;
+  (void) fnGenericParams;
   
   // Form type parameter substitutions.
   SmallVector<Substitution, 4> subs;
@@ -1036,9 +1030,7 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
 
   // We're converting between C function pointer types. They better be
   // ABI-compatible, since we can't emit a thunk.
-  switch (SGF.SGM.Types.checkForABIDifferences(
-              loweredResultTy.getSwiftRValueType(),
-              loweredDestTy.getSwiftRValueType())) {
+  switch (SGF.SGM.Types.checkForABIDifferences(loweredResultTy, loweredDestTy)){
   case TypeConverter::ABIDifference::Trivial:
     result = fnEmitter();
     assert(result.getType() == loweredResultTy);
@@ -1326,6 +1318,25 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   return RValue(SGF, E, mv);
 }
 
+RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
+                                                  SGFContext C) {
+  // Ensure that the intrinsic function exists.
+  auto convertFn = SGF.SGM.getConvertToAnyHashable(E);
+  if (!convertFn) return SGF.emitUndefRValue(E, E->getType());
+
+  // Construct the substitution for T: Hashable.
+  ProtocolConformanceRef conformances[] = { E->getConformance() };
+  Substitution sub(E->getSubExpr()->getType(),
+                   SGF.getASTContext().AllocateCopy(conformances));
+
+  // Emit the source value into a temporary.
+  auto sourceOrigType = AbstractionPattern::getOpaque();
+  auto source =
+    SGF.emitMaterializedRValueAsOrig(E->getSubExpr(), sourceOrigType);
+
+  return SGF.emitApplyOfLibraryIntrinsic(E, convertFn, sub, source, C);
+}
+
 /// Treating this as a successful operation, turn a CMV into a +1 MV.
 ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
                                              ConsumableManagedValue value) {
@@ -1419,10 +1430,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
                                        unsigned numElements) {
   // Reabstract the base type against the array element type.
-  AbstractionPattern baseAbstraction(
-    arrayTy->getNominalOrBoundGenericNominal()
-           ->getGenericParams()->getPrimaryArchetypes()[0]);
-  
+  auto baseAbstraction = AbstractionPattern::getOpaque();
+
   // Allocate the array.
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
                              SILType::getBuiltinWordType(gen.getASTContext()),
@@ -1724,6 +1733,29 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                    ApplyOptions::None, None, None, C);
 }
 
+RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
+    SILLocation loc,
+    const PatternBindingEntry &entry,
+    ArrayRef<Substitution> subs,
+    CanType resultType,
+    AbstractionPattern origResultType,
+    SGFContext C) {
+
+  VarDecl *var = entry.getAnchoringVarDecl();
+  SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
+  auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
+  auto fnType = fnRef.getType().castTo<SILFunctionType>();
+
+  auto substFnType = fnType->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
+                                              subs);
+
+  return emitApply(loc, fnRef, subs, {},
+                   substFnType,
+                   origResultType,
+                   resultType,
+                   ApplyOptions::None, None, None, C);
+}
+
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
                                      TupleShuffleExpr *E,
                                      Initialization *outerTupleInit) {
@@ -2008,7 +2040,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     auto UnsafeRawPointer = SGF.getASTContext().getUnsafeRawPointerDecl();
     auto UnsafeRawPtrTy =
       SGF.getLoweredType(UnsafeRawPointer->getDeclaredInterfaceType());
-    SILType BulitinRawPtrTy = SILType::getRawPointerType(SGF.getASTContext());
+    SILType BuiltinRawPtrTy = SILType::getRawPointerType(SGF.getASTContext());
 
 
     auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
@@ -2016,11 +2048,11 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
       DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
                                             SILLinkage::HiddenExternal,
                                             IsNotFragile, "__dso_handle",
-                                            BulitinRawPtrTy);
+                                            BuiltinRawPtrTy);
     auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
 
     auto DSOPointer = SGF.B.createAddressToPointer(SILLoc, DSOAddr,
-                                                   BulitinRawPtrTy);
+                                                   BuiltinRawPtrTy);
 
     auto UnsafeRawPtrStruct = SGF.B.createStruct(SILLoc, UnsafeRawPtrTy,
                                                  { DSOPointer });
@@ -2041,9 +2073,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   auto isNotPresentBB = SGF.createBasicBlock();
   auto isPresentBB = SGF.createBasicBlock();
 
-  OptionalTypeKind unused;
-  SILType resultTy = optVal.getType().getAnyOptionalObjectType(SGF.SGM.M,
-                                                               unused);
+  SILType resultTy = optVal.getType().getAnyOptionalObjectType();
   auto &resultTL = SGF.getTypeLowering(resultTy);
   assert(resultTy.getSwiftRValueType().getAnyOptionalObjectType() &&
          "input was not a nested optional value");
@@ -2231,12 +2261,28 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-static bool isNullableTypeInC(SILModule &M, Type ty) {
+static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
   ty = ty->getLValueOrInOutObjectType()->getReferenceStorageReferent();
 
-  // Functions, class instances, and @objc existentials are all nullable.
-  if (ty->hasReferenceSemantics())
+  // Class instances, and @objc existentials are all nullable.
+  if (ty->hasReferenceSemantics()) {
+    // So are blocks, but we usually bridge them to Swift closures before we get
+    // a chance to check for optional promotion, so we're already screwed if
+    // an API lies about nullability.
+    if (auto fnTy = ty->getAs<AnyFunctionType>()) {
+      switch (fnTy->getRepresentation()) {
+      // Carried verbatim from C.
+      case FunctionTypeRepresentation::Block:
+      case FunctionTypeRepresentation::CFunctionPointer:
+        return true;
+      // Was already bridged.
+      case FunctionTypeRepresentation::Swift:
+      case FunctionTypeRepresentation::Thin:
+        return false;
+      }
+    }
     return true;
+  }
 
   // Other types like UnsafePointer can also be nullable.
   const DeclContext *DC = M.getAssociatedContext();
@@ -2267,7 +2313,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Functions that return non-optional reference type and were imported from
   // Objective-C.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
-    assert((isNullableTypeInC(M, func->getResultType())
+    assert((isVerbatimNullableTypeInC(M, func->getResultType())
             || func->getResultType()->hasArchetype())
            && "func's result type is not nullable?!");
     return func->hasClangNode();
@@ -2276,7 +2322,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Computed properties of non-optional reference type that were imported from
   // Objective-C.
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    assert((isNullableTypeInC(M, var->getType()->getReferenceStorageReferent())
+    assert((isVerbatimNullableTypeInC(M, var->getType()->getReferenceStorageReferent())
             || var->getType()->getReferenceStorageReferent()->hasArchetype())
            && "property's result type is not nullable?!");
     return var->hasClangNode();
@@ -2285,7 +2331,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M,
   // Subscripts of non-optional reference type that were imported from
   // Objective-C.
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    assert((isNullableTypeInC(M, subscript->getElementType())
+    assert((isVerbatimNullableTypeInC(M, subscript->getElementType())
             || subscript->getElementType()->hasArchetype())
            && "subscript's result type is not nullable?!");
     return subscript->hasClangNode();
@@ -2309,7 +2355,7 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
   // get the function we're calling.
   if (auto apply = dyn_cast<ApplyExpr>(expr)) {
     // The result has to be a nullable type.
-    if (!isNullableTypeInC(M, apply->getType()))
+    if (!isVerbatimNullableTypeInC(M, apply->getType()))
       return false;
     
     auto getFuncDeclFromDynamicMemberLookup = [&](Expr *expr) -> FuncDecl * {
@@ -2362,25 +2408,25 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
 
   // A reference to a member property.
   if (auto member = dyn_cast<MemberRefExpr>(expr)) {
-    return isNullableTypeInC(M, member->getType()) &&
+    return isVerbatimNullableTypeInC(M, member->getType()) &&
       mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
   }
 
   // A reference to a subscript.
   if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-    return isNullableTypeInC(M, subscript->getType()) &&
+    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
       mayLieAboutNonOptionalReturn(M, subscript->getDecl().getDecl());
   }
 
   // A reference to a member property found via dynamic lookup.
   if (auto member = dyn_cast<DynamicMemberRefExpr>(expr)) {
-    return isNullableTypeInC(M, member->getType()) &&
+    return isVerbatimNullableTypeInC(M, member->getType()) &&
       mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
   }
 
   // A reference to a subscript found via dynamic lookup.
   if (auto subscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-    return isNullableTypeInC(M, subscript->getType()) &&
+    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
       mayLieAboutNonOptionalReturn(M, subscript->getMember().getDecl());
   }
 
@@ -2543,10 +2589,6 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     return RValue(SGF, E,
                   SGF.manageBufferForExprResult(resultAddr, lowering, C));
   }
-}
-
-RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
-  return visit(E->getSubExpr(), C);
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc,

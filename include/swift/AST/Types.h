@@ -42,7 +42,6 @@ namespace swift {
   class AssociatedTypeDecl;
   class ASTContext;
   class ClassDecl;
-  class ExprHandle;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class GenericParamList;
@@ -394,7 +393,7 @@ public:
   bool hasReferenceSemantics();
 
   /// Is this an uninhabited type, such as 'Never'?
-  bool isNever();
+  bool isUninhabited();
 
   /// Is this the 'Any' type?
   bool isAny();
@@ -636,6 +635,19 @@ public:
   /// for queries that care whether a generic class type can be substituted into
   /// a type's subclass.
   bool isExactSuperclassOf(Type ty, LazyResolver *resolver);
+
+  /// \brief Get the substituted base class type, starting from a base class
+  /// declaration and a substituted derived class type.
+  ///
+  /// For example, given the following declarations:
+  ///
+  /// class A<T, U> {}
+  /// class B<V> : A<Int, V> {}
+  /// class C<X, Y> : B<Y> {}
+  ///
+  /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
+  /// `A<Int, NSObject>`.
+  Type getSuperclassForDecl(const ClassDecl *classDecl, LazyResolver *resolver);
 
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
@@ -2468,7 +2480,7 @@ public:
   /// function type and return the resulting non-generic type.
   ///
   /// The order of Substitutions must match the order of generic parameters.
-  FunctionType *substGenericArgs(ModuleDecl *M, ArrayRef<Substitution> subs);
+  FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),
@@ -3745,19 +3757,6 @@ public:
     return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
   }
   
-  /// True if this is the 'Self' parameter of a protocol or an associated type
-  /// of 'Self'.
-  bool isSelfDerived() {
-    ArchetypeType *t = this;
-
-    do {
-      if (t->getSelfProtocol())
-        return true;
-    } while ((t = t->getParent()));
-
-    return false;
-  }
-
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
@@ -3808,6 +3807,16 @@ public:
   /// archetype, e.g., 
   bool isPrimary() const { 
     return ParentOrOpened.isNull();
+  }
+
+  /// getPrimary - Return the primary archetype parent of this archetype.
+  ArchetypeType *getPrimary() const {
+    assert(!getOpenedExistentialType() && "Check for opened existential first");
+
+    auto *archetype = this;
+    while (auto *parent = archetype->getParent())
+      archetype = parent;
+    return const_cast<ArchetypeType *>(archetype);
   }
 
   /// Retrieve the ID number of this opened existential.

@@ -92,7 +92,10 @@ private:
   CanSILFunctionType LoweredType;
 
   /// The context archetypes of the function.
-  GenericParamList *ContextGenericParams;
+  GenericEnvironment *GenericEnv;
+
+  /// The forwarding substitutions, lazily computed.
+  Optional<ArrayRef<Substitution>> ForwardingSubs;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
@@ -175,7 +178,7 @@ private:
 
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
-              GenericParamList *contextGenericParams,
+              GenericEnvironment *genericEnv,
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
@@ -189,7 +192,7 @@ private:
 
   static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
                              CanSILFunctionType loweredType,
-                             GenericParamList *contextGenericParams,
+                             GenericEnvironment *genericEnv,
                              Optional<SILLocation> loc,
                              IsBare_t isBareSILFunction,
                              IsTransparent_t isTrans,
@@ -542,16 +545,14 @@ public:
     return (ClangNodeOwner ? ClangNodeOwner->getClangDecl() : nullptr);
   }
 
-  /// Retrieve the generic parameter list containing the contextual archetypes
-  /// of the function.
-  ///
-  /// FIXME: We should remove this in favor of lazy archetype instantiation
-  /// using the 'getArchetype' and 'mapTypeIntoContext' interfaces.
-  GenericParamList *getContextGenericParams() const {
-    return ContextGenericParams;
+  /// Retrieve the generic environment containing the mapping from interface
+  /// types to context archetypes for this function. Only present if the
+  /// function has a body.
+  GenericEnvironment *getGenericEnvironment() const {
+    return GenericEnv;
   }
-  void setContextGenericParams(GenericParamList *params) {
-    ContextGenericParams = params;
+  void setGenericEnvironment(GenericEnvironment *env) {
+    GenericEnv = env;
   }
 
   /// Map the given type, which is based on an interface SILFunctionType and may

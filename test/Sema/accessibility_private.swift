@@ -71,7 +71,7 @@ extension Container {
 
   // FIXME: Why do these errors happen twice?
   var extensionInner: PrivateInner? { return nil } // FIXME expected-error 2 {{use of undeclared type 'PrivateInner'}}
-  var extensionInnerQualified: Container.PrivateInner? { return nil } // FIXME expected-error 2 {{'PrivateInner' is not a member type of 'Container'}}
+  var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 extension Container.Inner {
@@ -87,7 +87,7 @@ extension Container.Inner {
 
   // FIXME: Why do these errors happen twice?
   var inner: PrivateInner? { return nil } // FIXME expected-error 2 {{use of undeclared type 'PrivateInner'}}
-  var innerQualified: Container.PrivateInner? { return nil } // FIXME expected-error 2 {{'PrivateInner' is not a member type of 'Container'}}
+  var innerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 class Sub : Container {
@@ -108,7 +108,7 @@ class Sub : Container {
   }
 
   var subInner: PrivateInner? // FIXME expected-error {{use of undeclared type 'PrivateInner'}}
-  var subInnerQualified: Container.PrivateInner? // FIXME expected-error {{'PrivateInner' is not a member type of 'Container'}}
+  var subInnerQualified: Container.PrivateInner? // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
 
@@ -144,4 +144,19 @@ private class VIPPrivateSetPropBase {
 }
 private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
   typealias Assoc = Int
+}
+
+extension Container {
+  private typealias ExtensionConflictingType = Int // expected-note * {{declared here}}
+}
+extension Container {
+  private typealias ExtensionConflictingType = Double // expected-note * {{declared here}}
+}
+extension Container {
+  func test() {
+    let a: ExtensionConflictingType? = nil // FIXME expected-error {{use of undeclared type 'ExtensionConflictingType'}}
+    let b: Container.ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
+    _ = ExtensionConflictingType() // FIXME expected-error {{use of unresolved identifier 'ExtensionConflictingType'}}
+    _ = Container.ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
+  }
 }

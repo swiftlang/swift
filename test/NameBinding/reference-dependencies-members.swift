@@ -1,15 +1,15 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -parse -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
-// RUN: FileCheck -check-prefix=PROVIDES-NOMINAL %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=PROVIDES-NOMINAL-NEGATIVE %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=PROVIDES-MEMBER %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=PROVIDES-MEMBER-NEGATIVE %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=DEPENDS-NOMINAL %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=DEPENDS-NOMINAL-NEGATIVE %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=DEPENDS-MEMBER %s < %t.swiftdeps
-// RUN: FileCheck -check-prefix=DEPENDS-MEMBER-NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL-NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=PROVIDES-MEMBER %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=PROVIDES-MEMBER-NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=DEPENDS-NOMINAL %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=DEPENDS-NOMINAL-NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=DEPENDS-MEMBER %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=DEPENDS-MEMBER-NEGATIVE %s < %t.swiftdeps
 
 
 // PROVIDES-NOMINAL-LABEL: {{^provides-nominal:$}}

@@ -48,7 +48,8 @@ public enum CommandLine {
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }
 
-// FIXME(ABI): Remove this and the entrypoints in SILGen.
+// FIXME(ABI)#25 : Remove this and the entrypoints in SILGen.
+// rdar://problem/19696522
 @_transparent
 public // COMPILER_INTRINSIC
 func _stdlib_didEnterMain(

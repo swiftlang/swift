@@ -25,7 +25,7 @@ Swift has a pretty small set of types right now:
   float and double; eventually maybe others.
 * Function types.
 * Tuples. Heterogeneous fixed-length products. Swift's system
-  provides two basic kinds of element: positional and labelled.
+  provides two basic kinds of element: positional and labeled.
 * Arrays. Homogeneous fixed-length aggregates.
 * Algebraic data types (ADTs), introduce by enum.  Nominal closed
   disjoint unions of heterogeneous types.
@@ -292,10 +292,10 @@ braces end up causing a lot of unnecessary vertical whitespace, like so::
 
   switch (x)
   case .foo {
-    …
+    // …
   }
   case .bar {
-    …
+    // …
   }
   
 So instead, let's require the switch statement to have braces, and
@@ -303,9 +303,9 @@ we'll allow the cases to be written without them::
 
   switch (x) {
   case .foo:
-    …
+    // …
   case .bar:
-    …
+    // …
   }
 
 That's really a lot prettier, except it breaks the rule about always grouping
@@ -787,8 +787,8 @@ copied into the variable, but this is less critical.
   *-pattern-tuple-element ::= *-pattern
   *-pattern-tuple-element ::= identifier '=' *-pattern
 
-Tuples are interesting because of the labelled / non-labelled
-distinction. Especially with labelled elements, it is really nice to
+Tuples are interesting because of the labeled / non-labeled
+distinction. Especially with labeled elements, it is really nice to
 be able to ignore all the elements you don't care about. This grammar
 permits some prefix or set of labels to be matched and the rest to be
 ignored.

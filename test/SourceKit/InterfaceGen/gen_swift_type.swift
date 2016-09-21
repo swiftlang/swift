@@ -1,9 +1,9 @@
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSi_ %s -- %s | FileCheck -check-prefix=CHECK1 %s
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSS_ %s -- %s | FileCheck -check-prefix=CHECK2 %s
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtV14gen_swift_type1A %s -- %s | FileCheck -check-prefix=CHECK3 %s
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaV14gen_swift_type1A_ %s -- %s | FileCheck -check-prefix=CHECK4 %s
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DCS_2T1_ %s -- %s | FileCheck -check-prefix=CHECK5 %s
-// RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DSi_ %s -- %s | FileCheck -check-prefix=CHECK6 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSi_ %s -- %s | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSS_ %s -- %s | %FileCheck -check-prefix=CHECK2 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtV14gen_swift_type1A %s -- %s | %FileCheck -check-prefix=CHECK3 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaV14gen_swift_type1A_ %s -- %s | %FileCheck -check-prefix=CHECK4 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DCS_2T1_ %s -- %s | %FileCheck -check-prefix=CHECK5 %s
+// RUN: %sourcekitd-test -req=interface-gen -usr _TtGC14gen_swift_type1DSi_ %s -- %s | %FileCheck -check-prefix=CHECK6 %s
 
 public struct A {
 	public func fa() {}

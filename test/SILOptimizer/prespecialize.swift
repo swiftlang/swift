@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  %s -Onone  -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend  %s -Onone  -emit-sil | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 
@@ -11,7 +11,7 @@
 // CHECK: function_ref @_TTSgq5GVs14CountableRangeSi_GS_Si_s10Collections___TFesRxs10Collectionwx8IteratorzGVs16IndexingIteratorx_wx8_ElementzWxS0_7Element_rS_12makeIteratorfT_GS1_x_
 //
 // function_ref specialized IndexingIterator.next() -> A._Element?
-// CHECK: function_ref @_TTSgq5GVs14CountableRangeSi_GS_Si_s13IndexableBases___TFVs16IndexingIterator4nextfT_GSqwx8_Element_
+// CHECK: function_ref @_TTSgq5GVs14CountableRangeSi_GS_Si_s14_IndexableBases___TFVs16IndexingIterator4nextfT_GSqwx8_Element_
 //
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref {{@_TTSgq5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}

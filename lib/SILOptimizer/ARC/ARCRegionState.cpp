@@ -282,16 +282,16 @@ static bool processBlockBottomUpInsts(
 
 bool ARCRegionState::processBlockBottomUp(
     const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+    EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
+    bool FreezeOwnedArgEpilogueReleases,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
   SILBasicBlock &BB = *R->getBlock();
   BottomUpDataflowRCStateVisitor<ARCRegionState> DataflowVisitor(
-      RCIA, *this, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-      IncToDecStateMap, SetFactory);
+      RCIA, EAFI, *this, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
+      SetFactory);
 
   // Visit each non-terminator arc relevant instruction I in BB visited in
   // reverse...
@@ -373,8 +373,8 @@ bool ARCRegionState::processLoopBottomUp(
 
 bool ARCRegionState::processBottomUp(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
-    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+    EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
+    bool FreezeOwnedArgEpilogueReleases,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
     ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
@@ -385,9 +385,8 @@ bool ARCRegionState::processBottomUp(
   if (!R->isBlock())
     return processLoopBottomUp(R, AA, LRFI, RegionStateInfo, SetFactory);
 
-  return processBlockBottomUp(R, AA, RCIA, LRFI, FreezeOwnedArgEpilogueReleases,
-                              ConsumedArgToReleaseMap, IncToDecStateMap,
-                              SetFactory);
+  return processBlockBottomUp(R, AA, RCIA, EAFI, LRFI, FreezeOwnedArgEpilogueReleases,
+                              IncToDecStateMap, SetFactory);
 }
 
 //===---

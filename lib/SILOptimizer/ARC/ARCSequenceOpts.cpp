@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -38,7 +39,7 @@ using namespace swift;
 
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
-llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
+llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                                Code Motion
@@ -192,6 +193,7 @@ static bool
 processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
                                   AliasAnalysis *AA, PostOrderAnalysis *POTA,
                                   RCIdentityFunctionInfo *RCIA,
+                                  EpilogueARCFunctionInfo *EAFI,
                                   ProgramTerminationFunctionInfo *PTFI) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
@@ -203,7 +205,7 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   bool Changed = false;
-  BlockARCPairingContext Context(F, AA, POTA, RCIA, PTFI);
+  BlockARCPairingContext Context(F, AA, POTA, RCIA, EAFI, PTFI);
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while (true) {
@@ -237,9 +239,9 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 //===----------------------------------------------------------------------===//
 
 static bool processFunctionWithLoopSupport(
-    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
+    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA, 
     LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI, RCIdentityFunctionInfo *RCFI,
-    ProgramTerminationFunctionInfo *PTFI) {
+    EpilogueARCFunctionInfo *EAFI, ProgramTerminationFunctionInfo *PTFI) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
   // perspective (i.e. no ref count operations in a loop), disable it on such
@@ -249,7 +251,7 @@ static bool processFunctionWithLoopSupport(
 
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
-  LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI, PTFI);
+  LoopARCPairingContext Context(F, AA, LRFI, LI, RCFI, EAFI, PTFI);
   return Context.process();
 }
 
@@ -270,10 +272,11 @@ class ARCSequenceOpts : public SILFunctionTransform {
       auto *AA = getAnalysis<AliasAnalysis>();
       auto *POTA = getAnalysis<PostOrderAnalysis>();
       auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
+      auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
       ProgramTerminationFunctionInfo PTFI(F);
 
-      if (processFunctionWithoutLoopSupport(*F, false, AA, POTA, RCFI, &PTFI)) {
-        processFunctionWithoutLoopSupport(*F, true, AA, POTA, RCFI, &PTFI);
+      if (processFunctionWithoutLoopSupport(*F, false, AA, POTA, RCFI, EAFI, &PTFI)) {
+        processFunctionWithoutLoopSupport(*F, true, AA, POTA, RCFI, EAFI, &PTFI);
         invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
       }
       return;
@@ -297,10 +300,11 @@ class ARCSequenceOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
     auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
     ProgramTerminationFunctionInfo PTFI(F);
 
-    if (processFunctionWithLoopSupport(*F, AA, POTA, LRFI, LI, RCFI, &PTFI)) {
+    if (processFunctionWithLoopSupport(*F, AA, POTA, LRFI, LI, RCFI, EAFI, &PTFI)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }
 

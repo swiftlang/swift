@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,12 +42,12 @@ namespace swift {
     /// Language features
     ///
 
+    /// \brief User-overridable language version to compile for.
+    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
+
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
     
-    /// Whether to warn about "needless" words in declarations.
-    bool WarnOmitNeedlessWords = false;
-
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -95,9 +96,6 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
-    /// Whether to implement SE-0111, the removal of argument labels in types.
-    bool SuppressArgumentLabelsInTypes = false;
-
     ///
     /// Flags for developers
     ///
@@ -131,14 +129,11 @@ namespace swift {
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 15000000;
+    unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
 
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
-    
-    /// \brief Enable experimental "switch" pattern-matching features.
-    bool EnableExperimentalPatterns = false;
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
@@ -146,16 +141,12 @@ namespace swift {
     /// \brief Enable experimental nested generic types feature.
     bool EnableExperimentalNestedGenericTypes = false;
 
-    /// \brief Enable generalized collection casting.
-    bool EnableExperimentalCollectionCasts = true;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
 
-    /// Should 'private' use Swift 3's lexical scoping, or the Swift 2 behavior
-    /// of 'fileprivate'?
-    bool EnableSwift3Private = true;
+    /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    bool EnableASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -163,15 +154,6 @@ namespace swift {
     /// member of some type instead. This includes inits, computed properties,
     /// and methods.
     bool InferImportAsMember = false;
-
-    /// Whether we are stripping the "NS" prefix from Foundation et al.
-    bool StripNSPrefix = true;
-
-    /// Should 'id' in Objective-C be imported as 'Any' in Swift?
-    bool EnableIdAsAny = true;
-
-    /// Enable the Swift 3 migration via Fix-Its.
-    bool Swift3Migration = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

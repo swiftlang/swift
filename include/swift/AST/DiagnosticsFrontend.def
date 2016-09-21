@@ -91,6 +91,11 @@ ERROR(error_immediate_mode_primary_file,none,
   "immediate mode is incompatible with -primary-file", ())
 ERROR(error_missing_frontend_action,none,
   "no frontend action was selected", ())
+ERROR(error_invalid_source_location_str,none,
+  "invalid source location string '%0'", (StringRef))
+ERROR(error_no_source_location_scope_map,none,
+  "-dump-scope-maps argument must be 'expanded' or a list of source locations",
+  ())
 
 ERROR(error_mode_cannot_emit_dependencies,none,
   "this mode does not support emitting dependency files", ())
@@ -151,6 +156,12 @@ ERROR(verify_encountered_fatal,none,
 
 ERROR(error_parse_input_file,none,
   "error parsing input file '%0' (%1)", (StringRef, StringRef))
+
+ERROR(error_formatting_multiple_file_ranges,none,
+  "file ranges don't support multiple input files", ())
+
+ERROR(error_formatting_invalid_range,none,
+  "file range is invalid", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

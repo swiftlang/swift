@@ -410,7 +410,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter date: The specified date.
     /// - returns: `true` if the starting time and duration of a component could be calculated, otherwise `false`.
     public func dateInterval(of component: Component, start: inout Date, interval: inout TimeInterval, for date: Date) -> Bool {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(of: Calendar._toCalendarUnit([component]), start: &nsDate, interval: &ti, for: date) }) {
             start = nsDate as! Date
@@ -688,7 +688,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - returns: `true` if a date range could be found, and `false` if the date is not in a weekend.
     @available(iOS 8.0, *)
     public func dateIntervalOfWeekend(containing date: Date, start: inout Date, interval: inout TimeInterval) -> Bool {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
             start = nsDate as! Date
@@ -705,7 +705,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - returns: A `DateInterval`, or nil if the date is not in a weekend.
     @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func dateIntervalOfWeekend(containing date: Date) -> DateInterval? {
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.range(ofWeekendStart: &nsDate, interval: &ti, containing: date) }) {
             return DateInterval(start: nsDate as! Date, duration: ti)
@@ -729,7 +729,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     @available(iOS 8.0, *)
     public func nextWeekend(startingAfter date: Date, start: inout Date, interval: inout TimeInterval, direction: SearchDirection = .forward) -> Bool {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             start = nsDate as! Date
@@ -751,7 +751,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     @available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public func nextWeekend(startingAfter date: Date, direction: SearchDirection = .forward) -> DateInterval? {
         // The implementation actually overrides previousKeepSmaller and nextKeepSmaller with matchNext, always - but strict still trumps all.
-        var nsDate : NSDate? = nil
+        var nsDate : NSDate?
         var ti : TimeInterval = 0
         if _handle.map({ $0.nextWeekendStart(&nsDate, interval: &ti, options: direction == .backward ? [.searchBackwards] : [], after: date) }) {
             /// WARNING: searching backwards is totally broken! 26643365
@@ -805,7 +805,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     }
     
     @available(*, unavailable, message: "use nextWeekend(startingAfter:matching:matchingPolicy:repeatedTimePolicy:direction:using:) instead")
-    public func enumerateDates(startingAfter start: Date, matching comps: DateComponents, options opts: NSCalendar.Options = [], using block: @noescape (Date?, Bool, UnsafeMutablePointer<ObjCBool>) -> Swift.Void) { fatalError() }
+    public func enumerateDates(startingAfter start: Date, matching comps: DateComponents, options opts: NSCalendar.Options = [], using block: (Date?, Bool, UnsafeMutablePointer<ObjCBool>) -> Swift.Void) { fatalError() }
     
     /// Computes the dates which match (or most closely match) a given set of components, and calls the closure once for each of them, until the enumeration is stopped.
     ///
@@ -825,7 +825,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// - parameter direction: Which direction in time to search. The default value is `.forward`, which means later in time.
     /// - parameter block: A closure that is called with search results.
     @available(iOS 8.0, *)
-    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: @noescape (_ result: Date?, _ exactMatch: Bool, _ stop: inout Bool) -> Void) {
+    public func enumerateDates(startingAfter start: Date, matching components: DateComponents, matchingPolicy: MatchingPolicy, repeatedTimePolicy: RepeatedTimePolicy = .first, direction: SearchDirection = .forward, using block: (_ result: Date?, _ exactMatch: Bool, _ stop: inout Bool) -> Void) {
         _handle.map {
             $0.enumerateDates(startingAfter: start, matching: components, options: Calendar._toCalendarOptions(matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy, direction: direction)) { (result, exactMatch, stop) in
                 var stopv = false
@@ -1122,7 +1122,7 @@ extension Calendar : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCalendar?) -> Calendar {
-        var result: Calendar? = nil
+        var result: Calendar?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

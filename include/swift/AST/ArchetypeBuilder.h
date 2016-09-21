@@ -63,15 +63,21 @@ public:
     /// The requirement was explicitly stated in the generic parameter
     /// clause.
     Explicit,
-    /// The requirement was explicitly stated in the generic parameter clause
-    /// but is redundant with some other requirement.
-    Redundant,
-    /// The requirement was part of a protocol requirement, e.g., an
-    /// inherited protocol or a requirement on an associated type.
-    Protocol,
-    /// 
-    /// The requirement was inferred from part of the signature.
+    /// The requirement was inferred from the function's parameter or
+    /// result types.
     Inferred,
+
+    /// The requirement was part of a protocol requirement on an
+    /// associated type.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Protocol,
+
+    /// The requirement is redundant with some other requirement.
+    ///
+    /// These are dropped when building the GenericSignature.
+    Redundant,
+
     /// The requirement came from an outer scope.
     /// FIXME: eliminate this in favor of keeping requirement sources in 
     /// GenericSignatures, at least non-canonical ones?
@@ -216,9 +222,7 @@ private:
 
 public:
   /// \brief Add a new generic parameter for which there may be requirements.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamDecl *GenericParam);
+  void addGenericParameter(GenericTypeParamDecl *GenericParam);
 
   /// Add the requirements placed on the given abstract type parameter
   /// to the given potential archetype.
@@ -227,9 +231,7 @@ public:
   bool addGenericParameterRequirements(GenericTypeParamDecl *GenericParam);
 
   /// \brief Add a new generic parameter for which there may be requirements.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericParameter(GenericTypeParamType *GenericParam);
+  void addGenericParameter(GenericTypeParamType *GenericParam);
   
   /// \brief Add a new requirement.
   ///
@@ -246,20 +248,27 @@ public:
   /// \brief Add all of a generic signature's parameters and requirements.
   ///
   /// FIXME: Requirements from the generic signature are treated as coming from
-  /// an outer scope in order to avoid disturbing the AllDependentTypes.
-  /// Setting \c treatRequirementsAsExplicit to true disables this behavior.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool addGenericSignature(GenericSignature *sig, bool adoptArchetypes,
+  /// an outer scope. Setting \c treatRequirementsAsExplicit to true disables
+  /// this behavior.
+  void addGenericSignature(GenericSignature *sig,
+                           GenericEnvironment *genericEnv,
                            bool treatRequirementsAsExplicit = false);
 
   /// \brief Get a generic signature based on the provided complete list
   /// of generic parameter types.
   ///
-  /// \returns a generic signature build based on the provided list of
+  /// \returns a generic signature built from the provided list of
   ///          generic parameter types.
   GenericSignature *
   getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+
+  /// \brief Get a generic context based on the complete list of generic
+  /// parameter types.
+  ///
+  /// \returns a generic context built from the provided list of
+  ///          generic parameter types.
+  GenericEnvironment *getGenericEnvironment(
+      ArrayRef<GenericTypeParamType *> genericParamsTypes);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -321,39 +330,21 @@ public:
   /// parameter.
   ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
-  /// \brief Retrieve the array of all of the archetypes produced during
-  /// archetype assignment. The 'primary' archetypes will occur first in this
-  /// list.
-  ArrayRef<ArchetypeType *> getAllArchetypes();
-  
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(const DeclContext *dc, Type type,
-                                 LazyResolver *resolver = nullptr);
+  static Type mapTypeIntoContext(const DeclContext *dc, Type type);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericParamList *genericParams,
-                                 Type type,
-                                 LazyResolver *resolver = nullptr);
+                                 GenericEnvironment *genericEnv,
+                                 Type type);
 
   /// Map a contextual type to an interface type.
   static Type mapTypeOutOfContext(const DeclContext *dc, Type type);
 
   /// Map a contextual type to an interface type.
   static Type mapTypeOutOfContext(ModuleDecl *M,
-                                  GenericParamList *genericParams,
+                                  GenericEnvironment *genericEnv,
                                   Type type);
-
-  using SameTypeRequirement
-    = std::pair<PotentialArchetype *,
-                PointerUnion<Type, PotentialArchetype*>>;
-  
-  /// Retrieve the set of same-type requirements that apply to the potential
-  /// archetypes known to this builder.
-  ArrayRef<SameTypeRequirement> getSameTypeRequirements() const;
-
-  // FIXME: Compute the set of 'extra' witness tables needed to express this
-  // requirement set.
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -552,7 +543,8 @@ public:
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, const RequirementSource &source,
+  bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
+                      const RequirementSource &source,
                       ArchetypeBuilder &builder);
 
   /// Retrieve the superclass of this archetype.
@@ -622,15 +614,15 @@ public:
   }
 
   void setIsRecursive() { IsRecursive = true; }
-  bool isRecursive() { return IsRecursive; }
+  bool isRecursive() const { return IsRecursive; }
 
-  bool isInvalid() { return Invalid; }
+  bool isInvalid() const { return Invalid; }
 
   void setInvalid() { Invalid = true; }
 
   /// Determine whether this archetype was renamed due to typo
   /// correction. If so, \c getName() retrieves the new name.
-  bool wasRenamed() { return Renamed; }
+  bool wasRenamed() const { return Renamed; }
 
   /// Note that this potential archetype was renamed (due to typo
   /// correction), providing the new name.
@@ -641,7 +633,7 @@ public:
 
   /// Whether this potential archetype makes a better archetype anchor than
   /// the given archetype anchor.
-  bool isBetterArchetypeAnchor(PotentialArchetype *other);
+  bool isBetterArchetypeAnchor(PotentialArchetype *other) const;
 
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);

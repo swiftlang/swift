@@ -322,6 +322,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::DefaultArgGenerator:
     OS << "!defaultarg" << "." << defaultArgIndex;
     break;
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+    OS << "!propertyinit";
+    break;
   }
   if (uncurryLevel != 0)
     OS << (isDot ? '.' : '!')  << uncurryLevel;
@@ -433,6 +436,7 @@ public:
         PrintState{{PrintCtx.OS()}, PrintOptions::printSIL()},
         LastBufferID(0) {
     PrintState.ASTOptions.AlternativeTypeNames = AlternativeTypeNames;
+    PrintState.ASTOptions.PrintForSIL = true;
   }
 
   ID getID(const SILBasicBlock *B);
@@ -542,20 +546,41 @@ public:
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
 
+  bool printTypeDependentOperands(SILInstruction *I) {
+    ArrayRef<Operand> TypeDepOps = I->getTypeDependentOperands();
+    if (TypeDepOps.empty())
+      return false;
+
+    PrintState.OS.PadToColumn(50);
+    *this << "// type-defs: ";
+    interleave(TypeDepOps,
+               [&](const Operand &op) { *this << getID(op.get()); },
+               [&] { *this << ", "; });
+    return true;
+  }
+
   /// Print out the users of the SILValue \p V. Return true if we printed out
   /// either an id or a use list. Return false otherwise.
-  bool printUsersOfSILValue(SILValue V) {
-    if (!V->hasValue()) {
+  bool printUsersOfSILValue(SILValue V, bool printedSlashes) {
+
+    if (V->hasValue() && V->use_empty())
+      return printedSlashes;
+
+    if (printedSlashes) {
+      *this << "; ";
+    } else {
       PrintState.OS.PadToColumn(50);
-      *this << "// id: " << getID(V);
+      *this << "// ";
+    }
+    if (!V->hasValue()) {
+      *this << "id: " << getID(V);
       return true;
     }
 
     if (V->use_empty())
-      return false;
+      return true;
 
-    PrintState.OS.PadToColumn(50);
-    *this << "// user";
+    *this << "user";
     if (std::next(V->use_begin()) != V->use_end())
       *this << 's';
     *this << ": ";
@@ -729,14 +754,16 @@ public:
     // Print the value.
     visit(V);
 
+    bool printedSlashes = false;
     if (auto *I = dyn_cast<SILInstruction>(V)) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
+      printedSlashes = printTypeDependentOperands(I);
     }
 
     // Print users, or id for valueless instructions.
-    bool printedSlashes = printUsersOfSILValue(V);
+    printedSlashes = printUsersOfSILValue(V, printedSlashes);
 
     // Print SIL location.
     if (Ctx.printVerbose()) {
@@ -817,6 +844,12 @@ public:
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
       *this << "[stack] ";
+    auto Types = ARI->getTailAllocatedTypes();
+    auto Counts = ARI->getTailAllocatedCounts();
+    for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
+      *this << "[tail_elems " << Types[Idx] << " * "
+            << getIDAndType(Counts[Idx].get()) << "] ";
+    }
     *this << ARI->getType();
   }
 
@@ -1291,6 +1324,11 @@ public:
     *this << EI->getField()->getName().get();
   }
 
+  void visitRefTailAddrInst(RefTailAddrInst *RTAI) {
+    *this << "ref_tail_addr " << getIDAndType(RTAI->getOperand()) << ", "
+          << RTAI->getTailType();
+  }
+
   void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {
     *this << Name << " ";
     if (I->isVolatile())
@@ -1316,9 +1354,9 @@ public:
     if (WMI->isVolatile())
       *this << "[volatile] ";
     *this << "$" << WMI->getLookupType() << ", " << WMI->getMember();
-    if (!WMI->getOpenedArchetypeOperands().empty()) {
+    if (!WMI->getTypeDependentOperands().empty()) {
       *this << ", ";
-      *this << getIDAndType(WMI->getOpenedArchetypeOperands()[0].get());
+      *this << getIDAndType(WMI->getTypeDependentOperands()[0].get());
     }
     *this << " : " << WMI->getType();
   }
@@ -1477,6 +1515,11 @@ public:
   void visitIndexAddrInst(IndexAddrInst *IAI) {
     *this << "index_addr " << getIDAndType(IAI->getBase()) << ", "
        << getIDAndType(IAI->getIndex());
+  }
+
+  void visitTailAddrInst(TailAddrInst *TAI) {
+    *this << "tail_addr " << getIDAndType(TAI->getBase()) << ", "
+          << getIDAndType(TAI->getIndex()) << ", " << TAI->getTailType();
   }
 
   void visitIndexRawPointerInst(IndexRawPointerInst *IAI) {
@@ -1767,33 +1810,35 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   llvm::DenseMap<CanType, Identifier> Aliases;
   llvm::DenseSet<Identifier> UsedNames;
   
-  auto params = ContextGenericParams;
-  llvm::SmallString<16> disambiguatedNameBuf;
-  unsigned disambiguatedNameCounter = 1;
-  while (params) {
-    for (ArchetypeType *param : params->getPrimaryArchetypes()) {
-      Identifier name = param->getName();
+  auto sig = getLoweredFunctionType()->getGenericSignature();
+  auto *env = getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
+      assert(archetypeTy);
+
+      Identifier name = archetypeTy->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << param->getName() << disambiguatedNameCounter++;
+          names << archetypeTy->getName() << disambiguatedNameCounter++;
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != param->getName())
-        Aliases[CanType(param)] = name;
+      if (name != archetypeTy->getName())
+        Aliases[CanType(archetypeTy)] = name;
     }
-    
-    params = params->getOuterParameters();
   }
 
   {
-    PrintOptions withContextGenericParams = PrintOptions::printSIL();
-    withContextGenericParams.ContextGenericParams = ContextGenericParams;
-    withContextGenericParams.AlternativeTypeNames =
+    PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+    withGenericEnvironment.GenericEnv = env;
+    withGenericEnvironment.AlternativeTypeNames =
       Aliases.empty() ? nullptr : &Aliases;
-    LoweredType->print(OS, withContextGenericParams);
+    LoweredType->print(OS, withGenericEnvironment);
   }
   
   if (!isExternalDeclaration()) {

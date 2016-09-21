@@ -46,6 +46,20 @@ SILGenModule::~SILGenModule() {
   M.verify();
 }
 
+EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
+  auto &ctx = getASTContext();
+  if (elt->getParentEnum()->classifyAsOptionalType()
+        != OTK_ImplicitlyUnwrappedOptional)
+    return elt;
+
+  if (elt == ctx.getImplicitlyUnwrappedOptionalSomeDecl()) {
+    return ctx.getOptionalSomeDecl();
+  } else {
+    assert(elt == ctx.getImplicitlyUnwrappedOptionalNoneDecl());
+    return ctx.getOptionalNoneDecl();
+  }
+}
+
 static SILDeclRef
 getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
@@ -283,6 +297,81 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
   return nullptr;
 }
 
+ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
+  if (BridgedStoredNSError)
+    return *BridgedStoredNSError;
+
+  // Find the _BridgedStoredNSError protocol.
+  auto &ctx = getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::BridgedStoredNSError);
+  BridgedStoredNSError = proto;
+  return proto;
+}
+
+VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
+  if (NSErrorRequirement)
+    return *NSErrorRequirement;
+
+  // Find the _BridgedStoredNSError protocol.
+  auto proto = getBridgedStoredNSError(loc);
+  if (!proto) {
+    NSErrorRequirement = nullptr;
+    return nullptr;
+  }
+
+  // Look for _nsError.
+  auto &ctx = getASTContext();
+  VarDecl *found = nullptr;
+  for (auto member : proto->lookupDirect(ctx.Id_nsError, true)) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      found = var;
+      break;
+    }
+  }
+
+  NSErrorRequirement = found;
+  return found;
+}
+
+Optional<ProtocolConformanceRef>
+SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
+  auto proto = getBridgedStoredNSError(loc);
+  if (!proto) return None;
+
+  // Find the conformance to _BridgedStoredNSError.
+  return SwiftModule->lookupConformance(type, proto, nullptr);
+}
+
+ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
+  if (NSErrorConformanceToError)
+    return *NSErrorConformanceToError;
+
+  auto &ctx = getASTContext();
+  auto nsError = ctx.getNSErrorDecl();
+  if (!nsError) {
+    NSErrorConformanceToError = nullptr;
+    return nullptr;
+  }
+
+  auto error = ctx.getErrorDecl();
+  if (!error) {
+    NSErrorConformanceToError = nullptr;
+    return nullptr;
+  }
+
+  auto conformance =
+    SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
+                                   cast<ProtocolDecl>(error),
+                                   nullptr);
+
+  if (conformance && conformance->isConcrete())
+    NSErrorConformanceToError = conformance->getConcrete();
+  else
+    NSErrorConformanceToError = nullptr;
+  return *NSErrorConformanceToError;
+}
+
+
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
   auto extInfo = SILFunctionType::ExtInfo()
@@ -500,8 +589,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
 
   assert(F->empty() && "already emitted function?!");
 
-  F->setContextGenericParams(
-                         Types.getConstantInfo(constant).ContextGenericParams);
+  F->setGenericEnvironment(Types.getConstantInfo(constant).GenericEnv);
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -877,6 +965,21 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
   });
 }
 
+void SILGenModule::
+emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
+  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
+  auto *var = pbdEntry.getAnchoringVarDecl();
+  auto *init = pbdEntry.getInit();
+
+  SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
+  emitOrDelayFunction(*this, constant, [this,constant,init](SILFunction *f) {
+    preEmitFunction(constant, init, f, init);
+    PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
+    SILGenFunction(*this, *f).emitGeneratorFunction(constant, init);
+    postEmitFunction(constant, f);
+  });
+}
+
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding,
                                                      unsigned pbdEntry) {
@@ -934,9 +1037,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
   unsigned index = 0;
   for (auto paramList : paramLists) {
     for (auto param : *paramList) {
-      if (auto handle = param->getDefaultValue())
+      if (auto defaultArg = param->getDefaultValue())
         emitDefaultArgGenerator(SILDeclRef::getDefaultArgGenerator(decl, index),
-                                handle->getExpr());
+                                defaultArg);
       ++index;
     }
   }
@@ -1091,6 +1194,9 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   if (!TopLevelSGF->B.hasValidInsertionPoint())
     return;
 
+  ProfilerRAII Profiler(*this, td);
+  TopLevelSGF->emitProfilerIncrement(td->getBody());
+ 
   for (auto &ESD : td->getBody()->getElements()) {
     if (!TopLevelSGF->B.hasValidInsertionPoint()) {
       if (Stmt *S = ESD.dyn_cast<Stmt*>()) {

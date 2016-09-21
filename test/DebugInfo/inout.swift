@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -module-name inout -o %t.ll
-// RUN: cat %t.ll | FileCheck %s
-// RUN: cat %t.ll | FileCheck %s --check-prefix=PROMO-CHECK
-// RUN: cat %t.ll | FileCheck %s --check-prefix=FOO-CHECK
+// RUN: cat %t.ll | %FileCheck %s
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=PROMO-CHECK
+// RUN: cat %t.ll | %FileCheck %s --check-prefix=FOO-CHECK
 
 // LValues are direct values, too. They are reference types, though.
 
-func Close(_ fn: @noescape () -> Int64) { fn() }
+func Close(_ fn: () -> Int64) { fn() }
 typealias MyFloat = Float
 
 // CHECK: define hidden void @_TF5inout13modifyFooHeap
@@ -18,8 +18,9 @@ typealias MyFloat = Float
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
-// PROMO-CHECK: ![[EMPTY_EXPR]] = !DIExpression()
-// PROMO-CHECK: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtRVs5Int64"
+// PROMO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
+// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtVs5Int64"
+// PROMO-CHECK-DAG: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "_TtRVs5Int64"
 // PROMO-CHECK: ![[A1]] = !DILocalVariable(name: "a", arg: 1
 // PROMO-CHECK-SAME:                       type: ![[INT]]
 func modifyFooHeap(_ a: inout Int64,

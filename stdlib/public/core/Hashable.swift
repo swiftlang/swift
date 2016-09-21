@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)(compiler limitation): This protocol exists to identify
+// FIXME(ABI)#33 (Generic subscripts): This protocol exists to identify
 // hashable types.  It is used for defining an imitation of a generic
 // subscript on `Dictionary<AnyHashable, *>`.
 public protocol _Hashable {
@@ -96,5 +96,24 @@ public protocol Hashable : _Hashable, Equatable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
+}
+
+public enum _RuntimeHelpers {}
+
+extension _RuntimeHelpers {
+  @_silgen_name("swift_stdlib_Hashable_isEqual_indirect")
+  public static func Hashable_isEqual_indirect<T : Hashable>(
+    _ lhs: UnsafePointer<T>,
+    _ rhs: UnsafePointer<T>
+  ) -> Bool {
+    return lhs.pointee == rhs.pointee
+  }
+
+  @_silgen_name("swift_stdlib_Hashable_hashValue_indirect")
+  public static func Hashable_hashValue_indirect<T : Hashable>(
+    _ value: UnsafePointer<T>
+  ) -> Int {
+    return value.pointee.hashValue
+  }
 }
 

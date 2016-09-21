@@ -87,17 +87,6 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           Decl *parentDecl,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
-  
-/// Derive an Error requirement for an enum type.
-///
-/// A unique string representation of the enum type will be used as the domain
-/// for members of the enum, and each case will have its own integer code.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveError(TypeChecker &tc,
-                               Decl *parentDecl,
-                               NominalTypeDecl *type,
-                               ValueDecl *requirement);
 
 /// Derive a _BridgedNSError requirement for an @objc enum type.
 ///
@@ -113,7 +102,8 @@ FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        NominalTypeDecl *typeDecl,
                                        Type propertyInterfaceType,
                                        Type propertyContextType,
-                                       bool isStatic = false);
+                                       bool isStatic,
+                                       bool isFinal);
 
 /// Declare a read-only property with an existing getter.
 std::pair<VarDecl *, PatternBindingDecl *>
@@ -124,7 +114,8 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
                                Type propertyInterfaceType,
                                Type propertyContextType,
                                FuncDecl *getterDecl,
-                               bool isStatic = false);
+                               bool isStatic,
+                               bool isFinal);
 
 
 /// Build a reference to the 'self' decl of a derived function.

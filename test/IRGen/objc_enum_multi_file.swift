@@ -1,8 +1,8 @@
-// RUN: rm -rf %t && mkdir %t
-// RUN: %target-swift-frontend -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-frontend -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
-// RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT
 import objc_enum_multi_file_helper

@@ -187,9 +187,8 @@ func constVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer(ii)
   takesConstVoidPointer(ff)
 
-  // TODO: These two should be accepted, tracked by rdar://17444930.
-  takesConstVoidPointer([0, 1, 2]) // expected-error {{contextual type 'UnsafeRawPointer' cannot be used with array literal}}
-  takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{contextual type 'UnsafeRawPointer' cannot be used with array literal}}
+  takesConstVoidPointer([0, 1, 2])
+  takesConstVoidPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer'}}
@@ -228,9 +227,8 @@ func constRawPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstRawPointer(ii)
   takesConstRawPointer(ff)
 
-  // TODO: These two should be accepted, tracked by rdar://17444930.
-  takesConstRawPointer([0, 1, 2]) // expected-error {{contextual type 'UnsafeRawPointer' cannot be used with array literal}}
-  takesConstRawPointer([0.0, 1.0, 2.0])  // expected-error {{contextual type 'UnsafeRawPointer' cannot be used with array literal}}
+  takesConstRawPointer([0, 1, 2])
+  takesConstRawPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer'}}

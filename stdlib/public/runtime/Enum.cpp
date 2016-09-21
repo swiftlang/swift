@@ -102,7 +102,8 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
-  vwtable->stride = llvm::alignTo(size, align);
+  auto rawStride = llvm::alignTo(size, align);
+  vwtable->stride = rawStride == 0 ? 1 : rawStride;
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -310,7 +311,8 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
     ;
-  vwtable->stride = (totalSize + alignMask) & ~alignMask;
+  auto rawStride = (totalSize + alignMask) & ~alignMask;
+  vwtable->stride = rawStride == 0 ? 1 : rawStride;
   
   installCommonValueWitnesses(vwtable);
 }
@@ -348,17 +350,25 @@ static void storeMultiPayloadValue(OpaqueValue *value,
 #if defined(__BIG_ENDIAN__)
   unsigned numPayloadValueBytes =
       std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(bytes,
+  memcpy(bytes + sizeof(OpaqueValue *) - numPayloadValueBytes,
          reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
          numPayloadValueBytes);
+  if (layout.payloadSize > sizeof(payloadValue) &&
+      layout.payloadSize > sizeof(OpaqueValue *)) {
+    memset(bytes, 0,
+           sizeof(OpaqueValue *) - numPayloadValueBytes);
+    memset(bytes + sizeof(OpaqueValue *), 0,
+           layout.payloadSize - sizeof(OpaqueValue *));
+  }
 #else
   memcpy(bytes, &payloadValue,
          std::min(layout.payloadSize, sizeof(payloadValue)));
-#endif
+
   // If the payload is larger than the value, zero out the rest.
   if (layout.payloadSize > sizeof(payloadValue))
     memset(bytes + sizeof(payloadValue), 0,
            layout.payloadSize - sizeof(payloadValue));
+#endif
 }
 
 static unsigned loadMultiPayloadTag(const OpaqueValue *value,
@@ -384,7 +394,7 @@ static unsigned loadMultiPayloadValue(const OpaqueValue *value,
   unsigned numPayloadValueBytes =
       std::min(layout.payloadSize, sizeof(payloadValue));
   memcpy(reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         bytes, numPayloadValueBytes);
+         bytes + sizeof(OpaqueValue *) - numPayloadValueBytes, numPayloadValueBytes);
 #else
   memcpy(&payloadValue, bytes,
          std::min(layout.payloadSize, sizeof(payloadValue)));

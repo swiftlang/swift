@@ -131,7 +131,7 @@
     {
       key.kind: source.lang.swift.decl.function.constructor,
       key.name: "init()",
-      key.sourcetext: "init() {\n<#code#>\n}",
+      key.sourcetext: "override init() {\n<#code#>\n}",
       key.description: "init()",
       key.typename: "",
       key.context: source.codecompletion.context.superclass,

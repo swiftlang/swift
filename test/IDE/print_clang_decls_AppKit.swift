@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}
 
@@ -34,8 +34,7 @@
 // APPKIT-NEXT: unowned(unsafe) var menu: @sil_unmanaged NSMenu?
 // APPKIT-NEXT: var title: String
 // APPKIT-NEXT: @NSCopying var attributedTitle: NSAttributedString?
-// TODO: Weak properties should not be bridged.
-// APPKIT-NEXT: var target: Any!
+// APPKIT-NEXT: weak var target: @sil_weak AnyObject!
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
 // APPKIT: extension NSNotification.Name {

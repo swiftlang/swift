@@ -69,6 +69,7 @@ add_swift_library(swiftBasic STATIC
   FileSystem.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LLVMContext.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp
@@ -98,7 +99,7 @@ add_swift_library(swiftBasic STATIC
 
   C_COMPILE_FLAGS ${UUID_INCLUDE}
   LINK_LIBRARIES ${UUID_LIBRARIES}
-  COMPONENT_DEPENDS support)
+  LLVM_COMPONENT_DEPENDS support)
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

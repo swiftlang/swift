@@ -1,10 +1,10 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM1 | FileCheck %s -check-prefix=PLATFORM1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM2 | FileCheck %s -check-prefix=PLATFORM1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM3 | FileCheck %s -check-prefix=PLATFORM1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM4 | FileCheck %s -check-prefix=PLATFORM1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL1 | FileCheck %s -check-prefix=AVAILABLE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL2 | FileCheck %s -check-prefix=AVAILABLE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL3 | FileCheck %s -check-prefix=AVAILABLE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM1 | %FileCheck %s -check-prefix=PLATFORM1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM2 | %FileCheck %s -check-prefix=PLATFORM1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM3 | %FileCheck %s -check-prefix=PLATFORM1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM4 | %FileCheck %s -check-prefix=PLATFORM1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL1 | %FileCheck %s -check-prefix=AVAILABLE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL2 | %FileCheck %s -check-prefix=AVAILABLE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL3 | %FileCheck %s -check-prefix=AVAILABLE1
 
 {
   if #available(#^PLATFORM1^#

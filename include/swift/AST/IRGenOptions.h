@@ -197,6 +197,18 @@ public:
     Hash = (Hash << 1) | DisableLLVMARCOpts;
     return Hash;
   }
+
+  /// Should LLVM IR value names be emitted and preserved?
+  bool shouldProvideValueNames() const {
+    // If the command line contains an explicit request about whether to add
+    // LLVM value names, honor it.  Otherwise, add value names only if the
+    // final result is textual LLVM assembly.
+    if (HasValueNamesSetting) {
+      return ValueNames;
+    } else {
+      return OutputKind == IRGenOutputKind::LLVMAssembly;
+    }
+  }
 };
 
 } // end namespace swift

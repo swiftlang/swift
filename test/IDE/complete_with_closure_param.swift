@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | FileCheck %s
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE | %FileCheck %s
 
 typealias FunctionTypealias = (Int, Int) -> Bool
 typealias OptionalFunctionTypealias = ((Int, Int) -> Bool)?
@@ -20,7 +20,7 @@ FooStruct().#^COMPLETE^#
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod2({#(callback): ((Int, Int) -> Void)?##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod3({#(callback): ((Int, Int) -> Void)??##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod4({#(callback): ((Int, Int) -> Void)!##(Int, Int) -> Void#})[#Void#]{{; name=.+$}}
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod5({#(callback): FunctionTypealias##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
+// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod5({#(callback): (Int, Int) -> Bool##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod6({#(callback): FunctionTypealias?##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
 // CHECK-DAG: Decl[InstanceMethod]/CurrNominal: instanceMethod7({#(callback): OptionalFunctionTypealias##(Int, Int) -> Bool#})[#Void#]{{; name=.+$}}
 // CHECK: End completions

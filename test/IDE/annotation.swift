@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -annotate -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -annotate -source-filename %s | %FileCheck %s
 
 // CHECK: import struct <iMod>Swift</iMod>.<iStruct@>Int</iStruct>
 import struct Swift.Int
@@ -251,13 +251,13 @@ class C10 {
   func meth(_ x: Int, withFloat: Float) {}
 }
 
-// CHECK: var <Var>c10</Var> = <Ctor@[[@LINE-4]]:3-Class@[[@LINE-5]]:7>C10</Ctor>(<Ctor@[[@LINE-4]]:3>int</Ctor>: 0, <Ctor@[[@LINE-4]]:3>andThis</Ctor>: 0)
+// CHECK: var <Var>c10</Var> = <Ctor@[[@LINE-4]]:3-Class@[[@LINE-5]]:7>C10</Ctor>(<Ctor@[[@LINE-4]]:3#int>int</Ctor>: 0, <Ctor@[[@LINE-4]]:3#andThis>andThis</Ctor>: 0)
 var c10 = C10(int: 0, andThis: 0)
-// CHECK: <Var@[[@LINE-1]]:5>c10</Var>.<Func@[[@LINE-5]]:8>meth</Func>(0, <Func@[[@LINE-5]]:8>withFloat</Func>: 0)
+// CHECK: <Var@[[@LINE-1]]:5>c10</Var>.<Func@[[@LINE-5]]:8>meth</Func>(0, <Func@[[@LINE-5]]:8#withFloat>withFloat</Func>: 0)
 c10.meth(0, withFloat: 0)
 
 func test7(int x: Int, andThis y: Float) {}
-// CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>int</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
+// CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6#int>int</Func>: 0, <Func@[[@LINE-1]]:6#andThis>andThis</Func>: 0)
 test7(int: 0, andThis: 0)
 
 func test8<T : Prot2>(_ x: T) {}
@@ -328,3 +328,16 @@ func test_defer() {
     test_defer()
   }
 }
+
+func test_arg_tuple1(_: Int, _: Int) {}
+func test_arg_tuple2(p1: Int, _: Int) {}
+func test_arg_tuple3(_: Int, p2: Int) {}
+func test_arg_tuple4(p1: Int, p2: Int) {}
+// CHECK: <Func@[[@LINE-4]]:6>test_arg_tuple1</Func>(0,0)
+test_arg_tuple1(0,0)
+// CHECK: <Func@[[@LINE-5]]:6>test_arg_tuple2</Func>(<Func@[[@LINE-5]]:6#p1>p1</Func>:0,0)
+test_arg_tuple2(p1:0,0)
+// CHECK: <Func@[[@LINE-6]]:6>test_arg_tuple3</Func>(0,<Func@[[@LINE-6]]:6#p2>p2</Func>:0)
+test_arg_tuple3(0,p2:0)
+// CHECK: <Func@[[@LINE-7]]:6>test_arg_tuple4</Func>(<Func@[[@LINE-7]]:6#p1>p1</Func>:0,<Func@[[@LINE-7]]:6#p2>p2</Func>:0)
+test_arg_tuple4(p1:0,p2:0)

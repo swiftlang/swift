@@ -33,39 +33,47 @@ We describe each in detail below:
 
 ### Smoke Testing
 
-        Platform     | Comment
-        ------------ | -------------
-        All supported platforms     | @swift-ci Please smoke test
-        All supported platforms     | @swift-ci Please smoke test and merge
-        OS X platform               | @swift-ci Please smoke test OS X platform
-        Linux platform              | @swift-ci Please smoke test Linux platform
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        All supported platforms     | @swift-ci Please smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
+        All supported platforms     | @swift-ci Please smoke test and mere       | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
+        OS X platform               | @swift-ci Please smoke test OS X platform  | Swift Test OS X Platform (smoke test)
+        Linux platform              | @swift-ci Please smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
 A smoke test on macOS does the following:
 
-1. Builds the compiler incrementally.
-2. Builds the standard library only for macOS. Simulator standard libraries and
+1. Builds LLVM/Clang incrementally.
+2. Builds Swift clean.
+3. Builds the standard library clean only for macOS. Simulator standard libraries and
    device standard libraries are not built.
-3. lldb is not built.
-4. The test and validation-test targets are run only for macOS. The optimized
+4. lldb is not built.
+5. The test and validation-test targets are run only for macOS. The optimized
    version of these tests are not run.
 
 A smoke test on Linux does the following:
 
-1. Builds the compiler incrementally.
-2. Builds the standard library incrementally.
-3. lldb is built incrementally.
-4. The swift test and validation-test targets are run. The optimized version of these
+1. Builds LLVM/Clang incrementally.
+2. Builds Swift clean.
+3. Builds the standard library clean.
+4. lldb is built incrementally.
+5. Foundation, SwiftPM, LLBuild, XCTest are built.
+6. The swift test and validation-test targets are run. The optimized version of these
    tests are not run.
-5. lldb is tested.
+7. lldb is tested.
+8. Foundation, SwiftPM, LLBuild, XCTest are tested.
 
 ### Validation Testing
 
-        Platform     | Comment
-        ------------ | -------------
-        All supported platforms     | @swift-ci Please test
-        All supported platforms     | @swift-ci Please test and merge
-        OS X platform               | @swift-ci Please test OS X platform
-        Linux platform              | @swift-ci Please test Linux platform
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>  
+        All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
+        OS X platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform
+        Linux platform              | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
+        Linux platform              | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 
 The core principles of validation testing is that:
 
@@ -91,42 +99,52 @@ A validation test on Linux does the following:
 2. Builds the compiler.
 3. Builds the standard library.
 4. lldb is built.
-5. Run the swift test and validation-test targets with and without optimization.
-6. lldb is tested.
+5. Builds Foundation, SwiftPM, LLBuild, XCTest
+6. Run the swift test and validation-test targets with and without optimization.
+7. lldb is tested.
+8. Foundation, SwiftPM, LLBuild, XCTest are tested.
 
 ### Benchmarking
 
-        Platform       | Comment
-        ------------   | -------------
-        OS X platform  | @swift-ci Please benchmark
+        Platform     | Comment | Check Status
+        ------------ | ------- | ------------
+        OS X platform  | @swift-ci Please benchmark | Swift Benchmark on OS X Platform
 
 ### Lint Testing
 
-        Language     | Comment
-        ------------ | -------------
-        Python       | @swift-ci Please Python lint
+        Language     | Comment | Check Status
+        ------------ | ------- | ------------
+        Python       | @swift-ci Please Python lint | Python lint
 
 ## Cross Repository Testing
 
-Currently @swift-ci pull request testing only supports testing changes against individual repositories. This is something that will most likely be fixed in the future. But in the short term, please follow the following workflow for performing cross repository testing:
+Simply provide the URL from corresponding pull requests in the same comment as "@swift-ci Please test" phrase. List all of the pull requests and then provide the specific test phrase you would like to trigger. Currently, it will only merge the main pull request you requested testing from as opposed to all of the PR's. 
 
-1. Make sure that all repos have been checked out:
+For example:   
 
-     ./swift/utils/update-checkout --clone
+```
+Please test with following pull request:
+https://github.com/apple/swift/pull/4574
 
-2. On Darwin and Linux run:
+@swift-ci Please test Linux platform
+```
 
-     ./swift/utils/build-toolchain local.swift
+```
+Please test with following PR:
+https://github.com/apple/swift-lldb/pull/48
+https://github.com/apple/swift-package-manager/pull/632
 
-If everything passes, a .tar.gz package file will be produced in the . directory.
+@swift-ci Please test macOS platform
+```
 
-3. Create a separate PR for each repository that needs to be changed. Each should reference the main Swift PR and create a reference to all of the others from the main PR.
+1. Create a separate PR for each repository that needs to be changed. Each should reference the main Swift PR and create a reference to all of the others from the main PR.
 
-4. Gate all commits on @swift-ci smoke test and merge. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then perform a smoke test and merge should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to th eother repositories, this smoke test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
+2. Gate all commits on @swift-ci smoke test and merge. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then perform a smoke test and merge should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to th eother repositories, this smoke test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
 
-5. Merge all of the pull requests simultaneously.
+3. Merge all of the pull requests simultaneously.
 
-6. Watch the public incremental build on ci.swift.org to make sure that you did not make any mistakes. It should complete within 30-40 minutes depending on what else was being committed in the mean time.
+4. Watch the public incremental build on ci.swift.org to make sure that you did not make any mistakes. It should complete within 30-40 minutes depending on what else was being committed in the mean time.
+
 
 ## ci.swift.org bots
 

@@ -30,3 +30,4 @@ class Product(object):
         self.toolchain = toolchain
         self.source_dir = source_dir
         self.build_dir = build_dir
+        self.cmake_options = []

@@ -129,6 +129,11 @@ public:
   Optional<FuncDecl*> UnconditionallyBridgeFromObjectiveCRequirement;
   Optional<AssociatedTypeDecl*> BridgedObjectiveCType;
 
+  Optional<ProtocolDecl*> BridgedStoredNSError;
+  Optional<VarDecl*> NSErrorRequirement;
+
+  Optional<ProtocolConformance *> NSErrorConformanceToError;
+
 public:
   SILGenModule(SILModule &M, Module *SM, bool makeModuleFragile);
   ~SILGenModule();
@@ -176,11 +181,16 @@ public:
   SILType getLoweredType(Type t) {
     return Types.getTypeLowering(t).getLoweredType();
   }
+
+  /// Translate a formal enum element decl into its lowered form.
+  ///
+  /// This just turns ImplicitlyUnwrappedOptional's cases into Optional's.
+  EnumElementDecl *getLoweredEnumElementDecl(EnumElementDecl *element);
   
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
-                                           GenericParamList *thunkContextParams,
+                                           GenericEnvironment *genericEnv,
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
@@ -252,7 +262,10 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg);
-  
+
+  /// Emits the stored property initializer for the given pattern.
+  void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
+
   /// Emits the default argument generator for the given function.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ArrayRef<ParameterList*> paramLists);
@@ -377,6 +390,20 @@ public:
   ProtocolConformance *getConformanceToObjectiveCBridgeable(SILLocation loc,
                                                             Type type);
 
+  /// Retrieve the _BridgedStoredNSError protocol definition.
+  ProtocolDecl *getBridgedStoredNSError(SILLocation loc);
+
+  /// Retrieve the _BridgedStoredNSError._nsError requirement.
+  VarDecl *getNSErrorRequirement(SILLocation loc);
+
+  /// Find the conformance of the given Swift type to the
+  /// _BridgedStoredNSError protocol.
+  Optional<ProtocolConformanceRef>
+  getConformanceToBridgedStoredNSError(SILLocation loc, Type type);
+
+  /// Retrieve the conformance of NSError to the Error protocol.
+  ProtocolConformance *getNSErrorConformanceToError();
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -401,12 +428,6 @@ public:
 
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
-
-  /// Substitute the `Self` type from a protocol conformance into a protocol
-  /// requirement's type to get the type of the witness.
-  CanAnyFunctionType
-  substSelfTypeIntoProtocolRequirementType(CanGenericFunctionType reqtTy,
-                                           ProtocolConformance *conformance);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.

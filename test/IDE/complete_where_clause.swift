@@ -1,8 +1,8 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP1 | FileCheck %s -check-prefix=A1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP2 | FileCheck %s -check-prefix=A1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP3 | FileCheck %s -check-prefix=A1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | FileCheck %s -check-prefix=TYPE1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP1 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP2 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP3 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | %FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | %FileCheck %s -check-prefix=TYPE1
 
 class A1<T1, T2, T3> {}
 

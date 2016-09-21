@@ -879,15 +879,19 @@ generally needs as much code in the function as implicit manual
 propagation would.  However, we could optimize this for many common
 cases by causing clean-ups to be called automatically by the
 interpretation function.  That is, instead of a landing pad that looks
-notionally like this::
+notionally like this:
 
-  void *exception = ...;
+.. code-block:: objc++
+
+  void *exception = /*...*/;
   SomeCXXType::~SomeCXXType(&foo);
   objc_release(bar);
   objc_release(baz);
   _Unwind_Resume(exception);
 
-The unwind table would have a record that looks notionally like this::
+The unwind table would have a record that looks notionally like this:
+
+.. code-block:: objc++
 
   CALL_WITH_FRAME_ADDRESS(&SomeCXXType::~SomeCXXType, FRAME_OFFSET_OF(foo))
   CALL_WITH_FRAME_VALUE(&objc_release, FRAME_OFFSET_OF(bar))

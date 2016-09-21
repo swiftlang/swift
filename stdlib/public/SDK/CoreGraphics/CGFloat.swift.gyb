@@ -187,6 +187,10 @@ extension CGFloat : SignedArithmetic {
     return CGFloat(native.nextUp)
   }
 
+  public var magnitude: CGFloat {
+    return CGFloat(Swift.abs(native))
+  }
+
   public mutating func negate() {
     native.negate()
   }

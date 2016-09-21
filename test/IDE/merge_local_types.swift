@@ -1,11 +1,11 @@
 // Tests merging of modules each with their own local types
 
-// RUN: rm -rf %t && mkdir %t
+// RUN: rm -rf %t && mkdir -p %t
 
 // Create separate modules and merge them together
 // RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypesMerged -o %t/LocalTypesMerged.swiftmodule %s %S/local_types.swift
 
-// RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | FileCheck %s
+// RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | %FileCheck %s
 
 public func toMerge() {
   // CHECK-DAG: VF16LocalTypesMerged7toMergeFT_T_L_16SingleFuncStruct

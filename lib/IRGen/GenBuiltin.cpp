@@ -20,6 +20,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
 
@@ -78,18 +79,6 @@ static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
     v = IGF.Builder.CreateICmp(pred, lhs, rhs);
   
   result.add(v);
-}
-
-/// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
-static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
-  using namespace llvm;
-  return StringSwitch<AtomicOrdering>(O)
-    .Case("unordered", Unordered)
-    .Case("monotonic", Monotonic)
-    .Case("acquire", Acquire)
-    .Case("release", Release)
-    .Case("acqrel", AcquireRelease)
-    .Case("seqcst", SequentiallyConsistent);
 }
 
 static void emitTypeTraitBuiltin(IRGenFunction &IGF,
@@ -179,22 +168,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
                            IGF.IGM.getSize(Size(1))));
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::StrideofNonZero) {
-    // Note this case must never return 0.
-    // It is implemented as max(strideof, 1)
-    args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
-    // Strideof should never return 0, so return 1 if the type has a 0 stride.
-    llvm::Value *StrideOf = valueTy.second.getStride(IGF, valueTy.first);
-    llvm::IntegerType *IntTy = cast<llvm::IntegerType>(StrideOf->getType());
-    auto *Zero = llvm::ConstantInt::get(IntTy, 0);
-    auto *One = llvm::ConstantInt::get(IntTy, 1);
-    llvm::Value *Cmp = IGF.Builder.CreateICmpEQ(StrideOf, Zero);
-    out.add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
     return;
   }
 
@@ -402,6 +375,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Decode the ordering argument, which is required.
     auto underscore = BuiltinName.find('_');
     auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    assert(ordering != llvm::AtomicOrdering::NotAtomic);
     BuiltinName = BuiltinName.substr(underscore);
     
     // Accept singlethread if present.
@@ -428,6 +402,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     assert(Parts.size() >= 2 && "Mismatch with sema");
     auto successOrdering = decodeLLVMAtomicOrdering(Parts[0]);
     auto failureOrdering = decodeLLVMAtomicOrdering(Parts[1]);
+    assert(successOrdering != llvm::AtomicOrdering::NotAtomic);
+    assert(failureOrdering != llvm::AtomicOrdering::NotAtomic);
     auto NextPart = Parts.begin() + 2;
 
     // Accept weak, volatile, and singlethread if present.
@@ -504,6 +480,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // Decode the ordering argument, which is required.
     underscore = BuiltinName.find('_');
     auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    assert(ordering != llvm::AtomicOrdering::NotAtomic);
     BuiltinName = BuiltinName.substr(underscore);
     
     // Accept volatile and singlethread if present.
@@ -549,6 +526,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     underscore = BuiltinName.find('_');
     auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    assert(ordering != llvm::AtomicOrdering::NotAtomic);
     BuiltinName = BuiltinName.substr(underscore);
 
     // Accept volatile and singlethread if present.

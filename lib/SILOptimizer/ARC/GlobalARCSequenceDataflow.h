@@ -54,6 +54,9 @@ private:
   /// releasing this value one is affecting.
   RCIdentityFunctionInfo *RCIA;
 
+  /// An analysis to get the epilogue ARC instructions. 
+  EpilogueARCFunctionInfo *EAFI;
+
   /// The map from dataflow terminating decrements -> increment dataflow state.
   BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
 
@@ -66,12 +69,11 @@ private:
   /// Stashed BB information.
   ARCBBStateInfo *BBStateInfo;
 
-  ConsumedArgToEpilogueReleaseMatcher ConsumedArgToReleaseMap;
-
 public:
   ARCSequenceDataflowEvaluator(
       SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-      RCIdentityFunctionInfo *RCIA, ProgramTerminationFunctionInfo *PTFI,
+      RCIdentityFunctionInfo *RCIA, EpilogueARCFunctionInfo *EAFI,
+      ProgramTerminationFunctionInfo *PTFI,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   ~ARCSequenceDataflowEvaluator();

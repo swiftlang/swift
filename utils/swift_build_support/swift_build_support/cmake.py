@@ -90,6 +90,8 @@ class CMake(object):
             sanitizers.append('Address')
         if args.enable_ubsan:
             sanitizers.append('Undefined')
+        if args.enable_tsan:
+            sanitizers.append('Thread')
         if sanitizers:
             define("LLVM_USE_SANITIZER", ";".join(sanitizers))
 

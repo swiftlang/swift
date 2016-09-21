@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar25733187
+
 // watchOS 2.0 does not have an XCTest module.
 // XFAIL: OS=watchos
 
@@ -161,8 +163,8 @@ XCTestTestSuite.test("XCTAssertEqual/Dictionary<T, U>") {
     }
 
     dynamic func test_whenDictionariesAreNotEqual_fails() {
-      XCTAssertEqual(["foo": ["bar": "baz"]],
-                     ["foo": ["bar": "flim"]])
+      XCTAssertEqual(["foo": ["bar": "baz"] as NSDictionary],
+                     ["foo": ["bar": "flim"] as NSDictionary])
     }
   }
 

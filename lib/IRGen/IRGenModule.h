@@ -133,25 +133,30 @@ class IRGenModule;
 
 /// A type descriptor for a field type accessor.
 class FieldTypeInfo {
-  llvm::PointerIntPair<CanType, 1, unsigned> Info;
+  llvm::PointerIntPair<CanType, 2, unsigned> Info;
   /// Bits in the "int" part of the Info pair.
   enum : unsigned {
     /// Flag indicates that the case is indirectly stored in a box.
     Indirect = 1,
+    /// Indicates a weak optional reference
+    Weak = 2,
   };
 
-  static unsigned getFlags(bool indirect) {
-    return (indirect ? Indirect : 0);
+  static unsigned getFlags(bool indirect, bool weak) {
+    return (indirect ? Indirect : 0)
+         | (weak ? Weak : 0);
     //   | (blah ? Blah : 0) ...
   }
 
 public:
-  FieldTypeInfo(CanType type, bool indirect)
-    : Info(type, getFlags(indirect))
+  FieldTypeInfo(CanType type, bool indirect, bool weak)
+    : Info(type, getFlags(indirect, weak))
   {}
 
   CanType getType() const { return Info.getPointer(); }
   bool isIndirect() const { return Info.getInt() & Indirect; }
+  bool isWeak() const { return Info.getInt() & Weak; }
+  bool hasFlags() const { return Info.getInt() != 0; }
 };
 
 /// The principal singleton which manages all of IR generation.
@@ -269,6 +274,13 @@ public:
 
   /// Emit type metadata records for types without explicit protocol conformance.
   void emitTypeMetadataRecords();
+
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
+  void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
+  void emitReflectionMetadataVersion();
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -742,8 +754,22 @@ public:
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
+
+  /// Emit a reflection metadata record for a builtin type referenced
+  /// from this module.
+  void emitBuiltinTypeMetadataRecord(CanType builtinType);
+
+  /// Emit a reflection metadata record for an imported type referenced
+  /// from this module.
+  void emitOpaqueTypeMetadataRecord(const NominalTypeDecl *nominalDecl);
+
+  /// Emit reflection metadata records for builtin and imported types referenced
+  /// from this module.
   void emitBuiltinReflectionMetadata();
+
+  /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
+
   std::string getBuiltinTypeMetadataSectionName();
   std::string getFieldTypeMetadataSectionName();
   std::string getAssociatedTypeMetadataSectionName();

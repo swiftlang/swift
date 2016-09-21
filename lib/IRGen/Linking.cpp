@@ -315,6 +315,19 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::SILGlobalVariable:
     mangler.appendSymbol(getSILGlobalVariable()->getName());
     return mangler.finalize(buffer);
+
+  case Kind::ReflectionBuiltinDescriptor:
+    mangler.append("_TMRb");
+    mangler.mangleType(getType(), getUncurryLevel());
+    return mangler.finalize(buffer);
+  case Kind::ReflectionFieldDescriptor:
+    mangler.append("_TMRf");
+    mangler.mangleType(getType(), getUncurryLevel());
+    return mangler.finalize(buffer);
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    mangler.append("_TMRa");
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return mangler.finalize(buffer);
   }
   llvm_unreachable("bad entity kind!");
 }

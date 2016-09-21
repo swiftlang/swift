@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 // Check that compiler does not crash on the devirtualization of materializeForSet methods
 // and produces a correct code.
@@ -13,14 +13,14 @@ public protocol Foo {
     var bar: String { get set }
 }
 
-public class BaseFoo: Foo {
-    public var bar: String = "hello"
+open class BaseFoo: Foo {
+    open var bar: String = "hello"
 }
 
-public class ChildFoo: BaseFoo {
+open class ChildFoo: BaseFoo {
     private var _bar: String = "world"
 
-    override public var bar: String {
+    override open var bar: String {
         get {
             return _bar
         }

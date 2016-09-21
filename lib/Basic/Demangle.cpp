@@ -1494,6 +1494,8 @@ private:
 
     if (Mangled.nextIf('S')) {
       assocTy = demangleSubstitutionIndex();
+      if (!assocTy)
+        return nullptr;
       if (assocTy->getKind() != Node::Kind::DependentAssociatedTypeRef)
         return nullptr;
     } else {

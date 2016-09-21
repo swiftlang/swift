@@ -50,6 +50,7 @@ STATISTIC(NumTargetsPredicted, "Number of monomorphic functions predicted");
 static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   // Clone the Apply.
   Builder.setCurrentDebugScope(AI.getDebugScope());
+  Builder.addOpenedArchetypeOperands(AI.getInstruction());
   auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
@@ -245,8 +246,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
   // Only consider 'private' members, unless we are in whole-module compilation.
   switch (CD->getEffectiveAccess()) {
-  case Accessibility::Public:
+  case Accessibility::Open:
     return false;
+  case Accessibility::Public:
   case Accessibility::Internal:
     if (!AI.getModule().isWholeModule())
       return false;
@@ -328,7 +330,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isNominalTypeWithUnboundGenericParameters(SubType, AI.getModule()))
+  if (SubType.getSwiftRValueType()->hasArchetype())
     return false;
 
   auto &M = CMI->getModule();

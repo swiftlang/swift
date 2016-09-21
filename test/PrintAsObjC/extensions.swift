@@ -1,17 +1,18 @@
 // Please keep this file in alphabetical order!
 
 // RUN: rm -rf %t
-// RUN: mkdir %t
+// RUN: mkdir -p %t
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -parse -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: FileCheck %s < %t/extensions.h
-// RUN: FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
+// RUN: %FileCheck %s < %t/extensions.h
+// RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
 
 // REQUIRES: objc_interop
 
 import Foundation
 import AppKit
+import objc_generics
 
 // CHECK-NOT: AppKit
 
@@ -81,6 +82,13 @@ extension ClassWithCustomName {
 // NEGATIVE-NOT: CGColor
 extension CGColor {
   func anyOldMethod() {}
+}
+
+// CHECK-LABEL: @interface GenericClass (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (void)bar;
+// CHECK-NEXT: @end
+extension GenericClass {
+  func bar() {}
 }
 
 // NEGATIVE-NOT: NotObjC

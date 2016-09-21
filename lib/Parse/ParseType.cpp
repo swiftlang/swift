@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/ExprHandle.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -78,7 +77,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
   case tok::kw_super:
-  case tok::kw_dynamicType:
   case tok::kw_self:
     // These keywords don't start a decl or a statement, and thus should be
     // safe to skip over.
@@ -451,7 +449,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       // Skip until we hit the '>'.
       RAngleLoc = skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     }
-    
+
     auto composition = ProtocolCompositionTypeRepr::create(
       Context, Protocols, ProtocolLoc, {LAngleLoc, RAngleLoc});
 
@@ -466,9 +464,19 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       SmallString<32> replacement;
       auto Begin = Protocols.begin();
       replacement += extractText(*Begin);
-      while(++Begin != Protocols.end()) {
+      while (++Begin != Protocols.end()) {
         replacement += " & ";
         replacement += extractText(*Begin);
+      }
+
+      // Copy trailing content after '>' to the replacement string.
+      // FIXME: lexer should smartly separate '>' and trailing contents like '?'.
+      StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
+        substr(1);
+      if (!TrailingContent.empty()) {
+        replacement.insert(replacement.begin(), '(');
+        replacement += ")";
+        replacement += TrailingContent;
       }
 
       // Replace 'protocol<T1, T2>' with 'T1 & T2'
@@ -711,6 +719,12 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
           diag.fixItRemoveChars(firstNameLoc, ElementsR[i]->getStartLoc());
         else
           diag.fixItReplace(SourceRange(firstNameLoc), "_");
+      }
+
+      if (firstNameLoc.isValid() || secondNameLoc.isValid()) {
+        // Form the named parameter type representation.
+        ElementsR[i] = new (Context) NamedTypeRepr(secondName, ElementsR[i],
+                                                   secondNameLoc, firstNameLoc);
       }
     }
   }

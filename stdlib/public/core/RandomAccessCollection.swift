@@ -15,9 +15,12 @@
 /// In most cases, it's best to ignore this protocol and use the
 /// `RandomAccessCollection` protocol instead, because it has a more complete
 /// interface.
-public protocol RandomAccessIndexable : BidirectionalIndexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
+public typealias RandomAccessIndexable = _RandomAccessIndexable
+public protocol _RandomAccessIndexable : _BidirectionalIndexable {
+  // FIXME(ABI)#54 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
+  // rdar://problem/20531108
   //
   // This protocol is almost an implementation detail of the standard
   // library.
@@ -44,21 +47,40 @@ public protocol RandomAccessIndexable : BidirectionalIndexable {
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
 public protocol RandomAccessCollection :
-  RandomAccessIndexable, BidirectionalCollection
+  _RandomAccessIndexable, BidirectionalCollection
 {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
-  associatedtype SubSequence : RandomAccessIndexable, BidirectionalCollection
+  associatedtype SubSequence : _RandomAccessIndexable, BidirectionalCollection
     = RandomAccessSlice<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#102 (Recursive Protocol Constraints):
   // associatedtype SubSequence : RandomAccessCollection
 
   /// A type that can represent the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : RandomAccessIndexable, BidirectionalCollection
+  associatedtype Indices : _RandomAccessIndexable, BidirectionalCollection
     = DefaultRandomAccessIndices<Self>
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#103 (Recursive Protocol Constraints):
   // associatedtype Indices : RandomAccessCollection
+
+  /// The indices that are valid for subscripting the collection, in ascending
+  /// order.
+  ///
+  /// A collection's `indices` property can hold a strong reference to the
+  /// collection itself, causing the collection to be non-uniquely referenced.
+  /// If you mutate the collection while iterating over its indices, a strong
+  /// reference can cause an unexpected copy of the collection. To avoid the
+  /// unexpected copy, use the `index(after:)` method starting with
+  /// `startIndex` to produce indices instead.
+  ///
+  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
+  ///     var i = c.startIndex
+  ///     while i != c.endIndex {
+  ///         c[i] /= 5
+  ///         i = c.index(after: i)
+  ///     }
+  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
+  var indices: Indices { get }
 }
 
 /// Supply the default "slicing" `subscript` for `RandomAccessCollection`
@@ -101,7 +123,7 @@ extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
 // wrong complexity.
 
 /// Default implementation for random access collections.
-extension RandomAccessIndexable {
+extension _RandomAccessIndexable {
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
   ///
@@ -125,9 +147,9 @@ extension RandomAccessIndexable {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection, unless the index passed as
+  /// `limit` prevents offsetting beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
@@ -178,18 +200,16 @@ where Index : Strideable,
     return startIndex..<endIndex
   }
 
-  internal func _validityChecked(_ i: Index) -> Index {
-    _precondition(i >= startIndex && i <= endIndex, "index out of range")
-    return i
-  }
-  
   /// Returns the position immediately after the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    return _validityChecked(i.advanced(by: 1))
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      i, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
+    return i.advanced(by: 1)
   }
 
   /// Returns the position immediately after the given index.
@@ -198,7 +218,11 @@ where Index : Strideable,
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    return _validityChecked(i.advanced(by: -1))
+    let result = i.advanced(by: -1)
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      result, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
+    return result
   }
 
   /// Returns an index that is the specified distance from the given index.
@@ -211,9 +235,8 @@ where Index : Strideable,
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// Advancing an index beyond a collection's ending index or offsetting it
-  /// before a collection's starting index may trigger a runtime error. The
-  /// value passed as `n` must not result in such an operation.
+  /// The value passed as `n` must not offset `i` beyond the `endIndex` or
+  /// before the `startIndex` of this collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
@@ -228,7 +251,15 @@ where Index : Strideable,
   ///   - If `n < 0`, `n >= self.distance(from: i, to: self.startIndex)`
   /// - Complexity: O(1)
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
-    return _validityChecked(i.advanced(by: n))
+    let result = i.advanced(by: n)
+    // This range check is not precise, tighter bounds exist based on `n`.
+    // Unfortunately, we would need to perform index manipulation to
+    // compute those bounds, which is probably too slow in the general
+    // case.
+    // FIXME: swift-3-indexing-model: tests for the trap.
+    _failEarlyRangeCheck(
+      result, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+    return result
   }
   
   /// Returns the distance between two indices.
@@ -241,6 +272,11 @@ where Index : Strideable,
   ///
   /// - Complexity: O(1)
   public func distance(from start: Index, to end: Index) -> Index.Stride {
+    // FIXME: swift-3-indexing-model: tests for traps.
+    _failEarlyRangeCheck(
+      start, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
+    _failEarlyRangeCheck(
+      end, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return start.distance(to: end)
   }
 }

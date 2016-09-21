@@ -1,5 +1,5 @@
-// RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
-// RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
+// RUN: %swift -target thumbv7--windows-itanium -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-OPT
+// RUN: %swift -target thumbv7--windows-itanium -O -emit-ir -parse-as-library -parse-stdlib -module-name dllexport %s -o - | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OPT
 
 // REQUIRES: CODEGENERATOR=ARM
 
@@ -12,13 +12,13 @@ public protocol p {
   func f()
 }
 
-public class c {
+open class c {
   public init() { }
 }
 
 public var ci : c = c()
 
-public class d {
+open class d {
   private func m() -> Never {
     fatalError()
   }
