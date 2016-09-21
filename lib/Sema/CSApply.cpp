@@ -4814,7 +4814,7 @@ Expr *ExprRewriter::coerceCallArguments(
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.Variadic) {
+    if (param.isVariadic()) {
       // Find the appropriate injection function.
       if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
         return nullptr;
@@ -4823,7 +4823,8 @@ Expr *ExprRewriter::coerceCallArguments(
       auto paramBaseType = param.Ty;
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label, true));
+      toSugarFields.push_back(
+          TupleTypeElt(sliceType, param.Label, param.parameterFlags));
       anythingShuffled = true;
       sources.push_back(TupleShuffleExpr::Variadic);
 
@@ -4867,12 +4868,12 @@ Expr *ExprRewriter::coerceCallArguments(
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
       toSugarFields.push_back(TupleTypeElt(
-                                param.Variadic
+                                param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
                                                          param.Ty)
                                   : param.Ty,
                                 param.Label,
-                                param.Variadic));
+                                param.parameterFlags));
 
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
@@ -4899,8 +4900,10 @@ Expr *ExprRewriter::coerceCallArguments(
     // If the types exactly match, this is easy.
     auto paramType = param.Ty;
     if (argType->isEqual(paramType)) {
-      toSugarFields.push_back(TupleTypeElt(argType, param.Label));
-      fromTupleExprFields[argIdx] = TupleTypeElt(paramType, param.Label);
+      toSugarFields.push_back(
+          TupleTypeElt(argType, param.Label, param.parameterFlags));
+      fromTupleExprFields[argIdx] =
+          TupleTypeElt(paramType, param.Label, param.parameterFlags);
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -4913,9 +4916,10 @@ Expr *ExprRewriter::coerceCallArguments(
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
-    fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
-                                               getArgLabel(argIdx));
-    toSugarFields.push_back(TupleTypeElt(argType, param.Label));
+    fromTupleExprFields[argIdx] = TupleTypeElt(
+        convertedArg->getType(), getArgLabel(argIdx), param.parameterFlags);
+    toSugarFields.push_back(
+        TupleTypeElt(argType, param.Label, param.parameterFlags));
   }
 
   // Compute a new 'arg', from the bits we have.  We have three cases: the

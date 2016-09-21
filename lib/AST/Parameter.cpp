@@ -121,13 +121,12 @@ Type ParameterList::getType(const ASTContext &C) const {
   
   for (auto P : *this) {
     if (!P->hasType()) return Type();
-    
-    argumentInfo.push_back({
-      P->getType(), P->getArgumentName(),
-      P->isVariadic()
-    });
+
+    argumentInfo.emplace_back(
+        P->getType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(P->getType(), P->isVariadic()));
   }
-  
+
   return TupleType::get(argumentInfo, C);
 }
 
@@ -153,10 +152,9 @@ Type ParameterList::getInterfaceType(DeclContext *DC) const {
       type = P->getType();
     assert(!type->hasArchetype());
 
-    argumentInfo.push_back({
-      type, P->getArgumentName(),
-      P->isVariadic()
-    });
+    argumentInfo.emplace_back(
+        type, P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic()));
   }
 
   return TupleType::get(argumentInfo, C);

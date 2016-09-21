@@ -53,7 +53,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 260; // Last change: open
+const uint16_t VERSION_MINOR = 268; // Last change: parameter type flags
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -570,7 +570,8 @@ namespace decls_block {
 
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField  // inner type
+    TypeIDField,                         // inner type
+    BCFixed<ParameterTypeFlags::NumBits> // vararg?, autoclosure?, escaping?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -579,9 +580,9 @@ namespace decls_block {
 
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
-    IdentifierIDField,    // name
-    TypeIDField,          // type
-    BCFixed<1>            // vararg?
+    IdentifierIDField,                   // name
+    TypeIDField,                         // type
+    BCFixed<ParameterTypeFlags::NumBits> // vararg?, autoclosure?, escaping?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
