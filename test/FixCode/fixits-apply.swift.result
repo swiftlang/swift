@@ -45,7 +45,7 @@ func testMask2(a: UInt64) {
   sendIt(MyEventMask2(rawValue: a))
 }
 func testMask3(a: MyEventMask2) {
-  testMask1(a: UInt64(a.rawValue))
+  testMask1(a: Int(a.rawValue))
 }
 func testMask4(a: MyEventMask2) {
   testMask2(a: a.rawValue)
@@ -69,7 +69,7 @@ func testMask10(a: Int?) {
   sendIt(a) // no fix, nullability mismatch.
 }
 func testMask11(a: MyEventMask2?) {
-  testMask7(a: a.map { UInt64($0.rawValue) })
+  testMask7(a: a.map { Int($0.rawValue) })
 }
 func testMask12(a: MyEventMask2?) {
   testMask8(a: a.map { $0.rawValue })

@@ -3719,7 +3719,7 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
-        convWrapBefore += rawTy->getString();
+        convWrapBefore += toType->getString();
         convWrapBefore += "(";
         convWrapAfter += ")";
       }
