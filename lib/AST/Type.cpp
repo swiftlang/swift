@@ -761,7 +761,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
         }
 
         Identifier newName = stripLabels? Identifier() : elt.getName();
-        elements.push_back(TupleTypeElt(eltTy, newName, elt.isVararg()));
+        elements.push_back(elt.getWithTypeAndName(eltTy, newName));
       }
       ++idx;
     }
@@ -850,7 +850,9 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
 
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(!elt.isVararg() && "Vararg argument tuple doesn't make sense");
+      assert(elt.getParameterFlags().value == 0 &&
+             "Vararg, autoclosure, or escaping argument tuple"
+             "doesn't make sense");
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];
@@ -915,7 +917,7 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
       argParam.Label = elt.getName();
       argParam.HasDefaultArgument =
           paramList && paramList->get(i)->isDefaultArgument();
-      argParam.Variadic = elt.isVararg();
+      argParam.parameterFlags = elt.getParameterFlags();
       result.push_back(argParam);
     }
     break;

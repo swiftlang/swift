@@ -2826,7 +2826,8 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(parenTy->getUnderlyingType()));
+                                addTypeRef(parenTy->getUnderlyingType()),
+                                parenTy->getParameterFlags().value);
     break;
   }
 
@@ -2838,10 +2839,9 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addIdentifierRef(elt.getName()),
-                                     addTypeRef(elt.getType()),
-                                     elt.isVararg());
+      TupleTypeEltLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getName()),
+          addTypeRef(elt.getType()), elt.getParameterFlags().value);
     }
 
     break;

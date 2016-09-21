@@ -3446,8 +3446,10 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    decls_block::ParenTypeLayout::readRecord(scratch, underlyingID);
-    typeOrOffset = ParenType::get(ctx, getType(underlyingID));
+    uint8_t flagsValue;
+    decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, flagsValue);
+    typeOrOffset = ParenType::get(ctx, getType(underlyingID),
+                                  ParameterTypeFlags(flagsValue));
     break;
   }
 
@@ -3467,11 +3469,12 @@ Type ModuleFile::getType(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVararg;
+      uint8_t flagsValue;
       decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
-                                                  isVararg);
+                                                  flagsValue);
 
-      elements.push_back({getType(typeID), getIdentifier(nameID), isVararg});
+      elements.emplace_back(getType(typeID), getIdentifier(nameID),
+                            ParameterTypeFlags(flagsValue));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);

@@ -293,7 +293,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
-    llvm::DenseMap<Type, ParenType*> ParenTypes;
+    llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
@@ -2597,13 +2597,14 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
   return vecTy;
 }
 
-
-ParenType *ParenType::get(const ASTContext &C, Type underlying) {
+ParenType *ParenType::get(const ASTContext &C, Type underlying,
+                          ParameterTypeFlags flags) {
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  ParenType *&Result = C.Impl.getArena(arena).ParenTypes[underlying];
+  ParenType *&Result =
+      C.Impl.getArena(arena).ParenTypes[{underlying, flags.value}];
   if (Result == 0) {
-    Result = new (C, arena) ParenType(underlying, properties);
+    Result = new (C, arena) ParenType(underlying, properties, flags);
   }
   return Result;
 }
@@ -2616,15 +2617,17 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
+    ID.AddPointer(Elt.Name.get());
     ID.AddPointer(Elt.getType().getPointer());
+    ID.AddInteger(Elt.Flags.value);
   }
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType());
+    return ParenType::get(C, Fields[0].getType(),
+                          Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {

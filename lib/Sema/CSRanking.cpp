@@ -671,7 +671,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             // We need either a default argument or a variadic
             // argument for the first declaration to be more
             // specialized.
-            if (!params2[i].HasDefaultArgument && !params2[i].Variadic)
+            if (!params2[i].HasDefaultArgument &&
+                !params2[i].isVariadic())
               return false;
 
             fewerEffectiveParameters = true;
@@ -682,10 +683,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           if (params1[i].Label != params2[i].Label) return false;
 
           // If one parameter is variadic and the other is not...
-          if (params1[i].Variadic != params2[i].Variadic) {
+          if (params1[i].isVariadic() != params2[i].isVariadic()) {
             // If the first parameter is the variadic one, it's not
             // more specialized.
-            if (params1[i].Variadic) return false;
+            if (params1[i].isVariadic()) return false;
 
             fewerEffectiveParameters = true;
           }
