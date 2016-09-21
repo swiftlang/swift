@@ -285,9 +285,26 @@ static void _buildNameForMetadata(const Metadata *type,
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     result += "(";
     auto elts = tuple->getElements();
+    const char *labels = tuple->Labels;
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       if (i > 0)
         result += ", ";
+
+      // If we have any labels, add the label.
+      if (labels) {
+        // Labels are space-separated.
+        if (const char *space = strchr(labels, ' ')) {
+          if (labels != space) {
+            result.append(labels, space - labels);
+            result += ": ";
+          }
+
+          labels = space + 1;
+        } else {
+          labels = nullptr;
+        }
+      }
+
       _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type, qualified,
                             result);
     }
@@ -2480,6 +2497,51 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
   return result;
 }
 
+static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
+                                     OpaqueValue *source,
+                                     const TupleTypeMetadata *sourceType,
+                                     const TupleTypeMetadata *targetType,
+                                     DynamicCastFlags flags) {
+  assert(sourceType != targetType &&
+         "Caller should handle exact tuple matches");
+
+
+  // Simple case: number of elements mismatches.
+  if (sourceType->NumElements != targetType->NumElements)
+    return _fail(source, sourceType, targetType, flags);
+
+  // Check that the elements line up.
+  const char *sourceLabels = sourceType->Labels;
+  const char *targetLabels = targetType->Labels;
+  for (unsigned i = 0, n = sourceType->NumElements; i != n; ++i) {
+    // Check the label, if there is one.
+    if (sourceLabels && targetLabels && sourceLabels != targetLabels) {
+      const char *sourceSpace = strchr(sourceLabels, ' ');
+      const char *targetSpace = strchr(targetLabels, ' ');
+
+      // If both have labels, and the labels mismatch, we fail.
+      if (sourceSpace && sourceSpace != sourceLabels &&
+          targetSpace && targetSpace != targetLabels) {
+        unsigned sourceLen = sourceSpace - sourceLabels;
+        unsigned targetLen = targetSpace - targetLabels;
+        if (sourceLen != targetLen ||
+            strncmp(sourceLabels, targetLabels, sourceLen) != 0)
+          return _fail(source, sourceType, targetType, flags);
+      }
+
+      sourceLabels = sourceSpace ? sourceSpace + 1 : nullptr;
+      targetLabels = targetSpace ? targetSpace + 1 : nullptr;
+    }
+
+    // Make sure the types match exactly.
+    // FIXME: we should dynamically cast the elements themselves.
+    if (sourceType->getElement(i).Type != targetType->getElement(i).Type)
+      return _fail(source, sourceType, targetType, flags);
+  }
+
+  return _succeed(destination, source, targetType, flags);
+}
+
 /******************************************************************************/
 /****************************** Main Entrypoint *******************************/
 /******************************************************************************/
@@ -2711,6 +2773,15 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
+    }
+
+    // If both are tuple types, allow the cast to add/remove labels.
+    if (srcType->getKind() == MetadataKind::Tuple &&
+        targetType->getKind() == MetadataKind::Tuple) {
+      return _dynamicCastTupleToTuple(dest, src,
+                                      cast<TupleTypeMetadata>(srcType),
+                                      cast<TupleTypeMetadata>(targetType),
+                                      flags);
     }
 
     // Otherwise, we have a failure.
