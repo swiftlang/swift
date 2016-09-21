@@ -2523,7 +2523,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
 
   @_versioned
   internal var _capacity: Int {
-    return _body.capacity
+    return _assumeNonNegative(_body.capacity)
   }
 
   @_versioned
@@ -2532,7 +2532,7 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
       _body.count = newValue
     }
     get {
-      return _body.count
+      return _assumeNonNegative(_body.count)
     }
   }
 
@@ -2703,7 +2703,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_versioned
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
     let res = (keys + i).pointee
@@ -2713,7 +2713,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     return initializedEntries[i]
   }
 
@@ -2747,7 +2747,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func setKey(_ key: Key, at i: Int) {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
     (keys + i).pointee = key
@@ -2804,8 +2804,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
+  @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, 0..<capacity)
+    return _squeezeHashValue(k.hashValue, capacity)
   }
 
   @_versioned
@@ -2933,6 +2934,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func assertingGet(_ i: Index) -> SequenceElement {
+    _precondition(i.offset >= 0 && i.offset < capacity)
     _precondition(
       isInitializedEntry(at: i.offset),
       "attempting to access ${Self} elements using an invalid Index")
