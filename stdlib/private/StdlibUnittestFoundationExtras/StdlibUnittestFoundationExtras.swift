@@ -127,6 +127,10 @@ public func expectBridgeToNSValue<T>(_ value: T,
   if let nsValueGetter = nsValueGetter {
     expectTrue(equal(value, nsValueGetter(nsValue)))
   }
+  if let nsValueInitializer = nsValueInitializer,
+     let nsValueGetter = nsValueGetter {
+    expectTrue(equal(value, nsValueGetter(nsValueInitializer(value))))
+  }
   expectTrue(equal(value, object as! T))
 
 }
