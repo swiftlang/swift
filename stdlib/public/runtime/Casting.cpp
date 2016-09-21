@@ -2513,6 +2513,7 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
   // Check that the elements line up.
   const char *sourceLabels = sourceType->Labels;
   const char *targetLabels = targetType->Labels;
+  bool anyTypeMismatches = false;
   for (unsigned i = 0, n = sourceType->NumElements; i != n; ++i) {
     // Check the label, if there is one.
     if (sourceLabels && targetLabels && sourceLabels != targetLabels) {
@@ -2533,13 +2534,74 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
       targetLabels = targetSpace ? targetSpace + 1 : nullptr;
     }
 
-    // Make sure the types match exactly.
-    // FIXME: we should dynamically cast the elements themselves.
+    // If the types don't match exactly, make a note of it. We'll try to
+    // convert them in a second pass.
     if (sourceType->getElement(i).Type != targetType->getElement(i).Type)
-      return _fail(source, sourceType, targetType, flags);
+      anyTypeMismatches = true;
   }
 
-  return _succeed(destination, source, targetType, flags);
+  // If there were no type mismatches, the only difference was in the argument
+  // labels. We can directly map from the source to the destination type.
+  if (!anyTypeMismatches)
+    return _succeed(destination, source, targetType, flags);
+
+  // Determine how the individual elements will get casted.
+  // If both success and failure will destroy the source, then
+  // we can be destructively cast each element. Otherwise, we'll have to
+  // manually handle them.
+  const DynamicCastFlags alwaysDestroySourceFlags =
+    DynamicCastFlags::TakeOnSuccess | DynamicCastFlags::DestroyOnFailure;
+  bool alwaysDestroysSource =
+    (static_cast<DynamicCastFlags>(flags & alwaysDestroySourceFlags)
+       == alwaysDestroySourceFlags);
+  DynamicCastFlags elementFlags = flags;
+  if (!alwaysDestroysSource)
+    elementFlags = elementFlags - alwaysDestroySourceFlags;
+
+  // Local function to destroy the elements in the range [start, end).
+  auto destroyRange = [](const TupleTypeMetadata *type, OpaqueValue *value,
+                        unsigned start, unsigned end) {
+    assert(start <= end && "invalid range in destroyRange");
+    for (unsigned i = start; i != end; ++i) {
+      const auto &elt = type->getElement(i);
+      elt.Type->vw_destroy(elt.findIn(value));
+    }
+  };
+
+  // Cast each element.
+  for (unsigned i = 0, n = sourceType->NumElements; i != n; ++i) {
+    // Cast the element. If it succeeds, keep going.
+    const auto &sourceElt = sourceType->getElement(i);
+    const auto &targetElt = targetType->getElement(i);
+    if (swift_dynamicCast(targetElt.findIn(destination),
+                          sourceElt.findIn(source),
+                          sourceElt.Type, targetElt.Type, elementFlags))
+      continue;
+
+    // Casting failed, so clean up.
+
+    // Destroy all of the elements that got casted into the destination buffer.
+    destroyRange(targetType, destination, 0, i);
+
+    // If we're supposed to destroy on failure, destroy any elements from the
+    // source buffer that haven't been destroyed/taken from yet.
+    if (flags & DynamicCastFlags::DestroyOnFailure)
+      destroyRange(sourceType, source, alwaysDestroysSource ? i : 0, n);
+
+    // If an unconditional cast failed, complain.
+    if (flags & DynamicCastFlags::Unconditional)
+      swift_dynamicCastFailure(sourceType, targetType);
+    return false;
+  }
+
+  // Casting succeeded.
+
+  // If we were supposed to take on success from the source buffer but couldn't
+  // before, destroy the source buffer now.
+  if (!alwaysDestroysSource && (flags & DynamicCastFlags::TakeOnSuccess))
+    destroyRange(sourceType, source, 0, sourceType->NumElements);
+
+  return true;
 }
 
 /******************************************************************************/
