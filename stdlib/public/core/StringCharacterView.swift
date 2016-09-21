@@ -444,11 +444,9 @@ extension String.CharacterView {
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
   public subscript(bounds: Range<Index>) -> String.CharacterView {
-    let unicodeScalarRange =
-      bounds.lowerBound._base..<bounds.upperBound._base
-    return String.CharacterView(
-      UnicodeScalarView(_core, coreOffset: _coreOffset)[unicodeScalarRange]._core,
-      coreOffset: bounds.lowerBound._base._position)
+    let unicodeScalarRange = bounds.lowerBound._base..<bounds.upperBound._base
+    return String.CharacterView(unicodeScalars[unicodeScalarRange]._core,
+      coreOffset: unicodeScalarRange.lowerBound._position)
   }
 }
 
