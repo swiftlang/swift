@@ -247,7 +247,8 @@ public protocol BinaryInteger :
   mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
 % end
 
-  func quotientAndRemainder(dividingBy rhs: Self) -> (Self, Self)
+  func quotientAndRemainder(dividingBy rhs: Self)
+    -> (quotient: Self, remainder: Self)
 
   /// Returns `-1` if the value of `self` is negative, `1` if it's positive,
   /// `0` otherwise.
@@ -278,7 +279,8 @@ extension BinaryInteger {
     return (self.bitWidth + ${word_bits} - 1) / ${word_bits}
   }
 
-  public func quotientAndRemainder(dividingBy rhs: Self) -> (Self, Self) {
+  public func quotientAndRemainder(dividingBy rhs: Self)
+    -> (quotient: Self, remainder: Self) {
     return (self.divided(by: rhs), self.remainder(dividingBy: rhs))
   }
 }
