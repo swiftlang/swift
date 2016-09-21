@@ -2628,6 +2628,15 @@ namespace {
       return OS;
     }
 
+    void dumpParameterFlags(ParameterTypeFlags paramFlags) {
+      if (paramFlags.isVariadic())
+        printFlag("vararg");
+      if (paramFlags.isAutoClosure())
+        printFlag("autoclosure");
+      if (paramFlags.isEscaping())
+        printFlag("escaping");
+    }
+
   public:
     PrintType(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) { }
 
@@ -2691,6 +2700,7 @@ namespace {
 
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(T, label, "paren_type");
+      dumpParameterFlags(T->getParameterFlags());
       printRec(T->getUnderlyingType());
       OS << ")";
     }
@@ -2705,9 +2715,7 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";
         if (elt.hasName())
           printField("name", elt.getName().str());
-        if (elt.isVararg())
-          printFlag("vararg");
-
+        dumpParameterFlags(elt.getParameterFlags());
         printRec(elt.getType());
         OS << ")";
       }
@@ -2918,10 +2926,7 @@ namespace {
       }
 
       printFlag(T->isAutoClosure(), "autoclosure");
-
-      // Dump out either @noescape or @escaping
-      printFlag(!T->isNoEscape(), "@escaping");
-
+      printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());

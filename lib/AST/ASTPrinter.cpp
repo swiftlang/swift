@@ -989,6 +989,20 @@ void StreamPrinter::printText(StringRef Text) {
   OS << Text;
 }
 
+/// Whether we will be printing a TypeLoc by using the TypeRepr printer
+static bool willUseTypeReprPrinting(TypeLoc tyLoc,
+                                    const PrintOptions &options) {
+  // Special case for when transforming archetypes
+  if (options.TransformContext && tyLoc.getType() &&
+      options.TransformContext->transform(tyLoc.getType()))
+    return false;
+
+  // Otherwise, whether we have a type repr and prefer that
+  return ((options.PreferTypeRepr && tyLoc.hasLocation()) ||
+          tyLoc.getType().isNull()) &&
+         tyLoc.getTypeRepr();
+}
+
 namespace {
 /// \brief AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
@@ -1184,8 +1198,11 @@ class PrintAST : public ASTVisitor<PrintAST> {
     // is null.
     if ((Options.PreferTypeRepr && TL.hasLocation()) ||
         TL.getType().isNull()) {
-      if (auto repr = TL.getTypeRepr())
+      if (auto repr = TL.getTypeRepr()) {
+        llvm::SaveAndRestore<bool> SPTA(Options.SkipParameterTypeAttributes,
+                                        true);
         repr->print(Printer, Options);
+      }
       return;
     }
 
@@ -1230,10 +1247,10 @@ private:
   /// \returns true if anything was printed.
   bool printASTNodes(const ArrayRef<ASTNode> &Elements, bool NeedIndent = true);
 
-  void printOneParameter(const ParamDecl *param, bool Curried,
-                         bool ArgNameIsAPIByDefault);
+  void printOneParameter(const ParamDecl *param, ParameterTypeFlags paramFlags,
+                         bool Curried, bool ArgNameIsAPIByDefault);
 
-  void printParameterList(ParameterList *PL, bool isCurried,
+  void printParameterList(ParameterList *PL, Type paramListTy, bool isCurried,
                           std::function<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
@@ -2520,6 +2537,14 @@ static bool isStructOrClassContext(DeclContext *dc) {
   return false;
 }
 
+static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
+                                ParameterTypeFlags flags) {
+  if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
+    printer << "@autoclosure ";
+  if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
+    printer << "@escaping ";
+}
+
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   // Print @sil_stored when the attribute is not already
@@ -2556,7 +2581,8 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
   visitVarDecl(decl);
 }
 
-void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
+void PrintAST::printOneParameter(const ParamDecl *param,
+                                 ParameterTypeFlags paramFlags, bool Curried,
                                  bool ArgNameIsAPIByDefault) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter, param);
   SWIFT_DEFER {
@@ -2610,7 +2636,25 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   // Set and restore in-parameter-position printing of types
   {
     llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
+    // FIXME: don't do if will be using type repr printing
+    printParameterFlags(Printer, Options, paramFlags);
+
+    // Special case, if we're not going to use the type repr printing, peek
+    // through the paren types so that we don't print excessive @escapings
+    unsigned numParens = 0;
+    if (!willUseTypeReprPrinting(TheTypeLoc, Options)) {
+      while (auto parenTy =
+                 dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
+        ++numParens;
+        TheTypeLoc = TypeLoc::withoutLoc(parenTy->getUnderlyingType());
+      }
+    }
+
+    for (unsigned i = 0; i < numParens; ++i)
+      Printer << "(";
     printTypeLoc(TheTypeLoc);
+    for (unsigned i = 0; i < numParens; ++i)
+      Printer << ")";
   }
 
   if (param->isVariadic())
@@ -2641,28 +2685,68 @@ void PrintAST::printOneParameter(const ParamDecl *param, bool Curried,
   }
 }
 
-void PrintAST::printParameterList(ParameterList *PL, bool isCurried,
-                            std::function<bool()> isAPINameByDefault) {
+void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
+                                  bool isCurried,
+                                  std::function<bool()> isAPINameByDefault) {
+  SmallVector<ParameterTypeFlags, 4> paramFlags;
+  if (paramListTy) {
+    if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {
+      paramFlags.push_back(parenTy->getParameterFlags());
+    } else if (auto tupleTy = paramListTy->getAs<TupleType>()) {
+      for (auto elt : tupleTy->getElements())
+        paramFlags.push_back(elt.getParameterFlags());
+    } else {
+      paramFlags.push_back({});
+    }
+  } else {
+    // Malformed AST, just use default flags
+    paramFlags.resize(PL->size());
+  }
+
   Printer << "(";
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
 
-    printOneParameter(PL->get(i), isCurried, isAPINameByDefault());
+    printOneParameter(PL->get(i), paramFlags[i], isCurried,
+                      isAPINameByDefault());
   }
   Printer << ")";
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameterLists();
+  auto curTy = AFD->hasType() ? AFD->getType() : nullptr;
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl())
+  if (AFD->getImplicitSelfDecl()) {
     BodyParams = BodyParams.slice(1);
+    if (curTy)
+      if (auto funTy = curTy->getAs<AnyFunctionType>())
+        curTy = funTy->getResult();
+  }
+
+  SmallVector<Type, 4> parameterListTypes;
+  for (auto i = 0; i < BodyParams.size(); ++i) {
+    if (curTy) {
+      if (auto funTy = curTy->getAs<AnyFunctionType>()) {
+        parameterListTypes.push_back(funTy->getInput());
+        if (i < BodyParams.size() - 1)
+          curTy = funTy->getResult();
+      } else {
+        parameterListTypes.push_back(curTy);
+      }
+    }
+  }
 
   for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
-    printParameterList(BodyParams[CurrPattern], /*Curried=*/CurrPattern > 0,
+    // Be extra careful in the event of printing mal-formed ASTs
+    auto paramListType = parameterListTypes.size() > CurrPattern
+                             ? parameterListTypes[CurrPattern]
+                             : nullptr;
+    printParameterList(BodyParams[CurrPattern], paramListType,
+                       /*Curried=*/CurrPattern > 0,
                        [&]()->bool {
       return CurrPattern > 0 || AFD->argumentNameIsAPIByDefault();
     });
@@ -2915,7 +2999,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
-    printParameterList(decl->getIndices(), /*Curried=*/false,
+    printParameterList(decl->getIndices(), decl->getIndicesType(),
+                       /*Curried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
@@ -3642,6 +3727,7 @@ public:
 
   void visitParenType(ParenType *T) {
     Printer << "(";
+    printParameterFlags(Printer, Options, T->getParameterFlags());
     visit(T->getUnderlyingType());
     Printer << ")";
   }
@@ -3671,8 +3757,10 @@ public:
       if (TD.isVararg()) {
         visit(TD.getVarargBaseTy());
         Printer << "...";
-      } else
+      } else {
+        printParameterFlags(Printer, Options, TD.getParameterFlags());
         visit(EltType);
+      }
     }
     Printer << ")";
   }
@@ -3804,13 +3892,6 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (info.isAutoClosure() && !Options.excludeAttrKind(TAK_autoclosure)) {
-      Printer.printSimpleAttr("@autoclosure") << " ";
-    }
-    if (inParameterPrinting && !info.isNoEscape() &&
-        !Options.excludeAttrKind(TAK_escaping)) {
-      Printer.printSimpleAttr("@escaping") << " ";
-    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
