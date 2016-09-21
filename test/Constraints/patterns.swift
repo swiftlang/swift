@@ -146,8 +146,8 @@ func SR2066(x: Int?) {
 // Test x???? patterns.
 switch (nil as Int???) {
 case let x???: print(x, terminator: "")
-case let x??: print(x, terminator: "")
-case let x?: print(x, terminator: "")
+case let x??: print(x as Any, terminator: "")
+case let x?: print(x as Any, terminator: "")
 case 4???: break
 case nil??: break
 case nil?: break
