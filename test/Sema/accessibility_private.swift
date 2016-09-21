@@ -188,7 +188,7 @@ extension Container {
   fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-warning {{method should not be declared fileprivate because its parameter uses a private type}} {{none}}
   fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-warning {{enum should not be declared fileprivate because its raw type uses a private type}} {{none}}
   // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
-  // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  // expected-error@-2 {{type 'Container.PrivateRawValue' does not conform to protocol 'RawRepresentable'}}
   fileprivate enum PrivatePayload {
     case A(VeryPrivateStruct) // expected-warning {{enum case in an internal enum uses a private type}} {{none}}
   }
