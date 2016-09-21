@@ -1497,9 +1497,9 @@ static void checkTypeAccessibilityImpl(
     return;
   if (!TL.getType())
     return;
-  // Don't spend time checking private access; this is always valid by the time
-  // we get to this point. This includes local declarations.
-  if (contextAccessScope && !isa<ModuleDecl>(contextAccessScope))
+  // Don't spend time checking local declarations; this is always valid by the
+  // time we get to this point.
+  if (contextAccessScope && contextAccessScope->isLocalContext())
     return;
 
   Optional<const DeclContext *> typeAccessScope =
@@ -1512,8 +1512,10 @@ static void checkTypeAccessibilityImpl(
   if (!typeAccessScope.hasValue())
     return;
 
-  if (!*typeAccessScope || *typeAccessScope == contextAccessScope)
+  if (!*typeAccessScope || *typeAccessScope == contextAccessScope ||
+      contextAccessScope->isChildContextOf(*typeAccessScope)) {
     return;
+  }
 
   const TypeRepr *complainRepr = nullptr;
   if (TypeRepr *TR = TL.getTypeRepr()) {

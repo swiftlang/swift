@@ -160,3 +160,51 @@ extension Container {
     _ = Container.ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
   }
 }
+
+extension Container {
+  private struct VeryPrivateStruct { // expected-note * {{type declared here}}
+    private typealias VeryPrivateType = Int // expected-note * {{type declared here}}
+    var privateVar: VeryPrivateType { fatalError() } // expected-error {{property must be declared private because its type uses a private type}}
+    var privateVar2 = VeryPrivateType() // expected-error {{property must be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateType' (aka 'Int') uses a private type}}
+    typealias PrivateAlias = VeryPrivateType // expected-error {{type alias must be declared private because its underlying type uses a private type}}
+    subscript(_: VeryPrivateType) -> Void { return () } // expected-error {{subscript must be declared private because its index uses a private type}}
+    func privateMethod(_: VeryPrivateType) -> Void {} // expected-error {{method must be declared private because its parameter uses a private type}} {{none}}
+    enum PrivateRawValue: VeryPrivateType { // expected-error {{enum must be declared private because its raw type uses a private type}} {{none}}
+      case A
+    }
+    enum PrivatePayload {
+      case A(VeryPrivateType) // expected-error {{enum case in an internal enum uses a private type}} {{none}}
+    }
+
+    private class PrivateInnerClass {} // expected-note * {{declared here}}
+    class PrivateSuper: PrivateInnerClass {} // expected-error {{class must be declared private because its superclass is private}} {{none}}
+  }
+
+  fileprivate var privateVar: VeryPrivateStruct { fatalError() } // expected-error {{property cannot be declared fileprivate because its type uses a private type}} {{none}}
+  fileprivate typealias PrivateAlias = VeryPrivateStruct // expected-error {{type alias cannot be declared fileprivate because its underlying type uses a private type}} {{none}}
+  fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-error {{subscript cannot be declared fileprivate because its index uses a private type}} {{none}}
+  fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}} {{none}}
+  fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-error {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}}
+  // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by any literal}}
+  // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  fileprivate enum PrivatePayload {
+    case A(VeryPrivateStruct) // expected-error {{enum case in an internal enum uses a private type}} {{none}}
+  }
+
+  private class PrivateInnerClass {} // expected-note * {{declared here}}
+  fileprivate class PrivateSuperClass: PrivateInnerClass {} // expected-error {{class cannot be declared fileprivate because its superclass is private}} {{none}}
+  fileprivate class PrivateGenericUser<T> where T: PrivateInnerClass {} // expected-error {{generic class cannot be declared fileprivate because its generic requirement uses a private type}} {{none}}
+  // expected-error@-1 {{type 'PrivateGenericUser' cannot be nested in extension of generic type 'Container'}}
+  // FIXME expected-error@-2 {{cannot conform to class protocol 'AnyObject'}}
+}
+
+fileprivate struct SR2579 {
+  private struct Inner {
+    private struct InnerPrivateType {}
+    var innerProperty = InnerPrivateType() // expected-error {{property must be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+  }
+  // FIXME: We need better errors when one access violation results in more
+  // downstream.
+  private var outerProperty = Inner().innerProperty // expected-error {{property cannot be declared PRIVATE because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+  var outerProperty2 = Inner().innerProperty // expected-error {{property must be declared private because its type 'SR2579.Inner.InnerPrivateType' uses a private type}}
+}
