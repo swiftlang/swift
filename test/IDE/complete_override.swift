@@ -492,9 +492,135 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (@escaping ()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
 }
 class Escaping : EscapingBase {
   override func #^ESCAPING_1^#
 }
-// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (@escaping () -> ())) -> ((@escaping () -> ()) -> ()) {|};
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
+
+class OverrideBase {
+  init(x: Int) {}
+  convenience init(y: Int) { self.init(x: y) }
+  required init(a: Int) {}
+  required convenience init(b: Int) {}
+  func defaultMethod() {}
+  final func finalMethod() {}
+  var varDecl: Int = 0
+  open func openMethod() {}
+}
+protocol OverrideP {
+  associatedtype Assoc : OverrideP
+  init(p: Int)
+}
+
+class Override1 : OverrideBase, OverrideP {
+  #^MODIFIER1^#
+}
+class Override2 : OverrideBase, OverrideP {
+  final #^MODIFIER2^#
+}
+class Override3 : OverrideBase, OverrideP {
+  open #^MODIFIER3^#
+  // Same as MODIFIER2.
+}
+class Override4 : OverrideBase, OverrideP {
+  required #^MODIFIER4^#
+}
+class Override5 : OverrideBase, OverrideP {
+  convenience #^MODIFIER5^#
+}
+class Override6 : OverrideBase, OverrideP {
+  typealias #^MODIFIER6^#
+}
+class Override7 : OverrideBase, OverrideP {
+  override #^MODIFIER7^#
+}
+class Override8 : OverrideBase, OverrideP {
+  // Note: This *does* emit functions. It will result invalid decl, but fix-it
+  // will do the job.
+  convenience func #^MODIFIER8^#
+}
+class Override9 : OverrideBase, OverrideP {
+  // Ditto.
+  required var #^MODIFIER9^#
+}
+class Override10 : OverrideBase, OverrideP {
+  // Ditto.
+  final typealias #^MODIFIER10^#
+  // Same as MODIFIER6.
+}
+
+// MODIFIER1: Begin completions, 7 items
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
+// MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
+// MODIFIER1-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER1-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER1: End completions
+
+// MODIFIER2: Begin completions, 3 items
+// MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
+// MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
+// MODIFIER2: End completions
+
+// MODIFIER4: Begin completions, 3 items
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(p: Int) {|}; name=init(p: Int)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER4-DAG: Decl[Constructor]/Super:            init(a: Int) {|}; name=init(a: Int)
+// MODIFIER4: End completions
+
+// MODIFIER5: Begin completions, 3 items
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            override init(x: Int) {|}; name=init(x: Int)
+// MODIFIER5-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER5: End completions
+
+// MODIFIER6: Begin completions, 1 items
+// MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
+// MODIFIER6: End completions
+
+// MODIFIER7: Begin completions, 5 items
+// MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
+// MODIFIER7-DAG: Decl[InstanceVar]/Super:            var varDecl: Int; name=varDecl: Int
+// MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func openMethod() {|}; name=openMethod()
+// MODIFIER7-DAG: Decl[Constructor]/Super:            init(x: Int) {|}; name=init(x: Int)
+// MODIFIER7-DAG: Decl[Constructor]/Super:            required init(a: Int) {|}; name=required init(a: Int)
+// MODIFIER7: End completions
+
+// MODIFIER8: Begin completions, 2 items
+// MODIFIER8-DAG: Decl[InstanceMethod]/Super:         defaultMethod() {|}; name=defaultMethod()
+// MODIFIER8-DAG: Decl[InstanceMethod]/Super:         openMethod() {|}; name=openMethod()
+// MODIFIER8: End completions
+
+// MODIFIER9: Begin completions, 1 items
+// MODIFIER9-DAG: Decl[InstanceVar]/Super:            varDecl: Int; name=varDecl: Int
+// MODIFIER9: End completions
+
+protocol RequiredP {
+  init(p: Int)
+}
+class RequiredClass : RequiredP {
+  #^PROTOINIT_NORM^#
+}
+final class RequiredFinal : RequiredP {
+  #^PROTOINIT_FINAL^#
+}
+struct RequiredS : RequiredP {
+  #^PROTOINIT_STRUCT^#
+}
+
+// PROTOINIT_NORM: Begin completions, 1 items
+// PROTOINIT_NORM-DAG: required init(p: Int) {|}; name=required init(p: Int)
+// PROTOINIT_NORM: End completions
+
+// PROTOINIT_FINAL: Begin completions, 1 items
+// PROTOINIT_FINAL-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_FINAL: End completions
+
+// PROTOINIT_STRUCT: Begin completions, 1 items
+// PROTOINIT_STRUCT-DAG: init(p: Int) {|}; name=init(p: Int)
+// PROTOINIT_STRUCT: End completions
