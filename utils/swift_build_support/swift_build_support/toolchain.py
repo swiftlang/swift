@@ -137,10 +137,14 @@ class Linux(GenericUnix):
 
 class FreeBSD(GenericUnix):
     def __init__(self):
+        # For testing toolchain initializer on non-FreeBSD systems
+        sys = platform.system()
+        if sys != 'FreeBSD':
+            suffixes = ['']
         # See: https://github.com/apple/swift/pull/169
         # Building Swift from source requires a recent version of the Clang
         # compiler with C++14 support.
-        if self._release_date and self._release_date >= 1100000:
+        elif self._release_date and self._release_date >= 1100000:
             suffixes = ['']
         else:
             suffixes = ['38', '37', '36', '35']
