@@ -1338,7 +1338,7 @@ bb0(%0 : $X):
   return %1 : $()
 }
 
-// Escape analysis should analyze the implcit destructor call which may
+// Escape analysis should analyze the implicit destructor call which may
 // happen due to strong_release and figure out that the object will not
 // globally escape.
 // CHECK-LABEL: CG of check_non_escaping_implicit_destructor_invocation_via_strong_release
@@ -1353,7 +1353,7 @@ bb0:
   return %3 : $()
 }
 
-// Escape analysis should analyze the implcit destructor call which may
+// Escape analysis should analyze the implicit destructor call which may
 // happen due to strong_release and figure out that the object will not
 // globally escape.
 // CHECK-LABEL: CG of check_non_escaping_implicit_destructor_invocation_via_release_value
@@ -1368,7 +1368,7 @@ bb0:
   return %3 : $()
 }
 
-// Escape analysis should analyze the implcit destructor call which may
+// Escape analysis should analyze the implicit destructor call which may
 // happen due to strong_release and figure out that the object will
 // globally escape.
 // CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_strong_release
@@ -1385,7 +1385,7 @@ bb0:
   return %3 : $()
 }
 
-// Escape analysis should analyze the implcit destructor call which may
+// Escape analysis should analyze the implicit destructor call which may
 // happen due to strong_release and figure out that the object will
 // globally escape.
 // CHECK-LABEL: CG of check_escaping_implicit_destructor_invocation_via_release_value
