@@ -22,7 +22,7 @@
 internal enum _SipHashDetail {
   @inline(__always)
   internal static func _rotate(_ x: UInt64, leftBy amount: Int) -> UInt64 {
-    return (x << UInt64(amount)) | (x >> (64 - UInt64(amount)))
+    return (x << UInt64(amount)) | (x >> ((64 - amount) as UInt64))
   }
 
   @inline(__always)
@@ -31,13 +31,13 @@ internal enum _SipHashDetail {
   ) -> UInt64 {
     return
       UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) |
-      (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8) |
-      (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16) |
-      (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24) |
-      (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32) |
-      (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40) |
-      (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48) |
-      (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) << 56)
+      (UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48 as UInt64) |
+      (UInt64(p.load(fromByteOffset: 7, as: UInt8.self)) << 56 as UInt64)
   }
 
   @inline(__always)
@@ -48,12 +48,12 @@ internal enum _SipHashDetail {
     _sanityCheck((0..<8).contains(byteCount))
     var result: UInt64 = 0
     if byteCount >= 1 { result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self)) }
-    if byteCount >= 2 { result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8 }
-    if byteCount >= 3 { result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16 }
-    if byteCount >= 4 { result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24 }
-    if byteCount >= 5 { result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32 }
-    if byteCount >= 6 { result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40 }
-    if byteCount >= 7 { result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48 }
+    if byteCount >= 2 { result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) << 8 as UInt64 }
+    if byteCount >= 3 { result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) << 16 as UInt64 }
+    if byteCount >= 4 { result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) << 24 as UInt64 }
+    if byteCount >= 5 { result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) << 32 as UInt64 }
+    if byteCount >= 6 { result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) << 40 as UInt64 }
+    if byteCount >= 7 { result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) << 48 as UInt64 }
     return result
   }
 
