@@ -11,6 +11,7 @@ protocol P {}
 protocol Q: P {}
 
 class A:P {}
+class AA:A {}
 
 class X {}
 
@@ -202,6 +203,18 @@ func cast32(_ p: P) -> Bool {
 func cast33(_ p: P) -> Bool {
   // Same as above, but non-existential metatype
   return p is X.Type
+}
+
+func cast38<T>(_ t: T) -> Bool {
+  return t is (Int, Int)
+}
+
+func cast39<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: Int)
+}
+
+func cast40<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: A)
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
@@ -798,6 +811,114 @@ public func test37<T>(ah: T) {
   }
 }
 
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38a() -> Bool {
+  return cast38((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38b() -> Bool {
+  return cast38((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38c() -> Bool {
+  return cast38((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39a() -> Bool {
+  return cast39((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39b() -> Bool {
+  return cast39((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39c() -> Bool {
+  return cast39((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39d
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39d() -> Bool {
+  return cast39((1, 2, 3))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40a
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40a() -> Bool {
+  return cast40((1, A()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40b
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40b() -> Bool {
+  return cast40((1, AA()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test40c() -> Bool {
+  return cast40((1, S()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40d
+// CHECK: bb0
+// CHECK-NOT: return
+// CHECK: checked_cast_addr_br take_always (Int, Any) in
+@inline(never)
+public func test40d(_ a: Any) -> Bool {
+  return cast40((1, a))
+}
 
 print("test0=\(test0())")
 
