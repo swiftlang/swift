@@ -3596,7 +3596,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 
 static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
                                           const DeclContext *DC) {
-  if (E == nullptr || isa<ErrorExpr>(E) || !E->getType())
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
   class OptionalToAnyCoercionWalker : public ASTWalker {
@@ -3608,13 +3608,12 @@ static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
         return { false, E };
 
       if (auto *coercion = dyn_cast<CoerceExpr>(E)) {
-        if (E->getType()->getDesugaredType()->isAny() &&
-            isa<ErasureExpr>(coercion->getSubExpr()))
+        if (E->getType()->isAny() && isa<ErasureExpr>(coercion->getSubExpr()))
           ErasureCoercedToAny.insert(coercion->getSubExpr());
       } else if (isa<ErasureExpr>(E) && !ErasureCoercedToAny.count(E) &&
-                 E->getType()->getDesugaredType()->isAny()) {
+                 E->getType()->isAny()) {
         auto subExpr = cast<ErasureExpr>(E)->getSubExpr();
-        auto erasedTy = subExpr->getType()->getDesugaredType();
+        auto erasedTy = subExpr->getType();
         if (erasedTy->getOptionalObjectType()) {
           TC.diagnose(subExpr->getStartLoc(), diag::optional_to_any_coercion,
                       erasedTy)
