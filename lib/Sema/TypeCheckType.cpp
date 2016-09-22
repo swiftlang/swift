@@ -2567,7 +2567,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     auto paramFlags = isImmediateFunctionInput
                           ? ParameterTypeFlags::fromParameterType(ty, variadic)
-                          : ParameterTypeFlags(variadic, false, false);
+                          : ParameterTypeFlags();
     elements.emplace_back(ty, name, paramFlags);
   }
 

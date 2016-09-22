@@ -1482,9 +1482,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     // Remap our parameters, and make sure to strip off @escaping
     for (const auto &elt : tupleTy->getElements()) {
       auto newEltTy = mapSignatureParamType(ctx, elt.getType());
-      ParameterTypeFlags newParamFlags(
-        elt.getParameterFlags().value & ~ParameterTypeFlags::Escaping);
-
+      auto newParamFlags = elt.getParameterFlags().withEscaping(false);
       bool exactlyTheSame = newParamFlags == elt.getParameterFlags() &&
                             newEltTy.getPointer() == elt.getType().getPointer();
 
@@ -1501,7 +1499,6 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
         anyChanged = true;
       }
 
-      // TODO: drop the name when it's finally out of the type system
       elements.emplace_back(newEltTy, elt.getName(), newParamFlags);
     }
     if (anyChanged) {

@@ -2642,7 +2642,7 @@ ParenType *ParenType::get(const ASTContext &C, Type underlying,
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
   ParenType *&Result =
-      C.Impl.getArena(arena).ParenTypes[{underlying, flags.value}];
+      C.Impl.getArena(arena).ParenTypes[{underlying, flags.toRaw()}];
   if (Result == 0) {
     Result = new (C, arena) ParenType(underlying, properties, flags);
   }
@@ -2659,7 +2659,7 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
   for (const TupleTypeElt &Elt : Fields) {
     ID.AddPointer(Elt.Name.get());
     ID.AddPointer(Elt.getType().getPointer());
-    ID.AddInteger(Elt.Flags.value);
+    ID.AddInteger(Elt.Flags.toRaw());
   }
 }
 
