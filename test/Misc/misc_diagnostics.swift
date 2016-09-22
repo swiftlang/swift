@@ -72,7 +72,7 @@ func bad_return2() -> (Int, Int) {
 }
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
-func bad_return3(lhs:Int, rhs:Int) {
+func bad_return3(lhs: Int, rhs: Int) {
   return lhs != 0  // expected-error {{'!=' produces 'Bool', not the expected contextual result type '()'}}
 }
 
@@ -80,7 +80,7 @@ class MyBadReturnClass {
   static var intProperty = 42
 }
 
-func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
+func ==(lhs: MyBadReturnClass, rhs: MyBadReturnClass) {
   return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error{{binary operator '==' cannot be applied to two 'Int' operands}} // expected-note{{expected an argument list of type '(MyBadReturnClass, MyBadReturnClass)'}}
 }
 
