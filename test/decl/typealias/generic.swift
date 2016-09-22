@@ -76,11 +76,13 @@ let _ : D = D(a: 1, b: 2)  // expected-error {{cannot convert value of type 'MyT
 
 let _ : D<Int, Int, Float> = D<Int, Int, Float>(a: 1, b: 2)
 
+// FIXME: This is not a great error.
 // expected-error @+1 {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
 let _ : D = D<Int, Int, Float>(a: 1, b: 2)
 
 
-// expected-error @+1 {{generic parameter 'T3' could not be inferred}}
+// expected-error @+2 {{generic parameter 'T3' could not be inferred}}
+// expected-note @+1 {{explicitly specify the generic arguments to fix this issue}} {{31-31=<Any, Any, Any>}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
@@ -95,7 +97,7 @@ _ = A<String, Int>(a: "foo", // expected-error {{'String' is not convertible to 
   b: 42)
 _ = B(a: 12, b: 42)
 _ = B(a: 12, b: 42 as Float)
-_ = B(a: "foo", b: 42)     // expected-error {{generic parameter 'T1' could not be inferred}}
+_ = B(a: "foo", b: 42)     // expected-error {{generic parameter 'T1' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{6-6=<Any>}}
 _ = C(a: "foo", b: 42)
 _ = C(a: 42,        // expected-error {{'Int' is not convertible to 'String'}}
   b: 42)
