@@ -96,6 +96,29 @@ func testConvertSomeName(s: String) {
   testPassSomeName(SomeName(rawValue: "\(s)}"))
 }
 
+class WrappedClass {}
+class WrappedClassSub: WrappedClass {}
+struct ClassWrapper : RawRepresentable {
+  var rawValue: WrappedClass
+}
+func testPassAnyObject(_: AnyObject) {}
+func testPassAnyObjectOpt(_: AnyObject?) {}
+func testPassWrappedSub(_: WrappedClassSub) {}
+func testConvertClassWrapper(_ x: ClassWrapper, _ sub: WrappedClassSub) {
+  testPassAnyObject(x.rawValue)
+  testPassAnyObjectOpt(x.rawValue)
+  testPassWrappedSub(x)
+
+  let iuo: ClassWrapper! = x
+  testPassAnyObject(iuo)
+  testPassAnyObjectOpt(iuo.map { $0.rawValue })
+
+  let _: ClassWrapper = ClassWrapper(rawValue: sub)
+  let _: ClassWrapper = ClassWrapper(rawValue: x.rawValue)
+  // FIXME: This one inserts 'as!', which is incorrect.
+  let _: ClassWrapper = sub as AnyObject as! ClassWrapper
+}
+
 enum MyEnumType : UInt32 {
   case invalid
 }
