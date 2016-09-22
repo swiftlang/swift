@@ -96,6 +96,29 @@ func testConvertSomeName(s: String) {
   testPassSomeName("\(s)}")
 }
 
+class WrappedClass {}
+class WrappedClassSub: WrappedClass {}
+struct ClassWrapper : RawRepresentable {
+  var rawValue: WrappedClass
+}
+func testPassAnyObject(_: AnyObject) {}
+func testPassAnyObjectOpt(_: AnyObject?) {}
+func testPassWrappedSub(_: WrappedClassSub) {}
+func testConvertClassWrapper(_ x: ClassWrapper, _ sub: WrappedClassSub) {
+  testPassAnyObject(x)
+  testPassAnyObjectOpt(x)
+  testPassWrappedSub(x)
+
+  let iuo: ClassWrapper! = x
+  testPassAnyObject(iuo)
+  testPassAnyObjectOpt(iuo)
+
+  let _: ClassWrapper = sub
+  let _: ClassWrapper = x.rawValue
+  // FIXME: This one inserts 'as!', which is incorrect.
+  let _: ClassWrapper = sub as AnyObject
+}
+
 enum MyEnumType : UInt32 {
   case invalid
 }
@@ -187,8 +210,12 @@ var graph: Graph2
 class Graph3<NodeType : ObjCProt> {}
 var graph: Graph3
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4
+var graphAgain = Graph4()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]

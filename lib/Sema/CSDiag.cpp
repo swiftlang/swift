@@ -3582,15 +3582,14 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 
 
 /// Return true if the given type conforms to a known protocol type.
-static bool isExpressibleByLiteralType(Type fromType,
-                                     KnownProtocolKind kind,
-                                     ConstraintSystem *CS) {
-  auto integerType =
-    CS->TC.getProtocol(SourceLoc(), kind);
-  if (!integerType)
+static bool conformsToKnownProtocol(Type fromType,
+                                    KnownProtocolKind kind,
+                                    ConstraintSystem *CS) {
+  auto proto = CS->TC.getProtocol(SourceLoc(), kind);
+  if (!proto)
     return false;
 
-  if (CS->TC.conformsToProtocol(fromType, integerType, CS->DC,
+  if (CS->TC.conformsToProtocol(fromType, proto, CS->DC,
                                 ConformanceCheckFlags::InExpression)) {
     return true;
   }
@@ -3599,9 +3598,9 @@ static bool isExpressibleByLiteralType(Type fromType,
 }
 
 static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
-  return isExpressibleByLiteralType(fromType,
-                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
-                                  CS);
+  return conformsToKnownProtocol(fromType,
+                                 KnownProtocolKind::ExpressibleByIntegerLiteral,
+                                 CS);
 }
 
 /// Return true if the given type conforms to RawRepresentable.
@@ -3631,7 +3630,7 @@ static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
                                ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !isExpressibleByLiteralType(rawTy, kind, CS))
+  if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
     return Type();
 
   return rawTy;
@@ -3642,7 +3641,7 @@ static Type isRawRepresentable(Type fromType,
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
                                              ConstraintSystem *CS) {
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
-  return (isExpressibleByLiteralType(fromType, kind, CS) &&
+  return (conformsToKnownProtocol(fromType, kind, CS) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
@@ -3697,14 +3696,23 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   };
 
-  if (isExpressibleByLiteralType(fromType, kind, CS)) {
+  if (conformsToKnownProtocol(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
       std::string convWrapBefore = toType.getString();
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
-      if (rawTy->getCanonicalType() != fromType->getCanonicalType()) {
+      if (!CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (kind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: break;
+#define PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: return false;
+#include "swift/AST/KnownProtocols.def"
+        }
         convWrapBefore += rawTy->getString();
         convWrapBefore += "(";
         convWrapAfter += ")";
@@ -3715,11 +3723,20 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   }
 
   if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (isExpressibleByLiteralType(toType, kind, CS)) {
+    if (conformsToKnownProtocol(toType, kind, CS)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
-      if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
-        convWrapBefore += rawTy->getString();
+      if (!CS->TC.isConvertibleTo(rawTy, toType, CS->DC)) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (kind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: break;
+#define PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: return false;
+#include "swift/AST/KnownProtocols.def"
+        }
+        convWrapBefore += toType->getString();
         convWrapBefore += "(";
         convWrapAfter += ")";
       }
@@ -4179,6 +4196,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                               expr) ||
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByStringLiteral,
+                              expr) ||
+    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
+                              KnownProtocolKind::AnyObject,
                               expr) ||
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
     addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
@@ -6491,39 +6511,112 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+static bool hasArchetype(const GenericTypeDecl *generic,
+                         const ArchetypeType *archetype) {
+  return std::any_of(generic->getInnermostGenericParamTypes().begin(),
+                     generic->getInnermostGenericParamTypes().end(),
+                     [archetype](const GenericTypeParamType *genericParamTy) {
+    return genericParamTy->getDecl()->getArchetype() == archetype;
+  });
+}
+
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
-                                TypeChecker &tc) {
-  GenericTypeDecl *FoundDecl = nullptr;
-  
+                                ConstraintSystem &cs) {
+  const GenericTypeDecl *FoundDecl = nullptr;
+  const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
+
   // Walk the TypeRepr to find the type in question.
   if (auto typerepr = loc.getTypeRepr()) {
     struct FindGenericTypeDecl : public ASTWalker {
-      GenericTypeDecl *&FoundDecl;
-      FindGenericTypeDecl(GenericTypeDecl *&FoundDecl) : FoundDecl(FoundDecl) {
-      }
+      const GenericTypeDecl *FoundDecl = nullptr;
+      const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
+      const ArchetypeType *Archetype;
+
+      FindGenericTypeDecl(const ArchetypeType *Archetype)
+          : Archetype(Archetype) {}
       
       bool walkToTypeReprPre(TypeRepr *T) override {
         // If we already emitted the note, we're done.
         if (FoundDecl) return false;
         
-        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T))
-          FoundDecl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+          auto *generic =
+              dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+          if (hasArchetype(generic, Archetype)) {
+            FoundDecl = generic;
+            FoundGenericTypeBase = ident;
+            return false;
+          }
+        }
         // Keep walking.
         return true;
       }
-    } findGenericTypeDecl(FoundDecl);
-    
+    } findGenericTypeDecl(archetype);
+
     typerepr->walk(findGenericTypeDecl);
+    FoundDecl = findGenericTypeDecl.FoundDecl;
+    FoundGenericTypeBase = findGenericTypeDecl.FoundGenericTypeBase;
   }
-  
+
   // If we didn't find the type in the TypeRepr, fall back to the type in the
   // type checked expression.
-  if (!FoundDecl)
-    FoundDecl = loc.getType()->getAnyGeneric();
-  
-  if (FoundDecl)
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype,
-                FoundDecl->getDeclaredType());
+  if (!FoundDecl) {
+    if (const GenericTypeDecl *generic = loc.getType()->getAnyGeneric())
+      if (hasArchetype(generic, archetype))
+        FoundDecl = generic;
+  }
+
+  auto &tc = cs.getTypeChecker();
+  if (FoundDecl) {
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type,
+                archetype, FoundDecl->getDeclaredType());
+  }
+
+  if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){
+    assert(FoundDecl);
+
+    // If we can, prefer using any types already fixed by the constraint system.
+    // This lets us produce fixes like `Pair<Int, Any>` instead of defaulting to
+    // `Pair<Any, Any>`.
+    // Right now we only handle this when the type that's at fault is the
+    // top-level type passed to this function.
+    ArrayRef<Type> genericArgs;
+    if (auto *boundGenericTy = loc.getType()->getAs<BoundGenericType>()) {
+      if (boundGenericTy->getDecl() == FoundDecl)
+        genericArgs = boundGenericTy->getGenericArgs();
+    }
+
+    auto getPreferredType =
+        [&](const GenericTypeParamDecl *genericParam) -> Type {
+      // If we were able to get the generic arguments (i.e. the types used at
+      // FoundDecl's use site), we can prefer those...
+      if (genericArgs.empty())
+        return Type();
+
+      Type preferred = genericArgs[genericParam->getIndex()];
+      if (!preferred || preferred->is<ErrorType>())
+        return Type();
+
+      // ...but only if they were actually resolved by the constraint system
+      // despite the failure.
+      TypeVariableType *unused;
+      Type maybeFixedType = cs.getFixedTypeRecursive(preferred, unused,
+                                                     /*wantRValue*/true);
+      if (maybeFixedType->hasTypeVariable() ||
+          maybeFixedType->hasUnresolvedType()) {
+        return Type();
+      }
+      return maybeFixedType;
+    };
+
+    SmallString<64> genericParamBuf;
+    if (tc.getDefaultGenericArgumentsString(genericParamBuf, FoundDecl,
+                                            getPreferredType)) {
+      tc.diagnose(FoundGenericTypeBase->getLoc(),
+                  diag::unbound_generic_parameter_explicit_fix)
+        .fixItInsertAfter(FoundGenericTypeBase->getEndLoc(), genericParamBuf);
+    }
+  }
 }
 
 
@@ -6639,11 +6732,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
       .highlight(ECE->getCastTypeLoc().getSourceRange());
 
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, tc);
-    if (auto *ND = ECE->getCastTypeLoc().getType()
-          ->getNominalOrBoundGenericNominal())
-      tc.diagnose(ND, diag::archetype_declared_in_type, archetype,
-                  ND->getDeclaredType());
+    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, *CS);
     return;
   }
 
@@ -6673,7 +6762,7 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 
   if (auto TE = dyn_cast<TypeExpr>(anchor)) {
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(TE->getTypeLoc(), archetype, tc);
+    noteArchetypeSource(TE->getTypeLoc(), archetype, *CS);
     return;
   }
 

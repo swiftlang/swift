@@ -1085,14 +1085,6 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     return;
   }
 
-  // Infix operator is only allowed on operator declarations, not on func.
-  if (isa<InfixAttr>(attr)) {
-    TC.diagnose(attr->getLocation(), diag::invalid_infix_on_func)
-      .fixItRemove(attr->getLocation());
-    attr->setInvalid();
-    return;
-  }
-
   // Otherwise, must be unary.
   if (!FD->isUnaryOperator()) {
     TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,

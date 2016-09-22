@@ -1156,7 +1156,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   }
   // If Ty is a an optional, its deallocation is equivalent to the deallocation
   // of its payload.
-  // TODO: Generalize it. Destructor of an aggrgate type is equivalent to calling
+  // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.
   while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
     Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
@@ -1312,7 +1312,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
 
   if (isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) {
     // Treat the release instruction as if it is the invocation
-    // of a deinit funciton.
+    // of a deinit function.
     if (RecursionDepth < MaxRecursionDepth) {
       // Check if the destructor is known.
       auto OpV = cast<RefCountingInst>(I)->getOperand(0);
