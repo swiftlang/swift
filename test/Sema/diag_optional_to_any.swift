@@ -8,9 +8,9 @@ func throwing() throws -> Int? {}
 
 func warnOptionalToAnyCoercion(value x: Int?) -> Any {
   let a: Any = x // expected-warning {{expression implicitly coerced from 'Int?' to Any}}
-  // expected-note@-1 {{provide a default value to avoid this warning}}
-  // expected-note@-2 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{17-17= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{17-17=!}}
+  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}{{17-17= as Any}}
 
   let b: Any = x as Any
 
@@ -35,9 +35,9 @@ func warnOptionalToAnyCoercion(value x: Int?) -> Any {
   // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
 
   let _: Any = takeAny(f as? Int, g) as Any // expected-warning {{expression implicitly coerced from 'Int?' to Any}}
-  // expected-note@-1 {{provide a default value to avoid this warning}}
-  // expected-note@-2 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{33-33= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{33-33=!}}
+  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}{{33-33= as Any}}
 
   let _: Any = takeAny(f as? Int as Any, g) as Any
 
