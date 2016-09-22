@@ -752,7 +752,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      /*Introduced=*/VersionSpec->getVersion(),
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),
-                                     UnconditionalAvailabilityKind::None,
+                                     PlatformAgnosticAvailabilityKind::None,
                                      /*Implicit=*/true));
       }
 
@@ -769,7 +769,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     StringRef Message, Renamed;
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
-    auto Unconditional = UnconditionalAvailabilityKind::None;
+    auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
     bool AnyAnnotations = false;
     int ParamIndex = 0;
 
@@ -860,12 +860,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       case IsDeprecated:
         if (!findAttrValueDelimiter()) {
-          if (Unconditional != UnconditionalAvailabilityKind::None) {
+          if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
             diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                      AttrName);
           }
 
-          Unconditional = UnconditionalAvailabilityKind::Deprecated;
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
           break;
         }
         SWIFT_FALLTHROUGH;
@@ -903,12 +903,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsUnavailable:
-        if (Unconditional != UnconditionalAvailabilityKind::None) {
+        if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
           diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                    AttrName);
         }
 
-        Unconditional = UnconditionalAvailabilityKind::Unavailable;
+        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         break;
 
       case IsInvalid:
@@ -942,7 +942,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                         Introduced,
                                         Deprecated,
                                         Obsoleted,
-                                        Unconditional,
+                                        PlatformAgnostic,
                                         /*Implicit=*/false));
       } else {
         // Not a known platform. Just drop the attribute.

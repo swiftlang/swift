@@ -91,8 +91,8 @@ bool DeclAttributes::isUnavailableInCurrentSwift() const {
       if (available->isInvalid())
         continue;
 
-      if (available->getUnconditionalAvailability() ==
-            UnconditionalAvailabilityKind::UnavailableInCurrentSwift)
+      if (available->getPlatformAgnosticAvailability() ==
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
         return true;
     }
   }
@@ -197,7 +197,7 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  if (AvailAttr->Unconditional != UnconditionalAvailabilityKind::None)
+  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None)
     return false;
 
   return true;
@@ -379,8 +379,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     // the generated interface.
     if (!Attr->Message.empty())
       Printer << ", message: \"" << Attr->Message << "\"";
-    else if (Attr->getUnconditionalAvailability()
-               == UnconditionalAvailabilityKind::UnavailableInSwift)
+    else if (Attr->getPlatformAgnosticAvailability()
+               == PlatformAgnosticAvailabilityKind::UnavailableInSwift)
       Printer << ", message: \"Not available in Swift\"";
 
     Printer << ")";
@@ -643,11 +643,11 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
 }
 
 AvailableAttr *
-AvailableAttr::createUnconditional(ASTContext &C,
+AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
-                                   UnconditionalAvailabilityKind Reason) {
-  assert(Reason != UnconditionalAvailabilityKind::None);
+                                   PlatformAgnosticAvailabilityKind Reason) {
+  assert(Reason != PlatformAgnosticAvailabilityKind::None);
   clang::VersionTuple NoVersion;
   return new (C) AvailableAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
@@ -659,27 +659,27 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
 }
 
 bool AvailableAttr::isUnconditionallyUnavailable() const {
-  switch (Unconditional) {
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
     return false;
 
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
     return true;
   }
 }
 
 bool AvailableAttr::isUnconditionallyDeprecated() const {
-  switch (Unconditional) {
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInSwift:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
+  switch (PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
     return false;
 
-  case UnconditionalAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     return true;
   }
 }

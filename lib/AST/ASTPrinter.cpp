@@ -1448,7 +1448,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
-  // Skip stub declarations used for prior variants of Swift.
+  // Skip stub declarations used for prior or later variants of Swift.
   if (D->getAttrs().isUnavailableInCurrentSwift())
     return false;
 

@@ -1297,16 +1297,16 @@ static bool checkTypeDeclAvailability(const TypeDecl *TypeDecl,
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
-      switch (Attr->getUnconditionalAvailability()) {
-      case UnconditionalAvailabilityKind::None:
-      case UnconditionalAvailabilityKind::Deprecated:
+      switch (Attr->getPlatformAgnosticAvailability()) {
+      case PlatformAgnosticAvailabilityKind::None:
+      case PlatformAgnosticAvailabilityKind::Deprecated:
         break;
 
-      case UnconditionalAvailabilityKind::Unavailable:
-      case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-      case UnconditionalAvailabilityKind::UnavailableInSwift: {
-        bool inSwift = (Attr->getUnconditionalAvailability() ==
-                        UnconditionalAvailabilityKind::UnavailableInSwift);
+      case PlatformAgnosticAvailabilityKind::Unavailable:
+      case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+      case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
+        bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
+                        PlatformAgnosticAvailabilityKind::UnavailableInSwift);
 
         if (!Attr->Rename.empty()) {
           auto diag = TC.diagnose(Loc,

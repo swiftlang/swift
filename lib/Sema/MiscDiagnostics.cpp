@@ -1842,16 +1842,16 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
-  switch (Attr->getUnconditionalAvailability()) {
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (Attr->getPlatformAgnosticAvailability()) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     break;
 
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-  case UnconditionalAvailabilityKind::UnavailableInSwift: {
-    bool inSwift = (Attr->getUnconditionalAvailability() ==
-                    UnconditionalAvailabilityKind::UnavailableInSwift);
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
+                    PlatformAgnosticAvailabilityKind::UnavailableInSwift);
 
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;

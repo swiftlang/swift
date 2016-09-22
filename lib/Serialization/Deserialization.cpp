@@ -2034,19 +2034,25 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         DECODE_VER_TUPLE(Deprecated)
         DECODE_VER_TUPLE(Obsoleted)
 
-        UnconditionalAvailabilityKind unconditional;
+        PlatformAgnosticAvailabilityKind platformAgnostic;
         if (isUnavailable)
-          unconditional = UnconditionalAvailabilityKind::Unavailable;
+          platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         else if (isDeprecated)
-          unconditional = UnconditionalAvailabilityKind::Deprecated;
+          platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+        else if (((PlatformKind)platform) == PlatformKind::none &&
+                 (!Introduced.empty() ||
+                  !Deprecated.empty() ||
+                  !Obsoleted.empty()))
+          platformAgnostic =
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
         else
-          unconditional = UnconditionalAvailabilityKind::None;
+          platformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
         Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
           (PlatformKind)platform, message, rename,
           Introduced, Deprecated, Obsoleted,
-          unconditional, isImplicit);
+          platformAgnostic, isImplicit);
         break;
 
 #undef DEF_VER_TUPLE_PIECES

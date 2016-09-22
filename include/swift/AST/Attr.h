@@ -558,17 +558,17 @@ enum class MinVersionComparison {
   Obsoleted,
 };
 
-/// Describes the unconditional availability of a declaration.
-enum class UnconditionalAvailabilityKind {
-  /// The declaration is not unconditionally unavailable.
+/// Describes the platform-agnostic availability of a declaration.
+enum class PlatformAgnosticAvailabilityKind {
+  /// The associated availability attribute is not platform-agnostic.
   None,
   /// The declaration is deprecated, but can still be used.
   Deprecated,
   /// The declaration is unavailable in Swift, specifically
   UnavailableInSwift,
-  /// The declaration is unavailable in the current version of Swift,
-  /// but was available in previous Swift versions.
-  UnavailableInCurrentSwift,
+  /// The declaration is available in some but not all versions
+  /// of Swift, as specified by the VersionTuple members.
+  SwiftVersionSpecific,
   /// The declaration is unavailable for other reasons.
   Unavailable,
 };
@@ -585,14 +585,14 @@ public:
                    const clang::VersionTuple &Introduced,
                    const clang::VersionTuple &Deprecated,
                    const clang::VersionTuple &Obsoleted,
-                   UnconditionalAvailabilityKind Unconditional,
+                   PlatformAgnosticAvailabilityKind PlatformAgnostic,
                    bool Implicit)
     : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced),
       INIT_VER_TUPLE(Deprecated),
       INIT_VER_TUPLE(Obsoleted),
-      Unconditional(Unconditional),
+      PlatformAgnostic(PlatformAgnostic),
       Platform(Platform)
   {}
 
@@ -618,8 +618,8 @@ public:
   /// Indicates when the symbol was obsoleted.
   const Optional<clang::VersionTuple> Obsoleted;
 
-  /// Indicates if the declaration has unconditional availability.
-  const UnconditionalAvailabilityKind Unconditional;
+  /// Indicates if the declaration has platform-agnostic availability.
+  const PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
   /// The platform of the availability.
   const PlatformKind Platform;
@@ -630,9 +630,9 @@ public:
   /// Whether this is an unconditionally deprecated entity.
   bool isUnconditionallyDeprecated() const;
 
-  /// Returns the unconditional unavailability.
-  UnconditionalAvailabilityKind getUnconditionalAvailability() const {
-    return Unconditional;
+  /// Returns the platform-agnostic availability.
+  PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
+    return PlatformAgnostic;
   }
 
   /// Determine if a given declaration should be considered unavailable given
@@ -668,9 +668,9 @@ public:
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
   static AvailableAttr *
-  createUnconditional(ASTContext &C, StringRef Message, StringRef Rename = "",
-                      UnconditionalAvailabilityKind Reason
-                        = UnconditionalAvailabilityKind::Unavailable);
+  createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
+                      PlatformAgnosticAvailabilityKind Reason
+                        = PlatformAgnosticAvailabilityKind::Unavailable);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
