@@ -13,6 +13,9 @@
 import Foundation
 @_exported import UIKit
 
+%{
+from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
+}%
 
 // UITableView extensions
 public extension IndexPath {
@@ -81,3 +84,8 @@ public extension URLResourceValues {
         return allValues[URLResourceKey.thumbnailDictionaryKey] as? [URLThumbnailSizeKey : UIImage]
     }
 }
+
+// Bridge UIKit structs to NSValue.
+
+${ ObjectiveCBridgeableImplementationForNSValue("UIEdgeInsets") }
+${ ObjectiveCBridgeableImplementationForNSValue("UIOffset") }
