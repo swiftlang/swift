@@ -189,6 +189,7 @@ var graph: Graph3
 
 class Graph4<NodeType : SomeProt> {}
 var graph: Graph4
+var graphAgain = Graph4()
 
 class GraphCombo<NodeType : SomeProt & ObjCProt> {}
 var graph: GraphCombo

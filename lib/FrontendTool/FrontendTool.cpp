@@ -650,7 +650,8 @@ private:
         Info.ID == diag::deprecated_protocol_composition.ID ||
         Info.ID == diag::deprecated_protocol_composition_single.ID ||
         Info.ID == diag::deprecated_any_composition.ID ||
-        Info.ID == diag::deprecated_operator_body.ID)
+        Info.ID == diag::deprecated_operator_body.ID ||
+        Info.ID == diag::unbound_generic_parameter_explicit_fix.ID)
       return true;
 
     return false;
