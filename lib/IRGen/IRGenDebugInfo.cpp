@@ -1383,7 +1383,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return InternalType;
   }
 
-  // Here goes!
+  // Handle each swift::Type.
   switch (BaseTy->getKind()) {
   case TypeKind::BuiltinInteger: {
     Encoding = llvm::dwarf::DW_ATE_unsigned;
@@ -1688,7 +1688,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // Sugared types.
 
   case TypeKind::NameAlias: {
-
     auto *NameAliasTy = cast<NameAliasType>(BaseTy);
     auto *Decl = NameAliasTy->getDecl();
     auto L = getDebugLoc(SM, Decl);
@@ -1702,9 +1701,30 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                                   File, L.Line, File);
   }
 
+  case TypeKind::BoundGenericAlias: {
+    auto *BoundGenericAliasTy = cast<BoundGenericAliasType>(BaseTy);
+    auto *Decl = BoundGenericAliasTy->getDecl();
+    auto L = getDebugLoc(SM, Decl);
+    return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
+                              File, L.Line, SizeInBits, AlignInBits, Flags,
+                              MangledName);
+  }
+
+
   case TypeKind::Substituted: {
-    auto OrigTy = cast<SubstitutedType>(BaseTy)->getReplacementType();
-    return getOrCreateDesugaredType(OrigTy, DbgTy);
+    auto SubstTy = cast<SubstitutedType>(BaseTy);
+    auto OriginalTy = SubstTy->getOriginal();
+    if (auto *NameAliasTy = dyn_cast<NameAliasType>(OriginalTy.getPointer())) {
+      // This is a generic TypeAlias.
+      auto *Decl = NameAliasTy->getDecl();
+      auto L = getDebugLoc(SM, Decl);
+      auto File = getOrCreateFile(L.Filename);
+      auto ReplacementTy =
+          getOrCreateDesugaredType(SubstTy->getReplacementType(), DbgTy);
+      return DBuilder.createTypedef(ReplacementTy, MangledName, File, L.Line,
+                                    File);
+    }
+    return getOrCreateDesugaredType(SubstTy->getReplacementType(), DbgTy);
   }
 
   case TypeKind::Paren: {

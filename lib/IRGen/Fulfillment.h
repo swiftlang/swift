@@ -149,7 +149,8 @@ private:
                                  unsigned source, MetadataPath &&path,
                                  const InterestingKeysCallback &keys);
 
-  bool searchBoundGenericTypeMetadata(IRGenModule &IGM, CanBoundGenericType type,
+  bool searchBoundGenericTypeMetadata(IRGenModule &IGM,
+                                      CanBoundGenericNominalType type,
                                       unsigned source, MetadataPath &&path,
                                       const InterestingKeysCallback &keys);
 

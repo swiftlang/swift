@@ -4427,7 +4427,7 @@ public:
       AnyFunctionType::ExtInfo Info;
       if (i == 0 && FD->hasThrows())
         Info = Info.withThrows();
-      
+
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
@@ -7489,7 +7489,7 @@ static Type checkExtensionGenericParams(
   if (auto unbound = type->getAs<UnboundGenericType>()) {
     parentType = unbound->getParent();
     nominal = cast<NominalTypeDecl>(unbound->getDecl());
-  } else if (auto bound = type->getAs<BoundGenericType>()) {
+  } else if (auto bound = type->getAs<BoundGenericNominalType>()) {
     parentType = bound->getParent();
     nominal = bound->getDecl();
   } else {
@@ -7534,9 +7534,8 @@ static Type checkExtensionGenericParams(
           genericArgs.push_back(gp->getDeclaredInterfaceType());
         }
 
-        extendedTypeInfer.setType(BoundGenericType::get(nominal,
-                                                        newParentType,
-                                                        genericArgs));
+        extendedTypeInfer.setType(
+            BoundGenericNominalType::get(nominal, newParentType, genericArgs));
       }
     }
     
@@ -7585,7 +7584,8 @@ static Type checkExtensionGenericParams(
   for (auto gp : *genericParams) {
     genericArgs.push_back(gp->getArchetype());
   }
-  Type resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
+  Type resultType =
+      BoundGenericNominalType::get(nominal, newParentType, genericArgs);
   return resultType->isEqual(type) ? type : resultType;
 }
 

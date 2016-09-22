@@ -283,7 +283,7 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
 
   while (type) {
     // Gather generic arguments from a bound generic type.
-    if (auto bound = type->getAs<BoundGenericType>()) {
+    if (auto *bound = type->getAs<BoundGenericType>()) {
       allGenericArgs.push_back(bound->getGenericArgs());
 
       // Continue up to the parent.
@@ -593,6 +593,7 @@ public:
   }
 };
 } // end anonymous namespace
+
 
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
@@ -1337,14 +1338,15 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
-    BoundGenericType *BGT = cast<BoundGenericType>(this);
+    auto *BGT = cast<BoundGenericNominalType>(this);
     Type parentTy;
     if (BGT->getParent())
       parentTy = BGT->getParent()->getCanonicalType();
     SmallVector<Type, 4> CanGenericArgs;
     for (Type Arg : BGT->getGenericArgs())
       CanGenericArgs.push_back(Arg->getCanonicalType());
-    Result = BoundGenericType::get(BGT->getDecl(), parentTy, CanGenericArgs);
+    Result =
+        BoundGenericNominalType::get(BGT->getDecl(), parentTy, CanGenericArgs);
     break;
   }
   }
@@ -1352,7 +1354,8 @@ CanType TypeBase::getCanonicalType() {
   
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
-  CanonicalType = Result;
+  if (getKind() != TypeKind::BoundGenericAlias)
+    CanonicalType = Result;
   return CanType(Result);
 }
 
@@ -1399,6 +1402,20 @@ TypeBase *TypeBase::getDesugaredType() {
   llvm_unreachable("Unknown type kind");
 }
 
+TypeBase *TypeBase::getSinglyDesugaredType() {
+  switch (getKind()) {
+#define ALWAYS_CANONICAL_TYPE(id, parent)
+#define UNCHECKED_TYPE(id, parent)
+#define SUGARED_TYPE(ID, PARENT) \
+  case TypeKind::ID: \
+    return cast<ID##Type>(this)->getSinglyDesugaredType();
+#define TYPE(id, parent)
+#include "swift/AST/TypeNodes.def"
+  default:
+    return this;
+  }
+}
+
 TypeBase *ParenType::getSinglyDesugaredType() {
   return getUnderlyingType().getPointer();
 }
@@ -1413,6 +1430,41 @@ TypeBase *NameAliasType::getSinglyDesugaredType() {
                                    TAD->getASTContext());
 
   return getDecl()->getUnderlyingType().getPointer();
+}
+
+TypeBase *BoundGenericAliasType::getSinglyDesugaredType() {
+  auto *TAD = getDecl();
+  auto *DC = TAD->getDeclContext();
+  TypeSubstitutionMap subs;
+  SmallVector<Type, 4> scratch;
+  ArrayRef<Type> genericArgs = getParent()->getAllGenericArgs(scratch);
+  GenericSignature *genericSig = TAD->getGenericSignature();
+  bool hasTypeVars = false;
+
+  // Parent substitutions.
+  unsigned i = 0;
+  for (unsigned e = genericArgs.size(); i < e; i++) {
+    Type sub = genericArgs[i];
+    hasTypeVars = sub->hasTypeVariable();
+    auto t = genericSig->getGenericParams()[i];
+    subs[t->getCanonicalType().getPointer()] = sub;
+  }
+  // Inner substitutions.
+  for (unsigned j = 0, e = getGenericArgs().size(); j < e; j++) {
+    Type sub = getGenericArgs()[j];
+    hasTypeVars = sub->hasTypeVariable();
+    auto t = genericSig->getGenericParams()[j + i];
+    subs[t->getCanonicalType().getPointer()] = sub;
+  }
+
+  // Did the constraint system have unresolved type variables?
+  if (hasTypeVars && !TAD->getASTContext().hasActiveConstraintSolver())
+    return ErrorType::get(TAD->getASTContext()).getPointer();
+
+  // Desugar the type by applying the substitutions.
+  Type t = ArchetypeBuilder::mapTypeOutOfContext(TAD, TAD->getUnderlyingType());
+  Type substType = t.subst(DC->getParentModule(), subs, None);
+  return substType.getPointer();
 }
 
 TypeBase *SyntaxSugarType::getSinglyDesugaredType() {
@@ -1441,7 +1493,7 @@ Type SyntaxSugarType::getImplementationType() {
   }
 
   // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), Base);
+  ImplOrContext = BoundGenericNominalType::get(implDecl, Type(), Base);
   return ImplOrContext.get<Type>();
 }
 
@@ -1459,7 +1511,7 @@ Type DictionaryType::getImplementationType() {
   assert(implDecl && "Dictionary type has not been set yet");
 
   // Record the implementation type.
-  ImplOrContext = BoundGenericType::get(implDecl, Type(), { Key, Value });
+  ImplOrContext = BoundGenericNominalType::get(implDecl, Type(), {Key, Value});
   return ImplOrContext.get<Type>();
 }
 
@@ -1553,6 +1605,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::DynamicSelf:
     return false;
 
+  case TypeKind::BoundGenericAlias:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
@@ -1565,6 +1618,11 @@ bool TypeBase::isSpelledLike(Type other) {
     for (size_t i = 0, sz = bgMe->getGenericArgs().size(); i < sz; ++i)
       if (!bgMe->getGenericArgs()[i]->isSpelledLike(bgThem->getGenericArgs()[i]))
         return false;
+    if (auto *bgaMe = dyn_cast<BoundGenericAliasType>(me)) {
+      auto bgaThem = cast<BoundGenericAliasType>(them);
+      if (bgaMe->getSinglyDesugaredType() != bgaThem->getSinglyDesugaredType())
+        return false;
+    }
     return true;
   }
 
@@ -2900,11 +2958,21 @@ Type DependentMemberType::substBaseType(ModuleDecl *module,
                               None);
 }
 
-static Type substType(
-    Type derivedType,
-    llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
-    const TypeSubstitutionMap &substitutions,
-    SubstOptions options) {
+/// Desugar until we reach a BoundGenericAliasType.
+static TypeBase *desugarNonBoundGenericAlias(TypeBase *ty) {
+  while (ty->getKind() != TypeKind::BoundGenericAlias) {
+    TypeBase *desugared = ty->getSinglyDesugaredType();
+    if (desugared == ty)
+      return ty;
+    ty = desugared;
+  }
+  return ty;
+}
+
+static Type substType(Type derivedType,
+		      llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
+		      const TypeSubstitutionMap &substitutions,
+		      SubstOptions options) {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
   auto failed = [&](Type t){
@@ -2921,7 +2989,8 @@ static Type substType(
     
     // For dependent member types, we may need to look up the member if the
     // base is resolved to a non-dependent type.
-    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+    if (auto depMemTy = dyn_cast<DependentMemberType>(
+            desugarNonBoundGenericAlias(type.getPointer()))) {
       // Check whether we have a direct substitution for the dependent type.
       // FIXME: This arguably should be getMemberForBaseType's responsibility.
       auto known =
@@ -2944,8 +3013,9 @@ static Type substType(
 
       return failed(type);
     }
-    
-    auto substOrig = type->getAs<SubstitutableType>();
+
+    auto substOrig = dyn_cast<SubstitutableType>(
+        desugarNonBoundGenericAlias(type.getPointer()));
     if (!substOrig)
       return type;
 
@@ -2974,6 +3044,7 @@ static Type substType(
     // Get the associated type reference from a child archetype.
     AssociatedTypeDecl *assocType = nullptr;
     if (auto archetype = substOrig->getAs<ArchetypeType>()) {
+      //if (auto archetype = dyn_cast<ArchetypeType>(substOrig)) {
       assocType = archetype->getAssocType();
     }
     
@@ -3277,10 +3348,12 @@ case TypeKind::Id:
     return *this;
   }
 
+  case TypeKind::BoundGenericAlias:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
     auto bound = cast<BoundGenericType>(base);
+    auto boundAlias = dyn_cast<BoundGenericAliasType>(base);
     SmallVector<Type, 4> substArgs;
     bool anyChanged = false;
     Type substParentTy;
@@ -3305,7 +3378,12 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
 
-    return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
+    if (boundAlias)
+      return BoundGenericAliasType::get(boundAlias->getDecl(), substParentTy,
+                                        substArgs);
+    else
+      return BoundGenericNominalType::get(
+          cast<NominalTypeDecl>(bound->getDecl()), substParentTy, substArgs);
   }
 
   case TypeKind::ExistentialMetatype: {

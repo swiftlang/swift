@@ -128,7 +128,7 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   if (auto nomTy = dyn_cast<NominalType>(type)) {
     return searchNominalTypeMetadata(IGM, nomTy, source, std::move(path), keys);
   }
-  if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+  if (auto boundTy = dyn_cast<BoundGenericNominalType>(type)) {
     return searchBoundGenericTypeMetadata(IGM, boundTy, source,
                                           std::move(path), keys);
   }
@@ -228,11 +228,9 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                   source, std::move(path), keys);
 }
 
-bool FulfillmentMap::searchBoundGenericTypeMetadata(IRGenModule &IGM,
-                                                    CanBoundGenericType type,
-                                                    unsigned source,
-                                                    MetadataPath &&path,
-                                         const InterestingKeysCallback &keys) {
+bool FulfillmentMap::searchBoundGenericTypeMetadata(
+    IRGenModule &IGM, CanBoundGenericNominalType type, unsigned source,
+    MetadataPath &&path, const InterestingKeysCallback &keys) {
   // Objective-C generics don't preserve their generic parameters at runtime,
   // so they aren't able to fulfill type metadata requirements.
   if (type->getDecl()->hasClangNode()) {

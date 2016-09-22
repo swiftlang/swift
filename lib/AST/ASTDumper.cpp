@@ -2689,6 +2689,16 @@ namespace {
       OS << ")";
     }
 
+    void visitBoundGenericAliasType(BoundGenericAliasType *T, StringRef label) {
+      printCommon(T, label, "bound_generic_alias_type");
+      printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+      for (auto arg : T->getGenericArgs())
+        printRec(arg);
+      OS << ")";
+    }
+
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(T, label, "paren_type");
       printRec(T->getUnderlyingType());

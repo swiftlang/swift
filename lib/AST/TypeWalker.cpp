@@ -36,6 +36,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitNameAliasType(NameAliasType *ty) { return false; }
+//  bool visitBoundGenericAliasType(BoundGenericAliasType *ty) { return false; }
 
   bool visitParenType(ParenType *ty) {
     return doIt(ty->getUnderlyingType());
@@ -150,6 +151,20 @@ class Traversal : public TypeVisitor<Traversal, bool>
     if (auto parent = ty->getParent())
       return doIt(parent);
     return false;
+  }
+
+  bool visitBoundGenericAliasType(BoundGenericAliasType *ty) {
+    if (Walker.shouldVisitOriginalSubstitutedType()) {
+      if (auto parent = ty->getParent())
+        if (doIt(parent))
+          return true;
+
+      for (auto arg : ty->getGenericArgs())
+        if (doIt(arg))
+          return true;
+    }
+
+    return doIt(ty->getSinglyDesugaredType());
   }
 
   bool visitBoundGenericType(BoundGenericType *ty) {

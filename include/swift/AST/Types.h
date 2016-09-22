@@ -354,7 +354,10 @@ public:
   /// getDesugaredType - If this type is a sugared type, remove all levels of
   /// sugar until we get down to a non-sugar type.
   TypeBase *getDesugaredType();
-  
+
+  /// If this type is a sugared type, remove one level of sugar.
+  TypeBase *getSinglyDesugaredType();
+
   /// If this type is a (potentially sugared) type of the specified kind, remove
   /// the minimal amount of sugar required to get a pointer to the type.
   template <typename T>
@@ -1492,25 +1495,21 @@ typedef ArrayRefView<Type,CanType,getAsCanType> CanTypeArrayRef;
 /// BoundGenericType - An abstract class for applying a generic type to the
 /// given type arguments.
 class BoundGenericType : public TypeBase, public llvm::FoldingSetNode {
-  NominalTypeDecl *TheDecl;
+  GenericTypeDecl *TheDecl;
 
   /// \brief The type of the parent, in which this type is nested.
   Type Parent;
-  
+
   ArrayRef<Type> GenericArgs;
-  
 
 protected:
-  BoundGenericType(TypeKind theKind, NominalTypeDecl *theDecl, Type parent,
+  BoundGenericType(TypeKind theKind, GenericTypeDecl *theDecl, Type parent,
                    ArrayRef<Type> genericArgs, const ASTContext *context,
                    RecursiveTypeProperties properties);
 
 public:
-  static BoundGenericType* get(NominalTypeDecl *TheDecl, Type Parent,
-                               ArrayRef<Type> GenericArgs);
-
   /// \brief Returns the declaration that declares this type.
-  NominalTypeDecl *getDecl() const { return TheDecl; }
+  GenericTypeDecl *getDecl() const { return TheDecl; }
 
   /// \brief Returns the type of the parent of this type. This will
   /// be null for top-level types or local types, and for non-generic types
@@ -1525,15 +1524,10 @@ public:
   /// Retrieve the set of generic arguments provided at this level.
   ArrayRef<Type> getGenericArgs() const { return GenericArgs; }
 
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    RecursiveTypeProperties properties;
-    Profile(ID, TheDecl, Parent, GenericArgs, properties);
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
-                      Type Parent, ArrayRef<Type> GenericArgs,
-                      RecursiveTypeProperties &properties);
+  /// FoldingSet implementation.
+  void Profile(llvm::FoldingSetNodeID &ID);
 
-  // Implement isa/cast/dyncast/etc.
+  /// Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_BoundGenericType &&
            T->getKind() <= TypeKind::Last_BoundGenericType;
@@ -1546,99 +1540,172 @@ BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, Type)
   }
 END_CAN_TYPE_WRAPPER(BoundGenericType, Type)
 
+/// A generic alias type whose type parameters have been bound.
+class BoundGenericAliasType : public BoundGenericType {
+  // NameAliasType are never canonical.
+  BoundGenericAliasType(TypeAliasDecl *d, Type Parent,
+                        ArrayRef<Type> GenericArgs,
+                        RecursiveTypeProperties properties)
+      : BoundGenericType(TypeKind::BoundGenericAlias,
+                         reinterpret_cast<GenericTypeDecl *>(d), Parent,
+                         GenericArgs, nullptr, properties) {}
+
+public:
+  /// Returns the declaration that declares this type.
+  TypeAliasDecl *getDecl() const {
+    return reinterpret_cast<TypeAliasDecl *>(BoundGenericType::getDecl());
+  }
+
+  /// FoldingSetNode implementation.
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    RecursiveTypeProperties Properties;
+    Profile(ID, getDecl(), getParent(), getGenericArgs(), Properties);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, TypeAliasDecl *TheDecl,
+                      Type Parent, ArrayRef<Type> GenericArgs,
+                      RecursiveTypeProperties &Properties);
+  static BoundGenericAliasType *get(TypeAliasDecl *theDecl, Type Parent,
+                                    ArrayRef<Type> GenericArgs);
+
+  /// Remove one level of top-level sugar from this type.
+  TypeBase *getSinglyDesugaredType();
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BoundGenericAlias;
+  }
+};
+
+/// BoundGenericNominalType - An abstract class for applying a generic type to
+/// the given nominal type.
+class BoundGenericNominalType : public BoundGenericType {
+protected:
+  BoundGenericNominalType(TypeKind theKind, NominalTypeDecl *theDecl,
+                          Type parent, ArrayRef<Type> genericArgs,
+                          const ASTContext *context,
+                          RecursiveTypeProperties properties)
+      : BoundGenericType(theKind, reinterpret_cast<GenericTypeDecl *>(theDecl),
+                         parent, genericArgs, context, properties) {}
+
+public:
+  static BoundGenericNominalType *get(NominalTypeDecl *TheDecl, Type Parent,
+                                      ArrayRef<Type> GenericArgs);
+
+  /// Returns the declaration that declares this type.
+  NominalTypeDecl *getDecl() const {
+    return reinterpret_cast<NominalTypeDecl *>(BoundGenericType::getDecl());
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    RecursiveTypeProperties properties;
+    Profile(ID, getDecl(), getParent(), getGenericArgs(), properties);
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, NominalTypeDecl *TheDecl,
+                      Type Parent, ArrayRef<Type> GenericArgs,
+                      RecursiveTypeProperties &properties);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_BoundGenericNominalType &&
+           T->getKind() <= TypeKind::Last_BoundGenericNominalType;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(BoundGenericNominalType, BoundGenericType)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
+  CanTypeArrayRef getGenericArgs() const {
+    return CanTypeArrayRef(getPointer()->getGenericArgs());
+  }
+END_CAN_TYPE_WRAPPER(BoundGenericNominalType, BoundGenericType)
 
 /// BoundGenericClassType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic class type.
-class BoundGenericClassType : public BoundGenericType {
+class BoundGenericClassType : public BoundGenericNominalType {
 private:
   BoundGenericClassType(ClassDecl *theDecl, Type parent,
                         ArrayRef<Type> genericArgs, const ASTContext *context,
                         RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericClass,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
-  friend class BoundGenericType;
+      : BoundGenericNominalType(TypeKind::BoundGenericClass,
+                                reinterpret_cast<NominalTypeDecl *>(theDecl),
+                                parent, genericArgs, context, properties) {}
+  friend class BoundGenericNominalType;
 
 public:
-  static BoundGenericClassType* get(ClassDecl *theDecl, Type parent,
+  static BoundGenericClassType *get(ClassDecl *theDecl, Type parent,
                                     ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericClassType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
+    return cast<BoundGenericClassType>(BoundGenericNominalType::get(
+        reinterpret_cast<NominalTypeDecl *>(theDecl), parent, genericArgs));
   }
 
   /// \brief Returns the declaration that declares this type.
   ClassDecl *getDecl() const {
-    return reinterpret_cast<ClassDecl*>(BoundGenericType::getDecl());
+    return reinterpret_cast<ClassDecl *>(BoundGenericType::getDecl());
   }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericClass;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericNominalType)
 
 /// BoundGenericEnumType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic enum type.
-class BoundGenericEnumType : public BoundGenericType {
+class BoundGenericEnumType : public BoundGenericNominalType {
 private:
   BoundGenericEnumType(EnumDecl *theDecl, Type parent,
                        ArrayRef<Type> genericArgs, const ASTContext *context,
                        RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericEnum,
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
-  friend class BoundGenericType;
+      : BoundGenericNominalType(TypeKind::BoundGenericEnum,
+                                reinterpret_cast<NominalTypeDecl *>(theDecl),
+                                parent, genericArgs, context, properties) {}
+  friend class BoundGenericNominalType;
 
 public:
-  static BoundGenericEnumType* get(EnumDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericEnumType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
+  static BoundGenericEnumType *get(EnumDecl *theDecl, Type parent,
+                                   ArrayRef<Type> genericArgs) {
+    return cast<BoundGenericEnumType>(BoundGenericNominalType::get(
+        reinterpret_cast<NominalTypeDecl *>(theDecl), parent, genericArgs));
   }
 
   /// \brief Returns the declaration that declares this type.
   EnumDecl *getDecl() const {
-    return reinterpret_cast<EnumDecl*>(BoundGenericType::getDecl());
+    return reinterpret_cast<EnumDecl *>(BoundGenericType::getDecl());
   }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericEnum;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericNominalType)
 
 /// BoundGenericStructType - A subclass of BoundGenericType for the case
 /// when the nominal type is a generic struct type.
-class BoundGenericStructType : public BoundGenericType {
+class BoundGenericStructType : public BoundGenericNominalType {
 private:
   BoundGenericStructType(StructDecl *theDecl, Type parent,
                          ArrayRef<Type> genericArgs, const ASTContext *context,
                          RecursiveTypeProperties properties)
-    : BoundGenericType(TypeKind::BoundGenericStruct, 
-                       reinterpret_cast<NominalTypeDecl*>(theDecl), parent,
-                       genericArgs, context, properties) {}
-  friend class BoundGenericType;
+      : BoundGenericNominalType(TypeKind::BoundGenericStruct,
+                                reinterpret_cast<NominalTypeDecl *>(theDecl),
+                                parent, genericArgs, context, properties) {}
+  friend class BoundGenericNominalType;
 
 public:
-  static BoundGenericStructType* get(StructDecl *theDecl, Type parent,
-                                    ArrayRef<Type> genericArgs) {
-    return cast<BoundGenericStructType>(
-             BoundGenericType::get(reinterpret_cast<NominalTypeDecl*>(theDecl),
-                                   parent, genericArgs));
+  static BoundGenericStructType *get(StructDecl *theDecl, Type parent,
+                                     ArrayRef<Type> genericArgs) {
+    return cast<BoundGenericStructType>(BoundGenericNominalType::get(
+        reinterpret_cast<NominalTypeDecl *>(theDecl), parent, genericArgs));
   }
 
   /// \brief Returns the declaration that declares this type.
   StructDecl *getDecl() const {
-    return reinterpret_cast<StructDecl*>(BoundGenericType::getDecl());
+    return reinterpret_cast<StructDecl *>(BoundGenericType::getDecl());
   }
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericStruct;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericType)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericNominalType)
 
 /// NominalType - Represents a type with a name that is significant, such that
 /// the name distinguishes it from other structurally-similar types that have
@@ -4349,7 +4416,7 @@ inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
   if (auto nomTy = dyn_cast<NominalType>(*this))
     return nomTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
+  if (auto boundTy = dyn_cast<BoundGenericNominalType>(*this))
     return boundTy->getDecl();
   
   return nullptr;
@@ -4363,7 +4430,7 @@ inline Type TypeBase::getNominalParent() {
   if (auto classType = getAs<NominalType>()) {
     return classType->getParent();
   } else {
-    return castTo<BoundGenericType>()->getParent();
+    return castTo<BoundGenericNominalType>()->getParent();
   }
 }
 

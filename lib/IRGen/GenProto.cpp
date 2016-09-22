@@ -2042,7 +2042,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::NominalTypeArgument:
   case Component::Kind::NominalTypeArgumentConformance: {
     assert(sourceKey.Kind == LocalTypeDataKind::forTypeMetadata());
-    auto generic = cast<BoundGenericType>(sourceKey.Type);
+    auto generic = cast<BoundGenericNominalType>(sourceKey.Type);
     auto reqtIndex = component.getPrimaryIndex();
 
     GenericTypeRequirements requirements(IGF.IGM, generic->getDecl());
@@ -2097,7 +2097,7 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
       nominalDecl = nominal->getDecl();
       sourceKey.Type = nominal.getParent();
     } else {
-      auto generic = cast<BoundGenericType>(sourceKey.Type);
+      auto generic = cast<BoundGenericNominalType>(sourceKey.Type);
       nominalDecl = generic->getDecl();
       sourceKey.Type = generic.getParent();
     }

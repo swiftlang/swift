@@ -2325,7 +2325,7 @@ namespace {
         
         if (auto nominalType = outputTy->getAs<NominalType>()) {
           NTD = nominalType->getDecl();
-        } else if (auto bgT = outputTy->getAs<BoundGenericType>()) {
+        } else if (auto bgT = outputTy->getAs<BoundGenericNominalType>()) {
           NTD = bgT->getDecl();
         }
         

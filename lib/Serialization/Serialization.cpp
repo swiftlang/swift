@@ -3210,6 +3210,7 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::BoundGenericAlias:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct: {
@@ -3219,11 +3220,17 @@ void Serializer::writeType(Type ty) {
     for (auto next : generic->getGenericArgs())
       genericArgIDs.push_back(addTypeRef(next));
 
-    unsigned abbrCode = DeclTypeAbbrCodes[BoundGenericTypeLayout::Code];
-    BoundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       addDeclRef(generic->getDecl()),
-                                       addTypeRef(generic->getParent()),
-                                       genericArgIDs);
+    if (auto alias = dyn_cast<BoundGenericAliasType>(generic))
+      BoundGenericAliasTypeLayout::emitRecord(
+          Out, ScratchRecord,
+          DeclTypeAbbrCodes[BoundGenericAliasTypeLayout::Code],
+          addDeclRef(generic->getDecl()),
+          addTypeRef(generic->getParent()), genericArgIDs);
+    else
+      BoundGenericTypeLayout::emitRecord(
+          Out, ScratchRecord, DeclTypeAbbrCodes[BoundGenericTypeLayout::Code],
+          addDeclRef(generic->getDecl()),
+          addTypeRef(generic->getParent()), genericArgIDs);
     break;
   }
 
@@ -3254,6 +3261,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<SubstitutedTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
+  registerDeclTypeAbbr<BoundGenericAliasTypeLayout>();
   registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();

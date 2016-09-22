@@ -3810,23 +3810,33 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::BOUND_GENERIC_ALIAS_TYPE:
   case decls_block::BOUND_GENERIC_TYPE: {
     DeclID declID;
-    TypeID parentID;
+    TypeID parentID, substID;
     ArrayRef<uint64_t> rawArgumentIDs;
+    Type substTy;
 
-    decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
-                                                    rawArgumentIDs);
+    if (recordID == decls_block::BOUND_GENERIC_TYPE)
+      decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
+                                                      rawArgumentIDs);
+    else
+      decls_block::BoundGenericAliasTypeLayout::readRecord(
+          scratch, declID, parentID, rawArgumentIDs);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    auto decl = cast<GenericTypeDecl>(getDecl(declID));
     auto parentTy = getType(parentID);
 
     SmallVector<Type, 8> genericArgs;
     for (TypeID type : rawArgumentIDs)
       genericArgs.push_back(getType(type));
 
-    auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
-    typeOrOffset = boundTy;
+    if (recordID == decls_block::BOUND_GENERIC_TYPE)
+      typeOrOffset = BoundGenericNominalType::get(cast<NominalTypeDecl>(decl),
+                                                  parentTy, genericArgs);
+    else
+      typeOrOffset = BoundGenericAliasType::get(cast<TypeAliasDecl>(decl),
+                                                parentTy, genericArgs);
     break;
   }
 

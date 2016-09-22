@@ -361,9 +361,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::Type: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
-    
+
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
+    if (auto *BGAT = dyn_cast<BoundGenericAliasType>(type.getPointer()))
+      type = BGAT->getCanonicalType();
+    
     std::string typeName = type->getString();
     Out << '\'' << typeName << '\'';
 

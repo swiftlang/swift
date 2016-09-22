@@ -81,7 +81,8 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
 /// Reconstitute type sugar, e.g., for array types, dictionary
 /// types, optionals, etc.
 static Type reconstituteSugar(Type type) {
-  if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
+  if (auto boundGeneric =
+          dyn_cast<BoundGenericNominalType>(type.getPointer())) {
     auto &ctx = type->getASTContext();
     if (boundGeneric->getDecl() == ctx.getArrayDecl())
       return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
