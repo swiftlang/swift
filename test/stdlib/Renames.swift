@@ -519,8 +519,8 @@ func _String<S, C>(x: String, s: S, c: C, i: String.Index)
   x.replaceRange(i..<i, with: x) // expected-error {{'replaceRange(_:with:)' has been renamed to 'replaceSubrange'}} {{5-17=replaceSubrange}} {{none}}
   _ = x.removeAtIndex(i) // expected-error {{'removeAtIndex' has been renamed to 'remove(at:)'}} {{9-22=remove}} {{23-23=at: }} {{none}}
   x.removeRange(i..<i) // expected-error {{'removeRange' has been renamed to 'removeSubrange'}} {{5-16=removeSubrange}} {{none}}
-  _ = x.lowercaseString // expected-error {{'lowercaseString' has been renamed to 'lowercased()'}} {{9-24=lowercased()}} {{none}}
-  _ = x.uppercaseString // expected-error {{'uppercaseString' has been renamed to 'uppercased()'}} {{9-24=uppercased()}} {{none}}
+  _ = x.lowercaseString // expected-error {{'lowercaseString' has been renamed to 'lowercased()'}} {{9-24=lowercased}} {{none}}
+  _ = x.uppercaseString // expected-error {{'uppercaseString' has been renamed to 'uppercased()'}} {{9-24=uppercased}} {{none}}
   // FIXME: SR-1649 <rdar://problem/26563343>; We should suggest to add '()'
 }
 func _String<S : Sequence>(s: S, sep: String) where S.Iterator.Element == String {
