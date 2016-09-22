@@ -47,6 +47,7 @@ module SwiftGlibc [system] {
       export *
     }
 % end
+% end
 
 % if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
     module features {
