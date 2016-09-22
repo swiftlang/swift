@@ -85,15 +85,24 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
-bool DeclAttributes::isUnavailableInCurrentSwift() const {
+bool
+DeclAttributes::isUnavailableInSwiftVersion(
+  const version::Version &effectiveVersion) const {
+  clang::VersionTuple vers = effectiveVersion;
   for (auto attr : *this) {
     if (auto available = dyn_cast<AvailableAttr>(attr)) {
       if (available->isInvalid())
         continue;
 
       if (available->getPlatformAgnosticAvailability() ==
-            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)
-        return true;
+          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+        if (available->Introduced.hasValue() &&
+            available->Introduced.getValue() > vers)
+          return true;
+        if (available->Obsoleted.hasValue() &&
+            available->Obsoleted.getValue() <= vers)
+          return true;
+      }
     }
   }
 

@@ -21,6 +21,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Version.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -1081,9 +1082,11 @@ public:
     return getUnavailable(ctx) != nullptr;
   }
 
-  /// Determine whether there is an "unavailable in current Swift"
-  /// attribute.
-  bool isUnavailableInCurrentSwift() const;
+  /// Determine whether there is a swiftVersionSpecific attribute that's
+  /// unavailable relative to the provided language version (defaulting to
+  /// current language version).
+  bool isUnavailableInSwiftVersion(const version::Version &effectiveVersion =
+           version::Version::getCurrentLanguageVersion()) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.

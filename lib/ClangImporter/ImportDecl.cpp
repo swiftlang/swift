@@ -3595,7 +3595,7 @@ namespace {
             typeResolver->resolveDeclSignature(singleResult);
 
           // Skip Swift 2 variants.
-          if (singleResult->getAttrs().isUnavailableInCurrentSwift())
+          if (singleResult->getAttrs().isUnavailableInSwiftVersion())
             continue;
 
           if (found)
@@ -6000,7 +6000,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
     for (auto member : proto->getMembers()) {
       // Skip Swift 2 stubs; there's no reason to mirror them.
-      if (member->getAttrs().isUnavailableInCurrentSwift())
+      if (member->getAttrs().isUnavailableInSwiftVersion())
         continue;
 
       if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -6097,7 +6097,7 @@ void SwiftDeclConverter::importInheritedConstructors(
         continue;
 
       // Don't inherit Swift 2 stubs.
-      if (ctor->getAttrs().isUnavailableInCurrentSwift())
+      if (ctor->getAttrs().isUnavailableInSwiftVersion())
         continue;
 
       // Don't inherit (non-convenience) factory initializers.

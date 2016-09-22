@@ -1449,7 +1449,7 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
     return false;
 
   // Skip stub declarations used for prior or later variants of Swift.
-  if (D->getAttrs().isUnavailableInCurrentSwift())
+  if (D->getAttrs().isUnavailableInSwiftVersion())
     return false;
 
   if (Options.ExplodeEnumCaseDecls) {
