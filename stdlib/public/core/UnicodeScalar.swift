@@ -371,7 +371,7 @@ extension UnicodeScalar : Comparable {
 
 extension UnicodeScalar {
   public struct UTF16View {
-    public var value: UnicodeScalar
+    internal var value: UnicodeScalar
   }
 
   public var utf16: UTF16View {
