@@ -746,7 +746,35 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       comp->setValue(nominal);
       return type;
     }
-    
+
+
+    // Try ignoring access control.
+    DeclContext *lookupDC = dc;
+    if (options.contains(TR_GenericSignature))
+      lookupDC = dc->getParent();
+
+    NameLookupOptions relookupOptions = lookupOptions;
+    relookupOptions |= NameLookupFlags::KnownPrivate;
+    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    LookupResult inaccessibleResults =
+        tc.lookupUnqualified(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
+                             relookupOptions);
+    if (inaccessibleResults) {
+      // FIXME: What if the unviable candidates have different levels of access?
+      auto first = cast<TypeDecl>(inaccessibleResults.front().Decl);
+      tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
+                  comp->getIdentifier(), first->getFormalAccess());
+
+      // FIXME: If any of the candidates (usually just one) are in the same
+      // module we could offer a fix-it.
+      for (auto lookupResult : inaccessibleResults)
+        tc.diagnose(lookupResult.Decl, diag::type_declared_here);
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if we do.
+      return ErrorType::get(tc.Context);
+    }
+
     // Fallback.
     SourceLoc L = comp->getIdLoc();
     SourceRange R = SourceRange(comp->getIdLoc());

@@ -70,7 +70,7 @@ extension Container {
   }
 
   // FIXME: Why do these errors happen twice?
-  var extensionInner: PrivateInner? { return nil } // FIXME expected-error 2 {{use of undeclared type 'PrivateInner'}}
+  var extensionInner: PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
   var extensionInnerQualified: Container.PrivateInner? { return nil } // expected-error 2 {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
@@ -107,7 +107,7 @@ class Sub : Container {
     _ = Container.PrivateInner() // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   }
 
-  var subInner: PrivateInner? // FIXME expected-error {{use of undeclared type 'PrivateInner'}}
+  var subInner: PrivateInner? // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
   var subInnerQualified: Container.PrivateInner? // expected-error {{'PrivateInner' is inaccessible due to 'private' protection level}}
 }
 
@@ -154,7 +154,7 @@ extension Container {
 }
 extension Container {
   func test() {
-    let a: ExtensionConflictingType? = nil // FIXME expected-error {{use of undeclared type 'ExtensionConflictingType'}}
+    let a: ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
     let b: Container.ExtensionConflictingType? = nil // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
     _ = ExtensionConflictingType() // FIXME expected-error {{use of unresolved identifier 'ExtensionConflictingType'}}
     _ = Container.ExtensionConflictingType() // expected-error {{'ExtensionConflictingType' is inaccessible due to 'private' protection level}}
