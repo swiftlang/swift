@@ -284,10 +284,13 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   };
 
   if (!Options.SkipParameterTypeAttributes) {
-    if (hasAttr(TAK_autoclosure))
-      Printer.printSimpleAttr("@autoclosure") << " ";
+    if (hasAttr(TAK_autoclosure)) {
+      Printer.printSimpleAttr("@autoclosure");
+      Printer << " ";
+    }
     if (hasAttr(TAK_escaping))
-      Printer.printSimpleAttr("@escaping") << " ";
+      Printer.printSimpleAttr("@escaping");
+      Printer << " ";
   }
 
   if (hasAttr(TAK_thin)) {
