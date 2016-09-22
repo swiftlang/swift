@@ -2551,6 +2551,9 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
                                       llvm::raw_ostream &os,
                                       unsigned indent) const {
+  if (archetype->isOpenedExistential())
+    return;
+
   archetype = archetype->getPrimary();
   if (!archetype)
     return;
