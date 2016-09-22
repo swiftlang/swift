@@ -33,7 +33,7 @@ bool swift::isNotAliasingArgument(SILValue V,
                                        isInoutAliasing);
 }
 
-/// Check if the the parameter \V is based on a local object, e.g. it is an
+/// Check if the parameter \V is based on a local object, e.g. it is an
 /// allocation instruction or a struct/tuple constructed from the local objects.
 /// Returns a found local object. If a local object was not found, returns an
 /// empty SILValue.
