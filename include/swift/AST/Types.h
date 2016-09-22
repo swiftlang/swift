@@ -1295,9 +1295,8 @@ public:
 //
 /// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
 /// escaping.
-struct ParameterTypeFlags {
-  uint8_t value;
-  enum : uint8_t {
+class ParameterTypeFlags {
+  enum ParameterFlags : uint8_t {
     None = 0,
     Variadic = 1 << 0,
     AutoClosure = 1 << 1,
@@ -1305,11 +1304,13 @@ struct ParameterTypeFlags {
 
     NumBits = 3
   };
+  OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(value), "overflowed");
 
-  ParameterTypeFlags() : value(None) {}
+  ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
 
-  ParameterTypeFlags(uint8_t val) : value(val) {}
+public:
+  ParameterTypeFlags() = default;
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping)
       : value((variadic ? Variadic : 0) |
@@ -1320,13 +1321,21 @@ struct ParameterTypeFlags {
   inline static ParameterTypeFlags fromParameterType(Type paramTy,
                                                      bool isVariadic);
 
-  bool isVariadic() const { return 0 != (value & Variadic); }
-  bool isAutoClosure() const { return 0 != (value & AutoClosure); }
-  bool isEscaping() const { return 0 != (value & Escaping); }
+  bool isNone() const { return !value; }
+  bool isVariadic() const { return value.contains(Variadic); }
+  bool isAutoClosure() const { return value.contains(AutoClosure); }
+  bool isEscaping() const { return value.contains(Escaping); }
 
-  bool operator==(const ParameterTypeFlags &other) {
-    return value == other.value;
+  ParameterTypeFlags withEscaping(bool escaping) const {
+    return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
+                                       : value - ParameterTypeFlags::Escaping);
   }
+
+  bool operator ==(const ParameterTypeFlags &other) const {
+    return value.toRaw() == other.value.toRaw();
+  }
+
+  uint8_t toRaw() const { return value.toRaw(); }
 };
 
 /// ParenType - A paren type is a type that's been written in parentheses.
@@ -1411,21 +1420,16 @@ public:
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), isVararg(), isAutoClosure(),
-                        isEscaping());
+    return TupleTypeElt(T, getName(), getParameterFlags());
   }
 
   /// Retrieve a copy of this tuple type element with the name replaced.
-  TupleTypeElt getWithName(Identifier name = Identifier()) const {
-    return TupleTypeElt(getType(), name, isVararg(), isAutoClosure(),
-                        isEscaping());
+  TupleTypeElt getWithName(Identifier name) const {
+    return TupleTypeElt(getType(), name, getParameterFlags());
   }
 
-  /// Retrieve a copy of this tuple type element with the type and name
-  /// replaced.
-  TupleTypeElt getWithTypeAndName(Type T, Identifier name) const {
-    return TupleTypeElt(T, name, isVararg(), isAutoClosure(), isEscaping());
-  }
+  /// Retrieve a copy of this tuple type element with no name
+  TupleTypeElt getWithoutName() const { return getWithName(Identifier()); }
 };
 
 inline Type getTupleEltType(const TupleTypeElt &elt) {

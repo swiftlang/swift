@@ -2640,7 +2640,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     printParameterFlags(Printer, Options, paramFlags);
 
     // Special case, if we're not going to use the type repr printing, peek
-    // through the paren types so that we don't print excessive @escapings
+    // through the paren types so that we don't print excessive @escapings.
     unsigned numParens = 0;
     if (!willUseTypeReprPrinting(TheTypeLoc, Options)) {
       while (auto parenTy =
@@ -2727,7 +2727,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   }
 
   SmallVector<Type, 4> parameterListTypes;
-  for (auto i = 0; i < BodyParams.size(); ++i) {
+  for (unsigned i = 0; i < BodyParams.size(); ++i) {
     if (curTy) {
       if (auto funTy = curTy->getAs<AnyFunctionType>()) {
         parameterListTypes.push_back(funTy->getInput());
@@ -2742,7 +2742,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   for (unsigned CurrPattern = 0, NumPatterns = BodyParams.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
     // Be extra careful in the event of printing mal-formed ASTs
-    auto paramListType = parameterListTypes.size() > CurrPattern
+    auto paramListType = CurrPattern < parameterListTypes.size()
                              ? parameterListTypes[CurrPattern]
                              : nullptr;
     printParameterList(BodyParams[CurrPattern], paramListType,
@@ -3985,7 +3985,7 @@ public:
       SmallVector<TupleTypeElt, 4> elements;
       elements.reserve(tupleTy->getNumElements());
       for (const auto &elt : tupleTy->getElements())
-        elements.push_back(elt.getWithName());
+        elements.push_back(elt.getWithoutName());
       inputType = TupleType::get(elements, inputType->getASTContext());
     }
 

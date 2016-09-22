@@ -761,7 +761,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
         }
 
         Identifier newName = stripLabels? Identifier() : elt.getName();
-        elements.push_back(elt.getWithTypeAndName(eltTy, newName));
+        elements.emplace_back(eltTy, newName, elt.getParameterFlags());
       }
       ++idx;
     }
@@ -850,7 +850,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
 
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(elt.getParameterFlags().value == 0 &&
+      assert(elt.getParameterFlags().isNone() &&
              "Vararg, autoclosure, or escaping argument tuple"
              "doesn't make sense");
       CallArgParam argParam;

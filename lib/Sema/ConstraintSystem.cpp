@@ -623,7 +623,7 @@ static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
     SmallVector<TupleTypeElt, 4> elements;
     elements.reserve(tupleTy->getNumElements());
     for (const auto &elt : tupleTy->getElements()) {
-      elements.push_back(elt.getWithName());
+      elements.push_back(elt.getWithoutName());
     }
     inputType = TupleType::get(elements, type->getASTContext());
   }
