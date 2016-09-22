@@ -938,6 +938,69 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(DiagnoseWalker(TC, isAlreadyInClosure));
 }
 
+bool TypeChecker::getDefaultGenericArgumentsString(
+    SmallVectorImpl<char> &buf,
+    const swift::GenericTypeDecl *typeDecl,
+    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType) {
+  llvm::raw_svector_ostream genericParamText{buf};
+  genericParamText << "<";
+
+  auto printGenericParamSummary =
+      [&](const GenericTypeParamType *genericParamTy) {
+    const GenericTypeParamDecl *genericParam = genericParamTy->getDecl();
+    if (Type result = getPreferredType(genericParam)) {
+      result.print(genericParamText);
+      return;
+    }
+
+    ArrayRef<ProtocolDecl *> protocols =
+        genericParam->getConformingProtocols(this);
+
+    if (Type superclass = genericParam->getSuperclass()) {
+      if (protocols.empty()) {
+        superclass.print(genericParamText);
+        return;
+      }
+
+      genericParamText << "<#" << genericParam->getName() << ": ";
+      superclass.print(genericParamText);
+      for (const ProtocolDecl *proto : protocols) {
+        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+          continue;
+        genericParamText << " & " << proto->getName();
+      }
+      genericParamText << "#>";
+      return;
+    }
+
+    if (protocols.empty()) {
+      genericParamText << Context.Id_Any;
+      return;
+    }
+
+    if (protocols.size() == 1 &&
+        (protocols.front()->isObjC() ||
+         protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
+      genericParamText << protocols.front()->getName();
+      return;
+    }
+
+    genericParamText << "<#" << genericParam->getName() << ": ";
+    interleave(protocols,
+               [&](const ProtocolDecl *proto) {
+                 genericParamText << proto->getName();
+               },
+               [&] { genericParamText << " & "; });
+    genericParamText << "#>";
+  };
+
+  interleave(typeDecl->getInnermostGenericParamTypes(),
+             printGenericParamSummary, [&]{ genericParamText << ", "; });
+
+  genericParamText << ">";
+  return true;
+}
+
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
 bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
