@@ -3148,9 +3148,8 @@ namespace {
         return nullptr;
 
       // Convert the subexpression.
-      bool failed = tc.convertToType(sub, toType, cs.DC);
-      (void)failed;
-      assert(!failed && "Not convertible?");
+      if (tc.convertToType(sub, toType, cs.DC))
+        return nullptr;
 
       expr->setSubExpr(sub);
       expr->setType(toType);
