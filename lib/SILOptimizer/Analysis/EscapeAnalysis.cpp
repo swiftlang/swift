@@ -561,8 +561,10 @@ bool EscapeAnalysis::ConnectionGraph::isReachable(CGNode *From, CGNode *To) {
   From->isInWorkList = true;
   for (unsigned Idx = 0; Idx < WorkList.size(); ++Idx) {
     CGNode *Reachable = WorkList[Idx];
-    if (Reachable == To)
+    if (Reachable == To) {
+      clearWorkListFlags(WorkList);
       return true;
+    }
     for (Predecessor Pred : Reachable->Preds) {
       CGNode *PredNode = Pred.getPointer();
       if (!PredNode->isInWorkList) {
