@@ -3582,15 +3582,14 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 
 
 /// Return true if the given type conforms to a known protocol type.
-static bool isExpressibleByLiteralType(Type fromType,
-                                     KnownProtocolKind kind,
-                                     ConstraintSystem *CS) {
-  auto integerType =
-    CS->TC.getProtocol(SourceLoc(), kind);
-  if (!integerType)
+static bool conformsToKnownProtocol(Type fromType,
+                                    KnownProtocolKind kind,
+                                    ConstraintSystem *CS) {
+  auto proto = CS->TC.getProtocol(SourceLoc(), kind);
+  if (!proto)
     return false;
 
-  if (CS->TC.conformsToProtocol(fromType, integerType, CS->DC,
+  if (CS->TC.conformsToProtocol(fromType, proto, CS->DC,
                                 ConformanceCheckFlags::InExpression)) {
     return true;
   }
@@ -3599,9 +3598,9 @@ static bool isExpressibleByLiteralType(Type fromType,
 }
 
 static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
-  return isExpressibleByLiteralType(fromType,
-                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
-                                  CS);
+  return conformsToKnownProtocol(fromType,
+                                 KnownProtocolKind::ExpressibleByIntegerLiteral,
+                                 CS);
 }
 
 /// Return true if the given type conforms to RawRepresentable.
@@ -3631,7 +3630,7 @@ static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
                                ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !isExpressibleByLiteralType(rawTy, kind, CS))
+  if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
     return Type();
 
   return rawTy;
@@ -3642,7 +3641,7 @@ static Type isRawRepresentable(Type fromType,
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
                                              ConstraintSystem *CS) {
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
-  return (isExpressibleByLiteralType(fromType, kind, CS) &&
+  return (conformsToKnownProtocol(fromType, kind, CS) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
@@ -3697,14 +3696,23 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   };
 
-  if (isExpressibleByLiteralType(fromType, kind, CS)) {
+  if (conformsToKnownProtocol(fromType, kind, CS)) {
     if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
       std::string convWrapBefore = toType.getString();
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
-      if (rawTy->getCanonicalType() != fromType->getCanonicalType()) {
+      if (!CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (kind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: break;
+#define PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: return false;
+#include "swift/AST/KnownProtocols.def"
+        }
         convWrapBefore += rawTy->getString();
         convWrapBefore += "(";
         convWrapAfter += ")";
@@ -3715,11 +3723,20 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
   }
 
   if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (isExpressibleByLiteralType(toType, kind, CS)) {
+    if (conformsToKnownProtocol(toType, kind, CS)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
-      if (rawTy->getCanonicalType() != toType->getCanonicalType()) {
-        convWrapBefore += rawTy->getString();
+      if (!CS->TC.isConvertibleTo(rawTy, toType, CS->DC)) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (kind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: break;
+#define PROTOCOL_WITH_NAME(name, _) \
+        case KnownProtocolKind::name: return false;
+#include "swift/AST/KnownProtocols.def"
+        }
+        convWrapBefore += toType->getString();
         convWrapBefore += "(";
         convWrapAfter += ")";
       }
@@ -4179,6 +4196,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                               expr) ||
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
                               KnownProtocolKind::ExpressibleByStringLiteral,
+                              expr) ||
+    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
+                              KnownProtocolKind::AnyObject,
                               expr) ||
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
     addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
