@@ -230,16 +230,13 @@ namespace {
         assert(superclass);
 
         if (superclass->hasClangNode()) {
-          // As a special case, assume NSObject has a fixed layout.
-          if (superclass->getName() !=
-                IGM.Context.getSwiftId(KnownFoundationEntity::NSObject)) {
-            // If the superclass was imported from Objective-C, its size is
-            // not known at compile time. However, since the field offset
-            // vector only stores offsets of stored properties defined in
-            // Swift, we don't have to worry about indirect indexing of
-            // the field offset vector.
-            ClassHasFixedSize = false;
-          }
+          // If the superclass was imported from Objective-C, its size is
+          // not known at compile time. However, since the field offset
+          // vector only stores offsets of stored properties defined in
+          // Swift, we don't have to worry about indirect indexing of
+          // the field offset vector.
+          ClassHasFixedSize = false;
+
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
 
