@@ -1,0 +1,8 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+{
+()AnyObject
+.n
+}
+import Swift
+class b{@objc func a(c)
