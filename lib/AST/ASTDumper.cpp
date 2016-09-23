@@ -2081,8 +2081,6 @@ public:
     printClosure(E, "closure_expr");
     if (E->hasSingleExpressionBody())
       OS << " single-expression";
-    if (E->isVoidConversionClosure())
-      OS << " void-conversion";
     
     if (E->getParameters()) {
       OS << '\n';
