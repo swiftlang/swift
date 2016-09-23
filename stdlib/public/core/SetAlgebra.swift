@@ -67,11 +67,13 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   func union(other: Self) -> Self
   
   /// Returns the set of elements contained in both `self` and `other`.
+  @swift3_migration(renamed="intersection")
   @warn_unused_result
   func intersect(other: Self) -> Self
 
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
+  @swift3_migration(renamed="symmetricDifference")
   @warn_unused_result
   func exclusiveOr(other: Self) -> Self
 
@@ -92,6 +94,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   ///
   /// - Equivalent to replacing `self` with `self.union(other)`.
   /// - Postcondition: `self.isSupersetOf(other)`
+  @swift3_migration(renamed="formUnion")
   mutating func unionInPlace(other: Self)
 
   /// Removes all elements of `self` that are not also present in
@@ -99,12 +102,14 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   ///
   /// - Equivalent to replacing `self` with `self.intersect(other)`
   /// - Postcondition: `self.isSubsetOf(other)`
+  @swift3_migration(renamed="formIntersection")
   mutating func intersectInPlace(other: Self)
 
   /// Replaces `self` with a set containing all elements contained in
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
+  @swift3_migration(renamed="formSymmetricDifference")
   mutating func exclusiveOrInPlace(other: Self)  
 
   //===--- Requirements with default implementations ----------------------===//
@@ -113,14 +118,17 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   func subtract(other: Self) -> Self
 
   /// Returns `true` iff every element of `self` is contained in `other`.
+  @swift3_migration(renamed="isSubset(of:)")
   @warn_unused_result
   func isSubsetOf(other: Self) -> Bool
 
   /// Returns `true` iff `self.intersect(other).isEmpty`.
+  @swift3_migration(renamed="isDisjoint(with:)")
   @warn_unused_result
   func isDisjointWith(other: Self) -> Bool
 
   /// Returns `true` iff every element of `other` is contained in `self`.
+  @swift3_migration(renamed="isSuperset(of:)")
   @warn_unused_result
   func isSupersetOf(other: Self) -> Bool
 
@@ -133,6 +141,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// Removes all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
+  @swift3_migration(renamed="subtract")
   mutating func subtractInPlace(other: Self)
 
   /// Returns `true` iff `a` subsumes `b`.
@@ -212,6 +221,7 @@ extension SetAlgebraType {
 
   /// Returns `true` iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
+  @swift3_migration(renamed="isStrictSuperset(of:)")
   @warn_unused_result
   public func isStrictSupersetOf(other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
@@ -219,6 +229,7 @@ extension SetAlgebraType {
 
   /// Returns `true` iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
+  @swift3_migration(renamed="isStrictSubset(of:)")
   @warn_unused_result
   public func isStrictSubsetOf(other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
