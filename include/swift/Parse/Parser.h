@@ -1245,7 +1245,7 @@ public:
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
+  ParserResult<PlatformVersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };
 
 /// Describes a parsed declaration name.

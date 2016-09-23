@@ -2984,7 +2984,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///
 ///  version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<VersionConstraintAvailabilitySpec>
+ParserResult<PlatformVersionConstraintAvailabilitySpec>
 Parser::parseVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
@@ -3024,7 +3024,7 @@ Parser::parseVersionConstraintSpec() {
     return nullptr;
   }
 
-  return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
+  return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
 }
 

@@ -740,7 +740,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       //  @available(iOS, introduced: 8.0)
       //  @available(OSX, introduced: 10.10)
       for (auto *Spec : Specs) {
-        auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+        auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
         if (!VersionSpec)
           continue;
 

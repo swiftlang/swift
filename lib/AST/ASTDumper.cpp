@@ -1215,8 +1215,11 @@ public:
       for (auto *Query : C.getAvailability()->getQueries()) {
         OS << '\n';
         switch (Query->getKind()) {
-        case AvailabilitySpecKind::VersionConstraint:
-          cast<VersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+        case AvailabilitySpecKind::PlatformVersionConstraint:
+          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        case AvailabilitySpecKind::LanguageVersionConstraint:
+          cast<LanguageVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
           break;
         case AvailabilitySpecKind::OtherPlatform:
           cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);

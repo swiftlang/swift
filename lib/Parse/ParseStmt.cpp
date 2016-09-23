@@ -1047,7 +1047,7 @@ static void validateAvailabilitySpecList(Parser &P,
       continue;
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
