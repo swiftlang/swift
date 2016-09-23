@@ -61,9 +61,43 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType();
 
   // Compute the substitutions.
-  ArrayRef<Substitution> substitutions =
-      swiftValueType->gatherAllSubstitutions(
-          gen.SGM.SwiftModule, nullptr);
+  ArrayRef<Substitution> witnessSubstitutions = witness.getSubstitutions();
+  ArrayRef<Substitution> typeSubstitutions =
+      swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
+  
+  // FIXME: Methods of generic types don't have substitutions in their
+  // ConcreteDeclRefs for some reason. Furthermore,
+  // SubsitutedProtocolConformances don't substitute their witness
+  // ConcreteDeclRefs, so we need to do it ourselves.
+  ArrayRef<Substitution> substitutions;
+  SmallVector<Substitution, 4> substitutionsBuf;
+  if (typeSubstitutions.empty()) {
+    substitutions = witnessSubstitutions;
+  } else if (witnessSubstitutions.empty()) {
+    substitutions = typeSubstitutions;
+  } else {
+    // FIXME: The substitutions in a witness ConcreteDeclRef really ought to
+    // be interface types. Instead, we get archetypes from a generic environment
+    // that's either the extension method's generic environment, for a witness
+    // from a nominal extension, or the conforming type's original declaration
+    // generic environment, for a witness from a protocol extension.
+    auto swiftValueTypeDecl = swiftValueType->getAnyNominal();
+    GenericParamList *witnessContext;
+    
+    if (witness.getDecl()->getDeclContext()->getDeclaredTypeOfContext()
+        ->isExistentialType()) {
+      witnessContext = swiftValueTypeDecl->getGenericParams();
+    } else {
+      witnessContext = witness.getDecl()->getDeclContext()
+        ->getGenericParamsOfContext();
+    }
+    
+    for (auto sub : witnessSubstitutions) {
+      substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, witnessContext,
+                                           typeSubstitutions));
+    }
+    substitutions = substitutionsBuf;
+  }
 
   if (!substitutions.empty()) {
     // Substitute into the witness function tye.
