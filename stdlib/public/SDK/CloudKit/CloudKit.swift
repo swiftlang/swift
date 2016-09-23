@@ -4,8 +4,9 @@ import Foundation
 @available(macOS 10.10, iOS 8.0, *)
 extension CKError {
   /// Retrieve partial error results associated by item ID.
-  public var partialErrorsByItemID: [NSObject : Error]? {
-    return userInfo[CKPartialErrorsByItemIDKey] as? [NSObject : Error]
+  public var partialErrorsByItemID: [AnyHashable: Error]? {
+    return userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: NSError]
+             as? [AnyHashable: Error]
   }
 
   /// The original CKRecord object that you used as the basis for
