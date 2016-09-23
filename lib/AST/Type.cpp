@@ -755,14 +755,13 @@ static Type getStrippedType(const ASTContext &context, Type type,
           for (unsigned i = 0; i != idx; ++i) {
             const TupleTypeElt &elt = tuple->getElement(i);
             Identifier newName = stripLabels? Identifier() : elt.getName();
-            elements.push_back(TupleTypeElt(elt.getType(), newName,
-                                            elt.isVararg()));
+            elements.push_back(elt.getWithName(newName));
           }
           anyChanged = true;
         }
 
         Identifier newName = stripLabels? Identifier() : elt.getName();
-        elements.push_back(TupleTypeElt(eltTy, newName, elt.isVararg()));
+        elements.emplace_back(eltTy, newName, elt.getParameterFlags());
       }
       ++idx;
     }
@@ -851,7 +850,9 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
 
     for (auto i : range(0, tupleTy->getNumElements())) {
       const auto &elt = tupleTy->getElement(i);
-      assert(!elt.isVararg() && "Vararg argument tuple doesn't make sense");
+      assert(elt.getParameterFlags().isNone() &&
+             "Vararg, autoclosure, or escaping argument tuple"
+             "doesn't make sense");
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];
@@ -916,7 +917,7 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
       argParam.Label = elt.getName();
       argParam.HasDefaultArgument =
           paramList && paramList->get(i)->isDefaultArgument();
-      argParam.Variadic = elt.isVararg();
+      argParam.parameterFlags = elt.getParameterFlags();
       result.push_back(argParam);
     }
     break;
@@ -1208,9 +1209,7 @@ CanType TypeBase::getCanonicalType() {
     for (const TupleTypeElt &field : TT->getElements()) {
       assert(!field.getType().isNull() &&
              "Cannot get canonical type of un-typechecked TupleType!");
-      CanElts.push_back(TupleTypeElt(field.getType()->getCanonicalType(),
-                                     field.getName(),
-                                     field.isVararg()));
+      CanElts.push_back(field.getWithType(field.getType()->getCanonicalType()));
     }
 
     const ASTContext &C = CanElts[0].getType()->getASTContext();
@@ -3394,17 +3393,13 @@ case TypeKind::Id:
       // elements.
       if (!anyChanged) {
         // Copy all of the previous elements.
-        for (unsigned I = 0; I != Index; ++I) {
-          const TupleTypeElt &FromElt =tuple->getElement(I);
-          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
-                                          FromElt.isVararg()));
-        }
-
+        elements.append(tuple->getElements().begin(),
+                        tuple->getElements().begin() + Index);
         anyChanged = true;
       }
 
       // Add the new tuple element, with the new type, no initializer,
-      elements.push_back(TupleTypeElt(eltTy, elt.getName(), elt.isVararg()));
+      elements.push_back(elt.getWithType(eltTy));
       ++Index;
     }
 

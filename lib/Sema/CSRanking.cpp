@@ -106,24 +106,6 @@ llvm::raw_ostream &constraints::operator<<(llvm::raw_ostream &out,
   return out;
 }
 
-/// \brief Remove the initializers from any tuple types within the
-/// given type.
-static Type stripInitializers(Type origType) {
-  return origType.transform([&](Type type) -> Type {
-             if (auto tupleTy = type->getAs<TupleType>()) {
-               SmallVector<TupleTypeElt, 4> fields;
-               for (const auto &field : tupleTy->getElements()) {
-                 fields.push_back(TupleTypeElt(field.getType(),
-                                               field.getName(),
-                                               field.isVararg()));
-                                               
-               }
-               return TupleType::get(fields, type->getASTContext());
-             }
-             return type;
-           });
-}
-
 ///\ brief Compare two declarations for equality when they are used.
 ///
 static bool sameDecl(Decl *decl1, Decl *decl2) {
@@ -689,7 +671,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             // We need either a default argument or a variadic
             // argument for the first declaration to be more
             // specialized.
-            if (!params2[i].HasDefaultArgument && !params2[i].Variadic)
+            if (!params2[i].HasDefaultArgument &&
+                !params2[i].isVariadic())
               return false;
 
             fewerEffectiveParameters = true;
@@ -700,10 +683,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           if (params1[i].Label != params2[i].Label) return false;
 
           // If one parameter is variadic and the other is not...
-          if (params1[i].Variadic != params2[i].Variadic) {
+          if (params1[i].isVariadic() != params2[i].isVariadic()) {
             // If the first parameter is the variadic one, it's not
             // more specialized.
-            if (params1[i].Variadic) return false;
+            if (params1[i].isVariadic()) return false;
 
             fewerEffectiveParameters = true;
           }
@@ -1011,11 +994,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
 
     auto type1 = binding.bindings[idx1];
     auto type2 = binding.bindings[idx2];
-
-    // Strip any initializers from tuples in the type; they aren't
-    // to be compared.
-    type1 = stripInitializers(type1);
-    type2 = stripInitializers(type2);
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))

@@ -2512,6 +2512,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
+  bool isImmediateFunctionInput = options.contains(TR_ImmediateFunctionInput);
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getElements().size());
   
@@ -2525,7 +2526,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = withoutContext(elementOptions, true);
-    if (options & TR_ImmediateFunctionInput)
+    if (isImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
   }
 
@@ -2533,7 +2534,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   // Variadic tuples are not permitted.
   if (repr->hasEllipsis() &&
-      !(options & TR_ImmediateFunctionInput)) {
+      !isImmediateFunctionInput) {
     TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
     repr->removeEllipsis();
     complained = true;
@@ -2549,7 +2550,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (namedTyR) {
       // FIXME: Preserve and serialize parameter names in function types, maybe
       // with a new sugar type.
-      if (!(options & TR_ImmediateFunctionInput))
+      if (!isImmediateFunctionInput)
         name = namedTyR->getName();
 
       tyR = namedTyR->getTypeRepr();
@@ -2574,12 +2575,15 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (variadic)
       ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
 
-    elements.push_back(TupleTypeElt(ty, name, variadic));
+    auto paramFlags = isImmediateFunctionInput
+                          ? ParameterTypeFlags::fromParameterType(ty, variadic)
+                          : ParameterTypeFlags();
+    elements.emplace_back(ty, name, paramFlags);
   }
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
-  if (!(options & TR_ImmediateFunctionInput)) {
+  if (!isImmediateFunctionInput) {
     if (elements.size() == 1 && elements[0].hasName()
         && !(options & TR_SILType)
         && !(options & TR_EnumCase)) {

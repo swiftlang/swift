@@ -2823,10 +2823,13 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
+    auto paramFlags = parenTy->getParameterFlags();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
-    ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(parenTy->getUnderlyingType()));
+    ParenTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
+        paramFlags.isVariadic(), paramFlags.isAutoClosure(),
+        paramFlags.isEscaping());
     break;
   }
 
@@ -2838,10 +2841,11 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addIdentifierRef(elt.getName()),
-                                     addTypeRef(elt.getType()),
-                                     elt.isVararg());
+      auto paramFlags = elt.getParameterFlags();
+      TupleTypeEltLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getName()),
+          addTypeRef(elt.getType()), paramFlags.isVariadic(),
+          paramFlags.isAutoClosure(), paramFlags.isEscaping());
     }
 
     break;

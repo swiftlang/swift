@@ -547,32 +547,21 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 }
 
 static std::string getTypeListString(Type type) {
-  // Assemble the parameter type list.
-  auto tupleType = type->getAs<TupleType>();
-  if (!tupleType) {
-    if (auto PT = dyn_cast<ParenType>(type.getPointer()))
-      type = PT->getUnderlyingType();
+  std::string result;
 
-    return "(" + type->getString() + ")";
-  }
+  // Always make sure to have at least one set of parens
+  bool forceParens =
+      !type->is<TupleType>() && !isa<ParenType>(type.getPointer());
+  if (forceParens)
+    result.push_back('(');
 
-  std::string result = "(";
-  for (auto field : tupleType->getElements()) {
-    if (result.size() != 1)
-      result += ", ";
-    if (!field.getName().empty()) {
-      result += field.getName().str();
-      result += ": ";
-    }
+  llvm::raw_string_ostream OS(result);
+  type->print(OS);
+  OS.flush();
 
-    if (!field.isVararg())
-      result += field.getType()->getString();
-    else {
-      result += field.getVarargBaseTy()->getString();
-      result += "...";
-    }
-  }
-  result += ")";
+  if (forceParens)
+    result.push_back(')');
+
   return result;
 }
 

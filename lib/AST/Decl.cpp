@@ -1467,25 +1467,28 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     SmallVector<TupleTypeElt, 4> elements;
     bool anyChanged = false;
     unsigned idx = 0;
+    // Remap our parameters, and make sure to strip off @escaping
     for (const auto &elt : tupleTy->getElements()) {
-      Type eltTy = mapSignatureParamType(ctx, elt.getType());
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer()) {
-        if (!anyChanged) {
-          elements.reserve(tupleTy->getNumElements());
-          for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tupleTy->getElement(i);
-            elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
-                                            elt.isVararg()));
-          }
-          anyChanged = true;
-        }
+      auto newEltTy = mapSignatureParamType(ctx, elt.getType());
+      auto newParamFlags = elt.getParameterFlags().withEscaping(false);
+      bool exactlyTheSame = newParamFlags == elt.getParameterFlags() &&
+                            newEltTy.getPointer() == elt.getType().getPointer();
 
-        elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                        elt.isVararg()));
+      // Don't build up anything if we never see any difference
+      if (!anyChanged && exactlyTheSame) {
+        ++idx;
+        continue;
       }
-      ++idx;
+
+      // First time we see a diff, copy over all the prior
+      if (!anyChanged && !exactlyTheSame) {
+        elements.append(tupleTy->getElements().begin(),
+                        tupleTy->getElements().begin() + idx);
+        anyChanged = true;
+      }
+
+      elements.emplace_back(newEltTy, elt.getName(), newParamFlags);
     }
-    
     if (anyChanged) {
       argTy = TupleType::get(elements, ctx);
     }
