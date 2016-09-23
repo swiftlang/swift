@@ -95,7 +95,7 @@ public:
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     SmallVector<ProtocolDecl *, 4> protos;
-    for (auto p : td->getConformingProtocols(nullptr))
+    for (auto p : td->getConformingProtocols())
       protos.push_back(p);
     ProtocolType::canonicalizeProtocols(protos);
     asDerived().addAssociatedType(td, protos);

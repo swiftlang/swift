@@ -95,7 +95,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
     paramInfos.push_back(CallArgParam());
     paramInfos.back().Label = param->getArgumentName();
     paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
-    paramInfos.back().Variadic = param->isVariadic();
+    paramInfos.back().parameterFlags = ParameterTypeFlags::fromParameterType(
+        param->getType(), param->isVariadic());
   }
 
   MatchCallArgumentListener listener;
@@ -262,7 +263,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.Variadic) {
+    if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
       auto claimed = claimNextNamed(param.Label, ignoreNameMismatch);
 
@@ -417,7 +418,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.Variadic)
+      if (param.isVariadic())
         continue;
 
       // Parameters with defaults can be unfulfilled.

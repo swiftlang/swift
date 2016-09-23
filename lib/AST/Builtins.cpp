@@ -445,7 +445,6 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
-  genericParam->setArchetype(archetype);
   return std::make_pair(archetype, genericParam);
 }
 
@@ -910,6 +909,15 @@ static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
   // <T> () -> T
   GenericSignatureBuilder builder(Context);
   builder.setResult(makeGenericParam());
+  return builder.build(Id);
+}
+
+static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
+                                                  Identifier Id) {
+  // <T> T.Type -> RawPointer
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
 
@@ -1740,6 +1748,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::GetObjCTypeEncoding:
+    return getGetObjCTypeEncodingOperation(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

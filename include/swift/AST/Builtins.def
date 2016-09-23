@@ -473,6 +473,9 @@ BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)
 // unsafeGuaranteedEnd has type (Builtin.Int8) -> ()
 BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
 
+// getObjCTypeEncoding has type <T> T.Type -> RawPointer
+BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.

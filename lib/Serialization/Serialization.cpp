@@ -1011,16 +1011,12 @@ void Serializer::writeGenericEnvironment(GenericSignature *sig,
   if (env == nullptr)
     return;
 
-  auto &map = env->getInterfaceToArchetypeMap();
-
   auto envAbbrCode = abbrCodes[GenericEnvironmentLayout::Code];
 
   // Iterate over the signature's generic parameters, for stable
   // iteration order.
   for (auto *paramTy : sig->getGenericParams()) {
-    auto found = map.find(paramTy->getCanonicalType().getPointer());
-    assert(found != map.end() && "missing generic parameter");
-    auto contextTy = found->second;
+    auto contextTy = env->mapTypeIntoContext(paramTy);
     GenericEnvironmentLayout::emitRecord(
       Out, ScratchRecord, envAbbrCode,
       addTypeRef(paramTy),
@@ -2252,7 +2248,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex(),
-                                addTypeRef(genericParam->getArchetype()),
                                 inheritedTypes);
     break;
   }
@@ -2272,7 +2267,6 @@ void Serializer::writeDecl(const Decl *D) {
       Out, ScratchRecord, abbrCode,
       addIdentifierRef(assocType->getName()),
       contextID,
-      addTypeRef(assocType->getArchetype()),
       addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),
       inheritedTypes);
@@ -2823,10 +2817,13 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
+    auto paramFlags = parenTy->getParameterFlags();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
-    ParenTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                addTypeRef(parenTy->getUnderlyingType()));
+    ParenTypeLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
+        paramFlags.isVariadic(), paramFlags.isAutoClosure(),
+        paramFlags.isEscaping());
     break;
   }
 
@@ -2838,10 +2835,11 @@ void Serializer::writeType(Type ty) {
 
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
-      TupleTypeEltLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addIdentifierRef(elt.getName()),
-                                     addTypeRef(elt.getType()),
-                                     elt.isVararg());
+      auto paramFlags = elt.getParameterFlags();
+      TupleTypeEltLayout::emitRecord(
+          Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getName()),
+          addTypeRef(elt.getType()), paramFlags.isVariadic(),
+          paramFlags.isAutoClosure(), paramFlags.isEscaping());
     }
 
     break;

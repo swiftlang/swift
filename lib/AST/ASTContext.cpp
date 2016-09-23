@@ -293,7 +293,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, Type>, DictionaryType *> DictionaryTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
-    llvm::DenseMap<Type, ParenType*> ParenTypes;
+    llvm::DenseMap<std::pair<Type, unsigned>, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
     llvm::DenseMap<Type, InOutType*> InOutTypes;
@@ -1289,11 +1289,9 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
                                        DeclContext *gpContext) const {
   assert(gpContext && "No generic parameter context");
   assert(BGT->isCanonical() && "Requesting non-canonical substitutions");
-  auto Params = gpContext->getGenericParamsOfContext()->getParams();
-  assert(Params.size() == 1);
-  auto Param = Params[0];
-  assert(Param->getArchetype() && "Not type-checked yet");
-  (void) Param;
+  assert(gpContext->isValidGenericContext() &&
+         "Not type-checked yet");
+  assert(BGT->getGenericArgs().size() == 1);
   Substitution Subst(BGT->getGenericArgs()[0], {});
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
   auto arena = getArena(BGT->getRecursiveProperties());
@@ -2551,6 +2549,9 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
                                       llvm::raw_ostream &os,
                                       unsigned indent) const {
+  if (archetype->isOpenedExistential())
+    return;
+
   archetype = archetype->getPrimary();
   if (!archetype)
     return;
@@ -2594,13 +2595,14 @@ BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
   return vecTy;
 }
 
-
-ParenType *ParenType::get(const ASTContext &C, Type underlying) {
+ParenType *ParenType::get(const ASTContext &C, Type underlying,
+                          ParameterTypeFlags flags) {
   auto properties = underlying->getRecursiveProperties();
   auto arena = getArena(properties);
-  ParenType *&Result = C.Impl.getArena(arena).ParenTypes[underlying];
+  ParenType *&Result =
+      C.Impl.getArena(arena).ParenTypes[{underlying, flags.toRaw()}];
   if (Result == 0) {
-    Result = new (C, arena) ParenType(underlying, properties);
+    Result = new (C, arena) ParenType(underlying, properties, flags);
   }
   return Result;
 }
@@ -2613,15 +2615,17 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
                         ArrayRef<TupleTypeElt> Fields) {
   ID.AddInteger(Fields.size());
   for (const TupleTypeElt &Elt : Fields) {
-    ID.AddPointer(Elt.NameAndVariadic.getOpaqueValue());
+    ID.AddPointer(Elt.Name.get());
     ID.AddPointer(Elt.getType().getPointer());
+    ID.AddInteger(Elt.Flags.toRaw());
   }
 }
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
-    return ParenType::get(C, Fields[0].getType());
+    return ParenType::get(C, Fields[0].getType(),
+                          Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
@@ -3942,7 +3946,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   }
 }
 
-bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
+bool ASTContext::isTypeBridgedInExternalModule(
      NominalTypeDecl *nominal) const {
   return (nominal == getBoolDecl() ||
           nominal == getIntDecl() ||
@@ -3955,8 +3959,18 @@ bool ASTContext::isStandardLibraryTypeBridgedInFoundation(
           nominal == getStringDecl() ||
           nominal == getErrorDecl() ||
           nominal == getAnyHashableDecl() ||
-          // Weird one-off case where CGFloat is bridged to NSNumber.
-          nominal->getName() == Id_CGFloat);
+          // Foundation's overlay depends on the CoreGraphics overlay, but
+          // CoreGraphics value types bridge to Foundation objects such as
+          // NSValue and NSNumber, so to avoid circular dependencies, the
+          // bridging implementations of CG types appear in the Foundation
+          // module.
+          nominal->getParentModule()->getName() == Id_CoreGraphics ||
+          // CoreMedia is a dependency of AVFoundation, but the bridged
+          // NSValue implementations for CMTime, CMTimeRange, and
+          // CMTimeMapping are provided by AVFoundation, and AVFoundation
+          // gets upset if you don't use the NSValue subclasses its factory
+          // methods instantiate.
+          nominal->getParentModule()->getName() == Id_CoreMedia);
 }
 
 Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,

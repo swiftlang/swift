@@ -13,7 +13,7 @@
 #
 # Symbolicates fatalError stack traces on Linux. Takes the main binary
 # and a log file containing a stack trace. Non-stacktrace lines are output
-# unmodified. Stack trace elements are analysed using reconstructed debug
+# unmodified. Stack trace elements are analyzed using reconstructed debug
 # target matching the original process in where shared libs where mapped.
 #
 # TODOs:

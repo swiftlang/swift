@@ -948,7 +948,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     }
 
     ArrayRef<ProtocolDecl *> protocols =
-        genericParam->getConformingProtocols(this);
+        genericParam->getConformingProtocols();
 
     if (Type superclass = genericParam->getSuperclass()) {
       if (protocols.empty()) {
@@ -1479,11 +1479,6 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       baseReplace += '.';
     }
     baseReplace += parsed.BaseName;
-    if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() && !call) {
-      // If we're going from a var to a function with no arguments, emit an
-      // empty parameter list.
-      baseReplace += "()";
-    }
     diag.fixItReplace(referenceRange, baseReplace);
   }
 

@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
@@ -547,32 +548,21 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 }
 
 static std::string getTypeListString(Type type) {
-  // Assemble the parameter type list.
-  auto tupleType = type->getAs<TupleType>();
-  if (!tupleType) {
-    if (auto PT = dyn_cast<ParenType>(type.getPointer()))
-      type = PT->getUnderlyingType();
+  std::string result;
 
-    return "(" + type->getString() + ")";
-  }
+  // Always make sure to have at least one set of parens
+  bool forceParens =
+      !type->is<TupleType>() && !isa<ParenType>(type.getPointer());
+  if (forceParens)
+    result.push_back('(');
 
-  std::string result = "(";
-  for (auto field : tupleType->getElements()) {
-    if (result.size() != 1)
-      result += ", ";
-    if (!field.getName().empty()) {
-      result += field.getName().str();
-      result += ": ";
-    }
+  llvm::raw_string_ostream OS(result);
+  type->print(OS);
+  OS.flush();
 
-    if (!field.isVararg())
-      result += field.getType()->getString();
-    else {
-      result += field.getVarargBaseTy()->getString();
-      result += "...";
-    }
-  }
-  result += ")";
+  if (forceParens)
+    result.push_back(')');
+
   return result;
 }
 
@@ -3099,7 +3089,14 @@ namespace {
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           TS->ExprTypes[expr] = expr->getType();
-          
+
+          SWIFT_DEFER {
+            assert((!expr->getType() || !expr->getType()->hasTypeVariable()
+                    // FIXME: We shouldn't allow these, either.
+                    || isa<LiteralExpr>(expr)) &&
+                   "Type variable didn't get erased!");
+          };
+
           // Preserve module expr type data to prevent further lookups.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
             if (isa<ModuleDecl>(declRef->getDecl()))
@@ -3110,17 +3107,13 @@ namespace {
           if (isa<OtherConstructorDeclRefExpr>(expr))
             return { false, expr };
           
-          // TypeExpr's are relabeled by CSGen.
-          if (isa<TypeExpr>(expr))
-            return { false, expr };
-          
           // If a literal has a Builtin.Int or Builtin.FP type on it already,
           // then sema has already expanded out a call to
           //   Init.init(<builtinliteral>)
           // and we don't want it to make
           //   Init.init(Init.init(<builtinliteral>))
           // preserve the type info to prevent this from happening.
-          if (isa<LiteralExpr>(expr) &&
+          if (isa<LiteralExpr>(expr) && !isa<InterpolatedStringLiteralExpr>(expr) &&
               !(expr->getType() && expr->getType()->is<ErrorType>()))
             return { false, expr };
 
@@ -3584,7 +3577,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 /// Return true if the given type conforms to a known protocol type.
 static bool conformsToKnownProtocol(Type fromType,
                                     KnownProtocolKind kind,
-                                    ConstraintSystem *CS) {
+                                    const ConstraintSystem *CS) {
   auto proto = CS->TC.getProtocol(SourceLoc(), kind);
   if (!proto)
     return false;
@@ -3597,7 +3590,7 @@ static bool conformsToKnownProtocol(Type fromType,
   return false;
 }
 
-static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
+static bool isIntegerType(Type fromType, const ConstraintSystem *CS) {
   return conformsToKnownProtocol(fromType,
                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
                                  CS);
@@ -3605,7 +3598,7 @@ static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
 
 /// Return true if the given type conforms to RawRepresentable.
 static Type isRawRepresentable(Type fromType,
-                               ConstraintSystem *CS) {
+                               const ConstraintSystem *CS) {
   auto rawReprType =
     CS->TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
@@ -3628,7 +3621,7 @@ static Type isRawRepresentable(Type fromType,
 /// underlying type conforming to the given known protocol.
 static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
-                               ConstraintSystem *CS) {
+                               const ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
   if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
     return Type();
@@ -3659,11 +3652,11 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
 ///
 /// This helps migration with SDK changes.
 static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
-                                      ConstraintSystem *CS,
+                                      const ConstraintSystem *CS,
                                       Type fromType,
                                       Type toType,
                                       KnownProtocolKind kind,
-                                      Expr *expr) {
+                                      const Expr *expr) {
   // The following fixes apply for optional destination types as well.
   bool toTypeIsOptional = !toType->getAnyOptionalObjectType().isNull();
   toType = toType->lookThroughAllAnyOptionalTypes();
@@ -3703,7 +3696,8 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
       std::string convWrapBefore = toType.getString();
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
-      if (!CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
+      if (!isa<LiteralExpr>(expr) &&
+          !CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (kind) {
@@ -6511,13 +6505,19 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
+// FIXME: Instead of doing this, we should store the decl in the type
+// variable, or in the locator.
 static bool hasArchetype(const GenericTypeDecl *generic,
-                         const ArchetypeType *archetype) {
-  return std::any_of(generic->getInnermostGenericParamTypes().begin(),
-                     generic->getInnermostGenericParamTypes().end(),
-                     [archetype](const GenericTypeParamType *genericParamTy) {
-    return genericParamTy->getDecl()->getArchetype() == archetype;
-  });
+                         ArchetypeType *archetype) {
+  assert(!archetype->getOpenedExistentialType() &&
+         !archetype->getParent());
+
+  auto genericEnv = generic->getGenericEnvironment();
+  if (!genericEnv)
+    return false;
+
+  auto &map = genericEnv->getArchetypeToInterfaceMap();
+  return map.find(archetype) != map.end();
 }
 
 static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
@@ -6530,9 +6530,9 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     struct FindGenericTypeDecl : public ASTWalker {
       const GenericTypeDecl *FoundDecl = nullptr;
       const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-      const ArchetypeType *Archetype;
+      ArchetypeType *Archetype;
 
-      FindGenericTypeDecl(const ArchetypeType *Archetype)
+      FindGenericTypeDecl(ArchetypeType *Archetype)
           : Archetype(Archetype) {}
       
       bool walkToTypeReprPre(TypeRepr *T) override {

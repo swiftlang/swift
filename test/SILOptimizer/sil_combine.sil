@@ -29,6 +29,10 @@ enum AddressOnlyEnum {
   case AddressOnly(Any)
 }
 
+protocol FakeProtocol {
+  func requirement()
+}
+
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -2745,11 +2749,50 @@ bb1:
 
 bb2:
   dealloc_stack %s1 : $*Bool
-  %r = tuple()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_generic_partial_apply_apply
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
+// CHECK: [[FN:%.*]] = function_ref @generic_callee
+// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
+// CHECK-NEXT: destroy_addr [[ARG1]]
+// CHECK-NEXT: destroy_addr [[TMP]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[TMP]]
+// CHECK-NEXT: return
+sil @test_generic_partial_apply_apply : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %f1 = function_ref @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_existential_partial_apply_apply
+// CHECK: bb0(%0 : $*FakeProtocol):
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr
+// CHECK-NEXT: [[FN:%.*]] = witness_method
+// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
+bb0(%0: $*FakeProtocol):
+  %o = open_existential_addr %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
+  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
+
+  %r = tuple ()
   return %r : $()
 }
 
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+sil @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
 sil @noreturn_func : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil @remove_destroy_array

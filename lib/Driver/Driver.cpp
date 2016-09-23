@@ -270,7 +270,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       if (!value)
         return true;
 
-      // NB: We check aginst
+      // NB: We check against
       // swift::version::Version::getCurrentLanguageVersion() here because any
       // -swift-version argument is handled in the argsHashStr check that
       // follows.
