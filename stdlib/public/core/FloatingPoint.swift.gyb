@@ -262,6 +262,7 @@ extension ${Self} : FloatingPointType {
   }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   public static var quietNaN: ${Self} {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
@@ -331,6 +332,7 @@ extension ${Self} : FloatingPointType {
   }
 
   /// `true` iff `self` is a signaling NaN.
+  @swift3_migration(renamed="isSignalingNaN")
   public var isSignaling: Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded

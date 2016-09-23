@@ -77,6 +77,7 @@ public struct CGFloat {
     return CGFloat(NativeType.NaN)
   }
 
+  @swift3_migration(renamed="nan")
   public static var quietNaN: CGFloat {
     return CGFloat(NativeType.quietNaN)
   }
@@ -109,6 +110,7 @@ public struct CGFloat {
     return native.isNaN
   }
 
+  @swift3_migration(renamed="isSignalingNaN")
   public var isSignaling: Bool {
     return native.isSignaling
   }
@@ -119,6 +121,7 @@ public struct CGFloat {
 }
 
 extension CGFloat {
+  @swift3_migration(renamed="leastNormalMagnitude")
   @_transparent public static var min: CGFloat {
 #if arch(i386) || arch(arm)
    return CGFloat(FLT_MIN)
@@ -127,6 +130,7 @@ extension CGFloat {
 #endif
   }
 
+  @swift3_migration(renamed="greatestFiniteMagnitude")
   @_transparent public static var max: CGFloat {
 #if arch(i386) || arch(arm)
    return CGFloat(FLT_MAX)
@@ -136,11 +140,13 @@ extension CGFloat {
   }
 }
 
+@swift3_migration(renamed="leastNormalMagnitude")
 @available(*,unavailable,message="use CGFloat.min")
 public var CGFLOAT_MIN: CGFloat {
   fatalError("can't retrieve unavailable property")
 }
 
+@swift3_migration(renamed="greatestFiniteMagnitude")
 @available(*,unavailable,message="use CGFloat.max")
 public var CGFLOAT_MAX: CGFloat {
   fatalError("can't retrieve unavailable property")

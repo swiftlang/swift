@@ -78,6 +78,7 @@ public protocol FloatingPointType : Strideable {
   static var NaN: Self { get }
 
   /// A quiet NaN.
+  @swift3_migration(renamed="nan")
   static var quietNaN: Self { get }
 
   //
@@ -111,6 +112,7 @@ public protocol FloatingPointType : Strideable {
   var isNaN: Bool { get }
 
   /// `true` iff `self` is a signaling NaN.
+  @swift3_migration(renamed="isSignalingNaN")
   var isSignaling: Bool { get }
 
   // Not implemented, because it only makes sense for decimal floating point.
