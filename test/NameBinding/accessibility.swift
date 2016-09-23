@@ -66,7 +66,7 @@ class Sub : Base {
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 
-    method() // expected-error {{use of unresolved identifier 'method'}}
+    method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     self.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     super.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
