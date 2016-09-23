@@ -1274,6 +1274,9 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
     void missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
     }
+    void missingLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+    }
     void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
     }
@@ -4681,7 +4684,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 
     CalleeCandidateInfo CandidateInfo;
 
-    // Indicates if problem was been found and diagnostic was emitted.
+    // Indicates if problem has been found and diagnostic was emitted.
     bool Diagnosed = false;
     // Indicates if functions we are trying to call is a subscript.
     bool IsSubscript;
@@ -4740,6 +4743,15 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       Diagnosed = true;
     }
 
+    void missingLabel(unsigned paramIdx) override {
+      auto tuple = cast<TupleExpr>(ArgExpr);
+      TC.diagnose(tuple->getElement(paramIdx)->getStartLoc(),
+                  diag::missing_argument_labels, false,
+                  Parameters[paramIdx].Label.str(), IsSubscript);
+
+      Diagnosed = true;
+    }
+
     void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       auto tuple = cast<TupleExpr>(ArgExpr);
       Identifier first = tuple->getElementName(argIdx);
@@ -4768,6 +4780,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       auto secondRange = argRange(prevArgIdx, second);
 
       SourceLoc diagLoc = firstRange.Start;
+
       if (first.empty() && second.empty()) {
         TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
                     argIdx + 1, prevArgIdx + 1)

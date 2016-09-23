@@ -713,10 +713,9 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
 }
 
-// FIXME: Bad diagnostic
 func secondArgumentNotLabeled(a:Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
-// expected-error@-1 {{unnamed argument #2 must precede unnamed argument #1}}
+// expected-error@-1 {{missing argument label 'a' in call}}
 
 // <rdar://problem/23709100> QoI: incorrect ambiguity error due to implicit conversion
 func testImplConversion(a : Float?) -> Bool {}
@@ -795,3 +794,24 @@ func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
   return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
 }
+
+// SR-2242: poor diagnostic when argument label is omitted
+
+func r27212391(x: Int, _ y: Int) {
+  let _: Int = x + y
+}
+
+func r27212391(a: Int, x: Int, _ y: Int) {
+  let _: Int = a + x + y
+}
+
+r27212391(3, 5)             // expected-error {{missing argument label 'x' in call}}
+r27212391(3, y: 5)          // expected-error {{missing argument label 'x' in call}}
+r27212391(3, x: 5)          // expected-error {{argument 'x' must precede unnamed argument #1}}
+r27212391(y: 3, x: 5)       // expected-error {{argument 'x' must precede argument 'y'}}
+r27212391(y: 3, 5)          // expected-error {{incorrect argument label in call (have 'y:_:', expected 'x:_:')}}
+r27212391(x: 3, x: 5)       // expected-error {{extraneous argument label 'x:' in call}}
+r27212391(a: 1, 3, y: 5)    // expected-error {{missing argument label 'x' in call}}
+r27212391(1, x: 3, y: 5)    // expected-error {{missing argument label 'a' in call}}
+r27212391(a: 1, y: 3, x: 5) // expected-error {{argument 'x' must precede argument 'y'}}
+r27212391(a: 1, 3, x: 5)    // expected-error {{argument 'x' must precede unnamed argument #2}}
