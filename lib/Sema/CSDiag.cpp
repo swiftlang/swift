@@ -3571,7 +3571,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
 /// Return true if the given type conforms to a known protocol type.
 static bool conformsToKnownProtocol(Type fromType,
                                     KnownProtocolKind kind,
-                                    ConstraintSystem *CS) {
+                                    const ConstraintSystem *CS) {
   auto proto = CS->TC.getProtocol(SourceLoc(), kind);
   if (!proto)
     return false;
@@ -3584,7 +3584,7 @@ static bool conformsToKnownProtocol(Type fromType,
   return false;
 }
 
-static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
+static bool isIntegerType(Type fromType, const ConstraintSystem *CS) {
   return conformsToKnownProtocol(fromType,
                                  KnownProtocolKind::ExpressibleByIntegerLiteral,
                                  CS);
@@ -3592,7 +3592,7 @@ static bool isIntegerType(Type fromType, ConstraintSystem *CS) {
 
 /// Return true if the given type conforms to RawRepresentable.
 static Type isRawRepresentable(Type fromType,
-                               ConstraintSystem *CS) {
+                               const ConstraintSystem *CS) {
   auto rawReprType =
     CS->TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
   if (!rawReprType)
@@ -3615,7 +3615,7 @@ static Type isRawRepresentable(Type fromType,
 /// underlying type conforming to the given known protocol.
 static Type isRawRepresentable(Type fromType,
                                KnownProtocolKind kind,
-                               ConstraintSystem *CS) {
+                               const ConstraintSystem *CS) {
   Type rawTy = isRawRepresentable(fromType, CS);
   if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
     return Type();
@@ -3646,11 +3646,11 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
 ///
 /// This helps migration with SDK changes.
 static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
-                                      ConstraintSystem *CS,
+                                      const ConstraintSystem *CS,
                                       Type fromType,
                                       Type toType,
                                       KnownProtocolKind kind,
-                                      Expr *expr) {
+                                      const Expr *expr) {
   // The following fixes apply for optional destination types as well.
   bool toTypeIsOptional = !toType->getAnyOptionalObjectType().isNull();
   toType = toType->lookThroughAllAnyOptionalTypes();
@@ -3690,7 +3690,8 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
       std::string convWrapBefore = toType.getString();
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
-      if (!CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
+      if (!isa<LiteralExpr>(expr) &&
+          !CS->TC.isConvertibleTo(fromType, rawTy, CS->DC)) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (kind) {

@@ -77,6 +77,10 @@ func testMask12(a: MyEventMask2?) {
 func testMask13(a: MyEventMask2?) {
   testMask1(a: a) // no fix, nullability mismatch.
 }
+func testMask14() {
+  sendIt(1)
+  sendItOpt(2)
+}
 
 struct Wrapper {
   typealias InnerMask = MyEventMask2
