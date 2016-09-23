@@ -95,7 +95,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
                                IRGenModule &IGM,
                                llvm::Module &M,
-                               SourceFile *SF)
+                               StringRef MainSourceFileName)
   : Opts(Opts),
     CI(CI),
     SM(IGM.Context.SourceMgr),
@@ -107,18 +107,8 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     LastDebugLoc({}),
     LastScope(nullptr)
 {
-  assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None
-         && "no debug info should be generated");
-  StringRef SourceFileName = SF ? SF->getFilename() :
-                                  StringRef(Opts.MainInputFilename);
-  StringRef Dir;
-  llvm::SmallString<256> AbsMainFile;
-  if (SourceFileName.empty())
-    AbsMainFile = "<unknown>";
-  else {
-    AbsMainFile = SourceFileName;
-    llvm::sys::fs::make_absolute(AbsMainFile);
-  }
+  assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
+         "no debug info should be generated");
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
   std::string Producer = version::getSwiftFullVersion(
@@ -131,6 +121,14 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
+
+  // The Darwin linker ld64 depends on DW_AT_comp_dir to determine
+  // whether an object file has debug info.
+  assert(!MainSourceFileName.empty() && "main source file name is empty");
+  llvm::SmallString<256> AbsMainFile;
+  AbsMainFile = MainSourceFileName;
+  llvm::sys::fs::make_absolute(AbsMainFile);
+
   // Note that File + Dir need not result in a valid path.
   // Clang is doing the same thing here.
   TheCU = DBuilder.createCompileUnit(
