@@ -199,11 +199,13 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     }
   }
 
-  UnqualifiedLookup lookup(name, dc, this,
-                           options.contains(NameLookupFlags::KnownPrivate),
-                           loc,
-                           options.contains(NameLookupFlags::OnlyTypes),
-                           options.contains(NameLookupFlags::ProtocolMembers));
+  UnqualifiedLookup lookup(
+      name, dc, this,
+      options.contains(NameLookupFlags::KnownPrivate),
+      loc,
+      options.contains(NameLookupFlags::OnlyTypes),
+      options.contains(NameLookupFlags::ProtocolMembers),
+      options.contains(NameLookupFlags::IgnoreAccessibility));
 
   LookupResult result;
   bool considerProtocolMembers

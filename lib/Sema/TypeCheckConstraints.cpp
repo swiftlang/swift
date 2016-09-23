@@ -425,10 +425,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
+  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
-    LookupOptions |= NameLookupFlags::KnownPrivate;
-  auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+  auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   if (!Lookup) {
     // If we failed lookup of an operator, check to see it to see if it is
@@ -438,12 +438,36 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
+    // Try ignoring access control.
+    NameLookupOptions relookupOptions = lookupOptions;
+    relookupOptions |= NameLookupFlags::KnownPrivate;
+    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    LookupResult inaccessibleResults = lookupUnqualified(DC, Name, Loc,
+                                                         relookupOptions);
+    if (inaccessibleResults) {
+      // FIXME: What if the unviable candidates have different levels of access?
+      const ValueDecl *first = inaccessibleResults.front().Decl;
+      diagnose(Loc, diag::candidate_inaccessible,
+               Name, first->getFormalAccess());
+
+      // FIXME: If any of the candidates (usually just one) are in the same
+      // module we could offer a fix-it.
+      for (auto lookupResult : inaccessibleResults) {
+        diagnose(lookupResult.Decl, diag::decl_declared_here,
+                 lookupResult.Decl->getFullName());
+      }
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if the type of the inaccessible decl is also inaccessible.
+      return new (Context) ErrorExpr(UDRE->getSourceRange());
+    }
+
     // TODO: Name will be a compound name if it was written explicitly as
     // one, but we should also try to propagate labels into this.
     DeclNameLoc nameLoc = UDRE->getNameLoc();
 
     performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
-                          LookupOptions, Lookup);
+                          lookupOptions, Lookup);
 
     diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
       .highlight(UDRE->getSourceRange());
