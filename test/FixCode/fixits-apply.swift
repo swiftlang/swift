@@ -214,8 +214,12 @@ var graph: Graph2
 class Graph3<NodeType : ObjCProt> {}
 var graph: Graph3
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4
+var graphAgain = Graph4()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]

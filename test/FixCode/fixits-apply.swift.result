@@ -215,10 +215,14 @@ var graph: Graph2<Node, Node2>
 
 @objc protocol ObjCProt { }
 class Graph3<NodeType : ObjCProt> {}
-var graph: Graph3<AnyObject>
+var graph: Graph3<ObjCProt>
 
-class GraphNoFix<NodeType : SomeProt> {}
-var graph: GraphNoFix
+class Graph4<NodeType : SomeProt> {}
+var graph: Graph4<<#NodeType: SomeProt#>>
+var graphAgain = Graph4<<#NodeType: SomeProt#>>()
+
+class GraphCombo<NodeType : SomeProt & ObjCProt> {}
+var graph: GraphCombo<<#NodeType: ObjCProt & SomeProt#>>
 
 func evilCommas(s: String) {
   _ = s[s.startIndex..<<#editorplaceholder#>]
