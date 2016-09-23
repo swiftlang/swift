@@ -1921,11 +1921,10 @@ public:
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   /// Callers can provide a lambda that adds additional information (such as a
   /// fixit hint) to the deprecation diagnostic, if it is emitted.
-  void diagnoseDeprecated(SourceRange SourceRange,
-                          const DeclContext *ReferenceDC,
-                          const AvailableAttr *Attr,
-                          DeclName Name,
-                          const ApplyExpr *Call);
+  void diagnoseIfDeprecated(SourceRange SourceRange,
+                            const DeclContext *ReferenceDC,
+                            const ValueDecl *DeprecatedDecl,
+                            const ApplyExpr *Call);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
