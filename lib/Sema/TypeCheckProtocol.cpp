@@ -3904,7 +3904,7 @@ void ConformanceChecker::checkConformance() {
   // between an imported Objective-C module and its overlay.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
     if (auto nominal = Adoptee->getAnyNominal()) {
-      if (!TC.Context.isStandardLibraryTypeBridgedInFoundation(nominal)) {
+      if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
         auto nominalModule = nominal->getParentModule();
         auto conformanceModule = DC->getParentModule();
         if (nominalModule->getName() != conformanceModule->getName()) {

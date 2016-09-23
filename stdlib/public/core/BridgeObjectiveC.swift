@@ -580,4 +580,16 @@ extension AutoreleasingUnsafeMutablePointer {
   }
 }
 
+/// Get the ObjC type encoding for a type as a pointer to a C string.
+///
+/// This is used by the Foundation overlays. The compiler will error if the
+/// passed-in type is generic or not representable in Objective-C
+@_transparent
+public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
+  // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is
+  // only supported by the compiler for concrete types that are representable
+  // in ObjC.
+  return UnsafePointer(Builtin.getObjCTypeEncoding(type))
+}
+
 #endif

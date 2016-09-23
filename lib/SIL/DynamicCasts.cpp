@@ -55,10 +55,11 @@ mustBridgeToSwiftValueBox(Module *M, CanType T) {
   if (T->isAnyExistentialType())
     return false;
 
-  // getBridgedToObjC() might return a null-type for bridged foundation types
-  // during compiling the standard library. Exclude this case here.
+  // getBridgedToObjC() might return a null-type for some types
+  // whose bridging implementation is allowed to live elsewhere. Exclude this
+  // case here.
   if (auto N = T->getAnyNominal())
-    if (M->getASTContext().isStandardLibraryTypeBridgedInFoundation(N))
+    if (M->getASTContext().isTypeBridgedInExternalModule(N))
       return false;
 
   auto bridgeTy  = M->getASTContext().getBridgedToObjC(M, T, nullptr);
