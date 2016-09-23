@@ -625,6 +625,9 @@ public:
   /// The platform of the availability.
   const PlatformKind Platform;
 
+  /// Whether this is a language-version-specific entity.
+  bool isLanguageVersionSpecific() const;
+
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
