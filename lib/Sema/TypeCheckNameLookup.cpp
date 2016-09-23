@@ -183,11 +183,13 @@ namespace {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, this,
-                           options.contains(NameLookupFlags::KnownPrivate),
-                           loc,
-                           options.contains(NameLookupFlags::OnlyTypes),
-                           options.contains(NameLookupFlags::ProtocolMembers));
+  UnqualifiedLookup lookup(
+      name, dc, this,
+      options.contains(NameLookupFlags::KnownPrivate),
+      loc,
+      options.contains(NameLookupFlags::OnlyTypes),
+      options.contains(NameLookupFlags::ProtocolMembers),
+      options.contains(NameLookupFlags::IgnoreAccessibility));
 
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
