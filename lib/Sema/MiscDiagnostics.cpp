@@ -3098,6 +3098,51 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
   }
 }
 
+void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
+                                        InFlightDiagnostic &diag,
+                                        const CallExpr *call,
+                                        Identifier closureLabel) {
+  auto argsExpr = call->getArg();
+  if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
+    argsExpr = TSE->getSubExpr();
+
+  SmallString<32> replacement;
+  SourceLoc lastLoc;
+  SourceRange closureRange;
+  if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
+    assert(PE->hasTrailingClosure() && "must have trailing closure");
+    closureRange = PE->getSubExpr()->getSourceRange();
+    lastLoc = PE->getLParenLoc(); // e.g funcName() { 1 }
+    if (!lastLoc.isValid()) {
+      // Bare trailing closure: e.g. funcName { 1 }
+      replacement = "(";
+      lastLoc = call->getFn()->getEndLoc();
+    }
+  } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
+    // Tuple + trailing closure: e.g. funcName(x: 1) { 1 }
+    assert(TE->hasTrailingClosure() && "must have trailing closure");
+    auto numElements = TE->getNumElements();
+    assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
+    closureRange = TE->getElement(numElements - 1)->getSourceRange();
+    lastLoc = TE->getElement(numElements - 2)->getEndLoc();
+    replacement = ", ";
+  } else {
+    // Can't be here.
+    return;
+  }
+
+  // Add argument label of the closure.
+  if (!closureLabel.empty()) {
+    replacement += closureLabel.str();
+    replacement += ": ";
+  }
+
+  lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
+  diag
+    .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
+    .fixItInsertAfter(closureRange.End, ")");
+}
+
 // Perform checkStmtConditionTrailingClosure for single expression.
 static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
@@ -3107,63 +3152,31 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     TypeChecker &TC;
 
     void diagnoseIt(const CallExpr *E) {
+      if (!E->hasTrailingClosure()) return;
+
       auto argsExpr = E->getArg();
       auto argsTy = argsExpr->getType();
-
       // Ignore invalid argument type. Some diagnostics are already emitted.
       if (!argsTy || argsTy->is<ErrorType>()) return;
 
       if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
         argsExpr = TSE->getSubExpr();
 
-      SmallString<16> replacement;
-      SourceLoc lastLoc;
-      SourceRange closureRange;
-      if (auto PE = dyn_cast<ParenExpr>(argsExpr)) {
-        // Ignore non-trailing-closure.
-        if (!PE->hasTrailingClosure()) return;
+      SourceLoc closureLoc;
+      if (auto PE = dyn_cast<ParenExpr>(argsExpr))
+        closureLoc = PE->getSubExpr()->getStartLoc();
+      else if (auto TE = dyn_cast<TupleExpr>(argsExpr))
+        closureLoc = TE->getElements().back()->getStartLoc();
 
-        closureRange = PE->getSubExpr()->getSourceRange();
-        lastLoc = PE->getLParenLoc();
-        if (lastLoc.isValid()) {
-          // Empty paren: e.g. if funcName() { 1 } { ... }
-          replacement = "";
-        } else {
-          // Bare trailing closure: e.g. if funcName { 1 } { ... }
-          replacement = "(";
-          lastLoc = E->getFn()->getEndLoc();
-        }
-      } else if (auto TE = dyn_cast<TupleExpr>(argsExpr)) {
-        // Ignore non-trailing-closure.
-        if (!TE->hasTrailingClosure()) return;
-
-        // Tuple + trailing closure: e.g. if funcName(x: 1) { 1 } { ... }
-        auto numElements = TE->getNumElements();
-        assert(numElements >= 2 && "Unexpected num of elements in TupleExpr");
-        closureRange = TE->getElement(numElements - 1)->getSourceRange();
-        lastLoc = TE->getElement(numElements - 2)->getEndLoc();
-        replacement = ", ";
-      } else {
-        // Can't be here.
-        return;
-      }
-
-      // Add argument label of the closure that is going to be enclosed in
-      // parens.
+      Identifier closureLabel;
       if (auto TT = argsTy->getAs<TupleType>()) {
         assert(TT->getNumElements() != 0 && "Unexpected empty TupleType");
-        auto closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
-        if (!closureLabel.empty()) {
-          replacement += closureLabel.str();
-          replacement += ": ";
-        }
+        closureLabel = TT->getElement(TT->getNumElements() - 1).getName();
       }
 
-      // Emit diagnostics.
-      lastLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, lastLoc);
-      TC.diagnose(closureRange.Start, diag::trailing_closure_requires_parens)
-        .fixItReplaceChars(lastLoc, closureRange.Start, replacement)
-        .fixItInsertAfter(closureRange.End, ")");
+      auto diag = TC.diagnose(closureLoc,
+                              diag::trailing_closure_requires_parens);
+      fixItEncloseTrailingClosure(TC, diag, E, closureLabel);
     }
 
   public:
