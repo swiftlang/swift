@@ -922,9 +922,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
           : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
                                         Optimized, Flags);
 
-  // Insert a debug intrinsic into the current block.
-  auto *BB = Builder.GetInsertBlock();
-
   // Running variables for the current/previous piece.
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
@@ -960,20 +957,17 @@ void IRGenDebugInfo::emitVariableDeclaration(
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
-    emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
-                     Loc.Column, Scope, DS);
+    emitDbgIntrinsic(Builder, Piece, Var, DBuilder.createExpression(Operands),
+                     Line, Loc.Column, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0) {
-    auto Zero = llvm::ConstantInt::get(IGM.Int64Ty, 0);
-    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
-                     Loc.Column, Scope, DS);
-  }
+  if (Storage.size() == 0)
+    emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
+                     DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }
 
-void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
-                                      llvm::Value *Storage,
+void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                                       llvm::DILocalVariable *Var,
                                       llvm::DIExpression *Expr, unsigned Line,
                                       unsigned Col, llvm::DILocalScope *Scope,
@@ -981,19 +975,35 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+  auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))
     return;
-
+  
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (isa<llvm::AllocaInst>(Storage))
+  if (isa<llvm::AllocaInst>(Storage)) {
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  else
-    DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+    return;
+  }
+
+  // If the storage is an instruction, insert the dbg.value directly after it.
+  if (auto *I = dyn_cast<llvm::Instruction>(Storage)) {
+    auto InsPt = std::next(I->getIterator());
+    auto E = I->getParent()->end();
+    while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
+        ++InsPt;
+    if (InsPt != E) {
+      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      return;
+    }
+  }
+
+  // Otherwise just insert it at the current insertion point.
+  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
