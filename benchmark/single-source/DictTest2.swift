@@ -18,7 +18,7 @@ public func run_Dictionary2(_ N: Int) {
   let ref_result = 199
   var res = 0
   for _ in 1...5*N {
-    var x: [String:Int] = [:]
+    var x: [String: Int] = [:]
     for i in 1...size {
       x[String(i, radix:16)] = i
     }

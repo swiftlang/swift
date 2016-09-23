@@ -238,7 +238,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout3: NonObjCProtocol!
   @IBOutlet private let ibout4: IBIssues!
   @IBOutlet private var ibout5: [[IBIssues]]!
-  @IBOutlet private var ibout6: [String:String]!
+  @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
 }
