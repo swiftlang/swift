@@ -1333,6 +1333,7 @@ bool swift::fixItOverrideDeclarationTypes(TypeChecker &TC,
 void swift::fixItAvailableAttrRename(TypeChecker &TC,
                                      InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
+                                     const ValueDecl *renamedDecl,
                                      const AvailableAttr *attr,
                                      const ApplyExpr *call) {
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
@@ -1487,6 +1488,12 @@ void swift::fixItAvailableAttrRename(TypeChecker &TC,
       baseReplace += '.';
     }
     baseReplace += parsed.BaseName;
+    if (parsed.IsFunctionName && parsed.ArgumentLabels.empty() &&
+        isa<VarDecl>(renamedDecl)) {
+      // If we're going from a var to a function with no arguments, emit an
+      // empty parameter list.
+      baseReplace += "()";
+    }
     diag.fixItReplace(referenceRange, baseReplace);
   }
 
@@ -1689,11 +1696,14 @@ describeRename(ASTContext &ctx, const AvailableAttr *attr, const ValueDecl *D,
   return ReplacementDeclKind::None;
 }
 
-void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const AvailableAttr *Attr,
-                                     DeclName Name,
-                                     const ApplyExpr *Call) {
+void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
+                                       const DeclContext *ReferenceDC,
+                                       const ValueDecl *DeprecatedDecl,
+                                       const ApplyExpr *Call) {
+  const AvailableAttr *Attr = TypeChecker::getDeprecated(DeprecatedDecl);
+  if (!Attr)
+    return;
+
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -1712,6 +1722,7 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     }
   }
 
+  DeclName Name = DeprecatedDecl->getFullName();
   StringRef Platform = Attr->prettyPlatformString();
   clang::VersionTuple DeprecatedVersion;
   if (Attr->Deprecated)
@@ -1750,7 +1761,8 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
-    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, Attr, Call);
+    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, DeprecatedDecl,
+                             Attr, Call);
   }
 }
 
@@ -1806,7 +1818,7 @@ bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  const ApplyExpr *call) {
   return diagnoseExplicitUnavailability(D, R, DC,
                                         [=](InFlightDiagnostic &diag) {
-    fixItAvailableAttrRename(*this, diag, R, AvailableAttr::isUnavailable(D),
+    fixItAvailableAttrRename(*this, diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
   });
 }
@@ -2134,9 +2146,7 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
     return true;
 
   // Diagnose for deprecation
-  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
-    TC.diagnoseDeprecated(R, DC, Attr, D->getFullName(), call);
-  }
+  TC.diagnoseIfDeprecated(R, DC, D, call);
 
   // Diagnose for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
