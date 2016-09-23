@@ -4752,28 +4752,22 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
           argBindings[argIdx] = paramIdx;
       }
 
-      auto firstRange = tuple->getElement(argIdx)->getSourceRange();
-      if (!first.empty()) {
-        firstRange.Start = tuple->getElementNameLoc(argIdx);
-      }
-      unsigned OOOParamIdx = argBindings[argIdx];
-      if (Bindings[OOOParamIdx].size() > 1) {
-        firstRange.End =
-            tuple->getElement(Bindings[OOOParamIdx].back())->getEndLoc();
-      }
+      auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+        auto range = tuple->getElement(argIdx)->getSourceRange();
+        if (!label.empty())
+          range.Start = tuple->getElementNameLoc(argIdx);
 
-      auto secondRange = tuple->getElement(prevArgIdx)->getSourceRange();
-      if (!second.empty()) {
-        secondRange.Start = tuple->getElementNameLoc(prevArgIdx);
-      }
-      unsigned OOOPrevParamIdx = argBindings[prevArgIdx];
-      if (Bindings[OOOPrevParamIdx].size() > 1) {
-        secondRange.End =
-            tuple->getElement(Bindings[OOOPrevParamIdx].back())->getEndLoc();
-      }
+        unsigned paramIdx = argBindings[argIdx];
+        if (Bindings[paramIdx].size() > 1)
+          range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
+
+        return range;
+      };
+
+      auto firstRange = argRange(argIdx, first);
+      auto secondRange = argRange(prevArgIdx, second);
 
       SourceLoc diagLoc = firstRange.Start;
-
       if (first.empty() && second.empty()) {
         TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
                     argIdx + 1, prevArgIdx + 1)
