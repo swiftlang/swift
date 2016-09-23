@@ -73,6 +73,7 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 void fixItAvailableAttrRename(TypeChecker &TC,
                               InFlightDiagnostic &diag,
                               SourceRange referenceRange,
+                              const ValueDecl *renamedDecl,
                               const AvailableAttr *attr,
                               const ApplyExpr *call);
 
