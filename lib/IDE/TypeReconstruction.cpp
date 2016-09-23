@@ -99,8 +99,11 @@ static TypeBase *GetTemplateArgument(TypeBase *type, size_t arg_idx) {
         break;
       if (arg_idx >= polymorphic_func_type->getGenericParameters().size())
         break;
-      return polymorphic_func_type->getGenericParameters()[arg_idx]
-          ->getArchetype();
+      auto paramDecl = polymorphic_func_type->getGenericParameters()[arg_idx];
+      auto paramType = paramDecl->getDeclaredInterfaceType()
+          ->castTo<GenericTypeParamType>();
+      return ArchetypeBuilder::mapTypeIntoContext(
+          paramDecl->getDeclContext(), paramType).getPointer();
     } break;
     default:
       break;

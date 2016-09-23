@@ -4373,13 +4373,8 @@ public:
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     // Substitute a context archetype if we have context generic params.
-    if (Options.GenericEnv) {
-      auto *paramTy = T->getCanonicalType().getPointer();
-      auto &map = Options.GenericEnv->getInterfaceToArchetypeMap();
-      auto found = map.find(paramTy);
-      if (found != map.end())
-        return visit(found->second);
-    }
+    if (Options.GenericEnv)
+      return visit(Options.GenericEnv->mapTypeIntoContext(T));
 
     auto Name = T->getName();
     if (Name.empty())

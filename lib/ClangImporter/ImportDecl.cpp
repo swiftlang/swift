@@ -3562,8 +3562,8 @@ namespace {
 
         // Calculate the correct bound-generic extended type.
         SmallVector<Type, 2> genericArgs;
-        for (auto gp : *genericParams) {
-          genericArgs.push_back(gp->getArchetype());
+        for (auto paramTy : sig->getInnermostGenericParams()) {
+          genericArgs.push_back(env->mapTypeIntoContext(paramTy));
         }
         Type extendedType =
           BoundGenericClassType::get(objcClass, nullptr, genericArgs);
@@ -6860,8 +6860,6 @@ buildGenericSignature(GenericParamList *genericParams,
   for (auto param : *genericParams) {
     genericParamTypes.push_back(
         param->getDeclaredType()->castTo<GenericTypeParamType>());
-    auto *archetype = builder.getArchetype(param);
-    param->setArchetype(archetype);
   }
 
   auto *sig = builder.getGenericSignature(genericParamTypes);

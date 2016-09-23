@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
@@ -682,12 +683,14 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   return performTypeLocChecking(Ctx, T,
                                 /*isSILMode=*/false,
                                 /*isSILType=*/false,
+                                /*GenericEnv=*/nullptr,
                                 DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILMode,
                                    bool isSILType,
+                                   GenericEnvironment *GenericEnv,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
@@ -699,12 +702,20 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
+  // FIXME: Get rid of PartialGenericTypeToArchetypeResolver
+  GenericTypeToArchetypeResolver contextResolver(GenericEnv);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
+
+  GenericTypeResolver *resolver =
+      (GenericEnv ? (GenericTypeResolver *) &contextResolver
+                  : (GenericTypeResolver *) &defaultResolver);
+
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options);
+    return TypeChecker(Ctx).validateType(T, DC, options, resolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options, resolver);
   }
 }
 

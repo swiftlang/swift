@@ -1370,33 +1370,40 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
                        RequirementSource(kind, loc), *this);
   };
 
-  // If the abstract type parameter already has an archetype assigned,
+  // If this is an associated type that already has an archetype assigned,
   // use that information.
-  if (auto archetype = decl->getArchetype()) {
-    SourceLoc loc = decl->getLoc();
+  if (isa<AssociatedTypeDecl>(decl) &&
+      decl->getDeclContext()->isValidGenericContext()) {
+    auto *archetype = mapTypeIntoContext(decl->getDeclContext(),
+                                         decl->getDeclaredInterfaceType())
+        ->getAs<ArchetypeType>();
 
-    // Superclass requirement.
-    if (auto superclass = archetype->getSuperclass()) {
-      if (addSuperclassRequirement(pa, superclass,
-                                   RequirementSource(kind, loc)))
-        return true;
-    }
+    if (archetype) {
+      SourceLoc loc = decl->getLoc();
 
-    // Conformance requirements.
-    for (auto proto : archetype->getConformsTo()) {
-      if (visited.count(proto)) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-          markRecursive(assocType, proto, loc);
-
-        continue;
+      // Superclass requirement.
+      if (auto superclass = archetype->getSuperclass()) {
+        if (addSuperclassRequirement(pa, superclass,
+                                     RequirementSource(kind, loc)))
+          return true;
       }
 
-      if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
-                                    visited))
-        return true;
-    }
+      // Conformance requirements.
+      for (auto proto : archetype->getConformsTo()) {
+        if (visited.count(proto)) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+            markRecursive(assocType, proto, loc);
 
-    return false;
+          continue;
+        }
+
+        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
+                                      visited))
+          return true;
+      }
+
+      return false;
+    }
   }
 
   // Otherwise, walk the 'inherited' list to identify requirements.
@@ -1797,16 +1804,6 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
   return invalid;
 }
 
-ArchetypeType *
-ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
-  auto known = Impl->PotentialArchetypes.find(
-                 GenericTypeParamKey::forDecl(GenericParam));
-  if (known == Impl->PotentialArchetypes.end())
-    return nullptr;
-
-  return known->second->getType(*this).getAsArchetype();
-}
-
 template<typename F>
 void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
@@ -2011,15 +2008,13 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
     if (env) {
       // If this generic parameter has an archetype, use it as the concrete
       // type.
-      auto contextTy = env->mapTypeIntoContext(&Mod, param);
-      if (auto archetype = contextTy->getAs<ArchetypeType>()) {
-        auto key = GenericTypeParamKey::forType(param);
-        assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
-        auto *pa = Impl->PotentialArchetypes[key];
-        assert(pa == pa->getRepresentative() && "Not the representative");
-        pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
-        pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
-      }
+      auto contextTy = env->mapTypeIntoContext(param);
+      auto key = GenericTypeParamKey::forType(param);
+      assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
+      auto *pa = Impl->PotentialArchetypes[key];
+      assert(pa == pa->getRepresentative() && "Not the representative");
+      pa->ArchetypeOrConcreteType = NestedType::forConcreteType(contextTy);
+      pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
     }
   }
 

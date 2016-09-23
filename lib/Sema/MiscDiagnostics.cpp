@@ -948,7 +948,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     }
 
     ArrayRef<ProtocolDecl *> protocols =
-        genericParam->getConformingProtocols(this);
+        genericParam->getConformingProtocols();
 
     if (Type superclass = genericParam->getSuperclass()) {
       if (protocols.empty()) {
