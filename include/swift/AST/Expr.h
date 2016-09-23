@@ -329,12 +329,8 @@ class alignas(8) Expr {
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     unsigned HasAnonymousClosureVars : 1;
-    
-    /// True if this is a closure created as a result of a void contextual
-    /// conversion.
-    unsigned IsVoidConversionClosure : 1;
   };
-  enum { NumClosureExprBits = NumAbstractClosureExprBits + 2 };
+  enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
   static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
   class BindOptionalExprBitfields {
@@ -3393,7 +3389,6 @@ public:
       Body(nullptr) {
     setParameterList(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
-    ClosureExprBits.IsVoidConversionClosure = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3419,18 +3414,6 @@ public:
     ClosureExprBits.HasAnonymousClosureVars = true;
   }
   
-  /// \brief Determine if this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  bool isVoidConversionClosure() const {
-    return ClosureExprBits.IsVoidConversionClosure;
-  }
-  
-  /// \brief Indicate that this closure was created to satisfy a contextual
-  /// conversion to a void function type.
-  void setIsVoidConversionClosure() {
-    ClosureExprBits.IsVoidConversionClosure = true;
-  }
-
   /// \brief Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }

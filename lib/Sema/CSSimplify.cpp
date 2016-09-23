@@ -1959,10 +1959,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
   
-  // If the types disagree, but we're comparing a non-void, single-expression
-  // closure result type to a void function result type, allow the conversion.
+  // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
+  // literals.
   {
-    if (concrete && kind >= TypeMatchKind::Subtype && type2->isVoid()) {
+    if (concrete && kind >= TypeMatchKind::Subtype &&
+        (type1->isUninhabited() || type2->isVoid())) {
       SmallVector<LocatorPathElt, 2> parts;
       locator.getLocatorParts(parts);
       

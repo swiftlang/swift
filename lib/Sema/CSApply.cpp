@@ -1198,10 +1198,10 @@ namespace {
     }
 
   public:
-    
-    
-    /// \brief Coerce a closure expression with a non-void return type to a
-    /// contextual function type with a void return type.
+
+
+    /// \brief Coerce a closure expression with a non-Void return type to a
+    /// contextual function type with a Void return type.
     ///
     /// This operation cannot fail.
     ///
@@ -1210,6 +1210,17 @@ namespace {
     /// \returns The coerced closure expression.
     ///
     ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
+
+    /// \brief Coerce a closure expression with a Never return type to a
+    /// contextual function type with some other return type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The closure expression to coerce.
+    ///
+    /// \returns The coerced closure expression.
+    ///
+    ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
     
     /// \brief Coerce the given expression to the given type.
     ///
@@ -5017,14 +5028,12 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
 
   // Re-write the single-expression closure to return '()'
   assert(closureExpr->hasSingleExpressionBody());
-  
-  // Transform the ClosureExpr representation into the "expr + return ()" rep
-  // if it isn't already.
-  if (!closureExpr->isVoidConversionClosure()) {
-    
-    auto member = closureExpr->getBody()->getElement(0);
-    
-    // A single-expression body contains a single return statement.
+
+  // A single-expression body contains a single return statement
+  // prior to this transformation.
+  auto member = closureExpr->getBody()->getElement(0);
+ 
+  if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
     auto singleExpr = returnStmt->getResult();
     auto voidExpr = TupleExpr::createEmpty(tc.Context,
@@ -5051,7 +5060,6 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                        /*implicit*/true);
     
     closureExpr->setImplicit();
-    closureExpr->setIsVoidConversionClosure();
     closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
   }
   
@@ -5062,6 +5070,38 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                           tc.Context.TheEmptyTupleType,
                                           fnType->getExtInfo());
   closureExpr->setType(newClosureType);
+  return closureExpr;
+}
+
+ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
+  auto &tc = cs.getTypeChecker();
+
+  // Re-write the single-expression closure to drop the 'return'.
+  assert(closureExpr->hasSingleExpressionBody());
+
+  // A single-expression body contains a single return statement
+  // prior to this transformation.
+  auto member = closureExpr->getBody()->getElement(0);
+
+  if (member.is<Stmt *>()) {
+    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
+    auto singleExpr = returnStmt->getResult();
+
+    tc.checkIgnoredExpr(singleExpr);
+
+    SmallVector<ASTNode, 1> elements;
+    elements.push_back(singleExpr);
+
+    auto braceStmt = BraceStmt::create(tc.Context,
+                                       closureExpr->getStartLoc(),
+                                       elements,
+                                       closureExpr->getEndLoc(),
+                                       /*implicit*/true);
+
+    closureExpr->setImplicit();
+    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+  }
+
   return closureExpr;
 }
 
@@ -6471,9 +6511,15 @@ namespace {
             closure->setSingleExpressionBody(body);
           
           if (body) {
-            
+            // A single-expression closure with a non-Void expression type
+            // coerces to a Void-returning function type.
             if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
               closure = Rewriter.coerceClosureExprToVoid(closure);
+            // A single-expression closure with a Never expression type
+            // coerces to any other function type.
+            } else if (!fnType->getResult()->isUninhabited() &&
+                       body->getType()->isUninhabited()) {
+              closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
             
               body = Rewriter.coerceToType(body,
