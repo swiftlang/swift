@@ -3099,7 +3099,14 @@ namespace {
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
           TS->ExprTypes[expr] = expr->getType();
-          
+
+          SWIFT_DEFER {
+            assert((!expr->getType() || !expr->getType()->hasTypeVariable()
+                    // FIXME: We shouldn't allow these, either.
+                    || isa<LiteralExpr>(expr)) &&
+                   "Type variable didn't get erased!");
+          };
+
           // Preserve module expr type data to prevent further lookups.
           if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
             if (isa<ModuleDecl>(declRef->getDecl()))
@@ -3110,17 +3117,13 @@ namespace {
           if (isa<OtherConstructorDeclRefExpr>(expr))
             return { false, expr };
           
-          // TypeExpr's are relabeled by CSGen.
-          if (isa<TypeExpr>(expr))
-            return { false, expr };
-          
           // If a literal has a Builtin.Int or Builtin.FP type on it already,
           // then sema has already expanded out a call to
           //   Init.init(<builtinliteral>)
           // and we don't want it to make
           //   Init.init(Init.init(<builtinliteral>))
           // preserve the type info to prevent this from happening.
-          if (isa<LiteralExpr>(expr) &&
+          if (isa<LiteralExpr>(expr) && !isa<InterpolatedStringLiteralExpr>(expr) &&
               !(expr->getType() && expr->getType()->is<ErrorType>()))
             return { false, expr };
 
