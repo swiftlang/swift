@@ -784,6 +784,12 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.clang_profile_instr_use:
+            impl_args += [
+                "--clang-profile-instr-use=%s" %
+                os.path.abspath(args.clang_profile_instr_use)
+            ]
+
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
@@ -1921,6 +1927,11 @@ details of the setups of other systems or automated environments.""")
         default=None,
         const='full',
         dest='lto_type')
+
+    parser.add_argument(
+        "--clang-profile-instr-use",
+        help="profile file to use for clang PGO",
+        metavar="PATH")
 
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     parser.add_argument(
