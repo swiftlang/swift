@@ -471,7 +471,7 @@ bool Decl::isWeakImported(Module *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailableAttr::getMinVersionAvailability().
+  // FIXME: Implement using AvailableAttr::getVersionAvailability().
   return false;
 }
 

@@ -1887,22 +1887,27 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   }
   }
 
-  auto MinVersion = Context.LangOpts.getMinPlatformVersion();
-  switch (Attr->getMinVersionAvailability(MinVersion)) {
-  case MinVersionComparison::Available:
-  case MinVersionComparison::PotentiallyUnavailable:
+  switch (Attr->getVersionAvailability(Context)) {
+  case AvailableVersionComparison::Available:
+  case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
-  case MinVersionComparison::Unavailable:
-    diagnose(D, diag::availability_marked_unavailable, Name)
+  case AvailableVersionComparison::Unavailable:
+    if (Attr->isLanguageVersionSpecific()
+        && Attr->Introduced.hasValue())
+      diagnose(D, diag::availability_introduced_in_swift, Name,
+               *Attr->Introduced).highlight(Attr->getRange());
+    else
+      diagnose(D, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
     break;
 
-  case MinVersionComparison::Obsoleted:
+  case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
     diagnose(D, diag::availability_obsoleted, Name,
-             Attr->prettyPlatformString(),
+             (Attr->isLanguageVersionSpecific() ?
+              "Swift" : Attr->prettyPlatformString()),
              *Attr->Obsoleted).highlight(Attr->getRange());
     break;
   }

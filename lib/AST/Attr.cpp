@@ -119,21 +119,21 @@ const AvailableAttr *DeclAttributes::getUnavailable(
         continue;
 
       // If this attribute doesn't apply to the active platform, we're done.
-      if (!AvAttr->isActivePlatform(ctx))
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific())
         continue;
 
       // Unconditional unavailable.
       if (AvAttr->isUnconditionallyUnavailable())
         return AvAttr;
 
-      auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
-      switch (AvAttr->getMinVersionAvailability(MinVersion)) {
-      case MinVersionComparison::Available:
-      case MinVersionComparison::PotentiallyUnavailable:
+      switch (AvAttr->getVersionAvailability(ctx)) {
+      case AvailableVersionComparison::Available:
+      case AvailableVersionComparison::PotentiallyUnavailable:
         break;
 
-      case MinVersionComparison::Obsoleted:
-      case MinVersionComparison::Unavailable:
+      case AvailableVersionComparison::Obsoleted:
+      case AvailableVersionComparison::Unavailable:
         conditional = AvAttr;
         break;
       }
@@ -149,7 +149,8 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isInvalid())
         continue;
 
-      if (!AvAttr->isActivePlatform(ctx))
+      if (!AvAttr->isActivePlatform(ctx) &&
+          !AvAttr->isLanguageVersionSpecific())
         continue;
 
       // Unconditional deprecated.
@@ -160,7 +161,10 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      auto MinVersion = ctx.LangOpts.getMinPlatformVersion();
+      clang::VersionTuple MinVersion =
+        AvAttr->isLanguageVersionSpecific() ?
+        ctx.LangOpts.EffectiveLanguageVersion :
+        ctx.LangOpts.getMinPlatformVersion();
 
       // We treat the declaration as deprecated if it is deprecated on
       // all deployment targets.
@@ -721,24 +725,37 @@ bool AvailableAttr::isUnconditionallyDeprecated() const {
   }
 }
 
-MinVersionComparison AvailableAttr::getMinVersionAvailability(
-                       clang::VersionTuple minVersion) const {
+AvailableVersionComparison AvailableAttr::getVersionAvailability(
+  const ASTContext &ctx) const {
+
   // Unconditional unavailability.
   if (isUnconditionallyUnavailable())
-    return MinVersionComparison::Unavailable;
+    return AvailableVersionComparison::Unavailable;
 
-  // If this entity was obsoleted before or at the minimum platform version,
+  clang::VersionTuple queryVersion =
+    isLanguageVersionSpecific() ?
+    ctx.LangOpts.EffectiveLanguageVersion :
+    ctx.LangOpts.getMinPlatformVersion();
+
+  // If this entity was obsoleted before or at the query platform version,
   // consider it obsolete.
-  if (Obsoleted && *Obsoleted <= minVersion)
-    return MinVersionComparison::Obsoleted;
+  if (Obsoleted && *Obsoleted <= queryVersion)
+    return AvailableVersionComparison::Obsoleted;
 
-  // If this entity was introduced after the minimum platform version, it's
-  // availability can only be determined dynamically.
-  if (Introduced && *Introduced > minVersion)
-    return MinVersionComparison::PotentiallyUnavailable;
+  // If this entity was introduced after the query version and we're doing a
+  // platform comparison, true availability can only be determined dynamically;
+  // if we're doing a _language_ version check, the query version is a
+  // static requirement, so we treat "introduced later" as just plain
+  // unavailable.
+  if (Introduced && *Introduced > queryVersion) {
+    if (isLanguageVersionSpecific())
+      return AvailableVersionComparison::Unavailable;
+    else
+      return AvailableVersionComparison::PotentiallyUnavailable;
+  }
 
   // The entity is available.
-  return MinVersionComparison::Available;
+  return AvailableVersionComparison::Available;
 }
 
 const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {

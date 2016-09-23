@@ -543,16 +543,16 @@ public:
 };
 
 /// Determine the result of comparing an availability attribute to a specific
-/// minimum platform version.
-enum class MinVersionComparison {
+/// platform or language version.
+enum class AvailableVersionComparison {
   /// The entity is guaranteed to be available.
   Available,
 
   /// The entity is never available.
   Unavailable,
 
-  /// The entity might be unavailable, because it was introduced after
-  /// the minimum version.
+  /// The entity might be unavailable at runtime, because it was introduced
+  /// after the requested minimum platform version.
   PotentiallyUnavailable,
 
   /// The entity has been obsoleted.
@@ -664,10 +664,10 @@ public:
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx) const;
 
-  /// Compare this attribute's version information against the minimum platform
-  /// version (assuming the this attribute pertains to the active platform).
-  MinVersionComparison getMinVersionAvailability(
-                         clang::VersionTuple minVersion) const;
+  /// Compare this attribute's version information against the platform or
+  /// language version (assuming the this attribute pertains to the active
+  /// platform).
+  AvailableVersionComparison getVersionAvailability(const ASTContext &ctx) const;
 
   /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
