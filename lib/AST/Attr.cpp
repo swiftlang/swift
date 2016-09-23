@@ -206,7 +206,8 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None)
+  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None &&
+      !AvailAttr->isLanguageVersionSpecific())
     return false;
 
   return true;
@@ -225,15 +226,22 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   assert(!Attrs.empty());
 
   Printer << "@available(";
-  for (auto *DA : Attrs) {
-    auto *AvailAttr = cast<AvailableAttr>(DA);
-    assert(AvailAttr->Introduced.hasValue());
-
-    Printer << platformString(AvailAttr->Platform) << " "
-            << AvailAttr->Introduced.getValue().getAsString() << ", ";
+  auto FirstAvail = dyn_cast<AvailableAttr>(Attrs[0]);
+  if (Attrs.size() == 1 &&
+      FirstAvail->isLanguageVersionSpecific()) {
+    assert(FirstAvail->Introduced.hasValue());
+    Printer << "swift "
+            << FirstAvail->Introduced.getValue().getAsString()
+            << ")";
+  } else {
+    for (auto *DA : Attrs) {
+      auto *AvailAttr = cast<AvailableAttr>(DA);
+      assert(AvailAttr->Introduced.hasValue());
+      Printer << platformString(AvailAttr->Platform) << " "
+              << AvailAttr->Introduced.getValue().getAsString() << ", ";
+    }
+    Printer << "*)";
   }
-
-  Printer << "*)";
   Printer.printNewline();
 }
 
@@ -366,7 +374,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options) 
     Printer.printAttrName("@available");
     Printer << "(";
     auto Attr = cast<AvailableAttr>(this);
-    Printer << Attr->platformString();
+    if (Attr->isLanguageVersionSpecific())
+      Printer << "swift";
+    else
+      Printer << Attr->platformString();
 
     if (Attr->isUnconditionallyUnavailable())
       Printer << ", unavailable";
