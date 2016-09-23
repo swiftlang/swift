@@ -2249,6 +2249,11 @@ public:
   /// \param paramIdx The index of the parameter that is missing an argument.
   virtual void missingArgument(unsigned paramIdx);
 
+  /// Indicate that there was no label given when one was expected by parameter.
+  ///
+  /// \param paramIndex The index of the parameter that is missing a label.
+  virtual void missingLabel(unsigned paramIndex);
+
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.
   ///
