@@ -640,7 +640,8 @@ public:
   const TypeRef *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     auto found = Substitutions.find({GTP->getDepth(), GTP->getIndex()});
-    assert(found != Substitutions.end());
+    if (found == Substitutions.end())
+      return GTP;
     assert(found->second->isConcrete());
 
     // When substituting a concrete type containing a metatype into a
@@ -672,7 +673,12 @@ public:
       unreachable("Unknown base type");
     }
 
-    assert(TypeWitness);
+    // We didn't find the member type, so return something to let the
+    // caller know we're dealing with incomplete metadata.
+    if (TypeWitness == nullptr)
+      return Builder.createDependentMemberType(DM->getMember(),
+                                               SubstBase,
+                                               DM->getProtocol());
 
     // Apply base type substitutions to get the fully-substituted nested type.
     auto *Subst = TypeWitness->subst(Builder, SubstBase->getSubstMap());
@@ -713,9 +719,7 @@ public:
 
 const TypeRef *
 TypeRef::subst(TypeRefBuilder &Builder, const GenericArgumentMap &Subs) const {
-  const TypeRef *Result = TypeRefSubstitution(Builder, Subs).visit(this);
-  assert(Result->isConcrete());
-  return Result;
+  return TypeRefSubstitution(Builder, Subs).visit(this);
 }
 
 bool TypeRef::deriveSubstitutions(GenericArgumentMap &Subs,
