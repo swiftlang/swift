@@ -1199,8 +1199,6 @@ function(add_swift_library name)
 
   if(NOT SWIFTLIB_TARGET_LIBRARY)
     set(SWIFTLIB_INSTALL_IN_COMPONENT dev)
-  elseif(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT SWIFT_BUILT_STANDALONE)
-    list(APPEND SWIFTLIB_DEPENDS clang)
   endif()
 
   # If target SDKs are not specified, build for all known SDKs.
@@ -1258,6 +1256,10 @@ function(add_swift_library name)
   endif()
   
   if(SWIFTLIB_TARGET_LIBRARY)
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+      list(APPEND SWIFTLIB_DEPENDS clang)
+    endif()
+    
     # If we are building this library for targets, loop through the various
     # SDKs building the variants of this library.
     list_intersect(
