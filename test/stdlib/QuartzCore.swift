@@ -22,10 +22,10 @@ let deviceRGB = CGColorSpaceCreateDeviceRGB()
 
 class FooLayer: CALayer {
   var black: CGColor 
-  var white = CGColor(colorSpace: deviceRGB, components: [1,1,1])!
+  var white = CGColor(colorSpace: deviceRGB, components: [1,1,1,1])!
 
   override init() {
-    black = CGColor(colorSpace: deviceRGB, components: [0,0,0])!
+    black = CGColor(colorSpace: deviceRGB, components: [0,0,0,1])!
     super.init()
     hangCanary(self)
   }
