@@ -294,12 +294,7 @@ public:
   }
 
 private:
-
   std::vector<ReflectionInfo> ReflectionInfos;
-
-  const AssociatedTypeDescriptor *
-  lookupAssociatedTypes(const std::string &MangledTypeName,
-                        const TypeRef *Protocol);
 
 public:
   TypeConverter &getTypeConverter() { return TC; }
