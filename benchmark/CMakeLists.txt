@@ -38,13 +38,13 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/DeadArray
+    single-source/DictTest
+    single-source/DictTest2
+    single-source/DictTest3
     single-source/DictionaryBridge
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySwap
-    single-source/DictTest
-    single-source/DictTest2
-    single-source/DictTest3
     single-source/ErrorHandling
     single-source/Fibonacci
     single-source/GlobalClass
@@ -59,10 +59,10 @@ set(SWIFT_BENCH_MODULES
     single-source/Memset
     single-source/MonteCarloE
     single-source/MonteCarloPi
-    single-source/NopDeinit
     single-source/NSDictionaryCastToSwift
     single-source/NSError
     single-source/NSStringConversion
+    single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/OpenClose
     single-source/Phonebook
@@ -72,10 +72,10 @@ set(SWIFT_BENCH_MODULES
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
-    single-source/RangeAssignment
     single-source/RC4
-    single-source/RecursiveOwnedParameter
     single-source/RGBHistogram
+    single-source/RangeAssignment
+    single-source/RecursiveOwnedParameter
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
@@ -83,11 +83,11 @@ set(SWIFT_BENCH_MODULES
     single-source/SortStrings
     single-source/StaticArray
     single-source/StrComplexWalk
+    single-source/StrToInt
     single-source/StringBuilder
     single-source/StringInterpolation
     single-source/StringTests
     single-source/StringWalk
-    single-source/StrToInt
     single-source/SuperChars
     single-source/TwoSum
     single-source/TypeFlood
