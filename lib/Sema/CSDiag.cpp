@@ -376,47 +376,12 @@ tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc, const Expr *expr,
 
   // If we got here, then all of the choices have unique labels. Offer them in
   // order.
-  SourceManager &sourceMgr = tc.Context.SourceMgr;
-  SourceLoc replaceStartLoc;
-  SourceLoc closureStartLoc;
-  bool hasOtherArgs, needsParens;
-  if (auto tupleArgs = dyn_cast<TupleExpr>(callExpr->getArg())) {
-    assert(tupleArgs->getNumElements() >= 2);
-    const Expr *lastBeforeClosure = tupleArgs->getElements().drop_back().back();
-    replaceStartLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, lastBeforeClosure->getEndLoc());
-    closureStartLoc = tupleArgs->getElements().back()->getStartLoc();
-    hasOtherArgs = true;
-    needsParens = false;
-  } else {
-    auto parenArgs = cast<ParenExpr>(callExpr->getArg());
-    replaceStartLoc = parenArgs->getRParenLoc();
-    closureStartLoc = parenArgs->getSubExpr()->getStartLoc();
-    hasOtherArgs = false;
-    needsParens = parenArgs->getRParenLoc().isInvalid();
-  }
-  if (!replaceStartLoc.isValid()) {
-    assert(callExpr->getFn()->getEndLoc().isValid());
-    replaceStartLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, callExpr->getFn()->getEndLoc());
-  }
-
   for (const auto &choicePair : choicesByLabel) {
-    SmallString<64> insertionString;
-    if (needsParens)
-      insertionString += "(";
-    else if (hasOtherArgs)
-      insertionString += ", ";
-
-    if (!choicePair.first.empty()) {
-      insertionString += choicePair.first.str();
-      insertionString += ": ";
-    }
-
-    tc.diagnose(expr->getLoc(), diag::ambiguous_because_of_trailing_closure,
-                choicePair.first.empty(), choicePair.second->getFullName())
-      .fixItReplaceChars(replaceStartLoc, closureStartLoc, insertionString)
-      .fixItInsertAfter(callExpr->getEndLoc(), ")");
+    auto diag = tc.diagnose(expr->getLoc(),
+                            diag::ambiguous_because_of_trailing_closure,
+                            choicePair.first.empty(),
+                            choicePair.second->getFullName());
+    swift::fixItEncloseTrailingClosure(tc, diag, callExpr, choicePair.first);
   }
 
   return true;

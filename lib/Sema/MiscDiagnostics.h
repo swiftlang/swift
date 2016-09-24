@@ -24,6 +24,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class ApplyExpr;
   class AvailableAttr;
+  class CallExpr;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
@@ -86,6 +87,12 @@ bool fixItOverrideDeclarationTypes(TypeChecker &TC,
                                    InFlightDiagnostic &diag,
                                    ValueDecl *decl,
                                    const ValueDecl *base);
+
+/// Emit fix-its to enclose trailing closure in argument parens.
+void fixItEncloseTrailingClosure(TypeChecker &TC,
+                                 InFlightDiagnostic &diag,
+                                 const CallExpr *call,
+                                 Identifier closureLabel);
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H
