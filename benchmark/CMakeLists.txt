@@ -139,7 +139,8 @@ runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clan
 # You have to delete CMakeCache.txt in the swift build to force a
 # reconfiguration.
 set(SWIFT_EXTRA_BENCH_CONFIGS CACHE STRING
-    "A semicolon separated list of benchmark configurations. Available configurations: <Optlevel>_SINGLEFILE, <Optlevel>_MULTITHREADED")
+    "A semicolon separated list of benchmark configurations. \
+Available configurations: <Optlevel>_SINGLEFILE, <Optlevel>_MULTITHREADED")
 
 # Syntax for an optset:  <optimization-level>_<configuration>
 #    where "_<configuration>" is optional.
@@ -147,6 +148,11 @@ if(NOT SWIFT_OPTIMIZATION_LEVELS)
   set(SWIFT_OPTIMIZATION_LEVELS "Onone" "O" "Ounchecked"
                                 ${SWIFT_EXTRA_BENCH_CONFIGS})
 endif()
+
+set(SWIFT_BENCHMARK_NUM_O_ITERATIONS "" CACHE STRING
+    "Number of iterations to perform when running -O benchmarks via cmake")
+set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
+    "Number of iterations to perform when running -Onone benchmarks via cmake")
 
 # Options for the default (= empty) configuration
 set(BENCHOPTS "-whole-module-optimization")
