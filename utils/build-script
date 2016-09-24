@@ -1561,6 +1561,15 @@ details of the setups of other systems or automated environments.""")
         help="run the Swift Benchmark Suite after building",
         action="store_true")
     run_tests_group.add_argument(
+        "--benchmark-num-o-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+iterations with -O",
+        metavar='N', type=int, default=3)
+    run_tests_group.add_argument(
+        "--benchmark-num-onone-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+        iterations with -Onone", metavar='N', type=int, default=3)
+    run_tests_group.add_argument(
         "--skip-test-osx",
         help="skip testing Swift stdlibs for Mac OS X",
         action=arguments.action.optional_bool)
