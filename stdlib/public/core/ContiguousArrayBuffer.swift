@@ -25,8 +25,6 @@ internal final class _EmptyArrayStorage
     _sanityCheckFailure("creating instance of _EmptyArrayStorage")
   }
   
-  var countAndCapacity: _ArrayBody
-
 #if _runtime(_ObjC)
   override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
@@ -34,7 +32,7 @@ internal final class _EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  // FIXME(ABI): remove 'Void' arguments here and elsewhere in this file, they
+  // FIXME(ABI)#26 (Type Checker): remove 'Void' arguments here and elsewhere in this file, they
   // are a workaround for an old compiler limitation.
   override func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
     return 0
@@ -65,11 +63,12 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
 
-// FIXME: This whole class is a workaround for
+// FIXME(ABI)#141 : This whole class is a workaround for
 // <rdar://problem/18560464> Can't override generic method in generic
 // subclass.  If it weren't for that bug, we'd override
 // _withVerbatimBridgedUnsafeBuffer directly in
 // _ContiguousArrayStorage<Element>.
+// rdar://problem/19341002
 class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 #if _runtime(_ObjC)
   /// If the `Element` is bridged verbatim, invoke `body` on an
@@ -78,7 +77,7 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   final override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
-    var result: R? = nil
+    var result: R?
     try self._withVerbatimBridgedUnsafeBufferImpl {
       result = try body($0)
     }
@@ -101,10 +100,8 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
 final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
 
   deinit {
-    __manager._elementPointer.deinitialize(
-      count: __manager._headerPointer.pointee.count)
-    __manager._headerPointer.deinitialize()
-    _fixLifetime(__manager)
+    _elementPointer.deinitialize(count: countAndCapacity.count)
+    _fixLifetime(self)
   }
 
 #if _runtime(_ObjC)
@@ -114,10 +111,10 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      let count = __manager.header.count
-      let elements = UnsafeRawPointer(__manager._elementPointer)
+      let count = countAndCapacity.count
+      let elements = UnsafeRawPointer(_elementPointer)
         .assumingMemoryBound(to: AnyObject.self)
-      defer { _fixLifetime(__manager) }
+      defer { _fixLifetime(self) }
       try body(UnsafeBufferPointer(start: elements, count: count))
     }
   }
@@ -129,7 +126,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    return __manager.header.count
+    return countAndCapacity.count
   }
 
   /// Bridge array elements and return a new buffer that owns them.
@@ -140,15 +137,15 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
-    let count = __manager.header.count
+    let count = countAndCapacity.count
     let result = _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, count, count)
     let resultPtr = result.baseAddress
-    let p = __manager._elementPointer
+    let p = _elementPointer
     for i in 0..<count {
       (resultPtr + i).initialize(to: _bridgeAnythingToObjectiveC(p[i]))
     }
-    _fixLifetime(__manager)
+    _fixLifetime(self)
     return result
   }
 #endif
@@ -174,12 +171,8 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
     return Element.self
   }
 
-  internal // private
-  typealias Manager = ManagedBufferPointer<_ArrayBody, Element>
-
-  internal // private
-  var __manager: Manager {
-    return Manager(_uncheckedUnsafeBufferObject: self)
+  internal final var _elementPointer : UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
 }
 
@@ -199,14 +192,16 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
       self = _ContiguousArrayBuffer<Element>()
     }
     else {
-      __bufferPointer = ManagedBufferPointer(
-        _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
-        minimumCapacity: realMinimumCapacity)
+      _storage = Builtin.allocWithTailElems_1(
+         _ContiguousArrayStorage<Element>.self,
+         realMinimumCapacity._builtinWordValue, Element.self)
+
+      let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
+      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
+      let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
 
       _initStorageHeader(
-        count: uninitializedCount, capacity: __bufferPointer.capacity)
-
-      _fixLifetime(__bufferPointer)
+        count: uninitializedCount, capacity: realCapacity)
     }
   }
 
@@ -219,17 +214,13 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Warning: storage may have been stack-allocated, so it's
   ///   crucial not to call, e.g., `malloc_size` on it.
   internal init(count: Int, storage: _ContiguousArrayStorage<Element>) {
-    __bufferPointer = ManagedBufferPointer(
-      _uncheckedUnsafeBufferObject: storage)
+    _storage = storage
 
     _initStorageHeader(count: count, capacity: count)
-
-    _fixLifetime(__bufferPointer)
   }
 
   internal init(_ storage: _ContiguousArrayStorageBase) {
-    __bufferPointer = ManagedBufferPointer(
-      _uncheckedUnsafeBufferObject: storage)
+    _storage = storage
   }
 
   /// Initialize the body part of our storage.
@@ -242,11 +233,12 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     let verbatim = false
 #endif
 
-    __bufferPointer._headerPointer.initialize(to: 
-      _ArrayBody(
-        count: count,
-        capacity: capacity,
-        elementTypeIsBridgedVerbatim: verbatim))
+    // We can initialize by assignment because _ArrayBody is a trivial type,
+    // i.e. contains no references.
+    _storage.countAndCapacity = _ArrayBody(
+      count: count,
+      capacity: capacity,
+      elementTypeIsBridgedVerbatim: verbatim)
   }
 
   /// True, if the array is native and does not need a deferred type check.
@@ -256,7 +248,8 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// A pointer to the first element.
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
-    return __bufferPointer._elementPointer
+    return UnsafeMutablePointer(Builtin.projectTailElems(_storage,
+                                                         Element.self))
   }
 
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
@@ -286,8 +279,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   //===--- _ArrayBufferProtocol conformance -----------------------------------===//
   /// Create an empty buffer.
   internal init() {
-    __bufferPointer = ManagedBufferPointer(
-      _uncheckedUnsafeBufferObject: _emptyArrayStorage)
+    _storage = _emptyArrayStorage
   }
 
   internal init(_buffer buffer: _ContiguousArrayBuffer, shiftedToStartIndex: Int) {
@@ -346,7 +338,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// The number of elements the buffer stores.
   internal var count: Int {
     get {
-      return __bufferPointer.header.count
+      return _storage.countAndCapacity.count
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
@@ -355,7 +347,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      __bufferPointer._headerPointer.pointee.count = newValue
+      _storage.countAndCapacity.count = newValue
     }
   }
 
@@ -364,14 +356,14 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inline(__always)
   func _checkValidSubscript(_ index : Int) {
     _precondition(
-      (index >= 0) && (index < __bufferPointer.header.count),
+      (index >= 0) && (index < count),
       "Index out of range"
     )
   }
 
   /// The number of elements the buffer can store without reallocation.
   internal var capacity: Int {
-    return __bufferPointer.header.capacity
+    return _storage.countAndCapacity.capacity
   }
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
@@ -398,7 +390,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   internal subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
       return _SliceBuffer(
-        owner: __bufferPointer.buffer,
+        owner: _storage,
         subscriptBaseAddress: subscriptBaseAddress,
         indices: bounds,
         hasNativeBuffer: true)
@@ -414,14 +406,14 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///   may need to be considered, such as whether the buffer could be
   ///   some immutable Cocoa container.
   internal mutating func isUniquelyReferenced() -> Bool {
-    return __bufferPointer.isUniqueReference()
+    return _isUnique(&_storage)
   }
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.  NOTE: this does not mean
   /// the buffer is mutable; see the comment on isUniquelyReferenced.
   internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return __bufferPointer._isUniqueOrPinnedReference()
+    return _isUniqueOrPinned(&_storage)
   }
 
 #if _runtime(_ObjC)
@@ -489,11 +481,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return true
   }
 
-  internal var _storage: _ContiguousArrayStorageBase {
-    return Builtin.castFromNativeObject(__bufferPointer._nativeBuffer)
-  }
-
-  var __bufferPointer: ManagedBufferPointer<_ArrayBody, Element>
+  internal var _storage: _ContiguousArrayStorageBase
 }
 
 /// Append the elements of `rhs` to `lhs`.

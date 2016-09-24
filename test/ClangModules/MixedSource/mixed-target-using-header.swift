@@ -59,12 +59,12 @@ func testFoundationOverlay() {
 }
 
 func testProtocolNamingConflict() {
-  let a: ConflictingName1? = nil
+  let a: ConflictingName1?
   var b: ConflictingName1Protocol?
   b = a // expected-error {{cannot assign value of type 'ConflictingName1?' to type 'ConflictingName1Protocol?'}}
   _ = b
 
-  let c: ConflictingName2? = nil
+  let c: ConflictingName2?
   var d: ConflictingName2Protocol?
   d = c // expected-error {{cannot assign value of type 'ConflictingName2?' to type 'ConflictingName2Protocol?'}}
   _ = d

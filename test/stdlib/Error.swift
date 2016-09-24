@@ -130,7 +130,7 @@ enum LifetimeError : Error {
 ErrorTests.test("existential in lvalue") {
   expectEqual(0, LifetimeTracked.instances)
   do {
-    var e: Error? = nil
+    var e: Error?
     do {
       throw LifetimeError.MistakeOfALifetime(LifetimeTracked(0),
                                              yearsIncarcerated: 25)

@@ -377,7 +377,7 @@ final internal class _VaListBuilder {
   let requiredAlignmentInBytes = MemoryLayout<Double>.alignment
   var count = 0
   var allocated = 0
-  var storage: UnsafeMutablePointer<Int>? = nil
+  var storage: UnsafeMutablePointer<Int>?
 
   static var alignedStorageForEmptyVaLists: Double = 0
 }
@@ -391,8 +391,8 @@ final internal class _VaListBuilder {
   struct Header {
     var gp_offset = CUnsignedInt(0)
     var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * MemoryLayout<Int>.stride)
-    var overflow_arg_area: UnsafeMutablePointer<Int>? = nil
-    var reg_save_area: UnsafeMutablePointer<Int>? = nil
+    var overflow_arg_area: UnsafeMutablePointer<Int>?
+    var reg_save_area: UnsafeMutablePointer<Int>?
   }
 
   init() {

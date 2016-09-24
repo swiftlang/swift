@@ -10,6 +10,7 @@ handle_gyb_sources(
 
 add_swift_library(swiftClangImporter STATIC
   CFTypeInfo.cpp
+  ClangAdapter.cpp
   ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
   IAMInference.cpp
@@ -24,5 +25,9 @@ add_swift_library(swiftClangImporter STATIC
     swiftParse
 )
 
-
-add_dependencies(swiftClangImporter "${generated_include_targets}")
+# This property is only set by calls to clang_tablegen. It will not be set on
+# standalone builds, so it can always be safely passed.
+get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
+add_dependencies(swiftClangImporter
+                "${generated_include_targets}"
+                ${CLANG_TABLEGEN_TARGETS})

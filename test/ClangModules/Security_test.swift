@@ -12,7 +12,7 @@ func testIntegration() {
   // Based on code in <rdar://problem/17162475>.
   let query = [kSecClass as NSString: kSecClassGenericPassword] as NSDictionary as CFDictionary
 
-  var dataTypeRef: Unmanaged<AnyObject>? = nil
+  var dataTypeRef: Unmanaged<AnyObject>?
   let status = SecItemCopyMatching(query, &dataTypeRef)
   
   if status == errSecSuccess {
@@ -24,7 +24,7 @@ func testIntegration() {
 }
 
 func testAuthorizationIsNotCF() {
-  var auth: AuthorizationRef? = nil
+  var auth: AuthorizationRef?
   _ = AuthorizationCreate(&auth)
   _ = AuthorizationFree(auth)
 }

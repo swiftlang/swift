@@ -463,6 +463,8 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicLoad;
   else if (OperationName.startswith("atomicstore_"))
     Info.ID = BuiltinValueKind::AtomicStore;
+  else if (OperationName.startswith("allocWithTailElems_"))
+    Info.ID = BuiltinValueKind::AllocWithTailElems;
   else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)

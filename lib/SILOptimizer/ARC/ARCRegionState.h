@@ -198,8 +198,8 @@ public:
   /// instructions. Returns false otherwise.
   bool processBottomUp(
       AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-      LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
-      ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+      EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
+      bool FreezeOwnedArgEpilogueReleases,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
       llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
@@ -224,8 +224,8 @@ private:
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   bool processBlockBottomUp(
       const LoopRegion *R, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+      EpilogueARCFunctionInfo *EAFI,
       LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
-      ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   bool processLoopBottomUp(

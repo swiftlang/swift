@@ -163,7 +163,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       if (!decl->hasType())
         continue;
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-        if (!assocType->getArchetype())
+        if (!assocType->getProtocol()->isValidGenericContext())
           continue;
     }
     
@@ -402,12 +402,12 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
   switch (scope->getKind()) {
   case ASTScopeKind::Preexpanded:
   case ASTScopeKind::SourceFile:
-  case ASTScopeKind::TypeOrExtensionBody:
+  case ASTScopeKind::TypeDecl:
   case ASTScopeKind::AbstractFunctionDecl:
+  case ASTScopeKind::TypeOrExtensionBody:
   case ASTScopeKind::AbstractFunctionBody:
   case ASTScopeKind::DefaultArgument:
   case ASTScopeKind::PatternBinding:
-  case ASTScopeKind::BraceStmt:
   case ASTScopeKind::IfStmt:
   case ASTScopeKind::GuardStmt:
   case ASTScopeKind::RepeatWhileStmt:
@@ -429,9 +429,9 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
     return DeclVisibilityKind::FunctionParameter;
 
   case ASTScopeKind::AfterPatternBinding:
-  case ASTScopeKind::LocalDeclaration:
   case ASTScopeKind::ConditionalClause:
   case ASTScopeKind::ForEachPattern:
+  case ASTScopeKind::BraceStmt:
   case ASTScopeKind::CatchStmt:
   case ASTScopeKind::CaseStmt:
   case ASTScopeKind::ForStmtInitializer:
@@ -443,7 +443,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      bool IsKnownNonCascading,
                                      SourceLoc Loc, bool IsTypeLookup,
-                                     bool AllowProtocolMembers) {
+                                     bool AllowProtocolMembers,
+                                     bool IgnoreAccessControl) {
   Module &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -457,7 +458,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   SmallVector<UnqualifiedLookupResult, 4> UnavailableInnerResults;
 
-  if (Loc.isValid() && Ctx.LangOpts.EnableASTScopeLookup) {
+  if (Loc.isValid() &&
+      DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
+      Ctx.LangOpts.EnableASTScopeLookup) {
     // Find the source file in which we are performing the lookup.
     SourceFile &sourceFile = *DC->getParentSourceFile();
 
@@ -578,7 +581,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           continue;
         }
 
-        // Top-level declarations have no lokup of their own.
+        // Top-level declarations have no lookup of their own.
         if (isa<TopLevelCodeDecl>(dc)) continue;
 
         // Typealiases have no lookup of their own.
@@ -599,6 +602,13 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // Dig out the type we're looking into.
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
+
+        // FIXME: Hack to deal with missing 'Self' archetypes.
+        if (!lookupType) {
+          if (auto proto = dc->getAsProtocolOrProtocolExtensionContext())
+            lookupType = proto->getDeclaredType();
+        }
+
         if (!lookupType || lookupType->is<ErrorType>()) continue;
 
         // If we're performing a static lookup, use the metatype.
@@ -621,6 +631,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_ProtocolMembers;
         if (IsTypeLookup)
           options |= NL_OnlyTypes;
+        if (IgnoreAccessControl)
+          options |= NL_IgnoreAccessibility;
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
@@ -806,6 +818,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             options |= NL_ProtocolMembers;
           if (IsTypeLookup)
             options |= NL_OnlyTypes;
+          if (IgnoreAccessControl)
+            options |= NL_IgnoreAccessibility;
 
           if (!ExtendedType)
             ExtendedType = ErrorType::get(Ctx);
@@ -1442,16 +1456,14 @@ bool DeclContext::lookupQualified(Type type,
       if (visited.insert(proto).second)
         stack.push_back(proto);
 
-    // If requested, look into the superclasses of this archetype.
-    if (options & NL_VisitSupertypes) {
-      if (auto superclassTy = archetypeTy->getSuperclass()) {
-        if (auto superclassDecl = superclassTy->getAnyNominal()) {
-          if (visited.insert(superclassDecl).second) {
-            stack.push_back(superclassDecl);
+    // Look into the superclasses of this archetype.
+    if (auto superclassTy = archetypeTy->getSuperclass()) {
+      if (auto superclassDecl = superclassTy->getAnyNominal()) {
+        if (visited.insert(superclassDecl).second) {
+          stack.push_back(superclassDecl);
 
-            wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                                  !isa<ProtocolDecl>(superclassDecl);
-          }
+          wantProtocolMembers = (options & NL_ProtocolMembers) &&
+                                !isa<ProtocolDecl>(superclassDecl);
         }
       }
     }
@@ -1554,10 +1566,6 @@ bool DeclContext::lookupQualified(Type type,
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
     }
-
-    // If we're not supposed to visit our supertypes, we're done.
-    if ((options & NL_VisitSupertypes) == 0)
-      continue;
 
     // Visit superclass.
     if (auto classDecl = dyn_cast<ClassDecl>(current)) {

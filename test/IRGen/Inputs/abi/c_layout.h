@@ -27,6 +27,9 @@ struct A {
 };
 struct A createA(void);
 
+enum CrappyColor {
+  Red, Green, Blue
+};
 
 struct BitfieldSeparatorReference {
   unsigned char a;

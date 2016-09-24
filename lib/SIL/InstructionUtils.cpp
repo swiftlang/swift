@@ -30,6 +30,25 @@ SILValue swift::getUnderlyingObject(SILValue V) {
   }
 }
 
+SILValue swift::getUnderlyingAddressRoot(SILValue V) {
+  while (true) {
+    SILValue V2 = stripIndexingInsts(stripCasts(V));
+    switch (V2->getKind()) {
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+      case ValueKind::UncheckedTakeEnumDataAddrInst:
+        V2 = cast<SILInstruction>(V2)->getOperand(0);
+        break;
+      default:
+        break;
+    }
+    if (V2 == V)
+      return V2;
+    V = V2;
+  }
+}
+
+
 SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue V) {
   while (true) {
     SILValue V2 = stripIndexingInsts(stripAddressProjections(stripCastsWithoutMarkDependence(V)));

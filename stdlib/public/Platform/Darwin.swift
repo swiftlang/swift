@@ -11,3 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Darwin // Clang module
+
+public let MAP_FAILED =
+  UnsafeMutableRawPointer(bitPattern: -1)! as UnsafeMutableRawPointer!

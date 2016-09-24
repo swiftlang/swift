@@ -62,7 +62,7 @@ KNOWN_SETTINGS=(
     swift-analyze-code-coverage "not-merged"     "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
     swift-tools-enable-lto      ""               "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     llvm-enable-lto             ""               "Must be set to one of 'thin' or 'full'"
-    llvm-enable-modules         "0"              "enable building llvm using modules"
+    llvm-enable-modules         "1"              "enable building llvm using modules"
     swift-tools-num-parallel-lto-link-jobs ""    "The number of parallel link jobs to use when compiling swift tools"
     llvm-num-parallel-lto-link-jobs ""           "The number of parallel link jobs to use when compiling llvm"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
@@ -237,6 +237,8 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
+    coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
 
@@ -321,6 +323,17 @@ function is_llvm_lto_enabled() {
 function is_swift_lto_enabled() {
     if [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "thin" ]] ||
        [[ "${SWIFT_TOOLS_ENABLE_LTO}" == "full" ]]; then
+        echo "TRUE"
+    else
+        echo "FALSE"
+    fi
+}
+
+# Enable module-builds of llvm only when asan is disabled.
+# FIXME: rdar://problem/28356072
+function is_llvm_module_build_enabled() {
+    if [[ "$(true_false ${LLVM_ENABLE_MODULES})" == "TRUE" ]] &&
+       [[ "$(true_false ${ENABLE_ASAN})" == "FALSE" ]]; then
         echo "TRUE"
     else
         echo "FALSE"
@@ -635,7 +648,7 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
-                -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
+                -DLLVM_ENABLE_MODULES:BOOL="$(is_llvm_module_build_enabled)"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
@@ -727,6 +740,16 @@ function set_build_options_for_host() {
             -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
         )
     fi
+
+    if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_PROFDATA_FILE="${CLANG_PROFILE_INSTR_USE}"
+        )
+    fi
+
+    swift_cmake_options+=(
+        -DCOVERAGE_DB="${COVERAGE_DB}"
+    )
 }
 
 function configure_default_options() {
@@ -1246,6 +1269,18 @@ if [[ ! "${SKIP_BUILD_SWIFTPM}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swiftpm)
 fi
 
+# Checks if a given product is enabled (i.e. part of $PRODUCTS array)
+function contains_product() {
+  local current_product
+  for current_product in "${PRODUCTS[@]}"; do
+    if [[ "$current_product" == "$1" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+
 # get_host_specific_variable(host, name)
 #
 # Get the value of a host-specific variable expected to have been passed by the
@@ -1673,6 +1708,43 @@ function set_swiftpm_bootstrap_command() {
     fi
 }
 
+# Construct the appropriate options to pass to an Xcode
+# build of any LLDB target.
+function set_lldb_xcodebuild_options() {
+    llvm_build_dir=$(build_directory ${host} llvm)
+    cmark_build_dir=$(build_directory ${host} cmark)
+    lldb_build_dir=$(build_directory ${host} lldb)
+    swift_build_dir=$(build_directory ${host} swift)
+
+    lldb_xcodebuild_options=(
+        LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
+        LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
+        LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
+        LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
+        LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
+        LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
+        LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
+        LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
+        SYMROOT="${lldb_build_dir}"
+        OBJROOT="${lldb_build_dir}"
+        ${LLDB_EXTRA_XCODEBUILD_ARGS}
+    )
+    if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_DISABLE_CODESIGN="1"
+            DEBUGSERVER_DELETE_AFTER_BUILD="1"
+        )
+    fi
+    if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
+        lldb_xcodebuild_options=(
+            "${lldb_xcodebuild_options[@]}"
+            DEBUGSERVER_USE_FROM_SYSTEM="1"
+        )
+    fi
+}
+
 #
 # Configure and build each product
 #
@@ -2045,6 +2117,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if contains_product "lldb" ; then
+                    lldb_build_dir=$(build_directory ${host} lldb)
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLDB_ENABLE:BOOL=TRUE
+                        -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
+                    )
+                fi
+
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
                 if [[ $(true_false "${build_perf_testsuite_this_time}") == "TRUE" ]]; then
                     native_swift_tools_path="$(build_directory_bin ${LOCAL_HOST} swift)"
@@ -2153,33 +2234,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ;;
                     macosx-*)
                         # Set up flags to pass to xcodebuild
-                        lldb_xcodebuild_options=(
-                            LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
-                            LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
-                            LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
-                            LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
-                            LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
-                            LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
-                            LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-                            LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
-                            SYMROOT="${lldb_build_dir}"
-                            OBJROOT="${lldb_build_dir}"
-                            ${LLDB_EXTRA_XCODEBUILD_ARGS}
-                        )
-                        if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_DISABLE_CODESIGN="1"
-                                DEBUGSERVER_DELETE_AFTER_BUILD="1"
-                            )
-                        fi
-                        if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                            lldb_xcodebuild_options=(
-                                "${lldb_xcodebuild_options[@]}"
-                                DEBUGSERVER_USE_FROM_SYSTEM="1"
-                            )
-                        fi
+                        set_lldb_xcodebuild_options
                         set_lldb_build_mode
                         with_pushd ${source_dir} \
                             call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
@@ -2490,6 +2545,24 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
+
+                # Run the gtests.
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    set_lldb_xcodebuild_options
+                    # Run the LLDB unittests (gtests).
+                    with_pushd ${LLDB_SOURCE_DIR} \
+                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
+                    rc=$?
+                    if [[ "$rc" -ne 0 ]] ; then
+                        >&2 echo "error: LLDB gtests failed"
+                        exit 1
+                    fi
+                else
+                    # FIXME run the gtests on other platforms.
+                    # There should be a CMake target for this already.
+                    echo Run LLDB gtests here.
+                fi
+
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
                 if [[ "$(uname -s)" == "Darwin" ]] ; then

@@ -45,7 +45,7 @@ extension SKWarpGeometryGrid {
   /// the node's native size. Values outside the (0.0-1.0) range are perfectly valid and
   /// correspond to positions outside of the native undistorted bounds.
   ///
-  /// Source and destination positions are provided in row-major order staring from the top-left.
+  /// Source and destination positions are provided in row-major order starting from the top-left.
   /// For example the indices for a 2x2 grid would be as follows:
   ///
   ///     [0]---[1]---[2]

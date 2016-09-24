@@ -22,7 +22,7 @@
 /// methods that return lazy wrappers that are themselves
 /// `LazyCollectionProtocol`s.
 ///
-/// - See Also: `LazySequenceProtocol`, `LazyCollection`
+/// - SeeAlso: `LazySequenceProtocol`, `LazyCollection`
 public protocol LazyCollectionProtocol
   : Collection, LazySequenceProtocol {
   /// A `Collection` that can contain the same elements as this one,
@@ -219,7 +219,7 @@ extension ${TraversalCollection} {
   /// intermediate operations from allocating storage, or when you only
   /// need a part of the final collection to avoid unnecessary computation.
   ///
-  /// - See Also: `LazySequenceProtocol`, `LazyCollectionProtocol`.
+  /// - SeeAlso: `LazySequenceProtocol`, `LazyCollectionProtocol`.
   public var lazy: ${Self}<Self> {
     return ${Self}(_base: self)
   }

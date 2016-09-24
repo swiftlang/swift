@@ -384,8 +384,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   else
     RegisterPreservingCC = DefaultCC;
 
-  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
-    DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
+  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
+    StringRef MainFile(SF ? SF->getFilename()
+                          : StringRef(IRGen.Opts.MainInputFilename));
+    DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, MainFile);
+  }
 
   initClangTypeConverter();
 }

@@ -118,7 +118,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 /// \brief Return true if this is a release instruction and the released value
 /// is a part of a guaranteed parameter.
 bool swift::isIntermediateRelease(SILInstruction *I,
-                                  ConsumedArgToEpilogueReleaseMatcher &ERM) {
+                                  EpilogueARCFunctionInfo *EAFI) {
   // Check whether this is a release instruction.
   if (!isa<StrongReleaseInst>(I) && !isa<ReleaseValueInst>(I))
     return false;
@@ -136,8 +136,10 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 
   // This is a release on an owned parameter and its not the epilogue release.
   // Its not the final release.
-  SILInstruction *Rel = ERM.getSingleReleaseForArgument(Arg);
-  if (Rel && Rel != I)
+  auto Rel 
+     = EAFI->computeEpilogueARCInstructions(
+            EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  if (Rel.size() && !Rel.count(I))
     return true;
 
   // Failed to prove anything.
@@ -1660,6 +1662,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
+  
+  // TODO: Handle indirect argument to or return from witness function.
+  if (ParamTypes[0].isIndirect()
+      || BridgedFunc->getLoweredFunctionType()->getSingleResult().isIndirect())
+    return nullptr;
 
   // Get substitutions, if source is a bound generic type.
   ArrayRef<Substitution> Subs =
@@ -1676,7 +1683,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   }
 
   // Compensate different owning conventions of the replaced cast instruction
-  // and the inserted convertion function.
+  // and the inserted conversion function.
   bool needRetainBeforeCall = false;
   bool needReleaseAfterCall = false;
   bool needReleaseInSucc = false;
@@ -1726,9 +1733,9 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     case ParameterConvention::Direct_Unowned:
       break;
     case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Indirect_In_Guaranteed:
     case ParameterConvention::Direct_Deallocating:
       llvm_unreachable("unsupported convention for bridging conversion");
   }
@@ -2683,7 +2690,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   case Accessibility::Public:
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->isRequired())
-	return false;
+        return false;
     }
     SWIFT_FALLTHROUGH;
   case Accessibility::Internal:
@@ -2722,6 +2729,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst: {
         auto *Inst = cast<SILInstruction>(V);
         // We are done once the current projection dominates the insert point.

@@ -30,7 +30,7 @@ public enum MemoryLayout<T> {
   /// performance for space efficiency. The result is always positive.
   @_transparent
   public static var stride: Int {
-    return Int(Builtin.strideof_nonzero(T.self))
+    return Int(Builtin.strideof(T.self))
   }
 
   /// The default memory alignment of `T`.

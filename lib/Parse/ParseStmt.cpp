@@ -1179,17 +1179,17 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     if (Tok.isAny(tok::oper_binary_spaced, tok::oper_binary_unspaced) &&
         Tok.getText() == "&&") {
       diagnose(Tok, diag::expected_comma_stmtcondition)
-      .fixItReplace(Tok.getLoc(), ",");
+        .fixItReplaceChars(getEndOfPreviousLoc(), Tok.getRange().getEnd(), ",");
       consumeToken();
       return true;
     }
 
     // Boolean conditions are separated by commas, not the 'where' keyword, as
     // they were in Swift 2 and earlier.
-    SourceLoc whereLoc;
-    if (consumeIf(tok::kw_where, whereLoc)) {
-      diagnose(whereLoc, diag::expected_comma_stmtcondition)
-        .fixItReplace(whereLoc, ",");
+    if (Tok.is(tok::kw_where)) {
+      diagnose(Tok, diag::expected_comma_stmtcondition)
+        .fixItReplaceChars(getEndOfPreviousLoc(), Tok.getRange().getEnd(), ",");
+      consumeToken();
       return true;
     }
     
@@ -1683,7 +1683,7 @@ Parser::evaluateConditionalCompilationExpr(Expr *condition) {
       if (!versionRequirement.hasValue())
         return ConditionalCompilationExprState::error();
 
-      auto thisVersion = version::Version::getCurrentLanguageVersion();
+      auto thisVersion = Context.LangOpts.EffectiveLanguageVersion;
 
       if (!prefix->getName().getBaseName().str().equals(">=")) {
         diagnose(PUE->getFn()->getLoc(),

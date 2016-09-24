@@ -779,7 +779,7 @@ public struct ${Self}<Element>
     return Builtin.castToNativeObject(_buffer.owner)
   }
 
-  // FIXME(ABI): move to an initializer on _Buffer.
+  // FIXME(ABI)#12 : move to an initializer on _Buffer.
   static internal func _copyBuffer(_ buffer: inout _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -839,8 +839,12 @@ public struct ${Self}<Element>
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   internal func _checkIndex(_ index: Int) {
-    _precondition(index <= endIndex, "${Self} index out of range")
+    _precondition(index <= endIndex, "${Self} index is out of range")
+% if Self in ['Array', 'ContiguousArray']:
     _precondition(index >= startIndex, "Negative ${Self} index is out of range")
+% else:
+    _precondition(index >= startIndex, "${Self} index is out of range (before startIndex)")
+% end
   }
 
   @_semantics("array.get_element")
@@ -950,12 +954,10 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
   if count > 0 {
     // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
-    let bufferObject = ManagedBufferPointer<_ArrayBody, Element>(
-      _uncheckedBufferClass: _ContiguousArrayStorage<Element>.self,
-      minimumCapacity: count)
+    let bufferObject = Builtin.allocWithTailElems_1(
+      _ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
 
-    let (array, ptr) = Array<Element>._adoptStorage(
-      bufferObject.buffer, count: count)
+    let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
   }
   // For an empty array no buffer allocation is needed.
@@ -1106,16 +1108,12 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   @_versioned
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
-    _ storage: AnyObject, count: Int
+    _ storage: _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
-    
-    _sanityCheck(
-      storage is _ContiguousArrayStorage<Element>, "Invalid array storage type")
     
     let innerBuffer = _ContiguousArrayBuffer<Element>(
       count: count,
-      storage: unsafeDowncast(
-        storage, to: _ContiguousArrayStorage<Element>.self))
+      storage: storage)
     
     return (
       Array(
@@ -1308,7 +1306,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
   // An overload of `append(contentsOf:)` that uses the += that is optimized for
   // collections.
-  // FIXME(ABI): remove this entrypoint.  The overload for `Sequence` should be
+  // FIXME(ABI)#13 (Performance): remove this entrypoint.  The overload for `Sequence` should be
   // made optimal for this case, too.
   /// Adds the elements of a collection to the end of the array.
   ///
@@ -1360,7 +1358,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     // FIXME(performance): if `self` is uniquely referenced, we should remove
     // the element as shown below (this will deallocate the element and
-    // decrease memory use).  If `self` is not uniquely refeneced, the code
+    // decrease memory use).  If `self` is not uniquely referenced, the code
     // below will make a copy of the storage, which is wasteful.  Instead, we
     // should just shrink the view without allocating new storage.
     let i = endIndex
@@ -1668,7 +1666,7 @@ internal struct _InitializeMemoryFromCollection<
   var newValues: C
 }
 
-// FIXME(ABI): add argument labels.
+// FIXME(ABI)#14 : add argument labels.
 @inline(never)
 internal func _arrayOutOfPlaceReplace<B, C>(
   _ source: inout B,
@@ -1696,7 +1694,7 @@ internal func _arrayOutOfPlaceReplace<B, C>(
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-// FIXME(ABI): add argument labels.
+// FIXME(ABI)#15 : add argument labels.
 internal func _expectEnd<C : Collection>(_ i: C.Index, _ s: C) {
   _debugPrecondition(
     i == s.endIndex,
@@ -1747,8 +1745,13 @@ extension ${Self} {
     _ subrange: Range<Int>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == _Buffer.Element {
+% if Self in ['Array', 'ContiguousArray']:
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "${Self} replace: subrange start is negative")
+% else:
+    _precondition(subrange.lowerBound >= self._buffer.startIndex,
+      "${Self} replace: subrange start is before the startIndex")
+% end
 
     _precondition(subrange.upperBound <= self._buffer.endIndex,
       "${Self} replace: subrange extends past the end")
@@ -1769,7 +1772,7 @@ extension ${Self} {
   }
 }
 
-// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// FIXME(ABI)#16 : remove this entrypoint.  The functionality should be provided by
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Appends the elements of a sequence to ${a_Self}.
 ///
@@ -1793,7 +1796,7 @@ public func += <
   lhs.append(contentsOf: rhs)
 }
 
-// FIXME(ABI): remove this entrypoint.  The functionality should be provided by
+// FIXME(ABI)#17 : remove this entrypoint.  The functionality should be provided by
 // a `+=` operator on `RangeReplaceableCollection`.
 /// Appends the elements of a collection to ${a_Self}.
 ///
@@ -2107,6 +2110,72 @@ public func != <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
 ) -> Bool {
   return !(lhs == rhs)
+}
+
+extension ${Self} {
+  /// Calls a closure with a view of the array's underlying bytes of memory as a
+  /// Collection of `UInt8`.
+  /// ${contiguousCaveat}
+  ///
+  /// - Precondition: `Pointee` is a trivial type.
+  ///
+  /// The following example shows how you copy bytes into an array:
+  ///
+  ///    var numbers = [Int32](repeating: 0, count: 2)
+  ///    var byteValues: [UInt8] = [0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
+  ///    numbers.withUnsafeMutableBytes { destBytes in
+  ///      byteValues.withUnsafeBytes { srcBytes in
+  ///        destBytes.copyBytes(from: srcBytes)
+  ///      }
+  ///    }
+  ///
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
+  ///   that points to the contiguous storage for the array. If `body` has a
+  ///   return value, it is used as the return value for the
+  ///   `withUnsafeBytes(_:)` method. The argument is valid only for the
+  ///   duration of the closure's execution.
+  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///
+  /// - SeeAlso: `withUnsafeBytes`, `UnsafeMutableRawBufferPointer`
+  public mutating func withUnsafeMutableBytes<R>(
+    _ body: (inout UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try self.withUnsafeMutableBufferPointer {
+      var bytes = UnsafeMutableRawBufferPointer($0)
+      return try body(&bytes)
+    }
+  }
+
+  /// Calls a closure with a view of the array's underlying bytes of memory
+  /// as a Collection of `UInt8`.
+  /// ${contiguousCaveat}
+  ///
+  /// - Precondition: `Pointee` is a trivial type.
+  ///
+  /// The following example shows how you copy the contents of an array into a
+  /// buffer of `UInt8`:
+  ///
+  ///    let numbers = [1, 2, 3]
+  ///    var byteBuffer = [UInt8]()
+  ///    numbers.withUnsafeBytes {
+  ///        byteBuffer += $0
+  ///    }
+  ///
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
+  ///   that points to the contiguous storage for the array. If `body` has a
+  ///   return value, it is used as the return value for the
+  ///   `withUnsafeBytes(_:)` method. The argument is valid only for the
+  ///   duration of the closure's execution.
+  /// - Returns: The return value of the `body` closure parameter, if any.
+  ///
+  /// - SeeAlso: `withUnsafeBytes`, `UnsafeRawBufferPointer`
+  public mutating func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try self.withUnsafeBufferPointer {
+      try body(UnsafeRawBufferPointer($0))
+    }
+  }
 }
 %end
 

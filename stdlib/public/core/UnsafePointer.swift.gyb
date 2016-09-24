@@ -373,13 +373,13 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
-    _ body: (UnsafeMutablePointer<T>) throws -> Result
+    _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer {
       Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
     }
-    return try body(UnsafeMutablePointer<T>(_rawValue))
+    return try body(${Self}<T>(_rawValue))
   }
 
   /// Accesses the pointee at `self + i`.
@@ -489,7 +489,7 @@ public func < <Pointee>(lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
 @_transparent
 public func + <Pointee>(lhs: ${Self}<Pointee>, rhs: Int) -> ${Self}<Pointee> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* MemoryLayout<Pointee>.stride)._builtinWordValue))
+    lhs._rawValue, rhs._builtinWordValue, Pointee.self))
 }
 
 @_transparent

@@ -43,7 +43,8 @@ function(get_test_dependencies SDK result_var_name)
       swift swift-ide-test sil-opt swift-llvm-opt swift-demangle sil-extract
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test)
   if(NOT SWIFT_BUILT_STANDALONE)
-    list(APPEND deps_binaries llc)
+    list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
+         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-profdata not)
   endif()
   if(SWIFT_BUILD_SOURCEKIT)
     list(APPEND deps_binaries sourcekitd-test complete-test)
@@ -144,6 +145,12 @@ if(PYTHONINTERP_FOUND)
       only_long
   )
 
+  if(NOT "${COVERAGE_DB}" STREQUAL "")
+    add_custom_target("touch-covering-tests"
+        COMMAND "${SWIFT_SOURCE_DIR}/utils/coverage-touch-tests" "--swift-dir" "${SWIFT_SOURCE_DIR}" "--coverage-db" "${COVERAGE_DB}"
+        COMMENT "Touching covering tests")
+  endif()
+
   foreach(SDK ${SWIFT_SDKS})
     foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
       # Configure variables for this subdirectory.
@@ -186,6 +193,10 @@ if(PYTHONINTERP_FOUND)
       if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}")
+      endif()
+
+      if(NOT "${COVERAGE_DB}" STREQUAL "")
+        list(APPEND test_dependencies "touch-covering-tests")
       endif()
 
       set(validation_test_dependencies

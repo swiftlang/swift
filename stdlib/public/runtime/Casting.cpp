@@ -285,9 +285,26 @@ static void _buildNameForMetadata(const Metadata *type,
     auto tuple = static_cast<const TupleTypeMetadata *>(type);
     result += "(";
     auto elts = tuple->getElements();
+    const char *labels = tuple->Labels;
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       if (i > 0)
         result += ", ";
+
+      // If we have any labels, add the label.
+      if (labels) {
+        // Labels are space-separated.
+        if (const char *space = strchr(labels, ' ')) {
+          if (labels != space) {
+            result.append(labels, space - labels);
+            result += ": ";
+          }
+
+          labels = space + 1;
+        } else {
+          labels = nullptr;
+        }
+      }
+
       _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type, qualified,
                             result);
     }
@@ -2480,6 +2497,113 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
   return result;
 }
 
+static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
+                                     OpaqueValue *source,
+                                     const TupleTypeMetadata *sourceType,
+                                     const TupleTypeMetadata *targetType,
+                                     DynamicCastFlags flags) {
+  assert(sourceType != targetType &&
+         "Caller should handle exact tuple matches");
+
+
+  // Simple case: number of elements mismatches.
+  if (sourceType->NumElements != targetType->NumElements)
+    return _fail(source, sourceType, targetType, flags);
+
+  // Check that the elements line up.
+  const char *sourceLabels = sourceType->Labels;
+  const char *targetLabels = targetType->Labels;
+  bool anyTypeMismatches = false;
+  for (unsigned i = 0, n = sourceType->NumElements; i != n; ++i) {
+    // Check the label, if there is one.
+    if (sourceLabels && targetLabels && sourceLabels != targetLabels) {
+      const char *sourceSpace = strchr(sourceLabels, ' ');
+      const char *targetSpace = strchr(targetLabels, ' ');
+
+      // If both have labels, and the labels mismatch, we fail.
+      if (sourceSpace && sourceSpace != sourceLabels &&
+          targetSpace && targetSpace != targetLabels) {
+        unsigned sourceLen = sourceSpace - sourceLabels;
+        unsigned targetLen = targetSpace - targetLabels;
+        if (sourceLen != targetLen ||
+            strncmp(sourceLabels, targetLabels, sourceLen) != 0)
+          return _fail(source, sourceType, targetType, flags);
+      }
+
+      sourceLabels = sourceSpace ? sourceSpace + 1 : nullptr;
+      targetLabels = targetSpace ? targetSpace + 1 : nullptr;
+    }
+
+    // If the types don't match exactly, make a note of it. We'll try to
+    // convert them in a second pass.
+    if (sourceType->getElement(i).Type != targetType->getElement(i).Type)
+      anyTypeMismatches = true;
+  }
+
+  // If there were no type mismatches, the only difference was in the argument
+  // labels. We can directly map from the source to the destination type.
+  if (!anyTypeMismatches)
+    return _succeed(destination, source, targetType, flags);
+
+  // Determine how the individual elements will get casted.
+  // If both success and failure will destroy the source, then
+  // we can be destructively cast each element. Otherwise, we'll have to
+  // manually handle them.
+  const DynamicCastFlags alwaysDestroySourceFlags =
+    DynamicCastFlags::TakeOnSuccess | DynamicCastFlags::DestroyOnFailure;
+  bool alwaysDestroysSource =
+    (static_cast<DynamicCastFlags>(flags & alwaysDestroySourceFlags)
+       == alwaysDestroySourceFlags);
+  DynamicCastFlags elementFlags = flags;
+  if (!alwaysDestroysSource)
+    elementFlags = elementFlags - alwaysDestroySourceFlags;
+
+  // Local function to destroy the elements in the range [start, end).
+  auto destroyRange = [](const TupleTypeMetadata *type, OpaqueValue *value,
+                        unsigned start, unsigned end) {
+    assert(start <= end && "invalid range in destroyRange");
+    for (unsigned i = start; i != end; ++i) {
+      const auto &elt = type->getElement(i);
+      elt.Type->vw_destroy(elt.findIn(value));
+    }
+  };
+
+  // Cast each element.
+  for (unsigned i = 0, n = sourceType->NumElements; i != n; ++i) {
+    // Cast the element. If it succeeds, keep going.
+    const auto &sourceElt = sourceType->getElement(i);
+    const auto &targetElt = targetType->getElement(i);
+    if (swift_dynamicCast(targetElt.findIn(destination),
+                          sourceElt.findIn(source),
+                          sourceElt.Type, targetElt.Type, elementFlags))
+      continue;
+
+    // Casting failed, so clean up.
+
+    // Destroy all of the elements that got casted into the destination buffer.
+    destroyRange(targetType, destination, 0, i);
+
+    // If we're supposed to destroy on failure, destroy any elements from the
+    // source buffer that haven't been destroyed/taken from yet.
+    if (flags & DynamicCastFlags::DestroyOnFailure)
+      destroyRange(sourceType, source, alwaysDestroysSource ? i : 0, n);
+
+    // If an unconditional cast failed, complain.
+    if (flags & DynamicCastFlags::Unconditional)
+      swift_dynamicCastFailure(sourceType, targetType);
+    return false;
+  }
+
+  // Casting succeeded.
+
+  // If we were supposed to take on success from the source buffer but couldn't
+  // before, destroy the source buffer now.
+  if (!alwaysDestroysSource && (flags & DynamicCastFlags::TakeOnSuccess))
+    destroyRange(sourceType, source, 0, sourceType->NumElements);
+
+  return true;
+}
+
 /******************************************************************************/
 /****************************** Main Entrypoint *******************************/
 /******************************************************************************/
@@ -2513,6 +2637,18 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     // unwrapping the target. This handles an optional source wrapped within an
     // existential that Optional conforms to (Any).
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+#if SWIFT_OBJC_INTEROP
+      // If coming from AnyObject, we may want to bridge.
+      if (srcExistentialType->Flags.getSpecialProtocol()
+            == SpecialProtocol::AnyObject) {
+        if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
+          return _dynamicCastClassToValueViaObjCBridgeable(dest, src, srcType,
+                                                           targetType,
+                                                           targetBridgeWitness,
+                                                           flags);
+        }
+      }
+#endif
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
     }
@@ -2699,6 +2835,15 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
+    }
+
+    // If both are tuple types, allow the cast to add/remove labels.
+    if (srcType->getKind() == MetadataKind::Tuple &&
+        targetType->getKind() == MetadataKind::Tuple) {
+      return _dynamicCastTupleToTuple(dest, src,
+                                      cast<TupleTypeMetadata>(srcType),
+                                      cast<TupleTypeMetadata>(targetType),
+                                      flags);
     }
 
     // Otherwise, we have a failure.

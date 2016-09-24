@@ -1,4 +1,4 @@
-//===--- ImportName.h - Imported Swift names for Clang decls --*- C++ ---*-===//
+//===--- ImportName.h - Imported Swift names for Clang decls ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,18 +14,17 @@
 // ClangImporter.
 //
 //===----------------------------------------------------------------------===//
-
-// ... include
-
 #ifndef SWIFT_IMPORT_NAME_H
 #define SWIFT_IMPORT_NAME_H
 
 #include "SwiftLookupTable.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 
 namespace swift {
 namespace importer {
+class EnumInfoCache;
 
 /// Information about imported error parameters.
 struct ImportedErrorInfo {
@@ -126,6 +125,10 @@ struct ImportedName {
   }
 };
 
+/// Strips a trailing "Notification", if present. Returns {} if name doesn't end
+/// in "Notification", or it there would be nothing left.
+StringRef stripNotification(StringRef name);
+
 /// Flags that control the import of names in importFullName.
 enum class ImportNameFlags {
   /// Suppress the factory-method-as-initializer transformation.
@@ -136,6 +139,16 @@ enum class ImportNameFlags {
 
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
+
+/// The below is a work in progress to make import naming less stateful and tied
+/// to the Impl. In it's current form, it is rather unwieldy.
+// TODO: refactor into convenience class, multi-versioned, etc.
+ImportedName importFullName(const clang::NamedDecl *, ASTContext &SwiftContext,
+                            clang::Sema &clangSema,
+                            EnumInfoCache &enumInfoCache,
+                            PlatformAvailability &platformAvailability,
+                            ImportNameOptions options,
+                            bool inferImportAsMember);
 }
 }
 

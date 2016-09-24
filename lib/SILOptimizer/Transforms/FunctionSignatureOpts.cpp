@@ -30,9 +30,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-function-signature-opt"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -106,14 +106,11 @@ class FunctionSignatureTransform {
   /// The newly created function.
   SILFunction *NewF;
 
-  /// The alias analysis we are using.
-  AliasAnalysis *AA;
-
   /// The RC identity analysis we are using.
   RCIdentityAnalysis *RCIA;
 
   /// Post order analysis we are using.
-  PostOrderAnalysis *PO;
+  EpilogueARCAnalysis *EA;
 
   // The function signature mangler we are using.
   FunctionSignatureSpecializationMangler &FM;
@@ -231,13 +228,12 @@ private:
 public:
   /// Constructor.
   FunctionSignatureTransform(SILFunction *F,
-                             AliasAnalysis *AA, RCIdentityAnalysis *RCIA,
-                             PostOrderAnalysis *PO,
+                             RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
                              FunctionSignatureSpecializationMangler &FM,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), AA(AA), RCIA(RCIA), PO(PO), FM(FM),
+    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), FM(FM),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
       ResultDescList(RDL) {}
 
@@ -317,7 +313,7 @@ public:
         // Currently we require that all dead parameters have trivial types.
         // The reason is that it's very hard to find places where we can release
         // those parameters (as a replacement for the removed partial_apply).
-        // TODO: maybe we can skip this restrication when we have semantic ARC.
+        // TODO: maybe we can skip this restriction when we have semantic ARC.
         if (!ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
           return false;
       }
@@ -664,9 +660,7 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
       return false;
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
-    auto Retains = 
-     computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain,
-          RV, F, PO->get(F), AA, RCIA->get(F));
+    auto Retains = EA->get(F)->computeEpilogueARCInstructions(EpilogueARCContext::EpilogueARCKind::Retain, RV); 
     // We do not need to worry about the throw block, as the return value is only
     // going to be used in the return block/normal block of the try_apply
     // instruction.
@@ -894,10 +888,9 @@ public:
       return;
     }
 
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
-    auto *PO = PM->getAnalysis<PostOrderAnalysis>();
+    auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
 
     const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
 
@@ -928,7 +921,7 @@ public:
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, AA, RCIA, PO, FM, AIM,
+    FunctionSignatureTransform FST(F, RCIA, EA, FM, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;

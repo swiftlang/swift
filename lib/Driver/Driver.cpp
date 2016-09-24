@@ -269,8 +269,14 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return true;
-      versionValid =
-          (value->getValue(scratch) == version::getSwiftFullVersion());
+
+      // NB: We check against
+      // swift::version::Version::getCurrentLanguageVersion() here because any
+      // -swift-version argument is handled in the argsHashStr check that
+      // follows.
+      versionValid = (value->getValue(scratch)
+                      == version::getSwiftFullVersion(
+                        version::Version::getCurrentLanguageVersion()));
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
@@ -1357,7 +1363,7 @@ void Driver::buildActions(const ToolChain &TC,
   } else {
     // The merge module action needs to be first to force the right outputs
     // for the other actions. However, we can't rely on it being the only
-    // action because there may be other actions (e.g. BackenJobActions) that
+    // action because there may be other actions (e.g. BackendJobActions) that
     // are not merge-module inputs but nonetheless should be run.
     if (MergeModuleAction)
       Actions.push_back(MergeModuleAction.release());
@@ -2007,7 +2013,8 @@ void Driver::printJobs(const Compilation &C) const {
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
-  OS << version::getSwiftFullVersion() << '\n';
+  OS << version::getSwiftFullVersion(
+    version::Version::getCurrentLanguageVersion()) << '\n';
   OS << "Target: " << TC.getTriple().str() << '\n';
 }
 

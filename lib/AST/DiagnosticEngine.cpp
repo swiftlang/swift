@@ -380,8 +380,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
     // If we're complaining about a function type, don't "aka" just because of
     // differences in the argument or result types.
-    if (showAKA && type->is<FunctionType>() &&
-        isa<FunctionType>(type.getPointer()))
+    if (showAKA && type->is<AnyFunctionType>() &&
+        isa<AnyFunctionType>(type.getPointer()))
       showAKA = false;
 
     // Don't unwrap intentional sugar types like T? or [T].

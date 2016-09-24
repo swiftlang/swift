@@ -35,20 +35,27 @@ class SubstitutionMap;
 /// signature and their dependent members.
 class GenericSignatureWitnessIterator {
   ArrayRef<Requirement> p;
-  
+
+  void checkValid() const {
+    assert(!p.empty() &&
+           p.front().getKind() == RequirementKind::WitnessMarker);
+  }
+
+  bool shouldSkip() const {
+    return (!p.empty() &&
+            p.front().getKind() != RequirementKind::WitnessMarker);
+  }
+
 public:
   GenericSignatureWitnessIterator() = default;
-  GenericSignatureWitnessIterator(ArrayRef<Requirement> p)
-    : p(p)
-  {
-    assert(p.empty() || p.front().getKind() == RequirementKind::WitnessMarker);
+  GenericSignatureWitnessIterator(ArrayRef<Requirement> requirements)
+      : p(requirements) {
+    while (shouldSkip()) { p = p.slice(1); }
   }
   
   GenericSignatureWitnessIterator &operator++() {
-    do {
-      p = p.slice(1);
-    } while (!p.empty()
-             && p.front().getKind() != RequirementKind::WitnessMarker);
+    checkValid();
+    do { p = p.slice(1); } while (shouldSkip());
     return *this;
   }
   
@@ -59,12 +66,12 @@ public:
   }
   
   Type operator*() const {
-    assert(p.front().getKind() == RequirementKind::WitnessMarker);
+    checkValid();
     return p.front().getFirstType();
   }
   
   Type operator->() const {
-    assert(p.front().getKind() == RequirementKind::WitnessMarker);
+    checkValid();
     return p.front().getFirstType();
   }
   
@@ -162,7 +169,14 @@ public:
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
   }
 
-  // Only allow allocation by doing a placement new.
+  /// Check if the generic signature makes all generic parameters
+  /// concrete.
+  bool areAllParamsConcrete() const {
+    auto iter = getAllDependentTypes();
+    return iter.begin() == iter.end();
+  }
+
+  /// Only allow allocation by doing a placement new.
   void *operator new(size_t Bytes, void *Mem) {
     assert(Mem);
     return Mem;

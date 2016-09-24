@@ -95,7 +95,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
     paramInfos.push_back(CallArgParam());
     paramInfos.back().Label = param->getArgumentName();
     paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
-    paramInfos.back().Variadic = param->isVariadic();
+    paramInfos.back().parameterFlags = ParameterTypeFlags::fromParameterType(
+        param->getType(), param->isVariadic());
   }
 
   MatchCallArgumentListener listener;
@@ -262,7 +263,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.Variadic) {
+    if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
       auto claimed = claimNextNamed(param.Label, ignoreNameMismatch);
 
@@ -417,7 +418,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.Variadic)
+      if (param.isVariadic())
         continue;
 
       // Parameters with defaults can be unfulfilled.
@@ -1955,10 +1956,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
   
-  // If the types disagree, but we're comparing a non-void, single-expression
-  // closure result type to a void function result type, allow the conversion.
+  // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
+  // literals.
   {
-    if (concrete && kind >= TypeMatchKind::Subtype && type2->isVoid()) {
+    if (concrete && kind >= TypeMatchKind::Subtype &&
+        (type1->isUninhabited() || type2->isVoid())) {
       SmallVector<LocatorPathElt, 2> parts;
       locator.getLocatorParts(parts);
       
@@ -3938,7 +3940,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
 
     // If the bridged value type is generic, the generic arguments
-    // must match the 
+    // must either match or be bridged.
     // FIXME: This should be an associated type of the protocol.
     if (auto bgt1 = type2->getAs<BoundGenericType>()) {
       if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
@@ -3981,7 +3983,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                         locator.withPathElement(
                           LocatorPathElt::getGenericArgument(0))));
       } else {
-        llvm_unreachable("unhandled generic bridged type");
+        // Nothing special to do; matchTypes will match generic arguments.
       }
     }
 

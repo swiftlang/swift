@@ -305,6 +305,7 @@ AliasResult AliasAnalysis::aliasAddressProjection(SILValue V1, SILValue V2,
 static bool isTypedAccessOracle(SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::RefElementAddrInst:
+  case ValueKind::RefTailAddrInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::TupleElementAddrInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
@@ -340,7 +341,9 @@ static bool isAddressRootTBAASafe(SILValue V) {
   default:
     return false;
   case ValueKind::AllocStackInst:
-  case ValueKind::AllocBoxInst:
+  case ValueKind::ProjectBoxInst:
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::RefTailAddrInst:
     return true;
   }
 }
@@ -366,7 +369,7 @@ static SILType findTypedAccessType(SILValue V) {
 }
 
 SILType swift::computeTBAAType(SILValue V) {
-  if (isAddressRootTBAASafe(getUnderlyingObject(V)))
+  if (isAddressRootTBAASafe(getUnderlyingAddressRoot(V)))
     return findTypedAccessType(V);
 
   // FIXME: add ref_element_addr check here. TBAA says that objects cannot be

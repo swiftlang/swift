@@ -22,6 +22,11 @@ protocol P1 {
   associatedtype A = Self
 }
 
+// Protocols involving associated types.
+protocol AProtocol {
+  associatedtype e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+}
+
 // Extensions.
 protocol P2 {
 }
@@ -77,3 +82,34 @@ extension PConstrained4 where Self : Superclass {
     self.bar()
   }
 }
+
+// Local computed properties.
+func localComputedProperties() {
+  var localProperty: Int {
+    get {
+      return localProperty // expected-warning{{attempting to access 'localProperty' within its own getter}}
+    }
+    set {
+      print(localProperty)
+    }
+  }
+  { print(localProperty) }()
+}
+
+// Top-level code.
+func topLevel() { }
+
+topLevel()
+
+let c1opt: C1? = C1()
+guard let c1 = c1opt else { }
+
+protocol Fooable {
+  associatedtype Foo
+
+  var foo: Foo { get }
+}
+
+let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
+// expected-error@-1 {{'a' used within its own type}}
+// FIXME: That second error is bogus.

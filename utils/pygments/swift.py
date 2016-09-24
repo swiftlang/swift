@@ -328,10 +328,10 @@ class SILLexer(RegexLexer):
 
     tokens = SwiftLexer.tokens.copy()
     tokens['token-list'] = [
-            (r'[%]([a-zA-Z0-9]+)', Name.Variable),   # Tokens
-            (r'\$[*]?([a-zA-Z0-9]+)', Name.Variable),   # Tokens
-            (r'\$[*]?\(([a-zA-Z0-9, ]+\))', Name.Variable),   # Tokens
-        ]
+        (r'[%]([a-zA-Z0-9]+)', Name.Variable),   # Tokens
+        (r'\$[*]?([a-zA-Z0-9]+)', Name.Variable),   # Tokens
+        (r'\$[*]?\(([a-zA-Z0-9, ]+\))', Name.Variable),   # Tokens
+    ]
 
 
 class SwiftConsoleLexer(RegexLexer):

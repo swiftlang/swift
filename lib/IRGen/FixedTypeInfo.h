@@ -120,8 +120,13 @@ public:
   /// object.  The stride is the storage size rounded up to the
   /// alignment; its practical use is that, in an array, it is the
   /// offset from the size of one element to the offset of the next.
+  /// The stride is at least one, even for zero-sized types, like the empty
+  /// tuple.
   Size getFixedStride() const {
-    return StorageSize.roundUpToAlignment(getFixedAlignment());
+    Size s = StorageSize.roundUpToAlignment(getFixedAlignment());
+    if (s.isZero())
+      s = Size(1);
+    return s;
   }
   
   /// Returns the fixed number of "extra inhabitants" (that is, bit

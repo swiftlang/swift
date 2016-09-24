@@ -230,16 +230,13 @@ namespace {
         assert(superclass);
 
         if (superclass->hasClangNode()) {
-          // As a special case, assume NSObject has a fixed layout.
-          if (superclass->getName() !=
-                IGM.Context.getSwiftId(KnownFoundationEntity::NSObject)) {
-            // If the superclass was imported from Objective-C, its size is
-            // not known at compile time. However, since the field offset
-            // vector only stores offsets of stored properties defined in
-            // Swift, we don't have to worry about indirect indexing of
-            // the field offset vector.
-            ClassHasFixedSize = false;
-          }
+          // If the superclass was imported from Objective-C, its size is
+          // not known at compile time. However, since the field offset
+          // vector only stores offsets of stored properties defined in
+          // Swift, we don't have to worry about indirect indexing of
+          // the field offset vector.
+          ClassHasFixedSize = false;
+
         } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
           ClassMetadataRequiresDynamicInitialization = true;
 
@@ -531,9 +528,111 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
   llvm_unreachable("bad field-access strategy");
 }
 
+Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
+        SILType ClassType,
+        SILType TailType) {
+  const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
+
+  llvm::Value *Offset = nullptr;
+  auto &layout = classTI.getLayout(IGF.IGM, ClassType);
+  Alignment HeapObjAlign = IGF.IGM.TargetInfo.HeapObjectAlignment;
+  Alignment Align;
+
+  // Get the size of the class instance.
+  if (layout.isFixedLayout()) {
+    Size ClassSize = layout.getSize();
+    Offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, ClassSize.getValue());
+    Align = HeapObjAlign.alignmentAtOffset(ClassSize);
+  } else {
+    llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
+                                                             ClassType);
+    Offset = emitClassFragileInstanceSizeAndAlignMask(IGF,
+                                        ClassType.getClassOrBoundGenericClass(),
+                                        metadata).first;
+  }
+  // Align up to the TailType.
+  assert(TailType.isObject());
+  const TypeInfo &TailTI = IGF.getTypeInfo(TailType);
+  llvm::Value *AlignMask = TailTI.getAlignmentMask(IGF, TailType);
+  Offset = IGF.Builder.CreateAdd(Offset, AlignMask);
+  llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+  Offset = IGF.Builder.CreateAnd(Offset, InvertedMask);
+
+  llvm::Value *Addr = IGF.emitByteOffsetGEP(Base, Offset,
+                                            TailTI.getStorageType(), "tailaddr");
+
+  if (auto *OffsetConst = dyn_cast<llvm::ConstantInt>(Offset)) {
+    // Try to get an accurate alignment (only possible if the Offset is a
+    // constant).
+    Size TotalOffset(OffsetConst->getZExtValue());
+    Align = HeapObjAlign.alignmentAtOffset(TotalOffset);
+  }
+  return Address(Addr, Align);
+}
+
+/// Try to stack promote a class instance with possible tail allocated arrays.
+///
+/// Returns the alloca if successful, or nullptr otherwise.
+static llvm::Value *stackPromote(IRGenFunction &IGF,
+                      const StructLayout &ClassLayout,
+                      int &StackAllocSize,
+                      ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays) {
+  if (StackAllocSize < 0)
+    return nullptr;
+  if (!ClassLayout.isFixedLayout())
+    return nullptr;
+
+  // Calculate the total size needed.
+  // The first part is the size of the class itself.
+  Alignment ClassAlign = ClassLayout.getAlignment();
+  Size TotalSize = ClassLayout.getSize();
+
+  // Add size for tail-allocated arrays.
+  for (const auto &TailArray : TailArrays) {
+    SILType ElemTy = TailArray.first;
+    llvm::Value *Count = TailArray.second;
+
+    // We can only calculate a constant size if the tail-count is constant.
+    auto *CI = dyn_cast<llvm::ConstantInt>(Count);
+    if (!CI)
+      return nullptr;
+
+    const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
+    if (!ElemTI.isFixedSize())
+      return nullptr;
+
+    const FixedTypeInfo &ElemFTI = ElemTI.as<FixedTypeInfo>();
+    Alignment ElemAlign = ElemFTI.getFixedAlignment();
+
+    // This should not happen - just to be save.
+    if (ElemAlign > ClassAlign)
+      return nullptr;
+
+    TotalSize = TotalSize.roundUpToAlignment(ElemAlign);
+    TotalSize += ElemFTI.getFixedStride() * CI->getValue().getZExtValue();
+  }
+  if (TotalSize > Size(StackAllocSize))
+    return nullptr;
+  StackAllocSize = TotalSize.getValue();
+
+  if (TotalSize == ClassLayout.getSize()) {
+    // No tail-allocated arrays: we can use the llvm class type for alloca.
+    llvm::Type *ClassTy = ClassLayout.getType();
+    Address Alloca = IGF.createAlloca(ClassTy, ClassAlign, "reference.raw");
+    return Alloca.getAddress();
+  }
+  // Use a byte-array as type for alloca.
+  llvm::Value *SizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                TotalSize.getValue());
+  Address Alloca = IGF.createAlloca(IGF.IGM.Int8Ty, SizeVal, ClassAlign,
+                                    "reference.raw");
+  return Alloca.getAddress();
+}
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                        bool objc, int &StackAllocSize) {
+                      bool objc, int &StackAllocSize,
+                      ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto classType = selfType.getSwiftRValueType();
 
@@ -558,22 +657,33 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
 
-  auto &layout = classTI.getLayout(IGF.IGM, selfType);
+  const StructLayout &layout = classTI.getLayout(IGF.IGM, selfType);
   llvm::Type *destType = layout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
-  if (layout.isFixedLayout() &&
-      (int)layout.getSize().getValue() < StackAllocSize) {
-    // Allocate the object on the stack.
-    auto *Ty = layout.getType();
-    auto Alloca = IGF.createAlloca(Ty, layout.getAlignment(),
-                                   "reference.raw");
-    val = Alloca.getAddress();
-    assert(val->getType() == destType);
-    val = IGF.Builder.CreateBitCast(val, IGF.IGM.RefCountedPtrTy);
+  if (llvm::Value *Promoted = stackPromote(IGF, layout, StackAllocSize,
+                                           TailArrays)) {
+    val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
-    StackAllocSize = layout.getSize().getValue();
   } else {
     // Allocate the object on the heap.
+
+    for (const auto &TailArray : TailArrays) {
+      SILType ElemTy = TailArray.first;
+      llvm::Value *Count = TailArray.second;
+
+      const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
+
+      // Align up to the tail-allocated array.
+      llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
+      llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+      size = IGF.Builder.CreateAdd(size, AlignMask);
+      llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+      size = IGF.Builder.CreateAnd(size, InvertedMask);
+
+      // Add the size of the tail allocated array.
+      llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
+      size = IGF.Builder.CreateAdd(size, AllocSize);
+    }
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }

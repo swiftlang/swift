@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_GENCLASS_H
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
 
 namespace llvm {
   class Constant;
@@ -40,6 +41,7 @@ namespace irgen {
   class IRGenModule;
   class MemberAccessStrategy;
   class OwnedAddress;
+  class Address;
   class Size;
   
   enum class ReferenceCounting : unsigned char;
@@ -76,6 +78,11 @@ namespace irgen {
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
   llvm::Constant *emitObjCProtocolData(IRGenModule &IGM, ProtocolDecl *ext);
 
+  /// Emit a projection from a class instance to the first tail allocated
+  /// element.
+  Address emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
+                                  SILType ClassType, SILType TailType);
+
   /// Emit an allocation of a class.
   /// The \p StackAllocSize is an in- and out-parameter. The passed value
   /// specifies the maximum object size for stack allocation. A negative value
@@ -83,7 +90,8 @@ namespace irgen {
   /// The returned \p StackAllocSize value is the actual size if the object is
   /// allocated on the stack or -1, if the object is allocated on the heap.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                   bool objc, int &StackAllocSize);
+                  bool objc, int &StackAllocSize,
+                  llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays);
 
   /// Emit an allocation of a class using a metadata value.
   llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 

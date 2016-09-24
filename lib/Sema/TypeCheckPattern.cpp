@@ -412,7 +412,7 @@ public:
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
-    GenericTypeToArchetypeResolver resolver;
+    GenericTypeToArchetypeResolver resolver(DC->getGenericEnvironmentOfContext());
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
@@ -497,7 +497,7 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    PartialGenericTypeToArchetypeResolver resolver(TC);
+    PartialGenericTypeToArchetypeResolver resolver;
     
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
@@ -738,28 +738,34 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
                                   TypeChecker &TC) {
   if (auto ty = decl->getTypeLoc().getType())
     return ty->is<ErrorType>();
-  
-  bool hadError = TC.validateType(decl->getTypeLoc(), DC,
-                                  options|TR_FunctionInput, resolver);
-  
+
+  // If the element is a variadic parameter, resolve the parameter type as if
+  // it were in non-parameter position, since we want functions to be
+  // @escaping in this case.
+  auto elementOptions = (options |
+                         (decl->isVariadic() ? TR_VariadicFunctionInput
+                                             : TR_FunctionInput));
+  bool hadError = false;
+
+  // We might have a null typeLoc if this is a closure parameter list,
+  // where parameters are allowed to elide their types.
+  if (!decl->getTypeLoc().isNull()) {
+    hadError |= TC.validateType(decl->getTypeLoc(), DC,
+                                elementOptions, resolver);
+  }
+
   Type Ty = decl->getTypeLoc().getType();
-  if (decl->isVariadic() && !hadError) {
-    // If isn't legal to declare something both inout and variadic.
-    if (Ty->is<InOutType>()) {
-      TC.diagnose(decl->getStartLoc(), diag::inout_cant_be_variadic);
+  if (decl->isVariadic() && !Ty.isNull() && !hadError) {
+    Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
+    if (Ty.isNull()) {
       hadError = true;
-    } else {
-      Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
-      if (Ty.isNull()) {
-        hadError = true;
-      }
     }
     decl->getTypeLoc().setType(Ty);
   }
   // If the param is not a 'let' and it is not an 'inout'.
   // It must be a 'var'. Provide helpful diagnostics like a shadow copy
   // in the function body to fix the 'var' attribute.
-  if (!decl->isLet() && !Ty->is<InOutType>() && !hadError) {
+  if (!decl->isLet() && (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
     auto func = dyn_cast_or_null<AbstractFunctionDecl>(DC);
     diagnoseAndMigrateVarParameterToBody(decl, func, TC);
     decl->setInvalid();
@@ -768,7 +774,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
 
   if (hadError)
     decl->getTypeLoc().setType(ErrorType::get(TC.Context), /*validated*/true);
-  
+
   return hadError;
 }
 
@@ -779,8 +785,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   bool hadError = false;
   
   for (auto param : *PL) {
-    if (param->getTypeLoc().getTypeRepr())
-      hadError |= validateParameterType(param, DC, options, resolver, *this);
+    hadError |= validateParameterType(param, DC, options, resolver, *this);
     
     auto type = param->getTypeLoc().getType();
     if (!type && param->hasType()) {
@@ -819,7 +824,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options,
                                    GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
   if (!resolver)
     resolver = &defaultResolver;
   

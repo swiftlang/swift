@@ -285,6 +285,24 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
+bool
+Version::isValidEffectiveLanguageVersion() const
+{
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  char const *whitelist[] = {
+    "3",
+    "3.0",
+  };
+  for (auto const i : whitelist) {
+    auto v = parseVersionString(i, SourceLoc(), nullptr);
+    assert(v.hasValue());
+    if (v == *this)
+      return true;
+  }
+  return false;
+}
+
 bool operator>=(const class Version &lhs,
                 const class Version &rhs) {
 
@@ -304,11 +322,22 @@ bool operator>=(const class Version &lhs,
   return lhs.size() >= rhs.size();
 }
 
+bool operator==(const class Version &lhs,
+                const class Version &rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    if (lhs[i] != rhs[i])
+      return false;
+  }
+  return true;
+}
+
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
 
-std::string getSwiftFullVersion() {
+std::string getSwiftFullVersion(Version effectiveVersion) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 
@@ -320,6 +349,10 @@ std::string getSwiftFullVersion() {
 #ifndef SWIFT_COMPILER_VERSION
   OS << "-dev";
 #endif
+
+  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+    OS << " effective-" << effectiveVersion;
+  }
 
 #if defined(SWIFT_COMPILER_VERSION)
   OS << " (swiftlang-" SWIFT_COMPILER_VERSION;

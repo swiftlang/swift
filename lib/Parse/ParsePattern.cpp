@@ -187,8 +187,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_let)) {
           diagnose(Tok, diag::parameter_let_as_attr)
-          .fixItRemove(Tok.getLoc());
-          param.isInvalid = true;
+            .fixItRemove(Tok.getLoc());
         } else {
           // We handle the var error in sema for a better fixit and inout is
           // handled later in this function for better fixits.
@@ -201,9 +200,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // Redundant specifiers are fairly common, recognize, reject, and recover
         // from this gracefully.
         diagnose(Tok, diag::parameter_inout_var_let_repeated)
-        .fixItRemove(Tok.getLoc());
+          .fixItRemove(Tok.getLoc());
         consumeToken();
-        param.isInvalid = true;
       }
     }
 
@@ -252,9 +250,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           hasValidInOut = true;
           if (hasSpecifier) {
             diagnose(Tok.getLoc(), diag::parameter_inout_var_let_repeated)
-            .fixItRemove(param.LetVarInOutLoc);
+              .fixItRemove(param.LetVarInOutLoc);
             consumeToken(tok::kw_inout);
-            param.isInvalid = true;
           } else {
             hasSpecifier = true;
             param.LetVarInOutLoc = consumeToken(tok::kw_inout);
@@ -263,9 +260,8 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
         if (!hasValidInOut && hasDeprecatedInOut) {
           diagnose(Tok.getLoc(), diag::inout_as_attr_disallowed)
-          .fixItRemove(param.LetVarInOutLoc)
-          .fixItInsert(postColonLoc, "inout ");
-          param.isInvalid = true;
+            .fixItRemove(param.LetVarInOutLoc)
+            .fixItInsert(postColonLoc, "inout ");
         }
         
         auto type = parseType(diag::expected_parameter_type);
@@ -322,14 +318,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         if (param.Type) {
           diagnose(typeStartLoc, diag::parameter_unnamed)
             .fixItInsert(typeStartLoc, "_: ");
-        } else {
-          param.isInvalid = true;
         }
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
         // like a parameter.
         diagnose(Tok, diag::expected_parameter_name);
         param.isInvalid = true;
+        param.FirstNameLoc = Tok.getLoc();
       }
     }
                         
@@ -908,14 +903,8 @@ ParserResult<Pattern> Parser::parsePattern() {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
-  VarDecl *var;
-  if (ArgumentIsParameter) {
-    var = new (Context) ParamDecl(isLet, SourceLoc(), loc, name, loc, name,
-                                  Type(), CurDeclContext);
-  } else {
-    var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
-                                loc, name, Type(), CurDeclContext);
-  }
+  auto var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
+                                   loc, name, Type(), CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 

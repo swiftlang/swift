@@ -190,7 +190,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   unspecified capacity.
   ///
   /// - Warning: Accessing memory via the returned pointer is undefined if the
-  ///   if the memory has not been bound to `T`.
+  ///   memory has not been bound to `T`.
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
@@ -468,7 +468,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
   /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
-    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
+    return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 

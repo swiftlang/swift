@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
@@ -249,6 +249,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
   }
+  static_assert(NumAlternativeLiteralTypes == 13, "Wrong # of literal types");
 
   // If we already looked for alternative literal types, return those results.
   if (AlternativeLiteralTypes[index])
@@ -446,10 +447,8 @@ namespace {
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
           archetype = nestedType.getValue()->getAs<ArchetypeType>();
-        } else if (implArchetype->isSelfDerived()) {
-          archetype = implArchetype;
         }
-                                
+
         ConstraintLocator *locator;
         if (archetype) {
           locator = CS.getConstraintLocator(
@@ -484,7 +483,7 @@ namespace {
                            superclass, locator);
         }
 
-        for (auto proto : member->getArchetype()->getConformsTo()) {
+        for (auto proto : member->getConformingProtocols()) {
           CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
                            proto->getDeclaredType(), locator);
         }
@@ -624,8 +623,7 @@ static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
     SmallVector<TupleTypeElt, 4> elements;
     elements.reserve(tupleTy->getNumElements());
     for (const auto &elt : tupleTy->getElements()) {
-      elements.push_back(TupleTypeElt(elt.getType(), Identifier(),
-                                      elt.isVararg()));
+      elements.push_back(elt.getWithoutName());
     }
     inputType = TupleType::get(elements, type->getASTContext());
   }
@@ -837,7 +835,7 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // If this is a curried reference to an instance method, where 'self' is
     // being applied, e.g., "ClassName.instanceMethod(self)", remove the
     // argument labels from the resulting function type. The 'self' parameter is
-    // always unlabled, so this operation is a no-op for the actual application.
+    // always unlabeled, so this operation is a no-op for the actual application.
     return isCurriedInstanceReference ? func->getNumParameterLists() : 1;
 
   case FunctionRefKind::DoubleApply:
@@ -1003,34 +1001,38 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
 
-  bool inTypeContext = true;
+  auto *genericEnv = outerDC->getGenericEnvironmentOfContext();
+
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
-    if (!parentDC->isTypeContext())
-      inTypeContext = false;
+    if (parentDC->isTypeContext() &&
+        (parentDC == outerDC ||
+         !parentDC->getAsProtocolOrProtocolExtensionContext()))
+      continue;
 
-    if ((!inTypeContext && parentDC->isInnermostContextGeneric()) ||
-        (parentDC->getAsProtocolOrProtocolExtensionContext() &&
-         parentDC != outerDC)) {
-      for (auto gpDecl : *parentDC->getGenericParamsOfContext()) {
-        auto gp = gpDecl->getDeclaredType();
-        auto *archetype = ArchetypeBuilder::mapTypeIntoContext(parentDC, gp)
-            ->castTo<ArchetypeType>();
-        auto found = replacements.find(gp->getCanonicalType());
+    auto *genericSig = parentDC->getGenericSignatureOfContext();
+    if (!genericSig)
+      break;
 
-        // When opening up an UnboundGenericType, we only pass in the
-        // innermost generic parameters as 'params' above -- outer
-        // parameters are not opened, so we must skip them here.
-        if (found != replacements.end()) {
-          auto typeVar = found->second;
-          cs.addConstraint(ConstraintKind::Bind, typeVar, archetype,
-                           locatorPtr);
-        }
+    for (auto *paramTy : genericSig->getGenericParams()) {
+      auto found = replacements.find(paramTy->getCanonicalType());
+
+      // We might not have a type variable for this generic parameter
+      // because either we're opening up an UnboundGenericType,
+      // in which case we only want to infer the innermost generic
+      // parameters, or because this generic parameter was constrained
+      // away into a concrete type.
+      if (found != replacements.end()) {
+        auto typeVar = found->second;
+        auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
+        cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
+                         locatorPtr);
       }
     }
-  }
 
+    break;
+  }
 }
 
 void ConstraintSystem::openGeneric(
@@ -1043,16 +1045,19 @@ void ConstraintSystem::openGeneric(
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
 
+  auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
+
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
-    auto *archetype = ArchetypeBuilder::mapTypeIntoContext(innerDC, gp)
-        ->castTo<ArchetypeType>();
-    auto typeVar = createTypeVariable(getConstraintLocator(
-                                        locator.withPathElement(
-                                          LocatorPathElt(archetype))),
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_MustBeMaterializable);
-    replacements[gp->getCanonicalType()] = typeVar;
+    auto contextTy = genericEnv->mapTypeIntoContext(gp);
+    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
+      auto typeVar = createTypeVariable(getConstraintLocator(
+                                          locator.withPathElement(
+                                            LocatorPathElt(archetype))),
+                                        TVO_PrefersSubtypeBinding |
+                                        TVO_MustBeMaterializable);
+      replacements[gp->getCanonicalType()] = typeVar;
+    }
   }
 
   GetTypeVariable getTypeVariable{*this, locator};

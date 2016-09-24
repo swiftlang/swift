@@ -269,18 +269,20 @@ static void maybeAddSameTypeRequirementForNestedType(
 
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
        ProtocolDecl *proto, 
+       bool updateExistingSource,
        const RequirementSource &source,
        ArchetypeBuilder &builder) {
   auto rep = getRepresentative();
   if (rep != this)
-    return rep->addConformance(proto, source, builder);
+    return rep->addConformance(proto, updateExistingSource, source, builder);
 
   // Check whether we already know about this conformance.
   auto known = ConformsTo.find(proto);
   if (known != ConformsTo.end()) {
     // We already have this requirement. Update the requirement source
     // appropriately.
-    updateRequirementSource(known->second, source);
+    if (updateExistingSource)
+      updateRequirementSource(known->second, source);
     return false;
   }
 
@@ -915,7 +917,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   auto T = PAT->getRepresentative();
 
   // Add the requirement, if we haven't done so already.
-  if (!T->addConformance(Proto, Source, *this))
+  if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
     return false;
 
   RequirementSource InnerSource(RequirementSource::Redundant, Source.getLoc());
@@ -1186,7 +1188,20 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
     T1->ArchetypeOrConcreteType = NestedType::forConcreteType(concrete2);
     T1->SameTypeSource = T2->SameTypeSource;
   }
-  
+
+  // Don't mark requirements as redundant if they come from one of our
+  // child archetypes. This is a targeted fix -- more general cases
+  // continue to break. In general, we need to detect cycles in the
+  // archetype graph and not propagate requirement source information
+  // along back edges.
+  bool creatingCycle = false;
+  auto T2Parent = T2;
+  while (T2Parent != nullptr) {
+    if (T2Parent->getRepresentative() == T1)
+      creatingCycle = true;
+    T2Parent = T2Parent->getParent();
+  }
+
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
   T2->SameTypeSource = Source;
@@ -1197,7 +1212,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Add all of the protocol conformance requirements of T2 to T1.
   for (auto conforms : T2->ConformsTo) {
-    T1->addConformance(conforms.first, conforms.second, *this);
+    T1->addConformance(conforms.first, /*updateExistingSource=*/!creatingCycle,
+                       conforms.second, *this);
   }
 
   // Recursively merge the associated types of T2 into T1.
@@ -1350,36 +1366,44 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
     assocType->setInvalid();
 
     // FIXME: Drop this protocol.
-    pa->addConformance(proto, RequirementSource(kind, loc), *this);
+    pa->addConformance(proto, /*updateExistingSource=*/true,
+                       RequirementSource(kind, loc), *this);
   };
 
-  // If the abstract type parameter already has an archetype assigned,
+  // If this is an associated type that already has an archetype assigned,
   // use that information.
-  if (auto archetype = decl->getArchetype()) {
-    SourceLoc loc = decl->getLoc();
+  if (isa<AssociatedTypeDecl>(decl) &&
+      decl->getDeclContext()->isValidGenericContext()) {
+    auto *archetype = mapTypeIntoContext(decl->getDeclContext(),
+                                         decl->getDeclaredInterfaceType())
+        ->getAs<ArchetypeType>();
 
-    // Superclass requirement.
-    if (auto superclass = archetype->getSuperclass()) {
-      if (addSuperclassRequirement(pa, superclass,
-                                   RequirementSource(kind, loc)))
-        return true;
-    }
+    if (archetype) {
+      SourceLoc loc = decl->getLoc();
 
-    // Conformance requirements.
-    for (auto proto : archetype->getConformsTo()) {
-      if (visited.count(proto)) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-          markRecursive(assocType, proto, loc);
-
-        continue;
+      // Superclass requirement.
+      if (auto superclass = archetype->getSuperclass()) {
+        if (addSuperclassRequirement(pa, superclass,
+                                     RequirementSource(kind, loc)))
+          return true;
       }
 
-      if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
-                                    visited))
-        return true;
-    }
+      // Conformance requirements.
+      for (auto proto : archetype->getConformsTo()) {
+        if (visited.count(proto)) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+            markRecursive(assocType, proto, loc);
 
-    return false;
+          continue;
+        }
+
+        if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
+                                      visited))
+          return true;
+      }
+
+      return false;
+    }
   }
 
   // Otherwise, walk the 'inherited' list to identify requirements.
@@ -1497,7 +1521,7 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
     PotentialArchetype *pa = resolveArchetype(req.getFirstType());
     assert(pa && "Re-introducing invalid requirement");
     // FIXME: defensively return if assertions are disabled until we figure out
-    // how this sitatuaion can occur and fix it properly.
+    // how this situation can occur and fix it properly.
     if (!pa)
       return;
 
@@ -1780,16 +1804,6 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
   return invalid;
 }
 
-ArchetypeType *
-ArchetypeBuilder::getArchetype(GenericTypeParamDecl *GenericParam) {
-  auto known = Impl->PotentialArchetypes.find(
-                 GenericTypeParamKey::forDecl(GenericParam));
-  if (known == Impl->PotentialArchetypes.end())
-    return nullptr;
-
-  return known->second->getType(*this).getAsArchetype();
-}
-
 template<typename F>
 void ArchetypeBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
@@ -1994,15 +2008,13 @@ void ArchetypeBuilder::addGenericSignature(GenericSignature *sig,
     if (env) {
       // If this generic parameter has an archetype, use it as the concrete
       // type.
-      auto contextTy = env->mapTypeIntoContext(&Mod, param);
-      if (auto archetype = contextTy->getAs<ArchetypeType>()) {
-        auto key = GenericTypeParamKey::forType(param);
-        assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
-        auto *pa = Impl->PotentialArchetypes[key];
-        assert(pa == pa->getRepresentative() && "Not the representative");
-        pa->ArchetypeOrConcreteType = NestedType::forConcreteType(archetype);
-        pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
-      }
+      auto contextTy = env->mapTypeIntoContext(param);
+      auto key = GenericTypeParamKey::forType(param);
+      assert(Impl->PotentialArchetypes.count(key) && "Missing parameter?");
+      auto *pa = Impl->PotentialArchetypes[key];
+      assert(pa == pa->getRepresentative() && "Not the representative");
+      pa->ArchetypeOrConcreteType = NestedType::forConcreteType(contextTy);
+      pa->SameTypeSource = RequirementSource(sourceKind, SourceLoc());
     }
   }
 

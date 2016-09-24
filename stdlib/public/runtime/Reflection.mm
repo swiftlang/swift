@@ -372,12 +372,30 @@ void swift_TupleMirror_subscript(String *outString,
   
   if (i < 0 || (size_t)i > Tuple->NumElements)
     swift::crash("Swift mirror subscript bounds check failure");
-  
-  // The name is the stringized element number '.0'.
-  char buf[32];
-  snprintf(buf, sizeof(buf), ".%zd", i);
-  new (outString) String(buf, strlen(buf));
-  
+
+  // Determine whether there is a label.
+  bool hasLabel = false;
+  if (const char *labels = Tuple->Labels) {
+    const char *space = strchr(labels, ' ');
+    for (intptr_t j = 0; j != i && space; ++j) {
+      labels = space + 1;
+      space = strchr(labels, ' ');
+    }
+
+    // If we have a label, create it.
+    if (labels && space && labels != space) {
+      new (outString) String(labels, space - labels);
+      hasLabel = true;
+    }
+  }
+
+  if (!hasLabel) {
+    // The name is the stringized element number '.0'.
+    char buf[32];
+    snprintf(buf, sizeof(buf), ".%zd", i);
+    new (outString) String(buf, strlen(buf));
+  }
+
   // Get a Mirror for the nth element.
   auto &elt = Tuple->getElement(i);
   auto bytes = reinterpret_cast<const char*>(value);
@@ -445,7 +463,7 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   memcpy(temporaryValue->getWitnessTables(), weakContainer->getWitnessTables(),
          valueWitnessesSize);
 
-  // This MagicMirror constructor creates a box to hold the loaded refernce
+  // This MagicMirror constructor creates a box to hold the loaded reference
   // value, which becomes the new owner for the value.
   new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
                               type, /*take*/ true);

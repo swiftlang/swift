@@ -29,6 +29,10 @@ enum AddressOnlyEnum {
   case AddressOnly(Any)
 }
 
+protocol FakeProtocol {
+  func requirement()
+}
+
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -1258,16 +1262,16 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   return %11 : $Int8
 }
 
-// CHECK-LABEL: sil @indexrawpointer_to_indexaddr_strideof_nonzero : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
+// CHECK-LABEL: sil @indexrawpointer_to_indexaddr_strideof : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
 // CHECK: bb0
 // CHECK-NEXT: pointer_to_address
 // CHECK-NEXT: index_addr
 // CHECK-NEXT: load
 // CHECK-NEXT: return
-sil @indexrawpointer_to_indexaddr_strideof_nonzero : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
+sil @indexrawpointer_to_indexaddr_strideof : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Int8 {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %3 = metatype $@thick Int8.Type
-  %4 = builtin "strideof_nonzero"<Int8>(%3 : $@thick Int8.Type) : $Builtin.Word
+  %4 = builtin "strideof"<Int8>(%3 : $@thick Int8.Type) : $Builtin.Word
   %6 = integer_literal $Builtin.Int1, -1
   %7 = builtin "smul_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %6 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Word, Builtin.Int1), 0
@@ -1303,7 +1307,7 @@ sil @indexrawpointer_to_indexaddr_with_casts : $@convention(thin) (Builtin.RawPo
 bb0(%0 : $Builtin.RawPointer, %1: $Builtin.Int64):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = metatype $@thick Int32.Type
-  %4 = builtin "strideof_nonzero"<Int32>(%3 : $@thick Int32.Type) : $Builtin.Word
+  %4 = builtin "strideof"<Int32>(%3 : $@thick Int32.Type) : $Builtin.Word
   %5 = builtin "zextOrBitCast_Word_Int64"(%4 : $Builtin.Word) : $Builtin.Int64
   %6 = builtin "smul_with_overflow_Int64"(%1 : $Builtin.Int64, %5 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %7 = tuple_extract %6 : $(Builtin.Int64, Builtin.Int1), 0
@@ -2143,7 +2147,7 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.RawPointer, %2 : $Builtin.RawPointer):
   %4 = metatype $@thick Int32.Type
   %5 = integer_literal $Builtin.Word, 1
   %6 = integer_literal $Builtin.Int1, 0
-  %7 = builtin "strideof_nonzero"<Int32>(%4 : $@thick Int32.Type) : $Builtin.Word
+  %7 = builtin "strideof"<Int32>(%4 : $@thick Int32.Type) : $Builtin.Word
   %14 = builtin "zextOrBitCast_Word_Int64"(%7 : $Builtin.Word) : $Builtin.Int64
   %8 = builtin "smul_with_overflow_Word"(%14 : $Builtin.Int64, %0 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
@@ -2745,11 +2749,50 @@ bb1:
 
 bb2:
   dealloc_stack %s1 : $*Bool
-  %r = tuple()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_generic_partial_apply_apply
+// CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack $T
+// CHECK: [[FN:%.*]] = function_ref @generic_callee
+// CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
+// CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
+// CHECK-NEXT: destroy_addr [[ARG1]]
+// CHECK-NEXT: destroy_addr [[TMP]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack [[TMP]]
+// CHECK-NEXT: return
+sil @test_generic_partial_apply_apply : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %f1 = function_ref @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %pa = partial_apply %f1<T, T>(%1) : $@convention(thin) <T, U> (@in T, @in U) -> ()
+  %a1 = apply %pa(%0) : $@callee_owned (@in T) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_existential_partial_apply_apply
+// CHECK: bb0(%0 : $*FakeProtocol):
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr
+// CHECK-NEXT: [[FN:%.*]] = witness_method
+// CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
+bb0(%0: $*FakeProtocol):
+  %o = open_existential_addr %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
+  %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
+  %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
+
+  %r = tuple ()
   return %r : $()
 }
 
 sil @callee : $@convention(thin) (Double, @in_guaranteed Int) -> ()
+sil @generic_callee : $@convention(thin) <T, U> (@in T, @in U) -> ()
 sil @noreturn_func : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil @remove_destroy_array

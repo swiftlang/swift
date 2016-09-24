@@ -64,7 +64,7 @@ struct HashableConformanceEntry {
     return 0;
   }
 };
-} // end unnamed namesapce
+} // end unnamed namespace
 
 // FIXME(performance): consider merging this cache into the regular
 // protocol conformance cache.

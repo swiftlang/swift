@@ -10,7 +10,7 @@
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_reflstr
 // STRIP_REFLECTION_NAMES-NOT: {{.*}}swift3_builtin
 
-// STRIP_REFLECTION_NAMES-DAG: @"\01l__swift3_reflection_metadata"
+// STRIP_REFLECTION_NAMES-DAG: @_TMRfP19reflection_metadata10MyProtocol_ = internal constant {{.*}}swift3_fieldmd
 
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_reflect
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_fieldmd
@@ -19,8 +19,6 @@
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_typeref
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_reflstr
 // STRIP_REFLECTION_METADATA-NOT: {{.*}}swift3_builtin
-
-// STRIP_REFLECTION_METADATA-NOT: @"\01l__swift3_reflection_metadata"
 
 // CHECK-DAG: @__swift_reflection_version = linkonce_odr hidden constant i16 {{[0-9]+}}
 // CHECK-DAG: private constant [2 x i8] c"i\00", section "{{[^"]*}}swift3_reflstr{{[^"]*}}"
@@ -41,7 +39,14 @@
 
 // CHECK-DAG: @"\01l__swift3_capture_descriptor" = private constant <{ {{.*}} }> <{ i32 1, i32 1, i32 2, {{.*}} }>
 
-// CHECK-DAG: @"\01l__swift3_reflection_metadata{{.*}}" = private constant <{ {{.*}} }>
+// CHECK-DAG: @_TMRfP19reflection_metadata10MyProtocol_ = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRfC19reflection_metadata7MyClass = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRaV19reflection_metadata11ConformanceS_10MyProtocolS_ = internal constant {{.*}}swift3_assocty
+// CHECK-DAG: @_TMRfV19reflection_metadata8MyStruct = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRfO19reflection_metadata6MyEnum = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRfC19reflection_metadata14MyGenericClass = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRfV19reflection_metadata15MyGenericStruct = internal constant {{.*}}swift3_fieldmd
+// CHECK-DAG: @_TMRfO19reflection_metadata13MyGenericEnum = internal constant {{.*}}swift3_fieldmd
 
 public protocol MyProtocol {
   associatedtype Inner

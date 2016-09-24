@@ -643,7 +643,9 @@ struct AggregateBox {
   using Helper = AggregateBoxHelper<0, EltBoxes...>;
   static constexpr size_t size = Helper::endOffset;
   static constexpr size_t alignment = Helper::alignment;
-  static constexpr size_t stride = roundUpToAlignment(size, alignment);
+  static constexpr size_t rawStride = roundUpToAlignment(size, alignment);
+  static constexpr size_t stride = rawStride == 0 ? 1 : rawStride;
+
   static constexpr bool isPOD = Helper::isPOD;
   static constexpr bool isBitwiseTakable = Helper::isBitwiseTakable;
 

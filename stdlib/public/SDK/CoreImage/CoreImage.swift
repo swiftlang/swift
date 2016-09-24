@@ -13,10 +13,6 @@
 import Foundation
 @_exported import CoreImage  // Clang module
 
-#if os(OSX)
-import QuartzCore
-#endif
-
 extension CIFilter {
 #if os(OSX)
   // - (CIImage *)apply:(CIKernel *)k, ...

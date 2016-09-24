@@ -311,7 +311,7 @@ static SILFunction *getSpecializedWithDeadParams(SILFunction *Orig,
   // Check if all dead parameters have trivial types. We don't support non-
   // trivial types because it's very hard to find places where we can release
   // those parameters (as a replacement for the removed partial_apply).
-  // TODO: maybe we can skip this restrication when we have semantic ARC.
+  // TODO: maybe we can skip this restriction when we have semantic ARC.
   for (unsigned Idx = NumArgs - numDeadParams; Idx < NumArgs; ++Idx) {
     SILType ArgTy = EntryBB.getBBArg(Idx)->getType();
     if (!ArgTy.isTrivial(M))

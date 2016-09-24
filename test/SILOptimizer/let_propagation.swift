@@ -97,7 +97,7 @@ public func testAllocAndUseLet() -> Int32 {
 // DISABLECHECK-NOT: load
 // DISABLECHECK: return
 @inline(never)
-public func testUseLet(a:A0) -> Int32 {
+public func testUseLet(a: A0) -> Int32 {
   var counter: Int32
   // a.x and a.y should be loaded only once.
   counter = a.sum2() + a.sum2()

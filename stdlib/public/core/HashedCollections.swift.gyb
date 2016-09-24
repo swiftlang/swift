@@ -262,6 +262,10 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 
 //===--- Hacks and workarounds --------------------------------------------===//
 
+// FIXME(ABI)#158 (Performance)
+// There used to be a now-fixed optimizer bug that prevented using 
+// UnsafePointer<Unmanaged<AnyObject>> in Dictionary implementation.
+// rdar://problem/16861508
 /// Like `UnsafeMutablePointer<Unmanaged<AnyObject>>`, or `id
 /// __unsafe_unretained *` in Objective-C ARC.
 internal struct _UnmanagedAnyObjectArray {
@@ -654,6 +658,9 @@ public struct Set<Element : Hashable> :
   /// Because a set is not an ordered collection, the "first" element may not
   /// be the first element that was added to the set. The set must not be
   /// empty.
+  ///
+  /// - Complexity: Amortized O(1) if the set does not wrap a bridged `NSSet`.
+  ///   If the set wraps a bridged `NSSet`, the performance is unspecified.
   ///
   /// - Returns: A member of the set.
   @discardableResult
@@ -2501,124 +2508,84 @@ internal struct _HashedContainerStorageHeader {
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-final internal class _Native${Self}StorageImpl<${TypeParameters}> :
-  ManagedBuffer<_HashedContainerStorageHeader, UInt8> {
+final internal class _Native${Self}StorageImpl<${TypeParameters}> {
   // Note: It is intended that ${TypeParameters}
   // (without : Hashable) is used here - this storage must work
   // with non-Hashable types.
 
-  internal typealias BufferPointer =
-    ManagedBufferPointer<_HashedContainerStorageHeader, UInt8>
   internal typealias StorageImpl = _Native${Self}StorageImpl
 
 %if Self == 'Set': # Set needs these to keep signatures simple.
   internal typealias Key = ${TypeParameters}
 %end
 
-  /// Returns the bytes necessary to store a bit map of 'capacity' bytes and
-  /// padding to align the start to word alignment.
-  internal static func bytesForBitMap(capacity: Int) -> Int {
-    let numWords = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
-    return numWords * MemoryLayout<UInt>.stride + MemoryLayout<UInt>.alignment
-  }
-
-  /// Returns the bytes necessary to store 'capacity' keys and padding to align
-  /// the start to the alignment of the 'Key' type assuming a word aligned base
-  /// address.
-  internal static func bytesForKeys(capacity: Int) -> Int {
-    let padding = max(0, MemoryLayout<Key>.alignment - MemoryLayout<UInt>.alignment)
-    return MemoryLayout<Key>.stride * capacity + padding
-  }
-
-%if Self == 'Dictionary':
-  /// Returns the bytes necessary to store 'capacity' values and padding to
-  /// align the start to the alignment of the 'Value' type assuming a base
-  /// address aligned to the maximum of the alignment of the 'Key' type and the
-  /// alignment of a word.
-  internal static func bytesForValues(capacity: Int) -> Int {
-    let maxPrevAlignment = max(MemoryLayout<Key>.alignment, MemoryLayout<UInt>.alignment)
-    let padding = max(0, MemoryLayout<Value>.alignment - maxPrevAlignment)
-    return MemoryLayout<Value>.stride * capacity + padding
-  }
-%end
-
-  internal var buffer: BufferPointer {
-    return BufferPointer(self)
-  }
-
-  // This API is unsafe and needs a `_fixLifetime` in the caller.
-  internal var _body: _HashedContainerStorageHeader {
-    unsafeAddress {
-      return UnsafePointer(buffer._headerPointer)
-    }
-    unsafeMutableAddress {
-      return buffer._headerPointer
-    }
-  }
+  internal var _body: _HashedContainerStorageHeader
 
   @_versioned
   internal var _capacity: Int {
-    defer { _fixLifetime(self) }
-    return _body.capacity
+    return _assumeNonNegative(_body.capacity)
   }
 
   @_versioned
   internal var _count: Int {
     set {
-      defer { _fixLifetime(self) }
       _body.count = newValue
     }
     get {
-      defer { _fixLifetime(self) }
-      return _body.count
+      return _assumeNonNegative(_body.count)
     }
   }
 
   internal var _maxLoadFactorInverse: Double {
-    defer { _fixLifetime(self) }
     return _body.maxLoadFactorInverse
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal
   var _initializedHashtableEntriesBitMapStorage: UnsafeMutablePointer<UInt> {
-    return _roundUp(buffer._elementPointer, toAlignmentOf: UInt.self)
+    return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
+  }
+
+  internal var _keysRawAddr: Builtin.RawPointer {
+    let bitmapAddr = Builtin.projectTailElems(self, UInt.self)
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: _capacity)
+    return Builtin.getTailAddr_Word(bitmapAddr,
+           numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
   }
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _keys: UnsafeMutablePointer<Key> {
-    let bitMapSizeInBytes =
-      _unsafeMultiply(
-        _UnsafeBitMap.sizeInWords(forSizeInBits: _body.capacity),
-        MemoryLayout<UInt>.stride)
-    let start =
-      UnsafeMutableRawPointer(_initializedHashtableEntriesBitMapStorage)
-      + bitMapSizeInBytes
-    return _roundUp(start, toAlignmentOf: Key.self)
+    return UnsafeMutablePointer(_keysRawAddr)
   }
 
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   internal var _values: UnsafeMutablePointer<Value> {
-    let keysSizeInBytes = _unsafeMultiply(_body.capacity, MemoryLayout<Key>.stride)
-    let start = UnsafeMutableRawPointer(_keys) + keysSizeInBytes
-    return _roundUp(start, toAlignmentOf: Value.self)
+    let valuesAddr = Builtin.getTailAddr_Word(_keysRawAddr,
+        _capacity._builtinWordValue, Key.self, Value.self)
+    return UnsafeMutablePointer(valuesAddr)
   }
 %end
 
   /// Create a storage instance with room for 'capacity' entries and all entries
   /// marked invalid.
   internal class func create(capacity: Int) -> StorageImpl {
-    let requiredCapacity =
-      bytesForBitMap(capacity: capacity) + bytesForKeys(capacity: capacity)
+    let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
-      + bytesForValues(capacity: capacity)
+    let storage = Builtin.allocWithTailElems_3(StorageImpl.self,
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self,
+        capacity._builtinWordValue, Value.self)
+%else:
+    let storage = Builtin.allocWithTailElems_2(StorageImpl.self,
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self)
 %end
-
-    let r = super.create(minimumCapacity: requiredCapacity) { _ in
-      return _HashedContainerStorageHeader(capacity: capacity)
-    }
-    let storage = r as! StorageImpl
+    
+    // We can initialize by assignment because _HashedContainerStorageHeader
+    // is a trivial type, i.e. contains no references.
+    storage._body = _HashedContainerStorageHeader(capacity: capacity)
+ 
     let initializedEntries = _UnsafeBitMap(
         storage: storage._initializedHashtableEntriesBitMapStorage,
         bitCount: capacity)
@@ -2652,8 +2619,11 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
       }
     }
 %end
-    buffer._headerPointer.deinitialize()
     _fixLifetime(self)
+  }
+
+  internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Only initialize these by calling create")
   }
 }
 
@@ -2733,7 +2703,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   @_versioned
   @inline(__always)
   internal func key(at i: Int) -> Key {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
     let res = (keys + i).pointee
@@ -2743,7 +2713,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
   @_versioned
   internal func isInitializedEntry(at i: Int) -> Bool {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     return initializedEntries[i]
   }
 
@@ -2777,7 +2747,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func setKey(_ key: Key, at i: Int) {
-    _precondition(i >= 0 && i < capacity)
+    _sanityCheck(i >= 0 && i < capacity)
     _sanityCheck(isInitializedEntry(at: i))
 
     (keys + i).pointee = key
@@ -2834,8 +2804,9 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @_versioned
+  @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, 0..<capacity)
+    return _squeezeHashValue(k.hashValue, capacity)
   }
 
   @_versioned
@@ -2963,6 +2934,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func assertingGet(_ i: Index) -> SequenceElement {
+    _precondition(i.offset >= 0 && i.offset < capacity)
     _precondition(
       isInitializedEntry(at: i.offset),
       "attempting to access ${Self} elements using an invalid Index")
@@ -3284,7 +3256,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   // operations on it.
   //
   // Do not access this property directly.
-  internal var _heapBufferBridged_DoNotUse: AnyObject? = nil
+  internal var _heapBufferBridged_DoNotUse: AnyObject?
 
   internal var nativeStorage: NativeStorage
 
@@ -4615,8 +4587,9 @@ elif Self == 'Dictionary':
 ${SubscriptingWithIndexDoc}
 public struct ${Self}Index<${TypeParametersDecl}> :
   Comparable {
-  // FIXME(ABI)(compiler limitation): `DictionaryIndex` and `SetIndex` should
+  // FIXME(ABI)#34 (Nesting types in generics): `DictionaryIndex` and `SetIndex` should
   // be nested types.
+  // rdar://problem/17002096
 
   // Index for native storage is efficient.  Index for bridged NS${Self} is
   // not, because neither NSEnumerator nor fast enumeration support moving

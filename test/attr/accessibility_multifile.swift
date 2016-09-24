@@ -8,12 +8,12 @@ private protocol P  {
 }
 public class C : P {
   public init() {}
-  fileprivate func privMethod() {}
+  fileprivate func privMethod() {} // expected-note {{declared here}}
 }
 
 // BEGIN file2.swift
 extension C {
   public func someFunc() {
-    privMethod() // expected-error {{use of unresolved identifier 'privMethod'}}
+    privMethod() // expected-error {{'privMethod' is inaccessible due to 'fileprivate' protection level}}
   }
 }

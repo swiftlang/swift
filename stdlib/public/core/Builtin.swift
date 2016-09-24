@@ -175,18 +175,18 @@ func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 @_versioned
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
-  let tmp = _canBeClass(x)
 
+  switch _canBeClass(x) {
   // Is not a class.
-  if tmp == 0 {
+  case 0:
     return false
   // Is a class.
-  } else if tmp == 1 {
+  case 1:
     return true
-  }
-
   // Maybe a class.
-  return _swift_isClassOrObjCExistentialType(x)
+  default:
+    return _swift_isClassOrObjCExistentialType(x)
+  }
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's

@@ -454,7 +454,7 @@ extension Decimal : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDecimalNumber?) -> Decimal {
-        var result: Decimal? = nil
+        var result: Decimal?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

@@ -925,7 +925,8 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[12];
+  static const unsigned NumAlternativeLiteralTypes = 13;
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
@@ -1017,28 +1018,30 @@ public:
 
 private:
   /// \brief Describe the candidate expression for partial solving.
-  /// This class used used by shrink & solve methods which apply
+  /// This class used by shrink & solve methods which apply
   /// variation of directional path consistency algorithm in attempt
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
-    bool IsPrimary;
-
-    ConstraintSystem &CS;
     TypeChecker &TC;
     DeclContext *DC;
 
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, bool primaryExpr)
-        : E(expr), IsPrimary(primaryExpr), CS(cs), TC(cs.TC), DC(cs.DC) {}
+    // Contextual Information.
+    Type CT;
+    ContextualTypePurpose CTP;
 
-    /// \brief Return underlaying expression.
+  public:
+    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
+              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
+        : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
+
+    /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
 
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
     ///
-    /// \returs true on solver failure, false otherwise.
+    /// \returns true on solver failure, false otherwise.
     bool solve();
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
@@ -2031,7 +2034,7 @@ private:
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
-  /// expression, this is achived to solving individual sub-expressions
+  /// expression, this is achieved to solving individual sub-expressions
   /// and combining resolving types. Such algorithm is called directional
   /// path consistency because it goes from children to parents for all
   /// related sub-expressions taking union of their domains.
@@ -2050,7 +2053,7 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns Error is an error occured, Solved is system is consistent
+  /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
   SolutionKind solve(Expr *&expr,
                      Type convertType,
@@ -2395,10 +2398,8 @@ public:
   }
 };
 
-/**
- * Count the number of overload sets present
- * in the expression and all of the children.
- */
+// Count the number of overload sets present
+// in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
   unsigned &NumOverloads;
 

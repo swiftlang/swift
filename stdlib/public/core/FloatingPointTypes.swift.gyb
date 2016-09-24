@@ -1056,11 +1056,11 @@ public postfix func -- (lhs: inout ${Self}) -> ${Self} {
   fatalError("-- is not available")
 }
 
-extension ${Self} {		
-  @available(*, unavailable, message: "Please use the `abs(_:)` free function")		
-  public static func abs(_ x: ${Self}) -> ${Self} {		
-    fatalError("unavailable")		
-  }		
+extension ${Self} {
+  @available(*, unavailable, message: "Please use the `abs(_:)` free function")
+  public static func abs(_ x: ${Self}) -> ${Self} {
+    fatalError("unavailable")
+  }
 }
 
 % if bits == 80:

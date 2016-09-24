@@ -1288,21 +1288,78 @@ public:
   }
 };
 
+// TODO: As part of AST modernization, replace with a proper
+// 'ParameterTypeElt' or similar, and have FunctionTypes only have a list
+// of 'ParameterTypeElt's. Then, this information can be removed from
+// TupleTypeElt.
+//
+/// Provide parameter type relevant flags, i.e. variadic, autoclosure, and
+/// escaping.
+class ParameterTypeFlags {
+  enum ParameterFlags : uint8_t {
+    None = 0,
+    Variadic = 1 << 0,
+    AutoClosure = 1 << 1,
+    Escaping = 1 << 2,
+
+    NumBits = 3
+  };
+  OptionSet<ParameterFlags> value;
+  static_assert(NumBits < 8*sizeof(value), "overflowed");
+
+  ParameterTypeFlags(OptionSet<ParameterFlags, uint8_t> val) : value(val) {}
+
+public:
+  ParameterTypeFlags() = default;
+
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping)
+      : value((variadic ? Variadic : 0) |
+              (autoclosure ? AutoClosure : 0) |
+              (escaping ? Escaping : 0)) {}
+
+  /// Create one from what's present in the parameter type
+  inline static ParameterTypeFlags fromParameterType(Type paramTy,
+                                                     bool isVariadic);
+
+  bool isNone() const { return !value; }
+  bool isVariadic() const { return value.contains(Variadic); }
+  bool isAutoClosure() const { return value.contains(AutoClosure); }
+  bool isEscaping() const { return value.contains(Escaping); }
+
+  ParameterTypeFlags withEscaping(bool escaping) const {
+    return ParameterTypeFlags(escaping ? value | ParameterTypeFlags::Escaping
+                                       : value - ParameterTypeFlags::Escaping);
+  }
+
+  bool operator ==(const ParameterTypeFlags &other) const {
+    return value.toRaw() == other.value.toRaw();
+  }
+
+  uint8_t toRaw() const { return value.toRaw(); }
+};
+
 /// ParenType - A paren type is a type that's been written in parentheses.
 class ParenType : public TypeBase {
   Type UnderlyingType;
+  ParameterTypeFlags parameterFlags;
 
   friend class ASTContext;
-  ParenType(Type UnderlyingType, RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::Paren, nullptr, properties),
-      UnderlyingType(UnderlyingType) {}
+  ParenType(Type UnderlyingType, RecursiveTypeProperties properties,
+            ParameterTypeFlags flags)
+      : TypeBase(TypeKind::Paren, nullptr, properties),
+        UnderlyingType(UnderlyingType), parameterFlags(flags) {}
+
 public:
   Type getUnderlyingType() const { return UnderlyingType; }
 
-  static ParenType *get(const ASTContext &C, Type underlying);
-   
+  static ParenType *get(const ASTContext &C, Type underlying,
+                        ParameterTypeFlags flags = {});
+
   /// Remove one level of top-level sugar from this type.
   TypeBase *getSinglyDesugaredType();
+
+  /// Get the parameter flags
+  ParameterTypeFlags getParameterFlags() const { return parameterFlags; }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -1312,33 +1369,45 @@ public:
 
 /// TupleTypeElt - This represents a single element of a tuple.
 class TupleTypeElt {
-  /// An optional name for the field, along with a bit indicating whether it
-  /// is variadic.
-  llvm::PointerIntPair<Identifier, 1, bool> NameAndVariadic;
+  /// An optional name for the field.
+  Identifier Name;
 
   /// \brief This is the type of the field.
   Type ElementType;
+
+  /// Flags that are specific to and relevant for parameter types
+  ParameterTypeFlags Flags;
 
   friend class TupleType;
 
 public:
   TupleTypeElt() = default;
-  inline /*implicit*/ TupleTypeElt(Type ty,
-                                   Identifier name = Identifier(),
-                                   bool isVariadic = false);
+  inline /*implicit*/ TupleTypeElt(Type ty, Identifier name,
+                                   bool isVariadic, bool isAutoClosure,
+                                   bool isEscaping);
+
+  TupleTypeElt(Type ty, Identifier name = Identifier(),
+               ParameterTypeFlags PTFlags = {})
+      : Name(name), ElementType(ty), Flags(PTFlags) {}
 
   /*implicit*/ TupleTypeElt(TypeBase *Ty)
-    : NameAndVariadic(Identifier(), false), ElementType(Ty) { }
+    : Name(Identifier()), ElementType(Ty), Flags() { }
 
-  bool hasName() const { return !NameAndVariadic.getPointer().empty(); }
-  Identifier getName() const { return NameAndVariadic.getPointer(); }
+  bool hasName() const { return !Name.empty(); }
+  Identifier getName() const { return Name; }
 
   Type getType() const { return ElementType.getPointer(); }
 
+  ParameterTypeFlags getParameterFlags() const { return Flags; }
+
   /// Determine whether this field is variadic.
-  bool isVararg() const {
-    return NameAndVariadic.getInt();
-  }
+  bool isVararg() const { return Flags.isVariadic(); }
+
+  /// Determine whether this field is an autoclosure parameter closure.
+  bool isAutoClosure() const { return Flags.isAutoClosure(); }
+
+  /// Determine whether this field is an escaping parameter closure.
+  bool isEscaping() const { return Flags.isEscaping(); }
 
   static inline Type getVarargBaseTy(Type VarArgT);
 
@@ -1351,8 +1420,16 @@ public:
 
   /// Retrieve a copy of this tuple type element with the type replaced.
   TupleTypeElt getWithType(Type T) const {
-    return TupleTypeElt(T, getName(), isVararg());
+    return TupleTypeElt(T, getName(), getParameterFlags());
   }
+
+  /// Retrieve a copy of this tuple type element with the name replaced.
+  TupleTypeElt getWithName(Identifier name) const {
+    return TupleTypeElt(getType(), name, getParameterFlags());
+  }
+
+  /// Retrieve a copy of this tuple type element with no name
+  TupleTypeElt getWithoutName() const { return getWithName(Identifier()); }
 };
 
 inline Type getTupleEltType(const TupleTypeElt &elt) {
@@ -2369,11 +2446,20 @@ struct CallArgParam {
   /// Whether the parameter has a default argument.  Not valid for arguments.
   bool HasDefaultArgument = false;
 
-  /// Whether the parameter is variadic. Not valid for arguments.
-  bool Variadic = false;
+  /// Parameter specific flags, not valid for arguments
+  ParameterTypeFlags parameterFlags = {};
 
   /// Whether the argument or parameter has a label.
   bool hasLabel() const { return !Label.empty(); }
+
+  /// Whether the parameter is varargs
+  bool isVariadic() const { return parameterFlags.isVariadic(); }
+
+  /// Whether the parameter is autoclosure
+  bool isAutoClosure() const { return parameterFlags.isAutoClosure(); }
+
+  /// Whether the parameter is escaping
+  bool isEscaping() const { return parameterFlags.isEscaping(); }
 };
 
 /// Break an argument type into an array of \c CallArgParams.
@@ -3757,17 +3843,6 @@ public:
     return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
   }
   
-  /// True if this is the 'Self' parameter of a protocol or an associated type
-  /// of 'Self'.
-  bool isSelfDerived() {
-    ArchetypeType *t = getPrimary();
-
-    if (t && t->getSelfProtocol())
-      return true;
-
-    return false;
-  }
-
   /// getConformsTo - Retrieve the set of protocols to which this substitutable
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const { return ConformsTo; }
@@ -4465,16 +4540,19 @@ inline bool TypeBase::mayHaveSuperclass() {
   return is<DynamicSelfType>();
 }
 
-inline TupleTypeElt::TupleTypeElt(Type ty,
-                                  Identifier name,
-                                  bool isVariadic)
-  : NameAndVariadic(name, isVariadic), ElementType(ty)
-{
+inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,
+                                  bool isAutoClosure, bool isEscaping)
+    : Name(name), ElementType(ty),
+      Flags(isVariadic, isAutoClosure, isEscaping) {
   assert(!isVariadic ||
          isa<ErrorType>(ty.getPointer()) ||
          isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
+  assert(!isAutoClosure || (ty->is<AnyFunctionType>() &&
+                            ty->castTo<AnyFunctionType>()->isAutoClosure()));
+  assert(!isEscaping || (ty->is<AnyFunctionType>() &&
+                         !ty->castTo<AnyFunctionType>()->isNoEscape()));
 }
 
 inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
@@ -4487,6 +4565,16 @@ inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
   }
   assert(isa<ErrorType>(T));
   return T;
+}
+
+/// Create one from what's present in the parameter decl and type
+inline ParameterTypeFlags
+ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic) {
+  bool autoclosure = paramTy->is<AnyFunctionType>() &&
+                     paramTy->castTo<AnyFunctionType>()->isAutoClosure();
+  bool escaping = paramTy->is<AnyFunctionType>() &&
+                  !paramTy->castTo<AnyFunctionType>()->isNoEscape();
+  return {isVariadic, autoclosure, escaping};
 }
 
 inline Identifier SubstitutableType::getName() const {

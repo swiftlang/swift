@@ -680,7 +680,7 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     }
 
     if (!OnlyKind.empty())
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, OnlyKind);
     else if (attr->isDeclModifier())
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
@@ -1085,14 +1085,6 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
     return;
   }
 
-  // Infix operator is only allowed on operator declarations, not on func.
-  if (isa<InfixAttr>(attr)) {
-    TC.diagnose(attr->getLocation(), diag::invalid_infix_on_func)
-      .fixItRemove(attr->getLocation());
-    attr->setInvalid();
-    return;
-  }
-
   // Otherwise, must be unary.
   if (!FD->isUnaryOperator()) {
     TC.diagnose(attr->getLocation(), diag::attribute_requires_single_argument,
@@ -1469,6 +1461,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   //   checked and diagnosed.
   // - This does not make use of Archetypes since it is directly substituting
   //   in place of GenericTypeParams.
+  //
+  // FIXME: Refactor to use GenericSignature->getSubstitutions()?
   SmallVector<Substitution, 4> substitutions;
   auto currentModule = FD->getParentModule();
   Type currentFromTy;
@@ -1521,7 +1515,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto superTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!TC.isSubtypeOf(firstTy, superTy, DC)) {
         TC.diagnose(attr->getLocation(), diag::type_does_not_inherit,
-                    FD->getType(), firstTy, superTy);
+                    FD->getInterfaceType(), firstTy, superTy);
       }
       break;
     }
@@ -1531,8 +1525,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
       auto firstTy = req.getFirstType().subst(currentModule, subMap, None);
       auto sameTy = req.getSecondType().subst(currentModule, subMap, None);
       if (!firstTy->isEqual(sameTy)) {
-        TC.diagnose(attr->getLocation(), diag::types_not_equal, FD->getType(),
-                    firstTy, sameTy);
+        TC.diagnose(attr->getLocation(), diag::types_not_equal,
+                    FD->getInterfaceType(), firstTy, sameTy);
 
         return;
       }
@@ -1570,7 +1564,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkAutoClosureAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
@@ -1579,7 +1573,7 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
       checkNoEscapeAttr(pd, attr);
     else {
       AttributeEarlyChecker Checker(*this, var);
-      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_only_one_decl_kind,
+      Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
                                     attr, "parameter");
     }
   }
