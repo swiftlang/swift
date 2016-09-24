@@ -138,6 +138,10 @@ private:
   /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
 
+  /// Cache for associated type lookups.
+  std::unordered_map<TypeRefID, const TypeRef *,
+                     TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
+
   TypeConverter TC;
   MetadataSourceBuilder MSB;
 
@@ -295,14 +299,21 @@ private:
 
   const AssociatedTypeDescriptor *
   lookupAssociatedTypes(const std::string &MangledTypeName,
-                        const DependentMemberTypeRef *DependentMember);
+                        const TypeRef *Protocol);
 
 public:
   TypeConverter &getTypeConverter() { return TC; }
 
   const TypeRef *
-  getDependentMemberTypeRef(const std::string &MangledTypeName,
-                            const DependentMemberTypeRef *DependentMember);
+  lookupTypeWitness(const std::string &MangledTypeName,
+                    const std::string &Member,
+                    const TypeRef *Protocol);
+
+  const TypeRef *
+  lookupSuperclass(const std::string &MangledTypeName);
+
+  const TypeRef *
+  lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
   const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);

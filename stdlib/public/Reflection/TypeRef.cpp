@@ -22,12 +22,6 @@
 using namespace swift;
 using namespace reflection;
 
-[[noreturn]]
-static void unreachable(const char *Message) {
-  std::cerr << "fatal error: " << Message << "\n";
-  std::abort();
-}
-
 class PrintTypeRef : public TypeRefVisitor<PrintTypeRef, void> {
   std::ostream &OS;
   unsigned Indent;
@@ -354,14 +348,9 @@ bool TypeRef::isConcreteAfterSubstitutions(
 
 unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
-    switch (P->getKind()) {
-    case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
-    case TypeRefKind::BoundGeneric:
-      return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
-    default:
-      unreachable("Asked for depth on non-nominal typeref");
-    }
+    if (auto *Nominal = dyn_cast<NominalTypeRef>(P))
+      return 1 + Nominal->getDepth();
+    return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
   }
 
   return 0;
@@ -657,20 +646,29 @@ public:
 
     const TypeRef *TypeWitness = nullptr;
 
-    // Get the original type of the witness from the conformance.
-    switch (SubstBase->getKind()) {
-    case TypeRefKind::Nominal: {
-      auto Nominal = cast<NominalTypeRef>(SubstBase);
-      TypeWitness = Builder.getDependentMemberTypeRef(Nominal->getMangledName(), DM);
-      break;
-    }
-    case TypeRefKind::BoundGeneric: {
-      auto BG = cast<BoundGenericTypeRef>(SubstBase);
-      TypeWitness = Builder.getDependentMemberTypeRef(BG->getMangledName(), DM);
-      break;
-    }
-    default:
-      unreachable("Unknown base type");
+    while (TypeWitness == nullptr) {
+      auto &Member = DM->getMember();
+      auto *Protocol = DM->getProtocol();
+
+      // Get the original type of the witness from the conformance.
+      if (auto *Nominal = dyn_cast<NominalTypeRef>(SubstBase)) {
+        TypeWitness = Builder.lookupTypeWitness(Nominal->getMangledName(),
+                                                Member, Protocol);
+      } else {
+        auto BG = cast<BoundGenericTypeRef>(SubstBase);
+        TypeWitness = Builder.lookupTypeWitness(BG->getMangledName(),
+                                                Member, Protocol);
+      }
+
+      if (TypeWitness != nullptr)
+        break;
+
+      // If we didn't find the member type, check the superclass.
+      auto *Superclass = Builder.lookupSuperclass(SubstBase);
+      if (Superclass == nullptr)
+        break;
+
+      SubstBase = Superclass;
     }
 
     // We didn't find the member type, so return something to let the
