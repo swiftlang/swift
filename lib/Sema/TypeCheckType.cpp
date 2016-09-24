@@ -747,7 +747,35 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       comp->setValue(nominal);
       return type;
     }
-    
+
+
+    // Try ignoring access control.
+    DeclContext *lookupDC = dc;
+    if (options.contains(TR_GenericSignature))
+      lookupDC = dc->getParent();
+
+    NameLookupOptions relookupOptions = lookupOptions;
+    relookupOptions |= NameLookupFlags::KnownPrivate;
+    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    LookupResult inaccessibleResults =
+        tc.lookupUnqualified(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
+                             relookupOptions);
+    if (inaccessibleResults) {
+      // FIXME: What if the unviable candidates have different levels of access?
+      auto first = cast<TypeDecl>(inaccessibleResults.front().Decl);
+      tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
+                  comp->getIdentifier(), first->getFormalAccess());
+
+      // FIXME: If any of the candidates (usually just one) are in the same
+      // module we could offer a fix-it.
+      for (auto lookupResult : inaccessibleResults)
+        tc.diagnose(lookupResult.Decl, diag::type_declared_here);
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if we do.
+      return ErrorType::get(tc.Context);
+    }
+
     // Fallback.
     SourceLoc L = comp->getIdLoc();
     SourceRange R = SourceRange(comp->getIdLoc());
@@ -1261,10 +1289,11 @@ static Type resolveIdentTypeComponent(
 }
 
 // FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
-static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
+static bool checkTypeDeclAvailability(const TypeDecl *TypeDecl,
+                                      IdentTypeRepr *IdType,
                                       SourceLoc Loc, DeclContext *DC,
                                       TypeChecker &TC,
-                                      bool AllowPotentiallyUnavailableProtocol) {
+                                      bool AllowPotentiallyUnavailableProtocol){
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
@@ -1284,7 +1313,8 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                   diag::availability_decl_unavailable_rename,
                                   CI->getIdentifier(), /*"replaced"*/false,
                                   /*special kind*/0, Attr->Rename);
-          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
+          fixItAvailableAttrRename(TC, diag, Loc, TypeDecl, Attr,
+                                   /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc,
                       inSwift ? diag::availability_decl_unavailable_in_swift
@@ -1310,11 +1340,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
       return true;
     }
 
-    if (auto *Attr = TypeChecker::getDeprecated(TypeDecl)) {
-      TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
-                            CI->getIdentifier(), /*call, N/A*/nullptr);
-    }
-
+    TC.diagnoseIfDeprecated(CI->getSourceRange(), DC, TypeDecl,
+                            /*call, N/A*/nullptr);
+    
     if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))
       return false;
 

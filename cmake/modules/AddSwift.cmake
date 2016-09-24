@@ -1256,6 +1256,10 @@ function(add_swift_library name)
   endif()
   
   if(SWIFTLIB_TARGET_LIBRARY)
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+      list(APPEND SWIFTLIB_DEPENDS clang)
+    endif()
+    
     # If we are building this library for targets, loop through the various
     # SDKs building the variants of this library.
     list_intersect(

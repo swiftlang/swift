@@ -912,27 +912,22 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // Create the descriptor for the variable.
-  llvm::DILocalVariable *Var = nullptr;
-
-  /// This could be Opts.Optimize if we would also unique DIVariables here.
+  // This could be Opts.Optimize if we would also unique DIVariables here.
   bool Optimized = false;
-  Var = (ArgNo > 0)
-    ? DBuilder.createParameterVariable(Scope, Name, ArgNo, Unit, Line, DITy,
-                                       Optimized, Flags)
-    : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
-                                  Optimized, Flags);
-
-  // Insert a debug intrinsic into the current block.
-  auto *BB = Builder.GetInsertBlock();
-  bool IsPiece = Storage.size() > 1;
-  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-  unsigned VarSizeInBits = getSizeInBits(Var);
+  // Create the descriptor for the variable.
+  llvm::DILocalVariable *Var =
+      (ArgNo > 0)
+          ? DBuilder.createParameterVariable(Scope, Name, ArgNo, Unit, Line,
+                                             DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
+                                        Optimized, Flags);
 
   // Running variables for the current/previous piece.
-  unsigned SizeInBits = 0;
+  bool IsPiece = Storage.size() > 1;
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned AlignInBits = SizeOfByte;
   unsigned OffsetInBits = 0;
+  unsigned SizeInBits = 0;
 
   for (llvm::Value *Piece : Storage) {
     SmallVector<uint64_t, 3> Operands;
@@ -942,7 +937,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
     if (isa<llvm::UndefValue>(Piece))
-      Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+      Piece = llvm::ConstantInt::get(IGM.Int64Ty, 0);
 
     if (IsPiece) {
       // Advance the offset and align it for the next piece.
@@ -954,30 +949,25 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
       // Sanity checks.
       assert(SizeInBits && "zero-sized piece");
-      assert(SizeInBits < VarSizeInBits && "piece covers entire var");
-      assert(OffsetInBits+SizeInBits <= VarSizeInBits && "pars > totum");
-      (void) VarSizeInBits;
+      assert(SizeInBits < getSizeInBits(Var) && "piece covers entire var");
+      assert(OffsetInBits+SizeInBits <= getSizeInBits(Var) && "pars > totum");
 
       // Add the piece DWARF expression.
       Operands.push_back(llvm::dwarf::DW_OP_bit_piece);
       Operands.push_back(OffsetInBits);
       Operands.push_back(SizeInBits);
     }
-    emitDbgIntrinsic(BB, Piece, Var, DBuilder.createExpression(Operands), Line,
-                     Loc.Column, Scope, DS);
+    emitDbgIntrinsic(Builder, Piece, Var, DBuilder.createExpression(Operands),
+                     Line, Loc.Column, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0) {
-    auto Zero =
-        llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
-    emitDbgIntrinsic(BB, Zero, Var, DBuilder.createExpression(), Line,
-                     Loc.Column, Scope, DS);
-  }
+  if (Storage.size() == 0)
+    emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
+                     DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }
 
-void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
-                                      llvm::Value *Storage,
+void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                                       llvm::DILocalVariable *Var,
                                       llvm::DIExpression *Expr, unsigned Line,
                                       unsigned Col, llvm::DILocalScope *Scope,
@@ -985,19 +975,35 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+  auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
   if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))
     return;
-
+  
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guaranteed and a variable can end up in
   // two allocas (for example, one function inlined twice).
-  if (isa<llvm::AllocaInst>(Storage))
+  if (isa<llvm::AllocaInst>(Storage)) {
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  else
-    DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
+    return;
+  }
+
+  // If the storage is an instruction, insert the dbg.value directly after it.
+  if (auto *I = dyn_cast<llvm::Instruction>(Storage)) {
+    auto InsPt = std::next(I->getIterator());
+    auto E = I->getParent()->end();
+    while (InsPt != E && isa<llvm::PHINode>(&*InsPt))
+        ++InsPt;
+    if (InsPt != E) {
+      DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, &*InsPt);
+      return;
+    }
+  }
+
+  // Otherwise just insert it at the current insertion point.
+  DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(

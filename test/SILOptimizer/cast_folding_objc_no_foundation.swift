@@ -44,7 +44,7 @@ func testAnyObjectToArrayNotBridged(_ a: AnyObject) -> Bool {
 // CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]] : $*AnyObject to Dictionary<Int, String> in [[TARGET]] : $*Dictionary<Int, String>, bb1, bb2
 @inline(never)
 func testAnyObjectToDictionary(_ a: AnyObject) -> Bool {
-  return a is [Int:String]
+  return a is [Int: String]
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation21testAnyObjectToStringFPs9AnyObject_Sb

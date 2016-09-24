@@ -1274,6 +1274,9 @@ CalleeCandidateInfo::evaluateCloseness(DeclContext *dc, Type candArgListType,
     void missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
     }
+    void missingLabel(unsigned paramIdx) override {
+      result = CC_ArgumentLabelMismatch;
+    }
     void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
       result = CC_ArgumentLabelMismatch;
     }
@@ -4671,152 +4674,159 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       CCI.closeness != CC_ArgumentCountMismatch)
     return false;
 
-  SmallVector<Identifier, 4> correctNames;
-  unsigned OOOArgIdx = ~0U, OOOPrevArgIdx = ~0U;
-  unsigned extraArgIdx = ~0U, missingParamIdx = ~0U;
-
   // If we have a single candidate that failed to match the argument list,
   // attempt to use matchCallArguments to diagnose the problem.
-  struct OurListener : public MatchCallArgumentListener {
-    SmallVectorImpl<Identifier> &correctNames;
-    unsigned &OOOArgIdx, &OOOPrevArgIdx;
-    unsigned &extraArgIdx, &missingParamIdx;
+  class ArgumentDiagnostic : public MatchCallArgumentListener {
+    TypeChecker &TC;
+    Expr *ArgExpr;
+    llvm::SmallVectorImpl<CallArgParam> &Parameters;
+    llvm::SmallVectorImpl<CallArgParam> &Arguments;
+
+    CalleeCandidateInfo CandidateInfo;
+
+    // Indicates if problem has been found and diagnostic was emitted.
+    bool Diagnosed = false;
+    // Indicates if functions we are trying to call is a subscript.
+    bool IsSubscript;
+
+    // Stores parameter bindings determined by call to matchCallArguments.
+    SmallVector<ParamBinding, 4> Bindings;
 
   public:
-    OurListener(SmallVectorImpl<Identifier> &correctNames,
-                unsigned &OOOArgIdx, unsigned &OOOPrevArgIdx,
-                unsigned &extraArgIdx, unsigned &missingParamIdx)
-    : correctNames(correctNames),
-    OOOArgIdx(OOOArgIdx), OOOPrevArgIdx(OOOPrevArgIdx),
-    extraArgIdx(extraArgIdx), missingParamIdx(missingParamIdx) {}
-    void extraArgument(unsigned argIdx) override {
-      extraArgIdx = argIdx;
+    ArgumentDiagnostic(Expr *argExpr,
+                       llvm::SmallVectorImpl<CallArgParam> &params,
+                       llvm::SmallVectorImpl<CallArgParam> &args,
+                       CalleeCandidateInfo &CCI, bool isSubscript)
+        : TC(CCI.CS->TC), ArgExpr(argExpr), Parameters(params), Arguments(args),
+          CandidateInfo(CCI), IsSubscript(isSubscript) {}
+
+    void extraArgument(unsigned extraArgIdx) override {
+      auto name = Arguments[extraArgIdx].Label;
+      Expr *arg = ArgExpr;
+
+      auto tuple = dyn_cast<TupleExpr>(ArgExpr);
+      if (tuple)
+        arg = tuple->getElement(extraArgIdx);
+
+      auto loc = arg->getLoc();
+      if (tuple && extraArgIdx == tuple->getNumElements() - 1 &&
+          tuple->hasTrailingClosure())
+        TC.diagnose(loc, diag::extra_trailing_closure_in_call)
+            .highlight(arg->getSourceRange());
+      else if (Parameters.empty())
+        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
+            .highlight(ArgExpr->getSourceRange());
+      else if (name.empty())
+        TC.diagnose(loc, diag::extra_argument_positional)
+            .highlight(arg->getSourceRange());
+      else
+        TC.diagnose(loc, diag::extra_argument_named, name)
+            .highlight(arg->getSourceRange());
+
+      Diagnosed = true;
     }
-    void missingArgument(unsigned paramIdx) override {
-      missingParamIdx = paramIdx;
+
+    void missingArgument(unsigned missingParamIdx) override {
+      Identifier name = Parameters[missingParamIdx].Label;
+      auto loc = ArgExpr->getStartLoc();
+      if (name.empty())
+        TC.diagnose(loc, diag::missing_argument_positional,
+                    missingParamIdx + 1);
+      else
+        TC.diagnose(loc, diag::missing_argument_named, name);
+
+      auto candidate = CandidateInfo[0];
+      if (candidate.getDecl())
+        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                    candidate.getDecl()->getFullName());
+
+      Diagnosed = true;
     }
-    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override{
-      OOOArgIdx = argIdx;
-      OOOPrevArgIdx = prevArgIdx;
+
+    void missingLabel(unsigned paramIdx) override {
+      auto tuple = cast<TupleExpr>(ArgExpr);
+      TC.diagnose(tuple->getElement(paramIdx)->getStartLoc(),
+                  diag::missing_argument_labels, false,
+                  Parameters[paramIdx].Label.str(), IsSubscript);
+
+      Diagnosed = true;
     }
+
+    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+      auto tuple = cast<TupleExpr>(ArgExpr);
+      Identifier first = tuple->getElementName(argIdx);
+      Identifier second = tuple->getElementName(prevArgIdx);
+
+      // Build a mapping from arguments to parameters.
+      SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
+      for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
+        for (auto argIdx : Bindings[paramIdx])
+          argBindings[argIdx] = paramIdx;
+      }
+
+      auto argRange = [&](unsigned argIdx, Identifier label) -> SourceRange {
+        auto range = tuple->getElement(argIdx)->getSourceRange();
+        if (!label.empty())
+          range.Start = tuple->getElementNameLoc(argIdx);
+
+        unsigned paramIdx = argBindings[argIdx];
+        if (Bindings[paramIdx].size() > 1)
+          range.End = tuple->getElement(Bindings[paramIdx].back())->getEndLoc();
+
+        return range;
+      };
+
+      auto firstRange = argRange(argIdx, first);
+      auto secondRange = argRange(prevArgIdx, second);
+
+      SourceLoc diagLoc = firstRange.Start;
+
+      if (first.empty() && second.empty()) {
+        TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
+                    argIdx + 1, prevArgIdx + 1)
+            .fixItExchange(firstRange, secondRange);
+      } else if (first.empty() && !second.empty()) {
+        TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
+                    argIdx + 1, second)
+            .fixItExchange(firstRange, secondRange);
+      } else if (!first.empty() && second.empty()) {
+        TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed, first,
+                    prevArgIdx + 1)
+            .fixItExchange(firstRange, secondRange);
+      } else {
+        TC.diagnose(diagLoc, diag::argument_out_of_order_named_named, first,
+                    second)
+            .fixItExchange(firstRange, secondRange);
+      }
+
+      Diagnosed = true;
+    }
+
     bool relabelArguments(ArrayRef<Identifier> newNames) override {
-      correctNames.append(newNames.begin(), newNames.end());
+      assert (!newNames.empty() && "No arguments were re-labeled");
+
+      // Let's diagnose labeling problem but only related to corrected ones.
+      if (diagnoseArgumentLabelError(TC, ArgExpr, newNames, IsSubscript))
+        Diagnosed = true;
+
       return true;
     }
-  } listener(correctNames, OOOArgIdx, OOOPrevArgIdx,
-             extraArgIdx, missingParamIdx);
 
-  // Use matchCallArguments to determine how close the argument list is (in
-  // shape) to the specified candidates parameters.  This ignores the
-  // concrete types of the arguments, looking only at the argument labels.
-  SmallVector<ParamBinding, 4> paramBindings;
-  if (!matchCallArguments(args, params, CCI.hasTrailingClosure,
-                          /*allowFixes:*/true, listener, paramBindings))
-    return false;
+    bool diagnose() {
+      // Use matchCallArguments to determine how close the argument list is (in
+      // shape) to the specified candidates parameters.  This ignores the
+      // concrete types of the arguments, looking only at the argument labels.
+      matchCallArguments(Arguments, Parameters,
+                         CandidateInfo.hasTrailingClosure,
+                         /*allowFixes:*/ true, *this, Bindings);
 
-
-  // If we are missing a parameter, diagnose that.
-  if (missingParamIdx != ~0U) {
-    Identifier name = params[missingParamIdx].Label;
-    auto loc = argExpr->getStartLoc();
-    if (name.empty())
-      TC.diagnose(loc, diag::missing_argument_positional,
-                  missingParamIdx+1);
-    else
-      TC.diagnose(loc, diag::missing_argument_named, name);
-    
-    if (candidate.getDecl())
-      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                  candidate.getDecl()->getFullName());
-    return true;
-  }
-
-  if (extraArgIdx != ~0U) {
-    auto name = args[extraArgIdx].Label;
-    Expr *arg = argExpr;
-    auto tuple = dyn_cast<TupleExpr>(argExpr);
-    if (tuple)
-      arg = tuple->getElement(extraArgIdx);
-    auto loc = arg->getLoc();
-    if (tuple && extraArgIdx == tuple->getNumElements()-1 &&
-        tuple->hasTrailingClosure())
-      TC.diagnose(loc, diag::extra_trailing_closure_in_call)
-        .highlight(arg->getSourceRange());
-    else if (params.empty())
-      TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-        .highlight(argExpr->getSourceRange());
-    else if (name.empty())
-      TC.diagnose(loc, diag::extra_argument_positional)
-        .highlight(arg->getSourceRange());
-    else
-      TC.diagnose(loc, diag::extra_argument_named, name)
-        .highlight(arg->getSourceRange());
-    return true;
-  }
-
-  // If this is an argument label mismatch, then diagnose that error now.
-  if (!correctNames.empty() &&
-      diagnoseArgumentLabelError(TC, argExpr, correctNames,
-                                 isa<SubscriptExpr>(fnExpr)))
-    return true;
-
-  // If we have an out-of-order argument, diagnose it as such.
-  if (OOOArgIdx != ~0U && isa<TupleExpr>(argExpr)) {
-    auto tuple = cast<TupleExpr>(argExpr);
-    Identifier first = tuple->getElementName(OOOArgIdx);
-    Identifier second = tuple->getElementName(OOOPrevArgIdx);
-
-    // Build a mapping from arguments to parameters.
-    SmallVector<unsigned, 4> argBindings(tuple->getNumElements());
-    for (unsigned paramIdx = 0; paramIdx != paramBindings.size(); ++paramIdx) {
-      for (auto argIdx : paramBindings[paramIdx])
-        argBindings[argIdx] = paramIdx;
+      return Diagnosed;
     }
+  };
 
-    auto firstRange = tuple->getElement(OOOArgIdx)->getSourceRange();
-    if (!first.empty()) {
-      firstRange.Start = tuple->getElementNameLoc(OOOArgIdx);
-    }
-    unsigned OOOParamIdx = argBindings[OOOArgIdx];
-    if (paramBindings[OOOParamIdx].size() > 1) {
-      firstRange.End =
-        tuple->getElement(paramBindings[OOOParamIdx].back())->getEndLoc();
-    }
-
-    auto secondRange = tuple->getElement(OOOPrevArgIdx)->getSourceRange();
-    if (!second.empty()) {
-      secondRange.Start = tuple->getElementNameLoc(OOOPrevArgIdx);
-    }
-    unsigned OOOPrevParamIdx = argBindings[OOOPrevArgIdx];
-    if (paramBindings[OOOPrevParamIdx].size() > 1) {
-      secondRange.End =
-        tuple->getElement(paramBindings[OOOPrevParamIdx].back())->getEndLoc();
-    }
-
-    SourceLoc diagLoc = firstRange.Start;
-
-    if (first.empty() && second.empty()) {
-      TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_unnamed,
-                  OOOArgIdx + 1, OOOPrevArgIdx + 1)
-        .fixItExchange(firstRange, secondRange);
-    } else if (first.empty() && !second.empty()) {
-      TC.diagnose(diagLoc, diag::argument_out_of_order_unnamed_named,
-                  OOOArgIdx + 1, second)
-        .fixItExchange(firstRange, secondRange);
-    } else if (!first.empty() && second.empty()) {
-      TC.diagnose(diagLoc, diag::argument_out_of_order_named_unnamed,
-                  first, OOOPrevArgIdx + 1)
-        .fixItExchange(firstRange, secondRange);
-    } else {
-      TC.diagnose(diagLoc, diag::argument_out_of_order_named_named,
-                  first, second)
-        .fixItExchange(firstRange, secondRange);
-    }
-
-    return true;
-  }
-
-  return false;
+  return ArgumentDiagnostic(argExpr, params, args, CCI,
+                            isa<SubscriptExpr>(fnExpr))
+      .diagnose();
 }
 
 /// If the candidate set has been narrowed down to a specific structural

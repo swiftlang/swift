@@ -773,9 +773,7 @@ AnyHashableTests.test("AnyHashable(Wrappers)/Hashable") {
   checkHashable(values, equalityOracle: equalityOracle,
                 allowBrokenTransitivity: true)
 }
-#endif
 
-#if _runtime(_ObjC)
 AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {
   let swiftErrors: [MinimalHashablePODSwiftError] = [
     .caseA, .caseA,
