@@ -225,6 +225,7 @@ KNOWN_SETTINGS=(
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
     llvm-targets-to-build              "X86;ARM;AArch64;PowerPC;SystemZ" "The code generators that LLVM should build"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
 
@@ -785,6 +786,12 @@ function set_build_options_for_host() {
         )
         swift_cmake_options+=(
             -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
+        )
+    fi
+
+    if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_PROFDATA_FILE="${CLANG_PROFILE_INSTR_USE}"
         )
     fi
 }
