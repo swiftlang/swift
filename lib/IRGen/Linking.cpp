@@ -328,6 +328,10 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.append("_TMRa");
     mangler.mangleProtocolConformance(getProtocolConformance());
     return mangler.finalize(buffer);
+  case Kind::ReflectionSuperclassDescriptor:
+    mangler.append("_TMRs");
+    mangler.mangleNominalType(cast<ClassDecl>(getDecl()));
+    return mangler.finalize(buffer);
   }
   llvm_unreachable("bad entity kind!");
 }
