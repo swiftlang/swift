@@ -82,15 +82,7 @@ endfunction()
 
 include(FindPythonInterp)
 if(PYTHONINTERP_FOUND)
-  if(PATH_TO_LLVM_SOURCE)
-    set(LIT "${PATH_TO_LLVM_SOURCE}/utils/lit/lit.py")
-  else()
-    set(LIT "${PATH_TO_LLVM_BUILD}/${CMAKE_CFG_INTDIR}/bin/llvm-lit")
-    # Installed LLVM does not contain ${CMAKE_CFG_INTDIR} in paths.
-    if(NOT EXISTS "${LIT}")
-      set(LIT "${PATH_TO_LLVM_BUILD}/llvm-lit/bin")
-    endif()
-  endif()
+  set (LIT ${CMAKE_CURRENT_SOURCE_DIR}/../utils/lit/lit.py)
 
   # Incremental mode in lit orders test files by the last modification time
   # instead of by the path, which is good for CI. In this mode lit also updates
