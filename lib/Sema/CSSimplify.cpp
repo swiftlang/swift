@@ -28,6 +28,8 @@ void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
 
 void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
 
+void MatchCallArgumentListener::missingLabel(unsigned paramIdx) {}
+
 void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
 }
@@ -454,6 +456,27 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       }
 
       unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
+
+      // First let's double check if out-of-order argument is nothing
+      // more than a simple label mismatch, because in situation where
+      // one argument requires label and another one doesn't, but caller
+      // doesn't provide either, problem is going to be identified as
+      // out-of-order argument instead of label mismatch.
+      auto &parameter = params[prevArgIdx];
+      if (parameter.hasLabel()) {
+        auto expectedLabel = parameter.Label;
+        auto argumentLabel = args[argIdx].Label;
+
+        // If there is a label but it's incorrect it can only mean
+        // situation like this: expected (x, _ y) got (y, _ x).
+        if (argumentLabel.empty() ||
+            (expectedLabel.compare(argumentLabel) != 0 &&
+             args[prevArgIdx].Label.empty())) {
+          listener.missingLabel(prevArgIdx);
+          return true;
+        }
+      }
+
       listener.outOfOrderArgument(argIdx, prevArgIdx);
       return true;
     }
