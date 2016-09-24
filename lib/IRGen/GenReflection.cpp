@@ -321,6 +321,45 @@ public:
   }
 };
 
+class SuperclassMetadataBuilder : public ReflectionMetadataBuilder {
+  static const uint32_t AssociatedTypeRecordSize = 8;
+
+  const ClassDecl *Class;
+  CanType Superclass;
+
+  void layout() override {
+    PrettyStackTraceDecl DebugStack("emitting superclass metadata",
+                                    Class);
+
+    auto *M = IGM.getSILModule().getSwiftModule();
+
+    addTypeRef(M, Class->getDeclaredType()->getCanonicalType());
+
+    auto anyObjectDecl = IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
+    addTypeRef(M, anyObjectDecl->getDeclaredType()->getCanonicalType());
+
+    addConstantInt32(1);
+    addConstantInt32(AssociatedTypeRecordSize);
+
+    auto NameGlobal = IGM.getAddrOfStringForTypeRef("super");
+    addRelativeAddress(NameGlobal);
+    addTypeRef(M, Superclass);
+  }
+
+public:
+  SuperclassMetadataBuilder(IRGenModule &IGM,
+                            const ClassDecl *Class,
+                            CanType Superclass)
+    : ReflectionMetadataBuilder(IGM), Class(Class),
+      Superclass(Superclass) {}
+
+  llvm::GlobalVariable *emit() {
+    auto entity = LinkEntity::forReflectionSuperclassDescriptor(Class);
+    auto section = IGM.getAssociatedTypeMetadataSectionName();
+    return ReflectionMetadataBuilder::emit(entity, section);
+  }
+};
+
 class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
@@ -907,6 +946,21 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
 
   FieldTypeMetadataBuilder builder(*this, Decl);
   builder.emit();
+
+  // So that -parse-stdlib tests don't need to define an AnyObject
+  // protocol (which will go away one day anyway).
+  if (!Context.getProtocol(KnownProtocolKind::AnyObject))
+    return;
+
+  // If this is a class declaration with a superclass, record the
+  // superclass as a special associated type named 'super' on the
+  // 'AnyObject' protocol.
+  if (auto Superclass = Decl->getDeclaredInterfaceType()
+                            ->getSuperclass(nullptr)) {
+    SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
+                                      Superclass->getCanonicalType());
+    builder.emit();
+  }
 }
 
 void IRGenModule::emitReflectionMetadataVersion() {
