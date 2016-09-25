@@ -728,6 +728,14 @@ private:
 
 //--- Remote reflection metadata --------------------------------------------
 public:
+  /// Section names.
+  std::string FieldTypeSection;
+  std::string BuiltinTypeSection;
+  std::string AssociatedTypeSection;
+  std::string CaptureDescriptorSection;
+  std::string ReflectionStringsSection;
+  std::string ReflectionTypeRefSection;
+
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
@@ -770,12 +778,12 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  std::string getBuiltinTypeMetadataSectionName();
-  std::string getFieldTypeMetadataSectionName();
-  std::string getAssociatedTypeMetadataSectionName();
-  std::string getCaptureDescriptorMetadataSectionName();
-  std::string getReflectionStringsSectionName();
-  std::string getReflectionTypeRefSectionName();
+  const char *getBuiltinTypeMetadataSectionName();
+  const char *getFieldTypeMetadataSectionName();
+  const char *getAssociatedTypeMetadataSectionName();
+  const char *getCaptureDescriptorMetadataSectionName();
+  const char *getReflectionStringsSectionName();
+  const char *getReflectionTypeRefSectionName();
 
 //--- Runtime ---------------------------------------------------------------
 public:

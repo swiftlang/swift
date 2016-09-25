@@ -17,10 +17,26 @@ public protocol P {
   associatedtype B
 }
 
-public struct Foo<T, U> : P {
+public protocol Q : P {}
+
+public struct ConformsP<T, U> : P {
   public typealias A = Box<U>
   public typealias B = Box<T>
 }
+
+public struct ConformsQ<T, U> : Q {
+  public typealias A = Box<U>
+  public typealias B = Box<T>
+}
+
+public class Base<T, U> : P {
+  public typealias A = Box<T>
+  public typealias B = Box<U>
+}
+
+public class Derived : Base<Int8, Int16> {}
+
+public class GenericDerived<T> : Base<T, T> {}
 
 public struct Bar<T : P> {
   public let a: T.A
@@ -29,7 +45,11 @@ public struct Bar<T : P> {
 }
 
 public struct AssocTypeStruct {
-  public let t: Bar<Foo<Int8, Int16>>
+  public let t1: Bar<ConformsP<Int8, Int16>>
+  public let t2: Bar<ConformsQ<Int8, Int16>>
+  public let t3: Bar<Base<Int8, Int16>>
+  public let t4: Bar<Derived>
+  public let t5: Bar<GenericDerived<Int8>>
 }
 
 public class C {}
