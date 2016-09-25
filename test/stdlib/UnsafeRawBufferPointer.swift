@@ -100,7 +100,7 @@ UnsafeRawBufferPointerTestSuite.test("empty") {
 }
 
 // Store a sequence of integers to raw memory, and reload them as structs.
-// Strore structs to raw memory, and reload them as integers.
+// Store structs to raw memory, and reload them as integers.
 UnsafeRawBufferPointerTestSuite.test("reinterpret") {
   struct Pair {
     var x: Int32
