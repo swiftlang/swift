@@ -109,7 +109,7 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Int>(oups)  // expected-error {{'init' is unavailable: use 'withMemoryRebound(to:capacity:_)' to temporarily view memory as another layout-compatible type.}}
 }
 
-func unsafeRawBufferPointerConversionAvailability(
+func unsafeRawBufferPointerConversions(
   mrp: UnsafeMutableRawPointer,
   rp: UnsafeRawPointer,
   mrbp: UnsafeMutableRawBufferPointer,

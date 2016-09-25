@@ -2115,6 +2115,7 @@ public func != <Element : Equatable>(
 extension ${Self} {
   /// Calls a closure with a view of the array's underlying bytes of memory as a
   /// Collection of `UInt8`.
+  ///
   /// ${contiguousCaveat}
   ///
   /// - Precondition: `Pointee` is a trivial type.
@@ -2129,25 +2130,25 @@ extension ${Self} {
   ///      }
   ///    }
   ///
-  /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
-  ///   that points to the contiguous storage for the array. If `body` has a
-  ///   return value, it is used as the return value for the
-  ///   `withUnsafeBytes(_:)` method. The argument is valid only for the
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
+  ///   parameter that points to the contiguous storage for the array. If `body`
+  ///   has a return value, it is used as the return value for the
+  ///   `withUnsafeMutableBytes(_:)` method. The argument is valid only for the
   ///   duration of the closure's execution.
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
   /// - SeeAlso: `withUnsafeBytes`, `UnsafeMutableRawBufferPointer`
   public mutating func withUnsafeMutableBytes<R>(
-    _ body: (inout UnsafeMutableRawBufferPointer) throws -> R
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeMutableBufferPointer {
-      var bytes = UnsafeMutableRawBufferPointer($0)
-      return try body(&bytes)
+      return try body(UnsafeMutableRawBufferPointer($0))
     }
   }
 
   /// Calls a closure with a view of the array's underlying bytes of memory
   /// as a Collection of `UInt8`.
+  ///
   /// ${contiguousCaveat}
   ///
   /// - Precondition: `Pointee` is a trivial type.
