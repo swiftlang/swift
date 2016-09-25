@@ -908,7 +908,7 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
 
   let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
   expectEqual("Cons(first: 0, rest: a.List<Swift.Int>.Cons(first: 1, rest: a.List<Swift.Int>.Nil))",
-	      "\(list)")
+    "\(list)")
 }
 
 class Brilliant : CustomReflectable {
