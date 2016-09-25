@@ -285,13 +285,13 @@ public:
 
   /// Gets the type being declared by this context.
   ///
-  /// - Generic types return an bound generic type using archetypes.
+  /// - Generic types return a bound generic type using archetypes.
   /// - Non-type contexts return a null type.
   Type getDeclaredTypeInContext() const;
   
   /// Gets the type being declared by this context.
   ///
-  /// - Generic types return an bound generic type using interface types.
+  /// - Generic types return a bound generic type using interface types.
   /// - Non-type contexts return a null type.
   Type getDeclaredInterfaceType() const;
 

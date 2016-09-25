@@ -59,7 +59,7 @@ public:
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
 
-  /// Map an generic parameter type to a contextual type.
+  /// Map a generic parameter type to a contextual type.
   Type mapTypeIntoContext(GenericTypeParamType *type) const;
 
   /// Derive a contextual type substitution map from a substitution array.
