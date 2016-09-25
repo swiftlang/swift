@@ -65,7 +65,7 @@
 ///
 /// Example (continued):
 /// ```swift
-///   // Copy a another slice of memory back into the original slice.
+///   // Copy another slice of memory back into the original slice.
 ///   destBytes[0..<n] = someBytes[m..<(m+n)]
 /// ```
 ///
