@@ -2,7 +2,7 @@
 // RUN: %FileCheck %s --check-prefix IMPORT-CHECK < %t.ll
 // RUN: %FileCheck %s --check-prefix LOC-CHECK < %t.ll
 // RUN: llc %t.ll -filetype=obj -o %t.o
-// RUN: llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
+// RUN: %llvm-dwarfdump %t.o | %FileCheck %s --check-prefix DWARF-CHECK
 // DISABLED <rdar://problem/28232630>: dwarfdump --verify %t.o
 
 // REQUIRES: OS=macosx
