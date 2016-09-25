@@ -59,6 +59,41 @@ def fline_map(filename):
 
 
 def map_line(filename, line_num):
+    """
+    >>> from tempfile import *
+    >>> t = NamedTemporaryFile()
+    >>> t.write('''line 1
+    ... line 2
+    ... // ###sourceLocation(file: "foo.bar", line: 20)
+    ... line 4
+    ... line 5
+    ... // ###sourceLocation(file: "baz.txt", line: 5)
+    ... line 7
+    ... line 8
+    ... ''')
+    >>> t.flush()
+    >>> (t2, l) = map_line(t.name, 1)
+    >>> t2 == t.name, l
+    (True, 1)
+    >>> (t2, l) = map_line(t.name, 2)
+    >>> t2 == t.name, l
+    (True, 2)
+    >>> (t2, l) = map_line(t.name, 3)
+    >>> t2 == t.name, l
+    (True, 3)
+    >>> map_line(t.name, 4)
+    ('foo.bar', 20)
+    >>> map_line(t.name, 5)
+    ('foo.bar', 21)
+    >>> map_line(t.name, 6)
+    ('foo.bar', 22)
+    >>> map_line(t.name, 7)
+    ('baz.txt', 5)
+    >>> map_line(t.name, 8)
+    ('baz.txt', 6)
+    >>> map_line(t.name, 42)
+    ('baz.txt', 40)
+    """
     assert(line_num > 0)
     map = fline_map(filename)
     index = bisect.bisect_left(map, (line_num, '', 0))
@@ -67,6 +102,65 @@ def map_line(filename, line_num):
 
 
 def run():
+    """
+    >>> from tempfile import *
+    >>> target1 = NamedTemporaryFile()
+    >>> target1.write('''line 1
+    ... line 2
+    ... // ###sourceLocation(file: "foo.bar", line: 20)
+    ... line 4
+    ... line 5
+    ... // ###sourceLocation(file: "baz.txt", line: 5)
+    ... line 7
+    ... line 8
+    ... ''')
+    >>> target1.flush()
+    >>> target2 = NamedTemporaryFile()
+    >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
+    ... line 2
+    ... line 3
+    ... // ###sourceLocation(file: "fox.box", line: 11)
+    ... line 5
+    ... line 6
+    ... ''')
+    >>> target2.flush()
+    >>> raw_output = NamedTemporaryFile()
+    >>> target1_name, target2_name = target1.name, target2.name
+    >>> raw_output.write('''A
+    ... %(target1_name)s:2:111: error one
+    ... B
+    ... %(target1_name)s:4:222: error two
+    ... C
+    ... %(target1_name)s:8:333: error three
+    ... D
+    ... glitch in file %(target2_name)s:1 assert one
+    ... E
+    ... glitch in file %(target2_name)s, line 2 assert two
+    ... glitch at %(target2_name)s, line 3 assert three
+    ... glitch at %(target2_name)s:4 assert four
+    ... glitch in [%(target2_name)s, line 5 assert five
+    ... glitch in [%(target2_name)s:22 assert six
+    ... ''' % locals())
+    >>> raw_output.flush()
+    >>> import subprocess
+    >>> output = subprocess.check_output([__file__, target1.name, target2.name, '--', 'cat', raw_output.name])
+    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME') + 'EOF'
+    A
+    TARGET1-NAME:2:111: error one
+    B
+    foo.bar:20:222: error two
+    C
+    baz.txt:6:333: error three
+    D
+    glitch in file TARGET2-NAME:1 assert one
+    E
+    glitch in file foo.bar, line 7 assert two
+    glitch at foo.bar, line 8 assert three
+    glitch at foo.bar:9 assert four
+    glitch in [fox.box, line 11 assert five
+    glitch in [fox.box:28 assert six
+    EOF
+    """
     if len(sys.argv) <= 1:
         import doctest
         doctest.testmod()
