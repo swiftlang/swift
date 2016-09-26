@@ -1313,6 +1313,22 @@ public func ParamAttrs4(a : @escaping () -> ()) {
   a()
 }
 
+// Setter
+// PASS_PRINT_AST: class FooClassComputed {
+class FooClassComputed {
+
+// PASS_PRINT_AST:   var stored: (((Int) -> Int) -> Int)?
+  var stored : (((Int) -> Int) -> Int)? = nil
+
+// PASS_PRINT_AST:   var computed: ((Int) -> Int) -> Int { get set }
+  var computed : ((Int) -> Int) -> Int {
+    get { return stored! }
+    set { stored = newValue }
+  }
+
+// PASS_PRINT_AST: }
+}
+
 // Protocol extensions
 
 protocol ProtocolToExtend {
