@@ -351,7 +351,9 @@ func invalid_inout(inout var x : Int) { // expected-error {{parameter may not ha
 func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-21=}} {{1-1=    var x = x\n}}
   
 }
-
+func takesClosure(_: (Int) -> Int) {
+  takesClosure { (var d) in d } // expected-error {{parameters may not have the 'var' specifier}}
+}
 
 func updateInt(_ x : inout Int) {}
 
