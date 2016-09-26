@@ -211,7 +211,7 @@ struct SubstDependentSILType
     // its context substitution against the associated type's abstraction
     // pattern.
     CanType astTy = Subst(t);
-    AbstractionPattern origTy(t->getAssocType()->getArchetype());
+    auto origTy = AbstractionPattern::getOpaque();
     
     return M.Types.getLoweredType(origTy, astTy)
       .getSwiftRValueType();

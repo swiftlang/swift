@@ -20,6 +20,7 @@
 #define SWIFT_SERIALIZATION_MODULEFORMAT_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Types.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Bitcode/BitCodes.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
@@ -53,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 266; // Last change: pattern binding init contexts
+const uint16_t VERSION_MINOR = 270; // Last change: parameter type flags
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -570,7 +571,10 @@ namespace decls_block {
 
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField  // inner type
+    TypeIDField,        // inner type
+    BCFixed<1>,         // vararg?
+    BCFixed<1>,         // autoclosure?
+    BCFixed<1>          // escaping?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -579,9 +583,11 @@ namespace decls_block {
 
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
-    IdentifierIDField,    // name
-    TypeIDField,          // type
-    BCFixed<1>            // vararg?
+    IdentifierIDField,  // name
+    TypeIDField,        // type
+    BCFixed<1>,         // vararg?
+    BCFixed<1>,         // autoclosure?
+    BCFixed<1>          // escaping?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
@@ -768,7 +774,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit flag
     BCVBR<4>,    // depth
     BCVBR<4>,    // index
-    TypeIDField, // archetype type
     BCArray<TypeIDField> // inherited types
   >;
 
@@ -776,7 +781,6 @@ namespace decls_block {
     ASSOCIATED_TYPE_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    TypeIDField,       // archetype type
     TypeIDField,       // default definition
     BCFixed<1>,        // implicit flag
     BCArray<TypeIDField> // inherited types

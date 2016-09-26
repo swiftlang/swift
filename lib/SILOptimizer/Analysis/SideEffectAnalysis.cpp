@@ -66,16 +66,22 @@ bool FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
 
 bool FunctionEffects::mergeFromApply(
                   const FunctionEffects &ApplyEffects, FullApplySite FAS) {
+  return mergeFromApply(ApplyEffects, FAS.getInstruction());
+}
+
+bool FunctionEffects::mergeFromApply(
+                  const FunctionEffects &ApplyEffects, SILInstruction *AS) {
   bool Changed = mergeFlags(ApplyEffects);
   Changed |= GlobalEffects.mergeFrom(ApplyEffects.GlobalEffects);
-  unsigned numCallerArgs = FAS.getNumArguments();
+  auto FAS = FullApplySite::isa(AS);
+  unsigned numCallerArgs = FAS ? FAS.getNumArguments() : 1;
   unsigned numCalleeArgs = ApplyEffects.ParamEffects.size();
   assert(numCalleeArgs >= numCallerArgs);
   for (unsigned Idx = 0; Idx < numCalleeArgs; Idx++) {
     // Map the callee argument effects to parameters of this function.
     // If there are more callee parameters than arguments it means that the
     // callee is the result of a partial_apply.
-    Effects *E = (Idx < numCallerArgs ? getEffectsOn(FAS.getArgument(Idx)) :
+    Effects *E = (Idx < numCallerArgs ? getEffectsOn(FAS ? FAS.getArgument(Idx) : AS->getOperand(Idx)) :
                   &GlobalEffects);
     Changed |= E->mergeFrom(ApplyEffects.ParamEffects[Idx]);
   }
@@ -94,6 +100,7 @@ static SILValue skipAddrProjections(SILValue V) {
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
       case ValueKind::ProjectBoxInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst:
       case ValueKind::PointerToAddressInst:

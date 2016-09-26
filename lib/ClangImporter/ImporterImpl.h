@@ -752,6 +752,10 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            bool useSwift2Name, ProtocolDecl *proto);
 
+  /// \brief Utility function for building simple generic signatures.
+  std::pair<GenericSignature *, GenericEnvironment *>
+  buildGenericSignature(GenericParamList *genericParams, DeclContext *dc);
+
   /// \brief Import the given Clang declaration context into Swift.
   ///
   /// Usually one will use \c importDeclContextOf instead.

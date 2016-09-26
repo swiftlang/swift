@@ -11,3 +11,9 @@ func rdar28207648() -> [(Int, CustomStringConvertible)] {
   return v as [(Int, CustomStringConvertible)] // expected-error {{cannot express tuple conversion '(Int, Int)' to '(Int, CustomStringConvertible)'}}
 }
 
+class rdar28207648Base {}
+class rdar28207648Derived : rdar28207648Base {}
+
+func rdar28207648(x: (Int, rdar28207648Derived)) -> (Int, rdar28207648Base) {
+  return x as (Int, rdar28207648Base) // expected-error {{cannot express tuple conversion '(Int, rdar28207648Derived)' to '(Int, rdar28207648Base)'}}
+}

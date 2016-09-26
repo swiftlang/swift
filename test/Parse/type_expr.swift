@@ -1,4 +1,5 @@
 // RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift -enable-astscope-lookup
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.

@@ -1,4 +1,4 @@
-//===--- ClangAdapter.cpp - Interfaces with Clang entities ------*- C++ -*-===//
+//===--- ClangAdapter.cpp - Interfaces with Clang entities ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -337,6 +337,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // FIXME: Types that can be mapped, but aren't yet.
     case clang::BuiltinType::Half:
     case clang::BuiltinType::LongDouble:
+    case clang::BuiltinType::Float128:
     case clang::BuiltinType::NullPtr:
       return OmissionTypeName();
 

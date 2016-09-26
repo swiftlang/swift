@@ -6,6 +6,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       Availability.mm
       DispatchShims.mm
       FoundationHelpers.mm
+      OptionalBridgingHelper.mm
       Reflection.mm
       SwiftNativeNSXXXBase.mm.gyb)
   set(LLVM_OPTIONAL_SOURCES
@@ -27,6 +28,5 @@ add_swift_library(swiftStdlibStubs OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_stubs_unicode_normalization_sources}
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS} -DswiftCore_EXPORTS
   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
-  LINK_LIBRARIES ${swift_stubs_link_libraries}
   INSTALL_IN_COMPONENT stdlib)
 

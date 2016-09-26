@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/ASTContext.h"
 
 #include "Explosion.h"
 #include "GenCall.h"
@@ -168,22 +169,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
                            IGF.IGM.getSize(Size(1))));
-    return;
-  }
-
-  if (Builtin.ID == BuiltinValueKind::StrideofNonZero) {
-    // Note this case must never return 0.
-    // It is implemented as max(strideof, 1)
-    args.claimAll();
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
-    // Strideof should never return 0, so return 1 if the type has a 0 stride.
-    llvm::Value *StrideOf = valueTy.second.getStride(IGF, valueTy.first);
-    llvm::IntegerType *IntTy = cast<llvm::IntegerType>(StrideOf->getType());
-    auto *Zero = llvm::ConstantInt::get(IntTy, 0);
-    auto *One = llvm::ConstantInt::get(IntTy, 1);
-    llvm::Value *Cmp = IGF.Builder.CreateICmpEQ(StrideOf, Zero);
-    out.add(IGF.Builder.CreateSelect(Cmp, One, StrideOf));
     return;
   }
 
@@ -843,6 +828,19 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     for (auto &elt : schema) {
       out.add(llvm::Constant::getNullValue(elt.getScalarType()));
     }
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
+    args.claimAll();
+    Type valueTy = substitutions[0].getReplacement();
+    // Get the type encoding for the associated clang type.
+    auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
+    std::string encoding;
+    IGF.IGM.getClangASTContext().getObjCEncodingForType(clangTy, encoding);
+    
+    auto globalString = IGF.IGM.getAddrOfGlobalString(encoding);
+    out.add(globalString);
     return;
   }
   

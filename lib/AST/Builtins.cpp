@@ -250,7 +250,7 @@ getBuiltinGenericFunction(Identifier Id,
 }
 
 /// Build a getelementptr operation declaration.
-static ValueDecl *getGepOperation(Identifier Id, Type ArgType) {
+static ValueDecl *getGepRawOperation(Identifier Id, Type ArgType) {
   auto &Context = ArgType->getASTContext();
   
   // This is always "(i8*, IntTy) -> i8*"
@@ -427,6 +427,11 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
 static const char * const GenericParamNames[] = {
   "T",
   "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z"
 };
 
 static std::pair<ArchetypeType*, GenericTypeParamDecl*>
@@ -440,7 +445,6 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
-  genericParam->setArchetype(archetype);
   return std::make_pair(archetype, genericParam);
 }
 
@@ -680,6 +684,53 @@ static ValueDecl *getBindMemoryOperation(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getAllocWithTailElemsOperation(ASTContext &Context,
+                                                 Identifier Id,
+                                                 int NumTailTypes) {
+  if (NumTailTypes < 1 ||
+      1 + NumTailTypes > (int)llvm::array_lengthof(GenericParamNames))
+    return nullptr;
+  GenericSignatureBuilder builder(Context, 1 + NumTailTypes);
+  builder.addParameter(makeMetatype(makeGenericParam(0)));
+  for (int Idx = 0; Idx < NumTailTypes; ++Idx) {
+    builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
+    builder.addParameter(makeMetatype(makeGenericParam(Idx + 1)));
+  }
+  builder.setResult(makeGenericParam(0));
+  return builder.build(Id);
+}
+
+static ValueDecl *getProjectTailElemsOperation(ASTContext &Context,
+                                               Identifier Id) {
+  GenericSignatureBuilder builder(Context, 2);
+  builder.addParameter(makeGenericParam(0));
+  builder.addParameter(makeMetatype(makeGenericParam(1)));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
+}
+
+/// Build a getelementptr operation declaration.
+static ValueDecl *getGepOperation(ASTContext &Context, Identifier Id,
+                                  Type ArgType) {
+  GenericSignatureBuilder builder(Context, 1);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(ArgType));
+  builder.addParameter(makeMetatype(makeGenericParam(0)));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getGetTailAddrOperation(ASTContext &Context, Identifier Id,
+                                          Type ArgType) {
+  GenericSignatureBuilder builder(Context, 2);
+  builder.addParameter(makeConcrete(Context.TheRawPointerType));
+  builder.addParameter(makeConcrete(ArgType));
+  builder.addParameter(makeMetatype(makeGenericParam(0)));
+  builder.addParameter(makeMetatype(makeGenericParam(1)));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
+  return builder.build(Id);
+}
+
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   GenericSignatureBuilder builder(Context);
@@ -858,6 +909,15 @@ static ValueDecl *getZeroInitializerOperation(ASTContext &Context,
   // <T> () -> T
   GenericSignatureBuilder builder(Context);
   builder.setResult(makeGenericParam());
+  return builder.build(Id);
+}
+
+static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
+                                                  Identifier Id) {
+  // <T> T.Type -> RawPointer
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
 
@@ -1452,6 +1512,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getAtomicStoreOperation(Context, Id, T);
   }
+  if (OperationName.startswith("allocWithTailElems_")) {
+    OperationName = OperationName.drop_front(strlen("allocWithTailElems_"));
+    int NumTailTypes = 0;
+    if (OperationName.getAsInteger(10, NumTailTypes))
+      return nullptr;
+
+    return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
+  }
 
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) \
@@ -1473,12 +1541,21 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AtomicRMW:
   case BuiltinValueKind::AtomicLoad:
   case BuiltinValueKind::AtomicStore:
+  case BuiltinValueKind::AllocWithTailElems:
     llvm_unreachable("Handled above");
   case BuiltinValueKind::None: return nullptr;
 
+  case BuiltinValueKind::GepRaw:
+    if (Types.size() != 1) return nullptr;
+    return getGepRawOperation(Id, Types[0]);
+
   case BuiltinValueKind::Gep:
     if (Types.size() != 1) return nullptr;
-    return getGepOperation(Id, Types[0]);
+    return getGepOperation(Context, Id, Types[0]);
+
+  case BuiltinValueKind::GetTailAddr:
+    if (Types.size() != 1) return nullptr;
+    return getGetTailAddrOperation(Context, Id, Types[0]);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION(id, name, attrs, overload)  case BuiltinValueKind::id:
@@ -1556,10 +1633,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getBindMemoryOperation(Context, Id);
 
+  case BuiltinValueKind::ProjectTailElems:
+    if (!Types.empty()) return nullptr;
+    return getProjectTailElemsOperation(Context, Id);
+
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Strideof:
   case BuiltinValueKind::Alignof:
-  case BuiltinValueKind::StrideofNonZero:
     return getSizeOrAlignOfOperation(Context, Id);
 
   case BuiltinValueKind::IsPOD:
@@ -1668,6 +1748,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IntToFPWithOverflow:
     if (Types.size() != 2) return nullptr;
     return getIntToFPWithOverflowOperation(Context, Id, Types[0], Types[1]);
+
+  case BuiltinValueKind::GetObjCTypeEncoding:
+    return getGetObjCTypeEncodingOperation(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

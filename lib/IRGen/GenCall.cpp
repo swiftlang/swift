@@ -539,6 +539,8 @@ namespace {
         return convertFloatingType(Ctx.getTargetInfo().getDoubleFormat());
       case clang::BuiltinType::LongDouble:
         return convertFloatingType(Ctx.getTargetInfo().getLongDoubleFormat());
+      case clang::BuiltinType::Float128:
+        return convertFloatingType(Ctx.getTargetInfo().getFloat128Format());
 
       // nullptr_t -> void*
       case clang::BuiltinType::NullPtr:

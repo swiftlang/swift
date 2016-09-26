@@ -539,20 +539,22 @@ namespace {
       if (GenericTypeDecl *GTD = dyn_cast<GenericTypeDecl>(VD))
         printGenericParameters(OS, GTD->getGenericParams());
 
-      OS << " type='";
-      if (VD->hasType())
-        VD->getType().print(OS);
-      else
-        OS << "<null type>";
+      if (!VD->hasType() || !VD->getType()->is<PolymorphicFunctionType>()) {
+        OS << " type='";
+        if (VD->hasType())
+          VD->getType().print(OS);
+        else
+          OS << "<null type>";
+        OS << '\'';
+      }
 
       if (VD->hasInterfaceType() &&
           (!VD->hasType() ||
            VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
-        OS << "' interface type='";
+        OS << " interface type='";
         VD->getInterfaceType()->getCanonicalType().print(OS);
+        OS << '\'';
       }
-
-      OS << '\'';
 
       if (VD->hasAccessibility()) {
         OS << " access=";
@@ -1519,7 +1521,7 @@ public:
     Indent -= 2;
   }
 
-  void printRecLabelled(Expr *E, StringRef label) {
+  void printRecLabeled(Expr *E, StringRef label) {
     Indent += 2;
     OS.indent(Indent);
     OS << '(' << label << '\n';
@@ -1941,11 +1943,11 @@ public:
     printRec(E->getSubExpr());
     if (auto keyConversion = E->getKeyConversion()) {
       OS << '\n';
-      printRecLabelled(keyConversion.Conversion, "key_conversion");
+      printRecLabeled(keyConversion.Conversion, "key_conversion");
     }
     if (auto valueConversion = E->getValueConversion()) {
       OS << '\n';
-      printRecLabelled(valueConversion.Conversion, "value_conversion");
+      printRecLabeled(valueConversion.Conversion, "value_conversion");
     }
     OS << ')';
   }
@@ -2079,8 +2081,6 @@ public:
     printClosure(E, "closure_expr");
     if (E->hasSingleExpressionBody())
       OS << " single-expression";
-    if (E->isVoidConversionClosure())
-      OS << " void-conversion";
     
     if (E->getParameters()) {
       OS << '\n';
@@ -2626,6 +2626,15 @@ namespace {
       return OS;
     }
 
+    void dumpParameterFlags(ParameterTypeFlags paramFlags) {
+      if (paramFlags.isVariadic())
+        printFlag("vararg");
+      if (paramFlags.isAutoClosure())
+        printFlag("autoclosure");
+      if (paramFlags.isEscaping())
+        printFlag("escaping");
+    }
+
   public:
     PrintType(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) { }
 
@@ -2689,6 +2698,7 @@ namespace {
 
     void visitParenType(ParenType *T, StringRef label) {
       printCommon(T, label, "paren_type");
+      dumpParameterFlags(T->getParameterFlags());
       printRec(T->getUnderlyingType());
       OS << ")";
     }
@@ -2703,9 +2713,7 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "tuple_type_elt";
         if (elt.hasName())
           printField("name", elt.getName().str());
-        if (elt.isVararg())
-          printFlag("vararg");
-
+        dumpParameterFlags(elt.getParameterFlags());
         printRec(elt.getType());
         OS << ")";
       }
@@ -2916,10 +2924,7 @@ namespace {
       }
 
       printFlag(T->isAutoClosure(), "autoclosure");
-
-      // Dump out either @noescape or @escaping
-      printFlag(!T->isNoEscape(), "@escaping");
-
+      printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());

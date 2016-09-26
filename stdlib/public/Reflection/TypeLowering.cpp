@@ -421,6 +421,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
 
   // Calculate the stride
   unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+  if (Stride == 0)
+    Stride = 1;
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
@@ -528,7 +530,7 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 0, 0);
+  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 1, 0);
   return EmptyTI;
 }
 
@@ -776,13 +778,13 @@ public:
 
   MetatypeRepresentation
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return MetatypeRepresentation::Unknown;
   }
 
   MetatypeRepresentation
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return MetatypeRepresentation::Unknown;
   }
 
@@ -962,6 +964,8 @@ public:
 
     // Calculate the stride
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    if (Stride == 0)
+      Stride = 1;
 
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
@@ -1118,13 +1122,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; GTP->dump());
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    unreachable("Must have concrete TypeRef");
+    DEBUG(std::cerr << "Unresolved generic TypeRef: "; DM->dump());
     return nullptr;
   }
 

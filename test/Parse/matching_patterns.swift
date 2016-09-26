@@ -288,8 +288,8 @@ default:
 
 
 // Optional patterns.
-let op1 : Int? = nil
-let op2 : Int?? = nil
+let op1 : Int?
+let op2 : Int??
 
 switch op1 {
 case nil: break

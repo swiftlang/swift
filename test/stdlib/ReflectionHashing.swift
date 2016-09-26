@@ -2,7 +2,12 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
-// XFAIL: linux
+// This test expects consistent hash code generation. However String instance
+// generate different values on Linux depending on which version of libicu is
+// installed. Therefore we run this test only on non-linux OSes, which is
+// best described as having objc_interop.
+
+// REQUIRES: objc_interop
 
 //
 // This file contains reflection tests that depend on hash values.
@@ -35,38 +40,38 @@ Reflection.test("Dictionary") {
   var expected = ""
   expected += "▿ 5 key/value pairs\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Four\"\n"
-  expected += "    - .1: 4\n"
+  expected += "    - key: \"Four\"\n"
+  expected += "    - value: 4\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"One\"\n"
-  expected += "    - .1: 1\n"
+  expected += "    - key: \"One\"\n"
+  expected += "    - value: 1\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Two\"\n"
-  expected += "    - .1: 2\n"
+  expected += "    - key: \"Two\"\n"
+  expected += "    - value: 2\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Five\"\n"
-  expected += "    - .1: 5\n"
+  expected += "    - key: \"Five\"\n"
+  expected += "    - value: 5\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Three\"\n"
-  expected += "    - .1: 3\n"
+  expected += "    - key: \"Three\"\n"
+  expected += "    - value: 3\n"
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   var expected = ""
   expected += "▿ 5 key/value pairs\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Three\"\n"
-  expected += "    - .1: 3\n"
+  expected += "    - key: \"Three\"\n"
+  expected += "    - value: 3\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Two\"\n"
-  expected += "    - .1: 2\n"
+  expected += "    - key: \"Two\"\n"
+  expected += "    - value: 2\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Four\"\n"
-  expected += "    - .1: 4\n"
+  expected += "    - key: \"Four\"\n"
+  expected += "    - value: 4\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"One\"\n"
-  expected += "    - .1: 1\n"
+  expected += "    - key: \"One\"\n"
+  expected += "    - value: 1\n"
   expected += "  ▿ (2 elements)\n"
-  expected += "    - .0: \"Five\"\n"
-  expected += "    - .1: 5\n"
+  expected += "    - key: \"Five\"\n"
+  expected += "    - value: 5\n"
 #else
   fatalError("unimplemented")
 #endif

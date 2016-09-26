@@ -30,7 +30,7 @@ extension FileManager {
     
     @available(*, deprecated, renamed:"replaceItemAt(_:withItemAt:backupItemName:options:)")
     public func replaceItemAtURL(originalItemURL: NSURL, withItemAtURL newItemURL: NSURL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
-        var error: NSError? = nil
+        var error: NSError?
         if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL, newItemURL, backupItemName, options, &error) {
             return result
         }
@@ -39,7 +39,7 @@ extension FileManager {
 
     @available(OSX 10.6, iOS 4.0, *)
     public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
-        var error: NSError? = nil
+        var error: NSError?
         if let result = NS_Swift_NSFileManager_replaceItemAtURL_withItemAtURL_backupItemName_options(self, originalItemURL as NSURL, newItemURL as NSURL, backupItemName, options, &error) {
             return result
         }

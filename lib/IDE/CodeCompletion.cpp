@@ -2935,7 +2935,7 @@ public:
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols(nullptr))
+        for (auto *protocol : GP->getConformingProtocols())
           addConstructorCallsForType(protocol->getType(), GP->getName(),
                                      Reason);
         return;
@@ -3003,7 +3003,7 @@ public:
 
       if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
         addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols(nullptr))
+        for (auto *protocol : GP->getConformingProtocols())
           addConstructorCallsForType(protocol->getType(), GP->getName(),
                                      Reason);
         return;
@@ -3064,16 +3064,6 @@ public:
       return true;
     }
     return false;
-  }
-
-  bool isOptionSetDecl(NominalTypeDecl *D) {
-    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetDecl());
-    if (!optionSetType)
-      return false;
-
-    SmallVector<ProtocolConformance *, 1> conformances;
-    return D->lookupConformance(CurrDeclContext->getParentModule(),
-                                optionSetType, conformances);
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {

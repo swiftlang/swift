@@ -25,7 +25,7 @@
 @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
 public typealias RangeReplaceableIndexable = _RangeReplaceableIndexable
 public protocol _RangeReplaceableIndexable : _Indexable {
-  // FIXME(ABI)(compiler limitation): there is no reason for this protocol
+  // FIXME(ABI)#58 (Recursive Protocol Constraints): there is no reason for this protocol
   // to exist apart from missing compiler features that we emulate with it.
   // rdar://problem/20531108
   //
@@ -244,6 +244,10 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 public protocol RangeReplaceableCollection
   : _RangeReplaceableIndexable, Collection
 {
+  // FIXME(ABI): should require `RangeReplaceableCollection`.
+  associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
+    = RangeReplaceableSlice<Self>
+
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Creates a new, empty collection.
@@ -540,6 +544,9 @@ public protocol RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollection {
+  public subscript(bounds: Range<Index>) -> RangeReplaceableSlice<Self> {
+    return RangeReplaceableSlice(base: self, bounds: bounds)
+  }
 
   /// Creates a new collection containing the specified number of a single,
   /// repeated value.

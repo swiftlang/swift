@@ -325,10 +325,6 @@ public:
   /// structurally with their corresponding archetypes and resolve dependent
   /// member types to the appropriate associated types.
   Type substDependentType(Type type);
-  
-  /// \brief Retrieve the archetype that corresponds to the given generic
-  /// parameter.
-  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);
@@ -345,10 +341,6 @@ public:
   static Type mapTypeOutOfContext(ModuleDecl *M,
                                   GenericEnvironment *genericEnv,
                                   Type type);
-
-  using SameTypeRequirement
-    = std::pair<PotentialArchetype *,
-                PointerUnion<Type, PotentialArchetype*>>;
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -547,7 +539,8 @@ public:
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, const RequirementSource &source,
+  bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
+                      const RequirementSource &source,
                       ArchetypeBuilder &builder);
 
   /// Retrieve the superclass of this archetype.

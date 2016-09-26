@@ -1518,25 +1518,52 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
   // do a byte-level GEP with the proper stride.
   const FixedTypeInfo *fixedTI = dyn_cast<FixedTypeInfo>(this);
 
-  Address dest;
+  llvm::Value *destValue = nullptr;
+  Size stride(1);
+  
   // TODO: Arrays currently lower-bound the stride to 1.
-  if (!fixedTI
-      || std::max(Size(1), fixedTI->getFixedStride()) != fixedTI->getFixedSize()) {
+  if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
     llvm::Value *byteAddr = IGF.Builder.CreateBitCast(base.getAddress(),
                                                       IGF.IGM.Int8PtrTy);
     llvm::Value *size = getStride(IGF, T);
     if (size->getType() != index->getType())
       size = IGF.Builder.CreateZExtOrTrunc(size, index->getType());
     llvm::Value *distance = IGF.Builder.CreateNSWMul(index, size);
-    llvm::Value *destValue = IGF.Builder.CreateInBoundsGEP(byteAddr, distance);
+    destValue = IGF.Builder.CreateInBoundsGEP(byteAddr, distance);
     destValue = IGF.Builder.CreateBitCast(destValue, base.getType());
-    return Address(destValue, base.getAlignment());
   } else {
     // We don't expose a non-inbounds GEP operation.
-    llvm::Value *destValue = IGF.Builder.CreateInBoundsGEP(base.getAddress(),
-                                                           index);
-    return Address(destValue, base.getAlignment());
+    destValue = IGF.Builder.CreateInBoundsGEP(base.getAddress(), index);
+    stride = fixedTI->getFixedStride();
   }
+  if (auto *IndexConst = dyn_cast<llvm::ConstantInt>(index)) {
+    // If we know the indexing value, we can get a better guess on the
+    // alignment.
+    // This even works if the stride is not known (and assumed to be 1).
+    stride *= IndexConst->getValue().getZExtValue();
+  }
+  Alignment Align = base.getAlignment().alignmentAtOffset(stride);
+  return Address(destValue, Align);
+}
+
+Address TypeInfo::roundUpToTypeAlignment(IRGenFunction &IGF, Address base,
+                                         SILType T) const {
+  Alignment Align = base.getAlignment();
+  llvm::Value *TyAlignMask = getAlignmentMask(IGF, T);
+  if (auto *TyAlignMaskConst = dyn_cast<llvm::ConstantInt>(TyAlignMask)) {
+    Alignment TyAlign(TyAlignMaskConst->getZExtValue() + 1);
+
+    // No need to align if the base is already aligned.
+    if (TyAlign <= Align)
+      return base;
+  }
+  llvm::Value *Addr = base.getAddress();
+  Addr = IGF.Builder.CreatePtrToInt(Addr, IGF.IGM.IntPtrTy);
+  Addr = IGF.Builder.CreateNUWAdd(Addr, TyAlignMask);
+  llvm::Value *InvertedMask = IGF.Builder.CreateNot(TyAlignMask);
+  Addr = IGF.Builder.CreateAnd(Addr, InvertedMask);
+  Addr = IGF.Builder.CreateIntToPtr(Addr, base.getAddress()->getType());
+  return Address(Addr, Align);
 }
 
 void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,

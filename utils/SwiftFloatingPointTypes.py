@@ -49,11 +49,3 @@ def floating_point_bits_to_type():
 
 def all_floating_point_types():
     return floating_point_bits_to_type().values()
-
-
-# Bit counts for all floating point types.
-#
-# 80-bit floating point types are only permitted on x86 architectures. This
-# restriction is handled via #if's in the generated code.
-def all_floating_point_bits():
-    return floating_point_bits_to_type().keys()

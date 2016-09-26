@@ -305,7 +305,7 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
   }
 
   if (![other isKindOfClass:getSwiftValueClass()]) {
-    return self == other;
+    return NO;
   }
 
   auto selfHeader = getSwiftValueHeader(self);
@@ -314,12 +314,12 @@ swift::findSwiftValueConformances(const ProtocolDescriptorList &protocols,
   auto hashableBaseType = selfHeader->getHashableBaseType();
   if (!hashableBaseType ||
       otherHeader->getHashableBaseType() != hashableBaseType) {
-    return self == other;
+    return NO;
   }
 
   auto hashableConformance = selfHeader->getHashableConformance();
   if (!hashableConformance) {
-    return self == other;
+    return NO;
   }
 
   return swift_stdlib_Hashable_isEqual_indirect(

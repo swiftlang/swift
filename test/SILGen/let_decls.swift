@@ -154,7 +154,7 @@ extension Optional {
 }
 struct CloseOverAddressOnlyConstant<T> {
   func isError() {
-    let AOV: T? = nil
+    let AOV: T?
     takeClosure({ AOV.getLV() })
   }
   

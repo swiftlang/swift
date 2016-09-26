@@ -133,15 +133,23 @@ func testPlatforms() {
 
 struct VarToFunc {
   @available(*, unavailable, renamed: "function()")
-  var variable: Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+  var variable: Int // expected-note 2 {{explicitly marked unavailable here}}
 
   @available(*, unavailable, renamed: "function()")
-  func oldFunction() -> Int { return 42 } // expected-note{{explicitly marked unavailable here}}
+  func oldFunction() -> Int { return 42 } // expected-note 2 {{explicitly marked unavailable here}}
 
   func function() -> Int {
     _ = variable // expected-error{{'variable' has been renamed to 'function()'}}{{9-17=function()}}
     _ = oldFunction() //expected-error{{'oldFunction()' has been renamed to 'function()'}}{{9-20=function}}
+    _ = oldFunction // expected-error{{'oldFunction()' has been renamed to 'function()'}} {{9-20=function}}
+
     return 42
+  }
+
+  mutating func testAssignment() {
+    // This is nonsense, but someone shouldn't be using 'renamed' for this
+    // anyway. Just make sure we don't crash or anything.
+    variable = 2 // expected-error {{'variable' has been renamed to 'function()'}} {{5-13=function()}}
   }
 }
 

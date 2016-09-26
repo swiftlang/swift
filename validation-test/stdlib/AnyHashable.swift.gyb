@@ -736,6 +736,44 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError).base") {
 }
 
 #if _runtime(_ObjC)
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+// A wrapper type around a String that bridges to NSString.
+struct StringWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: String
+}
+
+AnyHashableTests.test("AnyHashable(Wrappers)/Hashable") {
+  let values: [AnyHashable] = [
+    StringWrapper1(rawValue: "hello"),
+    StringWrapper2(rawValue: "hello"),
+    "hello" as String,
+    "hello" as NSString,
+    StringWrapper1(rawValue: "world"),
+    StringWrapper2(rawValue: "world"),
+    "world" as String,
+    "world" as NSString,
+  ]
+
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // Elements in [0, 3] match 3.
+    if lhs == 3 { return rhs >= 0 && rhs <= 3 }
+    if rhs == 3 { return lhs >= 0 && lhs <= 3 }
+
+    // Elements in [4, 7] match 7.
+    if lhs == 7 { return rhs >= 4 && rhs <= 7 }
+    if rhs == 7 { return lhs >= 4 && lhs <= 7 }
+
+    return lhs == rhs
+  }
+
+  checkHashable(values, equalityOracle: equalityOracle,
+                allowBrokenTransitivity: true)
+}
+
 AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {
   let swiftErrors: [MinimalHashablePODSwiftError] = [
     .caseA, .caseA,

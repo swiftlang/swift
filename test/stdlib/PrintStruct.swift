@@ -33,7 +33,7 @@ PrintTests.test("Printable") {
 
 PrintTests.test("custom string convertible structs") {
   struct Wrapper : CustomStringConvertible {
-    var x: CustomStringConvertible? = nil
+    var x: CustomStringConvertible?
     
     var description: String {
       return "Wrapper(\(x.debugDescription))"

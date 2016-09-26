@@ -1,9 +1,9 @@
 add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  Foundation.swift
+  Foundation.swift.gyb
   Boxing.swift
   NSError.swift
   NSStringAPI.swift
-  NSValue.swift
+  NSValue.swift.gyb
   ExtraStringAPIs.swift
   ReferenceConvertible.swift
   AffineTransform.swift

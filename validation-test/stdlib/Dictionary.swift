@@ -3853,8 +3853,8 @@ DictionaryTestSuite.test("misc") {
     expectEqual(3, d.values[d.keys.index(of: "three")!])
     expectEqual(4, d.values[d.keys.index(of: "four")!])
 
-    expectEqual(3, d3.values[d.keys.index(of: "three")!])
-    expectEqual(4, d3.values[d.keys.index(of: "four")!])
+    expectEqual(3, d3.values[d3.keys.index(of: "three")!])
+    expectEqual(4, d3.values[d3.keys.index(of: "four")!])
   }
 }
 
@@ -3885,7 +3885,7 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     start: UnsafeMutablePointer<NSString>.allocate(capacity: 2), count: 2)
   var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress!)
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
-  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
+  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>?
 
   d.available_getObjects(null, andKeys: null) // don't segfault
 

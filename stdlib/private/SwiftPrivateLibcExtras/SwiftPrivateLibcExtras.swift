@@ -115,6 +115,17 @@ public func _stdlib_select(
 }
 #endif
 
+
+/// Swift-y wrapper around pipe(2)
+public func _stdlib_pipe() -> (readEnd: CInt, writeEnd: CInt, error: CInt) {
+  var fds: [CInt] = [0, 0]
+  let ret = fds.withUnsafeMutableBufferPointer { unsafeFds -> CInt in
+    pipe(unsafeFds.baseAddress)
+  }
+  return (readEnd: fds[0], writeEnd: fds[1], error: ret)
+}
+
+
 //
 // Functions missing in `Darwin` module.
 //

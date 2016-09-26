@@ -1678,6 +1678,13 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
   return false;
 }
 
+static bool isSelfDerived(Type selfTy, Type t) {
+  while (auto dmt = t->getAs<DependentMemberType>())
+    t = dmt->getBase();
+
+  return t->isEqual(selfTy);
+}
+
 /// Substitute the `Self` type from a protocol conformance into a protocol
 /// requirement's type to get the type of the witness.
 static CanAnyFunctionType
@@ -1690,14 +1697,15 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
     return reqtTy;
   }
 
-  // Build a substitution map to replace `self` and its associated types.
   auto &C = M.getASTContext();
-  CanType selfParamTy = CanGenericTypeParamType::get(0, 0, C);
 
+  // Build a substitution map to replace `self` and its associated types.
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
+      ->getCanonicalType();
   Type concreteTy = conformance->getInterfaceType();
 
   SubstitutionMap subs;
-  subs.addSubstitution(selfParamTy, concreteTy);
+  subs.addSubstitution(selfTy, concreteTy);
 
   // FIXME: conformance substitutions should be in terms of interface types
   auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
@@ -1709,7 +1717,7 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
 
   SmallVector<ProtocolConformanceRef, 1> conformances;
   conformances.push_back(ProtocolConformanceRef(specialized));
-  subs.addConformances(selfParamTy, C.AllocateCopy(conformances));
+  subs.addConformances(selfTy, C.AllocateCopy(conformances));
 
   ArchetypeBuilder builder(*M.getSwiftModule(), C.Diags);
 
@@ -1729,17 +1737,10 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
     builder.addGenericParameter(param);
   }
 
-  auto rootedInSelf = [&](Type t) -> bool {
-    while (auto dmt = t->getAs<DependentMemberType>()) {
-      t = dmt->getBase();
-    }
-    return t->isEqual(selfParamTy);
-  };
-
   RequirementSource source(RequirementSource::Explicit, SourceLoc());
 
   for (auto &reqt : reqtTy->getRequirements()) {
-    if (rootedInSelf(reqt.getFirstType()))
+    if (isSelfDerived(selfTy, reqt.getFirstType()))
       continue;
 
     switch (reqt.getKind()) {
@@ -1750,7 +1751,7 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
       break;
 
     case RequirementKind::SameType: {
-      if (rootedInSelf(reqt.getSecondType()))
+      if (isSelfDerived(selfTy, reqt.getSecondType()))
         continue;
 
       // Substitute the constrained types.
@@ -1806,6 +1807,9 @@ getSubstitutedGenericEnvironment(SILModule &M,
 
   TypeSubstitutionMap witnessContextParams;
 
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
+      ->getCanonicalType();
+
   // Outer generic parameters come from the generic context of
   // the conformance (which might not be the same as the generic
   // context of the witness, if the witness is defined in a
@@ -1817,9 +1821,8 @@ getSubstitutedGenericEnvironment(SILModule &M,
   // also map to the archetypes of the requirement.
   for (auto pair : reqtEnv->getInterfaceToArchetypeMap()) {
     // Skip the 'Self' parameter and friends.
-    if (auto *archetypeTy = pair.second->getAs<ArchetypeType>())
-      if (archetypeTy->isSelfDerived())
-        continue;
+    if (isSelfDerived(selfTy, pair.first))
+      continue;
 
     auto result = witnessContextParams.insert(pair);
     assert(result.second);
@@ -2080,7 +2083,7 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
     // makes the actual thunk.
     mangler.append("_TTR");
     if (auto generics = thunkType->getGenericSignature()) {
-      mangler.append('G');
+      mangler.append(thunkType->isPseudogeneric() ? 'g' : 'G');
       mangler.setModuleContext(M.getSwiftModule());
       mangler.mangleGenericSignature(generics);
     }

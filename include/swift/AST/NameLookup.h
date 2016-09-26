@@ -68,7 +68,8 @@ public:
                     bool IsKnownPrivate = false,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false,
-                    bool AllowProtocolMembers = false);
+                    bool AllowProtocolMembers = false,
+                    bool IgnoreAccessControl = false);
 
   SmallVector<UnqualifiedLookupResult, 4> Results;
 

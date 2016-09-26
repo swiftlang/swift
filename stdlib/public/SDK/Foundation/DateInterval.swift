@@ -214,7 +214,7 @@ extension DateInterval : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateInterval?) -> DateInterval {
-        var result: DateInterval? = nil
+        var result: DateInterval?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

@@ -10,15 +10,16 @@ protocol P {}
 
 protocol Q: P {}
 
-class A:P {}
+class A: P {}
+class AA: A {}
 
 class X {}
 
-class B:P {}
+class B: P {}
 
-private struct S:P {}
+private struct S: P {}
 
-struct T:Q {}
+struct T: Q {}
 
 private struct U {}
 
@@ -35,113 +36,113 @@ private final class F: CP1 {}
 // Class E implements both class protocols at once
 class E: CP1, CP2 {}
 
-func cast0<T>(_ a:T) -> Bool {
+func cast0<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: A()) is T.Type
 }
 
 
-func cast1<T>(_ a:T) -> Bool {
+func cast1<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: (A() as AnyObject)) is T.Type
 }
 
-func cast2<T>(_ a:T) -> Bool {
+func cast2<T>(_ a: T) -> Bool {
   // Succeeds if T is A
-  let ao:AnyObject = A() as AnyObject
+  let ao: AnyObject = A() as AnyObject
   return type(of: ao) is T.Type
 }
 
 
-func cast3(_ p:AnyObject) -> Bool {
+func cast3(_ p: AnyObject) -> Bool {
   // Always fails
   return type(of: p) is AnyObject.Protocol
 }
 
-func cast4(_ p:AnyObject) -> Bool {
+func cast4(_ p: AnyObject) -> Bool {
   return type(of: p) is A.Type
 }
 
-func cast5(_ t:AnyObject.Type) -> Bool {
+func cast5(_ t: AnyObject.Type) -> Bool {
   // Succeeds if t is B.self
   return t is B.Type
 }
 
-func cast6<T>(_ t:T) -> Bool {
+func cast6<T>(_ t: T) -> Bool {
   // Always fails
   return AnyObject.self is T.Type
 }
 
-func cast7<T>(_ t:T.Type) -> Bool {
+func cast7<T>(_ t: T.Type) -> Bool {
   // Succeeds if t is AnyObject.self
   return t is AnyObject.Protocol
 }
 
 
-func cast8<T>(_ a:T) -> Bool {
+func cast8<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: (A() as P)) is T.Type
 }
 
-func cast9<T>(_ a:T) -> Bool {
+func cast9<T>(_ a: T) -> Bool {
   // Succeeds if T is A
-  let ao:P = A() as P
+  let ao: P = A() as P
   return type(of: ao) is T.Type
 }
 
 
-func cast10(_ p:P) -> Bool {
+func cast10(_ p: P) -> Bool {
   return type(of: p) is P.Protocol
 }
 
-func cast11(_ p:P) -> Bool {
+func cast11(_ p: P) -> Bool {
   // Succeeds if p is of type A
   return type(of: p) is A.Type
 }
 
-func cast12(_ t:P.Type) -> Bool {
+func cast12(_ t: P.Type) -> Bool {
   return t is B.Type
 }
 
 
-func cast13<T>(_ t:T) -> Bool {
+func cast13<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
 
-func cast14<T>(_ t:T.Type) -> Bool {
+func cast14<T>(_ t: T.Type) -> Bool {
   // Succeeds if p is P.self
   return t is P.Protocol
 }
 
-func cast15<T>(_ t:T) -> Bool {
+func cast15<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
-func cast16<T>(_ t:T) -> Bool {
+func cast16<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
 
 
-func cast17<T>(_ t:T) -> Bool {
+func cast17<T>(_ t: T) -> Bool {
   // Succeeds if T is AnyObject
   return AnyObject.self is T.Type
 }
 
-func cast18<T>(_ t:T) -> Bool {
+func cast18<T>(_ t: T) -> Bool {
   // Succeeds if T is AnyObject
   return T.self is AnyObject.Protocol
 }
 
-func cast20<T>(_ t:T) -> Bool {
+func cast20<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Type
 }
 
-func cast21<T>(_ t:T) -> Bool {
+func cast21<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
@@ -169,7 +170,7 @@ func cast25(_ concrete: P.Protocol) -> Bool {
 }
 
 func cast26(_ existential: Q.Type) -> Bool {
-  // Succeeds always, because Q:P
+  // Succeeds always, because Q: P
   return existential is P.Type
 }
 
@@ -202,6 +203,18 @@ func cast32(_ p: P) -> Bool {
 func cast33(_ p: P) -> Bool {
   // Same as above, but non-existential metatype
   return p is X.Type
+}
+
+func cast38<T>(_ t: T) -> Bool {
+  return t is (Int, Int)
+}
+
+func cast39<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: Int)
+}
+
+func cast40<T>(_ t: T) -> Bool {
+  return t is (x: Int, y: A)
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
@@ -798,6 +811,114 @@ public func test37<T>(ah: T) {
   }
 }
 
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38a() -> Bool {
+  return cast38((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38b() -> Bool {
+  return cast38((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test38c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test38c() -> Bool {
+  return cast38((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39a
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39a() -> Bool {
+  return cast39((1, 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39b
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39b() -> Bool {
+  return cast39((x: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39c() -> Bool {
+  return cast39((z: 1, y: 2))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test39d
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test39d() -> Bool {
+  return cast39((1, 2, 3))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40a
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40a() -> Bool {
+  return cast40((1, A()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40b
+// CHECK: bb0
+// FIXME: Would love to fold this to just "true"
+// CHECK-NOT: return:
+// CHECK: unconditional_checked_cast_addr
+@inline(never)
+public func test40b() -> Bool {
+  return cast40((1, AA()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40c
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+public func test40c() -> Bool {
+  return cast40((1, S()))
+}
+
+// CHECK-LABEL: sil [noinline] @_TF12cast_folding7test40d
+// CHECK: bb0
+// CHECK-NOT: return
+// CHECK: checked_cast_addr_br take_always (Int, Any) in
+@inline(never)
+public func test40d(_ a: Any) -> Bool {
+  return cast40((1, a))
+}
 
 print("test0=\(test0())")
 

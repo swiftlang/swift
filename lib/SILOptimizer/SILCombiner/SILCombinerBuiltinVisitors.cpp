@@ -184,7 +184,7 @@ matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
                   m_ApplyInst(
                       BuiltinValueKind::SMulOver, m_SILValue(Dist),
                       m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                               m_MetatypeInst(StrideType)))),
                   0))) ||
       match(
@@ -195,7 +195,7 @@ matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
                   m_ApplyInst(
                       BuiltinValueKind::SMulOver,
                       m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::StrideofNonZero,
+                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                               m_MetatypeInst(StrideType))),
                       m_SILValue(Dist)),
                   0)))) {
@@ -464,9 +464,6 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 
   if (match(I, m_ApplyInst(BuiltinValueKind::SMulOver,
                             m_ApplyInst(BuiltinValueKind::Strideof),
-                            m_ValueBase(), m_IntegerLiteralInst())) ||
-      match(I, m_ApplyInst(BuiltinValueKind::SMulOver,
-                            m_ApplyInst(BuiltinValueKind::StrideofNonZero),
                             m_ValueBase(), m_IntegerLiteralInst()))) {
     I->swapOperands(0, 1);
     return I;

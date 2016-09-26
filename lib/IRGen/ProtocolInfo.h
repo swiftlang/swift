@@ -131,7 +131,7 @@ public:
     assert(!BeginIndex.isPrefix());
     auto index = BeginIndex.getValue() + 1;
     for (auto protocol :
-           cast<AssociatedTypeDecl>(Member)->getConformingProtocols(nullptr)) {
+           cast<AssociatedTypeDecl>(Member)->getConformingProtocols()) {
       if (protocol == target) {
         return WitnessIndex(index, false);
       }

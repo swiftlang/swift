@@ -232,6 +232,10 @@ public:
     return LineAndColumn;
   }
 
+  bool exprEndAtLine(Expr *E, unsigned Line) {
+    return E->getEndLoc().isValid() && SM.getLineNumber(E->getEndLoc()) == Line;
+  };
+
   bool shouldAddIndentForLine(unsigned Line) {
     if (Cursor == Stack.rend())
       return false;
@@ -366,7 +370,8 @@ public:
     Expr *AtExprEnd = End.getAsExpr();
     if (AtExprEnd && (isa<ClosureExpr>(AtExprEnd) ||
                       isa<ParenExpr>(AtExprEnd) ||
-                      isa<TupleExpr>(AtExprEnd))) {
+                      isa<TupleExpr>(AtExprEnd) ||
+                      isa<CaptureListExpr>(AtExprEnd))) {
 
       if (auto *Paren = dyn_cast_or_null<ParenExpr>(Cursor->getAsExpr())) {
         auto *SubExpr = Paren->getSubExpr();
@@ -398,14 +403,27 @@ public:
     //    Character(UnicodeScalar(c))
     //  }) <--- No indentation here.
     auto AtCursorExpr = Cursor->getAsExpr();
-    if (AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
-                         isa<TupleExpr>(AtCursorExpr))) {
-      if (AtExprEnd && isa<CallExpr>(AtExprEnd)) {
-        if (AtExprEnd->getEndLoc().isValid() &&
-            AtCursorExpr->getEndLoc().isValid() &&
-            Line == SM.getLineNumber(AtExprEnd->getEndLoc()) &&
-            Line == SM.getLineNumber(AtCursorExpr->getEndLoc())) {
+    if (AtExprEnd && AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
+                                      isa<TupleExpr>(AtCursorExpr))) {
+      if (isa<CallExpr>(AtExprEnd)) {
+        if (exprEndAtLine(AtExprEnd, Line) &&
+            exprEndAtLine(AtCursorExpr, Line)) {
           return false;
+        }
+      }
+
+      // foo(A: {
+      //  ...
+      // }, B: { <--- No indentation here.
+      //  ...
+      // })
+      if (auto *TE = dyn_cast<TupleExpr>(AtCursorExpr)) {
+        if (isa<ClosureExpr>(AtExprEnd) && exprEndAtLine(AtExprEnd, Line)) {
+          for (auto *ELE : TE->getElements()) {
+            if (exprEndAtLine(ELE, Line)) {
+              return false;
+            }
+          }
         }
       }
     }

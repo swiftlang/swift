@@ -44,10 +44,11 @@ mustBridgeToSwiftValueBox(Module *M, CanType T) {
   if (T->isAnyExistentialType())
     return false;
 
-  // getBridgedToObjC() might return a null-type for bridged foundation types
-  // during compiling the standard library. Exclude this case here.
+  // getBridgedToObjC() might return a null-type for some types
+  // whose bridging implementation is allowed to live elsewhere. Exclude this
+  // case here.
   if (auto N = T->getAnyNominal())
-    if (M->getASTContext().isStandardLibraryTypeBridgedInFoundation(N))
+    if (M->getASTContext().isTypeBridgedInExternalModule(N))
       return false;
 
   return !M->getASTContext().getBridgedToObjC(M, T);
@@ -481,6 +482,40 @@ swift::classifyDynamicCast(Module *M,
     }
   }
 
+  // Tuple casts.
+  if (auto sourceTuple = dyn_cast<TupleType>(source)) {
+    if (auto targetTuple = dyn_cast<TupleType>(target)) {
+      // # of elements must coincide.
+      if (sourceTuple->getNumElements() != targetTuple->getNumElements())
+        return DynamicCastFeasibility::WillFail;
+
+      DynamicCastFeasibility result = DynamicCastFeasibility::WillSucceed;
+      for (unsigned i : range(sourceTuple->getNumElements())) {
+        const auto &sourceElt = sourceTuple->getElement(i);
+        const auto &targetElt = targetTuple->getElement(i);
+
+        // If both have names and the names mismatch, the cast will fail.
+        if (sourceElt.hasName() && targetElt.hasName() &&
+            sourceElt.getName() != targetElt.getName())
+          return DynamicCastFeasibility::WillFail;
+
+        // Combine the result of prior elements with this element type.
+        result = std::max(result,
+                          classifyDynamicCast(M,
+                            sourceElt.getType()->getCanonicalType(),
+                            targetElt.getType()->getCanonicalType(),
+                            isSourceTypeExact,
+                            isWholeModuleOpts));
+
+        // If this element failed, we're done.
+        if (result == DynamicCastFeasibility::WillFail)
+          break;
+      }
+
+      return result;
+    }
+  }
+
   // Class casts.
   auto sourceClass = source.getClassOrBoundGenericClass();
   auto targetClass = target.getClassOrBoundGenericClass();
@@ -574,8 +609,6 @@ swift::classifyDynamicCast(Module *M,
   // a class, and the destination is a metatype, there is no way the cast can
   // succeed.
   if (target->is<AnyMetatypeType>()) return DynamicCastFeasibility::WillFail;
-
-  // FIXME: tuple conversions?
 
   // FIXME: Be more careful with bridging conversions from
   // NSArray, NSDictionary and NSSet as they may fail?

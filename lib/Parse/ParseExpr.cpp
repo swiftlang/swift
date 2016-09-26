@@ -185,10 +185,6 @@ parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
     case tok::oper_binary_unspaced: {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        goto done;
-
       // If this is an "&& #available()" expression (or related things that
       // show up in a stmt-condition production), then don't eat it.
       //
@@ -1589,10 +1585,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        return Result;
-
       Expr *oper = parseExprOperator();
       Result = makeParserResult(
           new (Context) PostfixUnaryExpr(oper, Result.get()));
@@ -2469,7 +2461,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       rightLoc,
                                       trailingClosure);
 
-  // A tuple with a single, unlabelled element is just parentheses.
+  // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
       (subExprNames.empty() || subExprNames[0].empty())) {
     return makeParserResult(

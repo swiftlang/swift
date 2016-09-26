@@ -118,7 +118,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 /// \brief Return true if this is a release instruction and the released value
 /// is a part of a guaranteed parameter.
 bool swift::isIntermediateRelease(SILInstruction *I,
-                                  ConsumedArgToEpilogueReleaseMatcher &ERM) {
+                                  EpilogueARCFunctionInfo *EAFI) {
   // Check whether this is a release instruction.
   if (!isa<StrongReleaseInst>(I) && !isa<ReleaseValueInst>(I))
     return false;
@@ -136,8 +136,9 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 
   // This is a release on an owned parameter and its not the epilogue release.
   // Its not the final release.
-  SILInstruction *Rel = ERM.getSingleReleaseForArgument(Arg);
-  if (Rel && Rel != I)
+  auto Rel = EAFI->computeEpilogueARCInstructions(
+      EpilogueARCContext::EpilogueARCKind::Release, Arg);
+  if (Rel.size() && !Rel.count(I))
     return true;
 
   // Failed to prove anything.
@@ -1447,9 +1448,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     // a Swift type using _forceBridgeFromObjectiveC.
 
     if (!Src->getType().isLoadable(M)) {
-      // We have to convert from an ObjC Any* to a loadable type
-      // Use check_addr before making a source we can actually load
-      // TODO Joe handle this
+      // This code path is never reached in current test cases
+      // If reached, we'd have to convert from an ObjC Any* to a loadable type
+      // Should use check_addr / make a source we can actually load
       return nullptr;
     }
 
@@ -1678,6 +1679,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto SILFnTy = SILType::getPrimitiveObjectType(
       M.Types.getConstantFunctionType(BridgeFuncDeclRef));
 
+  // TODO: Handle return from witness function.
+  if (BridgedFunc->getLoweredFunctionType()->getSingleResult().isIndirect())
+    return nullptr;
+
   // Get substitutions, if source is a bound generic type.
   ArrayRef<Substitution> Subs =
       Source->gatherAllSubstitutions(
@@ -1687,13 +1692,13 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   SILType ResultTy = SubstFnTy.castTo<SILFunctionType>()->getSILResult();
 
   auto FnRef = Builder.createFunctionRef(Loc, BridgedFunc);
-  if (Src->getType().isAddress() && !AddressOnlyType) {
+  if (Src->getType().isAddress() && !ParamTypes[0].isIndirect()) {
     // Create load
     Src = Builder.createLoad(Loc, Src);
   }
 
   // Compensate different owning conventions of the replaced cast instruction
-  // and the inserted convertion function.
+  // and the inserted conversion function.
   bool needRetainBeforeCall = false;
   bool needReleaseAfterCall = false;
   bool needReleaseInSucc = false;
@@ -1752,8 +1757,6 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
       // Source as-is, we don't need to copy it due to guarantee
       break;
     case ParameterConvention::Indirect_In: {
-      assert(AddressOnlyType &&
-             "Expected an AddressOnlyType with Indirect_In Convention");
       // Need to make a copy of the source, can be changed in ObjC
       auto BridgeStack = Builder.createAllocStack(Loc, Src->getType());
       Src = Builder.createCopyAddr(Loc, Src, BridgeStack, IsNotTake,
@@ -1762,6 +1765,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     }
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+      // TODO handle remaining indirect argument types
+      return nullptr;
     case ParameterConvention::Direct_Deallocating:
       llvm_unreachable("unsupported convention for bridging conversion");
   }
@@ -2716,7 +2721,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   case Accessibility::Public:
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->isRequired())
-	return false;
+        return false;
     }
     SWIFT_FALLTHROUGH;
   case Accessibility::Internal:
@@ -2755,6 +2760,7 @@ void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
       case ValueKind::StructElementAddrInst:
       case ValueKind::TupleElementAddrInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
       case ValueKind::UncheckedTakeEnumDataAddrInst: {
         auto *Inst = cast<SILInstruction>(V);
         // We are done once the current projection dominates the insert point.
