@@ -2420,29 +2420,18 @@ public:
 /// whose common purpose is to anchor the abstract type parameter and specify
 /// requirements for any corresponding type argument.
 class AbstractTypeParamDecl : public TypeDecl {
-  /// The archetype describing this abstract type parameter within its scope.
-  ArchetypeType *Archetype;
-
 protected:
   AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
                         SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }), Archetype(nullptr) { }
+    : TypeDecl(kind, dc, name, NameLoc, { }) { }
 
 public:
   /// Return the superclass of the generic parameter.
   Type getSuperclass() const;
 
-  /// Retrieve the archetype that describes this abstract type parameter
-  /// within its scope.
-  ArchetypeType *getArchetype() const { return Archetype; }
-
-  /// Set the archetype used to describe this abstract type parameter within
-  /// its scope.
-  void setArchetype(ArchetypeType *archetype) { Archetype = archetype; }
-
   /// Retrieve the set of protocols to which this abstract type
   /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols(LazyResolver *resolver) const;
+  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&

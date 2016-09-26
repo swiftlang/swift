@@ -245,6 +245,9 @@ struct PrintOptions {
   /// protocol requirements.
   bool SkipOverrides = false;
 
+  /// Whether to skip parameter type attributes
+  bool SkipParameterTypeAttributes = false;
+
   /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;

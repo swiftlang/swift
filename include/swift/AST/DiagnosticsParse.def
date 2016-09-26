@@ -1143,9 +1143,12 @@ ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
+ERROR(mutually_exclusive_attrs,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
 
-ERROR(cannot_combine_attribute,none,
-      "attribute '%0' cannot be combined with this attribute", (StringRef))
+ERROR(invalid_infix_on_func,none,
+      "'infix' modifier is not required or allowed on func declarations", ())
+
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
 

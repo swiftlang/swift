@@ -68,6 +68,7 @@ static void buildTypeDependentOperands(
   for (auto archetype : OpenedArchetypes) {
     auto Def = OpenedArchetypesState.getOpenedArchetypeDef(
         F.getModule().Types.getLoweredType(archetype).getSwiftRValueType());
+    assert(Def);
     assert(getOpenedArchetypeOf(Def->getType().getSwiftRValueType()) &&
            "Opened archetype operands should be of an opened existential type");
     TypeDependentOperands.push_back(Def);

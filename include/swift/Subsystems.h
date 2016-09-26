@@ -205,6 +205,7 @@ namespace swift {
   bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                               bool isSILMode,
                               bool isSILType,
+                              GenericEnvironment *GenericEnv,
                               DeclContext *DC,
                               bool ProduceDiagnostics = true);
 

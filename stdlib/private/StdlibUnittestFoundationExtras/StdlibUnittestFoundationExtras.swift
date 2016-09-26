@@ -12,6 +12,7 @@
 
 import ObjectiveC
 import Foundation
+import StdlibUnittest
 
 internal var _temporaryLocaleCurrentLocale: NSLocale?
 
@@ -113,3 +114,24 @@ extension NSDictionary {
       andKeys: keys)
   }
 }
+
+public func expectBridgeToNSValue<T>(_ value: T,
+                                     nsValueInitializer: ((T) -> NSValue)? = nil,
+                                     nsValueGetter: ((NSValue) -> T)? = nil,
+                                     equal: (T, T) -> Bool) {
+  let object = value as AnyObject
+  let nsValue = object as! NSValue
+  if let nsValueInitializer = nsValueInitializer {
+    expectEqual(nsValueInitializer(value), nsValue)
+  }
+  if let nsValueGetter = nsValueGetter {
+    expectTrue(equal(value, nsValueGetter(nsValue)))
+  }
+  if let nsValueInitializer = nsValueInitializer,
+     let nsValueGetter = nsValueGetter {
+    expectTrue(equal(value, nsValueGetter(nsValueInitializer(value))))
+  }
+  expectTrue(equal(value, object as! T))
+
+}
+

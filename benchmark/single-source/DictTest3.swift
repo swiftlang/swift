@@ -17,8 +17,8 @@ public func run_Dictionary3(_ N: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 20 1980"
-  var hash1 = [String:Int]()
-  var hash2 = [String:Int]()
+  var hash1 = [String: Int]()
+  var hash2 = [String: Int]()
   var res = ""
 
   for _ in 1...N {

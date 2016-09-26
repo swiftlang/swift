@@ -17,6 +17,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
@@ -61,9 +62,50 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType();
 
   // Compute the substitutions.
-  ArrayRef<Substitution> substitutions =
-      swiftValueType->gatherAllSubstitutions(
-          gen.SGM.SwiftModule, nullptr);
+  ArrayRef<Substitution> witnessSubstitutions = witness.getSubstitutions();
+  ArrayRef<Substitution> typeSubstitutions =
+      swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
+  
+  // FIXME: Methods of generic types don't have substitutions in their
+  // ConcreteDeclRefs for some reason. Furthermore,
+  // SubsitutedProtocolConformances don't substitute their witness
+  // ConcreteDeclRefs, so we need to do it ourselves.
+  ArrayRef<Substitution> substitutions;
+  SmallVector<Substitution, 4> substitutionsBuf;
+  if (typeSubstitutions.empty()) {
+    substitutions = witnessSubstitutions;
+  } else if (witnessSubstitutions.empty()) {
+    substitutions = typeSubstitutions;
+  } else {
+    // FIXME: The substitutions in a witness ConcreteDeclRef really ought to
+    // be interface types. Instead, we get archetypes from a generic environment
+    // that's either the extension method's generic environment, for a witness
+    // from a nominal extension, or the conforming type's original declaration
+    // generic environment, for a witness from a protocol extension.
+    auto swiftValueTypeDecl = swiftValueType->getAnyNominal();
+    GenericEnvironment *witnessEnv;
+    GenericSignature *witnessSig;
+    
+    if (witness.getDecl()->getDeclContext()->getDeclaredTypeOfContext()
+        ->isExistentialType()) {
+      witnessEnv = swiftValueTypeDecl->getGenericEnvironment();
+      witnessSig = swiftValueTypeDecl->getGenericSignature();
+    } else {
+      witnessEnv = witness.getDecl()->getDeclContext()
+        ->getGenericEnvironmentOfContext();
+      witnessSig = witness.getDecl()->getDeclContext()
+        ->getGenericSignatureOfContext();
+    }
+    
+    SubstitutionMap typeSubMap = witnessEnv
+      ->getSubstitutionMap(gen.SGM.SwiftModule,
+                           witnessSig,
+                           typeSubstitutions);
+    for (auto sub : witnessSubstitutions) {
+      substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, typeSubMap));
+    }
+    substitutions = substitutionsBuf;
+  }
 
   if (!substitutions.empty()) {
     // Substitute into the witness function type.
@@ -350,22 +392,30 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
             blockInterfaceTy->getParameters().end(),
             std::back_inserter(params));
 
-  auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
-  auto genericEnv = F.getGenericEnvironment();
   auto extInfo =
       SILFunctionType::ExtInfo()
         .withRepresentation(SILFunctionType::Representation::CFunctionPointer);
 
-  // The block invoke function must be pseudogeneric. This should be OK for now
-  // since a bridgeable function's parameters and returns should all be
-  // trivially representable in ObjC so not need to exercise the type metadata.
-  //
-  // Ultimately we may need to capture generic parameters in block storage, but
-  // that will require a redesign of the interface to support dependent-layout
-  // context. Currently we don't capture anything directly into a block but a
-  // Swift closure, but that's totally dumb.
-  if (genericSig)
-    extInfo = extInfo.withIsPseudogeneric();
+  CanGenericSignature genericSig;
+  GenericEnvironment *genericEnv = nullptr;
+  ArrayRef<Substitution> subs;
+  if (fnTy->hasArchetype() || blockTy->hasArchetype()) {
+    genericSig = F.getLoweredFunctionType()->getGenericSignature();
+    genericEnv = F.getGenericEnvironment();
+
+    subs = F.getForwardingSubstitutions();
+
+    // The block invoke function must be pseudogeneric. This should be OK for now
+    // since a bridgeable function's parameters and returns should all be
+    // trivially representable in ObjC so not need to exercise the type metadata.
+    //
+    // Ultimately we may need to capture generic parameters in block storage, but
+    // that will require a redesign of the interface to support dependent-layout
+    // context. Currently we don't capture anything directly into a block but a
+    // Swift closure, but that's totally dumb.
+    if (genericSig)
+      extInfo = extInfo.withIsPseudogeneric();
+  }
 
   auto invokeTy =
     SILFunctionType::get(genericSig,
@@ -404,7 +454,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                                       SILType::getPrimitiveObjectType(blockTy),
-                                      getForwardingSubstitutions());
+                                      subs);
 
   // Copy the block so we have an independent heap object we can hand off.
   auto heapBlock = B.createCopyBlock(loc, stackBlock);
@@ -622,10 +672,16 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   CanSILFunctionType substFnTy;
   SmallVector<Substitution, 4> subs;
 
+  auto genericEnv = F.getGenericEnvironment();
+
   // Declare the thunk.
   auto blockTy = block.getType().castTo<SILFunctionType>();
+
   auto thunkTy = buildThunkType(block, funcTy, substFnTy, subs);
-  auto thunk = SGM.getOrCreateReabstractionThunk(F.getGenericEnvironment(),
+  if (!thunkTy->isPolymorphic())
+    genericEnv = nullptr;
+
+  auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
                                                  thunkTy,
                                                  blockTy,
                                                  funcTy,
@@ -634,7 +690,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Build it if necessary.
   if (thunk->empty()) {
     SILGenFunction thunkSGF(SGM, *thunk);
-    thunk->setGenericEnvironment(F.getGenericEnvironment());
+    thunk->setGenericEnvironment(genericEnv);
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
   }

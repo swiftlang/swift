@@ -237,6 +237,7 @@ KNOWN_SETTINGS=(
     user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
+    clang-profile-instr-use            ""        "If set, profile file to use for clang PGO"
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
 )
@@ -670,7 +671,12 @@ function set_build_options_for_host() {
                     )
                 fi
 
+                llvm_cmake_options+=(
+                    -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
+                )
+
                 swift_cmake_options+=(
+                    -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
                     "-DSWIFT_PARALLEL_LINK_JOBS=${SWIFT_TOOLS_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
             fi
@@ -740,6 +746,12 @@ function set_build_options_for_host() {
         )
     fi
 
+    if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
+        llvm_cmake_options+=(
+            -DLLVM_PROFDATA_FILE="${CLANG_PROFILE_INSTR_USE}"
+        )
+    fi
+
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
@@ -771,7 +783,7 @@ function configure_default_options() {
         local default_value="${KNOWN_SETTINGS[$((i+1))]}"
 
         # Find the variable name in our lookup table.
-        local varname="${known_setting_varnames[$((i/3))]]}"
+        local varname="${known_setting_varnames[$((i/3))]}"
 
         # Establish the associative array mapping.
         eval "${setting//-/_}_VARNAME=${varname}"
@@ -1549,6 +1561,12 @@ function is_cmake_release_build_type() {
     fi
 }
 
+function is_cmake_debuginfo_build_type() {
+    if [[ "$1" == "Debug" || "$1" == "RelWithDebInfo" ]] ; then
+        echo 1
+    fi
+}
+
 function common_cross_c_flags() {
     echo -n "${COMMON_C_FLAGS}"
 
@@ -1591,8 +1609,12 @@ function llvm_c_flags() {
     if [[ $(is_cmake_release_build_type "${LLVM_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
-    if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
-        echo -n " -gline-tables-only"
+    if [[ $(is_cmake_debuginfo_build_type "${LLVM_BUILD_TYPE}") ]] ; then
+        if [[ $(is_llvm_lto_enabled) == "TRUE" ]] ; then
+            echo -n " -gline-tables-only"
+        else
+            echo -n " -g"
+        fi
     fi
 }
 
@@ -1912,6 +1934,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_DEBUG=""
+                    -DCMAKE_CXX_FLAGS_DEBUG=""
+                    -DCMAKE_C_FLAGS_RELEASE="-O3"
+                    -DCMAKE_CXX_FLAGS_RELEASE="-O3"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_C_FLAGS_MINSIZEREL="-Os"
+                    -DCMAKE_CXX_FLAGS_MINSIZEREL="-Os"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
@@ -2025,6 +2055,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
+                    -DCMAKE_C_FLAGS_DEBUG=""
+                    -DCMAKE_CXX_FLAGS_DEBUG=""
+                    -DCMAKE_C_FLAGS_RELEASE="-O3"
+                    -DCMAKE_CXX_FLAGS_RELEASE="-O3"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_C_FLAGS_MINSIZEREL="-Os"
+                    -DCMAKE_CXX_FLAGS_MINSIZEREL="-Os"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")

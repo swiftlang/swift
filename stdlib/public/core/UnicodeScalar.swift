@@ -370,21 +370,21 @@ extension UnicodeScalar : Comparable {
 }
 
 extension UnicodeScalar {
-  struct UTF16View {
-    var value: UnicodeScalar
+  public struct UTF16View {
+    internal var value: UnicodeScalar
   }
 
-  var utf16: UTF16View {
+  public var utf16: UTF16View {
     return UTF16View(value: self)
   }
 }
 
 extension UnicodeScalar.UTF16View : RandomAccessCollection {
 
-  typealias Indices = CountableRange<Int>
+  public typealias Indices = CountableRange<Int>
 
   /// The position of the first code unit.
-  var startIndex: Int {
+  public var startIndex: Int {
     return 0
   }
 
@@ -392,7 +392,7 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
   /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
-  var endIndex: Int {
+  public var endIndex: Int {
     return 0 + UTF16.width(value)
   }
 
@@ -401,7 +401,7 @@ extension UnicodeScalar.UTF16View : RandomAccessCollection {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  subscript(position: Int) -> UTF16.CodeUnit {
+  public subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)

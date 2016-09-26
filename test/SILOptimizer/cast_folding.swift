@@ -10,16 +10,16 @@ protocol P {}
 
 protocol Q: P {}
 
-class A:P {}
-class AA:A {}
+class A: P {}
+class AA: A {}
 
 class X {}
 
-class B:P {}
+class B: P {}
 
-private struct S:P {}
+private struct S: P {}
 
-struct T:Q {}
+struct T: Q {}
 
 private struct U {}
 
@@ -36,113 +36,113 @@ private final class F: CP1 {}
 // Class E implements both class protocols at once
 class E: CP1, CP2 {}
 
-func cast0<T>(_ a:T) -> Bool {
+func cast0<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: A()) is T.Type
 }
 
 
-func cast1<T>(_ a:T) -> Bool {
+func cast1<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: (A() as AnyObject)) is T.Type
 }
 
-func cast2<T>(_ a:T) -> Bool {
+func cast2<T>(_ a: T) -> Bool {
   // Succeeds if T is A
-  let ao:AnyObject = A() as AnyObject
+  let ao: AnyObject = A() as AnyObject
   return type(of: ao) is T.Type
 }
 
 
-func cast3(_ p:AnyObject) -> Bool {
+func cast3(_ p: AnyObject) -> Bool {
   // Always fails
   return type(of: p) is AnyObject.Protocol
 }
 
-func cast4(_ p:AnyObject) -> Bool {
+func cast4(_ p: AnyObject) -> Bool {
   return type(of: p) is A.Type
 }
 
-func cast5(_ t:AnyObject.Type) -> Bool {
+func cast5(_ t: AnyObject.Type) -> Bool {
   // Succeeds if t is B.self
   return t is B.Type
 }
 
-func cast6<T>(_ t:T) -> Bool {
+func cast6<T>(_ t: T) -> Bool {
   // Always fails
   return AnyObject.self is T.Type
 }
 
-func cast7<T>(_ t:T.Type) -> Bool {
+func cast7<T>(_ t: T.Type) -> Bool {
   // Succeeds if t is AnyObject.self
   return t is AnyObject.Protocol
 }
 
 
-func cast8<T>(_ a:T) -> Bool {
+func cast8<T>(_ a: T) -> Bool {
   // Succeeds if T is A
   return type(of: (A() as P)) is T.Type
 }
 
-func cast9<T>(_ a:T) -> Bool {
+func cast9<T>(_ a: T) -> Bool {
   // Succeeds if T is A
-  let ao:P = A() as P
+  let ao: P = A() as P
   return type(of: ao) is T.Type
 }
 
 
-func cast10(_ p:P) -> Bool {
+func cast10(_ p: P) -> Bool {
   return type(of: p) is P.Protocol
 }
 
-func cast11(_ p:P) -> Bool {
+func cast11(_ p: P) -> Bool {
   // Succeeds if p is of type A
   return type(of: p) is A.Type
 }
 
-func cast12(_ t:P.Type) -> Bool {
+func cast12(_ t: P.Type) -> Bool {
   return t is B.Type
 }
 
 
-func cast13<T>(_ t:T) -> Bool {
+func cast13<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
 
-func cast14<T>(_ t:T.Type) -> Bool {
+func cast14<T>(_ t: T.Type) -> Bool {
   // Succeeds if p is P.self
   return t is P.Protocol
 }
 
-func cast15<T>(_ t:T) -> Bool {
+func cast15<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return P.self is T.Type
 }
 
-func cast16<T>(_ t:T) -> Bool {
+func cast16<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
 
 
-func cast17<T>(_ t:T) -> Bool {
+func cast17<T>(_ t: T) -> Bool {
   // Succeeds if T is AnyObject
   return AnyObject.self is T.Type
 }
 
-func cast18<T>(_ t:T) -> Bool {
+func cast18<T>(_ t: T) -> Bool {
   // Succeeds if T is AnyObject
   return T.self is AnyObject.Protocol
 }
 
-func cast20<T>(_ t:T) -> Bool {
+func cast20<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Type
 }
 
-func cast21<T>(_ t:T) -> Bool {
+func cast21<T>(_ t: T) -> Bool {
   // Succeeds if T is P
   return T.self is P.Protocol
 }
@@ -170,7 +170,7 @@ func cast25(_ concrete: P.Protocol) -> Bool {
 }
 
 func cast26(_ existential: Q.Type) -> Bool {
-  // Succeeds always, because Q:P
+  // Succeeds always, because Q: P
   return existential is P.Type
 }
 

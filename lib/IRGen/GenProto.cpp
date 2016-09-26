@@ -2837,6 +2837,8 @@ llvm::Value *irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
 
   // Call the accessor.
+  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
+         "creating a function call without a debug location");
   auto call = IGF.Builder.CreateCall(witness, { parentMetadata, wtable });
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.DefaultCC);

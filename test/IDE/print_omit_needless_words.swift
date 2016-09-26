@@ -88,7 +88,7 @@
 // CHECK-FOUNDATION-NEXT: case binary
 
 // Note: Make sure NSURL works in various places
-// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: (@escaping (Bool) -> Void)!)
+// CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercased: String
@@ -131,11 +131,11 @@
 // CHECK-FOUNDATION: static var reverse: NSEnumerationOptions
 
 // Note: usingBlock -> body
-// CHECK-FOUNDATION: func enumerateObjects(_: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(_: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options: NSEnumerationOptions = [], using: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: (@escaping (Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(block: ((Any?, Int, UnsafeMutablePointer<ObjCBool>?) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomething(with: NSCopying)

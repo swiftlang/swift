@@ -163,7 +163,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       if (!decl->hasType())
         continue;
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
-        if (!assocType->getArchetype())
+        if (!assocType->getProtocol()->isValidGenericContext())
           continue;
     }
     
@@ -443,7 +443,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      bool IsKnownNonCascading,
                                      SourceLoc Loc, bool IsTypeLookup,
-                                     bool AllowProtocolMembers) {
+                                     bool AllowProtocolMembers,
+                                     bool IgnoreAccessControl) {
   Module &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -630,6 +631,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_ProtocolMembers;
         if (IsTypeLookup)
           options |= NL_OnlyTypes;
+        if (IgnoreAccessControl)
+          options |= NL_IgnoreAccessibility;
 
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
@@ -815,6 +818,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             options |= NL_ProtocolMembers;
           if (IsTypeLookup)
             options |= NL_OnlyTypes;
+          if (IgnoreAccessControl)
+            options |= NL_IgnoreAccessibility;
 
           if (!ExtendedType)
             ExtendedType = ErrorType::get(Ctx);

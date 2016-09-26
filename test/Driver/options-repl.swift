@@ -5,8 +5,11 @@
 
 // REPL_NO_FILES: REPL mode requires no input files
 
+// RUN: rm -rf %t
+// RUN: mkdir -p %t/usr/bin
+// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/usr/bin/swift)
 
-// RUN: %swift_driver -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %t/usr/bin/swift -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 
 // INTEGRATED: swift -frontend -repl
 // INTEGRATED: -module-name REPL
@@ -38,13 +41,10 @@
 // like the Xcode installation environment. We use hard links to make sure
 // the Swift driver really thinks it's been moved.
 
-// RUN: %swift_driver -repl -### | %FileCheck -check-prefix=INTEGRATED %s
-// RUN: %swift_driver -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %t/usr/bin/swift -repl -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %t/usr/bin/swift -### | %FileCheck -check-prefix=INTEGRATED %s
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t/usr/bin/
 // RUN: touch %t/usr/bin/lldb
 // RUN: chmod +x %t/usr/bin/lldb
-// RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/usr/bin/swift)
 // RUN: %t/usr/bin/swift -repl -### | %FileCheck -check-prefix=LLDB %s
 // RUN: %t/usr/bin/swift -### | %FileCheck -check-prefix=LLDB %s

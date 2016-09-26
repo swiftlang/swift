@@ -252,7 +252,7 @@ public:
     /// Merge effects from \p RHS.
     bool mergeFrom(const FunctionEffects &RHS);
 
-    /// Merge effects from an function apply site within the function.
+    /// Merge effects from a function apply site within the function.
     bool mergeFromApply(const FunctionEffects &CalleeEffects,
                         SILInstruction *FAS);
 

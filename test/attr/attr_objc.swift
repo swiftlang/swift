@@ -2006,7 +2006,7 @@ class ClassThrows1 {
   // CHECK: {{^}} func methodReturnsOptionalObjCClass() throws -> Class_ObjC1?
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
-  // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
+  // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int) throws { }
 
@@ -2035,7 +2035,7 @@ class ClassThrows1 {
 
 // CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
-  // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int))
+  // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping ((Int) -> Int), fn3: @escaping ((Int) -> Int))
   // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }
 }

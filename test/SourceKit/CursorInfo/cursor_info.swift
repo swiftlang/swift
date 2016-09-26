@@ -157,7 +157,7 @@ func paramAutoclosureNoescape1(_ msg: ()->String) {}
 func paramAutoclosureNoescape2(_ msg: @autoclosure ()->String) {}
 func paramAutoclosureNoescape3(_ msg: @autoclosure @escaping ()->String) {}
 
-func paramDefaultPlaceholder(_ f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int:Int] = [:], opt: Int? = nil, reg: Int = 1) {}
+func paramDefaultPlaceholder(_ f: StaticString = #function, file: StaticString = #file, line: UInt = #line, col: UInt = #column, arr: [Int] = [], dict: [Int: Int] = [:], opt: Int? = nil, reg: Int = 1) {}
 
 protocol P3 {
   func f(_ s: Self) -> Self

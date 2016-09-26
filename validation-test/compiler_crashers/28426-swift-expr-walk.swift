@@ -7,4 +7,4 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-var d={protocol a{typealias d:a{}class B<associatedtype b{{}}class B:a{func d:d enum b
+func a<T{if let a<T:T.h{

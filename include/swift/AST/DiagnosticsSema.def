@@ -852,6 +852,8 @@ ERROR(unbound_generic_parameter_cast,none,
       "generic parameter %0 could not be inferred in cast to %1", (Type, Type))
 NOTE(archetype_declared_in_type,none,
      "%0 declared as parameter to type %1", (Type, Type))
+NOTE(unbound_generic_parameter_explicit_fix,none,
+     "explicitly specify the generic arguments to fix this issue", ())
 
 
 ERROR(string_index_not_integer,none,
@@ -901,8 +903,6 @@ ERROR(operator_not_func,none,
       "operators must be declared with 'func'", ())
 ERROR(redefining_builtin_operator,none,
       "cannot declare a custom %0 '%1' operator", (StringRef, StringRef))
-ERROR(invalid_infix_on_func,none,
-      "'infix' modifier is not required or allowed on func declarations", ())
 ERROR(attribute_requires_operator_identifier,none,
       "'%0' requires a function with an operator identifier", (StringRef))
 ERROR(attribute_requires_single_argument,none,

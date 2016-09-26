@@ -91,22 +91,6 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   return nullptr;
 }
 
-static bool canCombinePartialApply(const PartialApplyInst *PAI) {
-  // Only process partial apply if the callee is a known function.
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-  if (!FRI)
-    return false;
-
-  // Make sure that the substitution list of the PAI does not contain any
-  // archetypes.
-  ArrayRef<Substitution> Subs = PAI->getSubstitutions();
-  for (Substitution S : Subs)
-    if (S.getReplacement()->getCanonicalType()->hasArchetype())
-      return false;
-
-  return true;
-}
-
 // Helper class performing the apply{partial_apply(x,y)}(z) -> apply(z,x,y)
 // peephole.
 class PartialApplyCombiner {
@@ -132,9 +116,6 @@ class PartialApplyCombiner {
 
   SILBuilder &Builder;
 
-  // Function referenced by partial_apply.
-  FunctionRefInst *FRI;
-
   SILCombiner *SilCombiner;
 
   bool processSingleApply(FullApplySite AI);
@@ -146,7 +127,7 @@ public:
   PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder &Builder,
                        SILCombiner *SilCombiner)
       : isFirstTime(true), PAI(PAI), Builder(Builder),
-        FRI(nullptr), SilCombiner(SilCombiner) {}
+        SilCombiner(SilCombiner) {}
   SILInstruction *combine();
 };
 
@@ -280,10 +261,8 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   for (auto Op : PAI->getArguments()) {
     auto Arg = Op;
     // If there is new temporary for this argument, use it instead.
-    if (isa<AllocStackInst>(Arg)) {
-      if (ArgToTmp.count(Arg)) {
-        Op = ArgToTmp.lookup(Arg);
-      }
+    if (ArgToTmp.count(Arg)) {
+      Op = ArgToTmp.lookup(Arg);
     }
     Args.push_back(Op);
   }
@@ -314,24 +293,23 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     }
   }
 
-  auto *F = FRI->getReferencedFunction();
-  SILType FnType = F->getLoweredType();
-  SILType ResultTy = F->getLoweredFunctionType()->getSILResult();
+  auto Callee = PAI->getCallee();
+  auto FnType = PAI->getSubstCalleeSILType();
+  SILType ResultTy = PAI->getSubstCalleeType()->getSILResult();
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
-  if (!Subs.empty()) {
-    FnType = FnType.substGenericArgs(PAI->getModule(), Subs);
-    ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
-  }
+
+  // The partial_apply might be substituting in an open existential type.
+  Builder.addOpenedArchetypeOperands(PAI);
 
   FullApplySite NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI =
-      Builder.createTryApply(AI.getLoc(), FRI, FnType, Subs, Args,
+      Builder.createTryApply(AI.getLoc(), Callee, FnType, Subs, Args,
                               TAI->getNormalBB(), TAI->getErrorBB());
   else
     NAI =
-      Builder.createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
-                           cast<ApplyInst>(AI)->isNonThrowing());
+      Builder.createApply(AI.getLoc(), Callee, FnType, ResultTy, Subs, Args,
+                          cast<ApplyInst>(AI)->isNonThrowing());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
@@ -365,11 +343,11 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 /// by iterating over all uses of the partial_apply and searching
 /// for the pattern to transform.
 SILInstruction *PartialApplyCombiner::combine() {
-  if (!canCombinePartialApply(PAI))
-    return nullptr;
-
-  // Only process partial apply if the callee is a known function.
-  FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+  // We need to model @unowned_inner_pointer better before we can do the
+  // peephole here.
+  for (auto R : PAI->getSubstCalleeType()->getAllResults())
+    if (R.getConvention() == ResultConvention::UnownedInnerPointer)
+      return nullptr;
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.

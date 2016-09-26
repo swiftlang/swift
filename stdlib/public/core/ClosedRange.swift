@@ -233,11 +233,11 @@ public struct CountableClosedRange<Bound> : RandomAccessCollection
     case .pastEnd:
       if n == 0 {
         return i
-      } else if n > 0 {
-        _preconditionFailure("Advancing past end index")
-      } else {
+      } 
+      if n < 0 {
         return index(ClosedRangeIndex(upperBound), offsetBy: (n + 1))
       }
+      _preconditionFailure("Advancing past end index")
     }
   }
 

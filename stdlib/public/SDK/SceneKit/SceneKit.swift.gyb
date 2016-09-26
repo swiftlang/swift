@@ -12,7 +12,13 @@
 
 @_exported import SceneKit // Clang module
 import CoreGraphics
+import Foundation
 import simd
+
+%{
+from gyb_foundation_support import \
+  ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods
+}%
 
 // MARK: Exposing SCNFloat
 
@@ -232,4 +238,49 @@ extension SCNSceneSource {
       self, uid as NSString, entryClass as! AnyClass) as! T?
   }
 }
+
+// Bridge vector and matrix types to NSValue.
+//
+// SceneKit implements its categories on NSValue by converting SCNVector3
+// and SCNVector4 to CGRect, and SCNMatrix4 to CATransform3D, and boxing the
+// converted struct instead of as the original type.
+
+// Get the ObjC type used by -[NSValue valueWithSCN{Vector3,Vector4,Matrix4}:]
+// to instantiate the resulting NSValue objects, in case these get changed
+// in the future.
+private let SCNVector3InNSValueObjCType =
+  NSValue(scnVector3: SCNVector3()).objCType
+private let SCNVector4InNSValueObjCType =
+  NSValue(scnVector4: SCNVector4()).objCType
+
+${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
+  Type="SCNVector3",
+  initializer="{ NSValue(scnVector3: $0) }",
+  getter="{ $0.scnVector3Value }",
+  objCType="{ _ in SCNVector3InNSValueObjCType }",
+) }
+${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
+  Type="SCNVector4",
+  initializer="{ NSValue(scnVector4: $0) }",
+  getter="{ $0.scnVector4Value }",
+  objCType="{ _ in SCNVector4InNSValueObjCType }",
+) }
+
+// On macOS, SCNMatrix4 is a typedef for CATransform3D, which is already made
+// NSValue-bridgeable in the QuartzCore overlay. It is a separate struct on
+// iOS, watchOS, and tvOS.
+
+#if os(iOS) || os(tvOS) || os(watchOS)
+
+private let SCNMatrix4InNSValueObjCType =
+  NSValue(scnMatrix4: SCNMatrix4()).objCType
+
+${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
+  Type="SCNMatrix4",
+  initializer="{ NSValue(scnMatrix4: $0) }",
+  getter="{ $0.scnMatrix4Value }",
+  objCType="{ _ in SCNMatrix4InNSValueObjCType }",
+) }
+
+#endif
 

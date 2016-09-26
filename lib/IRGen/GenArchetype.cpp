@@ -75,7 +75,7 @@ llvm::Value *irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
 
 static bool declaresDirectConformance(AssociatedTypeDecl *associatedType,
                                       ProtocolDecl *target) {
-  for (auto protocol : associatedType->getConformingProtocols(nullptr)) {
+  for (auto protocol : associatedType->getConformingProtocols()) {
     if (protocol == target)
       return true;
   }
