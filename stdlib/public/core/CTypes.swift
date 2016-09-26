@@ -194,7 +194,7 @@ func _memcpy(
   let zero: Int32 = 0
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ zero._value,
+    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
 
@@ -213,7 +213,7 @@ func _memmove(
   let zero: Int32 = 0
   Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
-    /*alignment:*/ zero._value,
+    /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
 
