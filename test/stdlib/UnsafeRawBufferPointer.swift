@@ -1,5 +1,9 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
+//
+// Test corner cases specific to UnsafeRawBufferPointer.
+// General Collection behavior tests are in
+// validation-test/stdlib/UnsafeBufferPointer.swift.
 
 import StdlibUnittest
 
@@ -23,6 +27,27 @@ UnsafeRawBufferPointerTestSuite.test("initFromValue") {
     }
   }
   expectEqual(value2, value1)
+}
+
+// Test mutability and subscript getter/setters.
+UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
+  var value1: Int32 = -1
+  var value2: Int32 = 0
+
+  withUnsafeMutableBytes(of: &value1) { bytes1 in
+    withUnsafeMutableBytes(of: &value2) { bytes2 in
+      bytes2[0..<bytes2.count] = bytes1[0..<bytes1.count]
+    }
+  }
+  expectEqual(value2, value1)
+
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 4)
+  defer { buffer.deallocate() }
+  buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
+  let leftBytes = buffer[0..<2]
+  let rightBytes = buffer[0..<2]
+  leftBytes[0..<2] = rightBytes
+  expectEqualSequence(leftBytes, rightBytes)
 }
 
 // View an array's elements as bytes.
@@ -50,32 +75,8 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
   expectEqual(array2, array1)
 }
 
-// Check Collection conformance and associated types.
-UnsafeRawBufferPointerTestSuite.test("Collection") {
-  expectCollectionType(UnsafeRawBufferPointer.self)
-  expectMutableCollectionType(UnsafeMutableRawBufferPointer.self)
-  expectSliceType(UnsafeRawBufferPointer.self)
-  expectMutableSliceType(UnsafeMutableRawBufferPointer.self)
-
-  expectCollectionAssociatedTypes(
-    collectionType: UnsafeRawBufferPointer.self,
-    iteratorType: UnsafeRawBufferPointer.Iterator.self,
-    subSequenceType: UnsafeRawBufferPointer.self,
-    indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self)
-
-  expectCollectionAssociatedTypes(
-    collectionType: UnsafeMutableRawBufferPointer.self,
-    iteratorType: UnsafeMutableRawBufferPointer.Iterator.self,
-    subSequenceType: UnsafeMutableRawBufferPointer.self,
-    indexType: Int.self,
-    indexDistanceType: Int.self,
-    indicesType: CountableRange<Int>.self)
-}
-
-// Verify basic Sequence/Iterator functionality.
-UnsafeRawBufferPointerTestSuite.test("Sequence") {
+// Directly test the byte Sequence produced by withUnsafeBytes.
+UnsafeRawBufferPointerTestSuite.test("withUnsafeBytes.Sequence") {
   var array1: [Int32] = [0, 1, 2, 3]
   array1.withUnsafeBytes { bytes1 in
     // Initialize an array from a sequence of bytes.
@@ -100,7 +101,7 @@ UnsafeRawBufferPointerTestSuite.test("empty") {
 }
 
 // Store a sequence of integers to raw memory, and reload them as structs.
-// Strore structs to raw memory, and reload them as integers.
+// Store structs to raw memory, and reload them as integers.
 UnsafeRawBufferPointerTestSuite.test("reinterpret") {
   struct Pair {
     var x: Int32
@@ -165,117 +166,161 @@ UnsafeRawBufferPointerTestSuite.test("inBounds") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
   let bytes = buffer[1..<2]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   _ = bytes[-1]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
   let bytes = buffer[0..<1]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   _ = bytes[1]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
   let bytes = buffer[1..<2]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   bytes[-1] = 0
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
   let bytes = buffer[0..<1]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   bytes[1] = 0
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
   let bytes = buffer[1..<3]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   _ = bytes[-1..<1]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
   let bytes = buffer[0..<2]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   _ = bytes[1..<3]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
   var bytes = buffer[1..<3]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Accesses a valid buffer location but triggers a debug bounds check.
   bytes[-1..<1] = bytes[0..<2]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
   var bytes = buffer[0..<2]
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+
+  // Performs a valid byte-wise copy but triggers a debug bounds check.
   bytes[1..<3] = bytes[0..<2]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.narrow") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Performs a valid byte-wise copy but triggers a debug bounds check.
   buffer[0..<3] = buffer[0..<2]
 }
 
 UnsafeRawBufferPointerTestSuite.test("subscript.range.wide") {
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Performs a valid byte-wise copy but triggers a debug bounds check.
   buffer[0..<2] = buffer[0..<3]
+}
+
+UnsafeRawBufferPointerTestSuite.test("copyBytes.overflow") {
+  var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
+  defer { buffer.deallocate() }
+
+  var bytes = buffer[0..<2]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Performs a valid byte-wise copy but triggers a debug range size check.
+  bytes.copyBytes(from: buffer)
+}
+
+UnsafeRawBufferPointerTestSuite.test("copyBytes.sequence.overflow") {
+  var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
+  defer { buffer.deallocate() }
+  
+  var bytes = buffer[0..<2]
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  // Performs a valid byte-wise copy but triggers a debug range size check.
+  bytes.copyBytes(from: [0, 1, 2] as [UInt8])
 }
 
 UnsafeRawBufferPointerTestSuite.test("load.before")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition."))
 .code {
   expectCrashLater()
   var x: Int32 = 0
@@ -287,7 +332,7 @@ UnsafeRawBufferPointerTestSuite.test("load.before")
 UnsafeRawBufferPointerTestSuite.test("load.after")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition.."))
 .code {
   expectCrashLater()
   var x: Int32 = 0
@@ -299,7 +344,7 @@ UnsafeRawBufferPointerTestSuite.test("load.after")
 UnsafeRawBufferPointerTestSuite.test("store.before")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition.."))
 .code {
   expectCrashLater()
   var x: Int32 = 0
@@ -310,7 +355,7 @@ UnsafeRawBufferPointerTestSuite.test("store.before")
 UnsafeRawBufferPointerTestSuite.test("store.after")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition.."))
 .code {
   expectCrashLater()
   var x: Int32 = 0
@@ -322,7 +367,7 @@ UnsafeRawBufferPointerTestSuite.test("store.after")
 UnsafeRawBufferPointerTestSuite.test("copy.bytes.overflow")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition.."))
 .code {
   expectCrashLater()
   var x: Int64 = 0
@@ -338,7 +383,7 @@ UnsafeRawBufferPointerTestSuite.test("copy.bytes.overflow")
 UnsafeRawBufferPointerTestSuite.test("copy.sequence.overflow")
 .skip(.custom(
     { !_isDebugAssertConfiguration() },
-    reason: "This test behaves unpredictably in optimized mode."))
+    reason: "This tests a debug precondition.."))
 .code {
   expectCrashLater()
   var x: Int64 = 0

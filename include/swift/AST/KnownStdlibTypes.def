@@ -1,4 +1,4 @@
-//===--- KnownStdlibTypes.cpp - Common standard library types -------------===//
+//===--- KnownStdlibTypes.def - Common standard library types ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
