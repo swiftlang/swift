@@ -2,4 +2,5 @@ add_swift_library(swiftos ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLA
   os.swift
   os.mm
   SWIFT_MODULE_DEPENDS ObjectiveC Dispatch
-  SWIFT_MODULE_DEPENDS_OSX XPC)
+  SWIFT_MODULE_DEPENDS_OSX Dispatch ObjectiveC XPC
+)

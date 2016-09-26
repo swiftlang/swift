@@ -16,6 +16,6 @@ add_swift_library(swiftIntents ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_O
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation CoreLocation
-  SWIFT_MODULE_DEPENDS_OSX AppKit
-  SWIFT_MODULE_DEPENDS_IOS UIKit
+  SWIFT_MODULE_DEPENDS_OSX CoreGraphics CoreLocation Dispatch Foundation IOKit ObjectiveC os
+  SWIFT_MODULE_DEPENDS_IOS CoreLocation Dispatch Foundation ObjectiveC os
   FRAMEWORK_DEPENDS_WEAK Intents)

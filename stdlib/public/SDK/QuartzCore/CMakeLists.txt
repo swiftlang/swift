@@ -4,7 +4,9 @@ add_swift_library(swiftQuartzCore ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS ObjectiveC Foundation CoreGraphics
-  SWIFT_MODULE_DEPENDS_OSX CoreImage
+  SWIFT_MODULE_DEPENDS_OSX CoreGraphics CoreImage Dispatch Foundation IOKit ObjectiveC os XPC
+  SWIFT_MODULE_DEPENDS_IOS CoreGraphics Dispatch Foundation ObjectiveC os
+  SWIFT_MODULE_DEPENDS_TVOS CoreGraphics Dispatch Foundation ObjectiveC os
   FRAMEWORK_DEPENDS QuartzCore)
 
 
