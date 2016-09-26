@@ -1398,13 +1398,6 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   return false;
 }
 
-/// Whether the given DC is a noescape-by-default context, i.e. not a property
-/// setter
-static bool isDefaultNoEscapeContext(const DeclContext *DC) {
-  auto funcDecl = dyn_cast<FuncDecl>(DC);
-  return !funcDecl || !funcDecl->isSetter();
-}
-
 // Hack to apply context-specific @escaping to an AST function type.
 static Type applyNonEscapingFromContext(DeclContext *DC,
                                         Type ty,
@@ -1414,7 +1407,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     options.contains(TR_FunctionInput) ||
     options.contains(TR_ImmediateFunctionInput);
 
-  bool defaultNoEscape = isFunctionParam && isDefaultNoEscapeContext(DC);
+  bool defaultNoEscape = isFunctionParam;
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();
@@ -1572,6 +1565,13 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
 
       type = ErrorType::get(Context);
     }
+
+    // Special case: in computed property setter, newValue closure is escaping
+    if (auto funcDecl = dyn_cast<FuncDecl>(DC))
+      if (funcDecl->isSetter())
+        if (auto funTy = type->getAs<AnyFunctionType>())
+          type = funTy->withExtInfo(funTy->getExtInfo().withNoEscape(false));
+
     Loc.setType(type, true);
     return Loc.isError();
   }
