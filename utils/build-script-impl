@@ -783,7 +783,7 @@ function configure_default_options() {
         local default_value="${KNOWN_SETTINGS[$((i+1))]}"
 
         # Find the variable name in our lookup table.
-        local varname="${known_setting_varnames[$((i/3))]]}"
+        local varname="${known_setting_varnames[$((i/3))]}"
 
         # Establish the associative array mapping.
         eval "${setting//-/_}_VARNAME=${varname}"
