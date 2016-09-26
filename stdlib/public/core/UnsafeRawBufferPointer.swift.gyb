@@ -16,9 +16,10 @@
 %  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
 
-/// A non-owning view over a region of memory as a Collection of bytes
-/// independent of the type of values held in that memory. Each 8-bit byte in
-/// memory is viewed as a `UInt8` value.
+/// A non-owning view over a region of memory as a Collection of bytes.
+///
+/// Each 8-bit byte in memory is viewed as a `UInt8` value independent of the
+/// type of values held in that memory.
 ///
 /// Reads and writes on memory via `UnsafeRawBufferPointer` are untyped
 /// operations. Accessing this Collection's bytes does not bind the
@@ -313,7 +314,7 @@ public struct Unsafe${Mutable}RawBufferPointer
         count: bounds.count)
     }
 %  if mutable:
-    set {
+    nonmutating set {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
       _debugPrecondition(bounds.count == newValue.count)
@@ -363,12 +364,12 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
 %  if mutable:
 public func withUnsafeMutableBytes<T, Result>(
   of arg: inout T,
-  _ body: (inout UnsafeMutableRawBufferPointer) throws -> Result
+  _ body: (UnsafeMutableRawBufferPointer) throws -> Result
 ) rethrows -> Result
 {
   return try withUnsafeMutablePointer(to: &arg) {
-    var bytes = UnsafeMutableRawBufferPointer(start: $0, count: MemoryLayout<T>.size)
-    return try body(&bytes)
+    return try body(UnsafeMutableRawBufferPointer(
+        start: $0, count: MemoryLayout<T>.size))
   }
 }
 %  else:
