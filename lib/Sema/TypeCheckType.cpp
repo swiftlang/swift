@@ -1288,75 +1288,15 @@ static Type resolveIdentTypeComponent(
                                          unsatisfiedDependency);
 }
 
-// FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
 static bool checkTypeDeclAvailability(const TypeDecl *TypeDecl,
                                       IdentTypeRepr *IdType,
                                       SourceLoc Loc, DeclContext *DC,
                                       TypeChecker &TC,
                                       bool AllowPotentiallyUnavailableProtocol){
-
-  if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-    if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
-      switch (Attr->getPlatformAgnosticAvailability()) {
-      case PlatformAgnosticAvailabilityKind::None:
-      case PlatformAgnosticAvailabilityKind::Deprecated:
-        break;
-
-      case PlatformAgnosticAvailabilityKind::Unavailable:
-      case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-      case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
-        bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
-                        PlatformAgnosticAvailabilityKind::UnavailableInSwift);
-
-        if (!Attr->Rename.empty()) {
-          auto diag = TC.diagnose(Loc,
-                                  diag::availability_decl_unavailable_rename,
-                                  CI->getIdentifier(), /*"replaced"*/false,
-                                  /*special kind*/0, Attr->Rename);
-          fixItAvailableAttrRename(TC, diag, Loc, TypeDecl, Attr,
-                                   /*call*/nullptr);
-        } else if (Attr->Message.empty()) {
-          TC.diagnose(Loc,
-                      inSwift ? diag::availability_decl_unavailable_in_swift
-                              : diag::availability_decl_unavailable,
-                      CI->getIdentifier())
-            .highlight(Loc);
-        } else {
-          EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-          TC.diagnose(Loc,
-                      inSwift ? diag::availability_decl_unavailable_in_swift_msg
-                              : diag::availability_decl_unavailable_msg,
-                      CI->getIdentifier(), EncodedMessage.Message)
-            .highlight(Loc);
-        }
-        break;
-      }
-      }
-
-      auto DLoc = TypeDecl->getLoc();
-      if (DLoc.isValid())
-        TC.diagnose(DLoc, diag::availability_marked_unavailable,
-                    CI->getIdentifier()).highlight(Attr->getRange());
-      return true;
-    }
-
-    TC.diagnoseIfDeprecated(CI->getSourceRange(), DC, TypeDecl,
-                            /*call, N/A*/nullptr);
-    
-    if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))
-      return false;
-
-    // Check for potential unavailability because of the minimum
-    // deployment version.
-    // We should probably unify this checking for deployment-version API
-    // unavailability with checking for explicitly annotated unavailability.
-    Optional<UnavailabilityReason> Unavail =
-        TC.checkDeclarationAvailability(TypeDecl, Loc, DC);
-    if (Unavail.hasValue()) {
-      TC.diagnosePotentialUnavailability(TypeDecl, CI->getIdentifier(),
-                                         CI->getSourceRange(), DC,
-                                         Unavail.getValue());
-    }
+  if (isa<ComponentIdentTypeRepr>(IdType)) {
+    return diagnoseDeclAvailability(TypeDecl, TC, DC, Loc,
+                                    AllowPotentiallyUnavailableProtocol,
+                                    false);
   }
 
   return false;

@@ -1991,9 +1991,12 @@ public:
     return E;
   }
 
-private:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const ApplyExpr *call = nullptr);
+                        const ApplyExpr *call = nullptr,
+                        bool AllowPotentiallyUnavailableProtocol = false,
+                        bool SignalOnPotentialUnavailability = true);
+
+private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
@@ -2133,7 +2136,9 @@ private:
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call) {
+                                          const ApplyExpr *call,
+                                          bool AllowPotentiallyUnavailableProtocol,
+                                          bool SignalOnPotentialUnavailability) {
   if (!D)
     return false;
 
@@ -2150,11 +2155,15 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose for deprecation
   TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  // Diagnose for potential unavailability
+  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+    return false;
+
+  // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
+    if (SignalOnPotentialUnavailability)
+      return true;
   }
   return false;
 }
@@ -4128,4 +4137,21 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
+}
+
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
+                                     TypeChecker &TC,
+                                     DeclContext *DC,
+                                     SourceRange R,
+                                     bool AllowPotentiallyUnavailableProtocol,
+                                     bool SignalOnPotentialUnavailability)
+{
+  AvailabilityWalker AW(TC, DC);
+  return AW.diagAvailability(Decl, R, nullptr,
+                             AllowPotentiallyUnavailableProtocol,
+                             SignalOnPotentialUnavailability);
 }
