@@ -1867,9 +1867,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
+        EncodedDiagnosticMessage EncodedMessage(Attr->Message);
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
-                             newName, Attr->Message);
+                             newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
@@ -2131,7 +2132,6 @@ private:
   }
 };
 }
-
 
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
