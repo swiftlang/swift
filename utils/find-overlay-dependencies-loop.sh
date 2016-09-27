@@ -27,7 +27,11 @@ case $# in
   usage ;;
 esac
 
-# Don't update XCTest
-for overlay in $(find ./stdlib/public/SDK/ -depth 1 -type d ! -name XCTest -exec basename \{\} \;); do
-  $SCRIPT $overlay $1
+# Don't update XCTest, handle spaces in directories
+for f in ./stdlib/public/SDK/*/; do
+  name=`basename "${f}"`
+  if [[ "${name}" == "XCTest" ]]; then
+    continue
+  fi
+  $SCRIPT "${name}" "$1"
 done

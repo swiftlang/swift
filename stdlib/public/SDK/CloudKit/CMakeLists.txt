@@ -1,9 +1,9 @@
 add_swift_library(swiftCloudKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CloudKit.swift
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS Foundation CoreLocation
-  SWIFT_MODULE_DEPENDS_OSX Contacts CoreGraphics CoreLocation Dispatch Foundation IOKit ObjectiveC os
-  SWIFT_MODULE_DEPENDS_IOS Contacts CoreLocation Dispatch Foundation ObjectiveC os
-  SWIFT_MODULE_DEPENDS_TVOS CoreLocation Dispatch Foundation ObjectiveC os
-  SWIFT_MODULE_DEPENDS_WATCHOS CoreLocation Dispatch Foundation ObjectiveC os
-  FRAMEWORK_DEPENDS_WEAK CloudKit)
+  SWIFT_MODULE_DEPENDS_OSX Darwin Contacts CoreGraphics CoreLocation Dispatch Foundation IOKit ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin Contacts CoreLocation Dispatch Foundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreLocation Dispatch Foundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreLocation Dispatch Foundation ObjectiveC # auto-updated
+  FRAMEWORK_DEPENDS_WEAK CloudKit
+)
