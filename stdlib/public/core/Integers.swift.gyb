@@ -15,6 +15,7 @@
 #
 
 from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
+from SwiftFloatingPointTypes import getFtoIBounds
 
 from string import maketrans, capitalize
 
@@ -260,11 +261,6 @@ extension BinaryInteger {
     // FIXME(integers): implement
     fatalError()
     return nil
-  }
-
-  public init<T : FloatingPoint>(_ source: T) {
-    // FIXME(integers): implement
-    fatalError()
   }
 
   @_transparent
@@ -1081,6 +1077,35 @@ public struct ${Self}
   }
 }
 %# end of concrete type: ${Self}
+
+% sign = 's' if signed else 'u'
+extension ${Self} {
+  // FIXME(integers): implement me in a less terrible way
+  public init<T : FloatingPoint>(_ source: T) {
+    _precondition(source.isFinite, "") // FIXME(integers): message
+
+%   for (FloatType, FloatBits) in [
+%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
+%     if FloatType == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+    if source is ${FloatType} {
+      let x = source as! ${FloatType}
+%     (lower, upper) = getFtoIBounds(floatBits=32, intBits=int(bits), signed=signed)
+      _precondition(x > ${str(lower)}.0, "") // FIXME(integers): message
+      _precondition(x < ${str(upper)}.0, "") // FIXME(integers): message
+      self._value = Builtin.fpto${sign}i_FPIEEE${FloatBits}_${BuiltinName}(x._value)
+      return
+    }
+%     if FloatType == 'Float80':
+#endif
+%     end
+%   end
+
+    _preconditionFailure("Conversion is not supported")
+  }
+}
+
 
 extension ${Self} : Hashable {
   /// The hash value.
