@@ -50,6 +50,10 @@ if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
 else:
     config.available_features.add('no_asserts')
 
+# If tools have debug info, set the tools-debuginfo flag.
+if "@CMAKE_BUILD_TYPE@" in ["Debug", "RelWithDebInfo"]:
+    config.available_features.add('tools-debuginfo')
+
 if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
     config.available_features.add('swift_stdlib_asserts')
 else:
