@@ -970,7 +970,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       current->setInvalid();
       if (current->hasType())
-	current->overwriteType(ErrorType::get(tc.Context));
+        current->overwriteType(ErrorType::get(tc.Context));
       break;
     }
   }

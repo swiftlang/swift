@@ -40,6 +40,7 @@ extension {Type}: _ObjectiveCBridgeable {{
 }}
 """.format(Type=Type)
 
+
 def ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
   Type,
   initializer,

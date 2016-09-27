@@ -124,8 +124,8 @@ nsNumberBridging.test("${Type}") {
 % end
 
 %{
-allBridgedTypes = [Type for Type, _, _ in bridgedFixedPointTypes] + \
-                  [Type for Type, _ in bridgedFloatTypes]
+allBridgedTypes = [type_name for type_name, _, _ in bridgedFixedPointTypes] + \
+                  [type_name for type_name, _ in bridgedFloatTypes]
 }%
 
 % for AType in allBridgedTypes:

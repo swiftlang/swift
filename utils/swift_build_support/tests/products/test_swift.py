@@ -264,4 +264,3 @@ class SwiftTestCase(unittest.TestCase):
             ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=10',
              '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=25'],
             swift.cmake_options)
-

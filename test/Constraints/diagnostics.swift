@@ -713,7 +713,7 @@ func nilComparison(i: Int, o: AnyObject) {
   _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
 }
 
-func secondArgumentNotLabeled(a:Int, _ b: Int) { }
+func secondArgumentNotLabeled(a: Int, _ b: Int) { }
 secondArgumentNotLabeled(10, 20)
 // expected-error@-1 {{missing argument label 'a' in call}}
 

@@ -468,6 +468,30 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     /// Therefore there is no need for a liveness computation.
     /// The next line can be just replaced by:
     /// return false;
+
+    // Keep all transparent functions alive. This is important because we have
+    // to generate code for transparent functions.
+    // Here we handle the special case if a transparent function is referenced
+    // from a non-externally-available function (i.e. a function for which we
+    // generate code). And those function is only reachable through a
+    // vtable/witness-table. In such a case we would not visit the transparent
+    // function in findAliveFunctions() because we don't consider vtables/
+    // witness-tables as anchors.
+    for (SILFunction &F : *Module) {
+      if (isAvailableExternally(F.getLinkage()))
+        continue;
+
+      for (SILBasicBlock &BB : F) {
+        for (SILInstruction &I : BB) {
+          if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+            SILFunction *RefF = FRI->getReferencedFunction();
+            if (RefF->isTransparent() && RefF->isFragile())
+              ensureAlive(RefF);
+          }
+        }
+      }
+    }
+
     return FunctionLivenessComputation::findAliveFunctions();
   }
 
