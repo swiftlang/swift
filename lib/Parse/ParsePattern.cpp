@@ -736,7 +736,7 @@ Parser::parseConstructorArguments(DeclName &FullName,
     {
       auto diag = diagnose(Tok, diag::expected_lparen_initializer);
       if (Tok.is(tok::l_brace))
-        diag.fixItInsert(Tok.getLoc(), "() ");
+        diag.fixItInsertAfter(PreviousLoc, "()");
     }
 
     // Create an empty parameter list to recover.
