@@ -403,7 +403,7 @@ ${SelfName}TestSuite.test("nonNilNonEmpty") {
   expectEqual(1, iter.next())
   expectEqual(0, iter.next())
   expectEqual(1, iter.next())
-  expectNil(iter.next())
+  expectEqual(iter.next(), nil)
 
   expectEqualSequence([1, 0, 1], buffer.map { Int($0) })
 
