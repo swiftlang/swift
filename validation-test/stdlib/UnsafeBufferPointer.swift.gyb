@@ -518,14 +518,15 @@ ${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGet
   let buffer = SubscriptGetTest.create${SelfName}(from: memory)
 
 %     if IsRaw:
-  // A raw buffer pointer has debug bounds checks on indices.
-  if _isDebugAssertConfiguration() {
-    if expectedValues == nil { expectCrashLater() }
-  }
+  // A raw buffer pointer has debug bounds checks on indices, and
+  // (currently) invokes Collection._failEarlyRangeCheck in nondebug mode.
+  if expectedValues == nil { expectCrashLater() }
 %     end
   let range = test.rangeSelection.${RangeName}(in: buffer)
 
-  if expectedValues == nil { expectCrashLater() }
+  if _isDebugAssertConfiguration() {
+    if expectedValues == nil { expectCrashLater() }
+  }
   let slice = buffer[range]
   // If expectedValues is nil, we should have crashed above. Allowing the
   // following code to crash leads to false positives.
@@ -551,10 +552,19 @@ ${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGet
 % ]:
 %   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
 UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${RangeName}/set")
-  .forEach(in: subscriptSetTests) { (test) in
+%     if not IsRaw:
+  // UnsafeRawBuffer (currently) invokes Collection._failEarlyRangeCheck
+  // in nondebug mode.
+  .skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+%     end
+.forEach(in: subscriptSetTests) { (test) in
 
   let expectedValues: [Int]?
   let replacementValues: [OpaqueValue<Int>]
+  let elementCount = SubscriptSetTest.elementCount
+
 %      if 'closed' in RangeName.lower():
   if test.rangeSelection.isEmpty {
     return
@@ -567,12 +577,26 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
     expectedValues = test.expectedClosedValues
   }
   replacementValues = test.replacementClosedValues
+  let isOutOfBounds: () -> Bool = {
+    switch test.rangeSelection {
+    case let .offsets(lowerBound, upperBound):
+      return lowerBound < 0 || upperBound >= elementCount
+    default:
+      return false
+    }
+  }
 %      else:
   expectedValues = test.expectedValues
   replacementValues = test.replacementValues
+  let isOutOfBounds: () -> Bool = {
+    switch test.rangeSelection {
+    case let .offsets(lowerBound, upperBound):
+      return lowerBound < 0 || upperBound > elementCount
+    default:
+      return false
+    }
+  }
 %      end
-
-  let elementCount = SubscriptSetTest.elementCount
 
   var memory = SubscriptSetTest.allocateFor${'Raw' if IsRaw else ''}Buffer(
     count: elementCount)
@@ -586,8 +610,9 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   var buffer = SubscriptSetTest.create${SelfName}(from: memory)
 
 %     if IsRaw:
-  // A raw buffer pointer has debug bounds checks on indices.
-  if _isDebugAssertConfiguration() {
+  // A raw buffer pointer has debug bounds checks on indices, and
+  // (currently) invokes Collection._failEarlyRangeCheck in nondebug mode.
+  if _isDebugAssertConfiguration() || isOutOfBounds() {
     if expectedValues == nil { expectCrashLater() }
   }
 %     end
@@ -597,7 +622,9 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
     from: sliceMemory,
     replacementValues: replacementValues)
 
-  if expectedValues == nil { expectCrashLater() }
+  if _isDebugAssertConfiguration() {
+    if expectedValues == nil { expectCrashLater() }
+  }
   buffer[range] = replacementSlice
   // If expectedValues is nil, we should have crashed above. Allowing the
   // following code to crash leads to false positives.
