@@ -5,7 +5,7 @@ add_swift_library(swiftPhotos ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OV
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation CoreLocation CoreImage CoreMedia
-  SWIFT_MODULE_DEPENDS_IOS UIKit AVFoundation
-  SWIFT_MODULE_DEPENDS_TVOS UIKit AVFoundation
+  SWIFT_MODULE_DEPENDS_IOS AVFoundation CoreAudio CoreGraphics CoreImage CoreLocation CoreMedia Dispatch Foundation ObjectiveC os QuartzCore UIKit
+  SWIFT_MODULE_DEPENDS_TVOS AVFoundation CoreAudio CoreGraphics CoreImage CoreLocation CoreMedia Dispatch Foundation ObjectiveC os QuartzCore UIKit
   FRAMEWORK_DEPENDS Photos)
 
