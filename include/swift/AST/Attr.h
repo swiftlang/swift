@@ -674,7 +674,9 @@ public:
   static AvailableAttr *
   createPlatformAgnostic(ASTContext &C, StringRef Message, StringRef Rename = "",
                       PlatformAgnosticAvailabilityKind Reason
-                        = PlatformAgnosticAvailabilityKind::Unavailable);
+                         = PlatformAgnosticAvailabilityKind::Unavailable,
+                         clang::VersionTuple Obsoleted
+                         = clang::VersionTuple());
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;

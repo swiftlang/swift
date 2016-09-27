@@ -655,12 +655,16 @@ AvailableAttr *
 AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
-                                   PlatformAgnosticAvailabilityKind Reason) {
-  assert(Reason != PlatformAgnosticAvailabilityKind::None);
+                                   PlatformAgnosticAvailabilityKind Kind,
+                                   clang::VersionTuple Obsoleted) {
+  assert(Kind != PlatformAgnosticAvailabilityKind::None);
   clang::VersionTuple NoVersion;
+  if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+    assert(!Obsoleted.empty());
+  }
   return new (C) AvailableAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
-    NoVersion, NoVersion, NoVersion, Reason, /* isImplicit */ false);
+    NoVersion, NoVersion, Obsoleted, Kind, /* isImplicit */ false);
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {

@@ -1840,7 +1840,8 @@ namespace {
 
       auto attr = AvailableAttr::createPlatformAgnostic(
                     ctx, StringRef(), ctx.AllocateCopy(renamed.str()),
-                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific);
+                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+                    clang::VersionTuple(3));
       decl->getAttrs().add(attr);
       decl->setImplicit();
     }
