@@ -1456,16 +1456,24 @@ function(add_swift_library name)
         endif()
 
         set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+        
+        if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
+          set(unsigned "-unsigned")
+        endif()
+        
         _add_swift_lipo_target(
-            ${lipo_target}
-            "${UNIVERSAL_LIBRARY_NAME}"
+            ${lipo_target}${unsigned}
+            "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
             ${THIN_INPUT_TARGETS})
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           # Ad-hoc sign stdlib dylibs
-          add_custom_command(TARGET "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-                             POST_BUILD
-                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
+          add_custom_command_target(unused_var
+            COMMAND ${CMAKE_COMMAND} -E copy ${UNIVERSAL_LIBRARY_NAME}${unsigned} ${UNIVERSAL_LIBRARY_NAME}
+            COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}"
+            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
+            DEPENDS ${lipo_target}${unsigned}
+            CUSTOM_TARGET_NAME ${lipo_target})
         endif()
 
         # Cache universal libraries for dependency purposes
