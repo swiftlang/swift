@@ -1,10 +1,6 @@
 @_exported import CoreLocation
 import Foundation
 
-%{
-from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
-}%
-
 #if os(iOS)
 extension CLError {
   /// In a regionMonitoringResponseDelayed error, the region that the
@@ -14,5 +10,3 @@ extension CLError {
   }
 }
 #endif
-
-${ ObjectiveCBridgeableImplementationForNSValue("CLLocationCoordinate2D") }
