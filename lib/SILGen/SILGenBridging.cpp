@@ -68,7 +68,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   
   // FIXME: Methods of generic types don't have substitutions in their
   // ConcreteDeclRefs for some reason. Furthermore,
-  // SubsitutedProtocolConformances don't substitute their witness
+  // SubstitutedProtocolConformances don't substitute their witness
   // ConcreteDeclRefs, so we need to do it ourselves.
   ArrayRef<Substitution> substitutions;
   SmallVector<Substitution, 4> substitutionsBuf;
