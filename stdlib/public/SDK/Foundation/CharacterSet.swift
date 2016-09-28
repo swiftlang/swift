@@ -74,7 +74,7 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
 */
 public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgebra, _MutablePairBoxing {
     public typealias ReferenceType = NSCharacterSet
-    
+
     internal typealias SwiftNSWrapping = _SwiftNSCharacterSet
     internal typealias ImmutableType = SwiftNSWrapping.ImmutableType
     internal typealias MutableType = SwiftNSWrapping.MutableType
@@ -134,17 +134,9 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
             return nil
         }
     }
-    
+
     public var hashValue: Int {
         return _mapUnmanaged { $0.hashValue }
-    }
-    
-    public var description: String {
-        return _mapUnmanaged { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _mapUnmanaged { $0.debugDescription }
     }
     
     private init(reference: NSCharacterSet) {
@@ -467,6 +459,16 @@ extension CharacterSet : _ObjectiveCBridgeable {
         return CharacterSet(_bridged: source!)
     }
     
+}
+
+extension CharacterSet : CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        return _mapUnmanaged { $0.description }
+    }
+
+    public var debugDescription: String {
+        return _mapUnmanaged { $0.debugDescription }
+    }
 }
 
 extension NSCharacterSet : _HasCustomAnyHashableRepresentation {
