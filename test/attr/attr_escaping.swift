@@ -142,3 +142,16 @@ func takesVarargsOfFunctions(fns: () -> ()...) {
 func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
   takesVarargsOfFunctions(fns: fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
+
+
+class FooClass {
+  var stored : Optional<(()->Int)->Void> = nil
+  var computed : (()->Int)->Void {
+    get { return stored! }
+    set(newValue) { stored = newValue } // ok
+  }
+  var computedEscaping : (@escaping ()->Int)->Void {
+    get { return stored! }
+    set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type 'Optional<(() -> Int) -> Void>' (aka 'Optional<(() -> Int) -> ()>')}}
+  }
+}
