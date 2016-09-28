@@ -122,3 +122,29 @@ function(swift_install_in_component component)
     install(${ARGN})
   endif()
 endfunction()
+
+function(swift_install_symlink_component component)
+  cmake_parse_arguments(
+      ARG # prefix
+      "" "LINK_NAME;TARGET;DESTINATION" "" ${ARGN})
+  precondition(ARG_LINK_NAME MESSAGE "LINK_NAME is required")
+  precondition(ARG_TARGET MESSAGE "TARGET is required")
+  precondition(ARG_DESTINATION MESSAGE "DESTINATION is required")
+
+  swift_is_installing_component("${component}" is_installing)
+  if (NOT is_installing)
+    return()
+  endif()
+
+  foreach(path ${CMAKE_MODULE_PATH})
+    if(EXISTS ${path}/LLVMInstallSymlink.cmake)
+      set(INSTALL_SYMLINK ${path}/LLVMInstallSymlink.cmake)
+      break()
+    endif()
+  endforeach()
+  precondition(INSTALL_SYMLINK
+    MESSAGE "LLVMInstallSymlink script must be available.")
+
+  install(SCRIPT ${INSTALL_SYMLINK}
+          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})")
+endfunction()
