@@ -392,21 +392,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                        Result, Result.getEndLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
-
-        // If the parsed stmt was a GuardStmt, push the VarDecls into the
-        // Entries list, so that they can be found by unqual name lookup later.
-        if (!IsTopLevel) {
-          auto resultStmt = Result.dyn_cast<Stmt*>();
-          if (auto guard = dyn_cast_or_null<GuardStmt>(resultStmt)) {
-            for (const auto &elt : guard->getCond()) {
-              if (!elt.getPatternOrNull()) continue;
-
-              elt.getPattern()->forEachVariable([&](VarDecl *VD) {
-                Entries.push_back(VD);
-              });
-            }
-          }
-        }
       }
     } else if (Tok.is(tok::kw_init) && isa<ConstructorDecl>(CurDeclContext)) {
       SourceLoc StartLoc = Tok.getLoc();
@@ -422,15 +407,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
       diagnoseDiscardedClosure(*this, Result);
-      if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
-        // If this is a normal library, you can't have expressions or
-        // statements outside at the top level.
-        diagnose(Tok.getLoc(),
-                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
-                                    : diag::illegal_top_level_expr);
-        Result = ASTNode();
-      }
-
       if (!Result.isNull())
         Entries.push_back(Result);
     }
