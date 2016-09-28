@@ -28,6 +28,6 @@ case $# in
 esac
 
 # Don't update XCTest
-for overlay in $(find ./stdlib/public/SDK/ -depth 1 -type d ! -name XCTest -exec basename \{\} \;); do
+for overlay in $(find ./stdlib/public/SDK/ -mindepth 1 -maxdepth 1 -type d ! -name XCTest -exec basename \{\} \;); do
   $SCRIPT $overlay $1
 done
