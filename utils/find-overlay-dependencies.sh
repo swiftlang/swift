@@ -46,7 +46,7 @@ CUSTOM_NAMED_MODULES[xpc]=XPC
 
 # Exclude XCTest/ and CMakeLists.txt
 ALL_OVERLAYS=()
-for overlay in $(find "$OVERLAYS_PATH" -depth 1 -type d ! -name XCTest -exec basename \{\} \;); do
+for overlay in $(find "$OVERLAYS_PATH" -mindepth 1 -maxdepth 1 -type d ! -name XCTest -exec basename \{\} \;); do
   ALL_OVERLAYS+=${CUSTOM_NAMED_MODULES[$overlay]-$overlay}
 done
 
