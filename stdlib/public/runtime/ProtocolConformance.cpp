@@ -637,15 +637,11 @@ recur:
           C.cacheFailure(metadata, P);
         }
 
-      // If the record provides a nondependent witness table for all instances
-      // of a generic type, cache it for the generic pattern.
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
       // can be shared.
       } else if (record.getTypeKind()
-                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor
-                 && record.getConformanceKind()
-                   == ProtocolConformanceReferenceKind::WitnessTable) {
+                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor) {
 
         auto R = record.getNominalTypeDescriptor();
         auto P = record.getProtocol();
@@ -658,7 +654,20 @@ recur:
           continue;
 
         // Store the type-protocol pair in the cache.
-        C.cacheSuccess(R, P, record.getStaticWitnessTable());
+        switch (record.getConformanceKind()) {
+        case ProtocolConformanceReferenceKind::WitnessTable:
+          // If the record provides a nondependent witness table for all
+          // instances of a generic type, cache it for the generic pattern.
+          C.cacheSuccess(R, P, record.getStaticWitnessTable());
+          break;
+
+        case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+          // If the record provides a dependent witness table accessor,
+          // cache the result for the instantiated type metadata.
+          C.cacheSuccess(type, P, record.getWitnessTable(type));
+          break;
+
+        }
       }
     }
   }
