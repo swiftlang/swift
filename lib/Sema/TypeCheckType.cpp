@@ -1559,6 +1559,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     // Raise error if we parse an IUO type in an illegal position.
     checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
 
+    // Special case: in computed property setter, newValue closure is escaping
+    if (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isSetter())
+      options |= TR_ImmediateSetterNewValue;
+
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -1573,12 +1577,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
       Loc.setType(ErrorType::get(Context), true);
       return true;
     }
-
-    // Special case: in computed property setter, newValue closure is escaping
-    if (auto funcDecl = dyn_cast<FuncDecl>(DC))
-      if (funcDecl->isSetter())
-        if (auto funTy = type->getAs<AnyFunctionType>())
-          type = funTy->withExtInfo(funTy->getExtInfo().withNoEscape(false));
 
     Loc.setType(type, true);
     return Loc.isError();
@@ -1701,6 +1699,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_FunctionInput;
   }
 
+  bool isImmediateSetterNewValue = options.contains(TR_ImmediateSetterNewValue);
+  options -= TR_ImmediateSetterNewValue;
+
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TR_AllowUnavailable;
 
@@ -1723,8 +1724,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Function:
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
-      auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result && result->is<FunctionType>())
+      auto result =
+          resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
+      if (result && result->is<FunctionType>() && !isImmediateSetterNewValue)
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }
