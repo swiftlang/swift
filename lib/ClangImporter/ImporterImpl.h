@@ -583,13 +583,17 @@ public:
 
   /// Add the macros from the given Clang preprocessor to the given
   /// Swift name lookup table.
-  void addMacrosToLookupTable(clang::ASTContext &clangCtx,
-                              clang::Preprocessor &pp, SwiftLookupTable &table);
+  static void addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                                     clang::Preprocessor &pp,
+                                     SwiftLookupTable &table,
+       ASTContext &SwiftContext);
 
   /// Finalize a lookup table, handling any as-yet-unresolved entries
   /// and emitting diagnostics if necessary.
-  void finalizeLookupTable(clang::ASTContext &clangCtx,
-                           clang::Preprocessor &pp, SwiftLookupTable &table);
+  static void finalizeLookupTable(clang::ASTContext &clangCtx,
+                                  clang::Preprocessor &pp,
+                                  SwiftLookupTable &table,
+                                  ASTContext &SwiftContext);
 
 public:
   void registerExternalDecl(Decl *D) {
@@ -662,9 +666,10 @@ public:
   }
 
   /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro,
-                             clang::ASTContext &clangCtx);
+  static Identifier
+  importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                  const clang::MacroInfo *macro, clang::ASTContext &clangCtx,
+                  ASTContext &SwiftContext);
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
