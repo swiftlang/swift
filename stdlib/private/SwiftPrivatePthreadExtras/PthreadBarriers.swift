@@ -16,8 +16,6 @@ import Darwin
 import Glibc
 #endif
 
-// FIXME: On FreeBSD, code in this file doesn't compile
-#if !os(FreeBSD)
 //
 // Implement pthread barriers.
 //
@@ -45,8 +43,13 @@ public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
 }
 
 public struct _stdlib_pthread_barrier_t {
+#if CYGWIN || os(FreeBSD)
+  var mutex: UnsafeMutablePointer<pthread_mutex_t?>? = nil
+  var cond: UnsafeMutablePointer<pthread_cond_t?>? = nil
+#else
   var mutex: UnsafeMutablePointer<pthread_mutex_t>? = nil
   var cond: UnsafeMutablePointer<pthread_cond_t>? = nil
+#endif
 
   /// The number of threads to synchronize.
   var count: CUnsignedInt = 0
@@ -131,4 +134,3 @@ public func _stdlib_pthread_barrier_wait(
     return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD
   }
 }
-#endif
