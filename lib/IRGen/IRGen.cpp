@@ -820,9 +820,10 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
-    auto collectReference = [&](llvm::GlobalObject &G) {
+    auto collectReference = [&](llvm::GlobalValue &G) {
       if (G.isDeclaration()
-          && G.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
+          && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
+              G.getLinkage() == GlobalValue::ExternalLinkage)) {
         referencedGlobals.insert(G.getName());
         G.setLinkage(GlobalValue::ExternalLinkage);
       }
@@ -832,6 +833,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
     for (llvm::Function &F : M->getFunctionList()) {
       collectReference(F);
+    }
+    for (llvm::GlobalAlias &A : M->getAliasList()) {
+      collectReference(A);
     }
   }
 
@@ -843,7 +847,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     // If a shared function/global is referenced from another file it must have
     // weak instead of linkonce linkage. Otherwise LLVM would remove the
     // definition (if it's not referenced in the same file).
-    auto updateLinkage = [&](llvm::GlobalObject &G) {
+    auto updateLinkage = [&](llvm::GlobalValue &G) {
       if (!G.isDeclaration()
           && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
           && referencedGlobals.count(G.getName()) != 0) {
@@ -855,6 +859,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
     for (llvm::Function &F : M->getFunctionList()) {
       updateLinkage(F);
+    }
+    for (llvm::GlobalAlias &A : M->getAliasList()) {
+      updateLinkage(A);
     }
 
     if (!IGM->finalize())
