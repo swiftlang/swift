@@ -820,7 +820,10 @@ class BuildScriptInvocation(object):
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
         if args.coverage_db:
-            impl_args += ["--coverage-db=%s" % args.coverage_db]
+            impl_args += [
+                "--coverage-db=%s" %
+                os.path.abspath(args.coverage_db)
+            ]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
