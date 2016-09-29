@@ -132,6 +132,12 @@ struct ImportedName {
 /// in "Notification", or it there would be nothing left.
 StringRef stripNotification(StringRef name);
 
+/// Imports the name of the given Clang macro into Swift.
+Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                           const clang::MacroInfo *macro,
+                           clang::ASTContext &clangCtx,
+                           ASTContext &SwiftContext);
+
 // TODO: I'd like to remove the following
 /// Flags that control the import of names in importFullName.
 enum class ImportNameFlags {

@@ -5954,7 +5954,7 @@ void SwiftDeclConverter::importObjCMembers(
 
       // If this declaration shouldn't be visible, don't add it to
       // the list.
-      if (Impl.shouldSuppressDeclImport(objcMethod))
+      if (shouldSuppressDeclImport(objcMethod))
         continue;
     }
 
