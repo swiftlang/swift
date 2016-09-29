@@ -74,7 +74,7 @@ public struct DispatchWallTime : Comparable {
 
 public func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
 	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
-	return -Int64(a.rawValue) < -Int64(b.rawValue)
+	return -Int64(bitPattern: a.rawValue) < -Int64(bitPattern: b.rawValue)
 }
 
 public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
