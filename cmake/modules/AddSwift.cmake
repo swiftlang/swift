@@ -363,13 +363,8 @@ endfunction()
 #                         # lipo'd into the output.
 #   )
 function(_add_swift_lipo_target target output)
-  if("${target}" STREQUAL "")
-    message(FATAL_ERROR "target is required")
-  endif()
-
-  if("${output}" STREQUAL "")
-    message(FATAL_ERROR "output is required")
-  endif()
+  precondition(target MESSAGE "target is required")
+  precondition(output MESSAGE "output is required")
 
   set(source_targets ${ARGN})
 
