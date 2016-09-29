@@ -1594,3 +1594,41 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
   result.Imported = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
   return result;
 }
+
+/// Returns true if it is expected that the macro is ignored.
+static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
+  // Ignore include guards.
+  if (macro->isUsedForHeaderGuard())
+    return true;
+
+  // If there are no tokens, there is nothing to convert.
+  if (macro->tokens_empty())
+    return true;
+
+  // Currently we only convert non-function-like macros.
+  if (macro->isFunctionLike())
+    return true;
+
+  // Consult the blacklist of macros to suppress.
+  auto suppressMacro = llvm::StringSwitch<bool>(name)
+#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
+#include "MacroTable.def"
+                           .Default(false);
+
+  if (suppressMacro)
+    return true;
+
+  return false;
+}
+
+Identifier importer::importMacroName(
+    const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
+    clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
+  // If we're supposed to ignore this macro, return an empty identifier.
+  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
+    return Identifier();
+
+  // No transformation is applied to the name.
+  StringRef name = clangIdentifier->getName();
+  return SwiftContext.getIdentifier(name);
+}
