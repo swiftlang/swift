@@ -815,6 +815,27 @@ public struct ${Self}
     _value = x._value
   }
 
+%   for (FloatType, FloatBits) in [
+%     ('Float', 32), ('Double', 64), ('Float80', 80)]:
+%     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
+
+%     if FloatType == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+  public init(_ source: ${FloatType}) {
+    _precondition(source.isFinite, "") // FIXME(integers): message
+    _precondition(source > ${str(lower)}.0, "") // FIXME(integers): message
+    _precondition(source < ${str(upper)}.0, "") // FIXME(integers): message
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
+  }
+
+%     if FloatType == 'Float80':
+#endif
+%     end
+
+%   end
+
 // FIXME(integers): workaround for a problem where enums don't compile without
 //                  `== (Int, Int)`
 %   if Self in ['Int']:
@@ -1078,32 +1099,25 @@ public struct ${Self}
 }
 %# end of concrete type: ${Self}
 
-% sign = 's' if signed else 'u'
 extension ${Self} {
   // FIXME(integers): implement me in a less terrible way
   public init<T : FloatingPoint>(_ source: T) {
-    _precondition(source.isFinite, "") // FIXME(integers): message
-
 %   for (FloatType, FloatBits) in [
 %     ('Float', 32), ('Double', 64), ('Float80', 80)]:
 %     if FloatType == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
     if source is ${FloatType} {
-      let x = source as! ${FloatType}
-%     (lower, upper) = getFtoIBounds(floatBits=32, intBits=int(bits), signed=signed)
-      _precondition(x > ${str(lower)}.0, "") // FIXME(integers): message
-      _precondition(x < ${str(upper)}.0, "") // FIXME(integers): message
-      self._value = Builtin.fpto${sign}i_FPIEEE${FloatBits}_${BuiltinName}(x._value)
+      self.init(source as! ${FloatType})
       return
     }
 %     if FloatType == 'Float80':
 #endif
 %     end
 %   end
-
     _preconditionFailure("Conversion is not supported")
   }
+
 }
 
 
