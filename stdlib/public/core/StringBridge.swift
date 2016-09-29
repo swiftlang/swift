@@ -247,11 +247,6 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     }
   }
 
-  @objc
-  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    return _core.elementWidth == 2 ? _core.startUTF16 : nil
-  }
-
   //
   // Implement sub-slicing without adding layers of wrapping
   //
@@ -304,6 +299,30 @@ public final class _NSContiguousString : _SwiftNativeNSString {
       _fixLifetime(rhs)
     }
     return try body(selfAsPointer, rhsAsPointer)
+  }
+
+  @objc
+  var fastestEncoding: UInt {
+    return _core.elementWidth == 1 ? UInt(1) : UInt(10)
+  }
+
+  @objc
+  var smallestEncoding: UInt {
+    return _core.elementWidth == 1 ? UInt(1) : UInt(10)
+  }
+
+  /// The following methods are purely optimizations as special dispensation from
+  /// Foundation. Relying on these methods to exist, return sane results and/or being
+  /// used in production code is strictly not supported. They may change behavior in
+  /// future releases and are purely SPI for authorized consumers.
+  @objc(_fastCharacterContents)
+  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+    return _core.elementWidth == 2 ? UnsafePointer<UInt16>(_core.startUTF16) : nil
+  }
+
+  @objc(_fastCStringContents:)
+  func _fastCStringContents(_ nullTerminationRequired: UInt8) -> UnsafePointer<UInt8>? {
+    return _core.elementWidth == 1 ? UnsafePointer<UInt8>(_core.startASCII) : nil
   }
 
   public let _core: _StringCore
