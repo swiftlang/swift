@@ -399,6 +399,9 @@ enum TypeResolutionFlags : unsigned {
 
   /// Whether we are in a type argument for an optional
   TR_ImmediateOptionalTypeArgument = 0x800000,
+
+  /// Whether we are checking the outermost type of a computed property setter's newValue
+  TR_ImmediateSetterNewValue = 0x1000000,
 };
 
 /// Option set describing how type resolution should work.

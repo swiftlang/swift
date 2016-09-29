@@ -775,9 +775,9 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `other` and is strictly smaller in
-  /// magnitude. The `truncatingRemainder(dividingBy:)` method is always
-  /// exact.
+  /// remainder has the same sign as `self` and is strictly smaller in
+  /// magnitude than `other`. The `truncatingRemainder(dividingBy:)` method
+  /// is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
@@ -811,9 +811,9 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `other` and is strictly smaller in
-  /// magnitude. The `formtruncatingRemainder(dividingBy:)` method is always
-  /// exact.
+  /// remainder has the same sign as `self` and is strictly smaller in
+  /// magnitude than `other`. The `formTruncatingRemainder(dividingBy:)`
+  /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   ///

@@ -866,13 +866,26 @@ static void VisitNodeAssociatedTypeRef(
       ArchetypeType *archetype = type->getAs<ArchetypeType>();
       if (archetype) {
         Identifier identifier = ast->getIdentifier(ident->getText());
-        if (archetype->hasNestedType(identifier)) {
-          Type nested = archetype->getNestedTypeValue(identifier);
-          if (nested) {
-            result._types.push_back(nested);
-            result._module = type_result._module;
-            return;
+        Type nested;
+        if (archetype->hasNestedType(identifier))
+          nested = archetype->getNestedTypeValue(identifier);
+        else if (ProtocolDecl *self_protocol = archetype->getSelfProtocol()) {
+          for (auto self_member: self_protocol->getMembers()) {
+            if (AssociatedTypeDecl *associated_decl = llvm::dyn_cast_or_null<AssociatedTypeDecl>(self_member)) {
+              if (associated_decl->hasName()) {
+                llvm::StringRef decl_name = associated_decl->getNameStr();
+                if (decl_name == ident->getText()) {
+                  nested = associated_decl->getDeclaredType();
+                  break;
+                }
+              }
+            }
           }
+        }
+        if (nested) {
+          result._types.push_back(nested);
+          result._module = type_result._module;
+          return;
         }
       }
     }
