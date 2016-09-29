@@ -1121,7 +1121,8 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importFullName(overridden, clangSema);
+      const auto overriddenName =
+          importFullName(overridden, clangSema, options);
       if (overriddenName.Imported)
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1154,7 +1155,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
           continue;
 
         const auto overriddenName =
-            importFullName(overriddenProperty, clangSema);
+            importFullName(overriddenProperty, clangSema, options);
         if (overriddenName.Imported)
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }

@@ -169,7 +169,7 @@ public:
   /// Determine the Swift name for a clang decl
   ImportedName importFullName(const clang::NamedDecl *,
                               clang::Sema &clangSema, // :-(
-                              ImportNameOptions options = None);
+                              ImportNameOptions options);
 
   ASTContext &getContext() { return swiftCtx; }
 
