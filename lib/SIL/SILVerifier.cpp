@@ -3546,15 +3546,27 @@ void SILModule::verify() const {
     g.verify();
   }
 
-  // Check all vtables.
+  // Check all vtables and the vtable cache.
   llvm::DenseSet<ClassDecl*> vtableClasses;
+  unsigned EntriesSZ = 0;
   for (const SILVTable &vt : getVTables()) {
     if (!vtableClasses.insert(vt.getClass()).second) {
       llvm::errs() << "Vtable redefined: " << vt.getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }
     vt.verify(*this);
+    // Check if there is a cache entry for each vtable entry
+    for (auto entry : vt.getEntries()) {
+      if (VTableEntryCache.find({&vt, entry.first}) == VTableEntryCache.end()) {
+        llvm::errs() << "Vtable entry for function: " << entry.second->getName()
+                     << "not in cache!\n";
+        assert(false && "triggering standard assertion failure routine");
+      }
+      EntriesSZ++;
+    }
   }
+  assert(EntriesSZ == VTableEntryCache.size() &&
+         "Cache size is not equal to true number of VTable entries");
 
   // Check all witness tables.
   DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
