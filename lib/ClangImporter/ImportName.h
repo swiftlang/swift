@@ -171,6 +171,8 @@ public:
                               clang::Sema &clangSema, // :-(
                               ImportNameOptions options = None);
 
+  ASTContext &getContext() { return swiftCtx; }
+
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
 

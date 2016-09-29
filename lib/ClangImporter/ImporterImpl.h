@@ -572,8 +572,14 @@ public:
 
   /// Add the given named declaration as an entry to the given Swift name
   /// lookup table, including any of its child entries.
+  static void addEntryToLookupTable(clang::Sema &clangSema,
+                                    SwiftLookupTable &table,
+                                    clang::NamedDecl *named,
+                                    importer::NameImporter &);
   void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
-                             clang::NamedDecl *named);
+                             clang::NamedDecl *named) {
+    return addEntryToLookupTable(clangSema, table, named, nameImporter);
+  }
 
   /// Add the macros from the given Clang preprocessor to the given
   /// Swift name lookup table.

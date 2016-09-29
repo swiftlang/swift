@@ -801,10 +801,8 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 }
 
 void ClangImporter::Implementation::addEntryToLookupTable(
-       clang::Sema &clangSema,
-       SwiftLookupTable &table,
-       clang::NamedDecl *named)
-{
+    clang::Sema &clangSema, SwiftLookupTable &table, clang::NamedDecl *named,
+    NameImporter &nameImporter) {
   // Determine whether this declaration is suppressed in Swift.
   if (shouldSuppressDeclImport(named)) return;
 
@@ -827,19 +825,21 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName = importFullName(named, None, &clangSema)) {
+  if (auto importedName =
+          nameImporter.importFullName(named, clangSema, None)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
+      table.addEntry(DeclName(nameImporter.getContext(),
+                              nameImporter.getContext().Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
 
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
-    if (auto swift2Name = importFullName(named, ImportNameFlags::Swift2Name,
-                                         &clangSema)) {
+    if (auto swift2Name = nameImporter.importFullName(
+            named, clangSema, ImportNameFlags::Swift2Name)) {
       if (swift2Name.Imported != importedName.Imported)
         table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
     }
@@ -858,7 +858,7 @@ void ClangImporter::Implementation::addEntryToLookupTable(
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
-        addEntryToLookupTable(clangSema, table, namedMember);
+        addEntryToLookupTable(clangSema, table, namedMember, nameImporter);
     }
   }
 }
