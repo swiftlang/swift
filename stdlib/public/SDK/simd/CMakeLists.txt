@@ -2,4 +2,8 @@ add_swift_library(swiftsimd ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVER
   simd.swift.gyb
 
   SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL} -parse-stdlib
-  SWIFT_MODULE_DEPENDS Darwin)
+  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+)

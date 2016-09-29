@@ -1,5 +1,12 @@
 add_swift_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   ObjectiveC.mm
   ObjectiveC.swift
-  SWIFT_MODULE_DEPENDS Darwin)
 
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+
+  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+)

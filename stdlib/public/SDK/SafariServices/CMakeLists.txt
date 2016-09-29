@@ -3,5 +3,6 @@ add_swift_library(swiftSafariServices ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} I
   SafariServices.swift
 
   TARGET_SDKS OSX
-  SWIFT_MODULE_DEPENDS Foundation AppKit
-  FRAMEWORK_DEPENDS_WEAK SafariServices)
+  SWIFT_MODULE_DEPENDS_OSX Darwin AppKit CoreData CoreGraphics CoreImage Dispatch Foundation IOKit ObjectiveC QuartzCore XPC # auto-updated
+  FRAMEWORK_DEPENDS_WEAK SafariServices
+)
