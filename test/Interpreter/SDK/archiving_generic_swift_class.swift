@@ -55,7 +55,7 @@ func driver() {
 
   do {
     // Set up the archiver's stdout to feed into our pipe.
-    var archiverActions: posix_spawn_file_actions_t? = nil
+    var archiverActions: posix_spawn_file_actions_t?
     guard posix_spawn_file_actions_init(&archiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }
@@ -85,7 +85,7 @@ func driver() {
 
   do {
     // Set up the unarchiver's stdin to read from our pipe.
-    var unarchiverActions: posix_spawn_file_actions_t? = nil
+    var unarchiverActions: posix_spawn_file_actions_t?
     guard posix_spawn_file_actions_init(&unarchiverActions) == 0 else {
       fatalError("posix_spawn_file_actions_init failed")
     }

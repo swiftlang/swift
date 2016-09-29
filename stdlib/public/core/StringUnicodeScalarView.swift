@@ -577,7 +577,7 @@ extension String.UnicodeScalarIndex {
 }
 
 extension String.UnicodeScalarView {
-  // FIXME(ABI): don't make this function inlineable.  Grapheme cluster
+  // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
     if i == startIndex || i == endIndex {

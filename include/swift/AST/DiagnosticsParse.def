@@ -499,8 +499,12 @@ ERROR(sil_witness_method_not_protocol,none,
       "witness_method is not a protocol method", ())
 ERROR(sil_witness_method_type_does_not_conform,none,
       "witness_method type does not conform to protocol", ())
-ERROR(sil_member_decl_not_found,none,
-      "member not found in method instructions", ())
+ERROR(sil_member_decl_not_found,none, "member not found", ())
+ERROR(sil_named_member_decl_not_found,none,
+      "member %0 not found in type %1", (DeclName, Type))
+ERROR(sil_member_lookup_bad_type,none,
+      "cannot lookup member %0 in non-nominal, non-module type %1",
+      (DeclName, Type))
 ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
@@ -1139,9 +1143,12 @@ ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
+ERROR(mutually_exclusive_attrs,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
 
-ERROR(cannot_combine_attribute,none,
-      "attribute '%0' cannot be combined with this attribute", (StringRef))
+ERROR(invalid_infix_on_func,none,
+      "'infix' modifier is not required or allowed on func declarations", ())
+
 ERROR(expected_in_attribute_list,none,
       "expected ']' or ',' in attribute list", ())
 

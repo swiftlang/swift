@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -40,6 +41,9 @@ namespace swift {
     ///
     /// Language features
     ///
+
+    /// \brief User-overridable language version to compile for.
+    version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;

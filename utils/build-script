@@ -810,11 +810,20 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.clang_profile_instr_use:
+            impl_args += [
+                "--clang-profile-instr-use=%s" %
+                os.path.abspath(args.clang_profile_instr_use)
+            ]
+
         if args.lit_args:
             impl_args += ["--llvm-lit-args=%s" % args.lit_args]
 
         if args.coverage_db:
-            impl_args += ["--coverage-db=%s" % args.coverage_db]
+            impl_args += [
+                "--coverage-db=%s" %
+                os.path.abspath(args.coverage_db)
+            ]
 
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
@@ -1555,6 +1564,15 @@ details of the setups of other systems or automated environments.""")
         help="run the Swift Benchmark Suite after building",
         action="store_true")
     run_tests_group.add_argument(
+        "--benchmark-num-o-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+iterations with -O",
+        metavar='N', type=int, default=3)
+    run_tests_group.add_argument(
+        "--benchmark-num-onone-iterations",
+        help="if the Swift Benchmark Suite is run after building, run N \
+        iterations with -Onone", metavar='N', type=int, default=3)
+    run_tests_group.add_argument(
         "--skip-test-osx",
         help="skip testing Swift stdlibs for Mac OS X",
         action=arguments.action.optional_bool)
@@ -1984,6 +2002,11 @@ details of the setups of other systems or automated environments.""")
         default=None,
         const='full',
         dest='lto_type')
+
+    parser.add_argument(
+        "--clang-profile-instr-use",
+        help="profile file to use for clang PGO",
+        metavar="PATH")
 
     default_max_lto_link_job_counts = host.max_lto_link_job_counts()
     parser.add_argument(

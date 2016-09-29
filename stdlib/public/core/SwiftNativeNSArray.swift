@@ -131,7 +131,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   // operations on it.
   //
   // Do not access this property directly.
-  internal var _heapBufferBridged_DoNotUse: AnyObject? = nil
+  internal var _heapBufferBridged_DoNotUse: AnyObject?
 
   // When this class is allocated inline, this property can become a
   // computed one.

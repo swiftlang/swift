@@ -35,7 +35,6 @@ set(SWIFT_API_NOTES_INPUTS
   ObjectiveC
   PassKit
   Photos
-  QuartzCore
   QuickLook
   SafariServices
   SceneKit

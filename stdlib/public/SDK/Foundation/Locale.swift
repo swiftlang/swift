@@ -476,7 +476,7 @@ extension Locale : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSLocale?) -> Locale {
-        var result: Locale? = nil
+        var result: Locale?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

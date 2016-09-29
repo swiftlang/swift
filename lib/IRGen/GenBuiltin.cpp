@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/ASTContext.h"
 
 #include "Explosion.h"
 #include "GenCall.h"
@@ -827,6 +828,19 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     for (auto &elt : schema) {
       out.add(llvm::Constant::getNullValue(elt.getScalarType()));
     }
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
+    args.claimAll();
+    Type valueTy = substitutions[0].getReplacement();
+    // Get the type encoding for the associated clang type.
+    auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
+    std::string encoding;
+    IGF.IGM.getClangASTContext().getObjCEncodingForType(clangTy, encoding);
+    
+    auto globalString = IGF.IGM.getAddrOfGlobalString(encoding);
+    out.add(globalString);
     return;
   }
   

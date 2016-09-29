@@ -69,10 +69,7 @@ static bool getSymbolNameAddr(llvm::StringRef libraryName, Dl_info dlinfo,
   // need to use the hex address.
   bool hasUnavailableAddress = dlinfo.dli_sname == nullptr;
 
-  // If the address is unavailable, just use <unavailable> as the symbol
-  // name. We do not set addrOut, since addrOut will be set to our ptr address.
   if (hasUnavailableAddress) {
-    symbolName += "<unavailable>";
     return false;
   }
 
@@ -132,12 +129,21 @@ static void dumpStackTraceEntry(unsigned index, void *framePC) {
   // We do not use %p here for our pointers since the format is implementation
   // defined. This makes it logically impossible to check the output. Forcing
   // hexadecimal solves this issue.
-  static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
-
-  // Then dump the backtrace.
-  fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
-          foundSymbol ? symbolAddr : uintptr_t(framePC), symbolName.c_str(),
-          ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  // If the symbol is not available, we print out <unavailable> + offset
+  // from the base address of where the image containing framePC is mapped.
+  // This gives enough info to reconstruct identical debugging target after
+  // this process terminates.
+  if (foundSymbol) {
+    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx %s + %td\n";
+    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(), symbolAddr,
+            symbolName.c_str(), ptrdiff_t(uintptr_t(framePC) - symbolAddr));
+  } else {
+    static const char *backtraceEntryFormat = "%-4u %-34s 0x%0.16lx "
+                                              "<unavailable> + %td\n";
+    fprintf(stderr, backtraceEntryFormat, index, libraryName.data(),
+            uintptr_t(framePC),
+            ptrdiff_t(uintptr_t(framePC) - uintptr_t(dlinfo.dli_fbase)));
+  }
 }
 
 #endif

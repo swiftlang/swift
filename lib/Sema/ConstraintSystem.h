@@ -925,7 +925,8 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[12];
+  static const unsigned NumAlternativeLiteralTypes = 13;
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
@@ -2241,6 +2242,11 @@ public:
   ///
   /// \param paramIdx The index of the parameter that is missing an argument.
   virtual void missingArgument(unsigned paramIdx);
+
+  /// Indicate that there was no label given when one was expected by parameter.
+  ///
+  /// \param paramIndex The index of the parameter that is missing a label.
+  virtual void missingLabel(unsigned paramIndex);
 
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.

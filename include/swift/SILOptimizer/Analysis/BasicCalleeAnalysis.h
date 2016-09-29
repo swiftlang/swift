@@ -101,6 +101,9 @@ public:
   /// Return the list of callees that can potentially be called at the
   /// given apply site.
   CalleeList getCalleeList(FullApplySite FAS) const;
+  /// Return the list of callees that can potentially be called at the
+  /// given instruction. E.g. it could be destructors.
+  CalleeList getCalleeList(SILInstruction *I) const;
 
 private:
   void enumerateFunctionsInModule();
@@ -140,6 +143,13 @@ public:
       Cache = llvm::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(FAS);
+  }
+
+  CalleeList getCalleeList(SILInstruction *I) {
+    if (!Cache)
+      Cache = llvm::make_unique<CalleeCache>(M);
+
+    return Cache->getCalleeList(I);
   }
 };
 

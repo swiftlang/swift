@@ -23,6 +23,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
@@ -195,7 +196,7 @@ Type TypeChecker::resolveTypeInContext(
        bool isSpecialized,
        GenericTypeResolver *resolver,
        UnsatisfiedDependency *unsatisfiedDependency) {
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -517,7 +518,7 @@ Type TypeChecker::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -549,7 +550,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     if (auto outerSig = TAD->getDeclContext()->getGenericSignatureOfContext()) {
       for (auto outerParam : outerSig->getGenericParams()) {
         subs[outerParam->getCanonicalType().getPointer()] =
-            resolver->resolveGenericTypeParamType(outerParam);
+            resolver->resolveTypeOfDecl(outerParam->getDecl());
       }
     }
 
@@ -624,42 +625,9 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
     InFlightDiagnostic diag = tc.diagnose(loc,
         diag::generic_type_requires_arguments, ty);
     if (auto *genericD = unbound->getDecl()) {
-
-      // Tries to infer the type arguments to pass.
-      // Currently it only works if all the generic arguments have a super type,
-      // or it requires a class, in which case it infers 'AnyObject'.
-      auto inferGenericArgs = [](GenericTypeDecl *genericD)->std::string {
-        auto *mod = genericD->getParentModule();
-        auto *genericSig = genericD->getGenericSignature();
-        if (!genericSig)
-          return std::string();
-
-        auto params = genericSig->getInnermostGenericParams();
-        if (params.empty())
-          return std::string();
-        std::string argsToAdd = "<";
-        for (unsigned i = 0, e = params.size(); i != e; ++i) {
-          auto param = params[i];
-          if (auto superTy = genericSig->getSuperclassBound(param, *mod)) {
-            if (superTy->hasTypeParameter())
-              return std::string(); // give up
-            argsToAdd += superTy.getString();
-          } else if (genericSig->requiresClass(param, *mod)) {
-            argsToAdd += "AnyObject";
-          } else {
-            return std::string(); // give up.
-          }
-          if (i < e-1)
-            argsToAdd += ", ";
-        }
-        argsToAdd += ">";
-        return argsToAdd;
-      };
-
-      std::string genericArgsToAdd = inferGenericArgs(genericD);
-      if (!genericArgsToAdd.empty()) {
+      SmallString<64> genericArgsToAdd;
+      if (tc.getDefaultGenericArgumentsString(genericArgsToAdd, genericD))
         diag.fixItInsertAfter(loc, genericArgsToAdd);
-      }
     }
   }
   tc.diagnose(unbound->getDecl()->getLoc(), diag::generic_type_declared_here,
@@ -779,7 +747,35 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       comp->setValue(nominal);
       return type;
     }
-    
+
+
+    // Try ignoring access control.
+    DeclContext *lookupDC = dc;
+    if (options.contains(TR_GenericSignature))
+      lookupDC = dc->getParent();
+
+    NameLookupOptions relookupOptions = lookupOptions;
+    relookupOptions |= NameLookupFlags::KnownPrivate;
+    relookupOptions |= NameLookupFlags::IgnoreAccessibility;
+    LookupResult inaccessibleResults =
+        tc.lookupUnqualified(lookupDC, comp->getIdentifier(), comp->getIdLoc(),
+                             relookupOptions);
+    if (inaccessibleResults) {
+      // FIXME: What if the unviable candidates have different levels of access?
+      auto first = cast<TypeDecl>(inaccessibleResults.front().Decl);
+      tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
+                  comp->getIdentifier(), first->getFormalAccess());
+
+      // FIXME: If any of the candidates (usually just one) are in the same
+      // module we could offer a fix-it.
+      for (auto lookupResult : inaccessibleResults)
+        tc.diagnose(lookupResult.Decl, diag::type_declared_here);
+
+      // Don't try to recover here; we'll get more access-related diagnostics
+      // downstream if we do.
+      return ErrorType::get(tc.Context);
+    }
+
     // Fallback.
     SourceLoc L = comp->getIdLoc();
     SourceRange R = SourceRange(comp->getIdLoc());
@@ -1293,10 +1289,11 @@ static Type resolveIdentTypeComponent(
 }
 
 // FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
-static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
+static bool checkTypeDeclAvailability(const TypeDecl *TypeDecl,
+                                      IdentTypeRepr *IdType,
                                       SourceLoc Loc, DeclContext *DC,
                                       TypeChecker &TC,
-                                      bool AllowPotentiallyUnavailableProtocol) {
+                                      bool AllowPotentiallyUnavailableProtocol){
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
@@ -1316,7 +1313,8 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                   diag::availability_decl_unavailable_rename,
                                   CI->getIdentifier(), /*"replaced"*/false,
                                   /*special kind*/0, Attr->Rename);
-          fixItAvailableAttrRename(TC, diag, Loc, Attr, /*call*/nullptr);
+          fixItAvailableAttrRename(TC, diag, Loc, TypeDecl, Attr,
+                                   /*call*/nullptr);
         } else if (Attr->Message.empty()) {
           TC.diagnose(Loc,
                       inSwift ? diag::availability_decl_unavailable_in_swift
@@ -1342,11 +1340,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
       return true;
     }
 
-    if (auto *Attr = TypeChecker::getDeprecated(TypeDecl)) {
-      TC.diagnoseDeprecated(CI->getSourceRange(), DC, Attr,
-                            CI->getIdentifier(), /*call, N/A*/nullptr);
-    }
-
+    TC.diagnoseIfDeprecated(CI->getSourceRange(), DC, TypeDecl,
+                            /*call, N/A*/nullptr);
+    
     if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))
       return false;
 
@@ -1404,13 +1400,6 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   return false;
 }
 
-/// Whether the given DC is a noescape-by-default context, i.e. not a property
-/// setter
-static bool isDefaultNoEscapeContext(const DeclContext *DC) {
-  auto funcDecl = dyn_cast<FuncDecl>(DC);
-  return !funcDecl || !funcDecl->isSetter();
-}
-
 // Hack to apply context-specific @escaping to an AST function type.
 static Type applyNonEscapingFromContext(DeclContext *DC,
                                         Type ty,
@@ -1420,7 +1409,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     options.contains(TR_FunctionInput) ||
     options.contains(TR_ImmediateFunctionInput);
 
-  bool defaultNoEscape = isFunctionParam && isDefaultNoEscapeContext(DC);
+  bool defaultNoEscape = isFunctionParam;
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();
@@ -1570,6 +1559,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     // Raise error if we parse an IUO type in an illegal position.
     checkForIllegalIUOs(*this, Loc.getTypeRepr(), options);
 
+    // Special case: in computed property setter, newValue closure is escaping
+    if (isa<FuncDecl>(DC) && cast<FuncDecl>(DC)->isSetter())
+      options |= TR_ImmediateSetterNewValue;
+
     auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
                             unsatisfiedDependency);
     if (!type) {
@@ -1674,7 +1667,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
-  PartialGenericTypeToArchetypeResolver defaultResolver(*this);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
   if (!resolver)
     resolver = &defaultResolver;
 
@@ -1706,6 +1699,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_FunctionInput;
   }
 
+  bool isImmediateSetterNewValue = options.contains(TR_ImmediateSetterNewValue);
+  options -= TR_ImmediateSetterNewValue;
+
   if (Context.LangOpts.DisableAvailabilityChecking)
     options |= TR_AllowUnavailable;
 
@@ -1728,8 +1724,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Function:
     if (!(options & TR_SILType)) {
       // Default non-escaping for closure parameters
-      auto result = resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
-      if (result && result->is<FunctionType>())
+      auto result =
+          resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
+      if (result && result->is<FunctionType>() && !isImmediateSetterNewValue)
         return applyNonEscapingFromContext(DC, result, options);
       return result;
     }
@@ -2545,6 +2542,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
+  bool isImmediateFunctionInput = options.contains(TR_ImmediateFunctionInput);
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getElements().size());
   
@@ -2558,7 +2556,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = withoutContext(elementOptions, true);
-    if (options & TR_ImmediateFunctionInput)
+    if (isImmediateFunctionInput)
       elementOptions |= TR_FunctionInput;
   }
 
@@ -2566,7 +2564,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   // Variadic tuples are not permitted.
   if (repr->hasEllipsis() &&
-      !(options & TR_ImmediateFunctionInput)) {
+      !isImmediateFunctionInput) {
     TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
     repr->removeEllipsis();
     complained = true;
@@ -2582,7 +2580,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (namedTyR) {
       // FIXME: Preserve and serialize parameter names in function types, maybe
       // with a new sugar type.
-      if (!(options & TR_ImmediateFunctionInput))
+      if (!isImmediateFunctionInput)
         name = namedTyR->getName();
 
       tyR = namedTyR->getTypeRepr();
@@ -2607,12 +2605,15 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (variadic)
       ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
 
-    elements.push_back(TupleTypeElt(ty, name, variadic));
+    auto paramFlags = isImmediateFunctionInput
+                          ? ParameterTypeFlags::fromParameterType(ty, variadic)
+                          : ParameterTypeFlags();
+    elements.emplace_back(ty, name, paramFlags);
   }
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
-  if (!(options & TR_ImmediateFunctionInput)) {
+  if (!isImmediateFunctionInput) {
     if (elements.size() == 1 && elements[0].hasName()
         && !(options & TR_SILType)
         && !(options & TR_EnumCase)) {

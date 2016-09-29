@@ -364,7 +364,7 @@ extension URLComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
-        var result: URLComponents? = nil
+        var result: URLComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }
@@ -457,7 +457,7 @@ extension URLQueryItem : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLQueryItem?) -> URLQueryItem {
-        var result: URLQueryItem? = nil
+        var result: URLQueryItem?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

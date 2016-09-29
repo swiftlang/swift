@@ -262,6 +262,10 @@ public:
 
   constexpr Size() : Value(0) {}
   explicit constexpr Size(int_type Value) : Value(Value) {}
+  
+  static constexpr Size forBits(int_type bitSize) {
+    return Size((bitSize + 7U) / 8U);
+  }
 
   /// An "invalid" size, equal to the maximum possible size.
   static constexpr Size invalid() { return Size(~int_type(0)); }

@@ -198,22 +198,15 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0025][]:
 
-  A declaration marked as `private` can now only be accessed within the lexical
-  scope it is declared in (essentially the enclosing curly braces `{}`).
-  A `private` declaration at the top level of a file can be accessed anywhere
-  in that file, as in Swift 2. The access level formerly known as `private` is
-  now called `fileprivate`.
+  The access level formerly known as `private` is now called `fileprivate`. A Swift 3 declaration marked `private` can no longer be accessed outside its lexical scope (essentially its enclosing curly braces `{}`). A `private` declaration at the top level of a file can be accessed anywhere within the same file, as it could in Swift 2. 
 
 * [SE-0131][]:
 
-  The standard library provides a new type `AnyHashable` for use in heterogeneous
-  hashed collections. Untyped `NSDictionary` and `NSSet` APIs from Objective-C
-  now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
+  The standard library introduces the `AnyHashable` type for use in hashed heterogeneous collections. Untyped `NSDictionary` and `NSSet` Objective-C APIs now import as `[AnyHashable: Any]` and `Set<AnyHashable>`.
 
 * [SE-0102][]:
 
-  The `@noreturn` attribute on function declarations and function types has been
-  removed, in favor of an empty `Never` type:
+  Swift removes the `@noreturn` attribute on function declarations and replaces the attribute with an empty `Never` type:
 
   ```swift
   @noreturn func fatalError(msg: String) { ... }  // old
@@ -225,15 +218,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SE-0116][]:
 
-  Objective-C APIs using `id` now import into Swift as `Any` instead of as `AnyObject`.
-  Similarly, APIs using untyped `NSArray` and `NSDictionary` import as `[Any]` and
-  `[AnyHashable: Any]`, respectively.
+  Swift now imports Objective-C `id` APIs as `Any`. In Swift 2, `id` imported as `AnyObject`. Swift also imports untyped `NSArray` and `NSDictionary` as `[Any]` and `[AnyHashable: Any]`, respectively.
 
 * [SE-0072][]:
 
-  Bridging conversions are no longer implicit. The conversion from a Swift value type to
-  its corresponding object can be forced with `as`, e.g. `string as NSString`. Any Swift
-  value can also be converted to its boxed `id` representation with `as AnyObject`.
+  Swift eliminates implicit bridging conversions. Use `as` to force the conversion from a Swift value type to its corresponding object. For example, use `string as NSString`. Use `as AnyObject` to convert a Swift value to its boxed `id` representation.
 
 * Collection subtype conversions and dynamic casts now work with protocol types:
 
@@ -246,40 +235,36 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 
 * [SR-2131](https://bugs.swift.org/browse/SR-2131):
 
-  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a
-  prefix and suffix of all strings.
+  The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a prefix and suffix of all strings.
 
 * [SE-0128][]:
 
-  Some UnicodeScalar initializers (ones that are non-failable) now return an Optional,
-  i.e., in case a UnicodeScalar can not be constructed, nil is returned.
+  Some non-failable UnicodeScalar initializers now return an Optional. When a UnicodeScalar cannot be constructed, these initializers return nil.
 
   ```swift
   // Old
   var string = ""
-  let codepoint: UInt32 = 55357 // this is invalid
-  let ucode = UnicodeScalar(codepoint) // Program crashes at this point.
+  let codepoint: UInt32 = 55357 // Invalid
+  let ucode = UnicodeScalar(codepoint) // Program crashes here.
   string.append(ucode)
   ```
 
-  After marking the initializer as failable, users can write code like this
-  and the program will execute fine even if the codepoint isn't valid.
+  The updated initializers allow users to write code that safely works around invalid codepoints, like this example:
 
   ```swift
   // New
   var string = ""
-  let codepoint: UInt32 = 55357 // this is invalid
+  let codepoint: UInt32 = 55357 // Invalid
   if let ucode = UnicodeScalar(codepoint) {
-    string.append(ucode)
+      string.append(ucode)
   } else {
-    // do something else
+      // do something else
   }
   ```
 
 * [SE-0095][]:
 
-  The `protocol<...>` composition construct has been removed. In its
-  place, an infix type operator `&` has been introduced.
+  Swift removes the `protocol<...>` composition construct and introduces an infix type operator `&` in its place.
 
   ```swift
   let a: Foo & Bar
@@ -289,13 +274,11 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   typealias G = GenericStruct<Foo & Bar>
   ```
 
-  The empty protocol composition, the `Any` type, was previously
-  defined as being `protocol<>`. This has been removed from the
-  standard library and `Any` is now a keyword with the same behaviour.
+  Swift previously defined the empty protocol composition (the `Any` type) as `protocol<>`. This definition has been removed from the standard library. The `Any` keyword behavior remains unchanged.
 
 * [SE-0091][]:
 
-  Operators can now be defined within types or extensions thereof. For example:
+  Swift permits you to define operators within types or their extensions. For example:
 
   ```swift
   struct Foo: Equatable {
@@ -307,10 +290,8 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Such operators must be declared as `static` (or, within a class, `class
-  final`), and have the same signature as their global counterparts. As part of
-  this change, operator requirements declared in protocols must also be
-  explicitly declared `static`:
+  You must declare these operators as `static` (or, within a class, `class
+  final`) and they must use the same signature as their global counterparts. As part of this change, protocol-declared operator requirements must be declared `static` explicitly:
 
   ```swift
   protocol Equatable {
@@ -318,7 +299,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
   }
   ```
 
-  Note that the type checker performance optimization described by [SE-0091][]
+  Note: The type checker performance optimization described by [SE-0091][]
   is not yet implemented.
 
 * [SE-0099][]:
@@ -3663,7 +3644,7 @@ Swift 1.0
   accepts inouts or `nil`:
 
     ```swift
-    var error: NSError? = nil
+    var error: NSError?
     let words = NSString.stringWithContentsOfFile("/usr/share/dict/words",
       encoding: .UTF8StringEncoding,
       error: &error)

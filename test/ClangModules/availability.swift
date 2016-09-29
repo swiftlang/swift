@@ -34,9 +34,9 @@ func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocat
                        z: NSMethodSignature) {} // expected-error {{'NSMethodSignature' is unavailable}}
 
 func test_class_avail(_ x:NSObject, obj: AnyObject) {
-  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}} expected-warning {{result of call to 'class()' is unused}}
+  x.`class`() // expected-error {{'class()' is unavailable in Swift: use 'type(of:)' instead}} expected-warning {{result of call to 'class()' is unused}}
   _ = NSObject.`class`() // expected-error {{'class()' is unavailable in Swift: use 'self' instead}}
-  _ = obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'dynamicType' instead}}
+  _ = obj.`class`!() // expected-error {{'class()' is unavailable in Swift: use 'type(of:)' instead}}
 }
 
 func test_unavailable_app_extension() {

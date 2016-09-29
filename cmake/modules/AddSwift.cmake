@@ -250,13 +250,14 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags)
-  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO)
+  set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
+  DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME)
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
     ""
     ${ARGN})
-  
+
   if("${LFLAGS_SDK}" STREQUAL "")
     message(FATAL_ERROR "Should specify an SDK")
   endif()
@@ -294,6 +295,19 @@ function(_add_variant_link_flags)
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
   else()
     list(APPEND result "-lobjc")
+
+    # If lto is enabled, we need to add the object path flag so that the LTO code
+    # generator leaves the intermediate object file in a place where it will not
+    # be touched. The reason why this must be done is that on OS X, debug info is
+    # left in object files. So if the object file is removed when we go to
+    # generate a dsym, the debug info is gone.
+    if (LFLAGS_ENABLE_LTO)
+      precondition(LFLAGS_LTO_OBJECT_NAME
+        MESSAGE "Should specify a unique name for the lto object")
+      set(lto_object_dir ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR})
+      set(lto_object ${lto_object_dir}/${LFLAGS_LTO_OBJECT_NAME}-lto.o)
+        list(APPEND result "-Wl,-object_path_lto,${lto_object}")
+      endif()
   endif()
 
   if(NOT "${SWIFT_${LFLAGS_SDK}_ICU_UC}" STREQUAL "")
@@ -932,6 +946,7 @@ function(_add_swift_library_single target name)
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     ENABLE_LTO "${lto_type}"
+    LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     RESULT_VAR_NAME link_flags
       )
@@ -1256,6 +1271,10 @@ function(add_swift_library name)
   endif()
   
   if(SWIFTLIB_TARGET_LIBRARY)
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+      list(APPEND SWIFTLIB_DEPENDS clang)
+    endif()
+    
     # If we are building this library for targets, loop through the various
     # SDKs building the variants of this library.
     list_intersect(
@@ -1437,16 +1456,24 @@ function(add_swift_library name)
         endif()
 
         set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+        
+        if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
+          set(unsigned "-unsigned")
+        endif()
+        
         _add_swift_lipo_target(
-            ${lipo_target}
-            "${UNIVERSAL_LIBRARY_NAME}"
+            ${lipo_target}${unsigned}
+            "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
             ${THIN_INPUT_TARGETS})
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           # Ad-hoc sign stdlib dylibs
-          add_custom_command(TARGET "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-                             POST_BUILD
-                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
+          add_custom_command_target(unused_var
+            COMMAND ${CMAKE_COMMAND} -E copy ${UNIVERSAL_LIBRARY_NAME}${unsigned} ${UNIVERSAL_LIBRARY_NAME}
+            COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}"
+            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
+            DEPENDS ${lipo_target}${unsigned}
+            CUSTOM_TARGET_NAME ${lipo_target})
         endif()
 
         # Cache universal libraries for dependency purposes
@@ -1639,6 +1666,7 @@ function(_add_swift_executable_single name)
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
     ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags)
 

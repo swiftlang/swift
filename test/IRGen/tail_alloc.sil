@@ -160,4 +160,44 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
   return %r : $()
 }
 
+// sizeof(EmptyClass) = 16 bytes
+class EmptyClass {
+}
+
+sil_vtable EmptyClass {}
+
+// CHECK-LABEL: define{{( protected)?}} i8 @test_align_1_int8
+// CHECK: load i8, i8* %{{.*}}, align 1
+// CHECK: ret
+sil @test_align_1_int8 : $@convention(thin) (EmptyClass) -> Int8 {
+bb0(%0 : $EmptyClass):
+  %a = ref_tail_addr %0 : $EmptyClass, $Int8
+  %w = integer_literal $Builtin.Word, 1
+  %i = index_addr %a : $*Int8, %w : $Builtin.Word
+  %l = load %i : $*Int8
+  return %l : $Int8
+}
+
+// CHECK-LABEL: define{{( protected)?}} i8 @test_align_2_int8
+// CHECK: load i8, i8* %{{.*}}, align 2
+// CHECK: ret
+sil @test_align_2_int8 : $@convention(thin) (EmptyClass) -> Int8 {
+bb0(%0 : $EmptyClass):
+  %a = ref_tail_addr %0 : $EmptyClass, $Int8
+  %w = integer_literal $Builtin.Word, 2
+  %i = index_addr %a : $*Int8, %w : $Builtin.Word
+  %l = load %i : $*Int8
+  return %l : $Int8
+}
+
+// CHECK-LABEL: define{{( protected)?}} i32 @test_align_int32
+// CHECK: load i32, i32* %{{.*}}, align 4
+// CHECK: ret
+sil @test_align_int32 : $@convention(thin) (EmptyClass, Builtin.Word) -> Int32 {
+bb0(%0 : $EmptyClass, %1 : $Builtin.Word):
+  %a = ref_tail_addr %0 : $EmptyClass, $Int32
+  %i = index_addr %a : $*Int32, %1 : $Builtin.Word
+  %l = load %i : $*Int32
+  return %l : $Int32
+}
 

@@ -130,7 +130,7 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
     }
 
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSPersonNameComponents?) -> PersonNameComponents {
-        var result: PersonNameComponents? = nil
+        var result: PersonNameComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

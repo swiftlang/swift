@@ -171,6 +171,20 @@ def obtain_additional_swift_sources(
                    echo=False)
 
 
+def dump_repo_hashes(config):
+    max_len = reduce(lambda acc, x: max(acc, len(x)),
+                     config['repos'].keys(), 0)
+    fmt = "{:<%r}{}" % (max_len+5)
+    for repo_name, repo_info in sorted(config['repos'].items(),
+                                       key=lambda x: x[0]):
+        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
+                         dry_run=False,
+                         echo=False):
+            h = shell.capture(["git", "log", "--oneline", "-n", "1"],
+                              echo=False).strip()
+            print(fmt.format(repo_name, h))
+
+
 def validate_config(config):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
@@ -241,7 +255,11 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="""Check out related pull requests referenced in the given
         free-form GitHub-style comment.""",
         metavar='GITHUB-COMMENT',
-        dest='github_comment')
+        dest='github_comment'),
+    parser.add_argument(
+        '--dump-hashes',
+        action='store_true',
+        help='Dump the git hashes of all repositories being tracked')
     args = parser.parse_args()
 
     clone = args.clone
@@ -253,6 +271,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     with open(args.config) as f:
         config = json.load(f)
     validate_config(config)
+
+    if args.dump_hashes:
+        dump_repo_hashes(config)
+        return 0
 
     cross_repos_pr = {}
     if github_comment:

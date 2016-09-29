@@ -66,3 +66,13 @@ struct SomeStruct<A> {
   typealias A = A // expected-error {{type alias 'A' circularly references itself}}
 }
 
+// <rdar://problem/27680407> Infinite recursion when using fully-qualified associatedtype name that has not been defined with typealias
+protocol rdar27680407Proto {
+  associatedtype T // expected-note {{protocol requires nested type 'T'; do you want to add it?}}
+
+  init(value: T)
+}
+
+struct rdar27680407Struct : rdar27680407Proto { // expected-error {{type 'rdar27680407Struct' does not conform to protocol 'rdar27680407Proto'}}
+  init(value: rdar27680407Struct.T) {}
+}

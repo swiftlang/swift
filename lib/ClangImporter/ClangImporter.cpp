@@ -315,7 +315,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
-  auto languageVersion = swift::version::Version::getCurrentLanguageVersion();
+  auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
@@ -474,9 +474,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
 
-  // Set the module cache path.
+  // Set the module and API notes cache paths to the same location.
   if (!moduleCachePath.empty()) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
+    invocationArgStrs.back().append(moduleCachePath);
+
+    invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
 
@@ -561,6 +564,9 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+
+  // Enable API notes alongside headers/in frameworks.
+  invocationArgStrs.push_back("-fapinotes-modules");
 
   // Add API notes paths.
   for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
@@ -2670,7 +2676,8 @@ getExtensionMetadata() const {
   metadata.BlockName = "swift.lookup";
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
-  metadata.UserInfo = version::getSwiftFullVersion();
+  metadata.UserInfo = version::getSwiftFullVersion(
+    Impl.SwiftContext.LangOpts.EffectiveLanguageVersion);
   return metadata;
 }
 

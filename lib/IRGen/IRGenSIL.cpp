@@ -320,8 +320,7 @@ public:
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
-  llvm::SmallVector<std::pair<DominancePoint, llvm::Instruction *>, 8>
-      ValueVariables;
+  llvm::SmallDenseMap<llvm::Instruction *, DominancePoint, 8> ValueVariables;
   unsigned NumAnonVars = 0;
   unsigned NumCondFails = 0;
 
@@ -562,9 +561,9 @@ public:
   void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
     if (IGM.IRGen.Opts.Optimize)
       return;
-    for (auto &Variable : reversed(ValueVariables)) {
-      auto VarDominancePoint = Variable.first;
-      llvm::Value *Storage = Variable.second;
+    for (auto &Variable : ValueVariables) {
+      auto VarDominancePoint = Variable.second;
+      llvm::Value *Storage = Variable.first;
       if (getActiveDominancePoint() == VarDominancePoint ||
           isActiveDominancePointDominatedBy(VarDominancePoint)) {
         llvm::Type *ArgTys;
@@ -595,13 +594,14 @@ public:
         // that this shouldn't be necessary. LiveDebugValues should be doing
         // this but can't in general because it currently only tracks register
         // locations.
-        auto It = llvm::BasicBlock::iterator(Variable.second);
-        auto *BB = Variable.second->getParent();
+        llvm::Instruction *Value = Variable.first;
+        auto It = llvm::BasicBlock::iterator(Value);
+        auto *BB = Value->getParent();
         auto *CurBB = Builder.GetInsertBlock();
         if (BB != CurBB)
           for (auto I = std::next(It), E = BB->end(); I != E; ++I) {
             auto *DVI = dyn_cast<llvm::DbgValueInst>(I);
-            if (DVI && DVI->getValue() == Variable.second)
+            if (DVI && DVI->getValue() == Value)
               IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
                   DVI->getValue(), 0, DVI->getVariable(), DVI->getExpression(),
                   DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
@@ -649,7 +649,7 @@ public:
       if (!needsShadowCopy(Storage)) {
         // Mark for debug value range extension unless this is a constant.
         if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
-          ValueVariables.push_back({getActiveDominancePoint(), Value});
+          ValueVariables.insert({Value, getActiveDominancePoint()});
         return Storage;
       }
 
@@ -1569,10 +1569,12 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         assert(maybeScopeless(I) && "instruction has location, but no scope");
       }
 
-      // Ignore scope-less instructions and have IRBuilder reuse the
-      // previous location and scope.
+      // Set the builder's debug location.
       if (DS && !KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+      else
+        // Use an artificial (line 0) location.
+        IGM.DebugInfo->setCurrentLoc(Builder, DS);
 
       // Function argument handling.
       if (InEntryBlock && !ArgsEmitted) {

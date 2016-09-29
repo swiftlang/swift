@@ -123,7 +123,7 @@ int apinotes_main(ArrayRef<const char *> Args) {
     llvm::raw_fd_ostream os(OutputFilename, EC,
                             llvm::sys::fs::OpenFlags::F_None);
 
-    if (api_notes::compileAPINotes(input, os, targetOS))
+    if (api_notes::compileAPINotes(input, /*sourceFile=*/nullptr, os, targetOS))
       return 1;
     
     os.flush();
