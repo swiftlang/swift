@@ -259,11 +259,14 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
 {
   friend class ClangImporter;
 
+  using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
+
   class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-    Implementation &Impl; // FIXME: remove, instead have a NameImporter...
+    importer::NameImporter nameImporter;
+    LookupTableMap &lookupTables;
 
   public:
-    SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
+    inline SwiftNameLookupExtension(Implementation &impl);
 
     clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
     llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -305,7 +308,7 @@ private:
   /// Annoyingly, we list this table early so that it gets torn down after
   /// the underlying Clang instances that reference it
   /// (through the Swift name lookup module file extension).
-  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
+  LookupTableMap LookupTables;
 
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
@@ -1190,6 +1193,11 @@ public:
   void dumpSwiftLookupTables();
 };
 
+ClangImporter::Implementation::SwiftNameLookupExtension::
+    SwiftNameLookupExtension(Implementation &Impl)
+    : nameImporter(Impl.SwiftContext, Impl.platformAvailability,
+                   Impl.enumInfoCache, Impl.InferImportAsMember),
+      lookupTables(Impl.LookupTables) {}
 }
 
 #endif

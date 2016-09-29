@@ -2680,7 +2680,7 @@ getExtensionMetadata() const {
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
   metadata.UserInfo = version::getSwiftFullVersion(
-    Impl.SwiftContext.LangOpts.EffectiveLanguageVersion);
+      nameImporter.getLangOpts().EffectiveLanguageVersion);
   return metadata;
 }
 
@@ -2690,7 +2690,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.InferImportAsMember);
+                            nameImporter.isInferImportAsMember());
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
@@ -2698,6 +2698,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
     clang::ASTWriter &writer) {
     // Local function to populate the lookup table.
   auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
+    auto &swiftCtx = nameImporter.getContext();
     for (auto decl
            : sema.Context.getTranslationUnitDecl()->noload_decls()) {
       // Skip anything from an AST file.
@@ -2708,16 +2709,15 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
       if (!named) continue;
 
       // Add this entry to the lookup table.
-      Impl.addEntryToLookupTable(sema, table, named);
+      addEntryToLookupTable(sema, table, named, nameImporter);
     }
 
     // Add macros to the lookup table.
-    Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table,
-                                Impl.SwiftContext);
+    addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table,
+                           swiftCtx);
 
     // Finalize the lookup table, which may fail.
-    Impl.finalizeLookupTable(sema.Context, sema.getPreprocessor(), table,
-                             Impl.SwiftContext);
+    finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
@@ -2738,13 +2738,13 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionReader(
   assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
   // Check whether we already have an entry in the set of lookup tables.
-  auto &entry = Impl.LookupTables[mod.ModuleName];
+  auto &entry = lookupTables[mod.ModuleName];
   if (entry) return nullptr;
 
   // Local function used to remove this entry when the reader goes away.
   std::string moduleName = mod.ModuleName;
   auto onRemove = [this, moduleName]() {
-    Impl.LookupTables.erase(moduleName);
+    lookupTables.erase(moduleName);
   };
 
   // Create the reader.

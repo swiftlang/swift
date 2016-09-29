@@ -166,12 +166,16 @@ public:
       : swiftCtx(ctx), availability(avail), enumInfoCache(enumCache),
         inferImportAsMember(inferIAM) {}
 
-  /// Describe me
+  /// Determine the Swift name for a clang decl
   ImportedName importFullName(const clang::NamedDecl *,
                               clang::Sema &clangSema, // :-(
                               ImportNameOptions options = None);
 
   ASTContext &getContext() { return swiftCtx; }
+
+  const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+
+  bool isInferImportAsMember() const { return inferImportAsMember; }
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
