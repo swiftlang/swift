@@ -801,10 +801,8 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 }
 
 void ClangImporter::Implementation::addEntryToLookupTable(
-       clang::Sema &clangSema,
-       SwiftLookupTable &table,
-       clang::NamedDecl *named)
-{
+    clang::Sema &clangSema, SwiftLookupTable &table, clang::NamedDecl *named,
+    NameImporter &nameImporter) {
   // Determine whether this declaration is suppressed in Swift.
   if (shouldSuppressDeclImport(named)) return;
 
@@ -827,19 +825,21 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName = importFullName(named, None, &clangSema)) {
+  if (auto importedName =
+          nameImporter.importFullName(named, clangSema, None)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
+      table.addEntry(DeclName(nameImporter.getContext(),
+                              nameImporter.getContext().Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
 
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
-    if (auto swift2Name = importFullName(named, ImportNameFlags::Swift2Name,
-                                         &clangSema)) {
+    if (auto swift2Name = nameImporter.importFullName(
+            named, clangSema, ImportNameFlags::Swift2Name)) {
       if (swift2Name.Imported != importedName.Imported)
         table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
     }
@@ -858,15 +858,14 @@ void ClangImporter::Implementation::addEntryToLookupTable(
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
-        addEntryToLookupTable(clangSema, table, namedMember);
+        addEntryToLookupTable(clangSema, table, namedMember, nameImporter);
     }
   }
 }
 
 void ClangImporter::Implementation::addMacrosToLookupTable(
-       clang::ASTContext &clangCtx,
-       clang::Preprocessor &pp,
-       SwiftLookupTable &table) {
+    clang::ASTContext &clangCtx, clang::Preprocessor &pp,
+    SwiftLookupTable &table, ASTContext &SwiftContext) {
   for (const auto &macro : pp.macros(false)) {
     // Find the local history of this macro directive.
     clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
@@ -900,7 +899,7 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
         break;
 
       // Add this entry.
-      auto name = importMacroName(macro.first, info, clangCtx);
+      auto name = importMacroName(macro.first, info, clangCtx, SwiftContext);
       if (name.empty()) continue;
       table.addEntry(name, info, clangCtx.getTranslationUnitDecl(), &pp);
     }
@@ -910,7 +909,8 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
 void ClangImporter::Implementation::finalizeLookupTable(
        clang::ASTContext &clangCtx,
        clang::Preprocessor &pp,
-       SwiftLookupTable &table) {
+       SwiftLookupTable &table,
+       ASTContext &SwiftContext) {
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -993,7 +993,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // Add any defined macros to the bridging header lookup table.
   addMacrosToLookupTable(getClangASTContext(), getClangPreprocessor(),
-                         BridgingHeaderLookupTable);
+                         BridgingHeaderLookupTable, SwiftContext);
 
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
@@ -1004,7 +1004,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(getClangASTContext(), getClangPreprocessor(),
-                      BridgingHeaderLookupTable);
+                      BridgingHeaderLookupTable, SwiftContext);
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1332,7 +1332,9 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts) {}
+      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
+      nameImporter(SwiftContext, platformAvailability, enumInfoCache,
+                   InferImportAsMember) {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
@@ -1449,9 +1451,8 @@ bool ClangImporter::shouldIgnoreMacro(StringRef Name,
 }
 
 Identifier ClangImporter::Implementation::importMacroName(
-             const clang::IdentifierInfo *clangIdentifier,
-             const clang::MacroInfo *macro,
-             clang::ASTContext &clangCtx) {
+    const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
+    clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
   // If we're supposed to ignore this macro, return an empty identifier.
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
@@ -1893,7 +1894,8 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
     if (auto *MI = ClangPP.getMacroInfo(II)) {
       if (filter(MI)) {
-        Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
+        Identifier Name =
+            Impl.importMacroName(II, MI, ClangCtx, Impl.SwiftContext);
         if (Decl *imported = Impl.importMacro(Name, MI))
           receiver(imported);
       }
@@ -1970,7 +1972,8 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
             if (filter(MI)) {
-              Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
+              Identifier Name =
+                  Impl.importMacroName(II, MI, ClangCtx, Impl.SwiftContext);
               if (Decl *imported = Impl.importMacro(Name, MI))
                 receiver(imported);
             }
@@ -2677,7 +2680,7 @@ getExtensionMetadata() const {
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
   metadata.UserInfo = version::getSwiftFullVersion(
-    Impl.SwiftContext.LangOpts.EffectiveLanguageVersion);
+      nameImporter.getLangOpts().EffectiveLanguageVersion);
   return metadata;
 }
 
@@ -2687,7 +2690,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.InferImportAsMember);
+                            nameImporter.isInferImportAsMember());
 }
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
@@ -2695,6 +2698,7 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
     clang::ASTWriter &writer) {
     // Local function to populate the lookup table.
   auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
+    auto &swiftCtx = nameImporter.getContext();
     for (auto decl
            : sema.Context.getTranslationUnitDecl()->noload_decls()) {
       // Skip anything from an AST file.
@@ -2705,14 +2709,15 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
       if (!named) continue;
 
       // Add this entry to the lookup table.
-      Impl.addEntryToLookupTable(sema, table, named);
+      addEntryToLookupTable(sema, table, named, nameImporter);
     }
 
     // Add macros to the lookup table.
-    Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
+    addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table,
+                           swiftCtx);
 
     // Finalize the lookup table, which may fail.
-    Impl.finalizeLookupTable(sema.Context, sema.getPreprocessor(), table);
+    finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
   };
 
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
@@ -2733,13 +2738,13 @@ ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionReader(
   assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
 
   // Check whether we already have an entry in the set of lookup tables.
-  auto &entry = Impl.LookupTables[mod.ModuleName];
+  auto &entry = lookupTables[mod.ModuleName];
   if (entry) return nullptr;
 
   // Local function used to remove this entry when the reader goes away.
   std::string moduleName = mod.ModuleName;
   auto onRemove = [this, moduleName]() {
-    Impl.LookupTables.erase(moduleName);
+    lookupTables.erase(moduleName);
   };
 
   // Create the reader.

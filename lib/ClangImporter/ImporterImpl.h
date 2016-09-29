@@ -259,11 +259,14 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
 {
   friend class ClangImporter;
 
+  using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
+
   class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-    Implementation &Impl;
+    importer::NameImporter nameImporter;
+    LookupTableMap &lookupTables;
 
   public:
-    SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
+    inline SwiftNameLookupExtension(Implementation &impl);
 
     clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
     llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -305,7 +308,7 @@ private:
   /// Annoyingly, we list this table early so that it gets torn down after
   /// the underlying Clang instances that reference it
   /// (through the Swift name lookup module file extension).
-  llvm::StringMap<std::unique_ptr<SwiftLookupTable>> LookupTables;
+  LookupTableMap LookupTables;
 
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().
@@ -555,6 +558,7 @@ private:
 
 public:
   importer::PlatformAvailability platformAvailability;
+  importer::NameImporter nameImporter;
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -571,18 +575,28 @@ public:
 
   /// Add the given named declaration as an entry to the given Swift name
   /// lookup table, including any of its child entries.
+  static void addEntryToLookupTable(clang::Sema &clangSema,
+                                    SwiftLookupTable &table,
+                                    clang::NamedDecl *named,
+                                    importer::NameImporter &);
   void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
-                             clang::NamedDecl *named);
+                             clang::NamedDecl *named) {
+    return addEntryToLookupTable(clangSema, table, named, nameImporter);
+  }
 
   /// Add the macros from the given Clang preprocessor to the given
   /// Swift name lookup table.
-  void addMacrosToLookupTable(clang::ASTContext &clangCtx,
-                              clang::Preprocessor &pp, SwiftLookupTable &table);
+  static void addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                                     clang::Preprocessor &pp,
+                                     SwiftLookupTable &table,
+       ASTContext &SwiftContext);
 
   /// Finalize a lookup table, handling any as-yet-unresolved entries
   /// and emitting diagnostics if necessary.
-  void finalizeLookupTable(clang::ASTContext &clangCtx,
-                           clang::Preprocessor &pp, SwiftLookupTable &table);
+  static void finalizeLookupTable(clang::ASTContext &clangCtx,
+                                  clang::Preprocessor &pp,
+                                  SwiftLookupTable &table,
+                                  ASTContext &SwiftContext);
 
 public:
   void registerExternalDecl(Decl *D) {
@@ -649,12 +663,16 @@ public:
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
                  importer::ImportNameOptions options = None,
-                 clang::Sema *clangSemaOverride = nullptr);
+                 clang::Sema *clangSemaOverride = nullptr) {
+    return nameImporter.importFullName(
+        D, clangSemaOverride ? *clangSemaOverride : getClangSema(), options);
+  }
 
   /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro,
-                             clang::ASTContext &clangCtx);
+  static Identifier
+  importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                  const clang::MacroInfo *macro, clang::ASTContext &clangCtx,
+                  ASTContext &SwiftContext);
 
   /// Print an imported name as a string suitable for the swift_name attribute,
   /// or the 'Rename' field of AvailableAttr.
@@ -1175,6 +1193,11 @@ public:
   void dumpSwiftLookupTables();
 };
 
+ClangImporter::Implementation::SwiftNameLookupExtension::
+    SwiftNameLookupExtension(Implementation &Impl)
+    : nameImporter(Impl.SwiftContext, Impl.platformAvailability,
+                   Impl.enumInfoCache, Impl.InferImportAsMember),
+      lookupTables(Impl.LookupTables) {}
 }
 
 #endif
