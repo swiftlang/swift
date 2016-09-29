@@ -1332,7 +1332,9 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts) {}
+      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
+      nameImporter(SwiftContext, platformAvailability, enumInfoCache,
+                   InferImportAsMember) {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);

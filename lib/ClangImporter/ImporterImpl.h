@@ -260,7 +260,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   friend class ClangImporter;
 
   class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-    Implementation &Impl;
+    Implementation &Impl; // FIXME: remove, instead have a NameImporter...
 
   public:
     SwiftNameLookupExtension(Implementation &impl) : Impl(impl) { }
@@ -555,6 +555,7 @@ private:
 
 public:
   importer::PlatformAvailability platformAvailability;
+  importer::NameImporter nameImporter;
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -649,7 +650,10 @@ public:
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
                  importer::ImportNameOptions options = None,
-                 clang::Sema *clangSemaOverride = nullptr);
+                 clang::Sema *clangSemaOverride = nullptr) {
+    return nameImporter.importFullName(
+        D, clangSemaOverride ? *clangSemaOverride : getClangSema(), options);
+  }
 
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
