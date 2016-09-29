@@ -1621,6 +1621,11 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
   return false;
 }
 
+bool ClangImporter::shouldIgnoreMacro(StringRef Name,
+                                      const clang::MacroInfo *Macro) {
+  return ::shouldIgnoreMacro(Name, Macro);
+}
+
 Identifier importer::importMacroName(
     const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
     clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
