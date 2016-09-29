@@ -147,7 +147,7 @@ if(PYTHONINTERP_FOUND)
 
   if(NOT "${COVERAGE_DB}" STREQUAL "")
     add_custom_target("touch-covering-tests"
-        COMMAND "${SWIFT_SOURCE_DIR}/utils/coverage-touch-tests" "--swift-dir" "${SWIFT_SOURCE_DIR}" "--coverage-db" "${COVERAGE_DB}"
+        COMMAND "${SWIFT_SOURCE_DIR}/utils/coverage/coverage-touch-tests" "--swift-dir" "${SWIFT_SOURCE_DIR}" "--coverage-db" "${COVERAGE_DB}"
         COMMENT "Touching covering tests")
   endif()
 
