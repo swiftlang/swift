@@ -39,6 +39,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSStringEncodings.swift
   NSTextCheckingResult.swift
   NSUndoManager.swift
+  NSURL.swift
   NSValue.swift.gyb
   PersonNameComponents.swift
   ReferenceConvertible.swift

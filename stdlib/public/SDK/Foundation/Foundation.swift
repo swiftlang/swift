@@ -48,17 +48,6 @@ public func NSLog(_ format: String, _ args: CVarArg...) {
 }
 
 //===----------------------------------------------------------------------===//
-// Mirror/Quick Look Conformance
-//===----------------------------------------------------------------------===//
-
-extension NSURL : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    guard let str = absoluteString else { return .text("Unknown URL") }
-    return .url(str)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // AnyHashable
 //===----------------------------------------------------------------------===//
 
