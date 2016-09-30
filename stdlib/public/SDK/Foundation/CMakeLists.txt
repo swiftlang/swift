@@ -28,6 +28,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSString.swift
   NSStringAPI.swift
   NSStringEncodings.swift
+  NSTextCheckingResult.swift
   NSValue.swift.gyb
   PersonNameComponents.swift
   ReferenceConvertible.swift

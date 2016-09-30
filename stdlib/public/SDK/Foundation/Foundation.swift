@@ -26,24 +26,6 @@ extension NSObject : CustomDebugStringConvertible {}
 public let NSNotFound: Int = .max
 
 //===----------------------------------------------------------------------===//
-// TextChecking
-//===----------------------------------------------------------------------===//
-
-extension NSTextCheckingResult.CheckingType {
-    public static var allSystemTypes : NSTextCheckingResult.CheckingType {
-        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff)
-    }
-    
-    public static var allCustomTypes : NSTextCheckingResult.CheckingType {
-        return NSTextCheckingResult.CheckingType(rawValue: 0xffffffff << 32)
-    }
-    
-    public static var allTypes : NSTextCheckingResult.CheckingType {
-        return NSTextCheckingResult.CheckingType(rawValue: UInt64.max)
-    }
-}
-
-//===----------------------------------------------------------------------===//
 // Fast enumeration
 //===----------------------------------------------------------------------===//
 
