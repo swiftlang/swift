@@ -4,6 +4,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 import SwiftReflectionTest
 import Foundation
 
