@@ -182,10 +182,36 @@ public protocol _NSNumber {
   var objCType: UnsafePointer<Int8> { get }
 }
 
+/// A shadow for the API of NSString we will use in the core stdlib.
+@objc
+public protocol _NSStringCore {
+  func length() -> Int
+  func characterAtIndex(_ index: Int) -> UInt16
+
+  func getCharacters(
+    _ buffer: UnsafeMutablePointer<UInt16>,
+    range aRange: _SwiftNSRange)
+
+  // SPI APIs
+  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>?
+}
+
+// See _NSSet above for why this exists
+@unsafe_no_objc_tagged_pointer @objc
+public protocol _NSString : _NSStringCore {
+  func getCharacters(_ buffer: UnsafeMutablePointer<UInt16>)
+
+  // SPI APIs
+  // TODO: undo Uint8 being used as a proxy for bool
+  func _fastCStringContents(_ nullTerminationRequired: UInt8) 
+      -> UnsafeMutablePointer<Int8>?
+}
+
 #else
 
 public protocol _NSArrayCore {}
 public protocol _NSDictionaryCore {}
 public protocol _NSSetCore {}
+public protocol _NSStringCore {}
 
 #endif

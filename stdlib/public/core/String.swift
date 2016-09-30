@@ -624,10 +624,10 @@ extension Sequence where Iterator.Element == String {
 
 #if _runtime(_ObjC)
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
-func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
+func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _NSString
 
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
-func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
+func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _NSString
 #else
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   var buffer = _StringBuffer(
