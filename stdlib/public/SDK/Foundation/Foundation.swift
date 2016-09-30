@@ -25,43 +25,6 @@ extension NSObject : CustomDebugStringConvertible {}
 
 public let NSNotFound: Int = .max
 
-// FIXME: move inside NSIndexSet when the compiler supports this.
-public struct NSIndexSetIterator : IteratorProtocol {
-  public typealias Element = Int
-
-  internal let _set: NSIndexSet
-  internal var _first: Bool = true
-  internal var _current: Int?
-
-  internal init(set: NSIndexSet) {
-    self._set = set
-    self._current = nil
-  }
-
-  public mutating func next() -> Int? {
-    if _first {
-      _current = _set.firstIndex
-      _first = false
-    } else if let c = _current {
-      _current = _set.indexGreaterThanIndex(c)
-    } else {
-      // current is already nil
-    }
-    if _current == NSNotFound {
-      _current = nil
-    }
-    return _current
-  }
-}
-
-extension NSIndexSet : Sequence {
-  /// Return an *iterator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> NSIndexSetIterator {
-    return NSIndexSetIterator(set: self)
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // Ranges
