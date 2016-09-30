@@ -12,7 +12,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   ExtraStringAPIs.swift
   FileManager.swift
   FileManagerThunks.m
-  Foundation.swift.gyb
+  Foundation.swift
   Hashing.m
   Hashing.swift
   IndexPath.swift
@@ -22,6 +22,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Measurement.swift
   Notification.swift
   NSError.swift
+  NSNumber.swift.gyb
   NSString.swift
   NSStringAPI.swift
   NSStringEncodings.swift
