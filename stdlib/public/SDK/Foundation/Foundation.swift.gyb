@@ -24,54 +24,6 @@ extension NSObject : CustomStringConvertible {}
 extension NSObject : CustomDebugStringConvertible {}
 
 //===----------------------------------------------------------------------===//
-// New Strings
-//===----------------------------------------------------------------------===//
-
-//
-// Conversion from NSString to Swift's native representation
-//
-
-extension String {
-  public init(_ cocoaString: NSString) {
-    self = String(_cocoaString: cocoaString)
-  }
-}
-
-extension String : _ObjectiveCBridgeable {
-  @_semantics("convertToObjectiveC")
-  public func _bridgeToObjectiveC() -> NSString {
-    // This method should not do anything extra except calling into the
-    // implementation inside core.  (These two entry points should be
-    // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSString.self)
-  }
-
-  public static func _forceBridgeFromObjectiveC(
-    _ x: NSString,
-    result: inout String?
-  ) {
-    result = String(x)
-  }
-
-  public static func _conditionallyBridgeFromObjectiveC(
-    _ x: NSString,
-    result: inout String?
-  ) -> Bool {
-    self._forceBridgeFromObjectiveC(x, result: &result)
-    return result != nil
-  }
-
-  public static func _unconditionallyBridgeFromObjectiveC(
-    _ source: NSString?
-  ) -> String {
-    // `nil` has historically been used as a stand-in for an empty
-    // string; map it to an empty string.
-    if _slowPath(source == nil) { return String() }
-    return String(source!)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Numbers
 //===----------------------------------------------------------------------===//
 
@@ -1496,7 +1448,6 @@ extension CVarArg where Self: _ObjectiveCBridgeable {
   }
 }
 
-extension String: CVarArg {}
 extension Array: CVarArg {}
 extension Dictionary: CVarArg {}
 extension Set: CVarArg {}
