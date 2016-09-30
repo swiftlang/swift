@@ -230,6 +230,7 @@ macro(swift_common_unified_build_config product)
   set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(SWIFT_TABLEGEN_EXE llvm-tblgen)
+  set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 
   # If cmark was checked out into tools/cmark, expect to build it as
   # part of the unified build.

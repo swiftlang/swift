@@ -37,7 +37,17 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch os
-  SWIFT_MODULE_DEPENDS_OSX XPC
-  FRAMEWORK_DEPENDS Foundation)
 
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch IOKit ObjectiveC # auto-updated
+  # CoreGraphics is used by the overlay but not by the Foundation
+  # framework, so we need to add it as a dependency.
+  # The ./utils/find-overlay-dependencies.sh tool only touches the
+  # OSX|IOS|TVOS|WATCHOS lines, so the standalone CoreGraphics lines remain.
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch ObjectiveC # auto-updated
+    CoreGraphics
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch ObjectiveC # auto-updated
+    CoreGraphics
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch ObjectiveC # auto-updated
+    CoreGraphics
+  FRAMEWORK_DEPENDS Foundation
+)

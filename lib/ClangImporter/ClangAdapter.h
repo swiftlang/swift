@@ -136,7 +136,7 @@ bool isObjCId(const clang::Decl *decl);
 
 /// Determine whether the given declaration is considered
 /// 'unavailable' in Swift.
-bool isUnavailableInSwift(const clang::Decl *decl, PlatformAvailability &,
+bool isUnavailableInSwift(const clang::Decl *decl, const PlatformAvailability &,
                           bool enableObjCInterop);
 
 /// Determine the optionality of the given Clang parameter.

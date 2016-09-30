@@ -12,9 +12,6 @@
 
 @_exported import AssetsLibrary // Clang module
 
-//===----------------------------------------------------------------------===//
-// ALAssetsLibrary.h
-//===----------------------------------------------------------------------===//
 extension ALAssetsLibrary { 
   @nonobjc
   public func enumerateGroupsWithTypes(_ types: UInt32,

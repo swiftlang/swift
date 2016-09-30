@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# utils/coverage-touch-tests - Touch tests covering git changes
+# utils/coverage/coverage-touch-tests - Touch tests covering git changes
 #
 # This source file is part of the Swift.org open source project
 #

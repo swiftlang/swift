@@ -363,13 +363,8 @@ endfunction()
 #                         # lipo'd into the output.
 #   )
 function(_add_swift_lipo_target target output)
-  if("${target}" STREQUAL "")
-    message(FATAL_ERROR "target is required")
-  endif()
-
-  if("${output}" STREQUAL "")
-    message(FATAL_ERROR "output is required")
-  endif()
+  precondition(target MESSAGE "target is required")
+  precondition(output MESSAGE "output is required")
 
   set(source_targets ${ARGN})
 
@@ -618,8 +613,7 @@ function(_add_swift_library_single target name)
   else()
     string(REPLACE swift "" module_name "${name}")
   endif()
-  list(FIND SWIFT_API_NOTES_INPUTS "${module_name}" overlay_index)
-  if(NOT ${overlay_index} EQUAL -1)
+  if("${module_name}" IN_LIST SWIFT_API_NOTES_INPUTS)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
@@ -1456,16 +1450,24 @@ function(add_swift_library name)
         endif()
 
         set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+        
+        if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
+          set(unsigned "-unsigned")
+        endif()
+        
         _add_swift_lipo_target(
-            ${lipo_target}
-            "${UNIVERSAL_LIBRARY_NAME}"
+            ${lipo_target}${unsigned}
+            "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
             ${THIN_INPUT_TARGETS})
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           # Ad-hoc sign stdlib dylibs
-          add_custom_command(TARGET "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-                             POST_BUILD
-                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
+          add_custom_command_target(unused_var
+            COMMAND ${CMAKE_COMMAND} -E copy ${UNIVERSAL_LIBRARY_NAME}${unsigned} ${UNIVERSAL_LIBRARY_NAME}
+            COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}"
+            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
+            DEPENDS ${lipo_target}${unsigned}
+            CUSTOM_TARGET_NAME ${lipo_target})
         endif()
 
         # Cache universal libraries for dependency purposes

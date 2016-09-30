@@ -83,7 +83,7 @@ next(%z : $Builtin.Int8):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @empty_instance2(i2) {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} void @empty_instance2(i8) {{.*}} {
 sil @empty_instance2 : $@convention(thin) (EitherOr<(), ()>) -> () {
 // CHECK-NEXT: entry:
 entry(%e : $EitherOr<(), ()>):
@@ -97,20 +97,20 @@ entry(%e : $EitherOr<(), ()>):
   // CHECK-NEXT: llvm.lifetime.start
   %s = alloc_stack $EitherOr<(), ()>
 
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 0
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 0
   %l = enum $EitherOr<(), ()>, #EitherOr.Left!enumelt.1, undef : $()
   store %l to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 1
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 1
   %r = enum $EitherOr<(), ()>, #EitherOr.Right!enumelt.1, undef : $()
   store %r to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 -2
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 2
   %m = enum $EitherOr<(), ()>, #EitherOr.Middle!enumelt
   store %m to %s : $*EitherOr<(), ()>
-  // CHECK-NEXT: bitcast {{.*}} to i2*
-  // CHECK-NEXT: store i2 -1
+  // CHECK-NEXT: bitcast {{.*}} to i8*
+  // CHECK-NEXT: store i8 3
   %k = enum $EitherOr<(), ()>, #EitherOr.Center!enumelt
   store %k to %s : $*EitherOr<(), ()>
 
@@ -118,10 +118,10 @@ entry(%e : $EitherOr<(), ()>):
   %b = unchecked_enum_data %r : $EitherOr<(), ()>, #EitherOr.Right!enumelt.1
 
   // CHECK-NEXT: switch
-  // CHECK-NEXT:   i2  0, label %[[LEFT_PRE:[0-9]+]]
-  // CHECK-NEXT:   i2  1, label %[[RIGHT_PRE:[0-9]+]]
-  // CHECK-NEXT:   i2 -2, label [[MIDDLE:%[0-9]+]]
-  // CHECK-NEXT:   i2 -1, label [[CENTER:%[0-9]+]]
+  // CHECK-NEXT:   i8 0, label %[[LEFT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i8 1, label %[[RIGHT_PRE:[0-9]+]]
+  // CHECK-NEXT:   i8 2, label [[MIDDLE:%[0-9]+]]
+  // CHECK-NEXT:   i8 3, label [[CENTER:%[0-9]+]]
   switch_enum %e : $EitherOr<(), ()>,
     case #EitherOr.Left!enumelt.1: left,
     case #EitherOr.Middle!enumelt: middle,

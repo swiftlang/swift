@@ -1,11 +1,6 @@
 @_exported import AVFoundation // Clang module
-import CoreMedia
 import Foundation
 
-%{
-from gyb_foundation_support import \
-  ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods
-}%
 
 extension AVError {
   /// The device name.
@@ -44,23 +39,3 @@ extension AVError {
   }
 }
 
-// Bridge CoreMedia structs to NSValue.
-// AVFoundation provides internal NSValue subclasses for these structures that
-// are incompatible with the NSConcreteValue subclasses you get using
-// -[NSValue valueWithBytes:objCType:].
-
-${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
-  Type="CMTime",
-  initializer="{ NSValue(time: $0) }",
-  getter="{ $0.timeValue }",
-) }
-${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
-  Type="CMTimeRange",
-  initializer="{ NSValue(timeRange: $0) }",
-  getter="{ $0.timeRangeValue }",
-) }
-${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
-  Type="CMTimeMapping",
-  initializer="{ NSValue(timeMapping: $0) }",
-  getter="{ $0.timeMappingValue }",
-) }

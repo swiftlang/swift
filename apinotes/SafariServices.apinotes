@@ -2,6 +2,6 @@
 Name: SafariServices
 Tags:
 - Name: SFErrorCode
-  SwiftName: SFErrorDomain
+  NSErrorDomain: SFErrorDomain
 - Name: SSReadingListErrorCode
-  SwiftName: SSReadingListErrorDomain
+  NSErrorDomain: SSReadingListErrorDomain
