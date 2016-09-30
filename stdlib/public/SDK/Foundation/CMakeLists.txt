@@ -24,6 +24,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   IndexSetThunks.m
   Measurement.swift
   Notification.swift
+  NSContiguousString.swift
   NSStringEncodings.swift
   PersonNameComponents.swift
   TypePreservingNSNumber.mm
