@@ -150,6 +150,13 @@ enum class ImportNameFlags {
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
 
+/// Hold (importer-global) Swift context references and information
+struct ImportNameSwiftContext {
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
+};
+
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
@@ -157,8 +164,8 @@ class NameImporter {
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
 
-  // FIXME: host an enumInfo ourselves, rather than a reference to the Impl's.
-  EnumInfoCache &enumInfoCache;
+  // FIXME: hold it directly once we eliminate sema override
+  std::unique_ptr<EnumInfoCache> enumInfoCache;
 
   StringScratchSpace scratch;
 
@@ -167,10 +174,13 @@ class NameImporter {
   // TODO: cache values
 
 public:
+  NameImporter(ImportNameSwiftContext ctx)
+      : swiftCtx(ctx.swiftCtx), availability(ctx.availability), enumInfoCache(),
+        inferImportAsMember(ctx.inferImportAsMember) {}
+
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               EnumInfoCache &enumCache, bool inferIAM)
-      : swiftCtx(ctx), availability(avail), enumInfoCache(enumCache),
-        inferImportAsMember(inferIAM) {}
+               bool inferIAM)
+      : NameImporter(ImportNameSwiftContext{ctx, avail, inferIAM}) {}
 
   /// Determine the Swift name for a clang decl
   ImportedName importFullName(const clang::NamedDecl *,
@@ -182,6 +192,19 @@ public:
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
 
   bool isInferImportAsMember() const { return inferImportAsMember; }
+
+  EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return getEnumInfoCache().getEnumInfo(decl);
+  }
+  EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return getEnumInfoCache().getEnumKind(decl);
+  }
+
+  // TODO: drop, no need to expose
+  EnumInfoCache &getEnumInfoCache() {
+    assert(enumInfoCache && "not set up");
+    return *enumInfoCache;
+  }
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }

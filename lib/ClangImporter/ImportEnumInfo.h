@@ -24,6 +24,9 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 
+// TODO: drop this when we embed PP directly
+#include "clang/Sema/Sema.h"
+
 namespace clang {
 class EnumDecl;
 class Preprocessor;
@@ -99,9 +102,14 @@ private:
 /// Provide a cache of enum infos, so that we don't have to re-calculate their
 /// information.
 class EnumInfoCache {
-  // TODO: reference a single preprocessor, that is different Clangs get
-  // different caches. This will then have the advantage that we can instead of
-  // caching names, cache Decls.
+  // TODO: drop when NameImporter is refactored to contain clang instance
+  friend class NameImporter;
+
+  ASTContext &swiftCtx;
+
+  // TODO: just store the PP
+  clang::Sema &clangSema;
+  clang::Preprocessor &getClangPP() { return clangSema.getPreprocessor(); }
 
   /// Cache enum infos, referenced with a dotted Clang name
   /// "ModuleName.EnumName".
@@ -113,17 +121,17 @@ class EnumInfoCache {
 
   // Never copy
   EnumInfoCache(const EnumInfoCache &) = delete;
-  EnumInfoCache &operator=(const EnumInfoCache &) = delete;
+  EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  EnumInfoCache() = default;
+  EnumInfoCache(ASTContext &swiftContext, clang::Sema &cSema)
+      : swiftCtx(swiftContext), clangSema(cSema) {}
 
-  importer::EnumInfo getEnumInfo(ASTContext &ctx, const clang::EnumDecl *decl,
-                                 clang::Preprocessor &preprocessor) {
+  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(ctx, decl, preprocessor);
+      return importer::EnumInfo(swiftCtx, decl, getClangPP());
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -131,22 +139,19 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(ctx, decl, preprocessor);
+    importer::EnumInfo enumInfo(swiftCtx, decl, getClangPP());
     enumInfos[key] = enumInfo;
     return enumInfo;
   }
 
-  importer::EnumKind getEnumKind(ASTContext &ctx, const clang::EnumDecl *decl,
-                                 clang::Preprocessor &preprocessor) {
-    return getEnumInfo(ctx, decl, preprocessor).getKind();
+  importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return getEnumInfo(decl).getKind();
   }
 
   /// The prefix to be stripped from the names of the enum constants within the
   /// given enum.
-  StringRef getEnumConstantNamePrefix(ASTContext &ctx,
-                                      const clang::EnumDecl *decl,
-                                      clang::Preprocessor &preprocessor) {
-    return getEnumInfo(ctx, decl, preprocessor).getConstantNamePrefix();
+  StringRef getEnumConstantNamePrefix(const clang::EnumDecl *decl) {
+    return getEnumInfo(decl).getConstantNamePrefix();
   }
 };
 

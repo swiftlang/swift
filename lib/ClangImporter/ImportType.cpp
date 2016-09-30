@@ -1662,7 +1662,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    if (enumInfoCache.getEnumKind(SwiftContext, enumTy->getDecl(), pp) ==
+    if (enumInfoCache.getEnumKind(enumTy->getDecl()) ==
         EnumKind::Options) {
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
@@ -2035,10 +2035,10 @@ Type ClangImporter::Implementation::importMethodType(
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
 
       auto defaultArg = inferDefaultArgument(
-          SwiftContext, enumInfoCache, getClangPreprocessor(), param->getType(),
-          optionalityOfParam, methodName.getBaseName(), numEffectiveParams,
-          name.empty() ? StringRef() : name.str(), paramIndex == 0,
-          isLastParameter);
+          SwiftContext, getEnumInfoCache(), getClangPreprocessor(),
+          param->getType(), optionalityOfParam, methodName.getBaseName(),
+          numEffectiveParams, name.empty() ? StringRef() : name.str(),
+          paramIndex == 0, isLastParameter);
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
     }

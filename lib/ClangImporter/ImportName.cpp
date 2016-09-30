@@ -798,8 +798,7 @@ EffectiveClangContext NameImporter::determineEffectiveContext(
   // scope, depending how their enclosing enumeration is imported.
   if (isa<clang::EnumConstantDecl>(decl)) {
     auto enumDecl = cast<clang::EnumDecl>(dc);
-    switch (enumInfoCache.getEnumKind(swiftCtx, enumDecl,
-                                      clangSema.getPreprocessor())) {
+    switch (getEnumKind(enumDecl)) {
     case EnumKind::Enum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
@@ -917,8 +916,7 @@ bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
   // private if the parent enum is marked private.
   if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
     auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-    switch (
-        enumInfoCache.getEnumKind(swiftCtx, ED, clangSema.getPreprocessor())) {
+    switch (getEnumKind(ED)) {
     case EnumKind::Constants:
     case EnumKind::Unknown:
       if (ED->hasAttr<clang::SwiftPrivateAttr>())
@@ -1082,6 +1080,13 @@ bool NameImporter::hasErrorMethodNameCollision(
 ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
                                           clang::Sema &clangSema,
                                           ImportNameOptions options) {
+  // TODO: drop when we have fixed lifetime
+  if (!enumInfoCache) {
+    enumInfoCache.reset(new EnumInfoCache(swiftCtx, clangSema));
+  } else {
+    assert(&clangSema == &(enumInfoCache->clangSema) &&
+           "NameImporter mis-used, should be per-Clang instance");
+  }
 
   ImportedName result;
 
@@ -1431,8 +1436,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
   bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    auto enumInfo = enumInfoCache.getEnumInfo(swiftCtx, enumDecl,
-                                              clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl);
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
@@ -1446,8 +1450,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
   // "Code" off the end of the name, if it's there, because it's
   // redundant.
   if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
-    auto enumInfo = enumInfoCache.getEnumInfo(swiftCtx, enumDecl,
-                                              clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl);
     if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
         camel_case::getLastWord(baseName) == "Code")
       baseName = baseName.substr(0, baseName.size() - 4);
@@ -1546,7 +1549,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
-          swiftCtx, enumInfoCache, clangSema, baseName, argumentNames, params,
+          swiftCtx, *enumInfoCache, clangSema, baseName, argumentNames, params,
           method->getReturnType(), method->getDeclContext(),
           getNonNullArgs(method, params),
           result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)

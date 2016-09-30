@@ -123,18 +123,19 @@ namespace swift {
 /// Module file extension writer for the Swift lookup tables.
 class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   clang::ASTWriter &Writer;
-  std::function<void(clang::Sema &, SwiftLookupTable &)> PopulateTable;
+  NameImporter nameImporter;
 
 public:
-  SwiftLookupTableWriter(
-      clang::ModuleFileExtension *extension,
-      std::function<void(clang::Sema &, SwiftLookupTable &)> populateTable,
-      clang::ASTWriter &writer)
+  SwiftLookupTableWriter(clang::ModuleFileExtension *extension,
+                         clang::ASTWriter &writer,
+                         ImportNameSwiftContext insCtx)
       : ModuleFileExtensionWriter(extension), Writer(writer),
-        PopulateTable(std::move(populateTable)) {}
+        nameImporter(insCtx) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
+
+  void populateTable(clang::Sema &sema, SwiftLookupTable &table);
 };
 
 /// Module file extension reader for the Swift lookup tables.
@@ -1068,7 +1069,7 @@ void SwiftLookupTableWriter::writeExtensionContents(
        llvm::BitstreamWriter &stream) {
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
-  PopulateTable(sema, table);
+  populateTable(sema, table);
 
   SmallVector<uint64_t, 64> ScratchRecord;
 
@@ -1491,7 +1492,7 @@ SwiftNameLookupExtension::getExtensionMetadata() const {
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
   metadata.UserInfo = version::getSwiftFullVersion(
-      nameImporter.getLangOpts().EffectiveLanguageVersion);
+      nameImporterCtx.swiftCtx.LangOpts.EffectiveLanguageVersion);
   return metadata;
 }
 
@@ -1500,37 +1501,37 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            nameImporter.isInferImportAsMember());
+                            nameImporterCtx.inferImportAsMember);
 }
+
+void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
+                                           SwiftLookupTable &table) {
+  auto &swiftCtx = nameImporter.getContext();
+  for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
+    // Skip anything from an AST file.
+    if (decl->isFromASTFile())
+      continue;
+
+    // Skip non-named declarations.
+    auto named = dyn_cast<clang::NamedDecl>(decl);
+    if (!named)
+      continue;
+
+    // Add this entry to the lookup table.
+    addEntryToLookupTable(sema, table, named, nameImporter);
+  }
+
+  // Add macros to the lookup table.
+  addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+
+  // Finalize the lookup table, which may fail.
+  finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
+};
 
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
-    // Local function to populate the lookup table.
-  auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
-    auto &swiftCtx = nameImporter.getContext();
-    for (auto decl
-           : sema.Context.getTranslationUnitDecl()->noload_decls()) {
-      // Skip anything from an AST file.
-      if (decl->isFromASTFile()) continue;
-
-      // Skip non-named declarations.
-      auto named = dyn_cast<clang::NamedDecl>(decl);
-      if (!named) continue;
-
-      // Add this entry to the lookup table.
-      addEntryToLookupTable(sema, table, named, nameImporter);
-    }
-
-    // Add macros to the lookup table.
-    addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table,
-                           swiftCtx);
-
-    // Finalize the lookup table, which may fail.
-    finalizeLookupTable(sema.Context, sema.getPreprocessor(), table, swiftCtx);
-  };
-
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
-           new SwiftLookupTableWriter(this, populateTable, writer));
+      new SwiftLookupTableWriter(this, writer, nameImporterCtx));
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>

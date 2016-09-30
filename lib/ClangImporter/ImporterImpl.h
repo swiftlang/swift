@@ -387,8 +387,6 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  importer::EnumInfoCache enumInfoCache;
-
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
@@ -398,19 +396,17 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
-  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return enumInfoCache.getEnumInfo(
-        SwiftContext, decl, ppOverride ? *ppOverride : getClangPreprocessor());
+  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return nameImporter.getEnumInfo(decl);
   }
-  importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return getEnumInfo(decl, ppOverride).getKind();
+  importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return nameImporter.getEnumKind(decl);
   }
 
-  // TODO: drop this accessor as soon as EnumInfoCaches are hosted by name
-  // lookup
-  importer::EnumInfoCache &getEnumInfoCache() { return enumInfoCache; }
+  // TODO: drop this
+  importer::EnumInfoCache &getEnumInfoCache() {
+    return nameImporter.getEnumInfoCache();
+  }
 
   // TODO: drop this accessor as soon as we further de-couple the swift name
   // lookup tables from the Impl.
@@ -1168,13 +1164,13 @@ void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-  NameImporter nameImporter;
+  ImportNameSwiftContext nameImporterCtx;
   LookupTableMap &lookupTables;
 
 public:
   SwiftNameLookupExtension(ClangImporter::Implementation &impl)
-      : nameImporter(impl.SwiftContext, impl.platformAvailability,
-                     impl.getEnumInfoCache(), impl.InferImportAsMember),
+      : nameImporterCtx({impl.SwiftContext, impl.platformAvailability,
+                        impl.InferImportAsMember}),
         lookupTables(impl.getLookupTables()) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
