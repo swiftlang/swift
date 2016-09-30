@@ -58,19 +58,6 @@ extension NSURL : CustomPlaygroundQuickLookable {
   }
 }
 
-extension NSDate : CustomPlaygroundQuickLookable {
-  var summary: String {
-    let df = DateFormatter()
-    df.dateStyle = .medium
-    df.timeStyle = .short
-    return df.string(from: self as Date)
-  }
-
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(summary)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // AnyHashable
 //===----------------------------------------------------------------------===//
