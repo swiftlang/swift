@@ -22,6 +22,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Measurement.swift
   Notification.swift
   NSArray.swift
+  NSCoder.swift
   NSDictionary.swift
   NSError.swift
   NSExpression.swift
