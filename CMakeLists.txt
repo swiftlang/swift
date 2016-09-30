@@ -8,6 +8,12 @@ if(POLICY CMP0054)
   cmake_policy(SET CMP0054 NEW)
 endif()
 
+# Enable the IN_LIST operator, as in:
+# `if(<element_variable> IN_LIST <list_variable>)`
+if(POLICY CMP0057)
+  cmake_policy(SET CMP0057 NEW)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -491,11 +497,10 @@ function(is_sdk_requested name result_var_name)
   if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${name}")
     set("${result_var_name}" "TRUE" PARENT_SCOPE)
   else()
-    list(FIND SWIFT_SDKS "${name}" sdk_index)
-    if(${sdk_index} EQUAL -1)
-      set("${result_var_name}" "FALSE" PARENT_SCOPE)
-    else()
+    if("${name}" IN_LIST SWIFT_SDKS)
       set("${result_var_name}" "TRUE" PARENT_SCOPE)
+    else()
+      set("${result_var_name}" "FALSE" PARENT_SCOPE)
     endif()
   endif()
 endfunction()

@@ -46,6 +46,23 @@ struct SyntaxModelContext::Implementation {
       SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
+static bool canFindSurroundingParens(ArrayRef<Token> Toks,
+                                    const unsigned Current) {
+  bool LeftOk = false;
+  bool RightOk = false;
+  for (unsigned Offset = 1; ; Offset ++) {
+    if (Current < Offset || Current + Offset >= Toks.size())
+      return false;
+    auto &L = Toks[Current - Offset];
+    auto &R = Toks[Current + Offset];
+    LeftOk |= L.getKind() == tok::l_paren;
+    RightOk |= R.getKind() == tok::r_paren;
+    if (LeftOk && RightOk)
+      return true;
+  }
+  llvm_unreachable("unreachable exit condition");
+}
+
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const bool IsPlayground = Impl.LangOpts.Playground;
@@ -103,7 +120,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
              Tokens[I-1].getKind() == tok::comma) &&
             (Tokens[I+1].getKind() == tok::colon ||
              Tokens[I+1].getKind() == tok::identifier ||
-             Tokens[I+1].isKeyword())) {
+             Tokens[I+1].isKeyword()) &&
+            canFindSurroundingParens(Tokens, I)) {
           // Keywords are allowed as argument labels and should be treated as
           // identifiers.  The exception is '_' which is not a name.
           Kind = SyntaxNodeKind::Identifier;

@@ -363,13 +363,8 @@ endfunction()
 #                         # lipo'd into the output.
 #   )
 function(_add_swift_lipo_target target output)
-  if("${target}" STREQUAL "")
-    message(FATAL_ERROR "target is required")
-  endif()
-
-  if("${output}" STREQUAL "")
-    message(FATAL_ERROR "output is required")
-  endif()
+  precondition(target MESSAGE "target is required")
+  precondition(output MESSAGE "output is required")
 
   set(source_targets ${ARGN})
 
@@ -618,8 +613,7 @@ function(_add_swift_library_single target name)
   else()
     string(REPLACE swift "" module_name "${name}")
   endif()
-  list(FIND SWIFT_API_NOTES_INPUTS "${module_name}" overlay_index)
-  if(NOT ${overlay_index} EQUAL -1)
+  if("${module_name}" IN_LIST SWIFT_API_NOTES_INPUTS)
     set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 

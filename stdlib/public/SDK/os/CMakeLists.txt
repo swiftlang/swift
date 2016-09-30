@@ -6,6 +6,9 @@ add_swift_library(swiftos ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLA
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch ObjectiveC XPC # auto-updated
   SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC # auto-updated
+    Dispatch # required in some configurations but not found by tool
   SWIFT_MODULE_DEPENDS_TVOS Darwin ObjectiveC # auto-updated
+    Dispatch # required in some configurations but not found by tool
   SWIFT_MODULE_DEPENDS_WATCHOS Darwin ObjectiveC # auto-updated
+    Dispatch # required in some configurations but not found by tool
 )

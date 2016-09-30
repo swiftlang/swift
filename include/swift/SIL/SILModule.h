@@ -132,6 +132,10 @@ private:
   /// The list of SILVTables in the module.
   VTableListType vtables;
 
+  /// This is a cache of vtable entries for quick look-up
+  llvm::DenseMap<std::pair<const SILVTable *, SILDeclRef>, SILFunction *>
+      VTableEntryCache;
+
   /// Lookup table for SIL witness tables from conformances.
   llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;

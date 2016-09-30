@@ -1578,6 +1578,12 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
       return true;
     }
 
+    // Special case: in computed property setter, newValue closure is escaping
+    if (auto funcDecl = dyn_cast<FuncDecl>(DC))
+      if (funcDecl->isSetter())
+        if (auto funTy = type->getAs<AnyFunctionType>())
+          type = funTy->withExtInfo(funTy->getExtInfo().withNoEscape(false));
+
     Loc.setType(type, true);
     return Loc.isError();
   }
