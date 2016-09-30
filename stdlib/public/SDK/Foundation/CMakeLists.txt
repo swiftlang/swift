@@ -1,39 +1,39 @@
 add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  Foundation.swift.gyb
-  Boxing.swift
-  NSError.swift
-  NSStringAPI.swift
-  NSValue.swift.gyb
-  ExtraStringAPIs.swift
-  ReferenceConvertible.swift
   AffineTransform.swift
+  Boxing.swift
   Calendar.swift
-  TimeZone.swift
-  Locale.swift
   CharacterSet.swift
+  Data.swift
+  DataThunks.m
   Date.swift
   DateComponents.swift
   DateInterval.swift
-  Data.swift
-  DataThunks.m
   Decimal.swift
+  ExtraStringAPIs.swift
   FileManager.swift
   FileManagerThunks.m
+  Foundation.swift.gyb
+  Hashing.m
+  Hashing.swift
   IndexPath.swift
   IndexSet.swift
   IndexSetThunks.m
+  Locale.swift
   Measurement.swift
   Notification.swift
+  NSError.swift
+  NSStringAPI.swift
   NSStringEncodings.swift
+  NSValue.swift.gyb
   PersonNameComponents.swift
+  ReferenceConvertible.swift
+  Thunks.mm
+  TimeZone.swift
   TypePreservingNSNumber.mm
   URL.swift
   URLComponents.swift
   URLRequest.swift
   UUID.swift
-  Hashing.swift
-  Hashing.m
-  Thunks.mm
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
