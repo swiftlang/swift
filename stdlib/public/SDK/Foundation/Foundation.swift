@@ -48,19 +48,6 @@ public func NSLog(_ format: String, _ args: CVarArg...) {
 }
 
 //===----------------------------------------------------------------------===//
-// Variadic initializers and methods
-//===----------------------------------------------------------------------===//
-
-extension NSExpression {
-  // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
-  public
-  convenience init(format expressionFormat: String, _ args: CVarArg...) {
-    let va_args = getVaList(args)
-    self.init(format: expressionFormat, arguments: va_args)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // NSUndoManager
 //===----------------------------------------------------------------------===//
 
