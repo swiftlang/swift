@@ -51,7 +51,7 @@ extension _NSFastEnumeration {
     let bufferCapacity = MemoryLayout<Storage>.size
                        / MemoryLayout<X>.stride
 
-    try withUnsafePointer(to: &bufferStorage) { p in
+    try withUnsafeMutablePointer(to: &bufferStorage) { p in
       try p.withMemoryRebound(
         to: AnyObject.self, capacity: bufferCapacity
       ) { buffer in
