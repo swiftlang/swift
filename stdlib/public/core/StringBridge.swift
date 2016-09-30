@@ -43,24 +43,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
-/// characters (does not apply ASCII optimizations).
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-func _cocoaStringToSwiftString_NonASCII(
-  _ source: _CocoaString
-) -> String {
-  let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
-  let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
-  let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
-
-  return String(_StringCore(
-    baseAddress: start,
-    count: length,
-    elementShift: 1,
-    hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
-}
-
 /// Loading Foundation initializes these function variables
 /// with useful values
 
@@ -154,30 +136,9 @@ extension String {
 
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
-
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start: UnsafeMutableRawPointer?
-    let isUTF16 = (nulTerminatedASCII == nil)
-    if isUTF16 {
-      let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = UnsafeMutableRawPointer(mutating: utf16Buf)
-    } else {
-      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
-    }
-
     self._core = _StringCore(
-      baseAddress: start,
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: cfImmutableValue)
+      _cocoaStringToContiguous(
+        source: cfImmutableValue, range: 0..<length, minimumCapacity: 0))
   }
 }
 

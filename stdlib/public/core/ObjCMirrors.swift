@@ -20,7 +20,7 @@ func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 func _getObjCSummary(_ data: _MagicMirrorData) -> String {
   let theDescription = _swift_stdlib_objcDebugDescription(data._loadValue(ofType: AnyObject.self)) as AnyObject
-  return _cocoaStringToSwiftString_NonASCII(theDescription)
+  return String(_cocoaString: theDescription)
 }
 
 public // SPI(runtime)
