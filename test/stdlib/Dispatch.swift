@@ -89,14 +89,14 @@ DispatchAPI.test("dispatch_data_t deallocator") {
 DispatchAPI.test("DispatchTime comparisons") {
     do {
         let now = DispatchTime.now()
-        checkComparable([now, now + .milliseconds(1)], oracle: {
+        checkComparable([now, now + .milliseconds(1), .distantFuture], oracle: {
             return $0 < $1 ? .lt : $0 == $1 ? .eq : .gt
         })
     }
 
     do {
         let now = DispatchWallTime.now()
-        checkComparable([now, now + .milliseconds(1)], oracle: {
+        checkComparable([now, now + .milliseconds(1), .distantFuture], oracle: {
             return $0 < $1 ? .lt : $0 == $1 ? .eq : .gt
         })
     }

@@ -45,7 +45,6 @@ public struct DispatchTime : Comparable {
 }
 
 public func <(a: DispatchTime, b: DispatchTime) -> Bool {
-	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
 	return a.rawValue < b.rawValue
 }
 
@@ -73,7 +72,11 @@ public struct DispatchWallTime : Comparable {
 }
 
 public func <(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
-	if a.rawValue == ~0 || b.rawValue == ~0 { return false }
+	if b.rawValue == ~0 {
+		return a.rawValue != ~0
+	} else if a.rawValue == ~0 {
+		return false
+	}
 	return -Int64(bitPattern: a.rawValue) < -Int64(bitPattern: b.rawValue)
 }
 
