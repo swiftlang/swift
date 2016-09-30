@@ -25,26 +25,6 @@ extension NSObject : CustomDebugStringConvertible {}
 
 public let NSNotFound: Int = .max
 
-
-//===----------------------------------------------------------------------===//
-// Ranges
-//===----------------------------------------------------------------------===//
-
-extension NSRange {
-  public init(_ x: Range<Int>) {
-    location = x.lowerBound
-    length = x.count
-  }
-
-  // FIXME(ABI)#75 (Conditional Conformance): this API should be an extension on Range.
-  // Can't express it now because the compiler does not support conditional
-  // extensions with type equality constraints.
-  public func toRange() -> Range<Int>? {
-    if location == NSNotFound { return nil }
-    return location..<(location+length)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // NSLocalizedString
 //===----------------------------------------------------------------------===//
@@ -346,18 +326,6 @@ extension NSURL : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     guard let str = absoluteString else { return .text("Unknown URL") }
     return .url(str)
-  }
-}
-
-extension NSRange : CustomReflectable {
-  public var customMirror: Mirror {
-    return Mirror(self, children: ["location": location, "length": length])
-  }
-}
-
-extension NSRange : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .range(Int64(location), Int64(length))
   }
 }
 

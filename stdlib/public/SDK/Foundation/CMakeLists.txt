@@ -27,6 +27,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSFastEnumeration.swift
   NSIndexSet.swift
   NSNumber.swift.gyb
+  NSRange.swift
   NSSet.swift
   NSString.swift
   NSStringAPI.swift
