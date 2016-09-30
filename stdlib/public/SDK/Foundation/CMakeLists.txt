@@ -21,6 +21,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Locale.swift
   Measurement.swift
   Notification.swift
+  NSArray.swift
   NSError.swift
   NSNumber.swift.gyb
   NSString.swift
