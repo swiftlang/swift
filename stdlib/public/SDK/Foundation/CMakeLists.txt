@@ -28,6 +28,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSGeometry.swift
   NSIndexSet.swift
   NSNumber.swift.gyb
+  NSPredicate.swift
   NSRange.swift
   NSSet.swift
   NSString.swift
