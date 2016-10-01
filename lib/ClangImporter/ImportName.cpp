@@ -1078,7 +1078,6 @@ bool NameImporter::hasErrorMethodNameCollision(
 }
 
 ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
-                                          clang::Sema &clangSema,
                                           ImportNameOptions options) {
   // TODO: drop when we have fixed lifetime
   if (!enumInfoCache) {
@@ -1126,8 +1125,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName =
-          importFullName(overridden, clangSema, options);
+      const auto overriddenName = importFullName(overridden, options);
       if (overriddenName.Imported)
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1159,8 +1157,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName =
-            importFullName(overriddenProperty, clangSema, options);
+        const auto overriddenName = importFullName(overriddenProperty, options);
         if (overriddenName.Imported)
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }

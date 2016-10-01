@@ -162,6 +162,7 @@ struct ImportNameSwiftContext {
 /// future will be more self-contained and encapsulated.
 class NameImporter {
   ASTContext &swiftCtx;
+  clang::Sema &clangSema;
   const PlatformAvailability &availability;
 
   // FIXME: hold it directly once we eliminate sema override
@@ -174,20 +175,22 @@ class NameImporter {
   // TODO: cache values
 
 public:
-  NameImporter(ImportNameSwiftContext ctx)
-      : swiftCtx(ctx.swiftCtx), availability(ctx.availability), enumInfoCache(),
+  NameImporter(ImportNameSwiftContext ctx, clang::Sema &cSema)
+      : swiftCtx(ctx.swiftCtx), clangSema(cSema),
+        availability(ctx.availability), enumInfoCache(),
         inferImportAsMember(ctx.inferImportAsMember) {}
 
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               bool inferIAM)
-      : NameImporter(ImportNameSwiftContext{ctx, avail, inferIAM}) {}
+               bool inferIAM, clang::Sema &cSema)
+      : NameImporter(ImportNameSwiftContext{ctx, avail, inferIAM}, cSema) {}
 
   /// Determine the Swift name for a clang decl
   ImportedName importFullName(const clang::NamedDecl *,
-                              clang::Sema &clangSema, // :-(
                               ImportNameOptions options);
 
   ASTContext &getContext() { return swiftCtx; }
+
+  clang::Sema &getClangSema() { return clangSema; }
 
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
 

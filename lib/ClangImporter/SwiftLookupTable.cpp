@@ -123,14 +123,15 @@ namespace swift {
 /// Module file extension writer for the Swift lookup tables.
 class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   clang::ASTWriter &Writer;
-  NameImporter nameImporter;
+  ImportNameSwiftContext nameImporterCtx;
+  std::unique_ptr<NameImporter> nameImporter;
 
 public:
   SwiftLookupTableWriter(clang::ModuleFileExtension *extension,
                          clang::ASTWriter &writer,
                          ImportNameSwiftContext insCtx)
       : ModuleFileExtensionWriter(extension), Writer(writer),
-        nameImporter(insCtx) {}
+        nameImporterCtx(insCtx), nameImporter() {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
@@ -1067,6 +1068,13 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
+  // Set up the name importer if this is the first time
+  if (!nameImporter) {
+    nameImporter.reset(new NameImporter(nameImporterCtx, sema));
+  } else {
+    assert(&sema == &nameImporter->getClangSema() && "Differs");
+  }
+
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
   populateTable(sema, table);
@@ -1506,7 +1514,7 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
 
 void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
                                            SwiftLookupTable &table) {
-  auto &swiftCtx = nameImporter.getContext();
+  auto &swiftCtx = nameImporter->getContext();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
     // Skip anything from an AST file.
     if (decl->isFromASTFile())
@@ -1518,7 +1526,7 @@ void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
       continue;
 
     // Add this entry to the lookup table.
-    addEntryToLookupTable(sema, table, named, nameImporter);
+    addEntryToLookupTable(table, named, *nameImporter);
   }
 
   // Add macros to the lookup table.

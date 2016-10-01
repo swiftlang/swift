@@ -397,15 +397,15 @@ public:
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
-    return nameImporter.getEnumInfo(decl);
+    return nameImporter->getEnumInfo(decl);
   }
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
-    return nameImporter.getEnumKind(decl);
+    return nameImporter->getEnumKind(decl);
   }
 
   // TODO: drop this
   importer::EnumInfoCache &getEnumInfoCache() {
-    return nameImporter.getEnumInfoCache();
+    return nameImporter->getEnumInfoCache();
   }
 
   // TODO: drop this accessor as soon as we further de-couple the swift name
@@ -538,7 +538,10 @@ private:
 
 public:
   importer::PlatformAvailability platformAvailability;
-  importer::NameImporter nameImporter;
+
+  /// For importing names. This is initialized by the ClangImporter::create()
+  /// after having set up a suitable Clang instance.
+  std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -617,10 +620,8 @@ public:
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
-                 importer::ImportNameOptions options = None,
-                 clang::Sema *clangSemaOverride = nullptr) {
-    return nameImporter.importFullName(
-        D, clangSemaOverride ? *clangSemaOverride : getClangSema(), options);
+                 importer::ImportNameOptions options = None) {
+    return nameImporter->importFullName(D, options);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -1146,8 +1147,8 @@ namespace importer {
 
 /// Add the given named declaration as an entry to the given Swift name
 /// lookup table, including any of its child entries.
-void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
-                           clang::NamedDecl *named, importer::NameImporter &);
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           importer::NameImporter &);
 
 /// Add the macros from the given Clang preprocessor to the given
 /// Swift name lookup table.

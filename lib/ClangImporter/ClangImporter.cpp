@@ -720,6 +720,10 @@ ClangImporter::create(ASTContext &ctx,
   clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
 
+  importer->Impl.nameImporter.reset(new NameImporter(
+      importer->Impl.SwiftContext, importer->Impl.platformAvailability,
+      importer->Impl.InferImportAsMember, importer->Impl.getClangSema()));
+
   // Prefer frameworks over plain headers.
   // We add search paths here instead of when building the initial invocation
   // so that (a) we use the same code as search paths for imported modules,
@@ -739,9 +743,8 @@ ClangImporter::create(ASTContext &ctx,
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
       if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-        addEntryToLookupTable(instance.getSema(),
-                              importer->Impl.BridgingHeaderLookupTable, named,
-                              importer->Impl.nameImporter);
+        addEntryToLookupTable(importer->Impl.BridgingHeaderLookupTable, named,
+                              *importer->Impl.nameImporter);
       }
     }
   }
@@ -799,8 +802,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   return false;
 }
 
-void importer::addEntryToLookupTable(clang::Sema &clangSema,
-                                     SwiftLookupTable &table,
+void importer::addEntryToLookupTable(SwiftLookupTable &table,
                                      clang::NamedDecl *named,
                                      NameImporter &nameImporter) {
   // Determine whether this declaration is suppressed in Swift.
@@ -825,8 +827,7 @@ void importer::addEntryToLookupTable(clang::Sema &clangSema,
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName =
-          nameImporter.importFullName(named, clangSema, None)) {
+  if (auto importedName = nameImporter.importFullName(named, None)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
@@ -838,8 +839,8 @@ void importer::addEntryToLookupTable(clang::Sema &clangSema,
 
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
-    if (auto swift2Name = nameImporter.importFullName(
-            named, clangSema, ImportNameFlags::Swift2Name)) {
+    if (auto swift2Name =
+            nameImporter.importFullName(named, ImportNameFlags::Swift2Name)) {
       if (swift2Name.Imported != importedName.Imported)
         table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
     }
@@ -858,7 +859,7 @@ void importer::addEntryToLookupTable(clang::Sema &clangSema,
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
-        addEntryToLookupTable(clangSema, table, namedMember, nameImporter);
+        addEntryToLookupTable(table, namedMember, nameImporter);
     }
   }
 }
@@ -986,8 +987,7 @@ bool ClangImporter::Implementation::importHeader(
   for (auto group : allParsedDecls)
     for (auto *D : group)
       if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named,
-                              nameImporter);
+        addEntryToLookupTable(BridgingHeaderLookupTable, named, *nameImporter);
 
   pp.EndSourceFile();
   bumpGeneration();
@@ -1334,7 +1334,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
       BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
-      nameImporter(SwiftContext, platformAvailability, InferImportAsMember) {}
+      nameImporter() {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
