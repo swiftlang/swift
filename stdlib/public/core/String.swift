@@ -399,7 +399,6 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
         baseAddress: UnsafeMutableRawPointer(start),
         count: Int(utf16CodeUnitCount),
         elementShift: 1,
-        hasCocoaBuffer: false,
         owner: nil))
   }
 }
@@ -417,7 +416,6 @@ extension String : _ExpressibleByBuiltinStringLiteral {
           baseAddress: UnsafeMutableRawPointer(start),
           count: Int(utf8CodeUnitCount),
           elementShift: 0,
-          hasCocoaBuffer: false,
           owner: nil))
     }
     else {
@@ -753,7 +751,7 @@ extension String {
     }
 
 #if _runtime(_ObjC)
-    return _cocoaStringToSwiftString_NonASCII(
+    return String(_cocoaString:
       _stdlib_NSStringLowercaseString(self._bridgeToObjectiveCImpl()))
 #else
     return _nativeUnicodeLowercaseString(self)
@@ -792,7 +790,7 @@ extension String {
     }
 
 #if _runtime(_ObjC)
-    return _cocoaStringToSwiftString_NonASCII(
+    return String(_cocoaString:
       _stdlib_NSStringUppercaseString(self._bridgeToObjectiveCImpl()))
 #else
     return _nativeUnicodeUppercaseString(self)

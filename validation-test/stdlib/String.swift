@@ -748,7 +748,6 @@ StringTests.test("stringCoreReserve")
     default:
       fatalError("case unhandled!")
     }
-    expectEqual(!base._core.hasCocoaBuffer, startedNative)
     
     var originalBuffer = base.bufferID
     let startedUnique = startedNative && base._core._owner != nil

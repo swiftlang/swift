@@ -36,21 +36,15 @@ func repr(_ x: NSString) -> String {
 }
 
 func repr(_ x: _StringCore) -> String {
-  if x.hasContiguousStorage {
-    if let b = x.nativeBuffer {
+  if let b = x.nativeBuffer {
     var offset = x.elementWidth == 2
       ? b.start - UnsafeMutableRawPointer(x.startUTF16)
       : b.start - UnsafeMutableRawPointer(x.startASCII)
-      return "Contiguous(owner: "
+    return "Contiguous(owner: "
       + "\(hexAddr(x._owner))[\(offset)...\(x.count + offset)]"
       + ", capacity = \(b.capacity))"
-    }
-    return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
   }
-  else if let b2 = x.cocoaBuffer {
-    return "Opaque(buffer: \(hexAddr(b2))[0...\(x.count)])"
-  }
-  return "?????"
+  return "Contiguous(owner: \(hexAddr(x._owner)), count: \(x.count))"
 }
 
 func repr(_ x: String) -> String {
