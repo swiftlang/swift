@@ -102,17 +102,12 @@ private:
 /// Provide a cache of enum infos, so that we don't have to re-calculate their
 /// information.
 class EnumInfoCache {
-  // TODO: drop when NameImporter is refactored to contain clang instance
-  friend class NameImporter;
-
   ASTContext &swiftCtx;
-
-  // TODO: just store the PP
-  clang::Sema &clangSema;
-  clang::Preprocessor &getClangPP() { return clangSema.getPreprocessor(); }
+  clang::Preprocessor &clangPP;
 
   /// Cache enum infos, referenced with a dotted Clang name
   /// "ModuleName.EnumName".
+  // TODO: switch to a Clang decl dense map
   llvm::StringMap<importer::EnumInfo> enumInfos;
 
   /// Retrieve the key to use when looking for enum information.
@@ -124,14 +119,14 @@ class EnumInfoCache {
   EnumInfoCache &operator = (const EnumInfoCache &) = delete;
 
 public:
-  EnumInfoCache(ASTContext &swiftContext, clang::Sema &cSema)
-      : swiftCtx(swiftContext), clangSema(cSema) {}
+  EnumInfoCache(ASTContext &swiftContext, clang::Preprocessor &cpp)
+      : swiftCtx(swiftContext), clangPP(cpp) {}
 
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     // If there is no name for linkage, the computation is trivial and we
     // wouldn't be able to perform name-based caching anyway.
     if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(swiftCtx, decl, getClangPP());
+      return importer::EnumInfo(swiftCtx, decl, clangPP);
 
     SmallString<32> keyScratch;
     auto key = getEnumInfoKey(decl, keyScratch);
@@ -139,7 +134,7 @@ public:
     if (known != enumInfos.end())
       return known->second;
 
-    importer::EnumInfo enumInfo(swiftCtx, decl, getClangPP());
+    importer::EnumInfo enumInfo(swiftCtx, decl, clangPP);
     enumInfos[key] = enumInfo;
     return enumInfo;
   }

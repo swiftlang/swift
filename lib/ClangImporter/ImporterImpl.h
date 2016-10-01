@@ -397,21 +397,15 @@ public:
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
   importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
-    return nameImporter->getEnumInfo(decl);
+    return getNameImporter().getEnumInfo(decl);
   }
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
-    return nameImporter->getEnumKind(decl);
-  }
-
-  // TODO: drop this
-  importer::EnumInfoCache &getEnumInfoCache() {
-    return nameImporter->getEnumInfoCache();
+    return getNameImporter().getEnumKind(decl);
   }
 
   // TODO: drop this accessor as soon as we further de-couple the swift name
   // lookup tables from the Impl.
   LookupTableMap &getLookupTables() { return LookupTables; }
-
 
 private:
   class EnumConstantDenseMapInfo {
@@ -539,9 +533,16 @@ private:
 public:
   importer::PlatformAvailability platformAvailability;
 
+private:
   /// For importing names. This is initialized by the ClangImporter::create()
   /// after having set up a suitable Clang instance.
   std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
+
+public:
+  importer::NameImporter &getNameImporter() {
+    assert(nameImporter && "haven't finished initialization");
+    return *nameImporter;
+  }
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -621,7 +622,7 @@ public:
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
                  importer::ImportNameOptions options = None) {
-    return nameImporter->importFullName(D, options);
+    return getNameImporter().importFullName(D, options);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -967,11 +968,10 @@ public:
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
-  inferDefaultArgument(ASTContext &, importer::EnumInfoCache &,
-                       clang::Preprocessor &pp, clang::QualType type,
-                       OptionalTypeKind clangOptionality, Identifier baseName,
-                       unsigned numParams, StringRef argumentLabel,
-                       bool isFirstParameter, bool isLastParameter);
+  inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
+                       Identifier baseName, unsigned numParams,
+                       StringRef argumentLabel, bool isFirstParameter,
+                       bool isLastParameter, importer::NameImporter &);
 
   /// \brief Import the type of an Objective-C method.
   ///

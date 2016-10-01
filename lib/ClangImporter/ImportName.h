@@ -165,9 +165,7 @@ class NameImporter {
   clang::Sema &clangSema;
   const PlatformAvailability &availability;
 
-  // FIXME: hold it directly once we eliminate sema override
-  std::unique_ptr<EnumInfoCache> enumInfoCache;
-
+  EnumInfoCache enumInfoCache;
   StringScratchSpace scratch;
 
   const bool inferImportAsMember;
@@ -177,7 +175,8 @@ class NameImporter {
 public:
   NameImporter(ImportNameSwiftContext ctx, clang::Sema &cSema)
       : swiftCtx(ctx.swiftCtx), clangSema(cSema),
-        availability(ctx.availability), enumInfoCache(),
+        availability(ctx.availability),
+        enumInfoCache(swiftCtx, clangSema.getPreprocessor()),
         inferImportAsMember(ctx.inferImportAsMember) {}
 
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
@@ -189,25 +188,26 @@ public:
                               ImportNameOptions options);
 
   ASTContext &getContext() { return swiftCtx; }
-
-  clang::Sema &getClangSema() { return clangSema; }
-
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+
+  Identifier getIdentifier(StringRef name) {
+    return swiftCtx.getIdentifier(name);
+  }
+
+  StringScratchSpace &getScratch() { return scratch; }
 
   bool isInferImportAsMember() const { return inferImportAsMember; }
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
-    return getEnumInfoCache().getEnumInfo(decl);
+    return enumInfoCache.getEnumInfo(decl);
   }
   EnumKind getEnumKind(const clang::EnumDecl *decl) {
-    return getEnumInfoCache().getEnumKind(decl);
+    return enumInfoCache.getEnumKind(decl);
   }
 
-  // TODO: drop, no need to expose
-  EnumInfoCache &getEnumInfoCache() {
-    assert(enumInfoCache && "not set up");
-    return *enumInfoCache;
-  }
+
+  clang::Sema &getClangSema() { return clangSema; }
+  clang::ASTContext &getClangContext() { return getClangSema().getASTContext(); }
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }

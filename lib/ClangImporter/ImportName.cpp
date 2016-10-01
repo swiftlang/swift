@@ -702,13 +702,12 @@ static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
 
 /// Attempt to omit needless words from the given function name.
 static bool omitNeedlessWordsInFunctionName(
-    ASTContext &swiftCtx, EnumInfoCache &enumInfoCache, clang::Sema &clangSema,
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const llvm::SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    StringScratchSpace &scratch) {
-  clang::ASTContext &clangCtx = clangSema.Context;
+    NameImporter &nameImporter) {
+  clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
   StringRef firstParamName;
@@ -736,10 +735,10 @@ static bool omitNeedlessWordsInFunctionName(
       argumentName = argumentNames[i];
     bool hasDefaultArg =
         ClangImporter::Implementation::inferDefaultArgument(
-            swiftCtx, enumInfoCache, clangSema.PP, param->getType(),
+            param->getType(),
             getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
-            swiftCtx.getIdentifier(baseName), numParams, argumentName,
-            i == 0, isLastParameter) != DefaultArgumentKind::None;
+            nameImporter.getIdentifier(baseName), numParams, argumentName,
+            i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
                                                      param->getOriginalType())
@@ -752,8 +751,8 @@ static bool omitNeedlessWordsInFunctionName(
   if (!contextType.isNull()) {
     if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
       if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
-        allPropertyNames =
-            swiftCtx.getAllPropertyNames(objcClassDecl, isInstanceMethod);
+        allPropertyNames = nameImporter.getContext().getAllPropertyNames(
+            objcClassDecl, isInstanceMethod);
   }
 
   // Omit needless words.
@@ -761,7 +760,7 @@ static bool omitNeedlessWordsInFunctionName(
                            getClangTypeNameForOmission(clangCtx, resultType),
                            getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
-                           allPropertyNames, scratch);
+                           allPropertyNames, nameImporter.getScratch());
 }
 
 /// Prepare global name for importing onto a swift_newtype.
@@ -1079,14 +1078,6 @@ bool NameImporter::hasErrorMethodNameCollision(
 
 ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
-  // TODO: drop when we have fixed lifetime
-  if (!enumInfoCache) {
-    enumInfoCache.reset(new EnumInfoCache(swiftCtx, clangSema));
-  } else {
-    assert(&clangSema == &(enumInfoCache->clangSema) &&
-           "NameImporter mis-used, should be per-Clang instance");
-  }
-
   ImportedName result;
 
   /// Whether we want the Swift 2.0 name.
@@ -1546,13 +1537,11 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
-          swiftCtx, *enumInfoCache, clangSema, baseName, argumentNames, params,
-          method->getReturnType(), method->getDeclContext(),
-          getNonNullArgs(method, params),
+          baseName, argumentNames, params, method->getReturnType(),
+          method->getDeclContext(), getNonNullArgs(method, params),
           result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                            : None,
-          method->hasRelatedResultType(), method->isInstanceMethod(),
-          scratch);
+          method->hasRelatedResultType(), method->isInstanceMethod(), *this);
     }
 
     // If the result is a value, lowercase it.
