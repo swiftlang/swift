@@ -14,6 +14,7 @@
 // modules.
 //
 //===----------------------------------------------------------------------===//
+#include "ImporterImpl.h"
 #include "SwiftLookupTable.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
@@ -31,9 +32,6 @@
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Support/OnDiskHashTable.h"
-
-// TODO: drop this once we get the lifetime of the NameImporter sorted out
-#include "ImporterImpl.h"
 
 using namespace swift;
 using namespace importer;
@@ -123,20 +121,22 @@ namespace swift {
 /// Module file extension writer for the Swift lookup tables.
 class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
   clang::ASTWriter &Writer;
-  ImportNameSwiftContext nameImporterCtx;
-  std::unique_ptr<NameImporter> nameImporter;
+
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
 
 public:
   SwiftLookupTableWriter(clang::ModuleFileExtension *extension,
-                         clang::ASTWriter &writer,
-                         ImportNameSwiftContext insCtx)
-      : ModuleFileExtensionWriter(extension), Writer(writer),
-        nameImporterCtx(insCtx), nameImporter() {}
+                         clang::ASTWriter &writer, ASTContext &ctx,
+                         const PlatformAvailability &avail, bool inferIAM)
+      : ModuleFileExtensionWriter(extension), Writer(writer), swiftCtx(ctx),
+        availability(avail), inferImportAsMember(inferIAM) {}
 
   void writeExtensionContents(clang::Sema &sema,
                               llvm::BitstreamWriter &stream) override;
 
-  void populateTable(clang::Sema &sema, SwiftLookupTable &table);
+  void populateTable(SwiftLookupTable &table, NameImporter &);
 };
 
 /// Module file extension reader for the Swift lookup tables.
@@ -1068,16 +1068,11 @@ namespace {
 void SwiftLookupTableWriter::writeExtensionContents(
        clang::Sema &sema,
        llvm::BitstreamWriter &stream) {
-  // Set up the name importer if this is the first time
-  if (!nameImporter) {
-    nameImporter.reset(new NameImporter(nameImporterCtx, sema));
-  } else {
-    assert(&sema == &nameImporter->getClangSema() && "Differs");
-  }
+  NameImporter nameImporter(swiftCtx, availability, sema, inferImportAsMember);
 
   // Populate the lookup table.
   SwiftLookupTable table(nullptr);
-  populateTable(sema, table);
+  populateTable(table, nameImporter);
 
   SmallVector<uint64_t, 64> ScratchRecord;
 
@@ -1499,8 +1494,8 @@ SwiftNameLookupExtension::getExtensionMetadata() const {
   metadata.BlockName = "swift.lookup";
   metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
   metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
-  metadata.UserInfo = version::getSwiftFullVersion(
-      nameImporterCtx.swiftCtx.LangOpts.EffectiveLanguageVersion);
+  metadata.UserInfo =
+      version::getSwiftFullVersion(swiftCtx.LangOpts.EffectiveLanguageVersion);
   return metadata;
 }
 
@@ -1509,12 +1504,12 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            nameImporterCtx.inferImportAsMember);
+                            inferImportAsMember);
 }
 
-void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
-                                           SwiftLookupTable &table) {
-  auto &swiftCtx = nameImporter->getContext();
+void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
+                                           NameImporter &nameImporter) {
+  auto &sema = nameImporter.getClangSema();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
     // Skip anything from an AST file.
     if (decl->isFromASTFile())
@@ -1526,7 +1521,7 @@ void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
       continue;
 
     // Add this entry to the lookup table.
-    addEntryToLookupTable(table, named, *nameImporter);
+    addEntryToLookupTable(table, named, nameImporter);
   }
 
   // Add macros to the lookup table.
@@ -1539,7 +1534,8 @@ void SwiftLookupTableWriter::populateTable(clang::Sema &sema,
 std::unique_ptr<clang::ModuleFileExtensionWriter>
 SwiftNameLookupExtension::createExtensionWriter(clang::ASTWriter &writer) {
   return std::unique_ptr<clang::ModuleFileExtensionWriter>(
-      new SwiftLookupTableWriter(this, writer, nameImporterCtx));
+      new SwiftLookupTableWriter(this, writer, swiftCtx, availability,
+                                 inferImportAsMember));
 }
 
 std::unique_ptr<clang::ModuleFileExtensionReader>

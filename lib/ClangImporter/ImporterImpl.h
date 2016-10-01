@@ -1165,14 +1165,16 @@ void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-  ImportNameSwiftContext nameImporterCtx;
   LookupTableMap &lookupTables;
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
 
 public:
-  SwiftNameLookupExtension(ClangImporter::Implementation &impl)
-      : nameImporterCtx({impl.SwiftContext, impl.platformAvailability,
-                        impl.InferImportAsMember}),
-        lookupTables(impl.getLookupTables()) {}
+  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+                           const PlatformAvailability &avail, bool inferIAM)
+      : lookupTables(tables), swiftCtx(ctx), availability(avail),
+        inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

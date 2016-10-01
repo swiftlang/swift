@@ -654,7 +654,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Install a Clang module file extension to build Swift name lookup tables.
   invocation->getFrontendOpts().ModuleFileExtensions.push_back(
-      new SwiftNameLookupExtension(importer->Impl));
+      new SwiftNameLookupExtension(importer->Impl.LookupTables,
+                                   importer->Impl.SwiftContext,
+                                   importer->Impl.platformAvailability,
+                                   importer->Impl.InferImportAsMember));
 
   // Create a compiler instance.
   auto PCHContainerOperations =
@@ -722,7 +725,7 @@ ClangImporter::create(ASTContext &ctx,
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.InferImportAsMember, importer->Impl.getClangSema()));
+      importer->Impl.getClangSema(), importer->Impl.InferImportAsMember));
 
   // Prefer frameworks over plain headers.
   // We add search paths here instead of when building the initial invocation

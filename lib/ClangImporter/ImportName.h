@@ -19,6 +19,7 @@
 
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -155,21 +156,14 @@ enum { NumImportNameFlags = 2 };
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
 
-/// Hold (importer-global) Swift context references and information
-struct ImportNameSwiftContext {
-  ASTContext &swiftCtx;
-  const PlatformAvailability &availability;
-  const bool inferImportAsMember;
-};
-
 /// Class to determine the Swift name of foreign entities. Currently fairly
 /// stateless and borrows from the ClangImporter::Implementation, but in the
 /// future will be more self-contained and encapsulated.
 class NameImporter {
   ASTContext &swiftCtx;
-  clang::Sema &clangSema;
   const PlatformAvailability &availability;
 
+  clang::Sema &clangSema;
   EnumInfoCache enumInfos;
   StringScratchSpace scratch;
 
@@ -183,15 +177,11 @@ class NameImporter {
   llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
 
 public:
-  NameImporter(ImportNameSwiftContext ctx, clang::Sema &cSema)
-      : swiftCtx(ctx.swiftCtx), clangSema(cSema),
-        availability(ctx.availability),
-        enumInfos(swiftCtx, clangSema.getPreprocessor()),
-        inferImportAsMember(ctx.inferImportAsMember) {}
-
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               bool inferIAM, clang::Sema &cSema)
-      : NameImporter(ImportNameSwiftContext{ctx, avail, inferIAM}, cSema) {}
+               clang::Sema &cSema, bool inferIAM)
+      : swiftCtx(ctx), availability(avail), clangSema(cSema),
+        enumInfos(swiftCtx, clangSema.getPreprocessor()),
+        inferImportAsMember(inferIAM) {}
 
   /// Determine the Swift name for a clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -256,8 +246,8 @@ private:
 
   ImportedName importNameImpl(const clang::NamedDecl *,
                               ImportNameOptions options);
-
 };
+
 }
 }
 
