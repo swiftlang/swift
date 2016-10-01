@@ -24,6 +24,9 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "clang/Sema/Sema.h"
 
+// TODO: remove when we drop import name options
+#include "clang/AST/Decl.h"
+
 namespace swift {
 namespace importer {
 struct PlatformAvailability;
@@ -147,6 +150,7 @@ enum class ImportNameFlags {
   /// Produce the Swift 2 name of the given entity.
   Swift2Name = 0x02,
 };
+enum { NumImportNameFlags = 2 };
 
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
@@ -171,7 +175,12 @@ class NameImporter {
 
   const bool inferImportAsMember;
 
-  // TODO: cache values
+  // TODO: remove when we drop the options (i.e. import all names)
+  using CacheKeyType =
+      llvm::PointerIntPair<const clang::NamedDecl *, NumImportNameFlags>;
+
+  /// Cache for repeated calls
+  llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
 
 public:
   NameImporter(ImportNameSwiftContext ctx, clang::Sema &cSema)
@@ -185,8 +194,8 @@ public:
       : NameImporter(ImportNameSwiftContext{ctx, avail, inferIAM}, cSema) {}
 
   /// Determine the Swift name for a clang decl
-  ImportedName importFullName(const clang::NamedDecl *,
-                              ImportNameOptions options);
+  ImportedName importName(const clang::NamedDecl *decl,
+                          ImportNameOptions options);
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
@@ -244,6 +253,10 @@ private:
                                                   const clang::DeclContext *,
                                                   ImportNameOptions options,
                                                   clang::Sema &clangSema);
+
+  ImportedName importNameImpl(const clang::NamedDecl *,
+                              ImportNameOptions options);
+
 };
 }
 }

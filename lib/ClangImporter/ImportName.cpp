@@ -40,6 +40,11 @@
 #include <algorithm>
 #include <memory>
 
+#include "llvm/ADT/Statistic.h"
+#define DEBUG_TYPE "Import Name"
+STATISTIC(ImportNameNumCacheHits, "# of times the import name cache was hit");
+STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed");
+
 using namespace swift;
 using namespace importer;
 
@@ -1076,7 +1081,7 @@ bool NameImporter::hasErrorMethodNameCollision(
                                enableObjCInterop());
 }
 
-ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
+ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
   ImportedName result;
 
@@ -1116,7 +1121,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName = importFullName(overridden, options);
+      const auto overriddenName = importName(overridden, options);
       if (overriddenName.Imported)
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1148,7 +1153,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName = importFullName(overriddenProperty, options);
+        const auto overriddenName = importName(overriddenProperty, options);
         if (overriddenName.Imported)
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
@@ -1625,4 +1630,18 @@ Identifier importer::importMacroName(
   // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
   return SwiftContext.getIdentifier(name);
+}
+
+/// Determine the Swift name for a clang decl
+ImportedName NameImporter::importName(const clang::NamedDecl *decl,
+                                      ImportNameOptions options) {
+  CacheKeyType key(decl, options.toRaw());
+  if (importNameCache.count(key)) {
+    ++ImportNameNumCacheHits;
+    return importNameCache[key];
+  }
+  ++ImportNameNumCacheMisses;
+  auto res = importNameImpl(decl, options);
+  importNameCache[key] = res;
+  return res;
 }

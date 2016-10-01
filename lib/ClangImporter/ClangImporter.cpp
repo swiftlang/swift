@@ -827,7 +827,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName = nameImporter.importFullName(named, None)) {
+  if (auto importedName = nameImporter.importName(named, None)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
@@ -840,7 +840,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
     if (auto swift2Name =
-            nameImporter.importFullName(named, ImportNameFlags::Swift2Name)) {
+            nameImporter.importName(named, ImportNameFlags::Swift2Name)) {
       if (swift2Name.Imported != importedName.Imported)
         table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
     }

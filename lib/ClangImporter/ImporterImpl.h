@@ -622,7 +622,7 @@ public:
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
                  importer::ImportNameOptions options = None) {
-    return getNameImporter().importFullName(D, options);
+    return getNameImporter().importName(D, options);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
