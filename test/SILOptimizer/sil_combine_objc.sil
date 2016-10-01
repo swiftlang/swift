@@ -1,6 +1,9 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 // REQUIRES: objc_interop
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 sil_stage canonical
 
 import Builtin

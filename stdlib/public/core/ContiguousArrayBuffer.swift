@@ -176,6 +176,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   }
 }
 
+@_versioned
 @_fixed_layout
 internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
@@ -247,6 +248,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// A pointer to the first element.
+  @_versioned
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(Builtin.projectTailElems(_storage,
                                                          Element.self))
@@ -318,6 +320,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   /// Get or set the value of the ith element.
+  @_versioned
   internal subscript(i: Int) -> Element {
     get {
       return getElement(i)
@@ -434,6 +437,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 #endif
 
   /// An object that keeps the elements stored in this buffer alive.
+  @_versioned
   internal var owner: AnyObject {
     return _storage
   }

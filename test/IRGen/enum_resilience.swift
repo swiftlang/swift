@@ -239,4 +239,17 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[METADATA]], %entry ], [ [[METADATA2]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
 
+// Methods inside extensions of resilient enums fish out type parameters
+// from metadata -- make sure we can do that
+extension ResilientMultiPayloadGenericEnum {
+
+// CHECK-LABEL: define{{( protected)?}} %swift.type* @_TFE15enum_resilienceO14resilient_enum32ResilientMultiPayloadGenericEnum16getTypeParameterfT_Mx(%swift.type* %"ResilientMultiPayloadGenericEnum<T>", %swift.opaque* noalias nocapture)
+// CHECK: [[METADATA:%.*]] = bitcast %swift.type* %"ResilientMultiPayloadGenericEnum<T>" to %swift.type**
+// CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[METADATA]], [[INT]] 3
+// CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
+  public func getTypeParameter() -> T.Type {
+    return T.self
+  }
+}
+
 // CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_EnumWithResilientPayload(i8*)
