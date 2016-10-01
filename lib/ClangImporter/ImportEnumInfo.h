@@ -19,13 +19,8 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "clang/AST/Attr.h"
-#include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
-
-// TODO: drop this when we embed PP directly
-#include "clang/Sema/Sema.h"
 
 namespace clang {
 class EnumDecl;
@@ -105,14 +100,7 @@ class EnumInfoCache {
   ASTContext &swiftCtx;
   clang::Preprocessor &clangPP;
 
-  /// Cache enum infos, referenced with a dotted Clang name
-  /// "ModuleName.EnumName".
-  // TODO: switch to a Clang decl dense map
-  llvm::StringMap<importer::EnumInfo> enumInfos;
-
-  /// Retrieve the key to use when looking for enum information.
-  StringRef getEnumInfoKey(const clang::EnumDecl *decl,
-                           SmallVectorImpl<char> &scratch);
+  llvm::DenseMap<const clang::EnumDecl *, EnumInfo> enumInfos;
 
   // Never copy
   EnumInfoCache(const EnumInfoCache &) = delete;
@@ -122,24 +110,9 @@ public:
   EnumInfoCache(ASTContext &swiftContext, clang::Preprocessor &cpp)
       : swiftCtx(swiftContext), clangPP(cpp) {}
 
-  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
-    // If there is no name for linkage, the computation is trivial and we
-    // wouldn't be able to perform name-based caching anyway.
-    if (!decl->hasNameForLinkage())
-      return importer::EnumInfo(swiftCtx, decl, clangPP);
+  EnumInfo getEnumInfo(const clang::EnumDecl *decl);
 
-    SmallString<32> keyScratch;
-    auto key = getEnumInfoKey(decl, keyScratch);
-    auto known = enumInfos.find(key);
-    if (known != enumInfos.end())
-      return known->second;
-
-    importer::EnumInfo enumInfo(swiftCtx, decl, clangPP);
-    enumInfos[key] = enumInfo;
-    return enumInfo;
-  }
-
-  importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
+  EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getEnumInfo(decl).getKind();
   }
 

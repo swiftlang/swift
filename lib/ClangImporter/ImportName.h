@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "clang/Sema/Sema.h"
 
 namespace swift {
 namespace importer {
@@ -165,7 +166,7 @@ class NameImporter {
   clang::Sema &clangSema;
   const PlatformAvailability &availability;
 
-  EnumInfoCache enumInfoCache;
+  EnumInfoCache enumInfos;
   StringScratchSpace scratch;
 
   const bool inferImportAsMember;
@@ -176,7 +177,7 @@ public:
   NameImporter(ImportNameSwiftContext ctx, clang::Sema &cSema)
       : swiftCtx(ctx.swiftCtx), clangSema(cSema),
         availability(ctx.availability),
-        enumInfoCache(swiftCtx, clangSema.getPreprocessor()),
+        enumInfos(swiftCtx, clangSema.getPreprocessor()),
         inferImportAsMember(ctx.inferImportAsMember) {}
 
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
@@ -199,12 +200,11 @@ public:
   bool isInferImportAsMember() const { return inferImportAsMember; }
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
-    return enumInfoCache.getEnumInfo(decl);
+    return enumInfos.getEnumInfo(decl);
   }
   EnumKind getEnumKind(const clang::EnumDecl *decl) {
-    return enumInfoCache.getEnumKind(decl);
+    return enumInfos.getEnumKind(decl);
   }
-
 
   clang::Sema &getClangSema() { return clangSema; }
   clang::ASTContext &getClangContext() { return getClangSema().getASTContext(); }
