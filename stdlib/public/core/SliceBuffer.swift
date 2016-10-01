@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
+@_versioned
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
     RandomAccessCollection
@@ -121,6 +122,7 @@ internal struct _SliceBuffer<Element>
   internal var owner: AnyObject
   internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
+  @_versioned
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
   }

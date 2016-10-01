@@ -12,6 +12,7 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
+@_versioned
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 

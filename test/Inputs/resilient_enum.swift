@@ -185,6 +185,14 @@ public enum ResilientMultiPayloadGenericEnum<T> {
   case Y(T)                       // -2
 }
 
+public enum ResilientMultiPayloadGenericEnumFixedSize<T> {
+  case A                          // 0
+  case B                          // 1
+  case C                          // 2
+  case X(Int)                     // -1
+  case Y(Int)                     // -2
+}
+
 public enum ResilientIndirectEnum {
   // 0
   case Base

@@ -787,6 +787,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalNestedGenericTypes |=
     Args.hasArg(OPT_enable_experimental_nested_generic_types);
 
+  Opts.EnableClassResilience |=
+    Args.hasArg(OPT_enable_class_resilience);
+
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)

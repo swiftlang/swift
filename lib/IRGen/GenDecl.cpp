@@ -2174,17 +2174,27 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
                   getPointerAlignment(), ProtocolDescriptorStructTy);
     auto typeEntity = getTypeEntityInfo(*this,
                                     conformance->getType()->getCanonicalType());
-    auto flags = typeEntity.flags
-        .withConformanceKind(ProtocolConformanceReferenceKind::WitnessTable);
+    auto flags = typeEntity.flags;
 
-    // If the conformance is in this object's table, then the witness table
-    // should also be in this object file, so we can always directly reference
-    // it.
-    // TODO: Should use accessor kind for lazy conformances
-    // TODO: Produce a relative reference to a private generator function
-    // if the witness table requires lazy initialization, instantiation, or
-    // conditional conformance checking.
-    auto witnessTableVar = getAddrOfWitnessTable(conformance);
+    llvm::Constant *witnessTableVar;
+
+    if (!isResilient(conformance->getProtocol(),
+                     ResilienceExpansion::Maximal)) {
+      flags = flags.withConformanceKind(
+          ProtocolConformanceReferenceKind::WitnessTable);
+
+      // If the conformance is in this object's table, then the witness table
+      // should also be in this object file, so we can always directly reference
+      // it.
+      witnessTableVar = getAddrOfWitnessTable(conformance);
+    } else {
+      flags = flags.withConformanceKind(
+          ProtocolConformanceReferenceKind::WitnessTableAccessor);
+
+      witnessTableVar = getAddrOfWitnessTableAccessFunction(
+          conformance, ForDefinition);
+    }
+
     auto witnessTableRef =
       ConstantReference(witnessTableVar, ConstantReference::Direct);
 

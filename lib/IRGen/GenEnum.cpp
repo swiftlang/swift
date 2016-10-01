@@ -4656,7 +4656,7 @@ namespace {
     }
     
     bool needsPayloadSizeInMetadata() const override {
-      llvm_unreachable("resilient enums cannot be defined");
+      return false;
     }
 
     void initializeMetadata(IRGenFunction &IGF,
