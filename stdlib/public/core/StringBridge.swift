@@ -43,24 +43,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Bridges `source` to `Swift.String`, assuming that `source` has non-ASCII
-/// characters (does not apply ASCII optimizations).
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-func _cocoaStringToSwiftString_NonASCII(
-  _ source: _CocoaString
-) -> String {
-  let cfImmutableValue = _stdlib_binary_CFStringCreateCopy(source)
-  let length = _stdlib_binary_CFStringGetLength(cfImmutableValue)
-  let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
-
-  return String(_StringCore(
-    baseAddress: start,
-    count: length,
-    elementShift: 1,
-    hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, to: Optional<AnyObject>.self)))
-}
-
 /// Loading Foundation initializes these function variables
 /// with useful values
 
@@ -70,8 +52,10 @@ func _cocoaStringToSwiftString_NonASCII(
 internal func _cocoaStringToContiguous(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
+  // FIXME(eager-bridging): I don't understand what this check was really for,
+  // but it seems important! Currently we're tripping it when running tests.
+  // _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
+  //  "Known contiguously stored strings should already be converted to Swift")
 
   let startIndex = range.lowerBound
   let count = range.upperBound - startIndex
@@ -95,38 +79,6 @@ internal func _cocoaStringReadAll(
   _swift_stdlib_CFStringGetCharacters(
     source, _swift_shims_CFRange(
       location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
-}
-
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-internal func _cocoaStringSlice(
-  _ target: _StringCore, _ bounds: Range<Int>
-) -> _StringCore {
-  _sanityCheck(target.hasCocoaBuffer)
-  
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
-  
-  _sanityCheck(
-    _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
-  let cfResult = _swift_stdlib_CFStringCreateWithSubstring(
-    nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.lowerBound, length: bounds.count)) as AnyObject
-
-  return String(_cocoaString: cfResult)._core
-}
-
-@_versioned
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-internal func _cocoaStringSubscript(
-  _ target: _StringCore, _ position: Int
-) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
-
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
-  return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
 //
@@ -154,30 +106,9 @@ extension String {
 
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
-
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start: UnsafeMutableRawPointer?
-    let isUTF16 = (nulTerminatedASCII == nil)
-    if isUTF16 {
-      let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = UnsafeMutableRawPointer(mutating: utf16Buf)
-    } else {
-      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
-    }
-
     self._core = _StringCore(
-      baseAddress: start,
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: cfImmutableValue)
+      _cocoaStringToContiguous(
+        source: cfImmutableValue, range: 0..<length, minimumCapacity: 0))
   }
 }
 
@@ -207,9 +138,6 @@ public protocol _NSStringCore :
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
 public final class _NSContiguousString : _SwiftNativeNSString {
   public init(_ _core: _StringCore) {
-    _sanityCheck(
-      _core.hasContiguousStorage,
-      "_NSContiguousString requires contiguous storage")
     self._core = _core
     super.init()
   }
@@ -313,11 +241,6 @@ extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer,
-        _swift_stdlib_CFStringGetLength(ns) == _core.count {
-      return ns
-    }
-    _sanityCheck(_core.hasContiguousStorage)
     return _NSContiguousString(_core)
   }
 

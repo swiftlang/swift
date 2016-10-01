@@ -50,15 +50,9 @@ extension _StringCore {
 
       // Convert the _UTF8Chunk into host endianness.
       return (i + utf16Count, _UTF8Chunk(littleEndian: result))
-    } else if _fastPath(_baseAddress != nil) {
+    } else {
       // Transcoding should return a _UTF8Chunk in host endianness.
       return _encodeSomeContiguousUTF16AsUTF8(from: i)
-    } else {
-#if _runtime(_ObjC)
-      return _encodeSomeNonContiguousUTF16AsUTF8(from: i)
-#else
-      _sanityCheckFailure("_encodeSomeUTF8: Unexpected cocoa string")
-#endif
     }
   }
 
@@ -66,28 +60,10 @@ extension _StringCore {
   /// storage is contiguous UTF-16.
   func _encodeSomeContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
-    _sanityCheck(_baseAddress != nil)
 
     let storage = UnsafeBufferPointer(start: startUTF16, count: self.count)
     return _transcodeSomeUTF16AsUTF8(storage, i)
   }
-
-#if _runtime(_ObjC)
-  /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
-  /// storage is non-contiguous UTF-16.
-  func _encodeSomeNonContiguousUTF16AsUTF8(from i: Int) -> (Int, _UTF8Chunk) {
-    _sanityCheck(elementWidth == 2)
-    _sanityCheck(_baseAddress == nil)
-
-    let storage = _CollectionOf<Int, UInt16>(
-      _startIndex: 0, endIndex: self.count
-    ) {
-      (i: Int) -> UInt16 in
-      return _cocoaStringSubscript(self, i)
-    }
-    return _transcodeSomeUTF16AsUTF8(storage, i)
-  }
-#endif
 }
 
 extension String {

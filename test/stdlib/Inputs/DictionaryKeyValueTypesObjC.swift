@@ -23,8 +23,6 @@ func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   switch d._variantStorage {
   case .native:
     return true
-  case .cocoa:
-    return false
   }
 }
 

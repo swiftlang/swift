@@ -12,7 +12,7 @@
 
 /// The core implementation of a highly-optimizable String that
 /// can store both ASCII and UTF-16, and can wrap native Swift
-/// _StringBuffer or NSString instances.
+/// _StringBuffer or immutable literals.
 ///
 /// Usage note: when elements are 8 bits wide, this code may
 /// dereference one past the end of the byte array that it owns, so
@@ -28,13 +28,13 @@
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
-  public var _baseAddress: UnsafeMutableRawPointer?
+  public var _baseAddress: UnsafeMutableRawPointer
   var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
-    baseAddress: UnsafeMutableRawPointer?,
+    baseAddress: UnsafeMutableRawPointer,
     _countAndFlags: UInt,
     owner: AnyObject?
   ) {
@@ -51,25 +51,14 @@ public struct _StringCore {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(count >= 0)
 
-    if _baseAddress == nil {
-#if _runtime(_ObjC)
-      _sanityCheck(hasCocoaBuffer,
-        "Only opaque cocoa strings may have a null base pointer")
-#endif
-      _sanityCheck(elementWidth == 2,
-        "Opaque cocoa strings should have an elementWidth of 2")
-    }
-    else if _baseAddress == _emptyStringBase {
-      _sanityCheck(!hasCocoaBuffer)
+    if _baseAddress == _emptyStringBase {
       _sanityCheck(count == 0, "Empty string storage with non-zero count")
       _sanityCheck(_owner == nil, "String pointing at empty storage has owner")
-    }
-    else if let buffer = nativeBuffer {
-      _sanityCheck(!hasCocoaBuffer)
+    } else if let buffer = nativeBuffer {
       _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
-      _sanityCheck(_baseAddress! >= buffer.start)
-      _sanityCheck(_baseAddress! <= buffer.usedEnd)
+      _sanityCheck(_baseAddress >= buffer.start)
+      _sanityCheck(_baseAddress <= buffer.usedEnd)
       _sanityCheck(_pointer(toElementAt: count) <= buffer.usedEnd)
     }
 #endif
@@ -97,8 +86,8 @@ public struct _StringCore {
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
   func _pointer(toElementAt n: Int) -> UnsafeMutableRawPointer {
-    _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
-    return _baseAddress! + (n << elementShift)
+    _sanityCheck(n >= 0 && n <= count)
+    return _baseAddress + (n << elementShift)
   }
 
   static func _copyElements(
@@ -141,10 +130,9 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Initialization
   public init(
-    baseAddress: UnsafeMutableRawPointer?,
+    baseAddress: UnsafeMutableRawPointer,
     count: Int,
     elementShift: Int,
-    hasCocoaBuffer: Bool,
     owner: AnyObject?
   ) {
     _sanityCheck(elementShift == 0 || elementShift == 1)
@@ -152,7 +140,6 @@ public struct _StringCore {
 
     self._countAndFlags
       = (UInt(elementShift) << (UInt._sizeInBits - 1))
-      | ((hasCocoaBuffer ? 1 : 0) << (UInt._sizeInBits - 2))
       | UInt(count)
 
     self._owner = owner
@@ -166,7 +153,6 @@ public struct _StringCore {
       baseAddress: buffer.start,
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
-      hasCocoaBuffer: false,
       owner: buffer._anyObject
     )
   }
@@ -210,22 +196,9 @@ public struct _StringCore {
     return elementShift &+ 1
   }
 
-  public var hasContiguousStorage: Bool {
-#if _runtime(_ObjC)
-    return _fastPath(_baseAddress != nil)
-#else
-    return true
-#endif
-  }
-
-  /// Are we using an `NSString` for storage?
-  public var hasCocoaBuffer: Bool {
-    return Int((_countAndFlags << 1)._value) < 0
-  }
-
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
     _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
-    return _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self)
+    return _baseAddress.assumingMemoryBound(to: UTF8.CodeUnit.self)
   }
 
   /// True iff a contiguous ASCII buffer available.
@@ -237,7 +210,7 @@ public struct _StringCore {
     _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF-16")
-    return _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self)
+    return _baseAddress.assumingMemoryBound(to: UTF16.CodeUnit.self)
   }
 
   public var asciiBuffer: UnsafeMutableBufferPointer<UTF8.CodeUnit>? {
@@ -247,27 +220,14 @@ public struct _StringCore {
     return UnsafeMutableBufferPointer(start: startASCII, count: count)
   }
 
-  /// the native _StringBuffer, if any, or `nil`.
+  /// The native _StringBuffer, if any, or `nil`.
+  /// There isn't a nativeBuffer if pointing to the empty singleton,
+  /// or some literal in rodata.
   public var nativeBuffer: _StringBuffer? {
-    if !hasCocoaBuffer {
-      return _owner.map {
-        unsafeBitCast($0, to: _StringBuffer.self)
-      }
+    return _owner.map {
+      unsafeBitCast($0, to: _StringBuffer.self)
     }
-    return nil
   }
-
-#if _runtime(_ObjC)
-  /// the Cocoa String buffer, if any, or `nil`.
-  public var cocoaBuffer: _CocoaString? {
-    if hasCocoaBuffer {
-      return _owner.map {
-        unsafeBitCast($0, to: _CocoaString.self)
-      }
-    }
-    return nil
-  }
-#endif
 
   //===--------------------------------------------------------------------===//
   // slicing
@@ -285,17 +245,10 @@ public struct _StringCore {
     let newCount = bounds.upperBound - bounds.lowerBound
     _sanityCheck(UInt(newCount) & _flagMask == 0)
 
-    if hasContiguousStorage {
-      return _StringCore(
-        baseAddress: _pointer(toElementAt: bounds.lowerBound),
-        _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
-        owner: _owner)
-    }
-#if _runtime(_ObjC)
-    return _cocoaStringSlice(self, bounds)
-#else
-    _sanityCheckFailure("subscript: non-native string without objc runtime")
-#endif
+    return _StringCore(
+      baseAddress: _pointer(toElementAt: bounds.lowerBound),
+      _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
+      owner: _owner)
   }
 
   /// Get the Nth UTF-16 Code Unit stored.
@@ -326,14 +279,7 @@ public struct _StringCore {
         position <= count,
         "subscript: index points past String end")
 
-      if _fastPath(_baseAddress != nil) {
-        return _nthContiguous(position)
-      }
-#if _runtime(_ObjC)
-      return _cocoaStringSubscript(self, position)
-#else
-      _sanityCheckFailure("subscript: non-native string without objc runtime")
-#endif
+      return _nthContiguous(position)
     }
   }
 
@@ -342,38 +288,26 @@ public struct _StringCore {
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void)
   {
-    if _fastPath(_baseAddress != nil) {
-      if _fastPath(elementWidth == 1) {
-        for x in UnsafeBufferPointer(
-          start: _baseAddress!.assumingMemoryBound(to: UTF8.CodeUnit.self),
-          count: count
-        ) {
-          Encoding.encode(UnicodeScalar(x), into: processCodeUnit)
-        }
-      }
-      else {
-        let hadError = transcode(
-          UnsafeBufferPointer(
-            start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
-            count: count
-          ).makeIterator(),
-          from: UTF16.self,
-          to: encoding,
-          stoppingOnError: true,
-          into: processCodeUnit
-        )
-        _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
+    if _fastPath(elementWidth == 1) {
+      for x in UnsafeBufferPointer(
+        start: _baseAddress.assumingMemoryBound(to: UTF8.CodeUnit.self),
+        count: count
+      ) {
+        Encoding.encode(UnicodeScalar(x), into: processCodeUnit)
       }
     }
-    else if (hasCocoaBuffer) {
-#if _runtime(_ObjC)
-      _StringCore(
-        _cocoaStringToContiguous(
-          source: cocoaBuffer!, range: 0..<count, minimumCapacity: 0)
-      ).encode(encoding, into: processCodeUnit)
-#else
-      _sanityCheckFailure("encode: non-native string without objc runtime")
-#endif
+    else {
+      let hadError = transcode(
+        UnsafeBufferPointer(
+          start: _baseAddress.assumingMemoryBound(to: UTF16.CodeUnit.self),
+          count: count
+        ).makeIterator(),
+        from: UTF16.self,
+        to: encoding,
+        stoppingOnError: true,
+        into: processCodeUnit
+      )
+      _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
     }
   }
 
@@ -461,25 +395,10 @@ public struct _StringCore {
     let newStorage = _StringBuffer(capacity: newCapacity, initialSize: newSize,
                                    elementWidth: newElementWidth)
 
-    if hasContiguousStorage {
-      _StringCore._copyElements(
-        _baseAddress!, srcElementWidth: elementWidth,
-        dstStart: UnsafeMutableRawPointer(newStorage.start),
-        dstElementWidth: newElementWidth, count: oldCount)
-    }
-    else {
-#if _runtime(_ObjC)
-      // Opaque cocoa buffers might not store ASCII, so assert that
-      // we've allocated for 2-byte elements.
-      // FIXME: can we get Cocoa to tell us quickly that an opaque
-      // string is ASCII?  Do we care much about that edge case?
-      _sanityCheck(newStorage.elementShift == 1)
-      _cocoaStringReadAll(cocoaBuffer!,
-        newStorage.start.assumingMemoryBound(to: UTF16.CodeUnit.self))
-#else
-      _sanityCheckFailure("_copyInPlace: non-native string without objc runtime")
-#endif
-    }
+    _StringCore._copyElements(
+      _baseAddress, srcElementWidth: elementWidth,
+      dstStart: UnsafeMutableRawPointer(newStorage.start),
+      dstElementWidth: newElementWidth, count: oldCount)
 
     self = _StringCore(newStorage)
   }
@@ -540,20 +459,9 @@ public struct _StringCore {
     let destination = _growBuffer(
       count + rhs.count, minElementWidth: minElementWidth)
 
-    if _fastPath(rhs.hasContiguousStorage) {
-      _StringCore._copyElements(
-        rhs._baseAddress!, srcElementWidth: rhs.elementWidth,
-        dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
-    }
-    else {
-#if _runtime(_ObjC)
-      _sanityCheck(elementWidth == 2)
-      _cocoaStringReadAll(rhs.cocoaBuffer!,
-        destination.assumingMemoryBound(to: UTF16.CodeUnit.self))
-#else
-      _sanityCheckFailure("subscript: non-native string without objc runtime")
-#endif
-    }
+    _StringCore._copyElements(
+      rhs._baseAddress, srcElementWidth: rhs.elementWidth,
+      dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     _invariantCheck()
   }
 
@@ -562,15 +470,12 @@ public struct _StringCore {
   ///
   /// - Complexity: O(*n*) in the worst case.
   func isRepresentableAsASCII() -> Bool {
-    if _slowPath(!hasContiguousStorage) {
-      return false
-    }
     if _fastPath(elementWidth == 1) {
       return true
     }
     let unsafeBuffer =
       UnsafeBufferPointer(
-        start: _baseAddress!.assumingMemoryBound(to: UTF16.CodeUnit.self),
+        start: _baseAddress.assumingMemoryBound(to: UTF16.CodeUnit.self),
         count: count)
     return !unsafeBuffer.contains { $0 > 0x7f }
   }
@@ -623,7 +528,7 @@ extension _StringCore : RangeReplaceableCollection {
     // buffer.
     let appending = bounds.lowerBound == endIndex
 
-    let existingStorage = !hasCocoaBuffer && (
+    let existingStorage = (
       appending || isKnownUniquelyReferenced(&_owner)
     ) ? _claimCapacity(newCount, minElementWidth: width).1 : nil
 
@@ -674,16 +579,14 @@ extension _StringCore : RangeReplaceableCollection {
   }
 
   public mutating func reserveCapacity(_ n: Int) {
-    if _fastPath(!hasCocoaBuffer) {
-      if _fastPath(isKnownUniquelyReferenced(&_owner)) {
+    if _fastPath(isKnownUniquelyReferenced(&_owner)) {
 
-        let bounds: Range<UnsafeRawPointer>
-          = UnsafeRawPointer(_pointer(toElementAt:0))
-          ..< UnsafeRawPointer(_pointer(toElementAt:count))
+      let bounds: Range<UnsafeRawPointer>
+        = UnsafeRawPointer(_pointer(toElementAt:0))
+        ..< UnsafeRawPointer(_pointer(toElementAt:count))
 
-        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {
-          return
-        }
+      if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {
+        return
       }
     }
     _copyInPlace(

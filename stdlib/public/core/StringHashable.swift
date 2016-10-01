@@ -81,15 +81,9 @@ extension String : Hashable {
     // If we have a contiguous string then we can use the stack optimization.
     let core = self._core
     let isASCII = core.isASCII
-    if core.hasContiguousStorage {
-      let stackAllocated = _NSContiguousString(core)
-      return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
-        return _stdlib_NSStringHashValuePointer($0, isASCII)
-      }
-    } else {
-      let cocoaString = unsafeBitCast(
-        self._bridgeToObjectiveCImpl(), to: _NSStringCore.self)
-      return hashOffset ^ _stdlib_NSStringHashValue(cocoaString, isASCII)
+    let stackAllocated = _NSContiguousString(core)
+    return hashOffset ^ stackAllocated._unsafeWithNotEscapedSelfPointer {
+      return _stdlib_NSStringHashValuePointer($0, isASCII)
     }
 #else
     if let asciiBuffer = self._core.asciiBuffer {

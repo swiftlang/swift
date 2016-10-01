@@ -130,8 +130,6 @@ func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
   switch s._variantStorage {
   case .native:
     return true
-  case .cocoa:
-    return false
   }
 }
 
@@ -161,18 +159,20 @@ func isCocoaSet<T : Hashable>(_ s: Set<T>) -> Bool {
 }
 
 /// Get an NSSet of TestObjCKeyTy values
-func getAsNSSet(_ members: [Int] = [1010, 2020, 3030]) -> NSSet {
+func makeNSSet(whoseMembersBridgeTo m: [Int] = [1010, 2020, 3030]) -> NSSet {
   let nsArray = NSMutableArray()
-  for member in members {
+  for member in m {
     nsArray.add(TestObjCKeyTy(member))
   }
   return NSMutableSet(array: nsArray as [AnyObject])
 }
 
 /// Get an NSMutableSet of TestObjCKeyTy values
-func getAsNSMutableSet(_ members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
+func makeNSMutableSet(
+  whoseMembersBridgeTo m: [Int] = [1010, 2020, 3030]
+) -> NSMutableSet {
   let nsArray = NSMutableArray()
-  for member in members {
+  for member in m {
     nsArray.add(TestObjCKeyTy(member))
   }
   return NSMutableSet(array: nsArray as [AnyObject])
@@ -192,7 +192,7 @@ public func convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
-  let nss = getAsNSSet(members)
+  let nss = makeNSSet(whoseMembersBridgeTo: members)
   let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
@@ -208,7 +208,7 @@ func getNativeBridgedVerbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getHugeBridgedVerbatimSet() -> Set<NSObject> {
-  let nss = getAsNSSet(hugeNumberArray)
+  let nss = makeNSSet(whoseMembersBridgeTo: hugeNumberArray)
   let result: Set<NSObject> = convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
@@ -217,7 +217,7 @@ func getHugeBridgedVerbatimSet() -> Set<NSObject> {
 /// Get a Set<TestBridgedKeyTy> backed by native storage
 func getBridgedNonverbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
   Set<TestBridgedKeyTy> {
-  let nss = getAsNSSet(members)
+  let nss = makeNSSet(whoseMembersBridgeTo: members)
   let _ = unsafeBitCast(nss, to: Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
@@ -227,7 +227,7 @@ func getBridgedNonverbatimSet(_ members: [Int] = [1010, 2020, 3030]) ->
 
 /// Get a larger Set<TestBridgedKeyTy> backed by native storage
 func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
-  let nss = getAsNSSet(hugeNumberArray)
+  let nss = makeNSSet(whoseMembersBridgeTo: hugeNumberArray)
   let _ = unsafeBitCast(nss, to: Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
@@ -236,13 +236,13 @@ func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
 }
 
 func getBridgedVerbatimSetAndNSMutableSet() -> (Set<NSObject>, NSMutableSet) {
-  let nss = getAsNSMutableSet()
+  let nss = makeNSMutableSet()
   return (convertNSSetToSet(nss), nss)
 }
 
 func getBridgedNonverbatimSetAndNSMutableSet()
     -> (Set<TestBridgedKeyTy>, NSMutableSet) {
-  let nss = getAsNSMutableSet()
+  let nss = makeNSMutableSet()
   return (Swift._forceBridgeFromObjectiveC(nss, Set.self), nss)
 }
 
@@ -1153,7 +1153,9 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
 
   var collisionChains = pickRandom(collisionChainsChoices)
   var chainOverlap = pickRandom(chainOverlapChoices)
-  print("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
+  print(
+    "chose parameters: collisionChains=\(collisionChains)"
+    + " chainLength=\(chainOverlap)")
 
   let chainLength = 7
 
@@ -1211,12 +1213,13 @@ class CustomImmutableNSSet : NSSet {
 
   override func member(_ object: Any) -> Any? {
     CustomImmutableNSSet.timesMemberWasCalled += 1
-    return getAsNSSet([ 1010, 1020, 1030 ]).member(object)
+    return makeNSSet(whoseMembersBridgeTo: [ 1010, 1020, 1030 ]).member(object)
   }
 
   override func objectEnumerator() -> NSEnumerator {
     CustomImmutableNSSet.timesObjectEnumeratorWasCalled += 1
-    return getAsNSSet([ 1010, 1020, 1030 ]).objectEnumerator()
+    return makeNSSet(
+      whoseMembersBridgeTo: [ 1010, 1020, 1030 ]).objectEnumerator()
   }
 
   override var count: Int {
@@ -1259,7 +1262,8 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.SetIsCopied") {
 
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
-  var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
+  var nss: NSSet = NSSet(
+    set: makeNSSet(whoseMembersBridgeTo: [ 1010, 1020, 1030 ]))
 
   var s: Set<NSObject> = convertNSSetToSet(nss)
 
@@ -1275,7 +1279,8 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.NSSetIsRetained") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.NSSetIsCopied") {
-  var nss: NSSet = NSSet(set: getAsNSSet([ 1010, 1020, 1030 ]))
+  var nss: NSSet = NSSet(set:
+    makeNSSet(whoseMembersBridgeTo: [ 1010, 1020, 1030 ]))
 
   var s: Set<TestBridgedKeyTy> = convertNSSetToSet(nss)
 
@@ -2117,7 +2122,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([1 + i,  2 + i, 3 + i]))
+        makeNSSet(whoseMembersBridgeTo: [1 + i,  2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<NSObject>]
@@ -2138,7 +2143,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   var nsa = NSMutableArray()
   for i in 0..<3 {
     nsa.add(
-        getAsNSSet([1 + i, 2 + i, 3 + i]))
+        makeNSSet(whoseMembersBridgeTo: [1 + i, 2 + i, 3 + i]))
   }
 
   var a = nsa as [AnyObject] as! [Set<TestBridgedKeyTy>]
@@ -2190,14 +2195,20 @@ SetTestSuite.test("BridgedToObjC.Verbatim.Contains") {
   expectNil(s.member(TestObjCInvalidKeyTy()))
 
   for i in 0..<3 {
-    expectEqual(idValue10,
-      unsafeBitCast(s.member(TestObjCKeyTy(1010)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue10,
+      unsafeBitCast(
+        s.member(TestObjCKeyTy(1010)).map { $0 as AnyObject }, to: UInt.self))
 
-    expectEqual(idValue20,
-      unsafeBitCast(s.member(TestObjCKeyTy(2020)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue20,
+      unsafeBitCast(
+        s.member(TestObjCKeyTy(2020)).map { $0 as AnyObject }, to: UInt.self))
 
-    expectEqual(idValue30,
-      unsafeBitCast(s.member(TestObjCKeyTy(3030)).map { $0 as AnyObject }, to: UInt.self))
+    expectEqual(
+      idValue30,
+      unsafeBitCast(
+        s.member(TestObjCKeyTy(3030)).map { $0 as AnyObject }, to: UInt.self))
   }
 
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
@@ -2215,7 +2226,8 @@ SetTestSuite.test("BridgingRoundtrip") {
   expectTrue(equalsUnordered([1010, 2020, 3030], items))
 }
 
-SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+SetTestSuite.test(
+  "BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
   let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
   checkSetFastEnumerationFromSwift(
@@ -2226,7 +2238,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
-SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+SetTestSuite.test(
+  "BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
   let s = getBridgedNSSetOfRefTypesBridgedVerbatim()
 
   checkSetFastEnumerationFromObjC(
@@ -2237,7 +2250,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFr
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
-SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
+SetTestSuite.test(
+  "BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
   let s = getBridgedEmptyNSSet()
 
   checkSetFastEnumerationFromSwift(
@@ -2249,7 +2263,8 @@ SetTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty
     { ($0 as! TestObjCKeyTy).value })
 }
 
-SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+SetTestSuite.test(
+  "BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
   let s = getBridgedNSSet_MemberTypesCustomBridged()
 
   checkSetFastEnumerationFromObjC(
@@ -2260,7 +2275,8 @@ SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFrom
   expectAutoreleasedKeysAndValues(unopt: (3, 0))
 }
 
-SetTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+SetTestSuite.test(
+  "BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
   let s = getBridgedNSSet_MemberTypesCustomBridged()
 
   checkSetFastEnumerationFromSwift(
@@ -2583,7 +2599,9 @@ SetTestSuite.test("SetDowncastConditional") {
   }
 
   // Unsuccessful downcast
-  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb" as NSString)
+  s.insert(
+    "Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb"
+    as NSString)
   if let sCC = s as? Set<TestObjCKeyTy> {
     expectTrue(false)
   }
@@ -2639,7 +2657,8 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Successful downcast.
-  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  if let sVC = _setBridgeFromObjectiveCConditional(s)
+  as Set<TestBridgedKeyTy>? {
     expectEqual(3, sVC.count)
     expectTrue(sVC.contains(TestBridgedKeyTy(1010)))
     expectTrue(sVC.contains(TestBridgedKeyTy(2020)))
@@ -2649,8 +2668,11 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditionalEntryPoint") {
   }
 
   // Unsuccessful downcasts
-  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb" as NSString)
-  if let sVC = _setBridgeFromObjectiveCConditional(s) as Set<TestBridgedKeyTy>? {
+  s.insert(
+    "Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb"
+    as NSString)
+  if let sVC = _setBridgeFromObjectiveCConditional(s)
+  as Set<TestBridgedKeyTy>? {
     expectTrue(false)
   }
 }
@@ -2682,7 +2704,9 @@ SetTestSuite.test("SetBridgeFromObjectiveCConditional") {
   }
 
   // Unsuccessful downcasts
-  s.insert("Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb" as NSString)
+  s.insert(
+    "Hello, world, I'm your wild girl. I'm your ch-ch-ch-ch-ch-ch cherry bomb"
+    as NSString)
   if let sCm = s as? Set<TestObjCKeyTy> {
     expectTrue(false)
   }
@@ -3344,8 +3368,10 @@ SetTestSuite.test("symmetricDifference") {
   expectEqual(s1.symmetricDifference(s2),
     s1.union(s2).intersection(universe.subtracting(s1.intersection(s2))))
 
-  expectEqual(s1.symmetricDifference(s2),
-    s1.intersection(universe.subtracting(s2)).union(universe.subtracting(s1).intersection(s2)))
+  expectEqual(
+    s1.symmetricDifference(s2),
+    s1.intersection(universe.subtracting(s2))
+      .union(universe.subtracting(s1).intersection(s2)))
 
   expectTrue(s1.symmetricDifference(s1).isEmpty)
 }
@@ -3539,7 +3565,8 @@ class MockSetWithCustomCount : NSSet {
 
   override func objectEnumerator() -> NSEnumerator {
     expectUnreachable()
-    return getAsNSSet([1010, 1020, 1030]).objectEnumerator()
+    return makeNSSet(whoseMembersBridgeTo: [1010, 1020, 1030])
+           .objectEnumerator()
   }
 
   override var count: Int {
@@ -3730,8 +3757,10 @@ SetTestSuite.test("Hashable") {
   checkHashable([s1, s2], equalityOracle: { $0 == $1 })
 
   // Explicit types help the type checker quite a bit.
-  let ss1 = Set([Set([1010] as [Int]), Set([2020] as [Int]), Set([3030] as [Int])])
-  let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
+  let ss1 = Set(
+    [Set([1010] as [Int]), Set([2020] as [Int]), Set([3030] as [Int])])
+  let ss11 = Set(
+    [Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
   checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
 }
@@ -3797,7 +3826,8 @@ SetTestSuite.test("mutationDoesNotAffectIterator/remove,all") {
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
-SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
+SetTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
   var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: false)
@@ -3805,7 +3835,8 @@ SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=false
   expectEqualsUnordered([1010, 1020, 1030], Array(IteratorSequence(iter)))
 }
 
-SetTestSuite.test("mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
+SetTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
   var set = Set([1010, 1020, 1030])
   var iter = set.makeIterator()
   set.removeAll(keepingCapacity: true)

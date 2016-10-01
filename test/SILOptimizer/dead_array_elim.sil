@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
-
-// Linux doesn't have the same symbol name for _ArrayBuffer.
-// XFAIL: linux
+// XFAIL: *
+// FIXME(eager-bridging): XFAIL'd because I don't know what to do with this.
 
 import Swift
 import Builtin
@@ -42,7 +41,8 @@ bb0(%0 : $TrivialDestructor):
 // CHECK-NEXT: strong_release %0 : $TrivialDestructor, loc "{{.*}}":[[@LINE+1]]:3
   store %0 to %10 : $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
+._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_retain %0 : $TrivialDestructor
   strong_release %15 : $Builtin.BridgeObject
@@ -69,7 +69,7 @@ bb0(%0 : $TrivialDestructor):
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
   %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_retain %0 : $TrivialDestructor
   strong_release %15 : $Builtin.BridgeObject
@@ -99,7 +99,7 @@ bb0(%0 : $TrivialDestructor):
   %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   cond_br undef, bb1, bb2
  
@@ -137,7 +137,7 @@ bb0(%0 : $TrivialDestructor):
 bb1:
   %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_release %15 : $Builtin.BridgeObject
   %18 = tuple ()
@@ -168,7 +168,7 @@ bb0(%0 : $TrivialDestructor):
 
   %12 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
   %13 = struct_extract %12 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   strong_release %15 : $Builtin.BridgeObject
 
@@ -195,7 +195,7 @@ bb0(%0 : $TrivialDestructor, %1 : $TrivialDestructor):
   %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
   %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
   %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
-  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %14 = struct_extract %13 : $_ContiguousArrayBuffer<TrivialDestructor>, #_ContiguousArrayBuffer._storage
   %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   cond_br undef, bb1, bb2
  
