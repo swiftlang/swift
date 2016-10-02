@@ -1145,22 +1145,6 @@ public:
 
 namespace importer {
 
-/// Add the given named declaration as an entry to the given Swift name
-/// lookup table, including any of its child entries.
-void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
-                           importer::NameImporter &);
-
-/// Add the macros from the given Clang preprocessor to the given
-/// Swift name lookup table.
-void addMacrosToLookupTable(clang::ASTContext &clangCtx,
-                            clang::Preprocessor &pp, SwiftLookupTable &table,
-                            ASTContext &SwiftContext);
-
-/// Finalize a lookup table, handling any as-yet-unresolved entries
-/// and emitting diagnostics if necessary.
-void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
-                         SwiftLookupTable &table, ASTContext &SwiftContext);
-
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 

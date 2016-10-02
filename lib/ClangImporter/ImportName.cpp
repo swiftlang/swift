@@ -1619,16 +1619,16 @@ bool ClangImporter::shouldIgnoreMacro(StringRef Name,
   return ::shouldIgnoreMacro(Name, Macro);
 }
 
-Identifier importer::importMacroName(
-    const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
-    clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
+Identifier
+NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
+                              const clang::MacroInfo *macro) {
   // If we're supposed to ignore this macro, return an empty identifier.
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
   // No transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
-  return SwiftContext.getIdentifier(name);
+  return swiftCtx.getIdentifier(name);
 }
 
 /// Determine the Swift name for a clang decl
