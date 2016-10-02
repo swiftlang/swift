@@ -7,8 +7,8 @@
 
 // Check that type metadata defined inside extensions of files imported from
 // other modules is emitted properly and there no linking errors.
-// In particular, it shoud be possible to define types inside extensions of
-// types importted from Foundation (rdar://problem/27245620).
+// In particular, it should be possible to define types inside extensions of
+// types imported from Foundation (rdar://problem/27245620).
 
 import Foundation
 

@@ -230,7 +230,7 @@ compiler only knows that a file *has* changed and not *what* changed, it's
 possible that the driver will start off assuming that some file won't need to
 be recompiled, and then discover later on that it should be. This means that
 it's not possible to use classic build models like Makefiles to make builds
-incremental, because Makefiles don't accomodate dependency graph changes during
+incremental, because Makefiles don't accommodate dependency graph changes during
 the build.
 
 Only the "frontend" tasks are considered skippable; module-merging and linking
