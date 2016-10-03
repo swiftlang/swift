@@ -357,12 +357,15 @@ endfunction()
 #
 # Usage:
 #   _add_swift_lipo_target(
+#     sdk                 # The name of the SDK the target was created for.
+#                         # Examples include "OSX", "IOS", "ANDROID", etc.
 #     target              # The name of the target to create
 #     output              # The file to be created by this target
 #     source_targets...   # The source targets whose outputs will be
 #                         # lipo'd into the output.
 #   )
-function(_add_swift_lipo_target target output)
+function(_add_swift_lipo_target sdk target output)
+  precondition(sdk MESSAGE "sdk is required")
   precondition(target MESSAGE "target is required")
   precondition(output MESSAGE "output is required")
 
@@ -381,7 +384,8 @@ function(_add_swift_lipo_target target output)
     endif()
   endforeach()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
         COMMAND "${LIPO}" "-create" "-output" "${output}" ${source_binaries}
@@ -1456,6 +1460,7 @@ function(add_swift_library name)
         endif()
         
         _add_swift_lipo_target(
+            ${sdk}
             ${lipo_target}${unsigned}
             "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
             ${THIN_INPUT_TARGETS})
@@ -1518,6 +1523,7 @@ function(add_swift_library name)
           set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
           _add_swift_lipo_target(
+              ${sdk}
               ${lipo_target_static}
               "${UNIVERSAL_LIBRARY_NAME}"
               ${THIN_INPUT_TARGETS_STATIC})
