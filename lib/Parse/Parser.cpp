@@ -438,7 +438,7 @@ void Parser::skipUntilAnyOperator() {
 /// of generic parameters, generic arguments, or list of types in a protocol
 /// composition.
 SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
-  SourceLoc lastLoc = Tok.getLoc();
+  SourceLoc lastLoc = PreviousLoc;
   while (true) {
     switch (Tok.getKind()) {
     case tok::eof:
@@ -473,8 +473,8 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
       
       break;
     }
-    lastLoc = Tok.getLoc();
     skipSingle();
+    lastLoc = PreviousLoc;
   }
 }
 
