@@ -5856,6 +5856,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::RawRepresentable:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
+  case KnownProtocolKind::CaseIterable:
   case KnownProtocolKind::Comparable:
   case KnownProtocolKind::ObjectiveCBridgeable:
   case KnownProtocolKind::DestructorSafeContainer:
