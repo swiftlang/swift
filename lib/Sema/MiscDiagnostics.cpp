@@ -3707,8 +3707,33 @@ static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
               .highlight(subExpr->getSourceRange())
               .fixItInsertAfter(subExpr->getEndLoc(), " as Any");
         }
-      }
+      } else if (auto *literal = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+        // Warn about interpolated segments that contain optionals.
+        for (auto &segment : literal->getSegments()) {
+          // Allow explicit casts.
+          if (isa<ExplicitCastExpr>(segment)) {
+            continue;
+          }
 
+          auto segmentTy = segment->getType();
+          if (segmentTy && !segmentTy->getOptionalObjectType().isNull()) {
+            TC.diagnose(segment->getStartLoc(),
+                        diag::optional_in_string_interpolation_segment)
+                .highlight(segment->getSourceRange());
+
+            TC.diagnose(segment->getLoc(),
+                        diag::silence_optional_in_interpolation_segment)
+              .highlight(segment->getSourceRange())
+              .fixItInsertAfter(segment->getEndLoc(), ".debugDescription");
+            TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+              .highlight(segment->getSourceRange())
+            	.fixItInsertAfter(segment->getEndLoc(), " ?? <#default value#>");
+            TC.diagnose(segment->getLoc(), diag::force_optional_to_any)
+              .highlight(segment->getSourceRange())
+              .fixItInsertAfter(segment->getEndLoc(), "!");
+          }
+        }
+      }
       return { true, E };
     }
 
