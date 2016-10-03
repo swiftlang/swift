@@ -554,12 +554,6 @@ public:
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
-  /// Retrieve the complete set of generic arguments for a specialized type.
-  ///
-  /// \param scratch Scratch space to use when the complete list needs to be
-  /// stitched together from multiple lists of generic arguments.
-  ArrayRef<Type> getAllGenericArgs(SmallVectorImpl<Type> &scratch);
-
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
   ///
