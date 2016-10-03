@@ -3972,6 +3972,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
+      StaticSpelling = StaticSpellingKind::None;
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
@@ -4346,6 +4347,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
+      StaticSpelling = StaticSpellingKind::None;
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass) {
