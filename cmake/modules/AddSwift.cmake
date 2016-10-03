@@ -125,23 +125,22 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-fms-compatibility-version=1900")
   endif()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    
+  if(IS_DARWIN)
     # Check if there's a specific iOS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
     endif()
-    
+
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
       set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
     endif()
-    
+
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
   endif()
-      
+
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
@@ -241,7 +240,8 @@ function(_add_variant_swift_compile_flags
       "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
       "-resource-dir" "${SWIFTLIB_DIR}")
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND result
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
   endif()
@@ -1688,7 +1688,8 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
