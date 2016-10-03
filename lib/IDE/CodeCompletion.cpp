@@ -5377,9 +5377,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
+        auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{ModuleFilename, TheModule->getName().str(),
                                    AccessPath, Request.NeedLeadingDot,
-                                   SF.hasTestableImport(TheModule)};
+                                   SF.hasTestableImport(TheModule),
+                                   Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
         std::pair<decltype(ImportsSeen)::iterator, bool>
         Result = ImportsSeen.insert(K);
         if (!Result.second)
