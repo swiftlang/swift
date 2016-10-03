@@ -43,48 +43,6 @@ func _stdlib_binary_CFStringGetCharactersPtr(
   return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Loading Foundation initializes these function variables
-/// with useful values
-
-/// Produces a `_StringBuffer` from a given subrange of a source
-/// `_CocoaString`, having the given minimum capacity.
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-internal func _cocoaStringToContiguous(
-  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
-) -> _StringBuffer {
-  // FIXME(eager-bridging): I don't understand what this check was really for,
-  // but it seems important! Currently we're tripping it when running tests.
-  // _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
-  //  "Known contiguously stored strings should already be converted to Swift")
-
-  let startIndex = range.lowerBound
-  let count = range.upperBound - startIndex
-
-  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
-                             initialSize: count, elementWidth: 2)
-
-  _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(location: startIndex, length: count), 
-    buffer.start.assumingMemoryBound(to: _swift_shims_UniChar.self))
-  
-  return buffer
-}
-
-/// Reads the entire contents of a _CocoaString into contiguous
-/// storage of sufficient capacity.
-@inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-internal func _cocoaStringReadAll(
-  _ source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
-) {
-  _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(
-      location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
-}
-
-//
-// Conversion from NSString to Swift's native representation
-//
-
 internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   return 0x0600
 }
@@ -93,6 +51,8 @@ extension String {
   @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
+    // If the NSString is actually a Swift String in disguise, 
+    // we can just copy out the internal repr.
     if let wrapped = _cocoaString as? _NSContiguousString {
       self._core = wrapped._core
       return
@@ -100,15 +60,43 @@ extension String {
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
-    // just does a retain.
+    // just does a retain. Even though we're unconditionally copying the bits
+    // into a new allocation, this is necessary to avoid races if others 
+    // are trying to mutate it.
     let cfImmutableValue
       = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
 
     let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
-    self._core = _StringCore(
-      _cocoaStringToContiguous(
-        source: cfImmutableValue, range: 0..<length, minimumCapacity: 0))
+    // Look first for null-terminated ASCII
+    // Note: the code in clownfish appears to guarantee
+    // nul-termination, but I'm waiting for an answer from Chris Kane
+    // about whether we can count on it for all time or not.
+    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+      cfImmutableValue, kCFStringEncodingASCII)
+
+    let isUTF16 = (nulTerminatedASCII == nil)
+    let buffer = _StringBuffer(capacity: length, 
+                               initialSize: length, 
+                               elementWidth: isUTF16 ? 2 : 1)
+
+    if isUTF16 {
+      // If we aren't ascii, ask the NSString to copy itself into our buffer
+      // let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+      // FIXME(eager-bridging): is the range variant or the non-range variant
+      // more effecient, assuming we've already computed the length?
+      _swift_stdlib_CFStringGetCharacters(
+        cfImmutableValue, 
+        _swift_shims_CFRange(location: 0, length: length), 
+        buffer.start.assumingMemoryBound(to: _swift_shims_UniChar.self))
+    } else {
+      // If we are ascii, as an optimization just emit a direct memcpy
+      // FIXME(eager-bridging): double check nul-terminator is being set.
+      // (is the nul-termintor part of the "length" GetLength reports?)
+      buffer.start.copyBytes(from: nulTerminatedASCII!, count: length)
+    }
+
+    self._core = _StringCore(buffer)
   }
 }
 
