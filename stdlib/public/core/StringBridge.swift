@@ -58,22 +58,11 @@ extension String {
       return
     }
 
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
-    // just does a retain. Even though we're unconditionally copying the bits
-    // into a new allocation, this is necessary to avoid races if others 
-    // are trying to mutate it.
-    let cfImmutableValue
-      = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
-
-    let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
+    let length = _swift_stdlib_CFStringGetLength(_cocoaString)
 
     // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
     let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
+      _cocoaString, kCFStringEncodingASCII)
 
     let isUTF16 = (nulTerminatedASCII == nil)
     let buffer = _StringBuffer(capacity: length, 
@@ -86,13 +75,13 @@ extension String {
       // FIXME(eager-bridging): is the range variant or the non-range variant
       // more effecient, assuming we've already computed the length?
       _swift_stdlib_CFStringGetCharacters(
-        cfImmutableValue, 
+        _cocoaString, 
         _swift_shims_CFRange(location: 0, length: length), 
         buffer.start.assumingMemoryBound(to: _swift_shims_UniChar.self))
     } else {
       // If we are ascii, as an optimization just emit a direct memcpy
       // FIXME(eager-bridging): double check nul-terminator is being set.
-      // (is the nul-termintor part of the "length" GetLength reports?)
+      // (is the nul-terminator part of the "length" GetLength reports?)
       buffer.start.copyBytes(from: nulTerminatedASCII!, count: length)
     }
 
@@ -106,22 +95,12 @@ extension String {
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
+//
+// Implementors should provide:
+// * func length() -> Int
+// * func characterAtIndex(_ index: Int) -> UInt16
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
 public class _SwiftNativeNSString {}
-
-@objc
-public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
-
-  // The following methods should be overridden when implementing an
-  // NSString subclass.
-
-  func length() -> Int
-
-  func characterAtIndex(_ index: Int) -> UInt16
-
-  // We also override the following methods for efficiency.
-}
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
 public final class _NSContiguousString : _SwiftNativeNSString {
