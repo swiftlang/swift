@@ -705,57 +705,6 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       params.push_back(genericParam);
       break;
     }
-    case GENERIC_REQUIREMENT: {
-      uint8_t rawKind;
-      uint64_t rawTypeIDs[2];
-      GenericRequirementLayout::readRecord(scratch, rawKind,
-                                           rawTypeIDs[0], rawTypeIDs[1]);
-
-      switch (rawKind) {
-      case GenericRequirementKind::Conformance: {
-        auto subject = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
-        auto constraint = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
-
-        requirements.push_back(RequirementRepr::getTypeConstraint(subject,
-                                                           SourceLoc(),
-                                                           constraint));
-        break;
-      }
-      case GenericRequirementKind::SameType: {
-        auto first = TypeLoc::withoutLoc(getType(rawTypeIDs[0]));
-        auto second = TypeLoc::withoutLoc(getType(rawTypeIDs[1]));
-
-        requirements.push_back(RequirementRepr::getSameType(first,
-                                                            SourceLoc(),
-                                                            second));
-        break;
-      }
-
-      case GenericRequirementKind::Superclass:
-      case WitnessMarker: {
-        // Shouldn't happen where we have requirement representations.
-        error();
-        break;
-      }
-
-      default:
-        // Unknown requirement kind. Drop the requirement and continue, but log
-        // an error so that we don't actually try to generate code.
-        error();
-      }
-
-      requirements.back().setAsWrittenString(blobData);
-
-      break;
-    }
-    case LAST_GENERIC_REQUIREMENT:
-      // Read the end-of-requirements record.
-      uint8_t dummy;
-      LastGenericRequirementLayout::readRecord(scratch, dummy);
-      lastRecordOffset.reset();
-      shouldContinue = false;
-      break;
-
     default:
       // This record is not part of the GenericParamList.
       shouldContinue = false;
@@ -767,7 +716,7 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   }
 
   auto paramList = GenericParamList::create(getContext(), SourceLoc(),
-                                            params, SourceLoc(), requirements,
+                                            params, SourceLoc(), { },
                                             SourceLoc());
   paramList->setOuterParameters(outerParams ? outerParams :
                                 DC->getGenericParamsOfContext());

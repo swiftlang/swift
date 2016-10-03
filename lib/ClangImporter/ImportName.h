@@ -19,9 +19,14 @@
 
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "clang/Sema/Sema.h"
+
+// TODO: remove when we drop import name options
+#include "clang/AST/Decl.h"
 
 namespace swift {
 namespace importer {
@@ -146,6 +151,7 @@ enum class ImportNameFlags {
   /// Produce the Swift 2 name of the given entity.
   Swift2Name = 0x02,
 };
+enum { NumImportNameFlags = 2 };
 
 /// Options that control the import of names in importFullName.
 typedef OptionSet<ImportNameFlags> ImportNameOptions;
@@ -157,31 +163,50 @@ class NameImporter {
   ASTContext &swiftCtx;
   const PlatformAvailability &availability;
 
-  // FIXME: host an enumInfo ourselves, rather than a reference to the Impl's.
-  EnumInfoCache &enumInfoCache;
-
+  clang::Sema &clangSema;
+  EnumInfoCache enumInfos;
   StringScratchSpace scratch;
 
   const bool inferImportAsMember;
 
-  // TODO: cache values
+  // TODO: remove when we drop the options (i.e. import all names)
+  using CacheKeyType =
+      llvm::PointerIntPair<const clang::NamedDecl *, NumImportNameFlags>;
+
+  /// Cache for repeated calls
+  llvm::DenseMap<CacheKeyType, ImportedName> importNameCache;
 
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               EnumInfoCache &enumCache, bool inferIAM)
-      : swiftCtx(ctx), availability(avail), enumInfoCache(enumCache),
+               clang::Sema &cSema, bool inferIAM)
+      : swiftCtx(ctx), availability(avail), clangSema(cSema),
+        enumInfos(swiftCtx, clangSema.getPreprocessor()),
         inferImportAsMember(inferIAM) {}
 
   /// Determine the Swift name for a clang decl
-  ImportedName importFullName(const clang::NamedDecl *,
-                              clang::Sema &clangSema, // :-(
-                              ImportNameOptions options);
+  ImportedName importName(const clang::NamedDecl *decl,
+                          ImportNameOptions options);
 
   ASTContext &getContext() { return swiftCtx; }
-
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
 
+  Identifier getIdentifier(StringRef name) {
+    return swiftCtx.getIdentifier(name);
+  }
+
+  StringScratchSpace &getScratch() { return scratch; }
+
   bool isInferImportAsMember() const { return inferImportAsMember; }
+
+  EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return enumInfos.getEnumInfo(decl);
+  }
+  EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return enumInfos.getEnumKind(decl);
+  }
+
+  clang::Sema &getClangSema() { return clangSema; }
+  clang::ASTContext &getClangContext() { return getClangSema().getASTContext(); }
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
@@ -218,7 +243,11 @@ private:
                                                   const clang::DeclContext *,
                                                   ImportNameOptions options,
                                                   clang::Sema &clangSema);
+
+  ImportedName importNameImpl(const clang::NamedDecl *,
+                              ImportNameOptions options);
 };
+
 }
 }
 

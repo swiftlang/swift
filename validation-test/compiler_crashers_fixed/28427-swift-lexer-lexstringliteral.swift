@@ -5,13 +5,6 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-protocol A{
-typealias e protocol P{
-var d:e
-class A{
-let a={enum k:P{
-{
-}
-typealias e:a
+struct c:protocol<{"

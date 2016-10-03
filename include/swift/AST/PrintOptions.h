@@ -16,6 +16,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include "llvm/ADT/Optional.h"
 #include <limits.h>
 #include <vector>
 
@@ -31,32 +32,21 @@ class DeclContext;
 class Type;
 class ModuleDecl;
 enum DeclAttrKind : unsigned;
-class PrinterTypeTransformer;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
-  Type getTypeBase();
-  NominalTypeDecl *getNominal();
-  PrinterTypeTransformer *getTransformer();
-  bool isPrintingSynthesizedExtension();
-  bool isPrintingTypeInterface();
-  TypeTransformContext(PrinterTypeTransformer *Transformer);
-  TypeTransformContext(PrinterTypeTransformer *Transformer,
-                            Type T);
-  TypeTransformContext(PrinterTypeTransformer *Transformer,
-                            NominalTypeDecl *NTD,
-                            SynthesizedExtensionAnalyzer *Analyzer);
-  Type transform(Type Input);
-  StringRef transform(StringRef Input);
+  TypeBase *BaseType;
+  NominalTypeDecl *Nominal = nullptr;
 
-  bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
+  explicit TypeTransformContext(Type T);
+  explicit TypeTransformContext(NominalTypeDecl* NTD);
 
-  ~TypeTransformContext();
-private:
-  struct Implementation;
-  Implementation &Impl;
+  Type getTypeBase() const;
+  NominalTypeDecl *getNominal() const;
+
+  bool isPrintingSynthesizedExtension() const;
 };
 
 typedef std::pair<ExtensionDecl*, bool> ExtensionAndIsSynthesized;
@@ -195,6 +185,10 @@ struct PrintOptions {
   /// \brief Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
+
+  /// \brief Print a dynamic Self type as its underlying type, rather than
+  /// the keyword `Self`.
+  bool StripDynamicSelf = false;
 
   /// \brief If true, the printer will explode a pattern like this:
   /// \code
@@ -350,7 +344,7 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// \brief The information for converting archetypes to specialized types.
-  std::shared_ptr<TypeTransformContext> TransformContext;
+  llvm::Optional<TypeTransformContext> TransformContext;
 
   /// \brief If this is not \c nullptr then functions (including accessors and
   /// constructors) will be printed with a body that is determined by this
@@ -413,16 +407,15 @@ struct PrintOptions {
     return result;
   }
 
-  static PrintOptions printTypeInterface(Type T, DeclContext *DC);
+  static PrintOptions printTypeInterface(Type T);
 
-  void setArchetypeSelfTransform(Type T, DeclContext *DC);
+  void setArchetypeSelfTransform(Type T);
 
-  void setArchetypeSelfTransformForQuickHelp(Type T, DeclContext *DC);
+  void setArchetypeSelfTransformForQuickHelp(Type T);
 
-  void setArchetypeAndDynamicSelfTransform(Type T, DeclContext *DC);
+  void setArchetypeAndDynamicSelfTransform(Type T);
 
-  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D,
-                                    SynthesizedExtensionAnalyzer *SynAnalyzer);
+  void initArchetypeTransformerForSynthesizedExtensions(NominalTypeDecl *D);
 
   void clearArchetypeTransformerForSynthesizedExtensions();
 

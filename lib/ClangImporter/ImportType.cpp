@@ -1628,11 +1628,9 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 }
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
-                      ASTContext &SwiftContext, EnumInfoCache &enumInfoCache,
-                      clang::Preprocessor &pp, clang::QualType type,
-                      OptionalTypeKind clangOptionality, Identifier baseName,
-                      unsigned numParams, StringRef argumentLabel,
-                      bool isFirstParameter, bool isLastParameter) {
+    clang::QualType type, OptionalTypeKind clangOptionality,
+    Identifier baseName, unsigned numParams, StringRef argumentLabel,
+    bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
   // Don't introduce a default argument for setters with only a single
   // parameter.
   if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
@@ -1662,8 +1660,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    if (enumInfoCache.getEnumKind(SwiftContext, enumTy->getDecl(), pp) ==
-        EnumKind::Options) {
+    if (nameImporter.getEnumKind(enumTy->getDecl()) == EnumKind::Options) {
       auto enumName = enumTy->getDecl()->getName();
       for (auto word : reversed(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
@@ -2035,10 +2032,9 @@ Type ClangImporter::Implementation::importMethodType(
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
 
       auto defaultArg = inferDefaultArgument(
-          SwiftContext, enumInfoCache, getClangPreprocessor(), param->getType(),
-          optionalityOfParam, methodName.getBaseName(), numEffectiveParams,
-          name.empty() ? StringRef() : name.str(), paramIndex == 0,
-          isLastParameter);
+          param->getType(), optionalityOfParam, methodName.getBaseName(),
+          numEffectiveParams, name.empty() ? StringRef() : name.str(),
+          paramIndex == 0, isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
     }

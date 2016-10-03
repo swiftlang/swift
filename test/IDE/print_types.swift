@@ -110,8 +110,8 @@ protocol QuxProtocol { associatedtype Qux }
 struct GenericStruct<A, B : FooProtocol> {}
 
 func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: A, b: B, c: C) {
-// CHECK: FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : FooProtocol & BarProtocol> (A, b: B, c: C) -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : FooProtocol & BarProtocol> (A, b: B, c: C) -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc1''' <A, B, C where B : FooProtocol, C : BarProtocol, C : FooProtocol> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
   _ = a1; a1 = a
@@ -135,6 +135,6 @@ func testInGenericFunc1<A, B : FooProtocol, C : FooProtocol & BarProtocol>(_ a: 
 }
 
 func testInGenericFunc2<T : QuxProtocol, U : QuxProtocol>() where T.Qux == U.Qux {}
-// CHECK: FuncDecl '''testInGenericFunc2''' <T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
-// FULL:  FuncDecl '''testInGenericFunc2''' <T : QuxProtocol, U : QuxProtocol where T.Qux == U.Qux> () -> (){{$}}
+// CHECK: FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
+// FULL:  FuncDecl '''testInGenericFunc2''' <T, U where T : QuxProtocol, U : QuxProtocol, T.Qux == U.Qux> () -> (){{$}}
 

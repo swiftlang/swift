@@ -980,7 +980,7 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
 /// \param types The types that will be scanned for generic type parameters,
 /// which will be used in the resulting type.
 ///
-/// \param genericParams The actual generic parameters, whose names will be used
+/// \param genericSig The actual generic parameters, whose names will be used
 /// in the resulting text.
 ///
 /// \param substitutions The generic parameter -> generic argument substitutions
@@ -988,16 +988,15 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
 /// "parameter = argument" bindings in the test.
 static std::string gatherGenericParamBindingsText(
                      ArrayRef<Type> types,
-                     ArrayRef<GenericTypeParamType *> genericParams,
-                     TypeSubstitutionMap &substitutions) {
+                     GenericSignature *genericSig,
+                     const TypeSubstitutionMap &substitutions) {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
-    type.findIf([&](Type type) -> bool {
+    type.visit([&](Type type) {
       if (auto gp = type->getAs<GenericTypeParamType>()) {
         knownGenericParams.insert(gp->getCanonicalType()
                                     ->castTo<GenericTypeParamType>());
       }
-      return false;
     });
   }
 
@@ -1005,7 +1004,7 @@ static std::string gatherGenericParamBindingsText(
     return "";
 
   SmallString<128> result;
-  for (auto gp : genericParams) {
+  for (auto gp : genericSig->getGenericParams()) {
     auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
     if (!knownGenericParams.count(canonGP))
       continue;
@@ -1016,7 +1015,12 @@ static std::string gatherGenericParamBindingsText(
       result += ", ";
     result += gp->getName().str();
     result += " = ";
-    result += substitutions[canonGP].getString();
+
+    auto found = substitutions.find(canonGP);
+    if (found == substitutions.end())
+      return "";
+
+    result += found->second.getString();
   }
 
   result += "]";
@@ -1027,31 +1031,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                                         SourceLoc noteLoc,
                                         Type owner,
                                         GenericSignature *genericSig,
-                                        ArrayRef<Type> genericArgs) {
-  // Form the set of generic substitutions required
-  TypeSubstitutionMap substitutions;
-
-  auto genericParams = genericSig->getGenericParams();
-
-  unsigned count = 0;
-
-  // If the type is nested inside a generic function, skip
-  // substitutions from the outer context.
-  unsigned start = (genericParams.size() - genericArgs.size());
-
-  for (auto gp : genericParams) {
-    if (count >= start) {
-      auto gpTy = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-      substitutions[gpTy] = genericArgs[count - start];
-    }
-
-    count++;
-  }
-
-  // The number of generic type arguments being bound must be equal to the
-  // total number of generic parameters in the current generic type context.
-  assert(count - start == genericArgs.size());
-
+                                        const TypeSubstitutionMap &substitutions) {
   // Check each of the requirements.
   Module *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
@@ -1099,7 +1079,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  req.getFirstType(), req.getSecondType(),
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
-                   genericParams, substitutions));
+                   genericSig, substitutions));
         return true;
       }
       continue;
@@ -1113,7 +1093,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
                  req.getFirstType(), req.getSecondType(),
                  gatherGenericParamBindingsText(
                    {req.getFirstType(), req.getSecondType()},
-                   genericParams, substitutions));
+                   genericSig, substitutions));
         return true;
       }
       continue;

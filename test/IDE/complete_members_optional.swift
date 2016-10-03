@@ -37,7 +37,7 @@ func optionalMembers2<T : HasOptionalMembers1>(_ a: T) {
   T.#^OPTIONAL_MEMBERS_2^#
 }
 // OPTIONAL_MEMBERS_2: Begin completions, 3 items
-// OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super:         optionalInstanceFunc!({#self: HasOptionalMembers1.Protocol#})[#() -> Int#]{{; name=.+$}}
+// OPTIONAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super:         optionalInstanceFunc!({#self: HasOptionalMembers1#})[#() -> Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticMethod]/Super:           optionalClassFunc!()[#Int#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2-DAG: Decl[StaticVar]/Super:              optionalClassProperty[#Int?#]{{; name=.+$}}
 // OPTIONAL_MEMBERS_2: End completions

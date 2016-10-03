@@ -1088,14 +1088,14 @@ public:
   /// \param noteLoc The location at which any notes will be printed.
   /// \param owner The type that owns the generic signature.
   /// \param genericSig The actual generic signature.
-  /// \param genericArgs The generic arguments.
+  /// \param substitutions Substitutions from interface types of the signature.
   ///
   /// \returns true if an error occurred, false otherwise.
   bool checkGenericArguments(DeclContext *dc, SourceLoc loc,
                              SourceLoc noteLoc,
                              Type owner,
                              GenericSignature *genericSig,
-                             ArrayRef<Type> genericArgs);
+                             const TypeSubstitutionMap &substitutions);
 
   /// Resolve the superclass of the given class.
   void resolveSuperclass(ClassDecl *classDecl) override;

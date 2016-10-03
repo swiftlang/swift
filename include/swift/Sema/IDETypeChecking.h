@@ -46,8 +46,6 @@ namespace swift {
 
   bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
 
-  Type lookUpTypeInContext(DeclContext *DC, StringRef Name);
-
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
@@ -56,11 +54,6 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
-
-  /// \brief Given the base type and the trailing identifiers, this function tries
-  /// to infer the type of BaseType.Name1.Name2.Name3
-  /// \returns Resolved type on success, nullptr on error.
-  Type checkMemberType(DeclContext &DC, Type BaseTy, ArrayRef<Identifier> Names);
 
   struct ResolveMemberResult {
     ValueDecl *Favored = nullptr;

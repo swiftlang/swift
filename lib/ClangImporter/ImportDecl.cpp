@@ -6267,7 +6267,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   if (!clangDecl)
     return "";
 
-  auto importedName = importFullName(clangDecl, None, &clangSema);
+  auto importedName = importFullName(clangDecl, None);
   if (!importedName)
     return "";
 
