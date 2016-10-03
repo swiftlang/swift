@@ -2405,16 +2405,21 @@ WARNING(optional_pattern_match_promotion,none,
         (Type, Type))
 WARNING(optional_to_any_coercion,none,
         "expression implicitly coerced from %0 to Any", (Type))
-WARNING(optional_in_string_interpolation_segment,none,
-        "string interpolation of optional can have unintended effects", ())
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
      "explicitly cast to Any with 'as Any' to silence this warning", ())
-NOTE(silence_optional_in_interpolation_segment,none,
-      "explicitly use '.debugDescription' to silence this warning", ())
+WARNING(optional_in_string_interpolation_segment,none,
+        "string interpolation produces a debug description for an optional "
+        "value; did you mean to make this explicit?",
+        ())
+NOTE(silence_optional_in_interpolation_segment_cast,none,
+     "use 'as' to explicitly cast to %0 to silence this warning",
+     (Type))
+NOTE(silence_optional_in_interpolation_segment_call,none,
+     "use '.debugDescription' to silence this warning", ())
 
 ERROR(invalid_noescape_use,none,
       "non-escaping %select{value|parameter}1 %0 may only be called",

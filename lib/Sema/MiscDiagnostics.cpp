@@ -3672,12 +3672,12 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
-static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
-                                          const DeclContext *DC) {
+static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
+                                               const DeclContext *DC) {
   if (!E || isa<ErrorExpr>(E) || !E->getType())
     return;
 
-  class OptionalToAnyCoercionWalker : public ASTWalker {
+  class UnintendedOptionalBehaviorWalker : public ASTWalker {
     TypeChecker &TC;
     SmallPtrSet<Expr *, 4> ErasureCoercedToAny;
 
@@ -3711,37 +3711,45 @@ static void diagnoseOptionalToAnyCoercion(TypeChecker &TC, const Expr *E,
         // Warn about interpolated segments that contain optionals.
         for (auto &segment : literal->getSegments()) {
           // Allow explicit casts.
-          if (isa<ExplicitCastExpr>(segment)) {
+          if (auto paren = dyn_cast<ParenExpr>(segment)) {
+            if (isa<ExplicitCastExpr>(paren->getSubExpr())) {
+              continue;
+            }
+          }
+
+          // Bail out if we don't have an optional.
+          auto objectTy = segment->getType()->getOptionalObjectType();
+          if (!objectTy) {
             continue;
           }
+          auto segmentTy = OptionalType::get(objectTy);
 
-          auto segmentTy = segment->getType();
-          if (segmentTy && !segmentTy->getOptionalObjectType().isNull()) {
-            TC.diagnose(segment->getStartLoc(),
-                        diag::optional_in_string_interpolation_segment)
-                .highlight(segment->getSourceRange());
+          TC.diagnose(segment->getStartLoc(),
+                      diag::optional_in_string_interpolation_segment)
+              .highlight(segment->getSourceRange());
 
-            TC.diagnose(segment->getLoc(),
-                        diag::silence_optional_in_interpolation_segment)
-              .highlight(segment->getSourceRange())
-              .fixItInsertAfter(segment->getEndLoc(), ".debugDescription");
-            TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-              .highlight(segment->getSourceRange())
-            	.fixItInsertAfter(segment->getEndLoc(), " ?? <#default value#>");
-            TC.diagnose(segment->getLoc(), diag::force_optional_to_any)
-              .highlight(segment->getSourceRange())
-              .fixItInsertAfter(segment->getEndLoc(), "!");
-          }
+          TC.diagnose(segment->getLoc(),
+                      diag::silence_optional_in_interpolation_segment_call)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segment->getEndLoc(), ".debugDescription");
+
+          auto opts = PrintOptions::printForDiagnostics();
+          TC.diagnose(segment->getLoc(),
+                      diag::silence_optional_in_interpolation_segment_cast,
+                      segmentTy)
+            .highlight(segment->getSourceRange())
+            .fixItInsert(segment->getEndLoc(),
+                         " as " + segmentTy->getString(opts));
         }
       }
       return { true, E };
     }
 
   public:
-    OptionalToAnyCoercionWalker(TypeChecker &tc) : TC(tc) { }
+    UnintendedOptionalBehaviorWalker(TypeChecker &tc) : TC(tc) { }
   };
 
-  OptionalToAnyCoercionWalker Walker(TC);
+  UnintendedOptionalBehaviorWalker Walker(TC);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -3757,7 +3765,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
-  diagnoseOptionalToAnyCoercion(TC, E, DC);
+  diagnoseUnintendedOptionalBehavior(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
     diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
