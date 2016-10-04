@@ -2146,7 +2146,7 @@ extension ${Self} {
   /// - Returns: The return value of the `body` closure parameter, if any.
   ///
   /// - SeeAlso: `withUnsafeBytes`, `UnsafeRawBufferPointer`
-  public mutating func withUnsafeBytes<R>(
+  public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {

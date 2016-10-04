@@ -53,7 +53,7 @@ UnsafeRawBufferPointerTestSuite.test("nonmutating_subscript_setter") {
 // View an array's elements as bytes.
 // Use copyBytes to overwrite the array element's bytes.
 UnsafeRawBufferPointerTestSuite.test("initFromArray") {
-  var array1: [Int32] = [0, 1, 2, 3]
+  let array1: [Int32] = [0, 1, 2, 3]
   var array2 = [Int32](repeating: 0, count: 4)
   // Immutable view of array1's bytes.
   array1.withUnsafeBytes { bytes1 in
@@ -77,7 +77,7 @@ UnsafeRawBufferPointerTestSuite.test("initFromArray") {
 
 // Directly test the byte Sequence produced by withUnsafeBytes.
 UnsafeRawBufferPointerTestSuite.test("withUnsafeBytes.Sequence") {
-  var array1: [Int32] = [0, 1, 2, 3]
+  let array1: [Int32] = [0, 1, 2, 3]
   array1.withUnsafeBytes { bytes1 in
     // Initialize an array from a sequence of bytes.
     let byteArray = [UInt8](bytes1)
