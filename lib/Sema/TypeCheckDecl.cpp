@@ -7548,7 +7548,7 @@ static Type checkExtensionGenericParams(
   auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
   auto *sig = tc.validateGenericSignature(genericParams,
                                           ext->getDeclContext(), parentSig,
-                                          /*allowConcreteGenericParams=*/false,
+                                          /*allowConcreteGenericParams=*/true,
                                           inferExtendedTypeReqs, invalid);
   ext->setGenericSignature(sig);
 
