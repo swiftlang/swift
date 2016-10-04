@@ -959,7 +959,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   return IGM.getOrCreateHelperFunction("__swift_destroy_strong",
                                        IGM.VoidTy, argTys,
                                        [&](IRGenFunction &IGF) {
-    Address arg(IGF.CurFn->arg_begin(), IGM.getPointerAlignment());
+    Address arg(&*IGF.CurFn->arg_begin(), IGM.getPointerAlignment());
     IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg));
     IGF.Builder.CreateRetVoid();
   });
@@ -992,8 +992,8 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   return IGM.getOrCreateHelperFunction(name, IGM.Int8PtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, fixedTI->getFixedAlignment());
-    Address src(it++, fixedTI->getFixedAlignment());
+    Address dest(&*it++, fixedTI->getFixedAlignment());
+    Address src(&*it++, fixedTI->getFixedAlignment());
     IGF.emitMemCpy(dest, src, fixedTI->getFixedSize());
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -1009,8 +1009,8 @@ static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
                                        IGM.Int8PtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, IGM.getPointerAlignment());
-    Address src(it++, IGM.getPointerAlignment());
+    Address dest(&*it++, IGM.getPointerAlignment());
+    Address src(&*it++, IGM.getPointerAlignment());
     auto ptr = IGF.Builder.CreateLoad(src);
     IGF.Builder.CreateStore(ptr, dest);
     IGF.Builder.CreateRet(ptr);
@@ -1058,8 +1058,8 @@ static llvm::Constant *getMemOpArrayFunction(IRGenModule &IGM,
   return IGM.getOrCreateHelperFunction(name, IGM.Int8PtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
-    Address dest(it++, fixedTI.getFixedAlignment());
-    Address src(it++, fixedTI.getFixedAlignment());
+    Address dest(&*it++, fixedTI.getFixedAlignment());
+    Address src(&*it++, fixedTI.getFixedAlignment());
     llvm::Value *count = &*(it++);
     llvm::Value *stride
       = llvm::ConstantInt::get(IGM.SizeTy, fixedTI.getFixedStride().getValue());
