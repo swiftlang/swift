@@ -230,6 +230,9 @@ static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<std::string>
+SwiftVersion("swift-version", llvm::cl::desc("Swift version"));
+
+static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
 
 static llvm::cl::opt<std::string>
@@ -2769,6 +2772,13 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+  if (!options::SwiftVersion.empty()) {
+    if (auto swiftVersion =
+          version::Version::parseVersionString(options::SwiftVersion,
+                                               SourceLoc(), nullptr)) {
+      InitInvok.getLangOptions().EffectiveLanguageVersion = *swiftVersion;
+    }
+  }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
