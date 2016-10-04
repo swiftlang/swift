@@ -36,7 +36,7 @@ We describe each in detail below:
         Platform     | Comment | Check Status
         ------------ | ------- | ------------
         All supported platforms     | @swift-ci Please smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-        All supported platforms     | @swift-ci Please smoke test and mere       | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
+        All supported platforms     | @swift-ci Please smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
         OS X platform               | @swift-ci Please smoke test OS X platform  | Swift Test OS X Platform (smoke test)
         Linux platform              | @swift-ci Please smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
