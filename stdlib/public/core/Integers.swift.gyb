@@ -268,7 +268,7 @@ def operationComment(operator):
   ///
   /// The `maskingShiftRight(_:)` method handles attempted overshifts and
   /// undershifts differently from the right shift operator (`>>`). When the
-  /// value passed `rhs` in a masking shift is within the range
+  /// value passed as `rhs` in a masking shift is within the range
   /// `0...<bitWidth`, the operation is equivalent to using the right shift
   /// operator.
   ///
@@ -326,7 +326,7 @@ def operationComment(operator):
   ///
   /// The `maskingShiftLeft(_:)` method handles attempted overshifts and
   /// undershifts differently from the left shift operator (`<<`). When the
-  /// value passed `rhs` in a masking shift is within the range
+  /// value passed as `rhs` in a masking shift is within the range
   /// `0...<bitWidth`, the operation is equivalent to using the left shift
   /// operator.
   ///
