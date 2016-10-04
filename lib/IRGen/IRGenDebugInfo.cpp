@@ -536,10 +536,8 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::Initializer:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::SubscriptDecl:
-    return getOrCreateContext(DC->getParent());
-
   case DeclContextKind::TopLevelCodeDecl:
-    return getEntryPointFn();
+    return getOrCreateContext(DC->getParent());
 
   case DeclContextKind::Module:
     return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
