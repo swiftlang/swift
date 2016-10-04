@@ -55,6 +55,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -575,6 +576,12 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
+
+  // Map the Swift major version into the API notes version for Swift. This
+  // has the effect of allowing API notes to effect changes only on Swift
+  // major versions, not minor versions.
+  invocationArgStrs.push_back("-fapinotes-swift-version=" +
+    llvm::itostr(ctx.LangOpts.EffectiveLanguageVersion[0]));
 }
 
 std::unique_ptr<ClangImporter>
