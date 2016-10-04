@@ -57,12 +57,7 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   *outArgLen = *_NSGetArgc();
   return *_NSGetArgv();
 }
-#elif defined(__linux__) || defined(__CYGWIN__) || defined(__FreeBSD__)
-#if defined(__FreeBSD__)
-#  define PROCFS_CMDLINE_PATH "/proc/curproc/cmdline"
-#else
-#  define PROCFS_CMDLINE_PATH "/proc/self/cmdline"
-#endif
+#elif defined(__linux__) || defined(__CYGWIN__)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   assert(outArgLen != nullptr);
@@ -72,12 +67,10 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     return _swift_stdlib_ProcessOverrideUnsafeArgv;
   }
 
-  FILE *cmdline = fopen(PROCFS_CMDLINE_PATH, "rb");
+  FILE *cmdline = fopen("/proc/self/cmdline", "rb");
   if (!cmdline) {
     swift::fatalError(0,
-            "fatal error: Unable to open interface to '"
-            PROCFS_CMDLINE_PATH
-            "'.\n");
+            "fatal error: Unable to open interface to '/proc/self/cmdline'.\n");
   }
   char *arg = nullptr;
   size_t size = 0;
@@ -110,6 +103,42 @@ extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
 
   *outArgLen = __argc;
   return __argv;
+}
+#elif defined(__FreeBSD__)
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+extern "C" char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
+  assert(outArgLen != nullptr);
+
+  if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
+    *outArgLen = _swift_stdlib_ProcessOverrideUnsafeArgc;
+    return _swift_stdlib_ProcessOverrideUnsafeArgv;
+  }
+
+  char argPtr[8192]; // or use ARG_MAX? 8192 is used in LLDB though..
+  size_t argPtrSize = sizeof(argPtr);
+  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ARGS, getpid() };
+  if (sysctl(mib, 4, argPtr, &argPtrSize, NULL, 0) != 0)
+    swift::fatalError(0, "fatal error: could not retrieve commandline "
+                         "arguments: sysctl: %s.\n", strerror(errno));
+
+  char *curPtr = argPtr;
+  char *endPtr = argPtr + argPtrSize;
+
+  std::vector<char *> argvec;
+  for (; curPtr < endPtr; curPtr += strlen(curPtr) + 1)
+    argvec.push_back(strdup(curPtr));
+  *outArgLen = argvec.size();
+  char **outBuf = (char **)calloc(argvec.size() + 1, sizeof(char *));
+  std::copy(argvec.begin(), argvec.end(), outBuf);
+  outBuf[argvec.size()] = nullptr;
+    
+  return outBuf;
 }
 #else // __ANDROID__; Add your favorite arch's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_INTERFACE
