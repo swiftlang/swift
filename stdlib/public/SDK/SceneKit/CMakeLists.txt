@@ -7,5 +7,6 @@ add_swift_library(swiftSceneKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_
   SWIFT_MODULE_DEPENDS_IOS Darwin CoreGraphics CoreImage Dispatch Foundation GLKit ObjectiveC QuartzCore simd UIKit # auto-updated
   SWIFT_MODULE_DEPENDS_TVOS Darwin CoreGraphics CoreImage Dispatch Foundation GLKit ObjectiveC QuartzCore simd UIKit # auto-updated
   SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreGraphics Dispatch Foundation ObjectiveC simd # auto-updated
+    UIKit # required in some configurations but not found by tool
   FRAMEWORK_DEPENDS_WEAK SceneKit
 )
