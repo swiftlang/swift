@@ -70,6 +70,7 @@ class ModuleFile : public LazyMemberLoader {
 
   /// The name of the module.
   StringRef Name;
+  friend StringRef getNameOfModule(const ModuleFile *);
 
   /// The target the module was built for.
   StringRef TargetTriple;
@@ -363,8 +364,11 @@ public:
   /// as being malformed.
   Status error(Status issue = Status::Malformed) {
     assert(issue != Status::Valid);
-    assert((!FileContext || issue != Status::Malformed) &&
-           "error deserializing an individual record");
+    // This would normally be an assertion but it's more useful to print the
+    // PrettyStackTrace here even in no-asserts builds. Malformed modules are
+    // generally unrecoverable.
+    if (FileContext && issue == Status::Malformed)
+      abort();
     setStatus(issue);
     return getStatus();
   }
