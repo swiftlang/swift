@@ -305,8 +305,11 @@ public:
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
+  /// \param allowConcreteGenericParams If true, allow generic parameters to
+  /// be made concrete.
+  ///
   /// \returns true if an error occurs, false otherwise.
-  bool finalize(SourceLoc loc);
+  bool finalize(SourceLoc loc, bool allowConcreteGenericParams=false);
 
   /// \brief Resolve the given type to the potential archetype it names.
   ///

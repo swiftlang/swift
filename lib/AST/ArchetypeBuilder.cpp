@@ -1155,15 +1155,6 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
        compareDependentTypes(&T2, &T1) < 0))
     std::swap(T1, T2);
 
-  // Don't allow two generic parameters to be equivalent, because then we
-  // don't actually have two parameters.
-  // FIXME: Should we simply allow this?
-  if (T1Depth == 0 && T2Depth == 0) {
-    Diags.diagnose(Source.getLoc(), diag::requires_generic_params_made_equal,
-                   T1->getName(), T2->getName());
-    return true;
-  }
-  
   // Merge any concrete constraints.
   Type concrete1 = T1->ArchetypeOrConcreteType.getAsConcreteType();
   Type concrete2 = T2->ArchetypeOrConcreteType.getAsConcreteType();
@@ -1246,16 +1237,6 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       return true;
     }
     return false;
-  }
-  
-  // Don't allow a generic parameter to be equivalent to a concrete type,
-  // because then we don't actually have a parameter.
-  // FIXME: Should we simply allow this?
-  if (T->getNestingDepth() == 0) {
-    Diags.diagnose(Source.getLoc(), 
-                   diag::requires_generic_param_made_equal_to_concrete,
-                   T->getName());
-    return true;
   }
   
   // Make sure the concrete type fulfills the requirements on the archetype.
@@ -1752,8 +1733,67 @@ static Identifier typoCorrectNestedType(
   return bestMatches.front();
 }
 
-bool ArchetypeBuilder::finalize(SourceLoc loc) {
+bool
+ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
   bool invalid = false;
+  SmallPtrSet<PotentialArchetype *, 4> visited;
+
+  // Check for generic parameters which have been made concrete or equated
+  // with each other.
+  if (!allowConcreteGenericParams) {
+    unsigned depth = 0;
+    for (const auto &pair : Impl->PotentialArchetypes) {
+      depth = std::max(depth, pair.second->getRootParam()->getDepth());
+    }
+
+    for (const auto &pair : Impl->PotentialArchetypes) {
+      auto pa = pair.second;
+      auto rep = pa->getRepresentative();
+
+      if (pa->getRootParam()->getDepth() < depth)
+        continue;
+
+      if (!visited.insert(rep).second)
+        continue;
+
+      // Don't allow a generic parameter to be equivalent to a concrete type,
+      // because then we don't actually have a parameter.
+      if (rep->ArchetypeOrConcreteType.getAsConcreteType()) {
+        auto &Source = rep->SameTypeSource;
+
+        // For auto-generated locations, we should have diagnosed the problem
+        // elsewhere already.
+        if (!Source->getLoc().isValid())
+          continue;
+
+        Diags.diagnose(Source->getLoc(),
+                       diag::requires_generic_param_made_equal_to_concrete,
+                       rep->getName());
+        invalid = true;
+        continue;
+      }
+
+      // Don't allow two generic parameters to be equivalent, because then we
+      // don't actually have two parameters.
+      for (auto other : rep->getEquivalenceClass()) {
+        if (pa != other && other->getParent() == nullptr) {
+          auto &Source = (other == rep ? pa->SameTypeSource
+                                       : other->SameTypeSource);
+
+          // For auto-generated locations, we should have diagnosed the problem
+          // elsewhere already.
+          if (!Source->getLoc().isValid())
+            continue;
+
+          Diags.diagnose(Source->getLoc(),
+                         diag::requires_generic_params_made_equal,
+                         pa->getName(), other->getName());
+          invalid = true;
+          break;
+        }
+      }
+    }
+  }
 
   // If any nested types remain unresolved, produce diagnostics.
   if (Impl->NumUnresolvedNestedTypes > 0) {

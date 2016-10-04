@@ -1056,6 +1056,7 @@ public:
                       GenericParamList *genericParams,
                       DeclContext *dc,
                       GenericSignature *outerSignature,
+                      bool allowConcreteGenericParams,
                       std::function<bool(ArchetypeBuilder &)> inferRequirements,
                       bool &invalid);
 

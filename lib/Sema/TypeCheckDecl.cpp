@@ -730,6 +730,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     auto genericParams = nestedList.rbegin()[i];
     bool invalid = false;
     auto *genericSig = validateGenericSignature(genericParams, DC, parentSig,
+                                                /*allowConcreteGenericParams=*/true,
                                                 nullptr, invalid);
     if (invalid)
       return std::make_pair(nullptr, nullptr);
@@ -7545,11 +7546,10 @@ static Type checkExtensionGenericParams(
   bool invalid = false;
   auto *parentSig = ext->getDeclContext()->getGenericSignatureOfContext();
   auto *parentEnv = ext->getDeclContext()->getGenericEnvironmentOfContext();
-  GenericSignature *sig = tc.validateGenericSignature(
-      genericParams,
-      ext->getDeclContext(),
-      parentSig,
-      inferExtendedTypeReqs, invalid);
+  auto *sig = tc.validateGenericSignature(genericParams,
+                                          ext->getDeclContext(), parentSig,
+                                          /*allowConcreteGenericParams=*/false,
+                                          inferExtendedTypeReqs, invalid);
   ext->setGenericSignature(sig);
 
   if (invalid) {
