@@ -56,9 +56,9 @@ class TestNSStringBridge : TestNSStringBridgeSuper {
 
     func test_copy() {
         let string = "hello world"
-        let ns1 = (string as NSString)
-        let ns2 = ns1.copy()
-        let ns2 = ns1.copy(with: nil)
+        let ns1 = (string as NSString) as AnyObject
+        let ns2 = ns1.copy() as AnyObject
+        let ns3 = ns1.copy(with: nil) as AnyObject
         expectTrue(ns1 === ns2)
         expectTrue(ns2 === ns3)
     }
