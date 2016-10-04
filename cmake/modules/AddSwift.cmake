@@ -48,6 +48,22 @@ function(_compute_lto_flag option out_var)
   endif()
 endfunction()
 
+function(_set_target_prefix_and_suffix target kind sdk)
+  precondition(target MESSAGE "target is required")
+  precondition(kind MESSAGE "kind is required")
+  precondition(sdk MESSAGE "sdk is required")
+
+  if("${sdk}" STREQUAL "WINDOWS")
+    if("${kind}" STREQUAL "STATIC")
+      set_property(TARGET "${target}" PROPERTY PREFIX "lib")
+      set_property(TARGET "${target}" PROPERTY SUFFIX ".lib")
+    elseif("${libkind}" STREQUAL "SHARED")
+      set_property(TARGET "${target}" PROPERTY PREFIX "")
+      set_property(TARGET "${target}" PROPERTY SUFFIX ".dll")
+    endif()
+  endif()
+endfunction()
+
 function(is_darwin_based_sdk sdk_name out_var)
   if ("${sdk_name}" STREQUAL "OSX" OR
       "${sdk_name}" STREQUAL "IOS" OR
@@ -683,6 +699,7 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
       ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES}
       ${SWIFT_SECTIONS_OBJECT_END})
+  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "")
@@ -696,13 +713,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    if("${libkind}" STREQUAL "STATIC")
-      set_property(TARGET "${target}" PROPERTY PREFIX "lib")
-      set_property(TARGET "${target}" PROPERTY SUFFIX ".lib")
-    elseif("${libkind}" STREQUAL "SHARED")
-      set_property(TARGET "${target}" PROPERTY PREFIX "")
-      set_property(TARGET "${target}" PROPERTY SUFFIX ".dll")
-
+    if("${libkind}" STREQUAL "SHARED")
       # Each dll has an associated .lib (import library); since we may be
       # building on a non-DLL platform (not windows), create an imported target
       # for the library which created implicitly by the dll.
