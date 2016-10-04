@@ -91,6 +91,11 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
   include(HandleLLVMOptions)
 
+  # The intrinsics_gen dependency is not available for Swift builds outside of
+  # the LLVM source tree, so remove it.
+  set(SWIFT_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS})
+  list(REMOVE_ITEM SWIFT_COMMON_DEPENDS intrinsics_gen)
+
   # HACK: this ugly tweaking is to prevent the propagation of the flag from LLVM
   # into swift.  The use of this flag pollutes all targets, and we are not able
   # to remove it on a per-target basis which breaks cross-compilation.
@@ -262,6 +267,8 @@ macro(swift_common_unified_build_config product)
   if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-nested-anon-types")
   endif()
+
+  set(SWIFT_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS})
 endmacro()
 
 # Common cmake project config for additional warnings.

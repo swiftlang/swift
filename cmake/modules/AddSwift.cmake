@@ -851,7 +851,7 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_DEPENDS}
         ${gyb_dependency_targets}
         "${swift_object_dependency_target}"
-        ${LLVM_COMMON_DEPENDS})
+        ${SWIFT_COMMON_DEPENDS})
 
   # HACK: On some systems or build directory setups, CMake will not find static
   # archives of Clang libraries in the Clang build directory, and it will pass
@@ -1728,7 +1728,7 @@ function(_add_swift_executable_single name)
       TARGETS "${name}"
       DEPENDS
         ${dependency_target}
-        ${LLVM_COMMON_DEPENDS}
+        ${SWIFT_COMMON_DEPENDS}
         ${SWIFTEXE_SINGLE_DEPENDS}
         ${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS})
   llvm_update_compile_flags("${name}")
