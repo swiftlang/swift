@@ -8,7 +8,13 @@ set_target_properties(SwiftUnitTests PROPERTIES FOLDER "Tests")
 function(add_swift_unittest test_dirname)
   # *NOTE* Even though "add_unittest" does not have llvm in its name, it is a
   # function defined by AddLLVM.cmake.
+  # FIXME: AddLLVM.cmake's add_unittest function should take a DEPENDS
+  #        argument, allowing dependencies to be set without modifying
+  #        LLVM_COMMON_DEPENDS.
+  set(_original_llvm_common_depends ${LLVM_COMMON_DEPENDS})
+  set(LLVM_COMMON_DEPENDS ${SWIFT_COMMON_DEPENDS})
   add_unittest(SwiftUnitTests ${test_dirname} ${ARGN})
+  set(LLVM_COMMON_DEPENDS ${_original_llvm_common_depends})
 
   # TODO: _add_variant_c_compile_link_flags and these tests should share some
   # sort of logic.

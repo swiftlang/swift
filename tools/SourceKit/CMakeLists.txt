@@ -157,9 +157,9 @@ macro(add_sourcekit_library name)
       BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
       LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
 
-  if(LLVM_COMMON_DEPENDS)
-    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
-  endif(LLVM_COMMON_DEPENDS)
+  if(SWIFT_COMMON_DEPENDS)
+    add_dependencies(${name} ${SWIFT_COMMON_DEPENDS})
+  endif()
 
   set(prefixed_link_libraries)
   foreach(dep ${SOURCEKITLIB_DEPENDS})
@@ -236,8 +236,8 @@ macro(add_sourcekit_executable name)
       LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
 
   # Add appropriate dependencies
-  if(LLVM_COMMON_DEPENDS)
-    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  if(SWIFT_COMMON_DEPENDS)
+    add_dependencies(${name} ${SWIFT_COMMON_DEPENDS})
   endif()
 
   target_link_libraries(${name} ${SOURCEKITEXE_DEPENDS})
@@ -308,9 +308,9 @@ macro(add_sourcekit_framework name)
     set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
   endif(MSVC_IDE OR XCODE)
 
-  if(LLVM_COMMON_DEPENDS)
-    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
-  endif(LLVM_COMMON_DEPENDS)
+  if(SWIFT_COMMON_DEPENDS)
+    add_dependencies(${name} ${SWIFT_COMMON_DEPENDS})
+  endif()
 
   target_link_libraries(${name} PRIVATE ${SOURCEKITFW_DEPENDS})
   swift_common_llvm_config(${name} ${SOURCEKITFW_LLVM_COMPONENT_DEPENDS})
@@ -411,7 +411,13 @@ macro(add_sourcekit_xpc_service name framework_target)
       "${CMAKE_CURRENT_BINARY_DIR}/${name}.Info.plist" "${xpc_contents_dir}/Info.plist")
   list(APPEND srcs "${xpc_contents_dir}/Info.plist")
 
+  # FIXME: LLVM's add_llvm_executable should take a DEPENDS argument, allowing
+  #        dependencies to be set without modifying LLVM_COMMON_DEPENDS.
+  set(_original_llvm_common_depends ${LLVM_COMMON_DEPENDS})
+  set(LLVM_COMMON_DEPENDS ${SWIFT_COMMON_DEPENDS})
   add_llvm_executable(${name} ${srcs})
+  set(LLVM_COMMON_DEPENDS ${_original_llvm_common_depends})
+
   set_target_properties(${name} PROPERTIES FOLDER "XPC Services")
   set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${xpc_bin_dir}")
 
@@ -420,9 +426,9 @@ macro(add_sourcekit_xpc_service name framework_target)
     LIBRARY_DIR "${xpc_bin_dir}")
 
   # Add appropriate dependencies
-  if(LLVM_COMMON_DEPENDS)
-    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
-  endif(LLVM_COMMON_DEPENDS)
+  if(SWIFT_COMMON_DEPENDS)
+    add_dependencies(${name} ${SWIFT_COMMON_DEPENDS})
+  endif(SWIFT_COMMON_DEPENDS)
 
   target_link_libraries(${name} ${SOURCEKITXPC_DEPENDS})
   swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_COMPONENT_DEPENDS})
