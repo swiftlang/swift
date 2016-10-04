@@ -302,7 +302,7 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
 
   @objc(copyWithZone:)
-  func copy(with zone: AnyObject? = nil) -> Any {
+  func copy(with zone: AnyObject?) -> Any {
     // Since this string is immutable we can just return ourselves.
     return self
   }

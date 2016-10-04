@@ -6,11 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+//
+// RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
+// RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestNSStringBridge
+
+// RUN: %target-run %t/TestNSStringBridge > %t.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
 import Foundation
+import FoundationBridgeObjC
 
 #if FOUNDATION_XCTEST
     import XCTest
@@ -55,12 +62,18 @@ class TestNSStringBridge : TestNSStringBridgeSuper {
     }
 
     func test_copy() {
-        let string = "hello world"
-        let ns1 = (string as NSString) as AnyObject
-        let ns2 = ns1.copy() as AnyObject
-        let ns3 = ns1.copy(with: nil) as AnyObject
-        expectTrue(ns1 === ns2)
-        expectTrue(ns2 === ns3)
+        let string1 = "test"
+        let ns1 = string1 as NSString
+        expectTrue(ObjectBehaviorVerifier.verifyEquality(of: ns1, with: ns1, options: [.copy, .rawPointerCompare]))
+
+        let string2 = "This is a test of strings"
+        let ns2 = string2 as NSString
+        expectTrue(ObjectBehaviorVerifier.verifyEquality(of: ns2, with: ns2, options: [.copy, .rawPointerCompare]))
+
+
+        let string3 = "héllö wørld"
+        let ns3 = string3 as NSString
+        expectTrue(ObjectBehaviorVerifier.verifyEquality(of: ns3, with: ns3, options: [.copy, .rawPointerCompare]))
     }
 }
 

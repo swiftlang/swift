@@ -74,6 +74,54 @@
     }];
 }
 
+
++ (BOOL)verifyEqualityOfObject:(NSObject *)left
+                    withObject:(NSObject *)right
+                       options:(ObjectBehaviorEqualityOptions)options {
+    if (options & ObjectBehaviorEqualityOptionsCopy) {
+        NSObject *leftCopy = [left copy];
+        NSObject *leftCopyWithZone = [(id<NSCopying>)left copyWithZone:nil];
+        NSObject *rightCopy = [right copy];
+        NSObject *rightCopyWithZone = [(id<NSCopying>)right copyWithZone:nil];
+        options = options & (~(ObjectBehaviorEqualityOptionsCopy));
+        BOOL res = [self verifyEqualityOfObject:left
+                                     withObject:leftCopy
+                                        options:options] &&
+               [self verifyEqualityOfObject:left
+                                 withObject:leftCopyWithZone
+                                    options:options] &&
+               [self verifyEqualityOfObject:leftCopy
+                                 withObject:rightCopy
+                                    options:options] &&
+               [self verifyEqualityOfObject:leftCopy
+                                 withObject:rightCopyWithZone
+                                    options:options] &&
+               [self verifyEqualityOfObject:leftCopyWithZone
+                                 withObject:rightCopy
+                                    options:options] &&
+               [self verifyEqualityOfObject:leftCopyWithZone
+                                 withObject:rightCopy
+                                    options:options] &&
+               [self verifyEqualityOfObject:leftCopyWithZone
+                                 withObject:rightCopyWithZone
+                                    options:options] &&
+               [self verifyEqualityOfObject:rightCopy
+                                 withObject:rightCopyWithZone
+                                    options:options];
+        [leftCopy release];
+        [rightCopy release];
+        [leftCopyWithZone release];
+        [rightCopyWithZone release];
+        return res;
+    }
+    if (options &ObjectBehaviorEqualityOptionsRawPointerCompare) {
+        if (left != right) {
+            return NO;
+        }
+    }
+    return [left isEqual:right] && [right isEqual:left];
+}
+
 @end
 
 
