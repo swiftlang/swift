@@ -1528,9 +1528,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///     '@' attribute
 /// \endverbatim
 bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
-                                    bool &FoundCCToken,
-                                    bool StopAtTypeAttributes,
-                                    bool InParam) {
+                                    bool &FoundCCToken) {
   FoundCCToken = false;
   while (Tok.is(tok::at_sign)) {
     if (peekToken().is(tok::code_complete)) {
@@ -1539,25 +1537,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
       FoundCCToken = true;
       continue;
     }
-    SourceLoc AtLoc = Tok.getLoc();
-
-    // If StopAtTypeAttributes is true, then we sniff to see if the following
-    // attribute is a type attribute.  If so, we stop here, instead of producing
-    // an error on it.
-    if (StopAtTypeAttributes) {
-      Token next = peekToken();
-      auto Kind = TypeAttributes::getAttrKindFromString(next.getText());
-
-      // noescape/autoclosure are valid as a decl attribute and type attribute
-      // (in parameter lists) but we disambiguate them as a decl attribute.
-      if (Kind == TAK_noescape || Kind == TAK_autoclosure)
-        Kind = TAK_Count;
-
-      if (Kind != TAK_Count)
-        return false;
-    }
-
-    consumeToken();
+    SourceLoc AtLoc = consumeToken();
     if (parseDeclAttribute(Attributes, AtLoc))
       return true;
   }
