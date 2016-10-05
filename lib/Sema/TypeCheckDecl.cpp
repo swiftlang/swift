@@ -7504,7 +7504,7 @@ static Type checkExtensionGenericParams(
 
   // Local function used to infer requirements from the extended type.
   TypeLoc extendedTypeInfer;
-  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) -> bool {
+  auto inferExtendedTypeReqs = [&](ArchetypeBuilder &builder) {
     if (extendedTypeInfer.isNull()) {
       if (isa<ProtocolDecl>(nominal)) {
         // Simple case: protocols don't form bound generic types.
@@ -7521,7 +7521,7 @@ static Type checkExtensionGenericParams(
       }
     }
     
-    return builder.inferRequirements(extendedTypeInfer, genericParams);
+    builder.inferRequirements(extendedTypeInfer, genericParams);
   };
 
   ext->setIsBeingTypeChecked(true);

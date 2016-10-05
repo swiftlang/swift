@@ -6852,9 +6852,7 @@ buildGenericSignature(GenericParamList *genericParams,
     (void) result;
   }
   // TODO: any need to infer requirements?
-  bool result = builder.finalize(genericParams->getSourceRange().Start);
-  assert(!result);
-  (void) result;
+  builder.finalize(genericParams->getSourceRange().Start);
 
   SmallVector<GenericTypeParamType *, 4> genericParamTypes;
   for (auto param : *genericParams) {

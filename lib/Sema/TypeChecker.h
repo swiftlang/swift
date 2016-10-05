@@ -1042,7 +1042,7 @@ public:
   ///
   /// \param inferRequirements When non-empty, callback that will be invoked
   /// to perform any additional requirement inference that contributes to the
-  /// generic signature. Returns true if an error occurred.
+  /// generic signature.
   ///
   /// \returns the generic signature that captures the generic
   /// parameters and inferred requirements.
@@ -1051,7 +1051,7 @@ public:
                       DeclContext *dc,
                       GenericSignature *outerSignature,
                       bool allowConcreteGenericParams,
-                      std::function<bool(ArchetypeBuilder &)> inferRequirements);
+                      std::function<void(ArchetypeBuilder &)> inferRequirements);
 
   /// Perform any final semantic checks on the given generic parameter list.
   void finalizeGenericParamList(GenericParamList *genericParams,
