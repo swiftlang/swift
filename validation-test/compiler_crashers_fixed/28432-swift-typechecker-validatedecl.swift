@@ -5,8 +5,11 @@
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // REQUIRES: asserts
-for in[{protocol a{func e
-typealias e=()
+{protocol A
+{func e
 typealias e
+typealias F=(f:A
+typealias F
+typealias e=(
