@@ -883,6 +883,36 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     }
   }
 
+  // Translate direct parameters passed indirectly.
+  Explosion translatedParams;
+
+  // We already handled self.
+  assert(origMethodType->hasSelfParam());
+  auto origParamInfos = origMethodType->getParameters();
+  origParamInfos = origParamInfos.drop_back();
+
+  for (auto info : origParamInfos) {
+    // Addresses consist of a single pointer argument.
+    if (isIndirectParameter(info.getConvention())) {
+      translatedParams.add(params.claimNext());
+      continue;
+    }
+    // Otherwise, we have a loadable type that can either be passed directly or
+    // indirectly.
+    assert(info.getSILType().isObject());
+    auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(info.getSILType()));
+    auto schema = ti.getSchema();
+
+    // Load the indirectly passed parameter.
+    if (schema.requiresIndirectParameter(IGM)) {
+      Address paramAddr = ti.getAddressForPointer(params.claimNext());
+      ti.loadAsTake(subIGF, paramAddr, translatedParams);
+      continue;
+    }
+    // Pass along the value.
+    ti.reexplode(subIGF, params, translatedParams);
+  }
+
   // Prepare the call to the underlying method.
   
   CallEmission emission
@@ -899,7 +929,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
 
   addObjCMethodCallImplicitArguments(subIGF, args, method.getMethod(), self,
                                      method.getSearchType());
-  args.add(params.claimAll());
+  args.add(translatedParams.claimAll());
   emission.setArgs(args);
   
   // Cleanup that always has to occur after the function call.
