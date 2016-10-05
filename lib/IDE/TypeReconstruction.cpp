@@ -243,6 +243,10 @@ public:
       }
     } else if (_type == LookupKind::SwiftModule)
       _module->lookupValue(path, name, kind, result);
+    else if (_type == LookupKind::Extension) {
+      auto results = _extension._decl->lookupDirect(DeclName(name));
+      result.append(results.begin(), results.end());
+    }
     return;
   }
 
@@ -1322,6 +1326,7 @@ static void VisitNodeFunction(
     case Demangle::Node::Kind::Module:
     case Demangle::Node::Kind::Structure:
     case Demangle::Node::Kind::Protocol:
+    case Demangle::Node::Kind::Extension:
       nodes.push_back((*pos));
       VisitNode(ast, nodes, decl_scope_result, generic_context);
       break;
