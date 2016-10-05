@@ -1817,7 +1817,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : sig->getGenericParams()) {
       auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
-      assert(archetypeTy);
+      if (!archetypeTy)
+        continue;
 
       Identifier name = archetypeTy->getName();
       while (!UsedNames.insert(name).second) {

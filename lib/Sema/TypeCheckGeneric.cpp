@@ -725,6 +725,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
                     GenericParamList *genericParams,
                     DeclContext *dc,
                     GenericSignature *parentSig,
+                    bool allowConcreteGenericParams,
                     std::function<bool(ArchetypeBuilder &)> inferRequirements,
                     bool &invalid) {
   assert(genericParams && "Missing generic parameters?");
@@ -747,7 +748,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   }
 
   // Finalize the generic requirements.
-  (void)builder.finalize(genericParams->getSourceRange().Start);
+  (void)builder.finalize(genericParams->getSourceRange().Start,
+                         allowConcreteGenericParams);
 
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the signature
@@ -920,6 +922,7 @@ bool TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   }
 
   auto *sig = validateGenericSignature(gp, dc, dc->getGenericSignatureOfContext(),
+                                       /*allowConcreteGenericParams=*/false,
                                        nullptr, invalid);
   assert(sig->getInnermostGenericParams().size()
            == typeDecl->getGenericParams()->size());
