@@ -171,8 +171,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   /// - Precondition: The memory is uninitialized.
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
   ///   through `self` + `count` * `MemoryLayout<T>.stride`
-  /// - Warning: Binding memory to a type is potentially undefined if the
-  ///   memory is ever accessed as an unrelated type.
+  /// - Warning: A memory location may only be bound to one type at a time.
+  ///   The behavior of accessing memory as type `U` while it is bound to an
+  ///   unrelated type `T` is undefined.
   @_transparent
   @discardableResult
   public func bindMemory<T>(to type: T.Type, capacity count: Int)
