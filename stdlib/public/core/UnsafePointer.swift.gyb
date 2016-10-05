@@ -374,12 +374,12 @@ public struct ${Self}<Pointee>
   /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
   ///
-  /// Accessing ${Self}<T>.pointee requires that the memory be "bound" to
+  /// Accessing `${Self}<T>.pointee` requires that the memory be "bound" to
   /// type `T`.  A memory location may only be bound to one type at a time, so
   /// accessing the same memory as an unrelated type without first rebinding the
   /// memory is undefined. `self` may not be accessed within the `body` closure
   /// because memory is no longer bound to `Pointee` while it executes. The
-  /// closure's ${Self}<T> argument must not escape the closure because memory
+  /// closure's `${Self}<T>` argument must not escape the closure because memory
   /// is only temporarily bound to `T`.
   ///
   /// To persistently bind this memory to a different type, first obtain a
