@@ -1,6 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
+@unknown(x,y) func f1() {} // expected-error{{unknown attribute 'unknown'}}
 
 enum binary { 
   case Zero
@@ -190,6 +191,16 @@ var func_result_type_attr : () -> @xyz Int  // expected-error {{unknown attribut
 func func_result_attr() -> @xyz Int {       // expected-error {{unknown attribute 'xyz'}}
   return 4
 }
+
+func func_with_unknown_attr1(@unknown(*) x: Int) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr2(x: @unknown(_) Int) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr3(x: @unknown(Int) -> Int) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr4(x: @unknown(Int) throws -> Int) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr5(x: @unknown (x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}}
+func func_with_unknown_attr6(x: @unknown(x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}} expected-error {{expected parameter type following ':'}}
+func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {{unknown attribute 'unknown'}} expected-error {{expected ',' separator}} {{47-47=,}} expected-error {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
+
+func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
 // @thin is not supported except in SIL.
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
