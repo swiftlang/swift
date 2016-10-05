@@ -366,12 +366,25 @@ public struct ${Self}<Pointee>
 %  end
 
   /// Rebinds memory at `self` to type `T` with capacity to hold `count`
-  /// adjacent `T` values while executing the `body` closure. After executing
-  /// the closure, rebinds memory back to `Pointee`.
+  /// adjacent `T` values while executing the `body` closure.
+  ///
+  /// After executing the closure, rebinds memory back to `Pointee`.
   ///
   /// - Precondition: Type 'T' is layout compatible with type 'Pointee'.
   /// - Precondition: The memory `self..<self + count * MemoryLayout<T>.stride`
   ///   is bound to `Pointee`.
+  ///
+  /// Accessing `${Self}<T>.pointee` requires that the memory be "bound" to
+  /// type `T`.  A memory location may only be bound to one type at a time, so
+  /// accessing the same memory as an unrelated type without first rebinding the
+  /// memory is undefined. `self` may not be accessed within the `body` closure
+  /// because memory is no longer bound to `Pointee` while it executes. The
+  /// closure's `${Self}<T>` argument must not escape the closure because memory
+  /// is only temporarily bound to `T`.
+  ///
+  /// To persistently bind this memory to a different type, first obtain a
+  /// raw pointer to the memory, then invoke the `bindMemory` API:
+  /// `UnsafeRawPointer(typedPointer).bindMemory(to:capacity:)`.
   public func withMemoryRebound<T, Result>(to: T.Type, capacity count: Int,
     _ body: (${Self}<T>) throws -> Result
   ) rethrows -> Result {
