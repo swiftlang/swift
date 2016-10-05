@@ -1048,7 +1048,6 @@ public:
   /// followed by one of the above tokens, then this function returns false,
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
-  bool canParseAttributes();
 
   bool canParseType();
   bool canParseTypeIdentifier();
