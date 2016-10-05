@@ -25,6 +25,10 @@
 using namespace swift;
 using namespace swift::serialization;
 
+StringRef swift::getNameOfModule(const ModuleFile *MF) {
+  return MF->Name;
+}
+
 namespace {
   struct IDAndKind {
     const Decl *D;
@@ -37,13 +41,15 @@ namespace {
   }
 
   class PrettyDeclDeserialization : public llvm::PrettyStackTraceEntry {
+    const ModuleFile *MF;
     const ModuleFile::Serialized<Decl*> &DeclOrOffset;
     DeclID ID;
     decls_block::RecordKind Kind;
   public:
-    PrettyDeclDeserialization(const ModuleFile::Serialized<Decl*> &declOrOffset,
+    PrettyDeclDeserialization(ModuleFile *module,
+                              const ModuleFile::Serialized<Decl*> &declOrOffset,
                               DeclID DID, decls_block::RecordKind kind)
-      : DeclOrOffset(declOrOffset), ID(DID), Kind(kind) {
+      : MF(module), DeclOrOffset(declOrOffset), ID(DID), Kind(kind) {
     }
 
     static const char *getRecordKindString(decls_block::RecordKind Kind) {
@@ -56,20 +62,20 @@ namespace {
     virtual void print(raw_ostream &os) const override {
       if (!DeclOrOffset.isComplete()) {
         os << "While deserializing decl #" << ID << " ("
-           << getRecordKindString(Kind) << ")\n";
-        return;
-      }
-
-      os << "While deserializing ";
-
-      if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-        os << "'" << VD->getName() << "' (" << IDAndKind{VD, ID} << ") \n";
-      } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
-        os << "extension of '" << ED->getExtendedType() << "' ("
-           << IDAndKind{ED, ID} << ") \n";
+           << getRecordKindString(Kind) << ")";
       } else {
-        os << IDAndKind{DeclOrOffset.get(), ID} << "\n";
+        os << "While deserializing ";
+
+        if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
+          os << "'" << VD->getName() << "' (" << IDAndKind{VD, ID} << ")";
+        } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
+          os << "extension of '" << ED->getExtendedType() << "' ("
+             << IDAndKind{ED, ID} << ")";
+        } else {
+          os << IDAndKind{DeclOrOffset.get(), ID};
+        }
       }
+      os << "in '" << getNameOfModule(MF) << "'\n";
     }
   };
 
@@ -222,6 +228,18 @@ namespace {
         piece.print(os);
         os << "\n";
       }
+    }
+  };
+
+  class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
+    const char *Action;
+    const ModuleFile *MF;
+  public:
+    explicit PrettyStackTraceModuleFile(const char *action, ModuleFile *module)
+        : Action(action), MF(module) {}
+
+    void print(raw_ostream &os) const override {
+      os << Action << " \'" << getNameOfModule(MF) << "'\n";
     }
   };
 } // end anonymous namespace
@@ -458,6 +476,10 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
 
+    PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
+                               "reading specialized conformance for",
+                               conformingType);
+
     // Read the substitutions.
     SmallVector<Substitution, 4> substitutions;
     while (numSubstitutions--) {
@@ -467,6 +489,7 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
     }
 
     ProtocolConformanceRef genericConformance = readConformance(Cursor);
+    PrettyStackTraceDecl traceTo("... to", genericConformance.getRequirement());
 
     assert(genericConformance.isConcrete() && "Abstract generic conformance?");
     auto conformance =
@@ -482,8 +505,13 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
+    PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
+                               "reading inherited conformance for",
+                               conformingType);
 
     ProtocolConformanceRef inheritedConformance = readConformance(Cursor);
+    PrettyStackTraceDecl traceTo("... to",
+                                 inheritedConformance.getRequirement());
 
     assert(inheritedConformance.isConcrete() &&
            "Abstract inherited conformance?");
@@ -506,14 +534,22 @@ ProtocolConformanceRef ModuleFile::readConformance(llvm::BitstreamCursor &Cursor
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
     auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
 
     SmallVector<ProtocolConformance *, 2> conformances;
     nominal->lookupConformance(module, proto,
                                conformances);
-    assert(!conformances.empty() && "Could not find conformance");
+    PrettyStackTraceModuleFile traceMsg(
+        "If you're seeing a crash here, check that your SDK and dependencies "
+        "are at least as new as the versions used to build", this);
+    // This would normally be an assertion but it's more useful to print the
+    // PrettyStackTrace here even in no-asserts builds.
+    if (conformances.empty())
+      abort();
     return ProtocolConformanceRef(conformances.front());
   }
 
@@ -559,10 +595,14 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
                                               typeCount, inheritedCount,
                                               rawIDs);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
   ASTContext &ctx = getContext();
   DeclContext *dc = getDeclContext(contextID);
   Type conformingType = dc->getDeclaredTypeInContext();
+  PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
+
+  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  PrettyStackTraceDecl traceTo("... to", proto);
+
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
                                         ProtocolConformanceState::Incomplete);
 
@@ -1353,6 +1393,10 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       return nullptr;
     }
 
+    PrettyStackTraceModuleFile traceMsg(
+        "If you're seeing a crash here, check that your SDK and dependencies "
+        "match the versions used to build", this);
+
     if (values.empty()) {
       error();
       return nullptr;
@@ -2098,7 +2142,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   PrettyDeclDeserialization stackTraceEntry(
-     declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
+     this, declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
 
   switch (recordID) {
   case decls_block::TYPE_ALIAS_DECL: {
@@ -4073,6 +4117,7 @@ void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
     IDC->addMember(member);
 
   if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
+    PrettyStackTraceDecl trace("reading default witness table for", D);
     bool Err = readDefaultWitnessTable(proto);
     assert(!Err && "unable to read default witness table");
     (void)Err;

@@ -1782,8 +1782,7 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   // signature, and the requirement had no additional generic parameters
   // beyond `Self`.
   if (!allParams.empty()) {
-    auto invalid = builder.finalize(SourceLoc());
-    assert(!invalid && "invalid requirements should not be seen in SIL");
+    builder.finalize(SourceLoc());
 
     auto *sig = builder.getGenericSignature(allParams);
 

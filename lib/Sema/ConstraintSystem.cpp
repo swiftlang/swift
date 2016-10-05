@@ -1044,20 +1044,19 @@ void ConstraintSystem::openGeneric(
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
-
   auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
     auto contextTy = genericEnv->mapTypeIntoContext(gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-      auto typeVar = createTypeVariable(getConstraintLocator(
-                                          locator.withPathElement(
-                                            LocatorPathElt(archetype))),
-                                        TVO_PrefersSubtypeBinding |
-                                        TVO_MustBeMaterializable);
-      replacements[gp->getCanonicalType()] = typeVar;
-    }
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      locatorPtr = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt(archetype)));
+
+    auto typeVar = createTypeVariable(locatorPtr,
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_MustBeMaterializable);
+    replacements[gp->getCanonicalType()] = typeVar;
   }
 
   GetTypeVariable getTypeVariable{*this, locator};

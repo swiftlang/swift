@@ -882,7 +882,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
       // FIXME: it's not clear exactly what we want to keep from the existing
       // options, and what we want to discard.
       PrintOptions FreshOptions;
-      FreshOptions.PrintAsInParamType = Options.PrintAsInParamType;
       FreshOptions.ExcludeAttrList = Options.ExcludeAttrList;
       FreshOptions.ExclusiveAttrList = Options.ExclusiveAttrList;
       FreshOptions.StripDynamicSelf = Options.StripDynamicSelf;
@@ -2389,8 +2388,6 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
-  // Set and restore in-parameter-position printing of types
-  llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
   visitVarDecl(decl);
 }
 
@@ -2446,29 +2443,25 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       TheTypeLoc.setType(BGT->getGenericArgs()[0]);
   }
 
-  // Set and restore in-parameter-position printing of types
-  {
-    llvm::SaveAndRestore<bool> savePrintParam(Options.PrintAsInParamType, true);
-    // FIXME: don't do if will be using type repr printing
-    printParameterFlags(Printer, Options, paramFlags);
+  // FIXME: don't do if will be using type repr printing
+  printParameterFlags(Printer, Options, paramFlags);
 
-    // Special case, if we're not going to use the type repr printing, peek
-    // through the paren types so that we don't print excessive @escapings.
-    unsigned numParens = 0;
-    if (!willUseTypeReprPrinting(TheTypeLoc, Options)) {
-      while (auto parenTy =
-                 dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
-        ++numParens;
-        TheTypeLoc = TypeLoc::withoutLoc(parenTy->getUnderlyingType());
-      }
+  // Special case, if we're not going to use the type repr printing, peek
+  // through the paren types so that we don't print excessive @escapings.
+  unsigned numParens = 0;
+  if (!willUseTypeReprPrinting(TheTypeLoc, Options)) {
+    while (auto parenTy =
+                dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
+      ++numParens;
+      TheTypeLoc = TypeLoc::withoutLoc(parenTy->getUnderlyingType());
     }
-
-    for (unsigned i = 0; i < numParens; ++i)
-      Printer << "(";
-    printTypeLoc(TheTypeLoc);
-    for (unsigned i = 0; i < numParens; ++i)
-      Printer << ")";
   }
+
+  for (unsigned i = 0; i < numParens; ++i)
+    Printer << "(";
+  printTypeLoc(TheTypeLoc);
+  for (unsigned i = 0; i < numParens; ++i)
+    Printer << ")";
 
   if (param->isVariadic())
     Printer << "...";
@@ -3252,10 +3245,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   ASTPrinter &Printer;
   const PrintOptions &Options;
 
-  /// Whether we are printing something in a function parameter position, and
-  /// thus want to print @escaping if it escapes.
-  bool inParameterPrinting;
-
   void printDeclContext(DeclContext *DC) {
     switch (DC->getContextKind()) {
     case DeclContextKind::Module: {
@@ -3419,8 +3408,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
 public:
   TypePrinter(ASTPrinter &Printer, const PrintOptions &PO)
-      : Printer(Printer), Options(PO),
-        inParameterPrinting(Options.PrintAsInParamType) {}
+      : Printer(Printer), Options(PO) {}
 
   void visit(Type T) {
     Printer.printTypePre(TypeLoc::withoutLoc(T));
@@ -3804,16 +3792,7 @@ public:
     if (needsParens)
       Printer << "(";
 
-    // Set in-parameter-position printing to print our parameters, then unset it
-    // for the return type (in case it is also a function), and restore at the
-    // end.
-    auto prior = inParameterPrinting;
-    inParameterPrinting = true;
     visit(inputType);
-    inParameterPrinting = false;
-    SWIFT_DEFER {
-      inParameterPrinting = prior;
-    };
     
     if (needsParens)
       Printer << ")";

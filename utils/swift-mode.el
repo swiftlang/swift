@@ -341,7 +341,6 @@ Use `M-x hs-show-all' to show them again."
       (move-to-column target-column)))
   )
 
-
 ;; Compilation error parsing
 (push 'swift0 compilation-error-regexp-alist)
 (push 'swift1 compilation-error-regexp-alist)
@@ -406,6 +405,61 @@ Use `M-x hs-show-all' to show them again."
        )
      1 2 nil 2)
       compilation-error-regexp-alist-alist)
+
+;; Flymake support
+
+(require 'flymake)
+
+(defvar swift-find-executable-function 'executable-find
+  "Function to find a command executable.
+The function is called with one argument, the name of the executable to find.
+Might be useful if you want to use a swiftc that you built instead 
+of the one in your PATH.")
+(make-variable-buffer-local 'swift-find-executable-function)
+
+(defvar swift-syntax-check-function 'swift-syntax-check-directory
+"Function to create the swift command-line that syntax-checks the current buffer.
+The function is called with two arguments, the swiftc executable, and
+the name of a temporary file that will contain the contents of the
+current buffer.
+Set to 'swift-syntax-check-single-file to ignore other files in the current directory.")
+(make-variable-buffer-local 'swift-syntax-check-function)
+
+(defun swift-syntax-check-single-file (swiftc temp-file)
+  "Return a flymake command-line list for syntax-checking the current buffer in isolation"
+  `(,swiftc ("-parse" ,temp-file)))
+
+(defun swift-syntax-check-directory (swiftc temp-file)
+  "Return a flymake command-line list for syntax-checking the
+current buffer along with the other swift files in the same
+directory."
+  (let* ((sources nil))
+    (dolist (x (directory-files (file-name-directory (buffer-file-name))))
+      (when (and (string-equal "swift" (file-name-extension x))
+                 (not (file-equal-p x (buffer-file-name))))
+        (setq sources (cons x sources))))
+    `(,swiftc ("-parse" ,temp-file ,@sources))))
+
+(defun flymake-swift-init ()
+  (let* ((temp-file 
+          (flymake-init-create-temp-buffer-copy
+           (lambda (x y) 
+             (make-temp-file 
+              (concat (file-name-nondirectory x) "-" y)
+              (not :DIR_FLAG) 
+              (concat "." (file-name-extension (buffer-file-name))))))))
+    (funcall swift-syntax-check-function 
+             (funcall swift-find-executable-function "swiftc")
+             temp-file)))
+
+(add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
+
+(setq flymake-err-line-patterns
+      (append 
+       (flymake-reformat-err-line-patterns-from-compile-el 
+        (mapcar (lambda (x) (assoc x compilation-error-regexp-alist-alist))
+                '(swift0 swift1 swift-fatal)))
+       flymake-err-line-patterns))
 
 (defgroup swift nil
   "Major mode for editing swift source files."

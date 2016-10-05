@@ -282,9 +282,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(TypeLoc type, GenericParamList *genericParams);
+  void inferRequirements(TypeLoc type, GenericParamList *genericParams);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -298,15 +296,14 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
-  /// \returns true if an error occurs, false otherwise.
-  bool finalize(SourceLoc loc);
+  /// \param allowConcreteGenericParams If true, allow generic parameters to
+  /// be made concrete.
+  void finalize(SourceLoc loc, bool allowConcreteGenericParams=false);
 
   /// \brief Resolve the given type to the potential archetype it names.
   ///

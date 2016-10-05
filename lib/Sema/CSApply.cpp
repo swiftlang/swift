@@ -1322,9 +1322,9 @@ namespace {
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        base = coerceObjectArgumentToType(base, containerTy, subscript,
-                                          AccessSemantics::Ordinary, locator);
-                 locator.withPathElement(ConstraintLocator::MemberRefBase);
+        base = coerceObjectArgumentToType(
+            base, containerTy, subscript, AccessSemantics::Ordinary,
+            locator.withPathElement(ConstraintLocator::MemberRefBase));
         if (!base)
           return nullptr;
 
