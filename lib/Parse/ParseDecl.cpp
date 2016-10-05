@@ -1570,7 +1570,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 ///     attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
-///     '@' attribute ','? attribute-list-clause
+///     '@' attribute attribute-list-clause
 /// \endverbatim
 bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
   Attributes.AtLoc = Tok.getLoc();

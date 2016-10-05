@@ -858,8 +858,11 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   P.consumeToken(tok::l_brace);
 
   // Eat attributes, if present.
-  if (!P.canParseAttributes())
-    return false;
+  while (P.consumeIf(tok::at_sign)) {
+    if (!P.consumeIf(tok::identifier)) return false;
+    // Eat paren after attribute name; e.g. @foo(x)
+    if (P.Tok.is(tok::l_paren)) P.skipSingle();
+  }
 
   // Check if we have 'didSet'/'willSet' after attributes.
   return P.Tok.isContextualKeyword("didSet") ||
