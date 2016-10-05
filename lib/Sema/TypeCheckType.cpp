@@ -582,19 +582,19 @@ Type TypeChecker::applyUnboundGenericArguments(
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
 
-    // Collect the complete set of generic arguments.
-    SmallVector<Type, 4> scratch;
-    ArrayRef<Type> allGenericArgs = BGT->getAllGenericArgs(scratch);
-
     // Check the generic arguments against the generic signature.
     auto genericSig = decl->getGenericSignature();
     if (!decl->hasType() || decl->isValidatingGenericSignature()) {
       diagnose(loc, diag::recursive_requirement_reference);
       return nullptr;
     }
+
+    // Collect the complete set of generic arguments.
     assert(genericSig != nullptr);
+    auto substitutions = BGT->getMemberSubstitutions(BGT->getDecl());
+
     if (checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
-                              allGenericArgs))
+                              substitutions))
       return nullptr;
 
     useObjectiveCBridgeableConformancesOfArgs(dc, BGT);

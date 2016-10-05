@@ -387,8 +387,6 @@ private:
     SwiftContext.bumpGeneration();
   }
 
-  importer::EnumInfoCache enumInfoCache;
-
 public:
   /// \brief Keep track of subscript declarations based on getter/setter
   /// pairs.
@@ -398,24 +396,16 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
-  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return enumInfoCache.getEnumInfo(
-        SwiftContext, decl, ppOverride ? *ppOverride : getClangPreprocessor());
+  importer::EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
+    return getNameImporter().getEnumInfo(decl);
   }
-  importer::EnumKind getEnumKind(const clang::EnumDecl *decl,
-                                 clang::Preprocessor *ppOverride = nullptr) {
-    return getEnumInfo(decl, ppOverride).getKind();
+  importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
+    return getNameImporter().getEnumKind(decl);
   }
-
-  // TODO: drop this accessor as soon as EnumInfoCaches are hosted by name
-  // lookup
-  importer::EnumInfoCache &getEnumInfoCache() { return enumInfoCache; }
 
   // TODO: drop this accessor as soon as we further de-couple the swift name
   // lookup tables from the Impl.
   LookupTableMap &getLookupTables() { return LookupTables; }
-
 
 private:
   class EnumConstantDenseMapInfo {
@@ -542,7 +532,17 @@ private:
 
 public:
   importer::PlatformAvailability platformAvailability;
-  importer::NameImporter nameImporter;
+
+private:
+  /// For importing names. This is initialized by the ClangImporter::create()
+  /// after having set up a suitable Clang instance.
+  std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
+
+public:
+  importer::NameImporter &getNameImporter() {
+    assert(nameImporter && "haven't finished initialization");
+    return *nameImporter;
+  }
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
@@ -621,10 +621,8 @@ public:
   /// \param D The Clang declaration whose name should be imported.
   importer::ImportedName
   importFullName(const clang::NamedDecl *D,
-                 importer::ImportNameOptions options = None,
-                 clang::Sema *clangSemaOverride = nullptr) {
-    return nameImporter.importFullName(
-        D, clangSemaOverride ? *clangSemaOverride : getClangSema(), options);
+                 importer::ImportNameOptions options = None) {
+    return getNameImporter().importName(D, options);
   }
 
   /// Print an imported name as a string suitable for the swift_name attribute,
@@ -970,11 +968,10 @@ public:
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
-  inferDefaultArgument(ASTContext &, importer::EnumInfoCache &,
-                       clang::Preprocessor &pp, clang::QualType type,
-                       OptionalTypeKind clangOptionality, Identifier baseName,
-                       unsigned numParams, StringRef argumentLabel,
-                       bool isFirstParameter, bool isLastParameter);
+  inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
+                       Identifier baseName, unsigned numParams,
+                       StringRef argumentLabel, bool isFirstParameter,
+                       bool isLastParameter, importer::NameImporter &);
 
   /// \brief Import the type of an Objective-C method.
   ///
@@ -1150,8 +1147,8 @@ namespace importer {
 
 /// Add the given named declaration as an entry to the given Swift name
 /// lookup table, including any of its child entries.
-void addEntryToLookupTable(clang::Sema &clangSema, SwiftLookupTable &table,
-                           clang::NamedDecl *named, importer::NameImporter &);
+void addEntryToLookupTable(SwiftLookupTable &table, clang::NamedDecl *named,
+                           importer::NameImporter &);
 
 /// Add the macros from the given Clang preprocessor to the given
 /// Swift name lookup table.
@@ -1168,14 +1165,16 @@ void finalizeLookupTable(clang::ASTContext &clangCtx, clang::Preprocessor &pp,
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 class SwiftNameLookupExtension : public clang::ModuleFileExtension {
-  NameImporter nameImporter;
   LookupTableMap &lookupTables;
+  ASTContext &swiftCtx;
+  const PlatformAvailability &availability;
+  const bool inferImportAsMember;
 
 public:
-  SwiftNameLookupExtension(ClangImporter::Implementation &impl)
-      : nameImporter(impl.SwiftContext, impl.platformAvailability,
-                     impl.getEnumInfoCache(), impl.InferImportAsMember),
-        lookupTables(impl.getLookupTables()) {}
+  SwiftNameLookupExtension(LookupTableMap &tables, ASTContext &ctx,
+                           const PlatformAvailability &avail, bool inferIAM)
+      : lookupTables(tables), swiftCtx(ctx), availability(avail),
+        inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

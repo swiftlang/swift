@@ -277,69 +277,6 @@ bool TypeBase::isSpecialized() {
   });
 }
 
-ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
-  Type type(this);
-  SmallVector<ArrayRef<Type>, 2> allGenericArgs;
-
-  while (type) {
-    // Gather generic arguments from a bound generic type.
-    if (auto bound = type->getAs<BoundGenericType>()) {
-      allGenericArgs.push_back(bound->getGenericArgs());
-
-      // Continue up to the parent.
-      type = bound->getParent();
-      continue;
-    }
-
-    // Use the generic type parameter types for an unbound generic type.
-    if (auto unbound = type->getAs<UnboundGenericType>()) {
-      auto genericSig = unbound->getDecl()->getGenericSignature();
-      auto genericParams = genericSig->getInnermostGenericParams();
-      allGenericArgs.push_back(
-        llvm::makeArrayRef((const Type *)genericParams.data(),
-                           genericParams.size()));
-
-      // Continue up to the parent.
-      type = unbound->getParent();
-      continue;
-    }
-
-    // For a protocol type, use its Self parameter.
-    if (auto protoType = type->getAs<ProtocolType>()) {
-      auto proto = protoType->getDecl();
-      allGenericArgs.push_back(
-        llvm::makeArrayRef(proto->getSelfInterfaceType()));
-
-      // Continue up to the parent.
-      type = protoType->getParent();
-      continue;
-    }
-
-    // Look through non-generic nominal types.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      continue;
-    }
-
-    break;
-  }
-
-  // Trivial case: no generic arguments.
-  if (allGenericArgs.empty())
-    return { };
-
-  // Common case: a single set of generic arguments, for which we need no
-  // allocation.
-  if (allGenericArgs.size() == 1)
-    return allGenericArgs.front();
-
-  // General case: concatenate all of the generic argument lists together.
-  scratch.clear();
-  for (auto args : reversed(allGenericArgs))
-    scratch.append(args.begin(), args.end());
-  return scratch;
-}
-
 bool TypeBase::isUnspecializedGeneric() {
   CanType CT = getCanonicalType();
   if (CT.getPointer() != this)
@@ -1042,9 +979,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
     return depMem->getAssocType();
 
   if (auto archetype = dyn_cast<ArchetypeType>(this)) {
-    if (auto proto = archetype->getSelfProtocol())
-      return proto->getProtocolSelf();
-
     if (auto assoc = archetype->getAssocType())
       return assoc;
 
@@ -2876,8 +2810,17 @@ static Type getMemberForBaseType(ConformanceSource conformances,
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
       return Type();
 
-    return conformance->getConcrete()->getTypeWitness(assocType, resolver)
-             .getReplacement();
+    auto witness = conformance->getConcrete()
+        ->getTypeWitness(assocType, resolver).getReplacement();
+
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (options & SubstFlags::DesugarMemberTypes)
+      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer()))
+        if (!aliasType->is<ErrorType>())
+          witness = aliasType->getSinglyDesugaredType();
+
+    return witness;
   }
 
   // FIXME: This is a fallback. We want the above, conformance-based

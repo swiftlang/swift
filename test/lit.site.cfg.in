@@ -64,6 +64,9 @@ if "@SWIFT_AST_VERIFIER@" == "TRUE":
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
+if "@SWIFT_STDLIB_ENABLE_RESILIENCE@" == "TRUE":
+    config.available_features.add("resilient_stdlib")
+
 if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
     config.available_features.add('broken_std_regex')
 

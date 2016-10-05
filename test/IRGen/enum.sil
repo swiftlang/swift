@@ -408,9 +408,8 @@ enum NoPayloads2 {
 sil @no_payload_switch_2 : $@convention(thin) (NoPayloads2) -> () {
 // CHECK: entry:
 entry(%u : $NoPayloads2):
-// CHECK:   switch i8 %0, label %[[DEFAULT_DEST:[0-9]+]] [
-// CHECK:     i8 4, label %[[U_DEST:[0-9]+]]
-// CHECK:   ]
+// CHECK:   [[COND:%.*]] = icmp ne i8 %0, 4
+// CHECK:   br i1 [[COND]], label %[[DEFAULT_DEST:[0-9]+]], label %[[U_DEST:[0-9]+]]
   switch_enum %u : $NoPayloads2, case #NoPayloads2.u!enumelt: u_dest, default default_dest
 
 // CHECK: ; <label>:[[U_DEST]]
@@ -2238,10 +2237,7 @@ enum MultiPayloadNested {
 // CHECK:   %5 = load i8, i8* %4
 // CHECK:   %6 = lshr i8 %5, 7
 // CHECK:   %7 = trunc i8 %6 to i1
-// CHECK:   switch i1 %7, label {{%.*}} [
-// CHECK:     i1 false, label {{%.*}}
-// CHECK:     i1 true, label {{%.*}}
-// CHECK:   ]
+// CHECK:   br i1 %7
 sil @multi_payload_nested_switch : $(@in MultiPayloadNested) -> () {
 entry(%c : $*MultiPayloadNested):
   switch_enum_addr %c : $*MultiPayloadNested, case #MultiPayloadNested.A!enumelt.1: a_dest, case #MultiPayloadNested.B!enumelt.1: b_dest
@@ -2274,10 +2270,7 @@ enum MultiPayloadNestedSpareBits {
 // CHECK-64:   %2 = load [[WORD]], [[WORD]]* %1
 // CHECK-64:   %3 = lshr [[WORD]] %2, 61
 // CHECK-64:   %4 = trunc [[WORD]] %3 to i1
-// CHECK-64:   switch i1 %4, label {{%.*}} [
-// CHECK-64:     i1 false, label {{%.*}}
-// CHECK-64:     i1 true, label {{%.*}}
-// CHECK-64:   ]
+// CHECK-64:   br i1 %4
 sil @multi_payload_nested_spare_bits_switch : $(@in MultiPayloadNestedSpareBits) -> () {
 entry(%c : $*MultiPayloadNestedSpareBits):
   switch_enum_addr %c : $*MultiPayloadNestedSpareBits, case #MultiPayloadNestedSpareBits.A!enumelt.1: a_dest, case #MultiPayloadNestedSpareBits.B!enumelt.1: b_dest

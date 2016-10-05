@@ -2403,11 +2403,12 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
         if (usesDeprecatedCompositionSyntax) {
           // Provide fixits to remove the composition, leaving the types intact.
           auto compositionRange = Composition->getCompositionRange();
+          auto token = Lexer::getTokenAtLocation(SourceMgr, compositionRange.End);
           diagnose(Composition->getSourceLoc(),
                    diag::disallowed_protocol_composition)
             .highlight({Composition->getStartLoc(), compositionRange.End})
             .fixItRemove({Composition->getSourceLoc(), compositionRange.Start})
-            .fixItRemove(startsWithGreater(L->getTokenAt(compositionRange.End))
+            .fixItRemove(startsWithGreater(token)
                          ? compositionRange.End
                          : SourceLoc());
         } else {

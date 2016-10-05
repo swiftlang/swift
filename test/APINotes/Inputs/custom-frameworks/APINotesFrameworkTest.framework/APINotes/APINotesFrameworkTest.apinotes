@@ -1,4 +1,0 @@
-Name: APINotesFrameworkTest
-Functions:
-  - Name: jumpToLocation
-    SwiftName: 'jumpTo(x:y:z:)'

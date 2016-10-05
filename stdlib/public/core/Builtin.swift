@@ -283,6 +283,7 @@ public func _onFastPath() {
 // Declare it here instead of RuntimeShims.h, because we need to specify
 // the type of argument to be AnyClass. This is currently not possible
 // when using RuntimeShims.h
+@_versioned
 @_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
 func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
@@ -480,6 +481,7 @@ internal func _makeBridgeObject(
   )
 }
 
+@_versioned
 @_silgen_name("_swift_class_getSuperclass")
 internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 

@@ -48,6 +48,22 @@ function(_compute_lto_flag option out_var)
   endif()
 endfunction()
 
+function(_set_target_prefix_and_suffix target kind sdk)
+  precondition(target MESSAGE "target is required")
+  precondition(kind MESSAGE "kind is required")
+  precondition(sdk MESSAGE "sdk is required")
+
+  if("${sdk}" STREQUAL "WINDOWS")
+    if("${kind}" STREQUAL "STATIC")
+      set_property(TARGET "${target}" PROPERTY PREFIX "lib")
+      set_property(TARGET "${target}" PROPERTY SUFFIX ".lib")
+    elseif("${libkind}" STREQUAL "SHARED")
+      set_property(TARGET "${target}" PROPERTY PREFIX "")
+      set_property(TARGET "${target}" PROPERTY SUFFIX ".dll")
+    endif()
+  endif()
+endfunction()
+
 function(is_darwin_based_sdk sdk_name out_var)
   if ("${sdk_name}" STREQUAL "OSX" OR
       "${sdk_name}" STREQUAL "IOS" OR
@@ -357,12 +373,15 @@ endfunction()
 #
 # Usage:
 #   _add_swift_lipo_target(
+#     sdk                 # The name of the SDK the target was created for.
+#                         # Examples include "OSX", "IOS", "ANDROID", etc.
 #     target              # The name of the target to create
 #     output              # The file to be created by this target
 #     source_targets...   # The source targets whose outputs will be
 #                         # lipo'd into the output.
 #   )
-function(_add_swift_lipo_target target output)
+function(_add_swift_lipo_target sdk target output)
+  precondition(sdk MESSAGE "sdk is required")
   precondition(target MESSAGE "target is required")
   precondition(output MESSAGE "output is required")
 
@@ -381,7 +400,8 @@ function(_add_swift_lipo_target target output)
     endif()
   endforeach()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
         COMMAND "${LIPO}" "-create" "-output" "${output}" ${source_binaries}
@@ -683,6 +703,7 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
       ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES}
       ${SWIFT_SECTIONS_OBJECT_END})
+  _set_target_prefix_and_suffix("${target}" "${libkind}" "${SWIFTLIB_SINGLE_SDK}")
 
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if(NOT "${SWIFT_${SWIFTLIB_SINGLE_SDK}_ICU_UC_INCLUDE}" STREQUAL "")
@@ -696,13 +717,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
-    if("${libkind}" STREQUAL "STATIC")
-      set_property(TARGET "${target}" PROPERTY PREFIX "lib")
-      set_property(TARGET "${target}" PROPERTY SUFFIX ".lib")
-    elseif("${libkind}" STREQUAL "SHARED")
-      set_property(TARGET "${target}" PROPERTY PREFIX "")
-      set_property(TARGET "${target}" PROPERTY SUFFIX ".dll")
-
+    if("${libkind}" STREQUAL "SHARED")
       # Each dll has an associated .lib (import library); since we may be
       # building on a non-DLL platform (not windows), create an imported target
       # for the library which created implicitly by the dll.
@@ -1456,6 +1471,7 @@ function(add_swift_library name)
         endif()
         
         _add_swift_lipo_target(
+            ${sdk}
             ${lipo_target}${unsigned}
             "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
             ${THIN_INPUT_TARGETS})
@@ -1518,6 +1534,7 @@ function(add_swift_library name)
           set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
           _add_swift_lipo_target(
+              ${sdk}
               ${lipo_target_static}
               "${UNIVERSAL_LIBRARY_NAME}"
               ${THIN_INPUT_TARGETS_STATIC})

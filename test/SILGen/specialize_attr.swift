@@ -21,9 +21,9 @@ public struct SS : QQ {
 
 public struct GG<T : PP> {}
 
-// CHECK-LABEL: public class CC<T : PP> {
+// CHECK-LABEL: public class CC<T> where T : PP {
 // CHECK-NEXT: @_specialize(RR, SS)
-// CHECK-NEXT: @inline(never) public func foo<U : QQ>(_ u: U, g: GG<T>) -> (U, GG<T>)
+// CHECK-NEXT: @inline(never) public func foo<U>(_ u: U, g: GG<T>) -> (U, GG<T>) where U : QQ
 public class CC<T : PP> {
   @inline(never)
   @_specialize(RR, SS)

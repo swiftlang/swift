@@ -1976,9 +1976,13 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
     aliasDecl->setImplicit();
-    if (type->is<ErrorType>())
+    if (type->is<ErrorType>()) {
       aliasDecl->setInvalid();
-    if (type->hasArchetype()) {
+
+      // If we're recording a failed type witness, keep the sugar around for
+      // code completion.
+      type = aliasDecl->getDeclaredType();
+    } else if (type->hasArchetype()) {
       Type metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
@@ -2101,9 +2105,9 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
       Type SelfType = Adopter->getSelfTypeInContext();
       if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType, Adopter);
+        Options.setArchetypeSelfTransform(SelfType);
       else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+        Options.setArchetypeAndDynamicSelfTransform(SelfType);
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in

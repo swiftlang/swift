@@ -242,7 +242,16 @@ namespace {
 
           // If the superclass is resilient to us, we cannot statically
           // know the layout of either its instances or its class objects.
-          ClassHasFixedFieldCount = false;
+          //
+          // FIXME: We need to implement indirect field/vtable entry access
+          // before we can enable this
+          if (IGM.Context.LangOpts.EnableClassResilience) {
+            ClassHasFixedFieldCount = false;
+          } else {
+            addFieldsForClass(superclass, superclassType);
+            NumInherited = Elements.size();
+          }
+
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to

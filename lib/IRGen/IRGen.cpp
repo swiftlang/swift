@@ -248,6 +248,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   ModulePasses.run(*Module);
 }
 
+namespace {
 /// An output stream which calculates the MD5 hash of the streamed data.
 class MD5Stream : public llvm::raw_ostream {
 private:
@@ -269,6 +270,7 @@ public:
     Hash.final(Result);
   }
 };
+}
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
