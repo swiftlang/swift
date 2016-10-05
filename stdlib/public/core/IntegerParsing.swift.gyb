@@ -125,11 +125,41 @@ private func _parseOptionalAsciiSign(
 %   Self = self_ty.stdlib_name
 
 extension ${Self} {
-  /// Construct from an ASCII representation in the given `radix`.
+  /// Creates a new integer value from the given string and radix.
   ///
-  /// If `text` does not match the regular expression
-  /// "[+-]?[0-9a-zA-Z]+", or the value it denotes in the given `radix`
-  /// is not representable, the result is `nil`.
+  /// The string passed as `text` may begin with a plus or minus sign character
+  /// (`+` or `-`), followed by one or more numeric digits (`0-9`) or letters
+  /// (`a-z` or `A-Z`). The string is case insensitive.
+  ///
+  ///     let x = ${Self}("123")
+  ///     // x == 123
+  ///
+%   if signed:
+  ///     let y = ${Self}("-123", radix: 8)
+  ///     // y == -83
+%   else:
+  ///     let y = ${Self}("+123", radix: 8)
+  ///     // y == +83
+%   end
+  ///
+  ///     let z = ${Self}("07b", radix: 16)
+  ///     // z == 123
+  ///
+  /// If `text` is in an invalid format or contains characters that are out of
+  /// range for the given `radix`, or if the value it denotes in the given
+  /// `radix` is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     ${Self}(" 100")                       // Includes whitespace
+  ///     ${Self}("21-50")                      // Invalid format
+  ///     ${Self}("ff6600")                     // Characters out of bounds
+  ///     ${Self}("zzzzzzzzzzzzz", radix: 36)   // Out of range
+  ///
+  /// - Parameters:
+  ///   - text: The ASCII representation of a number in the radix passed as
+  ///     `radix`.
+  ///   - radix: The radix, or base, to use for converting `text` to an integer
+  ///     value. `radix` must be in the range `2...36`. The default is 10.
   public init?(_ text: String, radix: Int = 10) {
     if let value = _parseAsciiAs${'' if signed else 'U'}Int${int_max_bits}(
       text.utf16, radix, ${'' if signed else 'U'}Int${int_max_bits}(${Self}.max)) {
