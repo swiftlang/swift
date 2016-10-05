@@ -683,7 +683,7 @@ GenericSignature *TypeChecker::validateGenericSignature(
                     DeclContext *dc,
                     GenericSignature *parentSig,
                     bool allowConcreteGenericParams,
-                    std::function<bool(ArchetypeBuilder &)> inferRequirements) {
+                    std::function<void(ArchetypeBuilder &)> inferRequirements) {
   assert(genericParams && "Missing generic parameters?");
 
   // Create the archetype builder.

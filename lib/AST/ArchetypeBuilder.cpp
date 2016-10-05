@@ -1534,7 +1534,6 @@ void ArchetypeBuilder::addRequirement(const Requirement &req,
 class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
   ArchetypeBuilder &Builder;
   SourceLoc Loc;
-  bool HadError = false;
   unsigned Depth;
 
   /// We cannot add requirements to archetypes from outer generic parameter
@@ -1550,8 +1549,6 @@ public:
                           SourceLoc loc,
                           unsigned Depth)
     : Builder(builder), Loc(loc), Depth(Depth) { }
-
-  bool hadError() const { return HadError; }
 
   virtual Action walkToTypePost(Type ty) override { 
     auto boundGeneric = ty->getAs<BoundGenericType>();
@@ -1604,14 +1601,12 @@ public:
         if (firstPA && secondPA) {
           if (Builder.addSameTypeRequirementBetweenArchetypes(firstPA, secondPA,
                                                               source)) {
-            HadError = true;
             return Action::Stop;
           }
         } else if (firstPA || secondPA) {
           auto PA = firstPA ? firstPA : secondPA;
           auto concrete = firstPA ? secondType : firstType;
           if (Builder.addSameTypeRequirementToConcrete(PA, concrete, source)) {
-            HadError = true;
             return Action::Stop;
           }
         }
@@ -1639,13 +1634,11 @@ public:
           auto proto = req.getSecondType()->castTo<ProtocolType>();
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
-            HadError = true;
             return Action::Stop;
           }
         } else {
           if (Builder.addSuperclassRequirement(subjectPA, req.getSecondType(),
                                                source)) {
-            HadError = true;
             return Action::Stop;
           }
         }
@@ -1658,28 +1651,25 @@ public:
   }
 };
 
-bool ArchetypeBuilder::inferRequirements(TypeLoc type,
+void ArchetypeBuilder::inferRequirements(TypeLoc type,
                                          GenericParamList *genericParams) {
   if (!type.getType())
-    return true;
+    return;
   if (genericParams == nullptr)
-    return false;
+    return;
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(*this, type.getSourceRange().Start,
                                  genericParams->getDepth());
   type.getType().walk(walker);
-  return walker.hadError();
 }
 
-bool ArchetypeBuilder::inferRequirements(ParameterList *params,
+void ArchetypeBuilder::inferRequirements(ParameterList *params,
                                          GenericParamList *genericParams) {
   if (genericParams == nullptr)
-    return false;
+    return;
   
-  bool hadError = false;
   for (auto P : *params)
-    hadError |= inferRequirements(P->getTypeLoc(), genericParams);
-  return hadError;
+    inferRequirements(P->getTypeLoc(), genericParams);
 }
 
 /// Perform typo correction on the given nested type, producing the
@@ -1733,9 +1723,8 @@ static Identifier typoCorrectNestedType(
   return bestMatches.front();
 }
 
-bool
+void
 ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
-  bool invalid = false;
   SmallPtrSet<PotentialArchetype *, 4> visited;
 
   // Check for generic parameters which have been made concrete or equated
@@ -1769,7 +1758,6 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
         Diags.diagnose(Source->getLoc(),
                        diag::requires_generic_param_made_equal_to_concrete,
                        rep->getName());
-        invalid = true;
         continue;
       }
 
@@ -1788,7 +1776,6 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
           Diags.diagnose(Source->getLoc(),
                          diag::requires_generic_params_made_equal,
                          pa->getName(), other->getName());
-          invalid = true;
           break;
         }
       }
@@ -1814,7 +1801,6 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
 
           Context.Diags.diagnose(loc, diag::invalid_member_type_alias,
                                  pa->getName());
-          invalid = true;
           pa->setInvalid();
           return;
         }
@@ -1823,7 +1809,6 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
       // Try to typo correct to a nested type name.
       Identifier correction = typoCorrectNestedType(pa);
       if (correction.empty()) {
-        invalid = true;
         pa->setInvalid();
         return;
       }
@@ -1838,8 +1823,6 @@ ArchetypeBuilder::finalize(SourceLoc loc, bool allowConcreteGenericParams) {
         RequirementSource(RequirementSource::Redundant, SourceLoc()));
     });
   }
-
-  return invalid;
 }
 
 template<typename F>
