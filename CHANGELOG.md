@@ -20,6 +20,14 @@ CHANGELOG
 Swift 3.1
 ---------
 
+* [SR-1009](https://bugs.swift.org/browse/SR-1009):
+
+  Constrained extensions allow same-type constraints between generic parameters and concrete types.
+
+  ```swift
+  extension Array where Element == Int { }
+  ```
+
 * [SE-0045][]:
 
   The `Sequence` protocol adds new members `prefix(while:)` and
