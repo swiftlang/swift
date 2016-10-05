@@ -1110,6 +1110,15 @@ namespace {
       auto subscriptMemberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
 
+      // FIXME: This can only happen when diagnostics successfully type-checked
+      // sub-expression of the subscript and mutated AST, but under normal
+      // circumstances subscript should never have InOutExpr as a direct child
+      // until type checking is complete and expression is re-written.
+      // Proper fix for such situation requires preventing diagnostics from
+      // re-writing AST after successful type checking of the sub-expressions.
+      if (auto inoutExpr = dyn_cast<InOutExpr>(base))
+        base = inoutExpr->getSubExpr();
+
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = base->getType();
@@ -1119,7 +1128,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (decl) {
-        OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
+        OverloadChoice choice(baseTy, decl, /*isSpecialized=*/false,
                               FunctionRefKind::DoubleApply);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
