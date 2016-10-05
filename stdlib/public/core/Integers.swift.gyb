@@ -1008,6 +1008,7 @@ extension ${Protocol} {
 %   for x in binaryArithmetic[Protocol]:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 ${operationComment(x.operator)}
+  @_transparent
   public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
     var lhs = self
     lhs.${x.mutatingName}(${callLabel}rhs)
@@ -2049,7 +2050,7 @@ extension FixedWidthInteger {
   public mutating func ${x.mutatingName}(${x.firstArg} other: Self) {
     let (result, overflow) = self.${x.name}WithOverflow(${callLabel}other)
     // FIXME(integers): uncomment the check
-    //_precondition(overflow != .none, "Overflow in ${x.mutatingName}")
+    _precondition(overflow != .none, "Overflow in ${x.mutatingName}")
     self = result
   }
 
@@ -2178,19 +2179,19 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
     // FIXME(integers): uncomment checks
-    //_precondition(source >= 0,
-      //"Negative value is not representable")
-    //let requiredBits = source.minimumSignedRepresentationBitWidth - 1
-    //_precondition(requiredBits <= Self.bitWidth,
-      //"Not enough bits to represent an unsigned value")
+    _precondition(source >= 0,
+      "negative value is not representable")
+    let requiredBits = source.minimumSignedRepresentationBitWidth - 1
+    _precondition(requiredBits <= Self.bitWidth,
+      "Not enough bits to represent an unsigned value")
     self.init(extendingOrTruncating: source)
   }
 
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
     // FIXME(integers): uncomment the check
-    //_precondition(source >= 0,
-      //"Negative value is not representable")
+    _precondition(source >= 0,
+      "Negative value is not representable")
     let requiredBits = source.minimumSignedRepresentationBitWidth - 1
     if requiredBits > Self.bitWidth {
       return nil

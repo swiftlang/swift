@@ -205,7 +205,6 @@ func _memcpy(
   let dest = destination._rawValue
   let src = src._rawValue
   let size = UInt64(size)._value
-  let zero: Int32 = 0
   Builtin.int_memcpy_RawPointer_RawPointer_Int64(
     dest, src, size,
     /*alignment:*/ Int32()._value,
@@ -224,7 +223,6 @@ func _memmove(
   let dest = destination._rawValue
   let src = src._rawValue
   let size = UInt64(size)._value
-  let zero: Int32 = 0
   Builtin.int_memmove_RawPointer_RawPointer_Int64(
     dest, src, size,
     /*alignment:*/ Int32()._value,

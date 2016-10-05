@@ -179,17 +179,6 @@ func _Filter<C>(c: LazyFilterCollection<C>) {
 }
 
 func _FixedPoint() {
-  var i: Int = 0
-  var u: UInt = 0
-  i++ // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{4-6= += 1}} {{none}}
-  ++i // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= += 1}} {{none}}
-  i-- // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{4-6= -= 1}} {{none}}
-  --i // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= -= 1}} {{none}}
-  u++ // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{4-6= += 1}} {{none}}
-  ++u // expected-error {{'++' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= += 1}} {{none}}
-  u-- // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{4-6= -= 1}} {{none}}
-  --u // expected-error {{'--' is unavailable: it has been removed in Swift 3}} {{3-5=}} {{6-6= -= 1}} {{none}}
-
   func fn1<T: IntegerType>(i: T) {} // expected-error {{'IntegerType' has been renamed to 'FixedWidthInteger'}} {{15-26=FixedWidthInteger}} {{none}}
   func fn2<T: SignedIntegerType>(i: T) {} // expected-error {{'SignedIntegerType' has been renamed to 'SignedInteger'}} {{15-32=SignedInteger}} {{none}}
   func fn3<T: UnsignedIntegerType>(i: T) {} // expected-error {{'UnsignedIntegerType' has been renamed to 'UnsignedInteger'}} {{15-34=UnsignedInteger}} {{none}}
