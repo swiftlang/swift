@@ -171,8 +171,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     // Attributes.
     bool FoundCCToken;
-    parseDeclAttributeList(param.Attrs, FoundCCToken,
-                          /*stop at type attributes*/true, true);
+    parseDeclAttributeList(param.Attrs, FoundCCToken);
     if (FoundCCToken) {
       if (CodeCompletion) {
         CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), true);
