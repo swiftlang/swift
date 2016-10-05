@@ -921,22 +921,30 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
       return CodeCompletionResult::ExpectedTypeRelation::Invalid;
-    return std::max(calculateTypeRelation(FT->getResult(), ExpectedTy, DC),
-                    CodeCompletionResult::ExpectedTypeRelation::Unrelated);
   }
   return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 }
 
-static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelationForDecl (
-                                                            const Decl *D,
-                                                            Type ExpectedType) {
+static CodeCompletionResult::ExpectedTypeRelation
+calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
+                             bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
   if (!VD)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  if (auto FD = dyn_cast<FuncDecl>(VD)) {
-    return std::max(calculateTypeRelation(FD->getType(), ExpectedType, DC),
-                    calculateTypeRelation(FD->getResultType(), ExpectedType, DC));
+
+  if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    auto funcType = FD->getType()->getAs<AnyFunctionType>();
+    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>())
+      funcType = funcType->getResult()->getAs<AnyFunctionType>();
+    if (funcType) {
+      auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
+      if (UseFuncResultType)
+        relation =
+            std::max(relation, calculateTypeRelation(funcType->getResult(),
+                                                     ExpectedType, DC));
+      return relation;
+    }
   }
   if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
     return std::max(calculateTypeRelation(NTD->getType(), ExpectedType, DC),
@@ -1632,6 +1640,19 @@ private:
       swift::markup::getSwiftDocKeyword(VD, Pairs);
     }
     Builder.addDeclDocCommentWords(llvm::makeArrayRef(Pairs));
+  }
+
+  bool shouldUseFunctionReference(AbstractFunctionDecl *D) {
+    if (PreferFunctionReferencesToCalls)
+      return true;
+    for (auto expectedType : ExpectedTypes) {
+      if (expectedType && expectedType->is<AnyFunctionType>() &&
+          calculateTypeRelationForDecl(D, expectedType, false) >=
+              CodeCompletionResult::ExpectedTypeRelation::Convertible) {
+        return true;
+      }
+    }
+    return false;
   }
 
 public:
@@ -2731,10 +2752,7 @@ public:
         Builder.addTextChunk(":");
       }
 
-      if (!HaveRParen)
-        Builder.addRightParen();
-      else
-        Builder.addAnnotatedRightParen();
+      Builder.addRightParen();
     }
   }
 
@@ -2757,7 +2775,7 @@ public:
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         // Do we want compound function names here?
-        if (PreferFunctionReferencesToCalls) {
+        if (shouldUseFunctionReference(CD)) {
           addCompoundFunctionName(CD, Reason);
           return;
         }
@@ -2821,7 +2839,7 @@ public:
           return;
 
         // Do we want compound function names here?
-        if (PreferFunctionReferencesToCalls) {
+        if (shouldUseFunctionReference(FD)) {
           addCompoundFunctionName(FD, Reason);
           return;
         }
@@ -2889,7 +2907,7 @@ public:
           return;
 
         // Do we want compound function names here?
-        if (PreferFunctionReferencesToCalls) {
+        if (shouldUseFunctionReference(FD)) {
           addCompoundFunctionName(FD, Reason);
           return;
         }
