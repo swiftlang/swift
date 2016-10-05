@@ -1,6 +1,7 @@
 // RUN: %target-parse-verify-swift
 
-@escaping var fn : () -> Int = { 4 }  // expected-error {{@escaping may only be used on 'parameter' declarations}} {{1-11=}}
+@escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
+func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}
 
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 

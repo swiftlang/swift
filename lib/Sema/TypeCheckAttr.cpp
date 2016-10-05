@@ -155,15 +155,6 @@ public:
     TC.checkNoEscapeAttr(cast<ParamDecl>(D), attr);
   }
 
-  void visitEscapingAttr(EscapingAttr *attr) {
-    auto *PD = cast<ParamDecl>(D);
-    auto *FTy = PD->getType()->getAs<FunctionType>();
-    if (FTy == 0) {
-      TC.diagnose(attr->getLocation(), diag::escaping_function_type);
-      attr->setInvalid();
-    }
-  }
-
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -742,7 +733,6 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(DiscardableResult)
-    IGNORED_ATTR(Escaping)
 
     // FIXME: We actually do have things to enforce for versioned API.
     IGNORED_ATTR(Versioned)
