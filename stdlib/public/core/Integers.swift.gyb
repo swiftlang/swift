@@ -240,9 +240,13 @@ def operationComment(operator):
   /// Returns the result of shifting this value's binary representation the
   /// specified number of digits to the right.
   ///
-  /// In a *masking shift*, the value passed as `rhs` is masked to produce a
-  /// value in the range `0..<x.bitWidth`. The shift is performed using this
-  /// masked value.
+  /// In a *masking shift*, the bit pattern of the value passed as `rhs` is
+  /// masked to produce a value between zero and the bit width of `lhs`. The
+  /// shift is performed using this masked value. Masking shifts require more
+  /// care to use correctly than a traditional bit shift, but are likely to be
+  /// more efficient when used with shift amounts that are not compile-time
+  /// constants. On most architectures, a masking shift compiles down to a
+  /// single instruction.
   ///
   /// For example, if you pass `2` to the `maskingShiftRight(_:)` method on an
   /// 8-bit, unsigned integer, the shift amount requires no masking.
@@ -298,9 +302,13 @@ def operationComment(operator):
   /// Returns the result of shifting this value's binary representation the
   /// specified number of digits to the left.
   ///
-  /// In a *masking shift*, the value passed as `rhs` is masked to produce a
-  /// value in the range `0..<x.bitWidth`. The shift is performed using this
-  /// masked value.
+  /// In a *masking shift*, the bit pattern of the value passed as `rhs` is
+  /// masked to produce a value between zero and the bit width of `lhs`. The
+  /// shift is performed using this masked value. Masking shifts require more
+  /// care to use correctly than a traditional bit shift, but are likely to be
+  /// more efficient when used with shift amounts that are not compile-time
+  /// constants. On most architectures, a masking shift compiles down to a
+  /// single instruction.
   ///
   /// For example, if you pass `2` to the `maskingShiftLeft(_:)` method on an
   /// 8-bit, unsigned integer, the shift amount requires no masking.
@@ -1471,7 +1479,8 @@ ${mutatingOperationComment(x.operator)}
   /// Returns `-1` if this value is negative and `1` if it's positive;
   /// otherwise, `0`.
   ///
-  /// - Returns: The sign of this number, expressed as an integer.
+  /// - Returns: The sign of this number, expressed as an integer of the same
+  ///   type.
   func signum() -> Self
 }
 
