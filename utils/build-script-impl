@@ -1934,8 +1934,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(llvm_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(llvm_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
@@ -2049,8 +2049,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
                     -DCMAKE_CXX_FLAGS="$(swift_c_flags ${host})"
-                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2"
-                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2"
+                    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
+                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
