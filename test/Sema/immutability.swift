@@ -452,11 +452,11 @@ struct StructWithDelegatingInit {
 }
 
 func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
-// expected-error @-1 2{{expected ',' separator}} {{38-38=,}} expected-error @-1 2 {{expected parameter name followed by ':'}}
+// expected-error @-1 {{expected parameter name followed by ':'}}
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F { // expected-note 2 {{in declaration of 'F'}}
-  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error 2 {{expected declaration}}
+struct F { // expected-note 1 {{in declaration of 'F'}}
+  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
   }
   
   mutating nonmutating func g() {  // expected-error {{method may not be declared both mutating and nonmutating}} {{12-24=}}

@@ -679,48 +679,39 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       RightLoc = Tok.getLoc();
       return Status;
     }
-    SourceLoc SepLoc = Tok.getLoc();
-    if (consumeIf(SeparatorK)) {
-      if (Tok.is(RightK)) {
-        if (!AllowSepAfterLast) {
-          diagnose(Tok, diag::unexpected_separator,
-                   SeparatorK == tok::comma ? "," : ";")
-            .fixItRemove(SourceRange(SepLoc));
-        }
+    // If we haven't made progress, or seeing any error, skip ahead.
+    if (Tok.getLoc() == StartLoc || Status.isError()) {
+      assert(Status.isError() && "no progress without error");
+      skipUntilDeclRBrace(RightK, SeparatorK);
+      if (Tok.is(RightK) || (!OptionalSep && Tok.isNot(SeparatorK)))
         break;
+    }
+    if (consumeIf(SeparatorK)) {
+      if (Tok.isNot(RightK))
+        continue;
+      if (!AllowSepAfterLast) {
+        diagnose(Tok, diag::unexpected_separator,
+                 SeparatorK == tok::comma ? "," : ";")
+          .fixItRemove(SourceRange(PreviousLoc));
       }
-      continue;
+      break;
+    }
+    // If we're in a comma-separated list, the next token is at the
+    // beginning of a new line and can never start a element, break.
+    if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
+        (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
+      break;
+    }
+    // If we found EOF or such, bailout.
+    if (Tok.isAny(tok::eof, tok::pound_endif)) {
+      IsInputIncomplete = true;
+      break;
     }
     if (!OptionalSep) {
-      // If we're in a comma-separated list and the next token starts a new
-      // declaration at the beginning of a new line, skip until the end.
-      if (SeparatorK == tok::comma && Tok.isAtStartOfLine() &&
-          isStartOfDecl() && Tok.getLoc() != StartLoc) {
-        skipUntilDeclRBrace(RightK, SeparatorK);
-        break;
-      }
-
       StringRef Separator = (SeparatorK == tok::comma ? "," : ";");
       diagnose(Tok, diag::expected_separator, Separator)
         .fixItInsertAfter(PreviousLoc, Separator);
       Status.setIsParseError();
-    }
-
-
-    // If we haven't made progress, skip ahead
-    if (Tok.getLoc() == StartLoc) {
-      skipUntilDeclRBrace(RightK, SeparatorK);
-      if (Tok.is(RightK))
-        break;
-      if (Tok.is(tok::eof) || Tok.is(tok::pound_endif)) {
-        RightLoc = PreviousLoc.isValid()? PreviousLoc : Tok.getLoc();
-        IsInputIncomplete = true;
-        Status.setIsParseError();
-        return Status;
-      }
-      if (consumeIf(SeparatorK) || OptionalSep)
-        continue;
-      break;
     }
   }
 
