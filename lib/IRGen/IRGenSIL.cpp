@@ -53,6 +53,8 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
+#include "GenConstant.h"
+#include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
@@ -63,11 +65,10 @@
 #include "GenProto.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
-#include "GenEnum.h"
+#include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "ReferenceTypeInfo.h"
-#include "GenType.h"
 #include "WeakTypeInfo.h"
 
 using namespace swift;
@@ -2250,68 +2251,19 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   setLoweredExplosion(v, function);
 }
 
-/// Construct a ConstantInt from an IntegerLiteralInst.
-static llvm::Constant *getConstantInt(IRGenModule &IGM,
-                                      swift::IntegerLiteralInst *i) {
-  APInt value = i->getValue();
-  BuiltinIntegerWidth width
-    = i->getType().castTo<BuiltinIntegerType>()->getWidth();
-
-  // The value may need truncation if its type had an abstract size.
-  if (width.isFixedWidth()) {
-    // nothing to do
-  } else if (width.isPointerWidth()) {
-    unsigned pointerWidth = IGM.getPointerSize().getValueInBits();
-    assert(pointerWidth <= value.getBitWidth()
-           && "lost precision at AST/SIL level?!");
-    if (pointerWidth < value.getBitWidth())
-      value = value.trunc(pointerWidth);
-  } else {
-    llvm_unreachable("impossible width value");
-  }
-
-  return llvm::ConstantInt::get(IGM.LLVMContext, value);
-}
-
 void IRGenSILFunction::visitIntegerLiteralInst(swift::IntegerLiteralInst *i) {
-  llvm::Value *constant = getConstantInt(IGM, i);
-  
+  llvm::Value *constant = emitConstantInt(IGM, i);
+
   Explosion e;
   e.add(constant);
   setLoweredExplosion(i, e);
-}
-
-/// Construct a ConstantFP from a FloatLiteralInst.
-static llvm::Constant *getConstantFP(IRGenModule &IGM,
-                                     swift::FloatLiteralInst *i) {
-  return llvm::ConstantFP::get(IGM.LLVMContext, i->getValue());
 }
 
 void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
-  llvm::Value *constant = getConstantFP(IGM, i);
+  llvm::Value *constant = emitConstantFP(IGM, i);
   Explosion e;
   e.add(constant);
   setLoweredExplosion(i, e);
-}
-
-static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
-                                       StringLiteralInst::Encoding encoding) {
-  switch (encoding) {
-  case swift::StringLiteralInst::Encoding::UTF8:
-    return IGM.getAddrOfGlobalString(string);
-
-  case swift::StringLiteralInst::Encoding::UTF16: {
-    // This is always a GEP of a GlobalVariable with a nul terminator.
-    auto addr = IGM.getAddrOfGlobalUTF16String(string);
-
-    // Cast to Builtin.RawPointer.
-    return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
-  }
-
-  case swift::StringLiteralInst::Encoding::ObjCSelector:
-    llvm_unreachable("cannot get the address of an Objective-C selector");
-  }
-  llvm_unreachable("bad string encoding");
 }
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
@@ -2321,7 +2273,7 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
   if (i->getEncoding() == swift::StringLiteralInst::Encoding::ObjCSelector)
     addr = emitObjCSelectorRefLoad(i->getValue());
   else
-    addr = getAddrOfString(IGM, i->getValue(), i->getEncoding());
+    addr = emitAddrOfConstantString(IGM, i);
 
   Explosion e;
   e.add(addr);
@@ -2399,7 +2351,7 @@ static llvm::BasicBlock *emitBBMapForSwitchValue(
 static llvm::ConstantInt *
 getSwitchCaseValue(IRGenFunction &IGF, SILValue val) {
   if (auto *IL = dyn_cast<IntegerLiteralInst>(val)) {
-    return dyn_cast<llvm::ConstantInt>(getConstantInt(IGF.IGM, IL));
+    return dyn_cast<llvm::ConstantInt>(emitConstantInt(IGF.IGM, IL));
   }
   else {
     llvm_unreachable("Switch value cases should be integers");
@@ -4749,60 +4701,6 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   setLoweredExplosion(i, e);
 }
 
-static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
-                                        TupleInst *TI);
-
-/// Generate ConstantStruct for StructInst.
-static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
-                                        StructInst *SI) {
-  SmallVector<llvm::Constant*, 32> Elts;
-  assert(SI->getNumOperands() == STy->getNumElements() &&
-         "mismatch StructInst with its lowered StructType!");
-  for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-    if (auto *Elem = dyn_cast<StructInst>(SI->getOperand(i)))
-      Elts.push_back(getConstantValue(IGM,
-                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
-    else if (auto *Elem = dyn_cast<TupleInst>(SI->getOperand(i)))
-      Elts.push_back(getConstantValue(IGM,
-                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
-    else if (auto *ILI = dyn_cast<IntegerLiteralInst>(SI->getOperand(i)))
-      Elts.push_back(getConstantInt(IGM, ILI));
-    else if (auto *FLI = dyn_cast<FloatLiteralInst>(SI->getOperand(i)))
-      Elts.push_back(getConstantFP(IGM, FLI));
-    else if (auto *SLI = dyn_cast<StringLiteralInst>(SI->getOperand(i)))
-      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
-    else
-      llvm_unreachable("Unexpected SILInstruction in static initializer!");
-  }
-  return llvm::ConstantStruct::get(STy, Elts);
-}
-
-
-/// Generate ConstantStruct for StructInst.
-static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
-                                        TupleInst *TI) {
-  SmallVector<llvm::Constant*, 32> Elts;
-  assert(TI->getNumOperands() == STy->getNumElements() &&
-         "mismatch StructInst with its lowered StructType!");
-  for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-    if (auto *Elem = dyn_cast<StructInst>(TI->getOperand(i)))
-      Elts.push_back(getConstantValue(IGM,
-                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
-    else if (auto *Elem = dyn_cast<TupleInst>(TI->getOperand(i)))
-      Elts.push_back(getConstantValue(IGM,
-                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
-    else if (auto *ILI = dyn_cast<IntegerLiteralInst>(TI->getOperand(i)))
-      Elts.push_back(getConstantInt(IGM, ILI));
-    else if (auto *FLI = dyn_cast<FloatLiteralInst>(TI->getOperand(i)))
-      Elts.push_back(getConstantFP(IGM, FLI));
-    else if (auto *SLI = dyn_cast<StringLiteralInst>(TI->getOperand(i)))
-      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
-    else
-      llvm_unreachable("Unexpected SILInstruction in static initializer!");
-  }
-  return llvm::ConstantStruct::get(STy, Elts);
-}
-
 void IRGenModule::emitSILStaticInitializers() {
   SmallVector<SILFunction *, 8> StaticInitializers;
   for (SILGlobalVariable &Global : getSILModule().getSILGlobals()) {
@@ -4817,19 +4715,18 @@ void IRGenModule::emitSILStaticInitializers() {
     if (!IRGlobal || !IRGlobal->hasInitializer())
       continue;
 
-    auto *STy = cast<llvm::StructType>(IRGlobal->getInitializer()->getType());
     auto *InitValue = Global.getValueOfStaticInitializer();
 
     // Set the IR global's initializer to the constant for this SIL
     // struct.
     if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-      IRGlobal->setInitializer(getConstantValue(*this, STy, SI));
+      IRGlobal->setInitializer(emitConstantStruct(*this, SI));
       continue;
     }
 
     // Set the IR global's initializer to the constant for this SIL
     // tuple.
     auto *TI = cast<TupleInst>(InitValue);
-    IRGlobal->setInitializer(getConstantValue(*this, STy, TI));
+    IRGlobal->setInitializer(emitConstantTuple(*this, TI));
   }
 }
