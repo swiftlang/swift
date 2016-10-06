@@ -319,7 +319,7 @@ template <> struct GraphTraits<StackPromoter *>
     return nodes_iterator(SP->getFunction()->end(), SP->getFunction()->end());
   }
   static unsigned size(GraphType SP) {
-    return std::distance(nodes_begin(SP), nodes_end(SP));
+    return std::distance(SP->getFunction()->begin(), SP->getFunction()->end());
   }
 };
 
