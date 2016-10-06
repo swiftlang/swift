@@ -5531,24 +5531,18 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 namespace llvm {
 
 template <>
+struct ilist_sentinel_traits<::swift::SILInstruction> :
+  public ilist_half_embedded_sentinel_traits<::swift::SILInstruction> {};
+
+template <>
 struct ilist_traits<::swift::SILInstruction> :
   public ilist_default_traits<::swift::SILInstruction> {
   using SILInstruction = ::swift::SILInstruction;
 
 private:
-  mutable ilist_half_node<SILInstruction> Sentinel;
-
   swift::SILBasicBlock *getContainingBlock();
 
 public:
-  SILInstruction *createSentinel() const {
-    return static_cast<SILInstruction*>(&Sentinel);
-  }
-  void destroySentinel(SILInstruction *) const {}
-
-  SILInstruction *provideInitialHead() const { return createSentinel(); }
-  SILInstruction *ensureHead(SILInstruction*) const { return createSentinel(); }
-  static void noteHead(SILInstruction*, SILInstruction*) {}
   static void deleteNode(SILInstruction *V) {
     SILInstruction::destroy(V);
   }

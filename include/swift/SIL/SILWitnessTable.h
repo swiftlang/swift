@@ -282,22 +282,15 @@ public:
 namespace llvm {
   
 template <>
+struct ilist_sentinel_traits<::swift::SILWitnessTable> :
+  public ilist_half_embedded_sentinel_traits<::swift::SILWitnessTable> {};
+
+template <>
 struct ilist_traits<::swift::SILWitnessTable> :
 public ilist_default_traits<::swift::SILWitnessTable> {
   typedef ::swift::SILWitnessTable SILWitnessTable;
 
-private:
-  mutable ilist_half_node<SILWitnessTable> Sentinel;
-
 public:
-  SILWitnessTable *createSentinel() const {
-    return static_cast<SILWitnessTable*>(&Sentinel);
-  }
-  void destroySentinel(SILWitnessTable *) const {}
-
-  SILWitnessTable *provideInitialHead() const { return createSentinel(); }
-  SILWitnessTable *ensureHead(SILWitnessTable*) const { return createSentinel(); }
-  static void noteHead(SILWitnessTable*, SILWitnessTable*) {}
   static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }
   
 private:

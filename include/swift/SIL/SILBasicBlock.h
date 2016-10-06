@@ -323,6 +323,10 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 
 template <>
+struct ilist_sentinel_traits<::swift::SILBasicBlock> :
+  public ilist_half_embedded_sentinel_traits<::swift::SILBasicBlock> {};
+
+template <>
 struct ilist_traits<::swift::SILBasicBlock>
   : ilist_default_traits<::swift::SILBasicBlock> {
   using SelfTy = ilist_traits<::swift::SILBasicBlock>;
@@ -332,19 +336,10 @@ struct ilist_traits<::swift::SILBasicBlock>
 
 private:
   friend class ::swift::SILFunction;
-  mutable ilist_half_node<SILBasicBlock> Sentinel;
 
   SILFunction *Parent;
 
 public:
-  SILBasicBlock *createSentinel() const {
-    return static_cast<SILBasicBlock *>(&Sentinel);
-  }
-  void destroySentinel(SILBasicBlock *) const {}
-
-  SILBasicBlock *provideInitialHead() const { return createSentinel(); }
-  SILBasicBlock *ensureHead(SILBasicBlock *) const { return createSentinel(); }
-  static void noteHead(SILBasicBlock *, SILBasicBlock *) {}
   static void deleteNode(SILBasicBlock *BB) { BB->~SILBasicBlock(); }
 
   void addNodeToList(SILBasicBlock *BB) {}

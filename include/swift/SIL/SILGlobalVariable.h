@@ -197,24 +197,15 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 namespace llvm {
 
 template <>
+struct ilist_sentinel_traits<::swift::SILGlobalVariable> :
+  public ilist_half_embedded_sentinel_traits<::swift::SILGlobalVariable> {};
+
+template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
 public ilist_default_traits<::swift::SILGlobalVariable> {
   typedef ::swift::SILGlobalVariable SILGlobalVariable;
 
-private:
-  mutable ilist_half_node<SILGlobalVariable> Sentinel;
-
 public:
-  SILGlobalVariable *createSentinel() const {
-    return static_cast<SILGlobalVariable*>(&Sentinel);
-  }
-  void destroySentinel(SILGlobalVariable *) const {}
-
-  SILGlobalVariable *provideInitialHead() const { return createSentinel(); }
-  SILGlobalVariable *ensureHead(SILGlobalVariable*) const {
-    return createSentinel();
-  }
-  static void noteHead(SILGlobalVariable*, SILGlobalVariable*) {}
   static void deleteNode(SILGlobalVariable *V) {}
   
 private:

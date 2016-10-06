@@ -771,22 +771,15 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 namespace llvm {
 
 template <>
+struct ilist_sentinel_traits<::swift::SILFunction> :
+  public ilist_half_embedded_sentinel_traits<::swift::SILFunction> {};
+
+template <>
 struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
   typedef ::swift::SILFunction SILFunction;
 
-private:
-  mutable ilist_half_node<SILFunction> Sentinel;
-
 public:
-  SILFunction *createSentinel() const {
-    return static_cast<SILFunction*>(&Sentinel);
-  }
-  void destroySentinel(SILFunction *) const {}
-
-  SILFunction *provideInitialHead() const { return createSentinel(); }
-  SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
-  static void noteHead(SILFunction*, SILFunction*) {}
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }
 
 private:
