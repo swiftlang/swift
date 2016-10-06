@@ -269,7 +269,7 @@ function(_add_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
   DEPLOYMENT_VERSION_IOS RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME)
   cmake_parse_arguments(LFLAGS
-    ""
+    "IS_STDLIB"
     "${oneValueArgs}"
     ""
     ${ARGN})
@@ -309,6 +309,9 @@ function(_add_variant_link_flags)
         "-ldl"
         "-L${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x"
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
+    if(LFLAGS_IS_STDLIB)
+      list(APPEND result "-shared")
+    endif()
   else()
     list(APPEND result "-lobjc")
 
@@ -957,6 +960,7 @@ function(_add_swift_library_single target name)
     ENABLE_LTO "${lto_type}"
     LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
+    ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
     RESULT_VAR_NAME link_flags
       )
 
@@ -1450,9 +1454,12 @@ function(add_swift_library name)
           if("${sdk}" STREQUAL "WINDOWS")
             set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${name}.dll")
-          else()
+          elseif("${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
             set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+          else()
+            set(UNIVERSAL_LIBRARY_NAME
+              "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}.so")
           endif()
         else()
           if("${sdk}" STREQUAL "WINDOWS")
