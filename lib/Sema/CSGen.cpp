@@ -699,14 +699,6 @@ namespace {
     return NTD->getHasFailableInits();
   }
   
-  Type getInnerParenType(const Type &t) {
-    if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
-      return getInnerParenType(parenType->getUnderlyingType());
-    }
-    
-    return t;
-  }
-  
   size_t getOperandCount(Type t) {
     size_t nOperands = 0;
     
@@ -874,8 +866,8 @@ namespace {
     auto argTy = expr->getArg()->getType();
     auto argTupleTy = argTy->castTo<TupleType>();
     auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
-    Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
-    Type secondArgTy = getInnerParenType(argTupleTy->getElement(1).getType());
+    Type firstArgTy = argTupleTy->getElement(0).getType()->getWithoutParens();
+    Type secondArgTy = argTupleTy->getElement(1).getType()->getWithoutParens();
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {

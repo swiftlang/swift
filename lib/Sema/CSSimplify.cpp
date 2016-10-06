@@ -2839,13 +2839,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
-            auto argType = fnType->getInput();
-            
-            if (auto parenType =
-                dyn_cast<ParenType>(argType.getPointer())) {
-              argType = parenType->getUnderlyingType();
-            }
-            
+            auto argType = fnType->getInput()->getWithoutParens();
             if (argType->isEqual(favoredType))
               result.FavoredChoice = result.ViableCandidates.size();
           }

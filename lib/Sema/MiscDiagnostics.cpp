@@ -3924,10 +3924,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Look through parentheses.
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = parenTy->getUnderlyingType();
-      continue;
-    }
+    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getAnyOptionalObjectType()) {
