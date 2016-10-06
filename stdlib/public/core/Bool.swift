@@ -26,7 +26,7 @@
 ///     print(containsTen)
 ///     // Prints "false"
 ///
-///     let (a, b) == (100, 101)
+///     let (a, b) = (100, 101)
 ///     let aFirst = a < b
 ///     print(aFirst)
 ///     // Prints "true"
