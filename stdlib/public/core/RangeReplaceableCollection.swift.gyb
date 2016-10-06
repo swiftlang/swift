@@ -244,7 +244,7 @@ public protocol _RangeReplaceableIndexable : _Indexable {
 public protocol RangeReplaceableCollection
   : _RangeReplaceableIndexable, Collection
 {
-  // FIXME(ABI): should require `RangeReplaceableCollection`.
+  // FIXME(ABI)#165 (Recursive Protocol Constraints): should require `RangeReplaceableCollection`.
   associatedtype SubSequence : _RangeReplaceableIndexable /*: RangeReplaceableCollection*/
     = RangeReplaceableSlice<Self>
 

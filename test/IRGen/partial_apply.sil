@@ -12,6 +12,7 @@ import gizmo
 
 @objc class ObjCClass : BaseClassForMethodFamilies {
   func method(x: Int) {}
+  func method2(r: NSRect) {}
   
   override func fakeInitFamily() -> ObjCClass { return self }
 }
@@ -33,6 +34,11 @@ bb0(%0 : $ObjCClass):
 
 sil @_TToFC13partial_apply9ObjCClass6methodfT1xSi_T_ : $@convention(objc_method) (Int, ObjCClass) -> () {
 bb0(%0 : $Int, %1 : $ObjCClass):
+  %v = tuple()
+  return %v : $()
+}
+sil @_TToFC13partial_apply9ObjCClass7method2fT1rVSC6NSRect_T_ : $@convention(objc_method) (NSRect, ObjCClass) -> () {
+bb0(%0 : $NSRect, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
 }
@@ -105,6 +111,27 @@ entry(%c : $ObjCClass):
   %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : (ObjCClass) -> (Int) -> () , $@convention(objc_method) (Int, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@convention(objc_method) (Int, ObjCClass) -> ()
   return %p : $@callee_owned Int -> ()
+}
+
+// CHECK-LABEL: define{{.*}} { i8*, %swift.refcounted* } @objc_partial_apply_indirect_sil_argument(%C13partial_apply9ObjCClass*) {{.*}}
+// CHECK:  [[CTX:%.*]] = call noalias %swift.refcounted* @rt_swift_allocObject
+// CHECK:  [[CTX_ADDR:%.*]] = bitcast %swift.refcounted* [[CTX]] to [[CTXTYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
+// CHECK:  [[SELF_ADDR:%.*]] = getelementptr inbounds [[CTXTYPE]], [[CTXTYPE]]* [[CTX_ADDR]], i32 0, i32 1
+// CHECK:  store %C13partial_apply9ObjCClass* %0, %C13partial_apply9ObjCClass** [[SELF_ADDR]]
+// CHECK:  [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%VSC6NSRect*, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB2:@_TPA[A-Za-z0-9_.]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CTX]], 1
+// CHECK:  ret { i8*, %swift.refcounted* } [[CLOSURE]]
+// CHECK:}
+// CHECK: define internal void [[OBJC_PARTIAL_APPLY_STUB2]](%VSC6NSRect* noalias nocapture dereferenceable(32), %swift.refcounted*
+// CHECK:  [[TMP:%.*]] = alloca %VSC6NSRect
+// CHECK:  [[ORIGIN:%.*]] = getelementptr inbounds %VSC6NSRect, %VSC6NSRect* %0
+// CHECK:  [[ORIGINX:%.*]] = getelementptr inbounds %VSC7NSPoint, %VSC7NSPoint* [[ORIGIN]]
+// CHECK:  [[ORIGINXVAL:%*]] = getelementptr inbounds %Sd, %Sd* [[ORIGINX]]
+// CHECK:  [[VAL:%.*]] = load double, double* [[ORIGINXVAL]]
+sil @objc_partial_apply_indirect_sil_argument : $@convention(thin) ObjCClass -> @callee_owned NSRect -> () {
+entry(%c : $ObjCClass):
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method2!1.foreign : (ObjCClass) -> (NSRect) -> () , $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  %p = partial_apply %m(%c) : $@convention(objc_method) (NSRect, ObjCClass) -> ()
+  return %p : $@callee_owned NSRect -> ()
 }
 
 // CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%C13partial_apply9ObjCClass*) {{.*}} {
