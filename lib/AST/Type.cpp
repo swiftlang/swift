@@ -1163,11 +1163,10 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(this);
     auto base = dependent->getBase()->getCanonicalType();
-    const ASTContext &ctx = base->getASTContext();
     if (auto assocType = dependent->getAssocType())
-      Result = DependentMemberType::get(base, assocType, ctx);
+      Result = DependentMemberType::get(base, assocType);
     else
-      Result = DependentMemberType::get(base, dependent->getName(), ctx);
+      Result = DependentMemberType::get(base, dependent->getName());
     break;
   }
 
@@ -2776,11 +2775,9 @@ static Type getMemberForBaseType(ConformanceSource conformances,
   // If the parent is dependent, create a dependent member type.
   if (substBase->isTypeParameter()) {
     if (assocType)
-      return DependentMemberType::get(substBase, assocType,
-                                      substBase->getASTContext());
+      return DependentMemberType::get(substBase, assocType);
     else
-      return DependentMemberType::get(substBase, name,
-                                      substBase->getASTContext());
+      return DependentMemberType::get(substBase, name);
   }
 
   // If we know the associated type, look in the witness table.
@@ -3366,11 +3363,9 @@ case TypeKind::Id:
       return *this;
 
     if (auto assocType = dependent->getAssocType())
-      return DependentMemberType::get(dependentBase, assocType,
-                                      Ptr->getASTContext());
+      return DependentMemberType::get(dependentBase, assocType);
 
-    return DependentMemberType::get(dependentBase, dependent->getName(),
-                                    Ptr->getASTContext());
+    return DependentMemberType::get(dependentBase, dependent->getName());
   }
 
   case TypeKind::Substituted: {

@@ -1672,8 +1672,7 @@ Type ValueDecl::getInterfaceType() const {
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
-                    const_cast<AssociatedTypeDecl *>(assocType),
-                    ctx);
+                    const_cast<AssociatedTypeDecl *>(assocType));
     InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
     return InterfaceTy;
   }

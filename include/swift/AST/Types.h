@@ -4118,10 +4118,8 @@ class DependentMemberType : public TypeBase {
       Base(base), NameOrAssocType(assocType) { }
 
 public:
-  static DependentMemberType *get(Type base, Identifier name,
-                                  const ASTContext &ctx);
-  static DependentMemberType *get(Type base, AssociatedTypeDecl *assocType,
-                                  const ASTContext &ctx);
+  static DependentMemberType *get(Type base, Identifier name);
+  static DependentMemberType *get(Type base, AssociatedTypeDecl *assocType);
 
   /// Retrieve the base type.
   Type getBase() const { return Base; }
@@ -4151,7 +4149,7 @@ public:
 BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType,
                                     const ASTContext &C) {
-    return CanDependentMemberType(DependentMemberType::get(base, assocType, C));
+    return CanDependentMemberType(DependentMemberType::get(base, assocType));
   }
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
@@ -4341,7 +4339,13 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
 
 inline bool TypeBase::isTypeParameter() {
-  return is<GenericTypeParamType>() || is<DependentMemberType>();
+  if (is<GenericTypeParamType>())
+    return true;
+
+  if (auto depMemTy = getAs<DependentMemberType>())
+    return depMemTy->getBase()->isTypeParameter();
+
+  return false;
 }
 
 inline bool TypeBase::isExistentialType() {
@@ -4576,8 +4580,6 @@ inline Identifier SubstitutableType::getName() const {
     return Archetype->getName();
   if (auto GenericParam = dyn_cast<GenericTypeParamType>(this))
     return GenericParam->getName();
-  if (auto DepMem = dyn_cast<DependentMemberType>(this))
-    return DepMem->getName();
 
   llvm_unreachable("Not a substitutable type");
 }

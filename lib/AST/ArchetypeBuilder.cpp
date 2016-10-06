@@ -747,7 +747,7 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
 
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
-      return DependentMemberType::get(parentType, assocType, builder.Context);
+      return DependentMemberType::get(parentType, assocType);
 
     // If typo correction renamed this type, get the renamed type.
     if (wasRenamed())
@@ -758,7 +758,7 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
     if (!allowUnresolved)
       return ErrorType::get(builder.Context);
 
-    return DependentMemberType::get(parentType, getName(), builder.Context);
+    return DependentMemberType::get(parentType, getName());
   }
   
   assert(getGenericParam() && "Not a generic parameter?");

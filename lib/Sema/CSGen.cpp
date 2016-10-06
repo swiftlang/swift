@@ -3193,9 +3193,7 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
   ConstraintSystem CS(*TC, &DC, None);
   if (ReplaceArchetypeWithVariables) {
     std::function<Type(Type)> Trans = [&](Type Base) {
-      if (isa<GenericTypeParamType>(Base.getPointer()) ||
-          isa<DependentMemberType>(Base.getPointer()) ||
-          isa<ArchetypeType>(Base.getPointer())) {
+      if (Base->isTypeParameter() || isa<ArchetypeType>(Base.getPointer())) {
         return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
                                     TypeVariableOptions::TVO_CanBindToLValue));
       }

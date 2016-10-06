@@ -2991,8 +2991,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
           FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
         Type valueTy = DependentMemberType::get(
                                           behaviorProto->getSelfInterfaceType(),
-                                          valueReqt,
-                                          TC.Context);
+                                          valueReqt);
         
         auto expectedParameterizedInitStorageTy =
           FunctionType::get(valueTy, storageTy);
