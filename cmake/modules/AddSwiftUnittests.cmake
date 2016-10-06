@@ -39,6 +39,8 @@ function(add_swift_unittest test_dirname)
     swift_common_llvm_config(${test_dirname} support)
   endif()
 
+  set_property(TARGET ${test_dirname} APPEND_STRING PROPERTY LINK_LIBRARIES LLVMSupport)
+
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
