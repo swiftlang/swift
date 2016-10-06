@@ -1039,7 +1039,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
-    SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
+    SILType closureTy = getSILType(Ty2, SILValueCategory::Object);
+
+    unsigned NumSub = NumSubs;
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
+    auto SubstFnTy = SILType::getPrimitiveObjectType(
+      FnTy.castTo<SILFunctionType>()
+        ->substGenericArgs(Builder.getModule(),
+                         Builder.getModule().getSwiftModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
@@ -1051,22 +1064,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     unsigned unappliedArgs = ArgTys.size() - ListOfValues.size();
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I + unappliedArgs]));
-
-    // Compute the result type of the partial_apply, based on which arguments
-    // are getting applied.
-    SILType closureTy
-      = SILBuilder::getPartialApplyResultType(SubstFnTy,
-                                              Args.size(),
-                                              Fn->getModule(),
-                                              {});
-
-    unsigned NumSub = NumSubs;
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,

@@ -164,7 +164,7 @@ def enable_guaranteed_closure_contexts : Flag<["-"], "enable-guaranteed-closure-
   HelpText<"Use @guaranteed convention for closure context">;
 
 def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
-HelpText<"Remove runtime asserts.">;
+  HelpText<"Remove runtime asserts.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;

@@ -3737,9 +3737,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
+  auto PartialApplyConvention = ParameterConvention::Direct_Owned;
   bool IsNonThrowingApply = false;
-  if (parseSILOptional(IsNonThrowingApply, *this, "nothrow"))
-    return true;
+  StringRef AttrName;
+  
+  if (parseSILOptional(AttrName, *this)) {
+    if (AttrName.equals("nothrow"))
+      IsNonThrowingApply = true;
+    else if (AttrName.equals("callee_guaranteed"))
+      PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
+    else
+      return true;
+  }
   
   if (parseValueName(FnName))
     return true;
@@ -3838,7 +3847,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     SILType closureTy =
-      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
+      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs,
+                                            PartialApplyConvention);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
                                      subs, Args, closureTy);
