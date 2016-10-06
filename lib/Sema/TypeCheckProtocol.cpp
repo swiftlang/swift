@@ -2730,6 +2730,16 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
   return result;
 }
 
+/// Map error types back to their original types.
+static Type mapErrorTypeToOriginal(Type type) {
+  if (auto errorType = type->getAs<ErrorType>()) {
+    if (auto originalType = errorType->getOriginalType())
+      return originalType.transform(mapErrorTypeToOriginal);
+  }
+
+  return type;
+}
+
 /// Produce the type when matching a witness.
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
@@ -2772,7 +2782,11 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   Module *module = conformance->getDeclContext()->getParentModule();
-  return type.subst(module, substitutions, SubstFlags::IgnoreMissing);
+  auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
+  if (!resultType->hasError()) return resultType;
+
+  // Map error types with original types *back* to the original, dependent type.
+  return resultType.transform(mapErrorTypeToOriginal);
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2824,6 +2838,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Structural mismatches imply that the witness cannot match.
     bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+      // If either type hit an error, don't stop yet.
+      if (firstType->hasError() || secondType->hasError())
+        return true;
+
       // FIXME: Check whether one of the types is dependent?
       return false;
     }
@@ -2831,6 +2849,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
                   TypeBase *secondType) {
+      // If the second type is an error, don't look at it further.
+      if (secondType->hasError())
+        return true;
+
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {

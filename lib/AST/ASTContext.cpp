@@ -232,6 +232,7 @@ struct ASTContext::Implementation {
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
+    llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -395,7 +396,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
-    TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
+    TheErrorType(
+      new (*this, AllocationArena::Permanent) ErrorType(*this, Type())),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -2374,6 +2376,21 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
+
+Type ErrorType::get(Type originalType) {
+  assert(originalType);
+
+  auto properties = originalType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  auto &ctx = originalType->getASTContext();
+  auto &entry = ctx.Impl.getArena(arena).ErrorTypesWithOriginal[originalType];
+  if (entry) return entry;
+
+  void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
+                           alignof(ErrorType), arena);
+  return entry = new (mem) ErrorType(ctx, originalType);
+}
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {

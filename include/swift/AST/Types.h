@@ -114,6 +114,9 @@ public:
     /// This type expression contains a DynamicSelf type.
     HasDynamicSelf       = 0x100,
 
+    /// This type contains an Error type.
+    HasError             = 0x200,
+
     IsNotMaterializable  = (HasInOut | IsLValue)
   };
 
@@ -148,6 +151,9 @@ public:
   
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
+
+  /// Does this type contain an error?
+  bool hasError() const { return Bits & HasError; }
 
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
@@ -258,6 +264,15 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
+  struct ErrorTypeBitfields {
+    unsigned : NumTypeBaseBits;
+
+    /// Whether there is an original type.
+    unsigned HasOriginalType : 1;
+  };
+  enum { NumErrorTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumErrorTypeBits <= 32, "fits in an unsigned");
+
   struct AnyFunctionTypeBitfields {
     unsigned : NumTypeBaseBits;
 
@@ -300,6 +315,7 @@ protected:
   
   union {
     TypeBaseBitfields TypeBaseBits;
+    ErrorTypeBitfields ErrorTypeBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
@@ -492,6 +508,11 @@ public:
   /// Determine whether the type contains an unbound generic type.
   bool hasUnboundGenericType() const {
     return getRecursiveProperties().hasUnboundGeneric();
+  }
+
+  /// Determine whether this type contains an error type.
+  bool hasError() const {
+    return getRecursiveProperties().hasError();
   }
 
   /// \brief Check if this type is a valid type for the LHS of an assignment.
@@ -922,10 +943,31 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C) 
-    : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties()) { }
+  ErrorType(ASTContext &C, Type originalType)
+      : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties::HasError) {
+    if (originalType) {
+      ErrorTypeBits.HasOriginalType = true;
+      *reinterpret_cast<Type *>(this + 1) = originalType;
+    } else {
+      ErrorTypeBits.HasOriginalType = false;
+    }
+  }
+
 public:
   static Type get(const ASTContext &C);
+
+  /// Produce an error type which records the original type we were trying to
+  /// substitute when we ran into a problem.
+  static Type get(Type originalType);
+
+  /// Retrieve the original type that this error type replaces, or none if
+  /// there is no such type.
+  Type getOriginalType() const {
+    if (ErrorTypeBits.HasOriginalType)
+      return *reinterpret_cast<const Type *>(this + 1);
+
+    return Type();
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

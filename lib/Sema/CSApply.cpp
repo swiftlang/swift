@@ -2896,7 +2896,7 @@ namespace {
         = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
                                                  cs.getConstraintLocator(expr));
       if (!cond) {
-        expr->getCondExpr()->setType(ErrorType::get(cs.getASTContext()));
+        expr->getCondExpr()->setType(ErrorType::get(resultTy));
       } else {
         expr->setCondExpr(cond);
       }

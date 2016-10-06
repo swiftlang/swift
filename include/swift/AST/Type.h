@@ -54,8 +54,8 @@ typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
-  /// missing, return the identity type rather than a null type.
-  IgnoreMissing = 0x01,
+  /// missing, place an 'error' type into the position of the base.
+  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution

@@ -562,7 +562,7 @@ namespace {
         // dependency that isn't being diagnosed properly.
         if (!unboundDecl->getGenericSignature()) {
           cs.TC.diagnose(unboundDecl, diag::circular_reference);
-          return ErrorType::get(cs.getASTContext());
+          return ErrorType::get(type);
         }
         
         

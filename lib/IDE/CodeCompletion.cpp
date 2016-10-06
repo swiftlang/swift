@@ -1982,7 +1982,7 @@ public:
         auto Subs = MaybeNominalType->getMemberSubstitutions(
             VD->getDeclContext());
         T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
-                              SubstFlags::IgnoreMissing));
+                              SubstFlags::UseErrorType));
       }
     }
 

@@ -1562,13 +1562,13 @@ void ConstraintSystem::shrink(Expr *expr) {
     /// \returns ErrorType on failure, properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
-      if (collection.isNull() || collection->is<ErrorType>())
+      if (collection.isNull() || collection->hasError())
         return ErrorType::get(ctx);
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
         return type.isNull() || type->hasUnresolvedType() ||
-               type->is<ErrorType>();
+               type->hasError();
       };
 
       // Array type.

@@ -3430,7 +3430,10 @@ public:
   }
 
   void visitErrorType(ErrorType *T) {
-    Printer << "<<error type>>";
+    if (auto originalType = T->getOriginalType())
+      visit(originalType);
+    else
+      Printer << "<<error type>>";
   }
 
   void visitUnresolvedType(UnresolvedType *T) {
