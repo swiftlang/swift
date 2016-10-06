@@ -838,8 +838,7 @@ public:
     printDebugVar(AVI->getVarInfo());
   }
 
-  void visitAllocRefInst(AllocRefInst *ARI) {
-    *this << "alloc_ref ";
+  void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
@@ -850,14 +849,18 @@ public:
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
     }
+  }
+
+  void visitAllocRefInst(AllocRefInst *ARI) {
+    *this << "alloc_ref ";
+    printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
 
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     *this << "alloc_ref_dynamic ";
-    if (ARDI->isObjC())
-      *this << "[objc] ";
-    *this << getIDAndType(ARDI->getOperand());
+    printAllocRefInstBase(ARDI);
+    *this << getIDAndType(ARDI->getMetatypeOperand());
     *this << ", " << ARDI->getType();
   }
 

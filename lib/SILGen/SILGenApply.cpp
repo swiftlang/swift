@@ -941,7 +941,7 @@ public:
                           loc,
                           selfMetaObjC.getValue(),
                           SGF.SGM.getLoweredType(type),
-                          /*objc=*/true),
+                          /*objc=*/true, {}, {}),
                           selfMetaObjC.getCleanup());
   }
 

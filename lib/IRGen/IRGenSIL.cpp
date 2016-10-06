@@ -3552,6 +3552,18 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   setLoweredContainedAddress(i, addr);
 }
 
+static void
+buildTailArrays(IRGenSILFunction &IGF,
+                SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
+                AllocRefInstBase *ARI) {
+  auto Types = ARI->getTailAllocatedTypes();
+  auto Counts = ARI->getTailAllocatedCounts();
+  for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
+    Explosion ElemCount = IGF.getLoweredExplosion(Counts[Idx].get());
+    TailArrays.push_back({Types[Idx], ElemCount.claimNext()});
+  }
+}
+
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
   int StackAllocSize = -1;
   if (i->canAllocOnStack()) {
@@ -3560,13 +3572,7 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-
-  auto Types = i->getTailAllocatedTypes();
-  auto Counts = i->getTailAllocatedCounts();
-  for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
-    llvm::Value *ElemCount = getLoweredExplosion(Counts[Idx].get()).claimNext();
-    TailArrays.push_back({Types[Idx], ElemCount});
-  }
+  buildTailArrays(*this, TailArrays, i);
 
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
                                              StackAllocSize, TailArrays);
@@ -3582,10 +3588,14 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
-  Explosion metadata = getLoweredExplosion(i->getOperand());
+  SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
+  buildTailArrays(*this, TailArrays, i);
+
+  Explosion metadata = getLoweredExplosion(i->getMetatypeOperand());
   auto metadataValue = metadata.claimNext();
   llvm::Value *alloced = emitClassAllocationDynamic(*this, metadataValue,
-                                                    i->getType(), i->isObjC());
+                                                    i->getType(), i->isObjC(),
+                                                    TailArrays);
   Explosion e;
   e.add(alloced);
   setLoweredExplosion(i, e);

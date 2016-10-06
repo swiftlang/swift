@@ -654,24 +654,29 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneTypeLayout(ABI->getKind(), ABI->getElementType());
     break;
   }
-  case ValueKind::AllocRefInst: {
-    const AllocRefInst *ARI = cast<AllocRefInst>(&SI);
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst: {
+    const AllocRefInstBase *ARI = cast<AllocRefInstBase>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
     SmallVector<ValueID, 4> Args;
     Args.push_back((unsigned)ARI->isObjC() |
                    ((unsigned)ARI->canAllocOnStack() << 1));
     ArrayRef<SILType> TailTypes = ARI->getTailAllocatedTypes();
-    ArrayRef<Operand> TailCounts = ARI->getTailAllocatedCounts();
+    ArrayRef<Operand> AllOps = ARI->getAllOperands();
     unsigned NumTailAllocs = TailTypes.size();
-    assert(TailCounts.size() == NumTailAllocs);
-    for (unsigned Idx = 0; Idx < NumTailAllocs; ++Idx) {
-      assert(TailTypes[Idx].isObject());
-      Args.push_back(S.addTypeRef(TailTypes[Idx].getSwiftRValueType()));
-      SILValue CountVal = TailCounts[Idx].get();
-      Args.push_back(addValueRef(CountVal));
-      SILType CountType = CountVal->getType();
-      assert(CountType.isObject());
-      Args.push_back(S.addTypeRef(CountType.getSwiftRValueType()));
+    unsigned NumOpsToWrite = NumTailAllocs;
+    if (SI.getKind() == ValueKind::AllocRefDynamicInst)
+      ++NumOpsToWrite;
+    for (unsigned Idx = 0; Idx < NumOpsToWrite; ++Idx) {
+      if (Idx < NumTailAllocs) {
+        assert(TailTypes[Idx].isObject());
+        Args.push_back(S.addTypeRef(TailTypes[Idx].getSwiftRValueType()));
+      }
+      SILValue OpVal = AllOps[Idx].get();
+      Args.push_back(addValueRef(OpVal));
+      SILType OpType = OpVal->getType();
+      assert(OpType.isObject());
+      Args.push_back(S.addTypeRef(OpType.getSwiftRValueType()));
     }
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        (unsigned)SI.getKind(),
@@ -679,15 +684,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                          ARI->getType().getSwiftRValueType()),
                                        (unsigned)ARI->getType().getCategory(),
                                        Args);
-    break;
-  }
-  case ValueKind::AllocRefDynamicInst: {
-    const AllocRefDynamicInst* ARD = cast<AllocRefDynamicInst>(&SI);
-    unsigned flags = 0;
-    if (ARD->isObjC())
-      flags = 1;
-    writeOneTypeOneOperandLayout(SI.getKind(), flags,
-                                 ARD->getType(), ARD->getOperand());
     break;
   }
   case ValueKind::AllocStackInst: {

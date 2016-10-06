@@ -867,9 +867,17 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &gen,
     ElemTypes.push_back(gen.getLoweredType(subs[Idx+1].getReplacement()->
                                            getCanonicalType()).getObjectType());
   }
-
-  SILValue result = gen.B.createAllocRef(loc, RefType, false, ElemTypes, Counts);
-
+  SILValue Metatype = args[0].getValue();
+  SILValue result;
+  if (auto *MI = dyn_cast<MetatypeInst>(Metatype)) {
+    assert(MI->getType().getMetatypeInstanceType(gen.SGM.M) == RefType &&
+           "substituted type does not match operand metatype");
+    result = gen.B.createAllocRef(loc, RefType, false, false,
+                                  ElemTypes, Counts);
+  } else {
+    result = gen.B.createAllocRefDynamic(loc, Metatype, RefType, false,
+                                         ElemTypes, Counts);
+  }
   return ManagedValue::forUnmanaged(result);
 }
 
