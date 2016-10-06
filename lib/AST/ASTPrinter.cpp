@@ -1317,8 +1317,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
 
       if (!subMap.empty()) {
-        auto argTy = Type(param).subst(M, subMap, SubstFlags::IgnoreMissing);
-        printType(argTy);
+        if (auto argTy = Type(param).subst(M, subMap))
+          printType(argTy);
+        else
+          printType(param);
       } else if (auto *GP = param->getDecl()) {
         Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, GP);
         Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
@@ -1347,8 +1349,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
       }
 
       if (!subMap.empty()) {
-        first = first.subst(M, subMap, SubstFlags::IgnoreMissing);
-        second = second.subst(M, subMap, SubstFlags::IgnoreMissing);
+        if (Type subFirst = first.subst(M, subMap))
+          first = subFirst;
+        if (Type subSecond = second.subst(M, subMap))
+          second = subSecond;
         if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
             !(second->is<ArchetypeType>() || second->isTypeParameter()))
           continue;

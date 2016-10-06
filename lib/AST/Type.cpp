@@ -2727,8 +2727,8 @@ GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   
   auto subs = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(subs, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(subs, SubstFlags::IgnoreMissing);
+  Type input = getInput().subst(subs);
+  Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());
 }
 

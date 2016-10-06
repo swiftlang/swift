@@ -3141,8 +3141,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   // Prepare type substitution map.
   TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
-    return Ty.subst(DC.getParentModule(), Substitutions,
-                    SubstFlags::IgnoreMissing);
+    return Ty.subst(DC.getParentModule(), Substitutions);
   };
 
   auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {

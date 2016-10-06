@@ -1580,8 +1580,7 @@ public:
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
                            &Builder.getModule(),
-                           substitutions,
-                           SubstFlags::IgnoreMissing);
+                           substitutions);
         if (!firstType)
           break;
 
@@ -1592,8 +1591,7 @@ public:
 
         auto secondType = req.getSecondType().subst(
                             &Builder.getModule(), 
-                            substitutions,
-                            SubstFlags::IgnoreMissing);
+                            substitutions);
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -1617,8 +1615,7 @@ public:
       case RequirementKind::Conformance: {
         auto subjectType = req.getFirstType().subst(
                              &Builder.getModule(),
-                             substitutions,
-                             SubstFlags::IgnoreMissing);
+                             substitutions);
         if (!subjectType)
           break;
 

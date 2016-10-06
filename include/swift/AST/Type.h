@@ -172,7 +172,7 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(ModuleDecl *module,
              const TypeSubstitutionMap &substitutions,
-             SubstOptions options) const;
+             SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -184,7 +184,7 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(const SubstitutionMap &substitutions,
-             SubstOptions options) const;
+             SubstOptions options = None) const;
 
   bool isPrivateStdlibType(bool whitelistProtocols=true) const;
 
