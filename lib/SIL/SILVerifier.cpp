@@ -677,27 +677,33 @@ public:
     }
   }
 
-  void checkAllocRefInst(AllocRefInst *AI) {
-    requireReferenceValue(AI, "Result of alloc_ref");
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
-            "alloc_ref must allocate class");
-    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
-    auto Types = AI->getTailAllocatedTypes();
-    auto Counts = AI->getTailAllocatedCounts();
+  void checkAllocRefBase(AllocRefInstBase *ARI) {
+    requireReferenceValue(ARI, "Result of alloc_ref");
+    verifyOpenedArchetype(ARI, ARI->getType().getSwiftRValueType());
+    auto Types = ARI->getTailAllocatedTypes();
+    auto Counts = ARI->getTailAllocatedCounts();
     unsigned NumTypes = Types.size();
     require(NumTypes == Counts.size(), "Mismatching types and counts");
+    require(NumTypes == 0 || !ARI->isObjC(),
+            "Can't tail allocate with ObjC class");
     for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
-      verifyOpenedArchetype(AI, Types[Idx].getSwiftRValueType());
+      verifyOpenedArchetype(ARI, Types[Idx].getSwiftRValueType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
   }
 
+  void checkAllocRefInst(AllocRefInst *AI) {
+    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+            "alloc_ref must allocate class");
+    checkAllocRefBase(AI);
+  }
+
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
-    requireReferenceValue(ARDI, "Result of alloc_ref_dynamic");
-    require(ARDI->getOperand()->getType().is<AnyMetatypeType>(),
+    SILValue Metadata = ARDI->getMetatypeOperand();
+    require(Metadata->getType().is<AnyMetatypeType>(),
             "operand of alloc_ref_dynamic must be of metatype type");
-    auto metaTy = ARDI->getOperand()->getType().castTo<AnyMetatypeType>();
+    auto metaTy = Metadata->getType().castTo<AnyMetatypeType>();
     require(metaTy->hasRepresentation(),
             "operand of alloc_ref_dynamic must have a metatype representation");
     if (ARDI->isObjC()) {
@@ -707,7 +713,7 @@ public:
       require(metaTy->getRepresentation() == MetatypeRepresentation::Thick,
               "alloc_ref_dynamic requires operand of thick metatype");
     }
-    verifyOpenedArchetype(ARDI, ARDI->getType().getSwiftRValueType());
+    checkAllocRefBase(ARDI);
   }
 
   /// Check the substitutions passed to an apply or partial_apply.

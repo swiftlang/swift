@@ -1868,19 +1868,26 @@ alloc_ref_dynamic
 `````````````````
 ::
 
-  sil-instruction ::= 'alloc_ref_dynamic' ('[' 'objc' ']')? sil-operand ',' sil-type
+  sil-instruction ::= 'alloc_ref_dynamic'
+                        ('[' 'objc' ']')?
+                        ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                        sil-operand ',' sil-type
 
   %1 = alloc_ref_dynamic %0 : $@thick T.Type, $T
   %1 = alloc_ref_dynamic [objc] %0 : $@objc_metatype T.Type, $T
+  %1 = alloc_ref_dynamic [tail_elems $E * %2 : Builtin.Word] %0 : $@thick T.Type, $T
   // $T must be a class type
   // %1 has type $T
+  // $E is the type of the tail-allocated elements
+  // %2 must be of a builtin integer type
 
 Allocates an object of class type ``T`` or a subclass thereof. The
 dynamic type of the resulting object is specified via the metatype
 value ``%0``. The object will be initialized with retain count 1; its
-state will be otherwise uninitialized. The optional ``objc`` attribute
-indicates that the object should be allocated using Objective-C's
-allocation methods (``+allocWithZone:``).
+state will be otherwise uninitialized.
+
+The optional ``tail_elems`` and ``objc`` attributes have the same effect as
+for ``alloc_ref``. See ``alloc_ref`` for details.
 
 alloc_box
 `````````

@@ -468,12 +468,12 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
 
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
-                                        useObjCAllocation);
+                                        useObjCAllocation, {}, {});
   } else {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
-    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false);
+    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false, {}, {});
   }
   args.push_back(selfValue);
 
