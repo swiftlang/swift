@@ -3567,8 +3567,10 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 GenericEnvironment *
 GenericEnvironment::get(ASTContext &ctx,
+                        ArrayRef<GenericTypeParamType *> genericParamTypes,
                         TypeSubstitutionMap interfaceToArchetypeMap) {
-  return new (ctx) GenericEnvironment(interfaceToArchetypeMap);
+  return new (ctx) GenericEnvironment(genericParamTypes,
+                                      interfaceToArchetypeMap);
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,

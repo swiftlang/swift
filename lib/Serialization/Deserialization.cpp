@@ -876,6 +876,32 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
       paramTypes.push_back(paramTy);
       break;
     }
+    case SIL_GENERIC_ENVIRONMENT: {
+      uint64_t rawTypeIDs[2];
+      IdentifierID IID;
+      SILGenericEnvironmentLayout::readRecord(scratch, IID,
+                                              rawTypeIDs[0], rawTypeIDs[1]);
+
+      auto paramTy = getType(rawTypeIDs[0])->castTo<GenericTypeParamType>();
+      auto contextTy = getType(rawTypeIDs[1]);
+
+      // Cons up a sugared type for this generic parameter
+      Identifier name = getIdentifier(IID);
+      auto paramDecl = createDecl<GenericTypeParamDecl>(getAssociatedModule(),
+                                                        name,
+                                                        SourceLoc(),
+                                                        paramTy->getDepth(),
+                                                        paramTy->getIndex());
+      paramTy = paramDecl->getDeclaredInterfaceType()
+          ->castTo<GenericTypeParamType>();
+
+      auto result = interfaceToArchetypeMap.insert(
+          std::make_pair(paramTy, contextTy));
+
+      assert(result.second);
+      paramTypes.push_back(paramTy);
+      break;
+    }
     default:
       // This record is not part of the GenericEnvironment.
       shouldContinue = false;
@@ -889,7 +915,8 @@ GenericEnvironment *ModuleFile::readGenericEnvironment(
   if (interfaceToArchetypeMap.empty())
     return nullptr;
 
-  return GenericEnvironment::get(getContext(), interfaceToArchetypeMap);
+  return GenericEnvironment::get(getContext(), paramTypes,
+                                 interfaceToArchetypeMap);
 }
 
 std::pair<GenericSignature *, GenericEnvironment *>
