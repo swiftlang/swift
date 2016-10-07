@@ -454,7 +454,7 @@ public:
   public:
     ErrorFinder () { }
     virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
-      if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->is<ErrorType>()) {
+      if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
         error = true;
         return { false, E };
       }
@@ -462,7 +462,7 @@ public:
     }
     virtual bool walkToDeclPre(Decl *D) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-        if (!VD->getType() || VD->getType()->is<ErrorType>()) {
+        if (!VD->getType() || VD->getType()->hasError()) {
           error = true;
           return false;
         }

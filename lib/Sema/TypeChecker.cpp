@@ -764,7 +764,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   // Try to recover if we've made any progress.
   if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
-      !parsedExpr->getType()->is<ErrorType>() &&
+      !parsedExpr->getType()->hasError() &&
       parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
     return parsedExpr->getType();
   }

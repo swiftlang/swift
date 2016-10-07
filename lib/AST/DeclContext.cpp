@@ -55,7 +55,7 @@ DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
-    if (type.isNull() || type->is<ErrorType>())
+    if (type.isNull() || type->hasError())
       return nullptr;
 
     if (auto ND = type->getNominalOrBoundGenericNominal())
@@ -147,7 +147,7 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     type = ED->getExtendedType();
   }
 
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return type;
 
   switch (kind) {

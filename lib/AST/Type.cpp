@@ -37,7 +37,7 @@ using namespace swift;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
-  return getType()->is<ErrorType>();
+  return getType()->hasError() || getType()->getCanonicalType()->hasError();
 }
 
 SourceRange TypeLoc::getSourceRange() const {
@@ -2834,6 +2834,9 @@ static Type getMemberForBaseType(ConformanceSource conformances,
         if (!aliasType->is<ErrorType>())
           witness = aliasType->getSinglyDesugaredType();
 
+    if (witness->is<ErrorType>())
+      return failed();
+
     return witness;
   }
 
@@ -3542,7 +3545,7 @@ case TypeKind::Id:
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
     auto objectTy = lvalue->getObjectType().transform(fn);
-    if (!objectTy || objectTy->is<ErrorType>())
+    if (!objectTy || objectTy->hasError())
       return objectTy;
 
     return objectTy.getPointer() == lvalue->getObjectType().getPointer() ?
@@ -3552,7 +3555,7 @@ case TypeKind::Id:
   case TypeKind::InOut: {
     auto inout = cast<InOutType>(base);
     auto objectTy = inout->getObjectType().transform(fn);
-    if (!objectTy || objectTy->is<ErrorType>())
+    if (!objectTy || objectTy->hasError())
       return objectTy;
     
     return objectTy.getPointer() == inout->getObjectType().getPointer() ?

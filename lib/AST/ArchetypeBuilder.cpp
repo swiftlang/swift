@@ -641,7 +641,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
       // Resolve the member type.
       auto type = getDependentType(builder, false);
-      if (type->is<ErrorType>())
+      if (type->hasError())
         return NestedType::forConcreteType(type);
 
       auto depMemberType = type->castTo<DependentMemberType>();
@@ -742,7 +742,7 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
        bool allowUnresolved) {
   if (auto parent = getParent()) {
     Type parentType = parent->getDependentType(builder, allowUnresolved);
-    if (parentType->is<ErrorType>())
+    if (parentType->hasError())
       return parentType;
 
     // If we've resolved to an associated type, use it.
@@ -2071,7 +2071,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     auto depTy = archetype->getDependentType(builder, false);
 
-    if (depTy->is<ErrorType>())
+    if (depTy->hasError())
       return;
 
     if (kind == RequirementKind::WitnessMarker) {
@@ -2089,7 +2089,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
           ->getDependentType(builder, false);
     }
 
-    if (repTy->is<ErrorType>())
+    if (repTy->hasError())
       return;
 
     requirements.push_back(Requirement(kind, depTy, repTy));

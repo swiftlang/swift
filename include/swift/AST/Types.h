@@ -4585,7 +4585,7 @@ inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,
     : Name(name), ElementType(ty),
       Flags(isVariadic, isAutoClosure, isEscaping) {
   assert(!isVariadic ||
-         isa<ErrorType>(ty.getPointer()) ||
+         ty->hasError() ||
          isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
@@ -4603,7 +4603,7 @@ inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }
-  assert(isa<ErrorType>(T));
+  assert(T->hasError());
   return T;
 }
 
