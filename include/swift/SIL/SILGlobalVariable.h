@@ -197,10 +197,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 namespace llvm {
 
 template <>
-struct ilist_sentinel_traits<::swift::SILGlobalVariable> :
-  public ilist_half_embedded_sentinel_traits<::swift::SILGlobalVariable> {};
-
-template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
 public ilist_default_traits<::swift::SILGlobalVariable> {
   typedef ::swift::SILGlobalVariable SILGlobalVariable;

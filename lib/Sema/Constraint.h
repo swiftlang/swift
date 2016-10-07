@@ -583,10 +583,6 @@ namespace llvm {
 
 /// Specialization of \c ilist_traits for constraints.
 template<>
-struct ilist_sentinel_traits<swift::constraints::Constraint>
-  : public ilist_half_embedded_sentinel_traits<swift::constraints::Constraint> {};
-
-template<>
 struct ilist_traits<swift::constraints::Constraint>
          : public ilist_default_traits<swift::constraints::Constraint> {
   typedef swift::constraints::Constraint Element;

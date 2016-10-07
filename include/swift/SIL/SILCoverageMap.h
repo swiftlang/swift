@@ -139,10 +139,6 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_sentinel_traits<::swift::SILCoverageMap> :
-    public ilist_half_embedded_sentinel_traits<::swift::SILCoverageMap> {};
-
-template <>
 struct ilist_traits<::swift::SILCoverageMap> :
 public ilist_default_traits<::swift::SILCoverageMap> {
   typedef ::swift::SILCoverageMap SILCoverageMap;

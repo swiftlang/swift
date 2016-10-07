@@ -114,10 +114,6 @@ private:
 namespace llvm {
 
 template <>
-struct ilist_sentinel_traits<::swift::SILVTable> :
-  public ilist_half_embedded_sentinel_traits<::swift::SILVTable> {};
-
-template <>
 struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
   typedef ::swift::SILVTable SILVTable;
