@@ -125,23 +125,22 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-fms-compatibility-version=1900")
   endif()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    
+  if(IS_DARWIN)
     # Check if there's a specific iOS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
     endif()
-    
+
     if("${DEPLOYMENT_VERSION}" STREQUAL "")
       set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
     endif()
-    
+
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
       "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
       "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
   endif()
-      
+
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
@@ -241,7 +240,8 @@ function(_add_variant_swift_compile_flags
       "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
       "-resource-dir" "${SWIFTLIB_DIR}")
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND result
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
   endif()
@@ -972,7 +972,7 @@ function(_add_swift_library_single target name)
 
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
-  if(APPLE AND SWIFTLIB_SINGLE_IS_STDLIB)
+  if("${SWIFTLIB_SINGLE_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_SINGLE_IS_STDLIB)
     set(PLIST_INFO_NAME ${name})
     set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
     set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
@@ -1465,25 +1465,17 @@ function(add_swift_library name)
         endif()
 
         set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-        
-        if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
-          set(unsigned "-unsigned")
-        endif()
-        
         _add_swift_lipo_target(
             ${sdk}
-            ${lipo_target}${unsigned}
-            "${UNIVERSAL_LIBRARY_NAME}${unsigned}"
+            ${lipo_target}
+            ${UNIVERSAL_LIBRARY_NAME}
             ${THIN_INPUT_TARGETS})
 
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
           # Ad-hoc sign stdlib dylibs
-          add_custom_command_target(unused_var
-            COMMAND ${CMAKE_COMMAND} -E copy ${UNIVERSAL_LIBRARY_NAME}${unsigned} ${UNIVERSAL_LIBRARY_NAME}
-            COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}"
-            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
-            DEPENDS ${lipo_target}${unsigned}
-            CUSTOM_TARGET_NAME ${lipo_target})
+          add_custom_command(TARGET "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
+                             POST_BUILD
+                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
         endif()
 
         # Cache universal libraries for dependency purposes
@@ -1688,7 +1680,8 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
+  if(IS_DARWIN)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")

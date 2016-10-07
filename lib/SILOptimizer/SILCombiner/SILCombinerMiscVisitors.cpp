@@ -1233,13 +1233,21 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
 SILInstruction *
 SILCombiner::
 visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
+  SmallVector<SILValue, 4> Counts;
+  auto getCounts = [&] (AllocRefDynamicInst *AI) -> ArrayRef<SILValue> {
+    for (Operand &Op : AI->getTailAllocatedCounts()) {
+      Counts.push_back(Op.get());
+    }
+    return Counts;
+  };
+
   // %1 = metatype $X.Type
   // %2 = alloc_ref_dynamic %1 : $X.Type, Y
   // ->
   // alloc_ref X
   Builder.setCurrentDebugScope(ARDI->getDebugScope());
 
-  SILValue MDVal = ARDI->getOperand();
+  SILValue MDVal = ARDI->getMetatypeOperand();
   if (auto *UC = dyn_cast<UpcastInst>(MDVal))
     MDVal = UC->getOperand();
 
@@ -1249,7 +1257,9 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                     ARDI->isObjC(), false);
+                                     ARDI->isObjC(), false,
+                                     ARDI->getTailAllocatedTypes(),
+                                     getCounts(ARDI));
 
   } else if (isa<SILArgument>(MDVal)) {
 
@@ -1267,7 +1277,9 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       auto &Mod = ARDI->getModule();
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
-                                         ARDI->isObjC(), false);
+                                       ARDI->isObjC(), false,
+                                       ARDI->getTailAllocatedTypes(),
+                                       getCounts(ARDI));
     }
   }
   if (NewInst && NewInst->getType() != ARDI->getType()) {

@@ -270,7 +270,7 @@ public:
     Hash.final(Result);
   }
 };
-}
+} // end anonymous namespace
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.

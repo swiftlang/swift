@@ -433,13 +433,15 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
+    const constexpr auto recordSize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
+    assert(length % recordSize == 0 && "invalid length");
     data_type result;
     while (length > 0) {
       TypeID typeID = endian::readNext<uint32_t, little, unaligned>(data);
       bool isInstanceMethod = *data++ != 0;
       DeclID methodID = endian::readNext<uint32_t, little, unaligned>(data);
       result.push_back(std::make_tuple(typeID, isInstanceMethod, methodID));
-      length -= sizeof(uint32_t) + 1 + sizeof(uint32_t);
+      length -= recordSize;
     }
 
     return result;
