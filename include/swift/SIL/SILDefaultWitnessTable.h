@@ -177,10 +177,6 @@ public:
 namespace llvm {
   
 template <>
-struct ilist_sentinel_traits<::swift::SILDefaultWitnessTable> :
-public ilist_half_embedded_sentinel_traits<::swift::SILDefaultWitnessTable> {};
-
-template <>
 struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_default_traits<::swift::SILDefaultWitnessTable> {
   typedef ::swift::SILDefaultWitnessTable SILDefaultWitnessTable;

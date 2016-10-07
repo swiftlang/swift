@@ -771,10 +771,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 namespace llvm {
 
 template <>
-struct ilist_sentinel_traits<::swift::SILFunction> :
-  public ilist_half_embedded_sentinel_traits<::swift::SILFunction> {};
-
-template <>
 struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
   typedef ::swift::SILFunction SILFunction;

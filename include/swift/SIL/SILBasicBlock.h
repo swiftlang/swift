@@ -45,7 +45,6 @@ private:
   /// The ordered set of instructions in the SILBasicBlock.
   InstListType InstList;
 
-  friend struct llvm::ilist_sentinel_traits<SILBasicBlock>;
   friend struct llvm::ilist_traits<SILBasicBlock>;
   SILBasicBlock() : Parent(nullptr) {}
   void operator=(const SILBasicBlock &) = delete;
@@ -321,10 +320,6 @@ namespace llvm {
 //===----------------------------------------------------------------------===//
 // ilist_traits for SILBasicBlock
 //===----------------------------------------------------------------------===//
-
-template <>
-struct ilist_sentinel_traits<::swift::SILBasicBlock> :
-  public ilist_half_embedded_sentinel_traits<::swift::SILBasicBlock> {};
 
 template <>
 struct ilist_traits<::swift::SILBasicBlock>

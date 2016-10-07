@@ -77,7 +77,6 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   /// used for debug info and diagnostics.
   SILDebugLocation Location;
 
-  friend llvm::ilist_sentinel_traits<SILInstruction>;
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
@@ -5529,10 +5528,6 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-
-template <>
-struct ilist_sentinel_traits<::swift::SILInstruction> :
-  public ilist_half_embedded_sentinel_traits<::swift::SILInstruction> {};
 
 template <>
 struct ilist_traits<::swift::SILInstruction> :
