@@ -6143,12 +6143,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     ArrayRef<Expr *> arguments;
     ArrayRef<TypeBase *> types;
 
+    SmallVector<Expr *, 1> Scratch;
     if (auto *TE = dyn_cast<TupleExpr>(CEA))
       arguments = TE->getElements();
-    else if (auto *PE = dyn_cast<ParenExpr>(CEA))
-      arguments = PE->getSubExpr();
-    else
-      arguments = apply->getArg();
+    else if (auto *PE = dyn_cast<ParenExpr>(CEA)) {
+      Scratch.push_back(PE->getSubExpr());
+      arguments = makeArrayRef(Scratch);
+    }
+    else {
+      Scratch.push_back(apply->getArg());
+      arguments = makeArrayRef(Scratch);
+    }
 
     for (auto arg: arguments) {
       bool isNoEscape = false;
