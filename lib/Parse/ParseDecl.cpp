@@ -2477,7 +2477,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, Diag<DiagArgTypes...> ID,
                         ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
-                                 tok::unknown, tok::unknown,
+                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
                                  TokenProperty::None,
                                  Diagnostic(ID, Args...));
 }
@@ -2488,7 +2488,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, tok ResyncT3,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
   return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, ResyncT3,
-                                 tok::unknown, TokenProperty::None,
+                                 tok::NUM_TOKENS, TokenProperty::None,
                                  Diagnostic(ID, Args...));
 }
 
@@ -2508,8 +2508,8 @@ static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
                         tok ResyncT1, tok ResyncT2, TokenProperty ResyncP1,
                         Diag<DiagArgTypes...> ID, ArgTypes... Args) {
-  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2, tok::unknown,
-                                 tok::unknown,
+  return parseIdentifierDeclName(P, Result, L, ResyncT1, ResyncT2,
+                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
                                  ResyncP1, Diagnostic(ID, Args...));
 }
 

@@ -424,7 +424,7 @@ public:
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1, tok T2 = tok::unknown);
+  void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
   /// \brief Skip until a token that starts with '>', and consume it if found.
@@ -438,12 +438,7 @@ public:
 
   void skipUntilDeclStmtRBrace(tok T1);
 
-  /// \brief Skip to the next decl, statement or '}'.
-  void skipUntilDeclStmtRBrace() {
-    skipUntilDeclStmtRBrace(tok::unknown);
-  }
-
-  void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
+  void skipUntilDeclRBrace(tok T1, tok T2);
   
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
