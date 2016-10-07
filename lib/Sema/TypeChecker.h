@@ -903,6 +903,19 @@ public:
   /// \returns true if \c t1 can be explicitly converted to \c t2.
   bool isExplicitlyConvertibleTo(Type t1, Type t2, DeclContext *dc);
 
+  /// \brief Determine whether the type of a declaration is implicitly
+  /// convertible to a given type. Unlike isConvertibleTo, this handles
+  /// generic types.
+  ///
+  /// \param decl The declaration of the potential source of the conversion.
+  ///
+  /// \param fromType The potential source type of the conversion.
+  ///
+  /// \param toType The potential destination type of the conversion.
+  ///
+  /// \returns true if \c fromType can be implicitly converted to \c toType.
+  bool isDeclConvertibleTo(const ValueDecl *decl, Type fromType, Type toType);
+
   /// \brief Return true if performing a checked cast from one type to another
   /// with the "as!" operator could possibly succeed.
   ///

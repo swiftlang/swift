@@ -40,6 +40,10 @@ namespace swift {
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
 
+  /// \brief Determine whether a declaration is implicitly convertible to a
+  /// given type. Unlike isConvertibleTo, this handles generic types correctly.
+  bool isDeclConvertibleTo(const ValueDecl *decl, Type fromType, Type toType);
+
   bool isEqual(Type T1, Type T2, DeclContext &DC);
 
   bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);

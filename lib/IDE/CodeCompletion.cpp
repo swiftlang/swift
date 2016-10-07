@@ -906,17 +906,16 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
   return ArrayRef<StringRef>();
 }
 
-static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
-                                                                Type Ty,
-                                                                Type ExpectedTy,
-                                                                DeclContext *DC) {
+static CodeCompletionResult::ExpectedTypeRelation
+calculateTypeRelation(const ValueDecl *D, Type Ty, Type ExpectedTy,
+                      DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
       Ty->getKind() == TypeKind::Error ||
       ExpectedTy->getKind() == TypeKind::Error)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
-  if (isConvertibleTo(Ty, ExpectedTy, *DC))
+  if (isDeclConvertibleTo(D, Ty, ExpectedTy))
     return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
@@ -935,24 +934,35 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto funcType = FD->getType()->getAs<AnyFunctionType>();
-    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
-        !IsImplicitlyCurriedInstanceMethod)
-      funcType = funcType->getResult()->getAs<AnyFunctionType>();
+    auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>();
+    // Strip the implicit self parameter off of a function type.
+    if (DC->isTypeContext() && funcType && !IsImplicitlyCurriedInstanceMethod) {
+      auto newFuncType = funcType->getResult()->getAs<AnyFunctionType>();
+      if (auto *genFuncType = dyn_cast<GenericFunctionType>(funcType)) {
+        if (newFuncType) {
+          // Re-wrap in GenericFunctionType to maintain the GenericSignature.
+          newFuncType = GenericFunctionType::get(
+              genFuncType->getGenericSignature(), newFuncType->getInput(),
+              newFuncType->getResult(), newFuncType->getExtInfo());
+        }
+      }
+      funcType = newFuncType;
+    }
     if (funcType) {
-      auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
+      auto relation = calculateTypeRelation(FD, funcType, ExpectedType, DC);
       if (UseFuncResultType)
         relation =
-            std::max(relation, calculateTypeRelation(funcType->getResult(),
+            std::max(relation, calculateTypeRelation(FD, funcType->getResult(),
                                                      ExpectedType, DC));
       return relation;
     }
   }
   if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    return std::max(calculateTypeRelation(NTD->getType(), ExpectedType, DC),
-                    calculateTypeRelation(NTD->getDeclaredType(), ExpectedType, DC));
+    return std::max(
+        calculateTypeRelation(NTD, NTD->getType(), ExpectedType, DC),
+        calculateTypeRelation(NTD, NTD->getDeclaredType(), ExpectedType, DC));
   }
-  return calculateTypeRelation(VD->getType(), ExpectedType, DC);
+  return calculateTypeRelation(VD, VD->getType(), ExpectedType, DC);
 }
 
 static CodeCompletionResult::ExpectedTypeRelation

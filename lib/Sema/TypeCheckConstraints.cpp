@@ -2390,6 +2390,43 @@ bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
                                 ConstraintKind::ExplicitConversion, dc);
 }
 
+bool TypeChecker::isDeclConvertibleTo(const ValueDecl *decl, Type fromType,
+                                      Type toType) {
+  auto *outerDC = decl->getDeclContext();
+  auto *innerDC = decl->getInnermostDeclContext();
+
+  ConstraintSystem cs(*this, outerDC, ConstraintSystemOptions());
+
+  auto openType = [innerDC, outerDC, &cs](Type type) -> Type {
+    if (type->is<GenericFunctionType>()) {
+      llvm::DenseMap<CanType, TypeVariableType *> replacements;
+      return cs.openFunctionType(type->castTo<GenericFunctionType>(),
+                                 /*numArgLabelsToRemove=*/0,
+                                 /*locator=*/nullptr, replacements, innerDC,
+                                 outerDC, /*skipProtocolSelfConstraint=*/false);
+    } else if (type->hasTypeParameter()) {
+      return cs.openType(type, /*locator=*/nullptr);
+    } else {
+      return type;
+    }
+  };
+
+  // Open generic types so we can match up their constraints in the conversion.
+  toType = openType(toType);
+  fromType = openType(fromType);
+
+  cs.addConstraint(ConstraintKind::Conversion, fromType, toType,
+                   cs.getConstraintLocator(nullptr));
+
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Constraints for isDeclConvertibleTo---\n";
+    cs.print(log);
+  }
+
+  return cs.solveSingle(FreeTypeVariableBinding::Allow).hasValue();
+}
+
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   auto kind = typeCheckCheckedCast(t1, t2, dc,
                                    SourceLoc(), SourceRange(), SourceRange(),

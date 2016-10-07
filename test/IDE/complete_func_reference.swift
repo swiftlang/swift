@@ -16,6 +16,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_INT_0 | %FileCheck %s -check-prefix=INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_INT_1 | %FileCheck %s -check-prefix=INT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_INT_2 | %FileCheck %s -check-prefix=INT_INT
 
 func voidToVoid() {}
 func voidToInt() -> Int {}
@@ -30,6 +33,10 @@ func intToAny(a: Int) -> Any {}
 func anyToInt(a: Any) -> Int {}
 
 func returnsIntToInt() -> (Int) -> Int {}
+
+func gen_tToU<T, U>(a: T) -> U {}
+func gen_eqToEq<T: Equatable, U: Equatable>(a: T) -> U {}
+func gen_tToEq<T, U: Equatable>(a: T) -> U {}
 
 struct S0 {
   func voidToVoid() {}
@@ -46,6 +53,10 @@ struct S0 {
 
   func returnsIntToInt() -> (Int) -> Int {}
 
+  func gen_tToU<T, U>(a: T) -> U {}
+  func gen_eqToEq<T: Equatable, U: Equatable>(a: T) -> U {}
+  func gen_tToEq<T, U: Equatable>(a: T) -> U {}
+
   static func voidToVoid() {}
   static func voidToInt() -> Int {}
   static func intToInt(a: Int) -> Int {}
@@ -59,6 +70,10 @@ struct S0 {
   static func anyToInt(a: Any) -> Int {}
 
   static func returnsIntToInt() -> (Int) -> Int {}
+
+  static func gen_tToU<T, U>(a: T) -> U {}
+  static func gen_eqToEq<T: Equatable, U: Equatable>(a: T) -> U {}
+  static func gen_tToEq<T, U: Equatable>(a: T) -> U {}
 }
 
 do {
@@ -69,7 +84,6 @@ do {
 // VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Identical]: voidToVoid;
 // VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToVoid(a:);
 // VOID_VOID-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
-// VOID_VOID-DAT: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
 // VOID_VOID-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];
 // VOID_VOID-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#];
 // VOID_VOID-DAG: Decl{{.*}}:      voidToInt()[#Int#];
@@ -77,6 +91,9 @@ do {
 // VOID_VOID-DAG: Decl{{.*}}:      intToInt({#a: Int#})[#Int#];
 // VOID_VOID-DAG: Decl{{.*}}:      voidToAny()[#Any#];
 // VOID_VOID-DAG: Decl{{.*}}:      returnsIntToInt()[#(Int) -> Int#];
+// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToU(a:);
+// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_eqToEq({#a: Equatable#})[#Equatable#];
+// VOID_VOID-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToEq({#a: T#})[#Equatable#];
 // VOID_VOID: End completions
 
 do {
@@ -121,6 +138,9 @@ do {
 // ANY_INT-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];
 // ANY_INT-DAG: Decl{{.*}}:      voidToInt()[#Int#];
 // ANY_INT-DAG: Decl{{.*}}:      returnsIntToInt()[#(Int) -> Int#];
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToU(a:);
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToEq(a:);
+// ANY_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_eqToEq({#a: Equatable#})[#Equatable#];
 // ANY_INT: End completions
 
 // ANY_INT_STATIC_CURRY: Begin completions
@@ -134,6 +154,9 @@ do {
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   anyToAny({#self: S0#})[#(a: Any) -> Any#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   intToAny({#self: S0#})[#(a: Int) -> Any#];
 // ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   returnsIntToInt({#self: S0#})[#() -> (Int) -> Int#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_tToU({#self: S0#})[#(a: T) -> U#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_tToEq({#self: S0#})[#(a: T) -> Equatable#];
+// ANY_INT_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_eqToEq({#self: S0#})[#(a: Equatable) -> Equatable#];
 // ANY_INT_STATIC_CURRY: End completions
 
 do {
@@ -152,6 +175,9 @@ do {
 // INT_ANY-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
 // INT_ANY-DAG: Decl{{.*}}:      voidToInt()[#Int#];
 // INT_ANY-DAG: Decl{{.*}}:      voidToAny()[#Any#];
+// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToU(a:);
+// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_eqToEq({#a: Equatable#})[#Equatable#];
+// INT_ANY-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToEq({#a: T#})[#Equatable#];
 // INT_ANY: End completions
 
 // INT_ANY_STATIC_CURRY: Begin completions
@@ -164,6 +190,9 @@ do {
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: returnsIntToInt({#self: S0#})[#() -> (Int) -> Int#];
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToAny({#self: S0#})[#() -> Any#];
 // INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal:   voidToInt({#self: S0#})[#() -> Int#];
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_tToU({#self: S0#})[#(a: T) -> U#];
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_eqToEq({#self: S0#})[#(a: Equatable) -> Equatable#];
+// INT_ANY_STATIC_CURRY-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: gen_tToEq({#self: S0#})[#(a: T) -> Equatable#];
 // INT_ANY_STATIC_CURRY: End completions
 
 do {
@@ -197,3 +226,31 @@ do {
 // VOID_INT_INT-DAG: Decl{{.*}}:      voidToInt()[#Int#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      anyToInt({#a: Any#})[#Int#];
 // VOID_INT_INT-DAG: Decl{{.*}}:      intToInt({#a: Int#})[#Int#];
+
+do {
+  func take(_: @escaping (Int)->Int) {}
+  take(#^INT_INT_0^#)
+}
+do {
+  func take(_: @escaping (Int)->Int) {}
+  take(S0().#^INT_INT_1^#)
+}
+do {
+  func take(_: @escaping (Int)->Int) {}
+  take(S0.#^INT_INT_2^#)
+}
+// INT_INT: Begin completions
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Identical]: returnsIntToInt()[#(Int) -> Int#];
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: intToInt(a:);
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: anyToInt(a:);
+// INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: voidToVoid()[#Void#];
+// INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: intToVoid({#a: Int#})[#Void#];
+// INT_INT-DAG: Decl{{.*}}/NotRecommended/TypeRelation[Invalid]: anyToVoid({#a: Any#})[#Void#];
+// INT_INT-DAG: Decl{{.*}}:      voidToInt()[#Int#];
+// INT_INT-DAG: Decl{{.*}}:      intToAny({#a: Int#})[#Any#];
+// INT_INT-DAG: Decl{{.*}}:      anyToAny({#a: Any#})[#Any#];
+// INT_INT-DAG: Decl{{.*}}:      voidToAny()[#Any#];
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToU(a:);
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_eqToEq(a:);
+// INT_INT-DAG: Decl{{.*}}/TypeRelation[Convertible]: gen_tToEq(a:);
+// INT_INT: End completions

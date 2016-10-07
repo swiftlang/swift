@@ -738,6 +738,20 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
+bool swift::isDeclConvertibleTo(const ValueDecl *decl, Type fromType,
+                                Type toType) {
+  auto &ctx = decl->getASTContext();
+  if (ctx.getLazyResolver()) {
+    TypeChecker *tc = static_cast<TypeChecker *>(ctx.getLazyResolver());
+    return tc->isDeclConvertibleTo(decl, fromType, toType);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine diags(ctx.SourceMgr);
+    TypeChecker tc(ctx, diags);
+    return tc.isDeclConvertibleTo(decl, fromType, toType);
+  }
+}
+
 static Optional<Type> getTypeOfCompletionContextExpr(
                         TypeChecker &TC,
                         DeclContext *DC,
