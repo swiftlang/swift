@@ -130,9 +130,7 @@ func rdar19137463<T>(_ t: T) where T.a == T {} // expected-error{{'a' is not a m
 rdar19137463(1)
 
 
-// FIXME: Terrible diagnostic
-
-struct Brunch<U : Fooable> where U.Foo == X {} // expected-note{{requirement specified as 'U.Foo' == 'X' [with U = BadFooable]}}
+struct Brunch<U : Fooable> where U.Foo == X {}
 
 struct BadFooable : Fooable {
   typealias Foo = DoesNotExist // expected-error{{use of undeclared type 'DoesNotExist'}}
@@ -140,7 +138,6 @@ struct BadFooable : Fooable {
 }
 
 func bogusInOutError(d: inout Brunch<BadFooable>) {}
-// expected-error@-1{{'Brunch' requires the types '<<error type>>' and 'X' be equivalent}}
 
 // Some interesting invalid cases that used to crash
 protocol P {

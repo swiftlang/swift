@@ -3797,8 +3797,7 @@ Type ModuleFile::getType(TypeID TID) {
                                                        assocTypeID);
     typeOrOffset = DependentMemberType::get(
                      getType(baseID),
-                     cast<AssociatedTypeDecl>(getDecl(assocTypeID)),
-                     ctx);
+                     cast<AssociatedTypeDecl>(getDecl(assocTypeID)));
     break;
   }
 

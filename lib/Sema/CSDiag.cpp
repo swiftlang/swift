@@ -3082,7 +3082,7 @@ namespace {
           //   Init.init(Init.init(<builtinliteral>))
           // preserve the type info to prevent this from happening.
           if (isa<LiteralExpr>(expr) && !isa<InterpolatedStringLiteralExpr>(expr) &&
-              !(expr->getType() && expr->getType()->is<ErrorType>()))
+              !(expr->getType() && expr->getType()->hasError()))
             return { false, expr };
 
           // If a ClosureExpr's parameter list has types on the decls, then
@@ -3160,7 +3160,7 @@ namespace {
       
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->is<ErrorType>());
+          D->setInvalid(D->getType()->hasError());
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -3200,7 +3200,7 @@ namespace {
 
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
-          D->setInvalid(D->getType()->is<ErrorType>());
+          D->setInvalid(D->getType()->hasError());
     }
   };
 }
@@ -3453,7 +3453,8 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // in.  Reset them to UnresolvedTypes for safe measures.
     for (auto param : *CE->getParameters()) {
       auto VD = param;
-      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
+          VD->getType()->getCanonicalType()->hasError())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }
   }
@@ -5770,7 +5771,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     //
     // Handle this by rewriting the arguments to UnresolvedType().
     for (auto VD : *CE->getParameters()) {
-      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError() ||
+          VD->getType()->getCanonicalType()->hasError())
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     }
   }
@@ -6569,7 +6571,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         return Type();
 
       Type preferred = genericArgs[genericParam->getIndex()];
-      if (!preferred || preferred->is<ErrorType>())
+      if (!preferred || preferred->hasError())
         return Type();
 
       // ...but only if they were actually resolved by the constraint system

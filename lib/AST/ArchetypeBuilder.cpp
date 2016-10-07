@@ -641,7 +641,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
       // Resolve the member type.
       auto type = getDependentType(builder, false);
-      if (type->is<ErrorType>())
+      if (type->hasError())
         return NestedType::forConcreteType(type);
 
       auto depMemberType = type->castTo<DependentMemberType>();
@@ -742,12 +742,12 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
        bool allowUnresolved) {
   if (auto parent = getParent()) {
     Type parentType = parent->getDependentType(builder, allowUnresolved);
-    if (parentType->is<ErrorType>())
+    if (parentType->hasError())
       return parentType;
 
     // If we've resolved to an associated type, use it.
     if (auto assocType = getResolvedAssociatedType())
-      return DependentMemberType::get(parentType, assocType, builder.Context);
+      return DependentMemberType::get(parentType, assocType);
 
     // If typo correction renamed this type, get the renamed type.
     if (wasRenamed())
@@ -758,7 +758,7 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
     if (!allowUnresolved)
       return ErrorType::get(builder.Context);
 
-    return DependentMemberType::get(parentType, getName(), builder.Context);
+    return DependentMemberType::get(parentType, getName());
   }
   
   assert(getGenericParam() && "Not a generic parameter?");
@@ -1580,8 +1580,7 @@ public:
       case RequirementKind::SameType: {
         auto firstType = req.getFirstType().subst(
                            &Builder.getModule(),
-                           substitutions,
-                           SubstFlags::IgnoreMissing);
+                           substitutions);
         if (!firstType)
           break;
 
@@ -1592,8 +1591,7 @@ public:
 
         auto secondType = req.getSecondType().subst(
                             &Builder.getModule(), 
-                            substitutions,
-                            SubstFlags::IgnoreMissing);
+                            substitutions);
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -1617,8 +1615,7 @@ public:
       case RequirementKind::Conformance: {
         auto subjectType = req.getFirstType().subst(
                              &Builder.getModule(),
-                             substitutions,
-                             SubstFlags::IgnoreMissing);
+                             substitutions);
         if (!subjectType)
           break;
 
@@ -2074,7 +2071,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
 
     auto depTy = archetype->getDependentType(builder, false);
 
-    if (depTy->is<ErrorType>())
+    if (depTy->hasError())
       return;
 
     if (kind == RequirementKind::WitnessMarker) {
@@ -2092,7 +2089,7 @@ static void collectRequirements(ArchetypeBuilder &builder,
           ->getDependentType(builder, false);
     }
 
-    if (repTy->is<ErrorType>())
+    if (repTy->hasError())
       return;
 
     requirements.push_back(Requirement(kind, depTy, repTy));

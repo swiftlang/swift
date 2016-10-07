@@ -127,14 +127,14 @@ Type Solution::computeSubstitutions(
                       &conformance);
     (void)isOpenedAnyObject;
     assert((conforms ||
-            replacement->is<ErrorType>() ||
+            replacement->hasError() ||
             isOpenedAnyObject(replacement) ||
             replacement->is<GenericTypeParamType>()) &&
            "Constraint system missed a conformance?");
     (void)conforms;
 
     assert(conformance ||
-           replacement->is<ErrorType>() ||
+           replacement->hasError() ||
            replacement->hasDependentProtocolConformances());
 
     return ProtocolConformanceRef(protoType->getDecl(), conformance);
@@ -2896,7 +2896,7 @@ namespace {
         = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
                                                  cs.getConstraintLocator(expr));
       if (!cond) {
-        expr->getCondExpr()->setType(ErrorType::get(cs.getASTContext()));
+        expr->getCondExpr()->setType(ErrorType::get(resultTy));
       } else {
         expr->setCondExpr(cond);
       }
@@ -5840,7 +5840,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       return nullptr;
 
     // If the argument type is in error, we're done.
-    if (argType->is<ErrorType>())
+    if (argType->hasError() || argType->getCanonicalType()->hasError())
       return nullptr;
 
     // Convert the literal to the non-builtin argument type via the
