@@ -370,10 +370,6 @@ public protocol RangeReplaceableCollection
   ///   collection.
   mutating func append(_ newElement: Iterator.Element)
 
-  /// Operator form of `append(contentsOf:)`.
-  static func += <S : Sequence>(lhs: inout Self, rhs: S)
-    where S.Iterator.Element == Iterator.Element
-
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.
   ///
