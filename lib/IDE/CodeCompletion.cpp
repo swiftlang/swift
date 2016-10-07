@@ -927,6 +927,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
 
 static CodeCompletionResult::ExpectedTypeRelation
 calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
+                             bool IsImplicitlyCurriedInstanceMethod,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
@@ -935,7 +936,8 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto funcType = FD->getType()->getAs<AnyFunctionType>();
-    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>())
+    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
+        !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
     if (funcType) {
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
@@ -953,12 +955,15 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
   return calculateTypeRelation(VD->getType(), ExpectedType, DC);
 }
 
-static CodeCompletionResult::ExpectedTypeRelation calculateMaxTypeRelationForDecl (
-                                                const Decl *D,
-                                                ArrayRef<Type> ExpectedTypes) {
+static CodeCompletionResult::ExpectedTypeRelation
+calculateMaxTypeRelationForDecl(
+    const Decl *D,
+    ArrayRef<Type> ExpectedTypes,
+    bool IsImplicitlyCurriedInstanceMethod = false) {
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : ExpectedTypes) {
-    Result = std::max(Result, calculateTypeRelationForDecl(D, Type));
+    Result = std::max(Result, calculateTypeRelationForDecl(
+                                  D, Type, IsImplicitlyCurriedInstanceMethod));
   }
   return Result;
 }
@@ -1645,9 +1650,11 @@ private:
   bool shouldUseFunctionReference(AbstractFunctionDecl *D) {
     if (PreferFunctionReferencesToCalls)
       return true;
+    bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
     for (auto expectedType : ExpectedTypes) {
       if (expectedType && expectedType->is<AnyFunctionType>() &&
-          calculateTypeRelationForDecl(D, expectedType, false) >=
+          calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
+                                       /*UseFuncResult=*/false) >=
               CodeCompletionResult::ExpectedTypeRelation::Convertible) {
         return true;
       }
@@ -2338,39 +2345,34 @@ public:
       addPattern(/*includeDefaultArgs*/ false);
     addPattern();
   }
-
-  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
-    if (FD->getName().empty())
-      return;
-    foundFunction(FD);
-    bool IsImplicitlyCurriedInstanceMethod;
+  bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD) {
     switch (Kind) {
     case LookupKind::ValueExpr:
-      IsImplicitlyCurriedInstanceMethod = ExprType->is<AnyMetatypeType>() &&
-                                          !FD->isStatic();
-      break;
+      return ExprType->is<AnyMetatypeType>() && !FD->isStatic();
     case LookupKind::ValueInDeclContext:
-      IsImplicitlyCurriedInstanceMethod =
-          InsideStaticMethod &&
+      if (InsideStaticMethod &&
           FD->getDeclContext() == CurrentMethod->getDeclContext() &&
-          !FD->isStatic();
-      if (!IsImplicitlyCurriedInstanceMethod) {
-        if (auto Init = dyn_cast<Initializer>(CurrDeclContext)) {
-          IsImplicitlyCurriedInstanceMethod =
-              FD->getDeclContext() == Init->getParent() &&
-              !FD->isStatic();
-        }
-      }
-      break;
+          !FD->isStatic())
+        return true;
+      if (auto Init = dyn_cast<Initializer>(CurrDeclContext))
+        return FD->getDeclContext() == Init->getParent() && !FD->isStatic();
+      return false;
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
-      IsImplicitlyCurriedInstanceMethod = false;
-      break;
+      return false;
     }
+  }
+
+  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
+    if (FD->getName().empty())
+      return;
+    foundFunction(FD);
+    bool IsImplicitlyCurriedInstanceMethod =
+        isImplicitlyCurriedInstanceMethod(FD);
 
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
