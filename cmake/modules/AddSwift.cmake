@@ -388,12 +388,20 @@ endfunction()
 #     source_targets...   # The source targets whose outputs will be
 #                         # lipo'd into the output.
 #   )
-function(_add_swift_lipo_target sdk target output)
-  precondition(sdk MESSAGE "sdk is required")
-  precondition(target MESSAGE "target is required")
-  precondition(output MESSAGE "output is required")
+function(_add_swift_lipo_target)
+  cmake_parse_arguments(
+    LIPO                # prefix
+    "CODESIGN"          # options
+    "SDK;TARGET;OUTPUT" # single-value args
+    ""                  # multi-value args
+    ${ARGN})
 
-  set(source_targets ${ARGN})
+  precondition(LIPO_SDK MESSAGE "sdk is required")
+  precondition(LIPO_TARGET MESSAGE "target is required")
+  precondition(LIPO_OUTPUT MESSAGE "output is required")
+  precondition(LIPO_UNPARSED_ARGUMENTS MESSAGE "one or more inputs are required")
+
+  set(source_targets ${LIPO_UNPARSED_ARGUMENTS})
 
   # Gather the source binaries.
   set(source_binaries)
@@ -408,20 +416,24 @@ function(_add_swift_lipo_target sdk target output)
     endif()
   endforeach()
 
-  is_darwin_based_sdk("${sdk}" IS_DARWIN)
+  is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
   if(IS_DARWIN)
+    if(LIPO_CODESIGN)
+      set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
+    endif()
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${LIPO}" "-create" "-output" "${output}" ${source_binaries}
-        CUSTOM_TARGET_NAME "${target}"
-        OUTPUT "${output}"
+        COMMAND "${LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        ${codesign_command}
+        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+        OUTPUT "${LIPO_OUTPUT}"
         DEPENDS ${source_targets})
   else()
     # We don't know how to create fat binaries for other platforms.
     add_custom_command_target(unused_var
-        COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${output}"
-        CUSTOM_TARGET_NAME "${target}"
-        OUTPUT "${output}"
+        COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
+        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+        OUTPUT "${LIPO_OUTPUT}"
         DEPENDS ${source_targets})
   endif()
 endfunction()
@@ -1473,18 +1485,15 @@ function(add_swift_library name)
         endif()
 
         set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-        _add_swift_lipo_target(
-            ${sdk}
-            ${lipo_target}
-            ${UNIVERSAL_LIBRARY_NAME}
-            ${THIN_INPUT_TARGETS})
-
         if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
-          # Ad-hoc sign stdlib dylibs
-          add_custom_command(TARGET "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
-                             POST_BUILD
-                             COMMAND "codesign" "-f" "-s" "-" "${UNIVERSAL_LIBRARY_NAME}")
+          set(codesign_arg CODESIGN)
         endif()
+        _add_swift_lipo_target(
+            SDK ${sdk}
+            TARGET ${lipo_target}
+            OUTPUT ${UNIVERSAL_LIBRARY_NAME}
+            ${codesign_arg}
+            ${THIN_INPUT_TARGETS})
 
         # Cache universal libraries for dependency purposes
         set(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}
@@ -1534,9 +1543,9 @@ function(add_swift_library name)
           set(UNIVERSAL_LIBRARY_NAME
               "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
           _add_swift_lipo_target(
-              ${sdk}
-              ${lipo_target_static}
-              "${UNIVERSAL_LIBRARY_NAME}"
+              SDK ${sdk}
+              TARGET ${lipo_target_static}
+              OUTPUT "${UNIVERSAL_LIBRARY_NAME}"
               ${THIN_INPUT_TARGETS_STATIC})
           swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
               FILES "${UNIVERSAL_LIBRARY_NAME}"
