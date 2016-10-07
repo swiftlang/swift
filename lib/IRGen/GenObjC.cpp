@@ -729,60 +729,21 @@ void irgen::addObjCMethodCallImplicitArguments(IRGenFunction &IGF,
   args.add(IGF.emitObjCSelectorRefLoad(selector.str()));
 }
 
-/// Return the formal type that we would use for +allocWithZone:.
-static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
-                                                   CanType classType) {
-  SILParameterInfo inputs[] = {
-    SILParameterInfo(CanType(ctx.TheRawPointerType), /* (NSZone*), kindof */
-                     ParameterConvention::Direct_Unowned),
-    SILParameterInfo(CanType(MetatypeType::get(classType,
-                                               MetatypeRepresentation::Thick)),
-                     ParameterConvention::Direct_Unowned)
-  };
-  auto result = SILResultInfo(classType, ResultConvention::Owned);
-  auto extInfo = SILFunctionType::ExtInfo(SILFunctionType::Representation::ObjCMethod,
-                                          /*pseudogeneric*/ true);
-
-  return SILFunctionType::get(nullptr, extInfo,
-                              /*callee*/ ParameterConvention::Direct_Unowned,
-                              inputs, result, None, ctx);
-}
-
 /// Call [self allocWithZone: nil].
 llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             llvm::Value *self,
                                             CanType classType) {
-  // Compute the formal type that we expect +allocWithZone: to have.
-  auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
+  // Get an appropriately-cast function pointer.
+  auto fn = IGF.IGM.getObjCAllocWithZoneFn();
 
-  // Compute the appropriate LLVM type for the function.
-  ForeignFunctionInfo foreignInfo;
-  llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(formalType, attrs, &foreignInfo);
-
-  // Get the messenger function.
-  llvm::Constant *messenger = IGF.IGM.getObjCMsgSendFn();
-  messenger = llvm::ConstantExpr::getBitCast(messenger, fnTy->getPointerTo());
-
-  // Prepare the call.
-  CallEmission emission(IGF, Callee::forKnownFunction(formalType,
-                                                      formalType, {},
-                                                      messenger, nullptr,
-                                                      foreignInfo));
-
-  // Emit the arguments.
-  {
-    Explosion args;
-    args.add(self);
-    args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
-    args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
-    emission.setArgs(args);
+  if (self->getType() != IGF.IGM.ObjCClassPtrTy) {
+    auto fnTy = llvm::FunctionType::get(self->getType(), self->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
   }
-
-  // Emit the call.
-  Explosion out;
-  emission.emitToExplosion(out);
-  return out.claimNext();
+  
+  auto call = IGF.Builder.CreateCall(fn, self);
+  return call;
 }
 
 static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
