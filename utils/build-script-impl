@@ -2442,10 +2442,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
         esac
 
-        # Clean the product-local module cache.
-        call rm -rf "${module_cache}"
-        call mkdir -p "${module_cache}"
-
         # Compute the generator output file to check for, to determine if we
         # must reconfigure. We only handle Ninja for now.
         #
