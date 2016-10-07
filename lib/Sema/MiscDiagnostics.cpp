@@ -277,12 +277,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
+        SmallVector<Expr *, 1> Scratch;
         if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
-        else if (auto *PE = dyn_cast<ParenExpr>(Arg))
-          arguments = PE->getSubExpr();
-        else
-          arguments = Call->getArg();
+        else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
+          Scratch.push_back(PE->getSubExpr());
+          arguments = makeArrayRef(Scratch);
+        }
+        else {
+          Scratch.push_back(Call->getArg());
+          arguments = makeArrayRef(Scratch);
+        }
 
         // Check each argument.
         for (auto arg : arguments) {
