@@ -388,6 +388,7 @@ public protocol RangeReplaceableCollection
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting
   ///   collection.
+  // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Iterator.Element
 
