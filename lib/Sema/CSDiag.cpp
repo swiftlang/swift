@@ -5279,6 +5279,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                               argLabels))
     return true;
 
+  // Diagnose some simple and common errors.
+  if (calleeInfo.diagnoseSimpleErrors(callExpr))
+    return true;
+
   // Force recheck of the arg expression because we allowed unresolved types
   // before, and that turned out not to help, and now we want any diagnoses
   // from disallowing them.
@@ -5286,10 +5290,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // Diagnose some simple and common errors.
-  if (calleeInfo.diagnoseSimpleErrors(callExpr))
-    return true;
   
   // A common error is to apply an operator that only has inout forms (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
