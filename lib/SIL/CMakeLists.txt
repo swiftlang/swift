@@ -37,10 +37,10 @@ add_swift_library(swiftSIL STATIC
     swiftSema
 )
 
-# This property is only set by calls to clang_tablegen. It will not be set on
-# standalone builds, so it can always be safely passed.
-get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
-if(CLANG_TABLEGEN_TARGETS)
-  add_dependencies(swiftSIL
-                  ${CLANG_TABLEGEN_TARGETS})
+# intrinsics_gen is the LLVM tablegen target that generates the include files
+# where intrinsics and attributes are declared. See the comment in lib/AST for
+# more detail.
+if(NOT SWIFT_BUILT_STANDALONE)
+  get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
+  add_dependencies(swiftSIL intrinsics_gen ${CLANG_TABLEGEN_TARGETS})
 endif(CLANG_TABLEGEN_TARGETS)
