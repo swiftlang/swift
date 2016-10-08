@@ -355,6 +355,8 @@ public:
       case PublicClass:
         if (L == SILLinkage::Private || L == SILLinkage::Hidden)
           return SILLinkage::Public;
+        if (L == SILLinkage::PrivateExternal || L == SILLinkage::HiddenExternal)
+          return SILLinkage::PublicExternal;
         break;
     }
     return L;
