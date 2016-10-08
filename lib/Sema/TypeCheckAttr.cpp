@@ -1287,7 +1287,7 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
       return;
     }
   } else {
-    if (!parentTy->is<ErrorType>()) {
+    if (!parentTy->hasError()) {
       TC.diagnose(ctor, diag::required_initializer_nonclass, parentTy)
         .highlight(attr->getLocation());
     }
@@ -1312,7 +1312,7 @@ static bool hasThrowingFunctionParameter(CanType type) {
   }
 
   // Suppress diagnostics in the presence of errors.
-  if (isa<ErrorType>(type)) {
+  if (type->hasError()) {
     return true;
   }
 
@@ -1441,7 +1441,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     auto &tl = attr->getTypeLocs()[paramIdx];
 
     auto ty = TC.resolveType(tl.getTypeRepr(), DC, None);
-    if (ty && !ty->is<ErrorType>()) {
+    if (ty && !ty->hasError()) {
       if (ty->getCanonicalType()->hasArchetype()) {
         TC.diagnose(attr->getLocation(),
                     diag::cannot_partially_specialize_generic_function);

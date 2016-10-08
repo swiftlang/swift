@@ -1368,7 +1368,7 @@ namespace {
       } else {
         type = E->getTypeLoc().getType();
       }
-      if (!type || type->is<ErrorType>()) return Type();
+      if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openType(type, locator);
@@ -2856,6 +2856,13 @@ namespace {
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        // If the function type has an error in it, we don't want to solve the
+        // system.
+        if (closure->getType() &&
+            (closure->getType()->hasError() ||
+             closure->getType()->getCanonicalType()->hasError()))
+          return nullptr;
+
         if (closure->hasSingleExpressionBody()) {
           // Visit the body. It's type needs to be convertible to the function's
           // return type.
@@ -3141,8 +3148,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   // Prepare type substitution map.
   TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
-    return Ty.subst(DC.getParentModule(), Substitutions,
-                    SubstFlags::IgnoreMissing);
+    return Ty.subst(DC.getParentModule(), Substitutions);
   };
 
   auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
@@ -3193,9 +3199,7 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
   ConstraintSystem CS(*TC, &DC, None);
   if (ReplaceArchetypeWithVariables) {
     std::function<Type(Type)> Trans = [&](Type Base) {
-      if (isa<GenericTypeParamType>(Base.getPointer()) ||
-          isa<DependentMemberType>(Base.getPointer()) ||
-          isa<ArchetypeType>(Base.getPointer())) {
+      if (Base->isTypeParameter() || isa<ArchetypeType>(Base.getPointer())) {
         return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
                                     TypeVariableOptions::TVO_CanBindToLValue));
       }

@@ -609,7 +609,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             lookupType = proto->getDeclaredType();
         }
 
-        if (!lookupType || lookupType->is<ErrorType>()) continue;
+        if (!lookupType || lookupType->hasError()) continue;
 
         // If we're performing a static lookup, use the metatype.
         // FIXME: This is awful. The client should filter, not us.
@@ -1156,7 +1156,7 @@ void NominalTypeDecl::addedMember(Decl *member) {
 
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
-    if (getExtendedType()->is<ErrorType>())
+    if (getExtendedType()->hasError())
       return;
 
     auto nominal = getExtendedType()->getAnyNominal();
@@ -1341,7 +1341,7 @@ bool DeclContext::lookupQualified(Type type,
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return false;
 
   auto checkLookupCascading = [this, options]() -> Optional<bool> {

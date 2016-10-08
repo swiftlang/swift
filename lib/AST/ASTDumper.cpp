@@ -2637,7 +2637,13 @@ namespace {
       printCommon(T, label, #Name "_type") << ")";              \
     }
 
-    TRIVIAL_TYPE_PRINTER(Error, error)
+    void visitErrorType(ErrorType *T, StringRef label) {
+      printCommon(T, label, "error_type");
+      if (auto originalType = T->getOriginalType())
+        printRec("original_type", originalType);
+      OS << ")";
+    }
+
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {

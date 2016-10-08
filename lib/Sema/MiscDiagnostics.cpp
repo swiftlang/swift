@@ -299,12 +299,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // The argument is either a ParenExpr or TupleExpr.
         ArrayRef<Expr*> arguments;
+        SmallVector<Expr *, 1> Scratch;
         if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
-        else if (auto *PE = dyn_cast<ParenExpr>(Arg))
-          arguments = PE->getSubExpr();
-        else
-          arguments = Call->getArg();
+        else if (auto *PE = dyn_cast<ParenExpr>(Arg)) {
+          Scratch.push_back(PE->getSubExpr());
+          arguments = makeArrayRef(Scratch);
+        }
+        else {
+          Scratch.push_back(Call->getArg());
+          arguments = makeArrayRef(Scratch);
+        }
 
         // Check each argument.
         for (auto arg : arguments) {
@@ -346,14 +351,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
       if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
         if (!CorrectDiscardAssignmentExprs.count(DAE) &&
-            !DAE->getType()->is<ErrorType>())
+            !DAE->getType()->hasError())
           TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
       }
 
       // Diagnose an '&' that isn't in an argument lists.
       if (auto *IOE = dyn_cast<InOutExpr>(E)) {
         if (!IOE->isImplicit() && !AcceptableInOutExprs.count(IOE) &&
-            !IOE->getType()->is<ErrorType>())
+            !IOE->getType()->hasError())
           TC.diagnose(IOE->getLoc(), diag::inout_expr_outside_of_call)
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
@@ -2272,7 +2277,7 @@ bool AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   StringRef Suffix = ">.";
   if (isValue) {
     auto valueType = subject->getType()->getRValueType();
-    if (!valueType || valueType->is<ErrorType>()) {
+    if (!valueType || valueType->hasError()) {
       // If we don't have a suitable argument, we cannot emit a fix-it.
       return true;
     }
@@ -2698,7 +2703,7 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
 void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return;
   }
@@ -2766,7 +2771,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
-  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+  if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
@@ -3167,7 +3172,7 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
       auto argsExpr = E->getArg();
       auto argsTy = argsExpr->getType();
       // Ignore invalid argument type. Some diagnostics are already emitted.
-      if (!argsTy || argsTy->is<ErrorType>()) return;
+      if (!argsTy || argsTy->hasError()) return;
 
       if (auto TSE = dyn_cast<TupleShuffleExpr>(argsExpr))
         argsExpr = TSE->getSubExpr();

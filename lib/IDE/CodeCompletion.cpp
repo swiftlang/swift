@@ -393,18 +393,18 @@ static void eraseErrorTypes(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (expr && expr->getType() && expr->getType()->is<ErrorType>())
+      if (expr && expr->getType() && expr->getType()->hasError())
         expr->setType(Type());
       return { true, expr };
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getType() && TL.getType()->is<ErrorType>())
+      if (TL.getType() && TL.getType()->hasError())
         TL.setType(Type(), /*was validated*/false);
       return true;
     }
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (P && P->hasType() && P->getType()->is<ErrorType>()) {
+      if (P && P->hasType() && P->getType()->hasError()) {
         P->setType(Type());
       }
       return { true, P };
@@ -927,6 +927,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
 
 static CodeCompletionResult::ExpectedTypeRelation
 calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
+                             bool IsImplicitlyCurriedInstanceMethod,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
@@ -935,7 +936,8 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto funcType = FD->getType()->getAs<AnyFunctionType>();
-    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>())
+    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
+        !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
     if (funcType) {
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
@@ -953,12 +955,15 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
   return calculateTypeRelation(VD->getType(), ExpectedType, DC);
 }
 
-static CodeCompletionResult::ExpectedTypeRelation calculateMaxTypeRelationForDecl (
-                                                const Decl *D,
-                                                ArrayRef<Type> ExpectedTypes) {
+static CodeCompletionResult::ExpectedTypeRelation
+calculateMaxTypeRelationForDecl(
+    const Decl *D,
+    ArrayRef<Type> ExpectedTypes,
+    bool IsImplicitlyCurriedInstanceMethod = false) {
   auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : ExpectedTypes) {
-    Result = std::max(Result, calculateTypeRelationForDecl(D, Type));
+    Result = std::max(Result, calculateTypeRelationForDecl(
+                                  D, Type, IsImplicitlyCurriedInstanceMethod));
   }
   return Result;
 }
@@ -1645,9 +1650,11 @@ private:
   bool shouldUseFunctionReference(AbstractFunctionDecl *D) {
     if (PreferFunctionReferencesToCalls)
       return true;
+    bool isImplicitlyCurriedIM = isImplicitlyCurriedInstanceMethod(D);
     for (auto expectedType : ExpectedTypes) {
       if (expectedType && expectedType->is<AnyFunctionType>() &&
-          calculateTypeRelationForDecl(D, expectedType, false) >=
+          calculateTypeRelationForDecl(D, expectedType, isImplicitlyCurriedIM,
+                                       /*UseFuncResult=*/false) >=
               CodeCompletionResult::ExpectedTypeRelation::Convertible) {
         return true;
       }
@@ -1982,7 +1989,7 @@ public:
         auto Subs = MaybeNominalType->getMemberSubstitutions(
             VD->getDeclContext());
         T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
-                              SubstFlags::IgnoreMissing));
+                              SubstFlags::UseErrorType));
       }
     }
 
@@ -2338,39 +2345,34 @@ public:
       addPattern(/*includeDefaultArgs*/ false);
     addPattern();
   }
-
-  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
-    if (FD->getName().empty())
-      return;
-    foundFunction(FD);
-    bool IsImplicitlyCurriedInstanceMethod;
+  bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD) {
     switch (Kind) {
     case LookupKind::ValueExpr:
-      IsImplicitlyCurriedInstanceMethod = ExprType->is<AnyMetatypeType>() &&
-                                          !FD->isStatic();
-      break;
+      return ExprType->is<AnyMetatypeType>() && !FD->isStatic();
     case LookupKind::ValueInDeclContext:
-      IsImplicitlyCurriedInstanceMethod =
-          InsideStaticMethod &&
+      if (InsideStaticMethod &&
           FD->getDeclContext() == CurrentMethod->getDeclContext() &&
-          !FD->isStatic();
-      if (!IsImplicitlyCurriedInstanceMethod) {
-        if (auto Init = dyn_cast<Initializer>(CurrDeclContext)) {
-          IsImplicitlyCurriedInstanceMethod =
-              FD->getDeclContext() == Init->getParent() &&
-              !FD->isStatic();
-        }
-      }
-      break;
+          !FD->isStatic())
+        return true;
+      if (auto Init = dyn_cast<Initializer>(CurrDeclContext))
+        return FD->getDeclContext() == Init->getParent() && !FD->isStatic();
+      return false;
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       llvm_unreachable("cannot have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
-      IsImplicitlyCurriedInstanceMethod = false;
-      break;
+      return false;
     }
+  }
+
+  void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
+    if (FD->getName().empty())
+      return;
+    foundFunction(FD);
+    bool IsImplicitlyCurriedInstanceMethod =
+        isImplicitlyCurriedInstanceMethod(FD);
 
     StringRef Name = FD->getName().get();
     assert(!Name.empty() && "name should not be empty");
@@ -2380,11 +2382,12 @@ public:
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
     assert(FunctionType);
-    if (FirstIndex != 0 && !FunctionType->is<ErrorType>())
+    if (FirstIndex != 0 && FunctionType->is<AnyFunctionType>())
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
 
     bool trivialTrailingClosure = false;
-    if (!IsImplicitlyCurriedInstanceMethod && !FunctionType->is<ErrorType>()) {
+    if (!IsImplicitlyCurriedInstanceMethod &&
+        FunctionType->is<AnyFunctionType>()) {
       trivialTrailingClosure = hasTrivialTrailingClosure(
           FD, FunctionType->castTo<AnyFunctionType>());
     }
@@ -2407,7 +2410,7 @@ public:
 
       llvm::SmallString<32> TypeStr;
 
-      if (FunctionType->is<ErrorType>()) {
+      if (!FunctionType->is<AnyFunctionType>()) {
         llvm::raw_svector_ostream OS(TypeStr);
         FunctionType.print(OS);
         Builder.addTypeAnnotation(OS.str());
@@ -2454,7 +2457,7 @@ public:
       Builder.addTypeAnnotation(TypeStr);
     };
 
-    if (!FunctionType->is<ErrorType>() &&
+    if (FunctionType->is<AnyFunctionType>() &&
         hasInterestingDefaultValues(FD)) {
       addMethodImpl(/*includeDefaultArgs*/ false);
     }
@@ -2472,10 +2475,9 @@ public:
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD, BaseType);
     AnyFunctionType *ConstructorType = nullptr;
-    if (!MemberType->is<ErrorType>())
-      ConstructorType = MemberType->castTo<AnyFunctionType>()
-                            ->getResult()
-                            ->castTo<AnyFunctionType>();
+    if (auto MemberFuncType = MemberType->getAs<AnyFunctionType>())
+      ConstructorType = MemberFuncType->getResult()
+                                      ->castTo<AnyFunctionType>();
 
     bool needInit = false;
     if (!IsOnMetatype) {
@@ -2508,10 +2510,10 @@ public:
       } else if (!addName.empty()) {
         Builder.addTextChunk(addName.str());
       } else {
-        assert(!MemberType->is<ErrorType>() && "will insert empty result");
+        assert(!MemberType->hasError() && "will insert empty result");
       }
 
-      if (MemberType->is<ErrorType>()) {
+      if (!ConstructorType) {
         addTypeAnnotation(Builder, MemberType);
         return;
       }

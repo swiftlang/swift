@@ -74,7 +74,7 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
 /// an apply, do so.
 ///
 Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
-  if (!E->getType() || E->getType()->is<ErrorType>())
+  if (!E->getType() || E->getType()->hasError())
     return E;
   
   Type resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult();

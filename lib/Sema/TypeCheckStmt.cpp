@@ -390,7 +390,7 @@ public:
     }
 
     Type ResultTy = TheFunc->getBodyResultType();
-    if (!ResultTy || ResultTy->is<ErrorType>())
+    if (!ResultTy || ResultTy->hasError())
       return nullptr;
 
     if (!RS->hasResult()) {
@@ -1003,7 +1003,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 }
 
 static bool isDiscardableType(Type type) {
-  return (type->is<ErrorType>() ||
+  return (type->hasError() ||
           type->isUninhabited() ||
           type->lookThroughAllAnyOptionalTypes()->isVoid());
 }
@@ -1211,7 +1211,7 @@ static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
   for (auto &param : *params) {
     ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
-        param->getType()->is<ErrorType>())
+        param->getType()->hasError())
       continue;
     
     Expr *e = param->getDefaultValue();

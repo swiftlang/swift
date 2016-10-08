@@ -289,7 +289,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   CanType T = E->getType()->getCanonicalType();
 
   // Don't try to print invalid expressions, module exprs, or void expressions.
-  if (isa<ErrorType>(T) || isa<ModuleType>(T) || T->isVoid())
+  if (T->hasError() || isa<ModuleType>(T) || T->isVoid())
     return;
 
   // Okay, we need to print this expression.  We generally do this by creating a
