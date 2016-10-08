@@ -294,26 +294,6 @@ public protocol RangeReplaceableCollection
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Iterator.Element
 
-  /*
-  We could have these operators with default implementations, but the compiler
-  crashes:
-
-  <rdar://problem/16566712> Dependent type should have been substituted by Sema
-  or SILGen
-
-  func + <S : Sequence>(_: Self, _: S) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <S : Sequence>(_: S, _: Self) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <S : Collection>(_: Self, _: S) -> Self
-    where S.Iterator.Element == Iterator.Element
-
-  func + <RC : RangeReplaceableCollection>(_: Self, _: S) -> Self
-    where RC.Iterator.Element == Iterator.Element
-  */
-
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
   ///
