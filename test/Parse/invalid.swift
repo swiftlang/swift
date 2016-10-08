@@ -15,18 +15,18 @@ func test2(inout let x : Int) {}  // expected-error {{parameter may not have mul
 func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
 
 func test3() {
-  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}}
-} // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
+  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}
+} // expected-error {{expected expression in list of expressions}}
 
 func runAction() {} // expected-note {{did you mean 'runAction'?}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}} expected-error {{expected ',' separator}} {{32-32=,}}
     
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}
-} // expected-error {{expected ')' in expression list}}
+}
 
 super.init() // expected-error {{'super' cannot be used outside of class members}}
 
@@ -38,7 +38,7 @@ switch state { // expected-error {{use of unresolved identifier 'state'}}
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << " // expected-note {{to match this opening '('}}  expected-error {{expected ')' in expression list}} expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
 
 }
 

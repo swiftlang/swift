@@ -715,7 +715,10 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
   }
 
-  if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
+  if (Status.isError()) {
+    // If we've already got errors, don't emit missing RightK diagnostics.
+    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+  } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }
 

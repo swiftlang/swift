@@ -457,10 +457,10 @@ func stringliterals(_ d: [String: Int]) {
   // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
   // expected-warning @+2 {{initialization of variable 'x2' was never used; consider replacing with assignment to '_' or removing it}}
-  // expected-error @+1 {{unterminated string literal}} expected-note @+1 {{to match this opening '('}}
+  // expected-error @+1 {{unterminated string literal}}
   var x2 : () = ("hello" + "
   ;
-} // expected-error {{expected ')' in expression list}}
+}
 
 func testSingleQuoteStringLiterals() {
   _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
@@ -689,7 +689,7 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+  var a = [1: ; // expected-error {{expected value in dictionary literal}}
   var b = [1: ;] // expected-error {{expected value in dictionary literal}}
   var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
   var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
