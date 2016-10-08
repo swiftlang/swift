@@ -74,25 +74,25 @@ static bool convertExternalDefinitionIntoDeclaration(SILFunction *F) {
   return true;
 }
 
+// The whitelist of classes and functions from the stdlib,
+// whose specializations we want to preserve.
+static const char *const WhitelistedSpecializations[] = {
+  "Array",
+  "_ArrayBuffer",
+  "_ContiguousArrayBuffer",
+  "Range",
+  "RangeGenerator",
+  "_allocateUninitializedArray",
+  "UTF8",
+  "UTF16",
+  "String",
+  "_StringBuffer",
+  "_toStringReadOnlyPrintable",
+};
+
 /// Check of a given name could be a name of a white-listed
 /// specialization.
 bool swift::isWhitelistedSpecialization(StringRef SpecName) {
-  // The whitelist of classes and functions from the stdlib,
-  // whose specializations we want to preserve.
-  ArrayRef<StringRef> Whitelist = {
-      "Array",
-      "_ArrayBuffer",
-      "_ContiguousArrayBuffer",
-      "Range",
-      "RangeGenerator",
-      "_allocateUninitializedArray",
-      "UTF8",
-      "UTF16",
-      "String",
-      "_StringBuffer",
-      "_toStringReadOnlyPrintable",
-  };
-
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
@@ -121,7 +121,8 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   pos += OfStr.size();
 
-  for(auto Name: Whitelist) {
+  for (auto NameStr: WhitelistedSpecializations) {
+    StringRef Name = NameStr;
     auto pos1 = DemangledName.find(Name, pos);
     if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
       return true;
