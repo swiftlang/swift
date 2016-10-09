@@ -170,8 +170,7 @@ void SILBasicBlock::moveAfter(SILBasicBlock *After) {
 void
 llvm::ilist_traits<swift::SILBasicBlock>::
 transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
-                      llvm::ilist_iterator<SILBasicBlock> First,
-                      llvm::ilist_iterator<SILBasicBlock> Last) {
+                      block_iterator First, block_iterator Last) {
   assert(&Parent->getModule() == &SrcTraits.Parent->getModule() &&
          "Module mismatch!");
 
