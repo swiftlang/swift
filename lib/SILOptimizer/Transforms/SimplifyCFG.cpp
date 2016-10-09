@@ -1546,7 +1546,8 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
 
   assert(Dest->bbarg_size() == 1 && "Expected only one argument!");
-  ArrayRef<SILValue> Args = { UED };
+  SmallVector<SILValue, 1> Args;
+  Args.push_back(UED);
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest, Args);
 
   addToWorklist(SEI->getParent());
