@@ -857,8 +857,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         return nullptr;
       }
 
-      for (llvm::iplist<SILInstruction>::reverse_iterator InsIt(
-               CurrIns->getIterator());
+      for (auto InsIt = ++CurrIns->getIterator().getReverse();
            InsIt != CurrBB->rend(); ++InsIt) {
         SILInstruction *Ins = &*InsIt;
         if (Ins == DataAddrInst) {

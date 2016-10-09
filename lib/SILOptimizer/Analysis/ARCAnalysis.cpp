@@ -1136,8 +1136,7 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       RCFI.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
 
   // Look before the "unsafeGuaranteedEnd".
-  for (auto ReverseIt = SILBasicBlock::reverse_iterator(
-                UnsafeGuaranteedEndI->getIterator()),
+  for (auto ReverseIt = ++UnsafeGuaranteedEndI->getIterator().getReverse(),
             End = BB.rend();
        ReverseIt != End; ++ReverseIt) {
     SILInstruction &CurInst = *ReverseIt;
