@@ -327,6 +327,7 @@ private:
   friend class ::swift::SILFunction;
 
   SILFunction *Parent;
+  using block_iterator = simple_ilist<SILBasicBlock>::iterator;
 
 public:
 
@@ -336,8 +337,7 @@ public:
   }
 
   void transferNodesFromList(ilist_traits<SILBasicBlock> &SrcTraits,
-                             ilist_iterator<SILBasicBlock> First,
-                             ilist_iterator<SILBasicBlock> Last);
+                             block_iterator First, block_iterator Last);
 
 private:
   static void createNode(const SILBasicBlock &);

@@ -5439,6 +5439,8 @@ struct ilist_traits<::swift::SILInstruction> :
 private:
   swift::SILBasicBlock *getContainingBlock();
 
+  using instr_iterator = simple_ilist<SILInstruction>::iterator;
+
 public:
   static void deleteNode(SILInstruction *V) {
     SILInstruction::destroy(V);
@@ -5447,8 +5449,7 @@ public:
   void addNodeToList(SILInstruction *I);
   void removeNodeFromList(SILInstruction *I);
   void transferNodesFromList(ilist_traits<SILInstruction> &L2,
-                             ilist_iterator<SILInstruction> first,
-                             ilist_iterator<SILInstruction> last);
+                             instr_iterator first, instr_iterator last);
 
 private:
   void createNode(const SILInstruction &);
