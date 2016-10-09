@@ -158,6 +158,18 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
+
+  // Check for conflicting profiling flags.
+  const Arg *ProfileGenerate = Args.getLastArg(options::OPT_profile_generate);
+  const Arg *ProfileUse = Args.getLastArg(options::OPT_profile_use);
+  if (ProfileGenerate && ProfileUse)
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-profile-use");
+
+  // Check if the profdata is missing.
+  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue()))
+    diags.diagnose(SourceLoc(), diag::error_profile_missing,
+                  ProfileUse->getValue());
 }
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {

@@ -119,6 +119,9 @@ ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
       (StringRef, StringRef))
 
+ERROR(error_profile_missing,none,
+      "no profdata file exists at '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
