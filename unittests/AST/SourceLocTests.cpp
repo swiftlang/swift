@@ -100,3 +100,46 @@ TEST(SourceLoc, AssignExpr) {
   EXPECT_EQ(SourceLoc(), invalidAll->getEndLoc());
   EXPECT_EQ(SourceRange(), invalidAll->getSourceRange());
 }
+
+TEST(SourceLoc, TupleExpr) {
+  TestContext C;
+  
+  // In a TupleExpr, if the parens are both invalid, then you can only have a
+  // valid range iff both the first element and last element have valid ranges.
+  // Source ranges also have the property:
+  //   Start.isValid() == End.isValid()
+  // For example, given the buffer "one", of the form:
+  // (tuple_expr
+  //   (declref_expr range=[test.swift:1:0 - line:1:2] ...)
+  //   (declref_expr range=invalid ...))
+  // the range of this TupleExpr is SourceLoc() (invalid).
+  //       v invalid                v invalid
+  //       (     one,         two   )
+  //       valid ^    invalid ^
+  // COL:  xxxxxx012xxxxxxxxxxxxxxxxx
+  // but the SourceRange of 'one' is 1:0 - 1:2.
+  
+  //                                                012
+  auto bufferID = C.Ctx.SourceMgr.addMemBufferCopy("one");
+  SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
+  
+  auto one = new (C.Ctx) UnresolvedDeclRefExpr(
+      C.Ctx.getIdentifier("one"),
+      DeclRefKind::Ordinary,
+      DeclNameLoc(start));
+  
+  auto two = new (C.Ctx) UnresolvedDeclRefExpr(
+      C.Ctx.getIdentifier("two"),
+      DeclRefKind::Ordinary,
+      DeclNameLoc());
+  
+  // the tuple from the example
+  SmallVector<Expr *, 2> SubExprs({ one, two });
+  SmallVector<Identifier, 2> SubExprNames(2, Identifier());
+  auto exampleTuple = TupleExpr::createImplicit(C.Ctx, SubExprs, SubExprNames);
+  
+  EXPECT_EQ(start, one->getStartLoc());
+  EXPECT_EQ(SourceLoc(), exampleTuple->getStartLoc());
+  EXPECT_EQ(SourceLoc(), exampleTuple->getEndLoc());
+  EXPECT_EQ(SourceRange(), exampleTuple->getSourceRange());
+}
