@@ -79,7 +79,7 @@ class ModuleFile : public LazyMemberLoader {
   StringRef IdentifierData;
 
   /// A callback to be invoked every time a type was deserialized.
-  llvm::function_ref<void(Type)> DeserializedTypeCallback;
+  std::function<void(Type)> DeserializedTypeCallback;
 
 public:
   /// Represents another module that has been imported as a dependency.
