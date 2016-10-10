@@ -1,4 +1,4 @@
-//===---- GenConstant.cpp - Swift IR Generation For Constants ---*- C++ -*-===//
+//===--- GenConstant.h - Swift IR Generation For Constants ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
