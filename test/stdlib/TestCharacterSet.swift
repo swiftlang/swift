@@ -199,6 +199,13 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectFalse(set1.contains("b"))
         set1.formSymmetricDifference(set2)
         expectTrue(set1.contains("b"))
+
+        let expected = set1
+        var set3 = CharacterSet()
+        set1.subtract(set3)
+        expectEqual(expected, set1)
+        set3.subtract(set1)
+        expectTrue(set3.isEmpty)
     }
 
     func test_hasMember() {
