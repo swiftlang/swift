@@ -4343,10 +4343,6 @@ public:
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
   
-  /// \brief If possible, retrieve the TypeBase object that was opened to create
-  /// this type variable.
-  TypeBase *getBaseBeingSubstituted();
-
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.
   ///
