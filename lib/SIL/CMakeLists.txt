@@ -43,4 +43,4 @@ add_swift_library(swiftSIL STATIC
 if(NOT SWIFT_BUILT_STANDALONE)
   get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
   add_dependencies(swiftSIL intrinsics_gen ${CLANG_TABLEGEN_TARGETS})
-endif(CLANG_TABLEGEN_TARGETS)
+endif()
