@@ -191,20 +191,20 @@ extension CGFloat : SignedArithmetic {
     native.negate()
   }
 
-  public mutating func add(_ other: CGFloat) {
-    native.add(other.native)
+  public static func +=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+    lhs.native += rhs.native
   }
 
-  public mutating func subtract(_ other: CGFloat) {
-    native.subtract(other.native)
+  public static func -=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+    lhs.native -= rhs.native
   }
 
-  public mutating func multiply(by other: CGFloat) {
-    native.multiply(by: other.native)
+  public static func *=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+    lhs.native *= rhs.native
   }
 
-  public mutating func divide(by other: CGFloat) {
-    native.divide(by: other.native)
+  public static func /=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+    lhs.native /= rhs.native
   }
 
   public mutating func formTruncatingRemainder(dividingBy other: CGFloat) {
@@ -370,56 +370,6 @@ extension CGFloat : CustomReflectable {
   public init(_ value: CGFloat) {
     self = Float(value.native) 
   }
-}
-
-//===----------------------------------------------------------------------===//
-// Standard Operator Table
-//===----------------------------------------------------------------------===//
-
-//  TODO: These should not be necessary, since they're already provided by
-//  <T: FloatingPoint>, but in practice they are currently needed to
-//  disambiguate overloads.  We should find a way to remove them, either by
-//  tweaking the overload resolution rules, or by removing the other
-//  definitions in the standard lib, or both.
-
-@_transparent
-public func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return lhs.adding(rhs)
-}
-
-@_transparent
-public func -(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return lhs.subtracting(rhs)
-}
-
-@_transparent
-public func *(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return lhs.multiplied(by: rhs)
-}
-
-@_transparent
-public func /(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-  return lhs.divided(by: rhs)
-}
-
-@_transparent
-public func +=(lhs: inout CGFloat, rhs: CGFloat) {
-  lhs.add(rhs)
-}
-
-@_transparent
-public func -=(lhs: inout CGFloat, rhs: CGFloat) {
-  lhs.subtract(rhs)
-}
-
-@_transparent
-public func *=(lhs: inout CGFloat, rhs: CGFloat) {
-  lhs.multiply(by: rhs)
-}
-
-@_transparent
-public func /=(lhs: inout CGFloat, rhs: CGFloat) {
-  lhs.divide(by: rhs)
 }
 
 //===----------------------------------------------------------------------===//

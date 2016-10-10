@@ -987,12 +987,14 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
 % for x in binaryArithmetic['Arithmetic']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-${operationComment(x.operator)}
-  func ${x.name}(${x.firstArg} rhs: Self) -> Self
+${operatorComment(x.operator)}
+  // FIXME(integers): revisit the doc comment
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
   // implementation hook
 ${mutatingOperationComment(x.operator)}
-  mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
+  // FIXME(integers): revisit the doc comment
+  static func ${x.operator}=(_ lhs: inout Self, rhs: Self)
 % end
 }
 
@@ -1008,10 +1010,11 @@ extension ${Protocol} {
 %   for x in binaryArithmetic[Protocol]:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 ${operationComment(x.operator)}
+  // FIXME(integers): revisit the doc comment
   @_transparent
-  public func ${x.name}(${x.firstArg} rhs: Self) -> Self {
-    var lhs = self
-    lhs.${x.mutatingName}(${callLabel}rhs)
+  public static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self {
+    var lhs = lhs
+    lhs ${x.operator}= rhs
     return lhs
   }
 %   end
@@ -1032,6 +1035,7 @@ ${operationComment(x.operator)}
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
 public protocol SignedArithmetic : Arithmetic {
+  // FIXME(integers): turn negate() into a static prefix func -(_:)
   /// Returns the additive inverse of this value.
   ///
   /// This method serves as the basis for the unary minus operator (prefixed
@@ -1069,7 +1073,7 @@ extension SignedArithmetic {
 
   @_transparent
   public mutating func negate() {
-    self = Self().subtracting(self)
+    self = Self() - self
   }
 }
 
@@ -1106,25 +1110,6 @@ public func abs<T : SignedArithmetic>(_ x: T) -> T {
 //===----------------------------------------------------------------------===//
 //===--- Arithmetic operators ---------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-% for Protocol in binaryArithmetic:
-extension ${Protocol} {
-%   for x in binaryArithmetic[Protocol]:
-%     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
-
-${operatorComment(x.operator)}
-  @_transparent
-  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
-    return lhs.${x.name}(${callLabel}rhs)
-  }
-
-  @_transparent
-  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
-    lhs.${x.mutatingName}(${callLabel}rhs)
-  }
-%   end
-}
-% end
 
 extension SignedArithmetic {
   @_transparent
@@ -1453,12 +1438,14 @@ public protocol BinaryInteger :
 % for x in binaryArithmetic['BinaryInteger']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
-${operationComment(x.operator)}
-  func ${x.name}(${x.firstArg} rhs: Self) -> Self
+${operatorComment(x.operator)}
+  // FIXME(integers): revisit the doc comment
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 
   // implementation hook
 ${mutatingOperationComment(x.operator)}
-  mutating func ${x.mutatingName}(${x.firstArg} rhs: Self)
+  // FIXME(integers): revisit the doc commenl
+  static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
   /// Returns the quotient and remainder of this value divided by the given
@@ -1511,7 +1498,7 @@ extension BinaryInteger {
 
   public func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self) {
-    return (self.divided(by: rhs), self.remainder(dividingBy: rhs))
+    return (self / rhs, self % rhs)
   }
 }
 
@@ -1520,7 +1507,7 @@ extension BinaryInteger {
   // FIXME(ABI): using Int as the return type is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
-    let distance = other.subtracting(self)
+    let distance = other - self
     if let result = Int(exactly: distance) {
       return result
     }
@@ -1531,7 +1518,7 @@ extension BinaryInteger {
   @_transparent
   public func advanced(by n: Int) -> Self {
     var advanced: Int = Int(self)
-    advanced.add(n)
+    advanced += n
     if let result = Self(exactly: advanced) {
       return result
     }
@@ -1820,7 +1807,10 @@ public enum ArithmeticOverflow {
 /// points for arithmetic operations. When you provide just those methods, the
 /// standard library provides default implementations for all other arithmetic
 /// methods and operators.
-public protocol FixedWidthInteger : BinaryInteger {
+public protocol FixedWidthInteger : BinaryInteger
+   // FIXME(integers): remove this along with the BitwiseOperations protocol
+  , BitwiseOperations
+  {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -1855,7 +1845,8 @@ ${overflowOperationComment(x.operator)}
 
 % for x in binaryBitwise + maskingShifts:
 ${operationComment(x.operator)}
-  func ${x.name}(_ rhs: Self) -> Self
+  // FIXME(integers): revisit the doc comment
+  static func ${x.operator}(_ lhs: Self, _ rhs: Self) -> Self
 % end
 
   /// Returns a tuple containing the high and low parts of the result of
@@ -1934,6 +1925,14 @@ ${operationComment(x.operator)}
   var leadingZeros: Int { get }
 }
 
+// FIXME(integers): this conformance should be removed along with the
+// BitwiseOperations protocol
+extension FixedWidthInteger {
+  /// An instance where every bit is set to zero.
+  public static var allZeros: Self { return 0 }
+}
+
+
 //===----------------------------------------------------------------------===//
 //===--- Operators on FixedWidthInteger -----------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -1944,39 +1943,13 @@ extension FixedWidthInteger {
     return 0 &- x &- 1
   }
 
-  % for x in binaryBitwise:
-
-${operatorComment(x.operator)}
-  @_transparent
-  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
-    return lhs.${x.name}(rhs)
-  }
-
-  @_transparent
-  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
-    lhs = lhs.${x.name}(rhs)
-  }
-
-  % end
-
   % for x in maskingShifts:
-
-${operatorComment(x.operator)}
-  @_transparent
-  public static func ${x.operator} (lhs: Self, rhs: Self) -> Self {
-    return lhs.${x.name}(rhs)
-  }
-
-  @_transparent
-  public static func ${x.operator}= (lhs: inout Self, rhs: Self) {
-    lhs = lhs ${x.operator} rhs
-  }
 
 ${operatorComment(x.operator)}
   public static func ${x.operator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
-    return lhs.${x.name}(Self(extendingOrTruncating: rhs))
+    return lhs ${x.operator} Self(extendingOrTruncating: rhs)
   }
 
   @_transparent
@@ -2008,7 +1981,7 @@ ${operatorComment(x.nonMaskingOperator)}
     let overshiftL: Self = 0
     if _fastPath(rhs >= 0) {
       if _fastPath(rhs < Self.bitWidth) {
-        return lhs.${x.name}(Self(extendingOrTruncating: rhs))
+        return lhs ${x.operator} Self(extendingOrTruncating: rhs)
       }
       return overshift${'LR'['R' in x.name]}
     }
@@ -2047,11 +2020,10 @@ extension FixedWidthInteger {
 % for x in binaryArithmetic['Arithmetic']:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
   @_transparent
-  public mutating func ${x.mutatingName}(${x.firstArg} other: Self) {
-    let (result, overflow) = self.${x.name}WithOverflow(${callLabel}other)
-    // FIXME(integers): uncomment the check
+  public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
+    let (result, overflow) = lhs.${x.name}WithOverflow(${callLabel}rhs)
     _precondition(overflow != .none, "Overflow in ${x.mutatingName}")
-    self = result
+    lhs = result
   }
 
 ${unsafeOperationComment(x.operator)}
@@ -2378,15 +2350,15 @@ public struct ${Self}
 %       end
 
   @_transparent
-  public mutating func formRemainder(dividingBy other: ${Self}) {
-    if _slowPath(other == 0) {
-      preconditionFailure("formRemainder(dividingBy: 0)")
+  public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    if _slowPath(rhs == 0) {
+      preconditionFailure("Remainder of division by zero")
     }
 
     let (newStorage, _) = (
-      Builtin.${u}rem_Int${bits}(self._value, other._value),
+      Builtin.${u}rem_Int${bits}(lhs._value, rhs._value),
       false._value)
-    self = ${Self}(newStorage)
+    lhs = ${Self}(newStorage)
   }
 
   @_transparent
@@ -2403,18 +2375,18 @@ public struct ${Self}
 
 % for x in binaryBitwise:
   @_transparent
-  public func ${x.name}(_ other: ${Self}) -> ${Self} {
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
     return ${Self}(
-      Builtin.${x.llvmName}_Int${bits}(self._value, other._value))
+      Builtin.${x.llvmName}_Int${bits}(lhs._value, rhs._value))
   }
 % end
 
 % for x in maskingShifts:
   @_transparent
-  public func ${x.name}(_ other: ${Self}) -> ${Self} {
-    let rhs_ = other & ${Self}._highBitIndex
+  public static func ${x.operator}(_ lhs: ${Self}, _ rhs: ${Self}) -> ${Self} {
+    let rhs_ = rhs & ${Self}._highBitIndex
     return ${Self}(
-      Builtin.${x.llvmName(signed)}_Int${bits}(self._value, rhs_._value))
+      Builtin.${x.llvmName(signed)}_Int${bits}(lhs._value, rhs_._value))
   }
 % end
 
@@ -2697,19 +2669,27 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 % end
 
 
-// FIXME(integers): this conformance should be removed along with the
+#if false
+// FIXME(integers): resolving the ambiguity. Should be gone along with the
 // BitwiseOperations protocol
+% for x in binaryBitwise:
 @_transparent
-extension ${Self} : BitwiseOperations {
-  /// An instance where every bit is set to zero.
-  public static var allZeros: ${Self} { return 0 }
+public func ${x.operator}= <
+  T : BitwiseOperations
+>(lhs: inout T, rhs: T) where T : FixedWidthInteger {
+  lhs = lhs ${x.operator} rhs
 }
+% end
+#endif
+
+
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // FIXME(integers): Remove these operators in favour of the generic ones on
 //                  Arithmetic
 //===----------------------------------------------------------------------===//
+#if false
 extension ${Self} {
 // Operations with potentially-static overflow checking
 //
@@ -2729,6 +2709,7 @@ extension ${Self} {
   }
 % end
 }
+#endif
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 % end # end of concrete FixedWidthInteger section
@@ -2787,18 +2768,6 @@ internal func _unsafeMultiply(_ lhs: Int, _ rhs: Int) -> Int {
   return lhs &* rhs
 #endif
 }
-
-// FIXME(integers): resolving the ambiguity. Should be gone along with the
-// BitwiseOperations protocol
-% for x in binaryBitwise:
-@_transparent
-public func ${x.operator}= <
-  T : BitwiseOperations
->(lhs: inout T, rhs: T) where T : FixedWidthInteger {
-  lhs = lhs.${x.name}(rhs)
-}
-% end
-
 
 // FIXME(integers): test more of these.
 // FIXME: should maybe be BinaryInteger & Arithmetic, but <rdar://27619386> prevents it

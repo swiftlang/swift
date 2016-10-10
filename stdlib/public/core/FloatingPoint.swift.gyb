@@ -515,7 +515,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///   value.
   ///
   /// - SeeAlso: `add(_:)`
-  func adding(_ other: Self) -> Self
+  // FIXME(integers): revise the doc comment
+  /*static func +(_ lhs: Self, _ rhs: Self) -> Self*/
 
   /// Adds the given value to this value in place, rounded to a representable
   /// value.
@@ -532,7 +533,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// - Parameter other: The value to add.
   ///
   /// - SeeAlso: `adding(_:)`
-  mutating func add(_ other: Self)
+  // FIXME(integers): revise the doc comment
+  /*static func +=(_ lhs: inout Self, _ rhs: Self)*/
 
   /// Returns the additive inverse of this value.
   ///
@@ -546,6 +548,7 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// - Returns: The additive inverse of this value.
   ///
   /// - SeeAlso: `negate()`
+  // FIXME(integers): make it a prefix func -
   func negated() -> Self
 
   /// Replaces this value with its additive inverse.
@@ -582,7 +585,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///   representable value.
   ///
   /// - SeeAlso: `subtract(_:)`
-  func subtracting(_ other: Self) -> Self
+  // FIXME(integers): revise the doc comment
+  /*static func -(_ lhs: Self, _ rhs: Self) -> Self*/
 
   /// Subtracts the given value from this value in place, rounding to a
   /// representable value.
@@ -599,7 +603,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// - Parameter other: The value to subtract.
   ///
   /// - SeeAlso: `subtracting(_:)`
-  mutating func subtract(_ other: Self)
+  // FIXME(integers): revise the doc comment
+  /*static func -=(_ lhs: inout Self, _ rhs: Self)*/
 
   /// Returns the product of this value and the given value, rounded to a
   /// representable value.
@@ -623,7 +628,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///   representable value.
   ///
   /// - SeeAlso: `multiply(by:)`
-  func multiplied(by other: Self) -> Self
+  // FIXME(integers): revise the doc comment
+  /*static func *(_ lhs: Self, _ rhs: Self) -> Self*/
 
   /// Multiplies this value by the given value in place, rounding to a
   /// representable value.
@@ -640,7 +646,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// - Parameter other: The value to multiply by this value.
   ///
   /// - SeeAlso: `multiplied(by:)`
-  mutating func multiply(by other: Self)
+  // FIXME(integers): revise the doc comment
+  /*static func *=(_ lhs: inout Self, _ rhs: Self)*/
 
   /// Returns the quotient of this value and the given value, rounded to a
   /// representable value.
@@ -664,7 +671,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   ///   representable value.
   ///
   /// - SeeAlso: `divide(by:)`
-  func divided(by other: Self) -> Self
+  // FIXME(integers): revise the doc comment
+  /*static func /(_ lhs: Self, _ rhs: Self) -> Self*/
 
   /// Divides this value by the given value in place, rounding to a
   /// representable value.
@@ -681,7 +689,8 @@ public protocol FloatingPoint: Comparable, SignedArithmetic, Strideable {
   /// - Parameter other: The value to use when dividing this value.
   ///
   /// - SeeAlso: `divided(by:)`
-  mutating func divide(by other: Self)
+  // FIXME(integers): revise the doc comment
+  /*static func /=(_ lhs: inout Self, _ rhs: Self)*/
 
   /// Returns the remainder of this value divided by the given value.
   ///
@@ -1475,28 +1484,6 @@ public enum FloatingPointRoundingRule {
   case awayFromZero
 }
 
-%{
-binary_arithmetic = [
-('+', 'adding',      'add',      None),
-('-', 'subtracting', 'subtract', None),
-('*', 'multiplied',  'multiply', 'by'),
-('/', 'divided',     'divide',   'by')
-]
-}%
-
-%for op in binary_arithmetic:
-@_transparent
-public func ${op[0]}<T : FloatingPoint>(lhs: T, rhs: T) -> T {
-  return lhs.${op[1]}(${op[3]+': ' if op[3] else ''}rhs)
-}
-
-@_transparent
-public func ${op[0]}=<T : FloatingPoint>(lhs: inout T, rhs: T) {
-  return lhs.${op[2]}(${op[3]+': ' if op[3] else ''}rhs)
-}
-
-%end
-
 @_transparent
 public func == <T : FloatingPoint>(lhs: T, rhs: T) -> Bool {
   return lhs.isEqual(to: rhs)
@@ -1782,9 +1769,9 @@ extension FloatingPoint {
   }
 
   @_transparent
-  public func remainder(dividingBy rhs: Self) -> Self {
+  public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
-    lhs.formRemainder(dividingBy: rhs)
+    lhs.formRemainder(dividingBy: other)
     return lhs
   }
 
@@ -1846,16 +1833,6 @@ extension FloatingPoint {
     if isSubnormal { return sign == .minus ? .negativeSubnormal : .positiveSubnormal }
     return sign == .minus ? .negativeZero : .positiveZero
   }
-
-%for op in binary_arithmetic:
-  @_transparent
-  public func ${op[1]}(${op[3] if op[3] else '_'} other: Self) -> Self {
-    var lhs = self
-    lhs.${op[2]}(${op[3]+': ' if op[3] else ''}other)
-    return lhs
-  }
-%end
-
 }
 
 extension BinaryFloatingPoint {

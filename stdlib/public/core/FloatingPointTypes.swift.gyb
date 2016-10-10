@@ -557,23 +557,23 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @_transparent
-  public mutating func add(_ other: ${Self}) {
-    _value = Builtin.fadd_FPIEEE${bits}(self._value, other._value)
+  public static func +=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fadd_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func subtract(_ other: ${Self}) {
-    _value = Builtin.fsub_FPIEEE${bits}(self._value, other._value)
+  public static func -=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fsub_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func multiply(by other: ${Self}) {
-    _value = Builtin.fmul_FPIEEE${bits}(self._value, other._value)
+  public static func *=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fmul_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public mutating func divide(by other: ${Self}) {
-    _value = Builtin.fdiv_FPIEEE${bits}(self._value, other._value)
+  public static func /=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    lhs._value = Builtin.fdiv_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
@@ -924,56 +924,6 @@ extension ${Self} {
 #endif
 %   end
 % end
-}
-
-//===----------------------------------------------------------------------===//
-// Standard Operator Table
-//===----------------------------------------------------------------------===//
-
-//  TODO: These should not be necessary, since they're already provided by
-//  <T: FloatingPoint>, but in practice they are currently needed to
-//  disambiguate overloads.  We should find a way to remove them, either by
-//  tweaking the overload resolution rules, or by removing the other
-//  definitions in the standard lib, or both.
-
-@_transparent
-public func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.adding(rhs)
-}
-
-@_transparent
-public func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.subtracting(rhs)
-}
-
-@_transparent
-public func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.multiplied(by: rhs)
-}
-
-@_transparent
-public func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return lhs.divided(by: rhs)
-}
-
-@_transparent
-public func += (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.add(rhs)
-}
-
-@_transparent
-public func -= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.subtract(rhs)
-}
-
-@_transparent
-public func *= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.multiply(by: rhs)
-}
-
-@_transparent
-public func /= (lhs: inout ${Self}, rhs: ${Self}) {
-  lhs.divide(by: rhs)
 }
 
 //===----------------------------------------------------------------------===//

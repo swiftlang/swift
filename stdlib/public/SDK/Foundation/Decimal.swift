@@ -57,26 +57,6 @@ extension Decimal {
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
-    public mutating func add(_ other: Decimal) {
-        var rhs = other
-        NSDecimalAdd(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func subtract(_ other: Decimal) {
-        var rhs = other
-        NSDecimalSubtract(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func multiply(by other: Decimal) {
-        var rhs = other
-        NSDecimalMultiply(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func divide(by other: Decimal) {
-        var rhs = other
-        NSDecimalDivide(&self, &self, &rhs, .plain)
-    }
-
     public mutating func negate() {
         _isNegative = _isNegative == 0 ? 1 : 0
     }
@@ -257,6 +237,26 @@ extension Decimal : SignedArithmetic {
   // FIXME(integers): implement properly
   public init?<T : BinaryInteger>(exactly source: T) {
     fatalError()
+  }
+
+  public static func +=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalAdd(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func -=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalSubtract(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func *=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalMultiply(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func /=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalDivide(&lhs, &lhs, &rhs, .plain)
   }
 }
 
