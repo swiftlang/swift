@@ -72,7 +72,7 @@ ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
   // NOTE: if you change this, change Type::usesNativeReferenceCounting.
   // If the root class is implemented in swift, then we have a swift
   // refcount; otherwise, we have an ObjC refcount.
-  if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+  if (getRootClass(theClass)->hasKnownSwiftImplementation())
     return ReferenceCounting::Native;
 
   return ReferenceCounting::ObjC;
@@ -83,7 +83,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
-    if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+    if (getRootClass(theClass)->hasKnownSwiftImplementation())
       return IsaEncoding::Pointer;
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;

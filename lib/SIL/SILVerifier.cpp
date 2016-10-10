@@ -996,6 +996,57 @@ public:
                 "function");
       }
     }
+    
+    // TODO: Impose additional constraints when partial_apply when the
+    // -disable-sil-partial-apply flag is enabled. We want to reduce
+    // partial_apply to being only a means of associating a closure invocation
+    // function with its context.
+    //
+    // When we reach that point, we should be able to more deeply redesign
+    // PartialApplyInst to simplify the representation to carry a single
+    // argument.
+    if (PAI->getModule().getOptions().DisableSILPartialApply) {
+      // Should only be one context argument.
+      require(PAI->getArguments().size() == 1,
+              "partial_apply should have a single context argument");
+      
+      // Callee should already have the thin convention, and result should be
+      // thick.
+      require(resultInfo->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thick,
+              "partial_apply result should have thick convention");
+      require(PAI->getCallee()->getType().castTo<SILFunctionType>()
+                ->getRepresentation() ==
+              SILFunctionTypeRepresentation::Thin,
+              "partial_apply callee should have thin convention");
+      
+      // TODO: Check that generic signature matches box's generic signature,
+      // once we have boxes with generic signatures.
+      require(!PAI->getCalleeFunction()->getGenericEnvironment(),
+              "partial_apply context must capture generic environment for "
+              "callee");
+      
+      // Result's callee convention should match context argument's convention.
+      require(substTy->getParameters().back().getConvention()
+                == resultInfo->getCalleeConvention(),
+              "partial_apply context argument must have the same convention "
+              "as the resulting function's callee convention");
+      
+      auto isSwiftRefcounted = [](SILType t) -> bool {
+        if (t.is<SILBoxType>())
+          return true;
+        if (t.getSwiftRValueType() == t.getASTContext().TheNativeObjectType)
+          return true;
+        if (auto clas = t.getClassOrBoundGenericClass())
+          // Must be a class defined in Swift.
+          return clas->hasKnownSwiftImplementation();
+        return false;
+      };
+      
+      // The context argument must be a swift-refcounted box or class.
+      require(isSwiftRefcounted(PAI->getArguments().front()->getType()),
+              "partial_apply context argument must be swift-refcounted");
+    }
   }
 
   void checkBuiltinInst(BuiltinInst *BI) {

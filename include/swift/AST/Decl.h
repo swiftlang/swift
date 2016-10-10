@@ -3268,6 +3268,11 @@ public:
   bool usesObjCGenericsModel() const {
     return isObjC() && hasClangNode() && isGenericContext();
   }
+  
+  /// True if the class is known to be implemented in Swift.
+  bool hasKnownSwiftImplementation() const {
+    return !hasClangNode();
+  }
 };
 
 
