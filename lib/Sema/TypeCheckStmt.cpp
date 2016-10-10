@@ -155,8 +155,8 @@ namespace {
       ASTContext &ctx = Function.getAsDeclContext()->getASTContext();
 
       if (ShouldDump) {
-        // Round to the nearest 100th of a millisecond
-        llvm::errs() << llvm::format("%0.2f", round(elapsed * 100000) / 100) << "ms\t";
+        // Round up to the nearest 100th of a millisecond.
+        llvm::errs() << llvm::format("%0.2f", ceil(elapsed * 100000) / 100) << "ms\t";
         Function.getLoc().print(llvm::errs(), ctx.SourceMgr);
 
         if (auto *AFD = Function.getAbstractFunctionDecl()) {
