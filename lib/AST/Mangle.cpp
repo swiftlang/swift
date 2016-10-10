@@ -250,7 +250,7 @@ void Mangler::mangleContext(const DeclContext *ctx) {
     auto ExtD = cast<ExtensionDecl>(ctx);
     auto ExtTy = ExtD->getExtendedType();
     // Recover from erroneous extension.
-    if (ExtTy.isNull() || ExtTy->is<ErrorType>())
+    if (ExtTy.isNull() || ExtTy->hasError())
       return mangleContext(ExtD->getDeclContext());
 
     auto decl = ExtTy->getAnyNominal();
@@ -388,7 +388,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   }
 
   auto declaredType = DC->getDeclaredTypeOfContext();
-  if (!declaredType || declaredType->is<ErrorType>())
+  if (!declaredType || declaredType->hasError())
     return false;
 
   auto *nominal = declaredType->getAnyNominal();
@@ -507,7 +507,7 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
   }
 
   // Shed the 'self' type and generic requirements from method manglings.
-  if (isMethodDecl(decl) && type && !type->is<ErrorType>()) {
+  if (isMethodDecl(decl) && type && !type->hasError()) {
     // Drop the Self argument clause from the type.
     type = type->castTo<AnyFunctionType>()->getResult();
 
@@ -1087,15 +1087,6 @@ void Mangler::mangleType(Type type, unsigned uncurryLevel) {
 
       mangleType(parent, 0);
       mangleIdentifier(archetype->getName());
-      addSubstitution(archetype);
-      return;
-    }
-    
-    // associated-type ::= 'Q' protocol-context
-    // Mangle the Self archetype of a protocol.
-    if (auto proto = archetype->getSelfProtocol()) {
-      Buffer << 'P';
-      mangleProtocolName(proto);
       addSubstitution(archetype);
       return;
     }

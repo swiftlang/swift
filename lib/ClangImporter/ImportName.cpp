@@ -40,6 +40,11 @@
 #include <algorithm>
 #include <memory>
 
+#include "llvm/ADT/Statistic.h"
+#define DEBUG_TYPE "Import Name"
+STATISTIC(ImportNameNumCacheHits, "# of times the import name cache was hit");
+STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed");
+
 using namespace swift;
 using namespace importer;
 
@@ -702,13 +707,12 @@ static clang::SwiftNameAttr *findSwiftNameAttr(const clang::Decl *decl,
 
 /// Attempt to omit needless words from the given function name.
 static bool omitNeedlessWordsInFunctionName(
-    ASTContext &swiftCtx, EnumInfoCache &enumInfoCache, clang::Sema &clangSema,
     StringRef &baseName, SmallVectorImpl<StringRef> &argumentNames,
     ArrayRef<const clang::ParmVarDecl *> params, clang::QualType resultType,
     const clang::DeclContext *dc, const llvm::SmallBitVector &nonNullArgs,
     Optional<unsigned> errorParamIndex, bool returnsSelf, bool isInstanceMethod,
-    StringScratchSpace &scratch) {
-  clang::ASTContext &clangCtx = clangSema.Context;
+    NameImporter &nameImporter) {
+  clang::ASTContext &clangCtx = nameImporter.getClangContext();
 
   // Collect the parameter type names.
   StringRef firstParamName;
@@ -736,10 +740,10 @@ static bool omitNeedlessWordsInFunctionName(
       argumentName = argumentNames[i];
     bool hasDefaultArg =
         ClangImporter::Implementation::inferDefaultArgument(
-            swiftCtx, enumInfoCache, clangSema.PP, param->getType(),
+            param->getType(),
             getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[i]),
-            swiftCtx.getIdentifier(baseName), numParams, argumentName,
-            i == 0, isLastParameter) != DefaultArgumentKind::None;
+            nameImporter.getIdentifier(baseName), numParams, argumentName,
+            i == 0, isLastParameter, nameImporter) != DefaultArgumentKind::None;
 
     paramTypes.push_back(getClangTypeNameForOmission(clangCtx,
                                                      param->getOriginalType())
@@ -752,8 +756,8 @@ static bool omitNeedlessWordsInFunctionName(
   if (!contextType.isNull()) {
     if (auto objcPtrType = contextType->getAsObjCInterfacePointerType())
       if (auto objcClassDecl = objcPtrType->getInterfaceDecl())
-        allPropertyNames =
-            swiftCtx.getAllPropertyNames(objcClassDecl, isInstanceMethod);
+        allPropertyNames = nameImporter.getContext().getAllPropertyNames(
+            objcClassDecl, isInstanceMethod);
   }
 
   // Omit needless words.
@@ -761,7 +765,7 @@ static bool omitNeedlessWordsInFunctionName(
                            getClangTypeNameForOmission(clangCtx, resultType),
                            getClangTypeNameForOmission(clangCtx, contextType),
                            paramTypes, returnsSelf, /*isProperty=*/false,
-                           allPropertyNames, scratch);
+                           allPropertyNames, nameImporter.getScratch());
 }
 
 /// Prepare global name for importing onto a swift_newtype.
@@ -798,8 +802,7 @@ EffectiveClangContext NameImporter::determineEffectiveContext(
   // scope, depending how their enclosing enumeration is imported.
   if (isa<clang::EnumConstantDecl>(decl)) {
     auto enumDecl = cast<clang::EnumDecl>(dc);
-    switch (enumInfoCache.getEnumKind(swiftCtx, enumDecl,
-                                      clangSema.getPreprocessor())) {
+    switch (getEnumKind(enumDecl)) {
     case EnumKind::Enum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
@@ -917,8 +920,7 @@ bool NameImporter::shouldBeSwiftPrivate(const clang::NamedDecl *decl,
   // private if the parent enum is marked private.
   if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
     auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
-    switch (
-        enumInfoCache.getEnumKind(swiftCtx, ED, clangSema.getPreprocessor())) {
+    switch (getEnumKind(ED)) {
     case EnumKind::Constants:
     case EnumKind::Unknown:
       if (ED->hasAttr<clang::SwiftPrivateAttr>())
@@ -1079,10 +1081,8 @@ bool NameImporter::hasErrorMethodNameCollision(
                                enableObjCInterop());
 }
 
-ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
-                                          clang::Sema &clangSema,
+ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameOptions options) {
-
   ImportedName result;
 
   /// Whether we want the Swift 2.0 name.
@@ -1121,8 +1121,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     SmallVector<const clang::ObjCMethodDecl *, 4> overriddenMethods;
     method->getOverriddenMethods(overriddenMethods);
     for (auto overridden : overriddenMethods) {
-      const auto overriddenName =
-          importFullName(overridden, clangSema, options);
+      const auto overriddenName = importName(overridden, options);
       if (overriddenName.Imported)
         overriddenNames.push_back({overridden, overriddenName});
     }
@@ -1154,8 +1153,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
         if (!knownProperties.insert(overriddenProperty).second)
           continue;
 
-        const auto overriddenName =
-            importFullName(overriddenProperty, clangSema, options);
+        const auto overriddenName = importName(overriddenProperty, options);
         if (overriddenName.Imported)
           overriddenNames.push_back({overriddenProperty, overriddenName});
       }
@@ -1431,8 +1429,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
   bool strippedPrefix = false;
   if (isa<clang::EnumConstantDecl>(D)) {
     auto enumDecl = cast<clang::EnumDecl>(D->getDeclContext());
-    auto enumInfo = enumInfoCache.getEnumInfo(swiftCtx, enumDecl,
-                                              clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl);
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty() && baseName.startswith(removePrefix)) {
@@ -1446,8 +1443,7 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
   // "Code" off the end of the name, if it's there, because it's
   // redundant.
   if (auto enumDecl = dyn_cast<clang::EnumDecl>(D)) {
-    auto enumInfo = enumInfoCache.getEnumInfo(swiftCtx, enumDecl,
-                                              clangSema.getPreprocessor());
+    auto enumInfo = getEnumInfo(enumDecl);
     if (enumInfo.isErrorEnum() && baseName.size() > 4 &&
         camel_case::getLastWord(baseName) == "Code")
       baseName = baseName.substr(0, baseName.size() - 4);
@@ -1546,13 +1542,11 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
     // Objective-C methods.
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(D)) {
       (void)omitNeedlessWordsInFunctionName(
-          swiftCtx, enumInfoCache, clangSema, baseName, argumentNames, params,
-          method->getReturnType(), method->getDeclContext(),
-          getNonNullArgs(method, params),
+          baseName, argumentNames, params, method->getReturnType(),
+          method->getDeclContext(), getNonNullArgs(method, params),
           result.ErrorInfo ? Optional<unsigned>(result.ErrorInfo->ParamIndex)
                            : None,
-          method->hasRelatedResultType(), method->isInstanceMethod(),
-          scratch);
+          method->hasRelatedResultType(), method->isInstanceMethod(), *this);
     }
 
     // If the result is a value, lowercase it.
@@ -1593,4 +1587,61 @@ ImportedName NameImporter::importFullName(const clang::NamedDecl *D,
 
   result.Imported = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
   return result;
+}
+
+/// Returns true if it is expected that the macro is ignored.
+static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
+  // Ignore include guards.
+  if (macro->isUsedForHeaderGuard())
+    return true;
+
+  // If there are no tokens, there is nothing to convert.
+  if (macro->tokens_empty())
+    return true;
+
+  // Currently we only convert non-function-like macros.
+  if (macro->isFunctionLike())
+    return true;
+
+  // Consult the blacklist of macros to suppress.
+  auto suppressMacro = llvm::StringSwitch<bool>(name)
+#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
+#include "MacroTable.def"
+                           .Default(false);
+
+  if (suppressMacro)
+    return true;
+
+  return false;
+}
+
+bool ClangImporter::shouldIgnoreMacro(StringRef Name,
+                                      const clang::MacroInfo *Macro) {
+  return ::shouldIgnoreMacro(Name, Macro);
+}
+
+Identifier importer::importMacroName(
+    const clang::IdentifierInfo *clangIdentifier, const clang::MacroInfo *macro,
+    clang::ASTContext &clangCtx, ASTContext &SwiftContext) {
+  // If we're supposed to ignore this macro, return an empty identifier.
+  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
+    return Identifier();
+
+  // No transformation is applied to the name.
+  StringRef name = clangIdentifier->getName();
+  return SwiftContext.getIdentifier(name);
+}
+
+/// Determine the Swift name for a clang decl
+ImportedName NameImporter::importName(const clang::NamedDecl *decl,
+                                      ImportNameOptions options) {
+  CacheKeyType key(decl, options.toRaw());
+  if (importNameCache.count(key)) {
+    ++ImportNameNumCacheHits;
+    return importNameCache[key];
+  }
+  ++ImportNameNumCacheMisses;
+  auto res = importNameImpl(decl, options);
+  importNameCache[key] = res;
+  return res;
 }

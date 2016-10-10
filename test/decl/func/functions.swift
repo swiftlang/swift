@@ -145,6 +145,12 @@ func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}
 
+func typeAttrBeforeParamDecl(@convention(c) _: () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+
+// FIXME: Bad diagnostics
+func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+// expected-error @-1 {{unnamed parameters must be written with the empty name '_'}} {{38-38=_: }}
+
 // Test fixits on curried functions.
 func testCurryFixits() {
   func f1(_ x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=, }}

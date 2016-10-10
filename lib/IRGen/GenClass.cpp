@@ -242,7 +242,16 @@ namespace {
 
           // If the superclass is resilient to us, we cannot statically
           // know the layout of either its instances or its class objects.
-          ClassHasFixedFieldCount = false;
+          //
+          // FIXME: We need to implement indirect field/vtable entry access
+          // before we can enable this
+          if (IGM.Context.LangOpts.EnableClassResilience) {
+            ClassHasFixedFieldCount = false;
+          } else {
+            addFieldsForClass(superclass, superclassType);
+            NumInherited = Elements.size();
+          }
+
           ClassHasFixedSize = false;
 
           // Furthermore, if the superclass is a generic context, we have to
@@ -629,10 +638,34 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   return Alloca.getAddress();
 }
 
+llvm::Value *irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                                     llvm::Value *size,
+                                                     TailArraysRef TailArrays) {
+  for (const auto &TailArray : TailArrays) {
+    SILType ElemTy = TailArray.first;
+    llvm::Value *Count = TailArray.second;
+
+    const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
+
+    // Align up to the tail-allocated array.
+    llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
+    llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
+    size = IGF.Builder.CreateAdd(size, AlignMask);
+    llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
+    size = IGF.Builder.CreateAnd(size, InvertedMask);
+
+    // Add the size of the tail allocated array.
+    llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
+    size = IGF.Builder.CreateAdd(size, AllocSize);
+  }
+  return size;
+}
+
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                      bool objc, int &StackAllocSize,
-                      ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays) {
+                                        bool objc, int &StackAllocSize,
+                                        TailArraysRef TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto classType = selfType.getSwiftRValueType();
 
@@ -666,24 +699,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
   } else {
     // Allocate the object on the heap.
-
-    for (const auto &TailArray : TailArrays) {
-      SILType ElemTy = TailArray.first;
-      llvm::Value *Count = TailArray.second;
-
-      const TypeInfo &ElemTI = IGF.getTypeInfo(ElemTy);
-
-      // Align up to the tail-allocated array.
-      llvm::Value *ElemStride = ElemTI.getStride(IGF, ElemTy);
-      llvm::Value *AlignMask = ElemTI.getAlignmentMask(IGF, ElemTy);
-      size = IGF.Builder.CreateAdd(size, AlignMask);
-      llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
-      size = IGF.Builder.CreateAnd(size, InvertedMask);
-
-      // Add the size of the tail allocated array.
-      llvm::Value *AllocSize = IGF.Builder.CreateMul(ElemStride, Count);
-      size = IGF.Builder.CreateAdd(size, AllocSize);
-    }
+    size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
     StackAllocSize = -1;
   }
@@ -693,7 +709,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
 llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
                                                llvm::Value *metadata,
                                                SILType selfType,
-                                               bool objc) {
+                                               bool objc,
+                                               TailArraysRef TailArrays) {
   // If we need to use Objective-C allocation, do so.
   if (objc) {
     return emitObjCAllocObjectCall(IGF, metadata, 
@@ -706,7 +723,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  
+  size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
+
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();

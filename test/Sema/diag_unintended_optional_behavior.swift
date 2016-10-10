@@ -58,3 +58,18 @@ func warnOptionalToAnyCoercion(value x: Int?) -> Any {
   // expected-note@-2 {{force-unwrap the value to avoid this warning}}
   // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
 }
+
+func warnOptionalInStringInterpolationSegment(_ o : Int?) {
+  print("Always some, Always some, Always some: \(o)")
+  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-2 {{use '.debugDescription' to silence this warning}} {{52-52=.debugDescription}}
+  // expected-note@-3 {{use 'as' to explicitly cast to 'Int?' to silence this warning}} {{52-52= as Int?}}
+  print("Always some, Always some, Always some: \(o.map { $0 + 1 })")
+  // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-2 {{use '.debugDescription' to silence this warning}} {{67-67=.debugDescription}}
+  // expected-note@-3 {{use 'as' to explicitly cast to 'Int?' to silence this warning}} {{67-67= as Int?}}
+
+  print("Always some, Always some, Always some: \(o as Int?)") // No warning
+  print("Always some, Always some, Always some: \(o.debugDescription)") // No warning.
+}
+

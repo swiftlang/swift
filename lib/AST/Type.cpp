@@ -37,7 +37,7 @@ using namespace swift;
 
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
-  return getType()->is<ErrorType>();
+  return getType()->hasError() || getType()->getCanonicalType()->hasError();
 }
 
 SourceRange TypeLoc::getSourceRange() const {
@@ -275,69 +275,6 @@ bool TypeBase::isSpecialized() {
   return CT.findIf([](Type type) -> bool {
     return isa<BoundGenericType>(type.getPointer());
   });
-}
-
-ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
-  Type type(this);
-  SmallVector<ArrayRef<Type>, 2> allGenericArgs;
-
-  while (type) {
-    // Gather generic arguments from a bound generic type.
-    if (auto bound = type->getAs<BoundGenericType>()) {
-      allGenericArgs.push_back(bound->getGenericArgs());
-
-      // Continue up to the parent.
-      type = bound->getParent();
-      continue;
-    }
-
-    // Use the generic type parameter types for an unbound generic type.
-    if (auto unbound = type->getAs<UnboundGenericType>()) {
-      auto genericSig = unbound->getDecl()->getGenericSignature();
-      auto genericParams = genericSig->getInnermostGenericParams();
-      allGenericArgs.push_back(
-        llvm::makeArrayRef((const Type *)genericParams.data(),
-                           genericParams.size()));
-
-      // Continue up to the parent.
-      type = unbound->getParent();
-      continue;
-    }
-
-    // For a protocol type, use its Self parameter.
-    if (auto protoType = type->getAs<ProtocolType>()) {
-      auto proto = protoType->getDecl();
-      allGenericArgs.push_back(
-        llvm::makeArrayRef(proto->getSelfInterfaceType()));
-
-      // Continue up to the parent.
-      type = protoType->getParent();
-      continue;
-    }
-
-    // Look through non-generic nominal types.
-    if (auto nominal = type->getAs<NominalType>()) {
-      type = nominal->getParent();
-      continue;
-    }
-
-    break;
-  }
-
-  // Trivial case: no generic arguments.
-  if (allGenericArgs.empty())
-    return { };
-
-  // Common case: a single set of generic arguments, for which we need no
-  // allocation.
-  if (allGenericArgs.size() == 1)
-    return allGenericArgs.front();
-
-  // General case: concatenate all of the generic argument lists together.
-  scratch.clear();
-  for (auto args : reversed(allGenericArgs))
-    scratch.append(args.begin(), args.end());
-  return scratch;
 }
 
 bool TypeBase::isUnspecializedGeneric() {
@@ -1042,9 +979,6 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
     return depMem->getAssocType();
 
   if (auto archetype = dyn_cast<ArchetypeType>(this)) {
-    if (auto proto = archetype->getSelfProtocol())
-      return proto->getProtocolSelf();
-
     if (auto assoc = archetype->getAssocType())
       return assoc;
 
@@ -1229,11 +1163,10 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(this);
     auto base = dependent->getBase()->getCanonicalType();
-    const ASTContext &ctx = base->getASTContext();
     if (auto assocType = dependent->getAssocType())
-      Result = DependentMemberType::get(base, assocType, ctx);
+      Result = DependentMemberType::get(base, assocType);
     else
-      Result = DependentMemberType::get(base, dependent->getName(), ctx);
+      Result = DependentMemberType::get(base, dependent->getName());
     break;
   }
 
@@ -2794,8 +2727,8 @@ GenericFunctionType::substGenericArgs(ArrayRef<Substitution> args) {
   
   auto subs = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(subs, SubstFlags::IgnoreMissing);
-  Type result = getResult().subst(subs, SubstFlags::IgnoreMissing);
+  Type input = getInput().subst(subs);
+  Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2808,9 +2741,32 @@ static Type getMemberForBaseType(ConformanceSource conformances,
                                  AssociatedTypeDecl *assocType,
                                  Identifier name,
                                  SubstOptions options) {
+  // Produce a dependent member type for the given base type.
+  auto getDependentMemberType = [&](Type baseType) {
+    if (assocType)
+      return DependentMemberType::get(baseType, assocType);
+
+    return DependentMemberType::get(baseType, name);
+  };
+
+  // Produce a failed result.
+  auto failed = [&]() -> Type {
+    if (!options.contains(SubstFlags::UseErrorType)) return Type();
+
+    Type baseType = ErrorType::get(substBase ? substBase : origBase);
+    if (assocType)
+      return DependentMemberType::get(baseType, assocType);
+
+    return DependentMemberType::get(baseType, name);
+  };
+
+  // If we don't have a substituted base type, fail.
+  if (!substBase) return failed();
+
   // Error recovery path.
+  // FIXME: Generalized existentials will look here.
   if (substBase->isOpenedExistential())
-    return ErrorType::get(substBase->getASTContext());
+    return getDependentMemberType(ErrorType::get(substBase));
 
   // If the parent is an archetype, extract the child archetype with the
   // given name.
@@ -2821,7 +2777,7 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     // If looking for an associated type and the archetype is constrained to a
     // class, continue to the default associated type lookup
     if (!assocType || !archetypeParent->getSuperclass())
-      return ErrorType::get(substBase->getASTContext());
+      return getDependentMemberType(ErrorType::get(substBase));
   }
 
   // If the parent is a type variable, retrieve its member type
@@ -2835,19 +2791,12 @@ static Type getMemberForBaseType(ConformanceSource conformances,
   // Retrieve the member type with the given name.
 
   // Tuples don't have member types.
-  if (substBase->is<TupleType>()) {
-    return Type();
-  }
+  if (substBase->is<TupleType>())
+    return failed();
 
   // If the parent is dependent, create a dependent member type.
-  if (substBase->isTypeParameter()) {
-    if (assocType)
-      return DependentMemberType::get(substBase, assocType,
-                                      substBase->getASTContext());
-    else
-      return DependentMemberType::get(substBase, name,
-                                      substBase->getASTContext());
-  }
+  if (substBase->isTypeParameter())
+    return getDependentMemberType(substBase);
 
   // If we know the associated type, look in the witness table.
   LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
@@ -2863,8 +2812,7 @@ static Type getMemberForBaseType(ConformanceSource conformances,
           origBase->getCanonicalType(), proto);
     }
 
-    if (!conformance)
-      return Type();
+    if (!conformance) return failed();
 
     // If we have an unsatisfied type witness while we're checking the
     // conformances we're supposed to skip this conformance's unsatisfied type
@@ -2874,20 +2822,33 @@ static Type getMemberForBaseType(ConformanceSource conformances,
     if (conformance->getConcrete()->getRootNormalConformance()->getState()
           == ProtocolConformanceState::CheckingTypeWitnesses &&
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
-      return Type();
+      return failed();
 
-    return conformance->getConcrete()->getTypeWitness(assocType, resolver)
-             .getReplacement();
+    auto witness = conformance->getConcrete()
+        ->getTypeWitness(assocType, resolver).getReplacement();
+
+    // This is a hacky feature allowing code completion to migrate to
+    // using Type::subst() without changing output.
+    if (options & SubstFlags::DesugarMemberTypes)
+      if (auto *aliasType = dyn_cast<NameAliasType>(witness.getPointer()))
+        if (!aliasType->is<ErrorType>())
+          witness = aliasType->getSinglyDesugaredType();
+
+    if (witness->is<ErrorType>())
+      return failed();
+
+    return witness;
   }
 
   // FIXME: This is a fallback. We want the above, conformance-based
   // result to be the only viable path.
   if (resolver && conformances.is<ModuleDecl *>()) {
-    return resolver->resolveMemberType(
-        conformances.get<ModuleDecl *>(), substBase, name);
+    if (auto result = resolver->resolveMemberType(
+                        conformances.get<ModuleDecl *>(), substBase, name))
+      return result;
   }
 
-  return Type();
+  return failed();
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,
@@ -2898,8 +2859,7 @@ Type DependentMemberType::substBaseType(ModuleDecl *module,
     return this;
 
   return getMemberForBaseType(module, Type(), substBase,
-                              getAssocType(), getName(),
-                              None);
+                              getAssocType(), getName(), None);
 }
 
 static Type substType(
@@ -2907,12 +2867,6 @@ static Type substType(
     llvm::PointerUnion<ModuleDecl *, const SubstitutionMap *> conformances,
     const TypeSubstitutionMap &substitutions,
     SubstOptions options) {
-  /// Return the original type or a null type, depending on the 'ignoreMissing'
-  /// flag.
-  auto failed = [&](Type t){
-    return options.contains(SubstFlags::IgnoreMissing) ? t : Type();
-  };
-
   return derivedType.transform([&](Type type) -> Type {
     assert((options.contains(SubstFlags::AllowLoweredTypes) ||
             !isa<SILFunctionType>(type.getPointer())) &&
@@ -2936,15 +2890,12 @@ static Type substType(
       auto newBase = substType(depMemTy->getBase(), conformances,
                                substitutions, options);
       if (!newBase)
-        return failed(type);
+        return Type();
       
-      if (Type r = getMemberForBaseType(conformances,
-                                        depMemTy->getBase(), newBase,
-                                        depMemTy->getAssocType(),
-                                        depMemTy->getName(), options))
-        return r;
-
-      return failed(type);
+      return getMemberForBaseType(conformances,
+                                  depMemTy->getBase(), newBase,
+                                  depMemTy->getAssocType(),
+                                  depMemTy->getName(), options);
     }
     
     auto substOrig = type->getAs<SubstitutableType>();
@@ -2966,8 +2917,6 @@ static Type substType(
 
     // Substitute into the parent type.
     Type substParent = substType(parent, conformances, substitutions, options);
-    if (!substParent)
-      return Type();
 
     // If the parent didn't change, we won't change.
     if (substParent.getPointer() == parent)
@@ -2979,12 +2928,9 @@ static Type substType(
       assocType = archetype->getAssocType();
     }
     
-    
-    if (Type r = getMemberForBaseType(conformances, parent, substParent,
-                                      assocType, substOrig->getName(),
-                                      options))
-      return r;
-    return failed(type);
+    return getMemberForBaseType(conformances, parent, substParent,
+                                assocType, substOrig->getName(),
+                                options);
   });
 }
 
@@ -3423,11 +3369,9 @@ case TypeKind::Id:
       return *this;
 
     if (auto assocType = dependent->getAssocType())
-      return DependentMemberType::get(dependentBase, assocType,
-                                      Ptr->getASTContext());
+      return DependentMemberType::get(dependentBase, assocType);
 
-    return DependentMemberType::get(dependentBase, dependent->getName(),
-                                    Ptr->getASTContext());
+    return DependentMemberType::get(dependentBase, dependent->getName());
   }
 
   case TypeKind::Substituted: {
@@ -3601,7 +3545,7 @@ case TypeKind::Id:
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
     auto objectTy = lvalue->getObjectType().transform(fn);
-    if (!objectTy || objectTy->is<ErrorType>())
+    if (!objectTy || objectTy->hasError())
       return objectTy;
 
     return objectTy.getPointer() == lvalue->getObjectType().getPointer() ?
@@ -3611,7 +3555,7 @@ case TypeKind::Id:
   case TypeKind::InOut: {
     auto inout = cast<InOutType>(base);
     auto objectTy = inout->getObjectType().transform(fn);
-    if (!objectTy || objectTy->is<ErrorType>())
+    if (!objectTy || objectTy->hasError())
       return objectTy;
     
     return objectTy.getPointer() == inout->getObjectType().getPointer() ?

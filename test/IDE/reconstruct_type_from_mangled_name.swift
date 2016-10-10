@@ -87,11 +87,11 @@ class Myclass2 {
 }
 
 struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
-// CHECK: decl: struct MyGenStruct1<T, U : ExpressibleByStringLiteral, V : Sequence>
+// CHECK: decl: struct MyGenStruct1<T, U, V> where U : ExpressibleByStringLiteral, V : Sequence
 // FIXME: why are these references to the base type?
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
-// CHECK: decl: struct MyGenStruct1<{{.*}}> for 'V' usr=s:tV14swift_ide_test12MyGenStruct11VMq0_
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'T' usr=s:tV14swift_ide_test12MyGenStruct11TMx
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'U' usr=s:tV14swift_ide_test12MyGenStruct11UMq_
+// CHECK: decl: struct MyGenStruct1<{{.*}}> where {{.*}} for 'V' usr=s:tV14swift_ide_test12MyGenStruct11VMq0_
 
   let x: T
 // CHECK: decl: let x: T

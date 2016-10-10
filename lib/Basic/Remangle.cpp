@@ -1374,15 +1374,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleSelfTypeRef(Node *node) {
-  SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  Out << "QP";
-  assert(node->getNumChildren() == 1);
-  mangleProtocolWithoutPrefix(node->begin()[0].get());
-  addSubstitution(entry);
-}
-
 void Remangler::mangleArchetypeRef(Node *node) {
   Node::IndexType relativeDepth = node->getChild(0)->getIndex();
   Node::IndexType index = node->getChild(1)->getIndex();

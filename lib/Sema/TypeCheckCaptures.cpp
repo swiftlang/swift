@@ -413,7 +413,7 @@ public:
     if (!AFR.isObjC())
       return true;
 
-    if (!E->getType() || E->getType()->is<ErrorType>())
+    if (!E->getType() || E->getType()->hasError())
       return false;
 
     // We can use Objective-C generics in limited ways without reifying

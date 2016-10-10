@@ -807,7 +807,7 @@ Module::lookupConformance(Type type, ProtocolDecl *protocol,
                                                         explicitConformanceDC);
       
       for (auto sub : substitutions) {
-        if (sub.getReplacement()->is<ErrorType>())
+        if (sub.getReplacement()->hasError())
           return None;
       }
 

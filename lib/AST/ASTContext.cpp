@@ -232,6 +232,7 @@ struct ASTContext::Implementation {
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
+    llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -395,7 +396,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
-    TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
+    TheErrorType(
+      new (*this, AllocationArena::Permanent) ErrorType(*this, Type())),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -2375,6 +2377,21 @@ void ASTContext::dumpArchetypeContext(ArchetypeType *archetype,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
+Type ErrorType::get(Type originalType) {
+  assert(originalType);
+
+  auto properties = originalType->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  auto &ctx = originalType->getASTContext();
+  auto &entry = ctx.Impl.getArena(arena).ErrorTypesWithOriginal[originalType];
+  if (entry) return entry;
+
+  void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
+                           alignof(ErrorType), arena);
+  return entry = new (mem) ErrorType(ctx, originalType);
+}
+
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
                                             const ASTContext &C) {
   BuiltinIntegerType *&Result = C.Impl.IntegerTypes[BitWidth];
@@ -3309,7 +3326,7 @@ void ProtocolType::Profile(llvm::FoldingSetNodeID &ID, ProtocolDecl *D,
 }
 
 LValueType *LValueType::get(Type objectTy) {
-  assert(!objectTy->is<ErrorType>() &&
+  assert(!objectTy->hasError() &&
          "cannot have ErrorType wrapped inside LValueType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an @lvalue");
@@ -3329,8 +3346,6 @@ LValueType *LValueType::get(Type objectTy) {
 }
 
 InOutType *InOutType::get(Type objectTy) {
-  assert(!objectTy->is<ErrorType>() &&
-         "cannot have ErrorType wrapped inside InOutType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an 'inout'");
 
@@ -3365,13 +3380,13 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
   return Known;
 }
 
-DependentMemberType *DependentMemberType::get(Type base, Identifier name,
-                                              const ASTContext &ctx) {
+DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
   properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
+  const ASTContext &ctx = base->getASTContext();
   auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
                                             {base, stored.getOpaqueValue()}];
   if (!known) {
@@ -3383,13 +3398,13 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name,
 }
 
 DependentMemberType *DependentMemberType::get(Type base,
-                                              AssociatedTypeDecl *assocType,
-                                              const ASTContext &ctx) {
+                                              AssociatedTypeDecl *assocType) {
   auto properties = base->getRecursiveProperties();
   properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
+  const ASTContext &ctx = base->getASTContext();
   auto *&known = ctx.Impl.getArena(arena).DependentMemberTypes[
                                             {base, stored.getOpaqueValue()}];
   if (!known) {

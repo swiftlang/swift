@@ -90,20 +90,6 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
-Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
-RequirementRepr::getAsAnalyzedWrittenString() const {
-  if (AsWrittenString.empty())
-    return None;
-  auto Pair = AsWrittenString.split("==");
-  auto Kind = RequirementReprKind::SameType;
-  if (Pair.second.empty()) {
-    Pair = AsWrittenString.split(":");
-    Kind =  RequirementReprKind::TypeConstraint;
-  }
-  assert(!Pair.second.empty() && "cannot get second type.");
-  return std::make_tuple(Pair.first.trim(), Pair.second.trim(), Kind);
-}
-
 void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
   auto printTy = [&](const TypeLoc &TyLoc) {
     if (AsWritten && TyLoc.getTypeRepr()) {
@@ -130,14 +116,6 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
 
 void RequirementRepr::print(raw_ostream &out) const {
   printImpl(out, /*AsWritten=*/false);
-}
-
-void RequirementRepr::printAsWritten(raw_ostream &out) const {
-  if (!AsWrittenString.empty()) {
-    out << AsWrittenString;
-  } else {
-    printImpl(out, /*AsWritten=*/true);
-  }
 }
 
 void GenericParamList::print(llvm::raw_ostream &OS) {
@@ -2659,7 +2637,13 @@ namespace {
       printCommon(T, label, #Name "_type") << ")";              \
     }
 
-    TRIVIAL_TYPE_PRINTER(Error, error)
+    void visitErrorType(ErrorType *T, StringRef label) {
+      printCommon(T, label, "error_type");
+      if (auto originalType = T->getOriginalType())
+        printRec("original_type", originalType);
+      OS << ")";
+    }
+
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
@@ -2822,8 +2806,6 @@ namespace {
         printField("parent", static_cast<void *>(parent));
       if (auto assocType = T->getAssocType())
         printField("assoc_type", assocType->printRef());
-      if (auto selfProto = T->getSelfProtocol())
-        printField("self_proto", selfProto->printRef());
 
       // FIXME: This is ugly.
       OS << "\n";

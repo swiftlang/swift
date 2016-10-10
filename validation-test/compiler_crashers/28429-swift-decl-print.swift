@@ -7,4 +7,5 @@
 
 // RUN: not --crash %target-swift-frontend %s -parse
 // REQUIRES: asserts
-struct c:protocol<{"
+{class
+func g:protocol<

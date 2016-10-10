@@ -1110,6 +1110,15 @@ namespace {
       auto subscriptMemberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
 
+      // FIXME: This can only happen when diagnostics successfully type-checked
+      // sub-expression of the subscript and mutated AST, but under normal
+      // circumstances subscript should never have InOutExpr as a direct child
+      // until type checking is complete and expression is re-written.
+      // Proper fix for such situation requires preventing diagnostics from
+      // re-writing AST after successful type checking of the sub-expressions.
+      if (auto inoutExpr = dyn_cast<InOutExpr>(base))
+        base = inoutExpr->getSubExpr();
+
       // Add the member constraint for a subscript declaration.
       // FIXME: lame name!
       auto baseTy = base->getType();
@@ -1119,7 +1128,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (decl) {
-        OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
+        OverloadChoice choice(baseTy, decl, /*isSpecialized=*/false,
                               FunctionRefKind::DoubleApply);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
@@ -1359,7 +1368,7 @@ namespace {
       } else {
         type = E->getTypeLoc().getType();
       }
-      if (!type || type->is<ErrorType>()) return Type();
+      if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openType(type, locator);
@@ -2847,6 +2856,13 @@ namespace {
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        // If the function type has an error in it, we don't want to solve the
+        // system.
+        if (closure->getType() &&
+            (closure->getType()->hasError() ||
+             closure->getType()->getCanonicalType()->hasError()))
+          return nullptr;
+
         if (closure->hasSingleExpressionBody()) {
           // Visit the body. It's type needs to be convertible to the function's
           // return type.
@@ -3107,73 +3123,6 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   return !PossibleTypes.empty();
 }
 
-Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
-                            ArrayRef<Identifier> Names) {
-  if (Names.empty())
-    return BaseTy;
-  ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
-
-  std::unique_ptr<TypeChecker> CreatedTC;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  if (!TC) {
-    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
-    TC = CreatedTC.get();
-  }
-  ConstraintSystem CS(*TC, &DC, Options);
-  auto Loc = CS.getConstraintLocator(nullptr);
-
-  Type Ty = BaseTy;
-  for (auto Id : Names) {
-    auto TV = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
-                                    TypeVariableOptions::TVO_CanBindToLValue);
-    CS.addConstraint(Constraint::createDisjunction(CS, {
-      Constraint::create(CS, ConstraintKind::TypeMember, Ty,
-                         TV, DeclName(Id), FunctionRefKind::Compound, Loc),
-      Constraint::create(CS, ConstraintKind::ValueMember, Ty,
-                         TV, DeclName(Id), FunctionRefKind::DoubleApply, Loc)
-    }, Loc));
-    Ty = TV;
-  }
-  assert(Ty->getKind() == TypeKind::TypeVariable && "Type is not variable");
-  if (auto OS = CS.solveSingle()) {
-    return OS.getValue().typeBindings[Ty->getAs<TypeVariableType>()];
-  }
-  return Type();
-}
-
-static ArrayRef<Identifier> getSubstitutableTypeNames(SubstitutableType *Ty,
-                                           std::vector<Identifier> &Scratch,
-                                                      bool &IsSelfDependent) {
-  IsSelfDependent = false;
-  for (auto Cur = Ty; Cur; Cur = Cur->getParent()) {
-    if (Cur->getName().str() == "Self") {
-      IsSelfDependent = true;
-      break;
-    }
-    Scratch.insert(Scratch.begin(), Cur->getName());
-  }
-  return llvm::makeArrayRef(Scratch);
-}
-
-static ArrayRef<Identifier> getDependentMemberNames(DependentMemberType *Dep,
-                                            std::vector<Identifier> &Scratch,
-                                                    bool &IsSelfDependent) {
-  DependentMemberType *Prev = nullptr;
-  IsSelfDependent = false;
-  for (DependentMemberType *Cur = Dep; Cur;
-       Prev = Cur, Cur = Cur->getBase()->getAs<DependentMemberType>()) {
-    Scratch.insert(Scratch.begin(), Cur->getName());
-    Prev = Cur;
-  }
-  if (Type Base = Prev->getBase()) {
-    if (SubstitutableType *Sub = Base->getAs<SubstitutableType>()) {
-      getSubstitutableTypeNames(Sub, Scratch, IsSelfDependent);
-    }
-  }
-  return llvm::makeArrayRef(Scratch);
-}
-
 bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
                                const ExtensionDecl *ED) {
   ConstraintSystemOptions Options;
@@ -3197,29 +3146,11 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   SmallVector<Type, 3> TypeScratch;
 
   // Prepare type substitution map.
-  auto GenericArgs = BaseTy->getAllGenericArgs(TypeScratch);
-  TypeSubstitutionMap Substitutions;
-  auto GenericParams = Nominal->getInnermostGenericParamTypes();
-  assert(GenericParams.size() == GenericArgs.size());
-  for (unsigned I = 0, N = GenericParams.size(); I != N; ++I) {
-    auto GP = GenericParams[I]->getCanonicalType()->castTo<GenericTypeParamType>();
-    Substitutions[GP] = GenericArgs[I];
-  }
+  TypeSubstitutionMap Substitutions = BaseTy->getMemberSubstitutions(ED);
   auto resolveType = [&](Type Ty) {
-    ArrayRef<Identifier> Names;
-    bool IsSelfDependent = false;
-    if (SubstitutableType *Sub = Ty->getAs<SubstitutableType>()) {
-      Scratch.clear();
-      Names = getSubstitutableTypeNames(Sub, Scratch, IsSelfDependent);
-    } else if (DependentMemberType *Dep = Ty->getAs<DependentMemberType>()) {
-      Scratch.clear();
-      Names = getDependentMemberNames(Dep, Scratch, IsSelfDependent);
-    } else
-      return Ty;
-    return IsSelfDependent ? checkMemberType(DC, BaseTy, Names)
-      :Ty.subst(DC.getParentModule(), Substitutions,
-                                       SubstFlags::IgnoreMissing);
+    return Ty.subst(DC.getParentModule(), Substitutions);
   };
+
   auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
     auto First = resolveType(Req.getFirstType());
     auto Second = resolveType(Req.getSecondType());
@@ -3268,7 +3199,7 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
   ConstraintSystem CS(*TC, &DC, None);
   if (ReplaceArchetypeWithVariables) {
     std::function<Type(Type)> Trans = [&](Type Base) {
-      if (Base->getKind() == TypeKind::Archetype) {
+      if (Base->isTypeParameter() || isa<ArchetypeType>(Base.getPointer())) {
         return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
                                     TypeVariableOptions::TVO_CanBindToLValue));
       }
@@ -3296,6 +3227,10 @@ bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
 
 bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
   return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
+}
+
+bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
+  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, false, false);
 }
 
 ResolveMemberResult

@@ -88,7 +88,7 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 0;
+static constexpr uint32_t onDiskCompletionCacheVersion = 1;
 
 static StringRef copyString(llvm::BumpPtrAllocator &Allocator, StringRef Str) {
   char *Mem = Allocator.Allocate<char>(Str.size());
@@ -297,6 +297,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       OSS << p << "\0";
     OSSLE.write(K.ResultsHaveLeadingDot);
     OSSLE.write(K.ForTestableLookup);
+    OSSLE.write(K.CodeCompleteInitsInPostfixExpr);
     LE.write(static_cast<uint32_t>(OSS.tell()));   // Size of debug info
     out.write(OSS.str().data(), OSS.str().size()); // Debug info blob
   }
@@ -404,9 +405,10 @@ static std::string getName(StringRef cacheDirectory,
   llvm::sys::path::append(name, K.ModuleName);
   llvm::raw_svector_ostream OSS(name);
 
-  // name[-dot][-testable]
+  // name[-dot][-testable][-inits]
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
-      << (K.ForTestableLookup ? "-testable" : "");
+      << (K.ForTestableLookup ? "-testable" : "")
+      << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "");
 
   // name[-access-path-components]
   for (StringRef component : K.AccessPath)
@@ -471,7 +473,7 @@ OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
     return None;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename, "<module-name>", {}, false, false};
+  CodeCompletionCache::Key K{filename, "<module-name>", {}, false, false, false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();

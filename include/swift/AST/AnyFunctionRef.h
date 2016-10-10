@@ -132,7 +132,7 @@ public:
 
 
     auto *CE = TheFunction.get<AbstractClosureExpr *>();
-    if (!CE->getType() || CE->getType()->is<ErrorType>())
+    if (!CE->getType() || CE->getType()->hasError())
       return false;
     return CE->getType()->castTo<FunctionType>()->isNoEscape();
   }

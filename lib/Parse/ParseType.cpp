@@ -1105,26 +1105,6 @@ bool Parser::canParseOldStyleProtocolComposition() {
   return true;
 }
 
-bool Parser::canParseAttributes() {
-  while (consumeIf(tok::at_sign)) {
-    if (!consumeIf(tok::identifier)) return false;
-    
-    if (consumeIf(tok::equal)) {
-      if (Tok.isNot(tok::identifier) &&
-          Tok.isNot(tok::integer_literal) &&
-          Tok.isNot(tok::floating_literal))
-        return false;
-      consumeToken();
-    } else if (Tok.is(tok::l_paren)) {
-      // Attributes like cc(x,y,z)
-      skipSingle();
-    }
-    
-    consumeIf(tok::comma);
-  }
-  return true;
-}
-
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNotEllipsis() && !isStartOfDecl()) {
@@ -1143,9 +1123,8 @@ bool Parser::canParseTypeTupleBody() {
         }
         consumeToken(tok::colon);
 
-        // Parse attributes then a type.
-        if (!canParseAttributes() ||
-            !canParseType())
+        // Parse a type.
+        if (!canParseType())
           return false;
 
         // Parse default values. This aren't actually allowed, but we recover
@@ -1163,11 +1142,6 @@ bool Parser::canParseTypeTupleBody() {
       }
       
       // Otherwise, this has to be a type.
-
-      // Parse attributes.
-      if (!canParseAttributes())
-        return false;
- 
       if (!canParseType())
         return false;
 
@@ -1179,6 +1153,3 @@ bool Parser::canParseTypeTupleBody() {
   
   return consumeIf(tok::r_paren);
 }
-
-
-

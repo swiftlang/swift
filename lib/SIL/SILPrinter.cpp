@@ -838,8 +838,7 @@ public:
     printDebugVar(AVI->getVarInfo());
   }
 
-  void visitAllocRefInst(AllocRefInst *ARI) {
-    *this << "alloc_ref ";
+  void printAllocRefInstBase(AllocRefInstBase *ARI) {
     if (ARI->isObjC())
       *this << "[objc] ";
     if (ARI->canAllocOnStack())
@@ -850,14 +849,18 @@ public:
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
     }
+  }
+
+  void visitAllocRefInst(AllocRefInst *ARI) {
+    *this << "alloc_ref ";
+    printAllocRefInstBase(ARI);
     *this << ARI->getType();
   }
 
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     *this << "alloc_ref_dynamic ";
-    if (ARDI->isObjC())
-      *this << "[objc] ";
-    *this << getIDAndType(ARDI->getOperand());
+    printAllocRefInstBase(ARDI);
+    *this << getIDAndType(ARDI->getMetatypeOperand());
     *this << ", " << ARDI->getType();
   }
 
@@ -907,10 +910,26 @@ public:
     *this << ", normal " << getID(AI->getNormalBB());
     *this << ", error " << getID(AI->getErrorBB());
   }
-  
-  
+
   void visitPartialApplyInst(PartialApplyInst *CI) {
     *this << "partial_apply ";
+    switch (CI->getFunctionType()->getCalleeConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // Default; do nothing.
+      break;
+    case ParameterConvention::Direct_Guaranteed:
+      *this << "[callee_guaranteed] ";
+      break;
+    
+    // Should not apply to callees.
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      llvm_unreachable("unexpected callee convention!");
+    }
     *this << getID(CI->getCallee());
     printSubstitutions(CI->getSubstitutions());
     *this << '(';
@@ -1817,7 +1836,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : sig->getGenericParams()) {
       auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
-      assert(archetypeTy);
+      if (!archetypeTy)
+        continue;
 
       Identifier name = archetypeTy->getName();
       while (!UsedNames.insert(name).second) {

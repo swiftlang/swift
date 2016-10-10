@@ -1755,10 +1755,8 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
         continue;
 
       // Substitute the constrained types.
-      auto first = reqt.getFirstType().subst(subs, SubstFlags::IgnoreMissing)
-          ->getCanonicalType();
-      auto second = reqt.getSecondType().subst(subs, SubstFlags::IgnoreMissing)
-          ->getCanonicalType();
+      auto first = reqt.getFirstType().subst(subs)->getCanonicalType();
+      auto second = reqt.getSecondType().subst(subs)->getCanonicalType();
 
       if (!first->isTypeParameter()) {
         assert(second->isTypeParameter());
@@ -1773,17 +1771,14 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   }
 
   // Substitute away `Self` in parameter and result types.
-  auto input = reqtTy->getInput().subst(subs, SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
-  auto result = reqtTy->getResult().subst(subs, SubstFlags::IgnoreMissing)
-    ->getCanonicalType();
+  auto input = reqtTy->getInput().subst(subs)->getCanonicalType();
+  auto result = reqtTy->getResult().subst(subs)->getCanonicalType();
 
   // The result might be fully concrete, if the witness had no generic
   // signature, and the requirement had no additional generic parameters
   // beyond `Self`.
   if (!allParams.empty()) {
-    auto invalid = builder.finalize(SourceLoc());
-    assert(!invalid && "invalid requirements should not be seen in SIL");
+    builder.finalize(SourceLoc());
 
     auto *sig = builder.getGenericSignature(allParams);
 

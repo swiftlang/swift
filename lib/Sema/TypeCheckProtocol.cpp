@@ -1826,7 +1826,8 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
-  bool isError = replacement->is<ErrorType>();
+  bool isError =
+    replacement->hasError() || replacement->getCanonicalType()->hasError();
   assert((archetype != nullptr || isError) &&
          "Should have built archetypes already");
 
@@ -1954,7 +1955,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // happen when type-checking a different conformance deduces a
     // different type witness with the same name. For non-error cases,
     // the caller handles this.
-    if (performRedeclarationCheck && type->is<ErrorType>()) {
+    if (performRedeclarationCheck && type->hasError()) {
       switch (resolveTypeWitnessViaLookup(assocType)) {
       case ResolveWitnessResult::Success:
       case ResolveWitnessResult::ExplicitFailed:
@@ -1976,9 +1977,13 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
     aliasDecl->setImplicit();
-    if (type->is<ErrorType>())
+    if (type->hasError()) {
       aliasDecl->setInvalid();
-    if (type->hasArchetype()) {
+
+      // If we're recording a failed type witness, keep the sugar around for
+      // code completion.
+      type = aliasDecl->getDeclaredType();
+    } else if (type->hasArchetype()) {
       Type metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
@@ -2101,9 +2106,9 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
       Type SelfType = Adopter->getSelfTypeInContext();
       if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType, Adopter);
+        Options.setArchetypeSelfTransform(SelfType);
       else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+        Options.setArchetypeAndDynamicSelfTransform(SelfType);
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in
@@ -2129,7 +2134,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
     if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->is<ErrorType>()) {
+          ->hasError()) {
       return ResolveWitnessResult::ExplicitFailed;
     }
   }
@@ -2604,7 +2609,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredType()->is<ErrorType>())
+        if (candidate.first->getDeclaredType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
@@ -2634,7 +2639,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
                      witnessResult.Inferred.end(),
                      [&](const std::pair<AssociatedTypeDecl *, Type> &result) {
                        // Filter out errors.
-                       if (result.second->is<ErrorType>())
+                       if (result.second->hasError())
                          return true;
 
                        // Filter out duplicates.
@@ -2726,6 +2731,16 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
   return result;
 }
 
+/// Map error types back to their original types.
+static Type mapErrorTypeToOriginal(Type type) {
+  if (auto errorType = type->getAs<ErrorType>()) {
+    if (auto originalType = errorType->getOriginalType())
+      return originalType.transform(mapErrorTypeToOriginal);
+  }
+
+  return type;
+}
+
 /// Produce the type when matching a witness.
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
@@ -2768,7 +2783,11 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   Module *module = conformance->getDeclContext()->getParentModule();
-  return type.subst(module, substitutions, SubstFlags::IgnoreMissing);
+  auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
+  if (!resultType->hasError()) return resultType;
+
+  // Map error types with original types *back* to the original, dependent type.
+  return resultType.transform(mapErrorTypeToOriginal);
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2820,6 +2839,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Structural mismatches imply that the witness cannot match.
     bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+      // If either type hit an error, don't stop yet.
+      if (firstType->hasError() || secondType->hasError())
+        return true;
+
       // FIXME: Check whether one of the types is dependent?
       return false;
     }
@@ -2827,6 +2850,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
                   TypeBase *secondType) {
+      // If the second type is an error, don't look at it further.
+      if (secondType->hasError())
+        return true;
+
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
@@ -3038,8 +3065,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     TC.validateDecl(assocType);
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
                          DC->getParentModule(),
-                         substitutions,
-                         SubstFlags::IgnoreMissing);
+                         substitutions);
     if (!defaultType)
       return Type();
 
@@ -3060,7 +3086,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function to compute the derived type of an associated type,
   // for protocols known to the compiler.
   auto computeDerivedTypeWitness = [&](AssociatedTypeDecl *assocType) -> Type {
-    if (Adoptee->is<ErrorType>())
+    if (Adoptee->hasError())
       return Type();
 
     // UnresolvedTypes propagated their unresolvedness to any witnesses.
@@ -3188,7 +3214,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
         auto typeWitness = typeWitnesses.begin(assocType);
         if (typeWitness != typeWitnesses.end()) {
           // The solution contains an error.
-          if (typeWitness->first->is<ErrorType>()) {
+          if (typeWitness->first->hasError()) {
             recordMissing();
             return;
           }
@@ -3200,7 +3226,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         // If we can form a default type, do so.
         if (Type defaultType = computeDefaultTypeWitness(assocType)) {
-          if (defaultType->is<ErrorType>()) {
+          if (defaultType->hasError()) {
             recordMissing();
             return;
           }
@@ -3211,7 +3237,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         // If we can derive a type witness, do so.
         if (Type derivedType = computeDerivedTypeWitness(assocType)) {
-          if (derivedType->is<ErrorType>()) {
+          if (derivedType->hasError()) {
             recordMissing();
             return;
           }
@@ -3687,7 +3713,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
     if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->is<ErrorType>()) {
+          ->hasError()) {
       Conformance->setInvalid();
       return;
     }
@@ -4002,7 +4028,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
                                        ProtocolDecl *Proto,
                                        DeclContext *DC,
                                        SourceLoc ComplainLoc) {
-  if (T->is<ErrorType>())
+  if (T->hasError() || T->getCanonicalType()->hasError())
     return;
 
   // If we're checking conformance of an existential type to a protocol,

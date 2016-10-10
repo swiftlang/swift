@@ -61,7 +61,8 @@ Type GenericEnvironment::mapTypeOutOfContext(ModuleDecl *M, Type type) const {
 
 Type GenericEnvironment::mapTypeIntoContext(ModuleDecl *M, Type type) const {
   type = type.subst(M, InterfaceToArchetypeMap, SubstFlags::AllowLoweredTypes);
-  assert(!type->hasTypeParameter() && "not fully substituted");
+  assert((!type->hasTypeParameter() || type->hasError()) &&
+         "not fully substituted");
   return type;
 }
 

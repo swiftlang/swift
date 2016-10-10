@@ -1,0 +1,10 @@
+Name: APINotesFrameworkTest
+Functions:
+  - Name: jumpToLocation
+    SwiftName: 'jumpTo(x:y:z:)'
+SwiftVersions:
+  - Version: 3.0
+    Functions:
+      - Name: acceptDoublePointer
+        SwiftName: 'acceptPointer(_:)'
+        Nullability: [ O ]

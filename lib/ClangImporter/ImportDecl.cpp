@@ -5954,7 +5954,7 @@ void SwiftDeclConverter::importObjCMembers(
 
       // If this declaration shouldn't be visible, don't add it to
       // the list.
-      if (Impl.shouldSuppressDeclImport(objcMethod))
+      if (shouldSuppressDeclImport(objcMethod))
         continue;
     }
 
@@ -6267,7 +6267,7 @@ getSwiftNameFromClangName(StringRef replacement) {
   if (!clangDecl)
     return "";
 
-  auto importedName = importFullName(clangDecl, None, &clangSema);
+  auto importedName = importFullName(clangDecl, None);
   if (!importedName)
     return "";
 
@@ -6852,9 +6852,7 @@ buildGenericSignature(GenericParamList *genericParams,
     (void) result;
   }
   // TODO: any need to infer requirements?
-  bool result = builder.finalize(genericParams->getSourceRange().Start);
-  assert(!result);
-  (void) result;
+  builder.finalize(genericParams->getSourceRange().Start);
 
   SmallVector<GenericTypeParamType *, 4> genericParamTypes;
   for (auto param : *genericParams) {

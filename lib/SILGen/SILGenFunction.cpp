@@ -428,7 +428,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   SILType closureTy =
     SILGenBuilder::getPartialApplyResultType(functionRef->getType(),
                                              capturedArgs.size(), SGM.M,
-                                             subs);
+                                             subs,
+                                             ParameterConvention::Direct_Owned);
   auto toClosure =
     B.createPartialApply(loc, functionRef, functionTy,
                          subs, forwardedArgs, closureTy);
@@ -840,7 +841,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy =
     SILGenBuilder::getPartialApplyResultType(toFn->getType(), curriedArgs.size(),
-                                             SGM.M, subs);
+                                             SGM.M, subs,
+                                             ParameterConvention::Direct_Owned);
   SILInstruction *toClosure =
     B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)

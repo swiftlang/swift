@@ -562,7 +562,7 @@ namespace {
         // dependency that isn't being diagnosed properly.
         if (!unboundDecl->getGenericSignature()) {
           cs.TC.diagnose(unboundDecl, diag::circular_reference);
-          return ErrorType::get(cs.getASTContext());
+          return ErrorType::get(type);
         }
         
         
@@ -1044,20 +1044,19 @@ void ConstraintSystem::openGeneric(
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
-
   auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
     auto contextTy = genericEnv->mapTypeIntoContext(gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>()) {
-      auto typeVar = createTypeVariable(getConstraintLocator(
-                                          locator.withPathElement(
-                                            LocatorPathElt(archetype))),
-                                        TVO_PrefersSubtypeBinding |
-                                        TVO_MustBeMaterializable);
-      replacements[gp->getCanonicalType()] = typeVar;
-    }
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      locatorPtr = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt(archetype)));
+
+    auto typeVar = createTypeVariable(locatorPtr,
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_MustBeMaterializable);
+    replacements[gp->getCanonicalType()] = typeVar;
   }
 
   GetTypeVariable getTypeVariable{*this, locator};
@@ -1327,7 +1326,7 @@ ConstraintSystem::getTypeOfMemberReference(
       if (!isClassBoundExistential &&
           !selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>() &&
-          !selfTy->is<ErrorType>())
+          !selfTy->hasError())
         selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);
