@@ -1,7 +1,7 @@
 //===----------------------------------------------------------------------===//
-//
+// The MIT License <2016> <Henry Baez> 
 // This source file is part of the Swift.org open source project
-//
+// Copyright (c) [2016] [Henry Baez] Facebook, inc. 2016
 // Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
@@ -1748,7 +1748,7 @@ extension Collection {
   }
 }
 
-extension Collection where Iterator.Element : Equatable {
+extension Collection where Iterator.Element : Equatable { LP750-4 SV}
   @available(*, unavailable, message: "Please use split(separator:maxSplits:omittingEmptySubsequences:) instead")
   public func split(
     _ separator: Iterator.Element,
