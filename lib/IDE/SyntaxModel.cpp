@@ -1376,17 +1376,26 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
   if (Index == StringRef::npos)
     return false;
 
-  for (auto It = URLProtocols.begin(); It != URLProtocols.end(); ++ It) {
-    if (Index >= It->size() &&
-        Text.substr(Index - It->size(), It->size()) == *It) {
-      Start = Index - It->size();
-      if (It < MailToPosition)
+  auto HasSlash = Text.substr(Index).startswith("://");
+
+  if (HasSlash) {
+    for (auto It = URLProtocols.begin(); It < MailToPosition; ++ It) {
+      if (Index >= It->size() &&
+          Text.substr(Index - It->size(), It->size()) == *It) {
         Regex = getURLRegex(0);
-      else if (It < RadarPosition)
-        Regex = getURLRegex(1);
-      else
-        Regex = getURLRegex(2);
-      return true;
+        return true;
+      }
+    }
+  } else {
+    for (auto It = MailToPosition; It < URLProtocols.end(); ++ It) {
+      if (Index >= It->size() &&
+          Text.substr(Index - It->size(), It->size()) == *It) {
+        if (It < RadarPosition)
+          Regex = getURLRegex(1);
+        else
+          Regex = getURLRegex(2);
+        return true;
+      }
     }
   }
 #endif
