@@ -56,6 +56,9 @@ namespace irgen {
   getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
                                         SILType baseType, VarDecl *field);
 
+  unsigned getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
+                                       VarDecl *field);
+
 } // end namespace irgen
 } // end namespace swift
 

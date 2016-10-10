@@ -270,7 +270,7 @@ public:
     Hash.final(Result);
   }
 };
-}
+} // end anonymous namespace
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
@@ -517,6 +517,22 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   if (Opts.EmbedMode == IRGenEmbedMode::None)
     return;
 
+  // Save llvm.compiler.used and remove it.
+  SmallVector<llvm::Constant*, 2> UsedArray;
+  SmallSet<llvm::GlobalValue*, 4> UsedGlobals;
+  auto *UsedElementType =
+    llvm::Type::getInt8Ty(M->getContext())->getPointerTo(0);
+  llvm::GlobalVariable *Used =
+    collectUsedGlobalVariables(*M, UsedGlobals, true);
+  for (auto *GV : UsedGlobals) {
+    if (GV->getName() != "llvm.embedded.module" &&
+        GV->getName() != "llvm.cmdline")
+      UsedArray.push_back(
+          ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
+  }
+  if (Used)
+    Used->eraseFromParent();
+
   // Embed the bitcode for the llvm module.
   std::string Data;
   llvm::raw_string_ostream OS(Data);
@@ -526,14 +542,15 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
   llvm::Constant *ModuleConstant =
     llvm::ConstantDataArray::get(M->getContext(), ModuleData);
-  // Use Appending linkage so it doesn't get optimized out.
   llvm::GlobalVariable *GV = new llvm::GlobalVariable(*M,
                                        ModuleConstant->getType(), true,
-                                       llvm::GlobalValue::AppendingLinkage,
+                                       llvm::GlobalValue::PrivateLinkage,
                                        ModuleConstant);
+  UsedArray.push_back(
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
   GV->setSection("__LLVM,__bitcode");
   if (llvm::GlobalVariable *Old =
-      M->getGlobalVariable("llvm.embedded.module")) {
+      M->getGlobalVariable("llvm.embedded.module", true)) {
     GV->takeName(Old);
     Old->replaceAllUsesWith(GV);
     delete Old;
@@ -547,16 +564,28 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   llvm::Constant *CmdConstant =
     llvm::ConstantDataArray::get(M->getContext(), CmdData);
   GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,
-                                llvm::GlobalValue::AppendingLinkage,
+                                llvm::GlobalValue::PrivateLinkage,
                                 CmdConstant);
   GV->setSection("__LLVM,__swift_cmdline");
-  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline")) {
+  UsedArray.push_back(
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
+  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline", true)) {
     GV->takeName(Old);
     Old->replaceAllUsesWith(GV);
     delete Old;
   } else {
     GV->setName("llvm.cmdline");
   }
+
+  if (UsedArray.empty())
+    return;
+
+  // Recreate llvm.compiler.used.
+  auto *ATy = llvm::ArrayType::get(UsedElementType, UsedArray.size());
+  auto *NewUsed = new GlobalVariable(
+           *M, ATy, false, llvm::GlobalValue::AppendingLinkage,
+           llvm::ConstantArray::get(ATy, UsedArray), "llvm.compiler.used");
+  NewUsed->setSection("llvm.metadata");
 }
 
 static void initLLVMModule(const IRGenModule &IGM) {

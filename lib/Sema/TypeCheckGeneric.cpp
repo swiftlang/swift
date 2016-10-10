@@ -128,7 +128,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveDependentMemberType(
                                               ComponentIdentTypeRepr *ref) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(baseTy, ref->getIdentifier(), DC->getASTContext());
+  return DependentMemberType::get(baseTy, ref->getIdentifier());
 }
 
 Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
@@ -137,7 +137,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveSelfAssociatedType(
        AssociatedTypeDecl *assocType) {
   // We don't have enough information to find the associated type.
   // FIXME: Nonsense, but we shouldn't need this code anyway.
-  return DependentMemberType::get(selfTy, assocType, DC->getASTContext());
+  return DependentMemberType::get(selfTy, assocType);
 }
 
 Type
@@ -199,7 +199,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
   // If the nested type has been resolved to an associated type, use it.
   if (auto assocType = nestedPA->getResolvedAssociatedType()) {
-    return DependentMemberType::get(baseTy, assocType, TC.Context);
+    return DependentMemberType::get(baseTy, assocType);
   }
 
   // If the nested type comes from a type alias, use either the alias's
@@ -979,8 +979,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
   // Check each of the requirements.
   Module *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
-    Type firstType = req.getFirstType().subst(module, substitutions,
-                                              SubstFlags::IgnoreMissing);
+    Type firstType = req.getFirstType().subst(module, substitutions);
     if (firstType.isNull()) {
       // Another requirement will fail later; just continue.
       continue;
@@ -988,8 +987,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
 
     Type secondType = req.getSecondType();
     if (secondType) {
-      secondType = secondType.subst(module, substitutions,
-                                    SubstFlags::IgnoreMissing);
+      secondType = secondType.subst(module, substitutions);
       if (secondType.isNull()) {
         // Another requirement will fail later; just continue.
         continue;

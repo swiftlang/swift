@@ -34,22 +34,17 @@ open class ManagedBuffer<Header, Element> {
       ManagedBuffer<Header, Element>) throws -> Header
   ) rethrows -> ManagedBuffer<Header, Element> {
 
-    let p = try ManagedBufferPointer<Header, Element>(
-      bufferClass: self,
-      minimumCapacity: minimumCapacity,
-      makingHeaderWith: { buffer, _ in
-        try factory(
-          unsafeDowncast(buffer, to: ManagedBuffer<Header, Element>.self))
-      })
+    let p = Builtin.allocWithTailElems_1(
+         self,
+         minimumCapacity._builtinWordValue, Element.self)
 
-    return unsafeDowncast(p.buffer, to: ManagedBuffer<Header, Element>.self)
-  }
-
-  /// Destroy the stored Header.
-  deinit {
-    ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-      _ = $0.deinitialize()
-    }
+    let initHeaderVal = try factory(p)
+    p.headerAddress.initialize(to: initHeaderVal)
+    // The _fixLifetime is not really needed, because p is used afterwards.
+    // But let's be conservative and fix the lifetime after we use the
+    // headerAddress.
+    _fixLifetime(p) 
+    return p
   }
 
   /// The actual number of elements that can be stored in this object.
@@ -58,8 +53,20 @@ open class ManagedBuffer<Header, Element> {
   /// idea to store this information in the "header" area when
   /// an instance is created.
   public final var capacity: Int {
-    let p = ManagedBufferPointer<Header, Element>(self)
-    return p.capacity
+    let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
+    let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
+    let realCapacity = endAddr.assumingMemoryBound(to: Element.self) -
+      firstElementAddress
+    return realCapacity
+  }
+
+  internal final var firstElementAddress: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(Builtin.projectTailElems(self,
+                                                         Element.self))
+  }
+
+  internal final var headerAddress: UnsafeMutablePointer<Header> {
+    return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -92,7 +99,8 @@ open class ManagedBuffer<Header, Element> {
   public final func withUnsafeMutablePointers<R>(
     _ body: (UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>) throws -> R
   ) rethrows -> R {
-    return try ManagedBufferPointer(self).withUnsafeMutablePointers(body)
+    defer { _fixLifetime(self) }
+    return try body(headerAddress, firstElementAddress)
   }
 
   /// The stored `Header` instance.
@@ -101,20 +109,7 @@ open class ManagedBuffer<Header, Element> {
   /// `ManagedBuffer.create`'s call to initialize, `ManagedBuffer`'s
   /// `header` property is as-yet uninitialized, and therefore
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
-  public final var header: Header {
-    addressWithNativeOwner {
-      return (
-        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader {
-          UnsafePointer($0)
-        },
-        Builtin.castToNativeObject(self))
-    }
-    mutableAddressWithNativeOwner {
-      return (
-        ManagedBufferPointer(self).withUnsafeMutablePointerToHeader { $0 },
-        Builtin.castToNativeObject(self))
-    }
-  }
+  public final var header: Header
 
   //===--- internal/private API -------------------------------------------===//
 
@@ -354,7 +349,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _debugPrecondition(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
-        !creating
+        (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
         && _class_getInstancePositiveExtentSize(bufferClass)
           == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
@@ -371,7 +366,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _sanityCheck(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
-        !creating
+        (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
         && _class_getInstancePositiveExtentSize(bufferClass)
           == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"

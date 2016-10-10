@@ -1246,7 +1246,7 @@ static bool tryTypeVariableBindings(
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       const auto type = binding.BindingType;
-      if (type->is<ErrorType>())
+      if (type->hasError())
         continue;
 
       // After our first pass, note that we've explored these
@@ -1562,13 +1562,13 @@ void ConstraintSystem::shrink(Expr *expr) {
     /// \returns ErrorType on failure, properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
-      if (collection.isNull() || collection->is<ErrorType>())
+      if (collection.isNull() || collection->hasError())
         return ErrorType::get(ctx);
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
         return type.isNull() || type->hasUnresolvedType() ||
-               type->is<ErrorType>();
+               type->hasError();
       };
 
       // Array type.
@@ -1651,7 +1651,7 @@ void ConstraintSystem::shrink(Expr *expr) {
                                                   TypeResolutionOptions());
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
-            if (coercionType->is<ErrorType>())
+            if (coercionType->hasError())
               return nullptr;
 
             // Visit collection expression inline.
@@ -1680,7 +1680,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (elementType->is<ErrorType>())
+        if (elementType->hasError())
           return;
 
         contextualType = elementType;

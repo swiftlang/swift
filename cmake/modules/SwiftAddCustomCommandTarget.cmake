@@ -120,15 +120,11 @@ function(add_custom_command_target dependency_out_var_name)
   set(ACCT_COMMANDS ${ACCT_UNPARSED_ARGUMENTS})
 
   if("${ACCT_CUSTOM_TARGET_NAME}" STREQUAL "")
-    # Construct a unique name for the custom target.
-    # Use a hash so that the file name does not push the OS limits for filename
-    # length.
+    # CMake doesn't allow '/' characters in filenames, so replace them with '-'
     list(GET ACCT_OUTPUT 0 output_filename)
-    string(MD5 target_md5
-        "add_custom_command_target${CMAKE_CURRENT_BINARY_DIR}/${output_filename}")
-    get_filename_component(output_filename_basename "${output_filename}" NAME)
-    set(target_name
-        "add_custom_command_target-${target_md5}-${output_filename_basename}")
+    string(REPLACE "${CMAKE_BINARY_DIR}/" "" target_name "${output_filename}")
+    string(REPLACE "${CMAKE_CFG_INTDIR}/" "" target_name "${target_name}")
+    string(REPLACE "/" "-" target_name "${target_name}")
   else()
     set(target_name "${ACCT_CUSTOM_TARGET_NAME}")
   endif()

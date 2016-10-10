@@ -122,7 +122,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
   Builder.setInsertionPoint(NewRetBB);
   ArrayRef<SILValue> BBArgs;
   if (!NewRetVal->getType().isVoid())
-    BBArgs = {NewRetVal};
+    BBArgs = NewRetVal;
   Builder.createBranch(Loc, MergedBB, BBArgs);
 }
 

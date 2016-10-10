@@ -863,7 +863,7 @@ struct ASTNodeBase {};
       Type Ty = E->getType();
       if (!Ty)
         return;
-      if (Ty->is<ErrorType>())
+      if (Ty->hasError())
         return;
       if (!Ty->is<FunctionType>()) {
         PrettyStackTraceExpr debugStack(Ctx, "verifying closure", E);
@@ -2750,7 +2750,7 @@ struct ASTNodeBase {};
 
       if (!D->hasType())
         return;
-      if (D->getType()->is<ErrorType>() && !D->isInvalid()) {
+      if (D->getType()->hasError() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
         D->dump(Out);
         abort();

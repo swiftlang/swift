@@ -374,7 +374,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto inheritedTy = inherited.getType();
 
     // If this is an error type, ignore it.
-    if (inheritedTy->is<ErrorType>())
+    if (inheritedTy->hasError())
       continue;
 
     // Retrieve the interface type for this inherited type.
@@ -693,7 +693,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->is<ErrorType>())
+    if (var->hasType() && !var->getType()->hasError())
       return;
 
     var->overwriteType(ErrorType::get(ctx));
@@ -1276,7 +1276,7 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   Accessibility maxAccess = Accessibility::Public;
 
   if (!ED->getExtendedType().isNull() &&
-      !ED->getExtendedType()->is<ErrorType>()) {
+      !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
       validateDecl(nominal);
       maxAccess = std::max(nominal->getFormalAccess(),
@@ -2617,7 +2617,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
-  if (rawTy->is<ErrorType>())
+  if (rawTy->hasError())
     return;
 
   AutomaticEnumValueKind valueKind;
@@ -2809,7 +2809,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     return;
   
   // Don't try to check the behavior if we already encountered an error.
-  if (decl->getType()->is<ErrorType>())
+  if (decl->getType()->hasError())
     return;
   
   auto behavior = decl->getMutableBehavior() ;
@@ -2991,8 +2991,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
           FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
         Type valueTy = DependentMemberType::get(
                                           behaviorProto->getSelfInterfaceType(),
-                                          valueReqt,
-                                          TC.Context);
+                                          valueReqt);
         
         auto expectedParameterizedInitStorageTy =
           FunctionType::get(valueTy, storageTy);
@@ -3651,7 +3650,7 @@ public:
         if (PBD->getPattern(i)->hasType() &&
             !PBD->getInit(i) &&
             PBD->getPattern(i)->hasStorage() &&
-            !PBD->getPattern(i)->getType()->is<ErrorType>()) {
+            !PBD->getPattern(i)->getType()->hasError()) {
 
           // If we have a type-adjusting attribute (like ownership), apply it now.
           if (auto var = PBD->getSingleVar())
@@ -4655,7 +4654,7 @@ public:
     // 'Self' is only a dynamic self on class methods and
     // protocol requirements.
     auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->is<ErrorType>())
+    if (declaredType->hasError())
       return false;
 
     auto nominal = declaredType->getAnyNominal();
@@ -5291,7 +5290,7 @@ public:
 
     {
       Type baseTy = base->getInterfaceType();
-      if (baseTy->is<ErrorType>())
+      if (baseTy->hasError())
         return false;
 
       Optional<InFlightDiagnostic> activeDiag;
@@ -5921,7 +5920,6 @@ public:
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(AutoClosure)
     UNINTERESTING_ATTR(NoEscape)
-    UNINTERESTING_ATTR(Escaping)
 
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
@@ -6369,7 +6367,7 @@ public:
       if (auto extendedTy = ED->getExtendedType()) {
         if (!extendedTy->is<NominalType>() &&
             !extendedTy->is<BoundGenericType>() &&
-            !extendedTy->is<ErrorType>()) {
+            !extendedTy->hasError()) {
           // FIXME: Redundant diagnostic test here?
           TC.diagnose(ED->getStartLoc(), diag::non_nominal_extension,
                       extendedTy);
@@ -6478,7 +6476,7 @@ public:
           TC.diagnose(CD->getLoc(), diag::cfclass_convenience_init);
         }
 
-        if (!extClass && !extType->is<ErrorType>()) {
+        if (!extClass && !extType->hasError()) {
           auto ConvenienceLoc =
             CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
 
@@ -7590,7 +7588,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // within a generic type.
   auto extendedType = ext->getExtendedType();
 
-  if (extendedType.isNull() || extendedType->is<ErrorType>())
+  if (extendedType.isNull() || extendedType->hasError())
     return;
 
   if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
