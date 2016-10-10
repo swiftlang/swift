@@ -1088,8 +1088,9 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       auto scopeID = ctx.getIdentifier(scopePath);
       assert(!scopeID.empty() &&
              "invalid decl name (non-top-level decls not supported)");
-      auto path = Module::AccessPathTy({scopeID, SourceLoc()});
-      dependency.Import = { ctx.AllocateCopy(path), module };
+      std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
+      dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
+                           module};
     }
   }
 
