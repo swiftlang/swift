@@ -156,73 +156,106 @@ set(SWIFTLIB_SOURCES
   VarArgs.swift
   Zip.swift
   )
+
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
-set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
-set(swift_core_framework_depends)
-set(swift_core_private_link_libraries)
-set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  list(APPEND swift_core_link_flags "-all_load")
-  list(APPEND swift_core_framework_depends Foundation)
-  list(APPEND swift_core_framework_depends CoreFoundation)
-else()
-  # With the GNU linker the equivalent of -all_load is to tell the linker
-  # --whole-archive before the archive and --no-whole-archive after (without
-  # the second, it causes errors when the system libraries are told to
-  # include everything). The best way to get it in there, according to the
-  # documentation, is to put the flags in the target_link_libraries setting.
-
-  # TODO: However, for the moment this actually makes things explode with an
-  # incomplete runtime. This should be turned back on when more of the porting
-  # effort has been completed.
-  #set(LINK_FLAGS
-  #  -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive)
-  find_package(ICU REQUIRED COMPONENTS uc i18n)
-  list(APPEND swift_core_private_link_libraries
-      ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY})
-endif()
-
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
-      OUTPUT_VARIABLE ENV_SYSTEMROOT)
-
-  list(APPEND swift_core_link_flags "${ENV_SYSTEMROOT}/system32/psapi.dll")
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
-  find_library(EXECINFO_LIBRARY execinfo)
-  list(APPEND swift_core_private_link_libraries
-      ${EXECINFO_LIBRARY})
-endif()
 
 option(SWIFT_CHECK_ESSENTIAL_STDLIB
     "Check core standard library layering by linking its essential subset"
     FALSE)
-
-if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
-endif()
-
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
 
+set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
+if(SWIFT_STDLIB_SIL_DEBUGGING)
+  list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-gsil")
+endif()
+
+# The copy_shim_headers target dependency is required to let the
+# build system know that there's a rule to produce the shims
+# directory, but is not sufficient to cause the object file to be rebuilt
+# when the shim header changes. Therefore, we pass both the target
+# and the generated directory as dependencies.
+set(swift_core_file_depends
+    FILE_DEPENDS
+      copy_shim_headers "${SWIFTLIB_DIR}/shims"
+      section_magic
+      ${GROUP_INFO_JSON_FILE})
+
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
-  # The copy_shim_headers target dependency is required to let the
-  # build system know that there's a rule to produce the shims
-  # directory, but is not sufficient to cause the object file to be rebuilt
-  # when the shim header changes.  Therefore, we pass both the target
-  # and the generated directory as dependencies.
-  FILE_DEPENDS
-    copy_shim_headers "${SWIFTLIB_DIR}/shims"
-    section_magic
-    ${GROUP_INFO_JSON_FILE}
+  ${swift_core_file_depends}
   SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
-  LINK_FLAGS ${swift_core_link_flags}
-  PRIVATE_LINK_LIBRARIES ${swift_core_private_link_libraries}
+  LINK_FLAGS ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS} "-all_load"
   INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
-  FRAMEWORK_DEPENDS ${swift_core_framework_depends}
+  FRAMEWORK_DEPENDS Foundation CoreFoundation
+  TARGET_SDKS ALL_APPLE_PLATFORMS
   INSTALL_IN_COMPONENT stdlib)
+
+# The linker flags for swiftCore for Apple targets includes -all_load. With the
+# GNU linker the equivalent of -all_load is to tell the linker
+# --whole-archive before the archive and --no-whole-archive after (without
+# the second, it causes errors when the system libraries are told to
+# include everything). The best way to get it in there, according to the
+# documentation, is to put the flags in the target_link_libraries setting.
+# TODO: However, for the moment this actually makes things explode with an
+# incomplete runtime. This should be turned back on when more of the porting
+# effort has been completed.
+set(swift_runtime_swift_gnu_link_flags
+  ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}
+  # -Wl,--whole-archive swiftRuntime -Wl,--no-whole-archive
+  )
+
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(ICU REQUIRED COMPONENTS uc i18n)
+endif()
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  ${SWIFTLIB_SOURCES}
+  ${swift_core_file_depends}
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
+  LINK_FLAGS ${swift_runtime_swift_gnu_link_flags}
+  PRIVATE_LINK_LIBRARIES ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  TARGET_SDKS LINUX
+  INSTALL_IN_COMPONENT stdlib)
+
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  ${SWIFTLIB_SOURCES}
+  ${swift_core_file_depends}
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
+  LINK_FLAGS ${swift_runtime_swift_gnu_link_flags}
+  PRIVATE_LINK_LIBRARIES ${SWIFT_ANDROID_ICU_UC} ${SWIFT_ANDROID_ICU_I18N}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  TARGET_SDKS ANDROID
+  INSTALL_IN_COMPONENT stdlib)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+  find_library(EXECINFO_LIBRARY execinfo)
+endif()
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  ${SWIFTLIB_SOURCES}
+  ${swift_core_file_depends}
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
+  LINK_FLAGS ${swift_runtime_swift_gnu_link_flags}
+  PRIVATE_LINK_LIBRARIES ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY} ${EXECINFO_LIBRARY}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  TARGET_SDKS FREEBSD
+  INSTALL_IN_COMPONENT stdlib)
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+  execute_process(COMMAND "cygpath" "-u" "$ENV{SYSTEMROOT}"
+      OUTPUT_VARIABLE ENV_SYSTEMROOT)
+endif()
+add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  ${SWIFTLIB_SOURCES}
+  ${swift_core_file_depends}
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
+  LINK_FLAGS ${swift_runtime_swift_gnu_link_flags} "${ENV_SYSTEMROOT}/system32/psapi.dll"
+  PRIVATE_LINK_LIBRARIES ${ICU_UC_LIBRARY} ${ICU_I18N_LIBRARY}
+  INCORPORATE_OBJECT_LIBRARIES swiftRuntime swiftStdlibStubs
+  TARGET_SDKS CYGWIN
+  INSTALL_IN_COMPONENT stdlib)
+
