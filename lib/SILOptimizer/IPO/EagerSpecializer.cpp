@@ -120,9 +120,9 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
   }
   // Create a CFG edge from NewRetBB to MergedBB.
   Builder.setInsertionPoint(NewRetBB);
-  ArrayRef<SILValue> BBArgs;
+  SmallVector<SILValue, 1> BBArgs;
   if (!NewRetVal->getType().isVoid())
-    BBArgs = NewRetVal;
+    BBArgs.push_back(NewRetVal);
   Builder.createBranch(Loc, MergedBB, BBArgs);
 }
 
