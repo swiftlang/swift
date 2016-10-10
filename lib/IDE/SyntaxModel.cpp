@@ -297,7 +297,7 @@ class ModelASTWalker : public ASTWalker {
   unsigned BufferID;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
-  static const std::regex &getURLRegex(unsigned Index);
+  static const std::regex &getURLRegex(StringRef Protocol);
   static const std::regex &getDocCommentRegex(unsigned Index);
 
   Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
@@ -366,13 +366,27 @@ private:
   }
 };
 
-const std::regex &ModelASTWalker::getURLRegex(unsigned Index) {
+const std::regex &ModelASTWalker::getURLRegex(StringRef Pro) {
   static const std::regex Regexes[3] =  {
     std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }
   };
-  return Regexes[Index];
+
+  static const auto MailToPosition = std::find(URLProtocols.begin(),
+                                               URLProtocols.end(),
+                                               "mailto");
+  static const auto RadarPosition = std::find(URLProtocols.begin(),
+                                              URLProtocols.end(),
+                                              "radar");
+  auto Found = std::find(URLProtocols.begin(), URLProtocols.end(), Pro);
+  assert(Found != URLProtocols.end() && "bad protocol name");
+  if (Found < MailToPosition)
+    return Regexes[0];
+  else if (Found < RadarPosition)
+    return Regexes[1];
+  else
+    return Regexes[2];
 }
 
 const std::regex &ModelASTWalker::getDocCommentRegex(unsigned Index) {
@@ -1369,31 +1383,30 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
   static const auto MailToPosition = std::find(URLProtocols.begin(),
                                                URLProtocols.end(),
                                                "mailto");
-  static const auto RadarPosition = std::find(URLProtocols.begin(),
-                                              URLProtocols.end(),
-                                              "radar");
   auto Index = Text.find(":");
   if (Index == StringRef::npos)
     return false;
 
+  auto Lookback = [Text](unsigned Index, StringRef Name) {
+    return Index >= Name.size() &&
+      Text.substr(Index - Name.size(), Name.size()) == Name;
+  };
+
   auto HasSlash = Text.substr(Index).startswith("://");
 
   if (HasSlash) {
-    for (auto It = URLProtocols.begin(); It < MailToPosition; ++ It) {
-      if (Index >= It->size() &&
-          Text.substr(Index - It->size(), It->size()) == *It) {
-        Regex = getURLRegex(0);
+    for (auto It = URLProtocols.begin(); It < URLProtocols.end(); ++ It) {
+      if (Lookback(Index, *It)) {
+        Regex = getURLRegex(*It);
+        Start = Index - It->size();
         return true;
       }
     }
   } else {
     for (auto It = MailToPosition; It < URLProtocols.end(); ++ It) {
-      if (Index >= It->size() &&
-          Text.substr(Index - It->size(), It->size()) == *It) {
-        if (It < RadarPosition)
-          Regex = getURLRegex(1);
-        else
-          Regex = getURLRegex(2);
+      if (Lookback(Index, *It)) {
+        Regex = getURLRegex(*It);
+        Start = Index - It->size();
         return true;
       }
     }
