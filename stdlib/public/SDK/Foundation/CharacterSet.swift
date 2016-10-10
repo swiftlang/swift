@@ -412,7 +412,17 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
             $0.formIntersection(with: other)
         }
     }
-    
+
+    /// Returns the set of elements in the `CharacterSet` but not in another `CharacterSet`.
+    public func subtracting(_ other: CharacterSet) -> CharacterSet {
+        return intersection(other.inverted)
+    }
+
+    /// Sets the value to the set of elements in the `CharacterSet` but not in another `CharacterSet`.
+    public mutating func subtract(_ other: CharacterSet) {
+        self = subtracting(other)
+    }
+
     /// Returns the exclusive or of the `CharacterSet` with another `CharacterSet`.
     public func symmetricDifference(_ other: CharacterSet) -> CharacterSet {
         return union(other).subtracting(intersection(other))
