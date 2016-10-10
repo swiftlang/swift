@@ -192,6 +192,15 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(expected, union)
     }
 
+    func test_subtractAndFormSymmetricDifference() {
+        var set1 = CharacterSet(charactersIn: "abc")
+        let set2 = CharacterSet(charactersIn: "b")
+        set1.subtract(set2)
+        expectFalse(set1.contains("b"))
+        set1.formSymmetricDifference(set2)
+        expectTrue(set1.contains("b"))
+    }
+
     func test_hasMember() {
         let contains = CharacterSet.letters.hasMember(inPlane: 1)
         expectTrue(contains)
@@ -219,6 +228,7 @@ CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacter
 CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 CharacterSetTests.test("test_superSet") { TestCharacterSet().test_superSet() }
 CharacterSetTests.test("test_union") { TestCharacterSet().test_union() }
+CharacterSetTests.test("test_subtractAndFormSymmetricDifference") { TestCharacterSet().test_subtractAndFormSymmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 runAllTests()
