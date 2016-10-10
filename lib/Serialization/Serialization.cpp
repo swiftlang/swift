@@ -3757,7 +3757,14 @@ static void writeDeclCommentTable(
 
   DeclCommentTableWriter Writer(GroupContext);
 
-  ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
+  ArrayRef<const FileUnit *> files;
+  SmallVector<const FileUnit *, 1> Scratch;
+  if (SF) {
+    Scratch.push_back(SF);
+    files = llvm::makeArrayRef(Scratch);
+  } else {
+    files = M->getFiles();
+  }
   for (auto nextFile : files) {
     Writer.resetSourceOrder();
     const_cast<FileUnit *>(nextFile)->walk(Writer);
@@ -3923,7 +3930,14 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
   Optional<DeclID> entryPointClassID;
 
-  ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
+  ArrayRef<const FileUnit *> files;
+  SmallVector<const FileUnit *, 1> Scratch;
+  if (SF) {
+    Scratch.push_back(SF);
+    files = llvm::makeArrayRef(Scratch);
+  } else {
+    files = M->getFiles();
+  }
   for (auto nextFile : files) {
     if (nextFile->hasEntryPoint())
       entryPointClassID = addDeclRef(nextFile->getMainClass());
