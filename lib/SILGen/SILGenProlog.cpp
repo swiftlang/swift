@@ -262,21 +262,18 @@ struct ArgumentInitHelper {
         gen.B.createDebugValueAddr(loc, address, {vd->isLet(), ArgNo});
         return;
       }
-      gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
       assert(argrv.getType().isAddress() && "expected inout to be address");
-      gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
-
     } else {
       assert(vd->isLet() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
-      gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
-      if (argrv.getType().isAddress())
-        gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
-      else
-        gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
     }
+    gen.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
+    if (argrv.getType().isAddress())
+      gen.B.createDebugValueAddr(loc, argrv.getValue(), {vd->isLet(), ArgNo});
+    else
+      gen.B.createDebugValue(loc, argrv.getValue(), {vd->isLet(), ArgNo});
   }
 
   void emitParam(ParamDecl *PD) {
