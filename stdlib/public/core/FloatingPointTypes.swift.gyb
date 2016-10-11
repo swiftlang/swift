@@ -978,18 +978,6 @@ extension ${Self} : Strideable {
 //===----------------------------------------------------------------------===//
 
 @_transparent
-@available(*, unavailable, message: "Use truncatingRemainder instead")
-public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  fatalError("% is not available.")
-}
-
-@_transparent
-@available(*, unavailable, message: "Use formTruncatingRemainder instead")
-public func %= (lhs: inout ${Self}, rhs: ${Self}) {
-  fatalError("%= is not available.")
-}
-
-@_transparent
 @available(*, unavailable, message: "use += 1")
 @discardableResult
 public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
@@ -1025,3 +1013,15 @@ extension ${Self} {
 #endif
 % end
 % end # for bits in all_floating_point_types
+
+@_transparent
+@available(*, unavailable, message: "Use truncatingRemainder instead")
+public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
+  fatalError("% is not available.")
+}
+
+@_transparent
+@available(*, unavailable, message: "Use formTruncatingRemainder instead")
+public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
+  fatalError("%= is not available.")
+}
