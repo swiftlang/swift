@@ -713,7 +713,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     if (tryLoc.isValid()) {
       diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/false)
         .fixItInsert(ExprLoc, "try ")
-        .fixItRemoveChars(tryLoc, ReturnLoc);
+        .fixItRemove(tryLoc);
 
       // Note: We can't use tryLoc here because that's outside the ReturnStmt's
       // source range.
@@ -753,7 +753,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
   if (tryLoc.isValid() && exprLoc.isValid()) {
     diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/true)
       .fixItInsert(exprLoc, "try ")
-      .fixItRemoveChars(tryLoc, throwLoc);
+      .fixItRemove(tryLoc);
 
     // Note: We can't use tryLoc here because that's outside the ThrowStmt's
     // source range.
