@@ -1,4 +1,4 @@
-//===---- GenConstant.cpp - Swift IR Generation For Constants ---*- C++ -*-===//
+//===--- GenConstant.cpp - Swift IR Generation For Constants ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -92,7 +92,7 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
 
   SmallVector<llvm::Constant *, 32> elts(sTy->getNumElements(), nullptr);
 
-  // run over the Swift initialisers, putting them into the struct as
+  // run over the Swift initializers, putting them into the struct as
   // appropriate.
   for (unsigned i = 0, e = inst->getElements().size(); i != e; i++) {
     auto operand = inst->getOperand(i);
@@ -111,7 +111,7 @@ llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
       auto *eltTy = sTy->getElementType(i);
       assert(eltTy->isArrayTy() &&
              eltTy->getArrayElementType()->isIntegerTy(8) &&
-             "Unexpected non-byte-array type for constrant struct padding");
+             "Unexpected non-byte-array type for constant struct padding");
       elt = llvm::UndefValue::get(eltTy);
     }
   }
