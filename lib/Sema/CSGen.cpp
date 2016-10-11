@@ -1738,10 +1738,10 @@ namespace {
       }
 
       // The array element type defaults to 'Any'.
-      if (auto elementTypeVar = arrayElementTy->getAs<TypeVariableType>()) {
+      if (arrayElementTy->isTypeVariableOrMember()) {
         CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
                          tc.Context.TheAnyType, locator);
-        CS.ArrayElementTypeVariables[expr] = elementTypeVar;
+        CS.ArrayElementTypes[expr] = arrayElementTy;
       }
 
       return arrayTy;
@@ -1871,8 +1871,8 @@ namespace {
       }
 
       // The dictionary key type defaults to 'AnyHashable'.
-      auto keyTypeVar = dictionaryKeyTy->getAs<TypeVariableType>();
-      if (keyTypeVar && tc.Context.getAnyHashableDecl()) {
+      if (dictionaryKeyTy->isTypeVariableOrMember() &&
+          tc.Context.getAnyHashableDecl()) {
         auto anyHashable = tc.Context.getAnyHashableDecl();
         tc.validateDecl(anyHashable);
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryKeyTy,
@@ -1880,15 +1880,15 @@ namespace {
       }
 
       // The dictionary value type defaults to 'Any'.
-      auto valueTypeVar = dictionaryValueTy->getAs<TypeVariableType>();
-      if (valueTypeVar) {
+      if (dictionaryValueTy->isTypeVariableOrMember()) {
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryValueTy,
                          tc.Context.TheAnyType, locator);
       }
 
       // Record key/value type variables.
-      if (keyTypeVar || valueTypeVar)
-        CS.DictionaryElementTypeVariables[expr] = { keyTypeVar, valueTypeVar };
+      if (dictionaryKeyTy->isTypeVariableOrMember() ||
+          dictionaryValueTy->isTypeVariableOrMember())
+        CS.DictionaryElementTypes[expr] = {dictionaryKeyTy, dictionaryValueTy};
 
       return dictionaryTy;
     }

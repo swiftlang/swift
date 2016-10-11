@@ -2647,10 +2647,10 @@ void Solution::dump(raw_ostream &out) const {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(sm, out);
     }, [&] {
       out << ", ";
     });
@@ -2805,10 +2805,10 @@ void ConstraintSystem::print(raw_ostream &out) {
     }
   }
 
-  if (!DefaultedTypeVariables.empty()) {
-    out << "\nDefaulted type variables: ";
-    interleave(DefaultedTypeVariables, [&](TypeVariableType *typeVar) {
-      out << "$T" << typeVar->getID();
+  if (!DefaultedConstraints.empty()) {
+    out << "\nDefaulted constraints: ";
+    interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
+      locator->dump(&getTypeChecker().Context.SourceMgr, out);
     }, [&] {
       out << ", ";
     });

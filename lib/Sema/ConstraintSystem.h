@@ -598,8 +598,8 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
 
-  /// The type variables that were bound via a Defaultable constraint.
-  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1001,20 +1001,17 @@ private:
     OpenedExistentialTypes;
 
 public:
-  /// The type variables that were bound via a Defaultable constraint.
-  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  /// The type variable used to describe the element type of the given array
+  /// The types used to describe the element type of the given array
   /// literal.
-  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
-    ArrayElementTypeVariables;
+  llvm::SmallDenseMap<ArrayExpr *, Type> ArrayElementTypes;
 
-
-  /// The type variables used to describe the key and value types of the given
+  /// The types used to describe the key and value types of the given
   /// dictionary literal.
-  llvm::SmallDenseMap<DictionaryExpr *,
-                      std::pair<TypeVariableType *, TypeVariableType *>>
-    DictionaryElementTypeVariables;
+  llvm::SmallDenseMap<DictionaryExpr *, std::pair<Type, Type>>
+    DictionaryElementTypes;
 
 private:
   /// \brief Describe the candidate expression for partial solving.
@@ -1177,8 +1174,8 @@ public:
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
 
-    /// The length of \c DefaultedTypeVariables.
-    unsigned numDefaultedTypeVariables;
+    /// The length of \c DefaultedConstraints.
+    unsigned numDefaultedConstraints;
 
     /// The previous score.
     Score PreviousScore;
