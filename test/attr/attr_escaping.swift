@@ -139,6 +139,11 @@ func takesVarargsOfFunctions(fns: () -> ()...) {
   }
 }
 
+// This is allowed, in order to keep source compat with Swift version 3.0.
+//
+// FIXME: version-gate on Swift version 3
+func takesVarargsOfFunctionsExplicitEscaping(fns: @escaping () -> ()...) {}
+
 func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
   takesVarargsOfFunctions(fns: fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }
