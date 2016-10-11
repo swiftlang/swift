@@ -689,9 +689,7 @@ public:
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
-                              bool &FoundCodeCompletionToken,
-                              bool StopAtTypeAttributes = false,
-                              bool InParam = false);
+                              bool &FoundCodeCompletionToken);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1048,7 +1046,6 @@ public:
   /// followed by one of the above tokens, then this function returns false,
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
-  bool canParseAttributes();
 
   bool canParseType();
   bool canParseTypeIdentifier();

@@ -108,6 +108,9 @@ public:
   /// conventions.
   bool EnableGuaranteedClosureContexts = false;
 
+  /// Don't generate code using partial_apply in SIL generation.
+  bool DisableSILPartialApply = false;
+
   /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
   std::string SILOutputFileNameForDebugging;
 };
