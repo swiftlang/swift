@@ -686,10 +686,14 @@ static bool areCompatibleArchitectures(const llvm::Triple &moduleTarget,
   if (moduleTarget.getArch() == ctxTarget.getArch())
     return true;
 
-  auto archPair = std::minmax(moduleTarget.getArch(), ctxTarget.getArch());
-  if (archPair == std::minmax(llvm::Triple::arm, llvm::Triple::thumb))
+  // Special case: ARM and Thumb are compatible.
+  const llvm::Triple::ArchType moduleArch = moduleTarget.getArch();
+  const llvm::Triple::ArchType ctxArch = ctxTarget.getArch();
+  if ((moduleArch == llvm::Triple::arm && ctxArch == llvm::Triple::thumb) ||
+      (moduleArch == llvm::Triple::thumb && ctxArch == llvm::Triple::arm))
     return true;
-  if (archPair == std::minmax(llvm::Triple::armeb, llvm::Triple::thumbeb))
+  if ((moduleArch == llvm::Triple::armeb && ctxArch == llvm::Triple::thumbeb) ||
+      (moduleArch == llvm::Triple::thumbeb && ctxArch == llvm::Triple::armeb))
     return true;
 
   return false;
@@ -700,8 +704,11 @@ static bool areCompatibleOSs(const llvm::Triple &moduleTarget,
   if (moduleTarget.getOS() == ctxTarget.getOS())
     return true;
 
-  auto osPair = std::minmax(moduleTarget.getOS(), ctxTarget.getOS());
-  if (osPair == std::minmax(llvm::Triple::Darwin, llvm::Triple::MacOSX))
+  // Special case: macOS and Darwin are compatible.
+  const llvm::Triple::OSType moduleOS = moduleTarget.getOS();
+  const llvm::Triple::OSType ctxOS = ctxTarget.getOS();
+  if ((moduleOS == llvm::Triple::Darwin && ctxOS == llvm::Triple::MacOSX) ||
+      (moduleOS == llvm::Triple::MacOSX && ctxOS == llvm::Triple::Darwin))
     return true;
 
   return false;
