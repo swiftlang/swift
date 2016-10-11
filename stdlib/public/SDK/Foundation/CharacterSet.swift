@@ -406,29 +406,29 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return result
     }
     
-    /// Sets the value to the intersection of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an intersection of the `CharacterSet` with another `CharacterSet`.
     public mutating func formIntersection(_ other: CharacterSet) {
         _applyUnmanagedMutation {
             $0.formIntersection(with: other)
         }
     }
 
-    /// Returns the set of elements in the `CharacterSet` but not in another `CharacterSet`.
+    /// Returns a `CharacterSet` created by removing elements in `other` from `self`.
     public func subtracting(_ other: CharacterSet) -> CharacterSet {
         return intersection(other.inverted)
     }
 
-    /// Sets the value to the set of elements in the `CharacterSet` but not in another `CharacterSet`.
+    /// Sets the value to a `CharacterSet` created by removing elements in `other` from `self`.
     public mutating func subtract(_ other: CharacterSet) {
         self = subtracting(other)
     }
 
-    /// Returns the exclusive or of the `CharacterSet` with another `CharacterSet`.
+    /// Returns an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public func symmetricDifference(_ other: CharacterSet) -> CharacterSet {
         return union(other).subtracting(intersection(other))
     }
     
-    /// Sets the value to the exclusive or of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public mutating func formSymmetricDifference(_ other: CharacterSet) {
         self = symmetricDifference(other)
     }
