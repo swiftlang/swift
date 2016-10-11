@@ -410,20 +410,35 @@ Use `M-x hs-show-all' to show them again."
 
 (require 'flymake)
 
-(defvar swift-find-executable-function 'executable-find
+;; This name doesn't end in "function" to avoid being unconditionally marked as risky.
+(defvar-local swift-find-executable-fn 'executable-find
   "Function to find a command executable.
 The function is called with one argument, the name of the executable to find.
 Might be useful if you want to use a swiftc that you built instead 
 of the one in your PATH.")
-(make-variable-buffer-local 'swift-find-executable-function)
+(put 'swift-find-executable-fn 'safe-local-variable 'functionp)
 
-(defvar swift-syntax-check-function 'swift-syntax-check-directory
+(defvar-local swift-syntax-check-fn 'swift-syntax-check-directory
 "Function to create the swift command-line that syntax-checks the current buffer.
 The function is called with two arguments, the swiftc executable, and
 the name of a temporary file that will contain the contents of the
 current buffer.
 Set to 'swift-syntax-check-single-file to ignore other files in the current directory.")
-(make-variable-buffer-local 'swift-syntax-check-function)
+(put 'swift-syntax-check-fn 'safe-local-variable 'functionp)
+
+(defvar-local swift-syntax-check-args '("-parse")
+  "List of arguments to be passed to swiftc for syntax checking.
+Elements of this list that are strings are inserted literally
+into the command line.  Elements that are S-expressions are
+evaluated.  The resulting list is cached in a file-local
+variable, `swift-syntax-check-evaluated-args', so if you change
+this variable you should set that one to nil.")
+(put 'swift-syntax-check-args 'safe-local-variable 'listp)
+
+(defvar-local swift-syntax-check-evaluated-args
+  "File-local cache of swift arguments used for syntax checking
+variable, `swift-syntax-check-args', so if you change
+that variable you should set this one to nil.")
 
 (defun swift-syntax-check-single-file (swiftc temp-file)
   "Return a flymake command-line list for syntax-checking the current buffer in isolation"
@@ -447,9 +462,11 @@ directory."
              (make-temp-file 
               (concat (file-name-nondirectory x) "-" y)
               (not :DIR_FLAG) 
-              (concat "." (file-name-extension (buffer-file-name))))))))
-    (funcall swift-syntax-check-function 
-             (funcall swift-find-executable-function "swiftc")
+              ;; grab *all* the extensions; handles .swift.gyb files, for example
+              ;; whereas using file-name-extension would only get ".gyb"
+              (replace-regexp-in-string "^\\(?:.*/\\)?[^.]*" "" (buffer-file-name)))))))
+    (funcall swift-syntax-check-fn 
+             (funcall swift-find-executable-fn "swiftc")
              temp-file)))
 
 (add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
