@@ -29,7 +29,7 @@ using namespace swift;
 using namespace constraints;
 
 static bool isUnresolvedOrTypeVarType(Type ty) {
-  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+  return ty->isTypeVariableOrMember() || ty->is<UnresolvedType>();
 }
 
 /// Given a subpath of an old locator, compute its summary flags.
@@ -3287,7 +3287,7 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>() ||
+    if (type->isTypeVariableOrMember() ||
         type->is<ArchetypeType>() ||
         type->isTypeParameter())
       return ctx.TheUnresolvedType;

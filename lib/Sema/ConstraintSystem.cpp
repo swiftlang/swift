@@ -93,7 +93,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!updateState)
     return;
 
-  if (!type->is<TypeVariableType>()) {
+  if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;

@@ -434,6 +434,10 @@ public:
     return getRecursiveProperties().hasTypeVariable();
   }
 
+  /// \brief Determine where this type is a type variable or a dependent
+  /// member root in a type variable.
+  bool isTypeVariableOrMember();
+
   /// \brief Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
@@ -4375,6 +4379,15 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+inline bool TypeBase::isTypeVariableOrMember() {
+  if (is<TypeVariableType>())
+    return true;
+
+  if (auto depMemTy = getAs<DependentMemberType>())
+    return depMemTy->getBase()->isTypeVariableOrMember();
+
+  return false;
+}
 
 inline bool TypeBase::isTypeParameter() {
   if (is<GenericTypeParamType>())
