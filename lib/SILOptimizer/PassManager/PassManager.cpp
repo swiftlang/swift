@@ -247,7 +247,7 @@ bool SILPassManager::continueTransforming() {
 }
 
 bool SILPassManager::analysesUnlocked() {
-  for (auto A : Analysis)
+  for (auto *A : Analysis)
     if (A->isLocked())
       return false;
 
@@ -542,11 +542,11 @@ void SILPassManager::run() {
 /// D'tor.
 SILPassManager::~SILPassManager() {
   // Free all transformations.
-  for (auto T : Transformations)
+  for (auto *T : Transformations)
     delete T;
 
   // delete the analysis.
-  for (auto A : Analysis) {
+  for (auto *A : Analysis) {
     Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
@@ -590,7 +590,7 @@ void SILPassManager::restartWithCurrentFunction(SILTransform *T) {
 /// \brief Reset the state of the pass manager and remove all transformation
 /// owned by the pass manager. Analysis passes will be kept.
 void SILPassManager::resetAndRemoveTransformations() {
-  for (auto T : Transformations)
+  for (auto *T : Transformations)
     delete T;
 
   Transformations.clear();
