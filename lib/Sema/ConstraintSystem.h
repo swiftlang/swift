@@ -1519,15 +1519,11 @@ public:
   ///
   /// \param type The type to simplify.
   ///
-  /// \param typeVar Will receive the type variable at which simplification 
-  /// stopped, which has no fixed type.
-  ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
-                             bool wantRValue,
+  Type getFixedTypeRecursive(Type type, bool wantRValue,
                              bool retainParens = false);
 
   /// \brief Assign a fixed type to the given type variable.

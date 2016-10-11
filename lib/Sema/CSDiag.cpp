@@ -6576,8 +6576,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
       // ...but only if they were actually resolved by the constraint system
       // despite the failure.
-      TypeVariableType *unused;
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred, unused,
+      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
                                                      /*wantRValue*/true);
       if (maybeFixedType->hasTypeVariable() ||
           maybeFixedType->hasUnresolvedType()) {

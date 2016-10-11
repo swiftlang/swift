@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: %target-swift-frontend %s -parse
 
 public enum R<V> {
   case value(V)
