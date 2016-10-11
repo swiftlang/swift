@@ -322,7 +322,7 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'let' as a parameter attribute is not allowed}}{{28-31=}}
+func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'let' as a parameter attribute is not allowed}}{{28-32=}}
   var _: Int = iis[17]
 }
 
@@ -335,7 +335,7 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
   _ = y
 }
 
-func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a parameter attribute is not allowed}}{{34-37=}}
+func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a parameter attribute is not allowed}}{{34-38=}}
                                  let bar y: Int) { // expected-error {{'let' as a parameter attribute is not allowed}}{{34-38=}}
                                  
   
@@ -346,9 +346,9 @@ func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-30=}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-26=}}{{34-34=inout }}
 }
-func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-21=}} {{1-1=    var x = x\n}}
+func invalid_var(var x: Int) { // expected-error {{parameters may not have the 'var' specifier}}{{18-22=}} {{1-1=    var x = x\n}}
   
 }
 func takesClosure(_: (Int) -> Int) {

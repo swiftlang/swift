@@ -244,20 +244,20 @@ public func XCTAssert(_ expression: @autoclosure () -> Bool, _ message: String =
 
 
 /// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
-func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{41-50=}}
+func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{41-51=}}
   return { f in
     x.flatMap(f)
   }
 }
 
-func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{42-51=}}
+func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-warning{{@noescape is the default and is deprecated}} {{42-52=}}
   return { (f : @noescape (A) -> [B]) in // expected-warning{{@noescape is the default and is deprecated}} {{17-27=}}
     x.flatMap(f)
   }
 }
 
 func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
-func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-warning{{@noescape is the default and is deprecated}} {{43-52=}}
+func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-warning{{@noescape is the default and is deprecated}} {{43-53=}}
   return { f in // expected-note{{parameter 'f' is implicitly non-escaping}}
     bad(f)  // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
   }
@@ -304,7 +304,7 @@ func doThing4(_ completion: @escaping CompletionHandler) {
 func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U { 
   // expected-warning@-1{{@noescape is the default and is deprecated}} {{23-33=}}
   // expected-warning@-2{{@noescape is the default and is deprecated}} {{46-56=}}
-  // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-66=}}
+  // expected-warning@-3{{@noescape is the default and is deprecated}} {{57-67=}}
   return g(f)
 }
 
@@ -328,14 +328,14 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-25=}} {{29-29=@noescape }}
+func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}} {{16-26=}} {{29-29=@noescape }}
 func noescapeT(f: @noescape () -> Bool) {} // expected-warning{{@noescape is the default and is deprecated}} {{19-29=}}
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-31=}} {{35-35=@autoclosure }}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{19-32=}} {{35-35=@autoclosure }}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
 
 func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{@noescape is now an attribute on a parameter type, instead of on the parameter itself}}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{39-49=}}
 
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-41=}} {{45-45=@autoclosure }}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{29-42=}} {{45-45=@autoclosure }}
  // expected-warning@-1{{@noescape is the default and is deprecated}} {{45-55=}}
 

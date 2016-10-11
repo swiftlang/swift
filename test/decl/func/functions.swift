@@ -124,7 +124,7 @@ func testObjCMethodCurry(_ a : ClassWithObjCMethod) -> (Int) -> () {
 
 // We used to crash on this.
 func rdar16786220(inout let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{25-29=}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{19-24=}}{{32-32=inout }}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{19-25=}}{{32-32=inout }}
 
   c = 42
 }
@@ -140,7 +140,7 @@ _ = [1] !!! [1]   // unambiguously picking the array overload.
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
 func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{28-32=}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{22-27=}}{{36-36=inout }}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{22-28=}}{{36-36=inout }}
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}

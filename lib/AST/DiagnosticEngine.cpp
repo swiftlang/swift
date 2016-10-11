@@ -167,10 +167,11 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // space around its hole.  Specifically, check to see there is whitespace
   // before and after the end of range.  If so, nuke the space afterward to keep
   // things consistent.
-  if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
-    charRange = CharSourceRange(charRange.getStart(),
-                                charRange.getByteLength()+1);
+  if (extractCharAfter(SM, charRange.getEnd()) == ' ') {
+    auto beforeChar = extractCharBefore(SM, charRange.getStart());
+    if (isspace(beforeChar) || beforeChar == '(')
+      charRange = CharSourceRange(charRange.getStart(),
+                                  charRange.getByteLength() + 1);
   }
   Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}));
   return *this;

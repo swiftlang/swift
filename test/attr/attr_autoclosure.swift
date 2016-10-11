@@ -70,7 +70,7 @@ struct AutoclosureEscapeTest {
 }
 
 // @autoclosure(escaping)
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{13-34=}} {{38-38=@autoclosure @escaping }}
+// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{13-35=}} {{38-38=@autoclosure @escaping }}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
@@ -138,10 +138,10 @@ let _ : (@autoclosure(escaping) () -> ()) -> ()
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{use of undeclared type 'escaping'}}
 
 // Migration
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{16-28=}} {{32-32=@autoclosure }}
+// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{16-29=}} {{32-32=@autoclosure }}
 func migrateAC(@autoclosure _: () -> ()) { }
 
-// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{17-39=}} {{43-43=@autoclosure @escaping }}
+// expected-error @+1 {{@autoclosure is now an attribute on a parameter type, instead of on the parameter itself}} {{17-40=}} {{43-43=@autoclosure @escaping }}
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
