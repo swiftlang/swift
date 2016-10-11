@@ -563,6 +563,25 @@ void SILPassManager::addFunctionToWorklist(SILFunction *F,
 
   int NewLevel = 1;
   if (DerivedFrom) {
+    // When SILVerifyAll is enabled, individual functions are verified after
+    // function passes are run upon them. This means that any functions created
+    // by a function pass will not be verified after the pass runs. Thus
+    // specialization errors that cause the verifier to trip will be
+    // misattributed to the first pass that makes a change to the specialized
+    // function. This is very misleading and increases triage time.
+    //
+    // As a result, when SILVerifyAll is enabled, we always verify newly
+    // specialized functions as they are added to the worklist.
+    //
+    // TODO: Currently, all specialized functions are added to the function
+    // worklist in this manner. This is all well and good, but we should really
+    // add support for verifying that all specialized functions are added via
+    // this function to the pass manager to ensure that we perform this
+    // verification.
+    if (getOptions().VerifyAll) {
+      F->verify();
+    }
+
     NewLevel = DerivationLevels[DerivedFrom] + 1;
     // Limit the number of derivations, i.e. don't allow that a pass specializes
     // a specialized function which is itself a specialized function, and so on.
