@@ -2920,7 +2920,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If simplification has turned this into the same types, then this isn't the
   // broken constraint that we're looking for.
   if (fromType->isEqual(toType) &&
-      constraint->getKind() != ConstraintKind::ConformsTo)
+      constraint->getKind() != ConstraintKind::ConformsTo &&
+      constraint->getKind() != ConstraintKind::LiteralConformsTo)
     return false;
   
   
