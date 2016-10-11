@@ -117,7 +117,7 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     /// A callback to be invoked every time a type was deserialized.
-    llvm::function_ref<void(Type)> ParsedTypeCallback;
+    std::function<void(Type)> ParsedTypeCallback;
 
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSILType,

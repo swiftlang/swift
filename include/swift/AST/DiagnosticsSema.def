@@ -1950,8 +1950,6 @@ ERROR(noescape_implied_by_autoclosure,none,
 ERROR(noescape_conflicts_escaping_autoclosure,none,
       "@noescape conflicts with @autoclosure(escaping)", ())
 
-ERROR(escaping_function_type,none,
-      "@escaping may only be applied to parameters of function type", ())
 ERROR(escaping_non_function_parameter,none,
       "@escaping attribute may only be used in function parameter position", ())
 

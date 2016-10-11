@@ -252,7 +252,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     let newSliceCount: IndexDistance =
       _base.distance(from: _startIndex, to: subRange.lowerBound)
       + _base.distance(from: subRange.upperBound, to: _endIndex)
-      + numericCast(newElements.count)
+      + (numericCast(newElements.count) as IndexDistance)
     _base.replaceSubrange(subRange, with: newElements)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -261,7 +261,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let newSliceCount: IndexDistance =
         _base.distance(from: _startIndex, to: subRange.lowerBound)
         + _base.distance(from: subRange.upperBound, to: _endIndex)
-        + numericCast(newElements.count)
+        + (numericCast(newElements.count) as IndexDistance)
       _base.replaceSubrange(subRange, with: newElements)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -270,7 +270,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let lastValidIndex = _base.index(before: subRange.lowerBound)
       let newEndIndexOffset =
         _base.distance(from: subRange.upperBound, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + (numericCast(newElements.count) as IndexDistance) + 1
       _base.replaceSubrange(subRange, with: newElements)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
@@ -318,14 +318,14 @@ public struct ${Self}<Base : ${BaseRequirements}>
     let sliceOffset: IndexDistance =
       _base.distance(from: _base.startIndex, to: _startIndex)
     let newSliceCount: IndexDistance =
-      count + numericCast(newElements.count)
+      count + (numericCast(newElements.count) as IndexDistance)
     _base.insert(contentsOf: newElements, at: i)
     _startIndex = _base.index(_base.startIndex, offsetBy: sliceOffset)
     _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
 %     else:
     if i == _base.startIndex {
       let newSliceCount: IndexDistance =
-        count + numericCast(newElements.count)
+        count + (numericCast(newElements.count) as IndexDistance)
       _base.insert(contentsOf: newElements, at: i)
       _startIndex = _base.startIndex
       _endIndex = _base.index(_startIndex, offsetBy: newSliceCount)
@@ -334,7 +334,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
       let lastValidIndex = _base.index(before: i)
       let newEndIndexOffset =
         _base.distance(from: i, to: _endIndex)
-        + numericCast(newElements.count) + 1
+        + (numericCast(newElements.count) as IndexDistance) + 1
       _base.insert(contentsOf: newElements, at: i)
       if shouldUpdateStartIndex {
         _startIndex = _base.index(after: lastValidIndex)
