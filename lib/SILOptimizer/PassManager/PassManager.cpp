@@ -481,7 +481,7 @@ void SILPassManager::runOneIteration() {
   }
   NumOptzIterations++;
   NumOptimizationIterations++;
-  SmallVector<SILFunctionTransform*, 16> PendingFuncTransforms;
+  SmallVector<SILFunctionTransform *, 16> PendingFuncTransforms;
 
   // Run the transforms by alternating between function transforms and
   // module transforms. We'll queue up all the function transforms
