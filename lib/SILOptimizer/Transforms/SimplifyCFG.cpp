@@ -3419,6 +3419,16 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
   bool Changed = false;
   llvm::SmallPtrSet<SILInstruction *, 4> InstsToRemove;
   for (auto &I : *BB) {
+  	// We can only remove the instructions below from the ARC-inert BB
+  	// We *can't* replace copy_addr with move instructions:
+  	// If the copy_addr was [take] [initialization]:
+  	//   * previous passes would have replaced it with moves
+  	// If the copy_addr contains [initialization]:
+  	//   * nothing we can do - the target address is invalid
+  	// Else, i.e. the copy_addr was [take] assignment, it is not always safe:
+  	// The type being operated on might contain weak references, 
+  	// or other side references - We'll corrupt the weak reference table
+  	// if we fail to release the old value.
     if (!isa<StrongReleaseInst>(I) && !isa<UnownedReleaseInst>(I) && 
         !isa<ReleaseValueInst>(I) && !isa<DestroyAddrInst>(I))
       continue;
