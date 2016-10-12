@@ -2375,14 +2375,18 @@ extern "C"
 void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 OpaqueValue *source,
                                 const Metadata *sourceValueType,
-                                const Metadata *targetValueType);
+                                const Metadata *targetValueType,
+                                const void *sourceValueHashable,
+                                const void *targetValueHashable);
 
 SWIFT_CC(swift)
 extern "C"
 bool _swift_setDownCastConditionalIndirect(OpaqueValue *destination,
-                                           OpaqueValue *source,
-                                           const Metadata *sourceValueType,
-                                           const Metadata *targetValueType);
+                                       OpaqueValue *source,
+                                       const Metadata *sourceValueType,
+                                       const Metadata *targetValueType,
+                                       const void *sourceValueHashable,
+                                       const void *targetValueHashable);
 
 SWIFT_CC(swift)
 extern "C"
@@ -2391,16 +2395,20 @@ void _swift_dictionaryDownCastIndirect(OpaqueValue *destination,
                                        const Metadata *sourceKeyType,
                                        const Metadata *sourceValueType,
                                        const Metadata *targetKeyType,
-                                       const Metadata *targetValueType);
+                                       const Metadata *targetValueType,
+                                       const void *sourceKeyHashable,
+                                       const void *targetKeyHashable);
 
 SWIFT_CC(swift)
 extern "C"
 bool _swift_dictionaryDownCastConditionalIndirect(OpaqueValue *destination,
-                                                  OpaqueValue *source,
-                                            const Metadata *sourceKeyType,
-                                            const Metadata *sourceValueType,
-                                            const Metadata *targetKeyType,
-                                            const Metadata *targetValueType);
+                                        OpaqueValue *source,
+                                        const Metadata *sourceKeyType,
+                                        const Metadata *sourceValueType,
+                                        const Metadata *targetKeyType,
+                                        const Metadata *targetValueType,
+                                        const void *sourceKeyHashable,
+                                        const void *targetKeyHashable);
 
 static bool _dynamicCastStructToStruct(OpaqueValue *destination,
                                        OpaqueValue *source,
@@ -2447,25 +2455,29 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
-                                        targetArgs[0], targetArgs[1]);
+                                        targetArgs[0], targetArgs[1],
+                                        sourceArgs[2], targetArgs[2]);
       result = true;
     } else {
       result =
         _swift_dictionaryDownCastConditionalIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
-                                        targetArgs[0], targetArgs[1]);
+                                        targetArgs[0], targetArgs[1],
+                                        sourceArgs[2], targetArgs[2]);
     }
 
   // Sets.
   } else if (descriptor == &_TMnVs3Set) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
-                                 sourceArgs[0], targetArgs[0]);
+                                 sourceArgs[0], targetArgs[0],
+                                 sourceArgs[1], targetArgs[1]);
       result = true;
     } else {
       result =
         _swift_setDownCastConditionalIndirect(source, destination,
-                                              sourceArgs[0], targetArgs[0]);
+                                              sourceArgs[0], targetArgs[0],
+                                              sourceArgs[1], targetArgs[1]);
     }
 
   // Other struct types don't support dynamic covariance for now.
