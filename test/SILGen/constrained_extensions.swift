@@ -3,6 +3,11 @@
 // RUN: %target-swift-frontend -emit-ir -O %s
 
 extension Array where Element == Int {
+  // CHECK-LABEL: sil @_TFe22constrained_extensionsRxzSirSaCfT1xT__GSax_ : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
+  public init(x: ()) {
+    self.init()
+  }
+
   // CHECK-LABEL: sil @_TFe22constrained_extensionsRxzSirSag16instancePropertySi : $@convention(method) (@guaranteed Array<Int>) -> Int
   // CHECK-LABEL: sil @_TFe22constrained_extensionsRxzSirSas16instancePropertySi : $@convention(method) (Int, @inout Array<Int>) -> ()
   // CHECK-LABEL: sil [transparent] [fragile] @_TFe22constrained_extensionsRxzSirSam16instancePropertySi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Array<Int>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
@@ -28,7 +33,7 @@ extension Array where Element == Int {
 
   // CHECK-LABEL: sil @_TZFe22constrained_extensionsRxzSirSag14staticPropertySi : $@convention(method) (@thin Array<Int>.Type) -> Int
   public static var staticProperty: Element {
-    return 0
+    return Array(x: ()).instanceProperty
   }
 
   // CHECK-LABEL: sil @_TZFe22constrained_extensionsRxzSirSa12staticMethodfT_x : $@convention(method) (@thin Array<Int>.Type) -> Int
@@ -58,6 +63,11 @@ extension Array where Element == Int {
 }
 
 extension Dictionary where Key == Int {
+  // CHECK-LABEL: sil @_TFe22constrained_extensions0_RxzSirVs10DictionaryCfT1xT__GS0_xq__ : $@convention(method) <Int, Value where Int == Int> (@thin Dictionary<Int, Value>.Type) -> @owned Dictionary<Int, Value> {
+  public init(x: ()) {
+    self.init()
+  }
+
   // CHECK-LABEL: sil @_TFe22constrained_extensions0_RxzSirVs10Dictionaryg16instancePropertyq_ : $@convention(method) <Int, Value where Int == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
   // CHECK-LABEL: sil @_TFe22constrained_extensions0_RxzSirVs10Dictionarys16instancePropertyq_ : $@convention(method) <Int, Value where Int == Int> (@in Value, @inout Dictionary<Int, Value>) -> ()
   // CHECK-LABEL: sil [transparent] [fragile] @_TFe22constrained_extensions0_RxzSirVs10Dictionarym16instancePropertyq_ : $@convention(method) <Int, Value where Int == Int> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Int, Value>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
@@ -101,6 +111,11 @@ extension Dictionary where Key == Int {
   // CHECK-LABEL: sil @_TZFe22constrained_extensions0_RxzSirVs10Dictionary17callsStaticMethodfT_q_ : $@convention(method) <Int, Value where Int == Int> (@thin Dictionary<Int, Value>.Type) -> @out Value
   public static func callsStaticMethod() -> Value {
     return staticMethod()
+  }
+
+  // CHECK-LABEL: sil @_TZFe22constrained_extensions0_RxzSirVs10Dictionary16callsConstructorfT_q_ : $@convention(method) <Int, Value where Int == Int> (@thin Dictionary<Int, Value>.Type) -> @out Value
+  public static func callsConstructor() -> Value {
+    return Dictionary(x: ()).instanceMethod()
   }
 
   // CHECK-LABEL: sil @_TFe22constrained_extensions0_RxzSirVs10Dictionaryg9subscriptFT_q_ : $@convention(method) <Int, Value where Int == Int> (@guaranteed Dictionary<Int, Value>) -> @out Value
