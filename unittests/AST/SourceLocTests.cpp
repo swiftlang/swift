@@ -134,12 +134,21 @@ TEST(SourceLoc, TupleExpr) {
       DeclNameLoc());
   
   // the tuple from the example
-  SmallVector<Expr *, 2> SubExprs({ one, two });
-  SmallVector<Identifier, 2> SubExprNames(2, Identifier());
-  auto exampleTuple = TupleExpr::createImplicit(C.Ctx, SubExprs, SubExprNames);
+  SmallVector<Expr *, 2> subExprsRight({ one, two });
+  SmallVector<Identifier, 2> subExprNamesRight(2, Identifier());
+  auto rightInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsRight, subExprNamesRight);
   
   EXPECT_EQ(start, one->getStartLoc());
-  EXPECT_EQ(SourceLoc(), exampleTuple->getStartLoc());
-  EXPECT_EQ(SourceLoc(), exampleTuple->getEndLoc());
-  EXPECT_EQ(SourceRange(), exampleTuple->getSourceRange());
+  EXPECT_EQ(SourceLoc(), rightInvalidTuple->getStartLoc());
+  EXPECT_EQ(SourceLoc(), rightInvalidTuple->getEndLoc());
+  EXPECT_EQ(SourceRange(), rightInvalidTuple->getSourceRange());
+
+  SmallVector<Expr *, 2> subExprsLeft({ two, one });
+  SmallVector<Identifier, 2> subExprNamesLeft(2, Identifier());
+  auto leftInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsLeft, subExprNamesLeft);
+  
+  EXPECT_EQ(start, one->getStartLoc());
+  EXPECT_EQ(SourceLoc(), leftInvalidTuple->getStartLoc());
+  EXPECT_EQ(SourceLoc(), leftInvalidTuple->getEndLoc());
+  EXPECT_EQ(SourceRange(), leftInvalidTuple->getSourceRange());
 }
