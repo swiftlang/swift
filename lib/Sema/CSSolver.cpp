@@ -62,14 +62,24 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
     return None;
 
   // If the type is a type variable itself, don't permit the binding.
-  // FIXME: This is a hack. We need to be smarter about whether there's enough
-  // structure in the type to produce an interesting binding, or not.
   if (auto bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>()) {
-    if (isNilLiteral &&
-        bindingTypeVar->getImpl().literalConformanceProto &&
-        bindingTypeVar->getImpl().literalConformanceProto->isSpecificProtocol(
-          KnownProtocolKind::ExpressibleByNilLiteral))
-      *isNilLiteral = true;
+    if (isNilLiteral) {
+      *isNilLiteral = false;
+
+      // Look for a literal-conformance constraint on the type variable.
+      SmallVector<Constraint *, 8> constraints;
+      cs.getConstraintGraph().gatherConstraints(bindingTypeVar, constraints);
+      for (auto constraint : constraints) {
+        if (constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+            constraint->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral) &&
+            cs.simplifyType(constraint->getFirstType())
+              ->isEqual(bindingTypeVar)) {
+          *isNilLiteral = true;
+          break;
+        }
+      }
+    }
     
     return None;
   }
@@ -200,8 +210,8 @@ Solution ConstraintSystem::finalize(
   }
 
   // Remember the defaulted type variables.
-  solution.DefaultedTypeVariables.insert(DefaultedTypeVariables.begin(),
-                                         DefaultedTypeVariables.end());
+  solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
+                                       DefaultedConstraints.end());
 
   return solution;
 }
@@ -260,8 +270,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedTypeVariables.append(solution.DefaultedTypeVariables.begin(),
-                                solution.DefaultedTypeVariables.end());
+  DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
+                              solution.DefaultedConstraints.end());
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
@@ -447,7 +457,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
-  numDefaultedTypeVariables = cs.DefaultedTypeVariables.size();
+  numDefaultedConstraints = cs.DefaultedConstraints.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -505,7 +515,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
   // Remove any defaulted type variables.
-  truncate(cs.DefaultedTypeVariables, numDefaultedTypeVariables);
+  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
   
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -546,14 +556,17 @@ namespace {
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
-    /// Whether this is a binding that comes from a 'Defaultable' constraint.
-    bool IsDefaultableBinding = false;
+    /// If this is a binding that comes from a \c Defaultable constraint,
+    /// the locator of that constraint.
+    ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
-                     bool isDefaultableBinding = false)
+                     ConstraintLocator *defaultableBinding = nullptr)
       : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
-        IsDefaultableBinding(isDefaultableBinding) { }
+        DefaultableBinding(defaultableBinding) { }
+
+    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
   };
 
   struct PotentialBindings {
@@ -664,6 +677,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Equal:
   case ConstraintKind::BindParam:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
@@ -710,7 +724,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         !binding.BindingType->hasTypeVariable() &&
         !binding.DefaultedProtocol &&
-        !binding.IsDefaultableBinding &&
+        !binding.isDefaultableBinding() &&
         allowJoinMeet) {
       if (lastSupertypeIndex) {
         // Can we compute a join?
@@ -779,15 +793,18 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       result.InvolvesTypeVariables = true;
       continue;
 
-    case ConstraintKind::ConformsTo: 
+    case ConstraintKind::LiteralConformsTo:
+        // If there is a 'nil' literal constraint, we might need optional
+        // supertype bindings.
+        if (constraint->getProtocol()->isSpecificProtocol(
+              KnownProtocolKind::ExpressibleByNilLiteral))
+          addOptionalSupertypeBindings = true;
+
+        SWIFT_FALLTHROUGH;
+
+    case ConstraintKind::ConformsTo:
     case ConstraintKind::SelfObjectOfProtocol: {
-      // FIXME: Can we always assume that the type variable is the lower bound?
-      TypeVariableType *lowerTypeVar = nullptr;
-      cs.getFixedTypeRecursive(constraint->getFirstType(), lowerTypeVar,
-                               /*wantRValue=*/false);
-      if (lowerTypeVar != typeVar) {
-        continue;
-      }
+      // FIXME: Only for LiteralConformsTo?
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
@@ -913,13 +930,17 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     // Check whether we can perform this binding.
     // FIXME: this has a super-inefficient extraneous simplifyType() in it.
     bool isNilLiteral = false;
-    if (auto boundType = checkTypeOfBinding(cs, typeVar, type, &isNilLiteral)) {
+    bool *isNilLiteralPtr = nullptr;
+    if (!addOptionalSupertypeBindings && kind == AllowedBindingKind::Supertypes)
+      isNilLiteralPtr = &isNilLiteral;
+    if (auto boundType = checkTypeOfBinding(cs, typeVar, type,
+                                            isNilLiteralPtr)) {
       type = *boundType;
       if (type->hasTypeVariable())
         result.InvolvesTypeVariables = true;
     } else {
       // If the bound is a 'nil' literal type, add optional supertype bindings.
-      if (isNilLiteral && kind == AllowedBindingKind::Supertypes) {
+      if (isNilLiteral) {
         addOptionalSupertypeBindings = true;
         continue;
       }
@@ -1060,7 +1081,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     ++result.NumDefaultableBindings;
-    addPotentialBinding({type, AllowedBindingKind::Exact, None, true});
+    addPotentialBinding({type, AllowedBindingKind::Exact, None,
+                         constraint->getLocator()});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1154,7 +1176,7 @@ static bool tryTypeVariableBindings(
     for (const auto &binding : bindings) {
       // If this is a defaultable binding and we have found any solutions,
       // don't explore the default binding.
-      if (binding.IsDefaultableBinding && anySolved)
+      if (binding.isDefaultableBinding() && anySolved)
         continue;
 
       auto type = binding.BindingType;
@@ -1222,8 +1244,8 @@ static bool tryTypeVariableBindings(
                        typeVar->getImpl().getLocator());
 
       // If this was from a defaultable binding note that.
-      if (binding.IsDefaultableBinding) {
-        cs.DefaultedTypeVariables.push_back(typeVar);
+      if (binding.isDefaultableBinding()) {
+        cs.DefaultedConstraints.push_back(binding.DefaultableBinding);
       }
 
       if (!cs.solveRec(solutions, allowFreeTypeVariables))

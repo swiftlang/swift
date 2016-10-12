@@ -29,7 +29,7 @@ using namespace swift;
 using namespace constraints;
 
 static bool isUnresolvedOrTypeVarType(Type ty) {
-  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+  return ty->isTypeVariableOrMember() || ty->is<UnresolvedType>();
 }
 
 /// Given a subpath of an old locator, compute its summary flags.
@@ -2920,7 +2920,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If simplification has turned this into the same types, then this isn't the
   // broken constraint that we're looking for.
   if (fromType->isEqual(toType) &&
-      constraint->getKind() != ConstraintKind::ConformsTo)
+      constraint->getKind() != ConstraintKind::ConformsTo &&
+      constraint->getKind() != ConstraintKind::LiteralConformsTo)
     return false;
   
   
@@ -3287,7 +3288,7 @@ static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
  auto &ctx = ty->getASTContext();
 
   return ty.transform([&](Type type) -> Type {
-    if (type->is<TypeVariableType>() ||
+    if (type->isTypeVariableOrMember() ||
         type->is<ArchetypeType>() ||
         type->isTypeParameter())
       return ctx.TheUnresolvedType;
@@ -6576,8 +6577,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
 
       // ...but only if they were actually resolved by the constraint system
       // despite the failure.
-      TypeVariableType *unused;
-      Type maybeFixedType = cs.getFixedTypeRecursive(preferred, unused,
+      Type maybeFixedType = cs.getFixedTypeRecursive(preferred,
                                                      /*wantRValue*/true);
       if (maybeFixedType->hasTypeVariable() ||
           maybeFixedType->hasUnresolvedType()) {
