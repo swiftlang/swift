@@ -3108,6 +3108,10 @@ ERROR(availability_decl_unavailable_in_swift_msg, none,
 NOTE(availability_marked_unavailable, none,
   "%0 has been explicitly marked unavailable here", (DeclName))
 
+NOTE(availability_introduced_in_swift, none,
+     "%0 was introduced in Swift %1",
+    (DeclName, clang::VersionTuple))
+
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
     (DeclName, StringRef, clang::VersionTuple))

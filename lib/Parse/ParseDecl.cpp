@@ -739,20 +739,45 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       // we will synthesize:
       //  @available(iOS, introduced: 8.0)
       //  @available(OSX, introduced: 10.10)
+      //
+      // Similarly if we have a language version spec in the spec
+      // list, create an implicit AvailableAttr with the specified
+      // version as the introduced argument. For example, if we have
+      //   @available(swift 3.1)
+      // we will synthesize
+      //   @available(swift, introduced: 3.1)
+
       for (auto *Spec : Specs) {
-        auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
-        if (!VersionSpec)
+        PlatformKind Platform;
+        clang::VersionTuple Version;
+        PlatformAgnosticAvailabilityKind PlatformAgnostic;
+
+        if (auto *PlatformVersionSpec =
+            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
+          Platform = PlatformVersionSpec->getPlatform();
+          Version = PlatformVersionSpec->getVersion();
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
+
+        } else if (auto *LanguageVersionSpec =
+                   dyn_cast<LanguageVersionConstraintAvailabilitySpec>(Spec)) {
+          Platform = PlatformKind::none;
+          Version = LanguageVersionSpec->getVersion();
+          PlatformAgnostic =
+            PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+
+        } else {
           continue;
+        }
 
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,
-                                     VersionSpec->getPlatform(),
+                                     Platform,
                                      /*Message=*/StringRef(),
                                      /*Renamed=*/StringRef(),
-                                     /*Introduced=*/VersionSpec->getVersion(),
+                                     /*Introduced=*/Version,
                                      /*Deprecated=*/clang::VersionTuple(),
                                      /*Obsoleted=*/clang::VersionTuple(),
-                                     UnconditionalAvailabilityKind::None,
+                                     PlatformAgnostic,
                                      /*Implicit=*/true));
       }
 
@@ -769,7 +794,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     StringRef Message, Renamed;
     clang::VersionTuple Introduced, Deprecated, Obsoleted;
-    auto Unconditional = UnconditionalAvailabilityKind::None;
+    auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
     bool AnyAnnotations = false;
     int ParamIndex = 0;
 
@@ -860,12 +885,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       case IsDeprecated:
         if (!findAttrValueDelimiter()) {
-          if (Unconditional != UnconditionalAvailabilityKind::None) {
+          if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
             diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                      AttrName);
           }
 
-          Unconditional = UnconditionalAvailabilityKind::Deprecated;
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
           break;
         }
         SWIFT_FALLTHROUGH;
@@ -903,12 +928,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
 
       case IsUnavailable:
-        if (Unconditional != UnconditionalAvailabilityKind::None) {
+        if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
           diagnose(Tok, diag::attr_availability_unavailable_deprecated,
                    AttrName);
         }
 
-        Unconditional = UnconditionalAvailabilityKind::Unavailable;
+        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         break;
 
       case IsInvalid:
@@ -934,6 +959,22 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute) {
       auto PlatformKind = platformFromString(Platform);
+
+      // Treat 'swift' as a valid version-qualifying token, when
+      // at least some versions were mentioned and no other
+      // platform-agnostic availability spec has been provided.
+      bool SomeVersion = (!Introduced.empty() ||
+                          !Deprecated.empty() ||
+                          !Obsoleted.empty());
+      if (!PlatformKind.hasValue() &&
+          Platform == "swift" &&
+          SomeVersion &&
+          PlatformAgnostic == PlatformAgnosticAvailabilityKind::None) {
+        PlatformKind = PlatformKind::none;
+        PlatformAgnostic =
+          PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+      }
+
       if (PlatformKind.hasValue()) {
         Attributes.add(new (Context)
                        AvailableAttr(AtLoc, AttrRange,
@@ -942,7 +983,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                         Introduced,
                                         Deprecated,
                                         Obsoleted,
-                                        Unconditional,
+                                        PlatformAgnostic,
                                         /*Implicit=*/false));
       } else {
         // Not a known platform. Just drop the attribute.

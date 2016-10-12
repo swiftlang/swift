@@ -24,6 +24,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "clang/Basic/VersionTuple.h"
 #include <string>
 
 namespace swift {
@@ -88,6 +89,10 @@ public:
   bool empty() const {
     return Components.empty();
   }
+
+  /// Convert to a (maximum-4-element) clang::VersionTuple, truncating
+  /// away any 5th component that might be in this version.
+  operator clang::VersionTuple() const;
 
   /// Return whether this version is a valid Swift language version number
   /// to set the compiler to using -swift-version; this is not the same as

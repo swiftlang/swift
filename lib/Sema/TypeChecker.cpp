@@ -1383,7 +1383,7 @@ private:
         continue;
       }
 
-      auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+      auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
       if (!VersionSpec)
         continue;
 
@@ -1407,7 +1407,7 @@ private:
       return AvailabilityContext::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 

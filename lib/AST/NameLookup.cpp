@@ -648,7 +648,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           auto unavailableLookupResult =
             [&](const UnqualifiedLookupResult &result) {
             return result.getValueDecl()->getAttrs()
-                     .isUnavailableInCurrentSwift();
+                     .isUnavailableInSwiftVersion();
           };
 
           // If all of the results we found are unavailable, keep looking.
@@ -849,7 +849,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             auto unavailableLookupResult =
               [&](const UnqualifiedLookupResult &result) {
               return result.getValueDecl()->getAttrs()
-                       .isUnavailableInCurrentSwift();
+                       .isUnavailableInSwiftVersion();
             };
 
             // If all of the results we found are unavailable, keep looking.
