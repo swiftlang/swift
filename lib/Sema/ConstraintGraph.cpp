@@ -940,6 +940,8 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
 }
 
 void ConstraintGraphNode::dump() {
+  llvm::SaveAndRestore<bool>
+    debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs(), 0);
 }
 
@@ -951,6 +953,8 @@ void ConstraintGraph::print(llvm::raw_ostream &out) {
 }
 
 void ConstraintGraph::dump() {
+  llvm::SaveAndRestore<bool>
+    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs());
 }
 

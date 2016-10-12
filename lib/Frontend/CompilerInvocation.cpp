@@ -1132,6 +1132,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
+  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from

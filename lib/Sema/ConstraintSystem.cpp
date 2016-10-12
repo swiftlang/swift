@@ -93,7 +93,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!updateState)
     return;
 
-  if (!type->is<TypeVariableType>()) {
+  if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;
@@ -136,9 +136,8 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
   assert(type->isMaterializable() &&
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
-  TypeVariableType *typeVar = nullptr;
-  type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/false);
-  if (typeVar) {
+  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
+  if (auto typeVar = type->getAs<TypeVariableType>()) {
     typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
   } else if (auto *tupleTy = type->getAs<TupleType>()) {
     for (auto elt : tupleTy->getElementTypes()) {
@@ -736,22 +735,7 @@ Type ConstraintSystem::openBindingType(Type type,
   return result;
 }
 
-static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
-                                        TypeVariableType *typeVar,
-                                        bool wantRValue) {
-  while (auto fixed = cs.getFixedType(typeVar)) {
-    if (wantRValue)
-      fixed = fixed->getRValueType();
-
-    typeVar = fixed->getAs<TypeVariableType>();
-    if (!typeVar)
-      return fixed;
-  }
-  return nullptr;
-}
-
-Type ConstraintSystem::getFixedTypeRecursive(Type type, 
-                                             TypeVariableType *&typeVar,
+Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              bool wantRValue,
                                              bool retainParens) {
   if (wantRValue)
@@ -759,19 +743,22 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 
   if (retainParens) {
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), typeVar,
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(),
                                    wantRValue, retainParens);
       return ParenType::get(getASTContext(), type);
     }
   }
 
-  auto desugar = type->getDesugaredType();
-  typeVar = desugar->getAs<TypeVariableType>();
-  if (typeVar) {
-    if (auto fixed = getFixedTypeRecursiveHelper(*this, typeVar, wantRValue)) {
+  while (auto typeVar = type->getAs<TypeVariableType>()) {
+    if (auto fixed = getFixedType(typeVar)) {
+      if (wantRValue)
+        fixed = fixed->getRValueType();
+
       type = fixed;
-      typeVar = nullptr;
+      continue;
     }
+
+    break;
   }
   return type;
 }
@@ -1181,9 +1168,7 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     llvm::DenseMap<CanType, TypeVariableType *> *replacementsPtr) {
   // Figure out the instance type used for the base.
-  TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
-                                         /*wantRValue=*/true);
+  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();

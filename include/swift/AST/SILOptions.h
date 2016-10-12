@@ -113,6 +113,9 @@ public:
 
   /// The name of the SIL outputfile if compiled with SIL debugging (-gsil).
   std::string SILOutputFileNameForDebugging;
+
+  /// If set to true, compile with the SIL Ownership Model enabled.
+  bool EnableSILOwnership = false;
 };
 
 } // end namespace swift

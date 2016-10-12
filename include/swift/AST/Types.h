@@ -434,6 +434,10 @@ public:
     return getRecursiveProperties().hasTypeVariable();
   }
 
+  /// \brief Determine where this type is a type variable or a dependent
+  /// member root in a type variable.
+  bool isTypeVariableOrMember();
+
   /// \brief Determine whether this type involves a UnresolvedType.
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
@@ -4343,10 +4347,6 @@ public:
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
   
-  /// \brief If possible, retrieve the TypeBase object that was opened to create
-  /// this type variable.
-  TypeBase *getBaseBeingSubstituted();
-
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.
   ///
@@ -4379,6 +4379,15 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+inline bool TypeBase::isTypeVariableOrMember() {
+  if (is<TypeVariableType>())
+    return true;
+
+  if (auto depMemTy = getAs<DependentMemberType>())
+    return depMemTy->getBase()->isTypeVariableOrMember();
+
+  return false;
+}
 
 inline bool TypeBase::isTypeParameter() {
   if (is<GenericTypeParamType>())

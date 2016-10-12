@@ -3739,7 +3739,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
             .fixItInsert(segmentStart, "String(describing: ")
             .fixItInsert(segment->getEndLoc(), ")");
 
-          // Suggest a cast to 'Optional'.
+          // Suggest inserting a default value. 
           TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
             .highlight(segment->getSourceRange())
             .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
@@ -3924,10 +3924,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Look through parentheses.
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = parenTy->getUnderlyingType();
-      continue;
-    }
+    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getAnyOptionalObjectType()) {
