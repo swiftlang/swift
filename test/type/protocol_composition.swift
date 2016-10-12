@@ -133,3 +133,5 @@ typealias B4 = protocol<P1 , P2> // expected-warning {{'protocol<...>' compositi
 typealias C1 = protocol<Any, P1> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{16-33=P1}}
 typealias C2 = protocol<P1, Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{16-33=P1}}
 typealias D = protocol<P1> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-27=P1}}
+typealias E = protocol<Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-28=Any}}
+typealias F = protocol<Any, Any> // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{15-33=Any}}
