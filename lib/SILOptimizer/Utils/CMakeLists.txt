@@ -9,6 +9,8 @@ set(UTILS_SOURCES
   Utils/LoadStoreOptUtils.cpp
   Utils/Local.cpp
   Utils/LoopUtils.cpp
+  Utils/NonGenericPerformanceInlinerUtils.cpp
+  Utils/PerformancePerformanceInlinerUtils.cpp
   Utils/SILInliner.cpp
   Utils/SILSSAUpdater.cpp
   PARENT_SCOPE)
