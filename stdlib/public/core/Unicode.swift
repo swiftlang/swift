@@ -298,7 +298,7 @@ public struct UTF8 : UnicodeCodec {
     let lut0: UInt32 = 0b1011_0000__1111_1111__1111_1111__1111_1111
     let lut1: UInt32 = 0b1100_0000__1111_1111__1111_1111__1111_1111
 
-    let index = (buffer >> 3) & 0x1f
+    let index: UInt32 = (buffer &>> (3 as UInt32)) & 0x1f
     let bit0 = (lut0 >> index) & 1
     let bit1 = (lut1 >> index) & 1
 
@@ -309,8 +309,8 @@ public struct UTF8 : UnicodeCodec {
       // Disallow xxxx xxxx  xxx0 000x (<= 7 bits case).
       if _slowPath(buffer & 0x001e == 0x0000) { return (nil, 1) }
       // Extract data bits.
-      let value = (buffer & 0x3f00) >> 8
-                | (buffer & 0x001f) << 6
+      let value = (buffer & 0x3f00) >> (8 as UInt32)
+                | (buffer & 0x001f) << (6 as UInt32)
       return (value, 2)
 
     case (0, 1): // 3-byte sequence, buffer: [ … CU2 CU1 CU0 ].
@@ -324,9 +324,9 @@ public struct UTF8 : UnicodeCodec {
         return (nil, 2) // All checks on CU0 & CU1 passed.
       }
       // Extract data bits.
-      let value = (buffer & 0x3f0000) >> 16
-                | (buffer & 0x003f00) >> 2
-                | (buffer & 0x00000f) << 12
+      let value = (buffer & 0x3f0000) >> (16 as UInt32)
+                | (buffer & 0x003f00) >> (2 as UInt32)
+                | (buffer & 0x00000f) << (12 as UInt32)
       return (value, 3)
 
     case (1, 0): // 4-byte sequence, buffer: [ CU3 CU2 CU1 CU0 ].
