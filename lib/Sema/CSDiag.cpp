@@ -6388,10 +6388,8 @@ bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
   
   // If we have a paren expr and our contextual type is a ParenType, remove the
   // paren expr sugar.
-  if (isa<ParenExpr>(E) && contextualType)
-    if (auto *PT = dyn_cast<ParenType>(contextualType.getPointer()))
-      contextualType = PT->getUnderlyingType();
-  
+  if (contextualType)
+    contextualType = contextualType->getWithoutParens();
   if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
                                    CS->getContextualTypePurpose()))
     return true;

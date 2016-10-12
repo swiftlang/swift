@@ -1487,9 +1487,7 @@ struct ASTNodeBase {};
       /// Retrieve the ith element type from the resulting tuple type.
       auto getOuterElementType = [&](unsigned i) -> Type {
         if (!TT) {
-          if (auto parenTy = dyn_cast<ParenType>(E->getType().getPointer()))
-            return parenTy->getUnderlyingType();
-          return E->getType();
+          return E->getType()->getWithoutParens();
         }
 
         return TT->getElementType(i);
