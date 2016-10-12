@@ -32,15 +32,11 @@ internal final class _EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  // FIXME(ABI)#26 (Type Checker): remove 'Void' arguments here and elsewhere in this file, they
-  // are a workaround for an old compiler limitation.
-  override func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
+  override func _getNonVerbatimBridgedCount() -> Int {
     return 0
   }
 
-  override func _getNonVerbatimBridgedHeapBuffer(
-    _ dummy: Void
-  ) -> _HeapBuffer<Int, AnyObject> {
+  override func _getNonVerbatimBridgedHeapBuffer() -> _HeapBuffer<Int, AnyObject> {
     return _HeapBuffer<Int, AnyObject>(
       _HeapBufferStorage<Int, AnyObject>.self, 0, 0)
   }
@@ -122,7 +118,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// Returns the number of elements in the array.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  override internal func _getNonVerbatimBridgedCount(_ dummy: Void) -> Int {
+  override internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
@@ -132,7 +128,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// Bridge array elements and return a new buffer that owns them.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  override internal func _getNonVerbatimBridgedHeapBuffer(_ dummy: Void) ->
+  override internal func _getNonVerbatimBridgedHeapBuffer() ->
     _HeapBuffer<Int, AnyObject> {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),

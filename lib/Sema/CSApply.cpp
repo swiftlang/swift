@@ -94,16 +94,7 @@ Type Solution::computeSubstitutions(
   }
 
   // Produce the concrete form of the opened type.
-  auto type = openedType.transform([&](Type type) -> Type {
-    if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-      auto archetype = tv->getImpl().getArchetype();
-      auto simplified = getFixedType(tv);
-      return SubstitutedType::get(archetype, simplified,
-                                  tc.Context);
-    }
-
-    return type;
-  });
+  Type type = simplifyType(tc, openedType);
 
   auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
@@ -2669,11 +2660,8 @@ namespace {
       expr->setType(arrayTy);
 
       // If the array element type was defaulted, note that in the expression.
-      auto elementTypeVariable = cs.ArrayElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.ArrayElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(elementTypeVariable->second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }
@@ -2747,14 +2735,8 @@ namespace {
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
-      auto elementTypeVariable = cs.DictionaryElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.DictionaryElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.first) ||
-            solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }

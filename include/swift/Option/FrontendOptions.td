@@ -227,6 +227,9 @@ def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
+def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
+  HelpText<"Enable the SIL Ownership Model">;
+
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;

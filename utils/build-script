@@ -2023,6 +2023,10 @@ iterations with -O",
         metavar="COUNT",
         default=default_max_lto_link_job_counts['swift'])
 
+    parser.add_argument("--enable-sil-ownership",
+                        help="Enable the SIL ownership model",
+                        action='store_true')
+
     parser.add_argument(
         # Explicitly unavailable options here.
         "--build-jobs",

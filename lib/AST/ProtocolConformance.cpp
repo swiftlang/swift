@@ -388,7 +388,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
     assert((conforms ||
-            specializedType->is<TypeVariableType>() ||
+            specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
             specializedType->hasError() ||
             specializedType->getCanonicalType()->hasError()) &&

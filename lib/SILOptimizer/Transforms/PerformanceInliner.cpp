@@ -43,6 +43,10 @@ llvm::cl::opt<bool> PrintShortestPathInfo(
     "print-shortest-path-info", llvm::cl::init(false),
     llvm::cl::desc("Print shortest-path information for inlining"));
 
+llvm::cl::opt<bool> EnableSILInliningOfGenerics(
+    "sil-inline-generics", llvm::cl::init(false),
+    llvm::cl::desc("Enable inlining of generics"));
+
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
 //===----------------------------------------------------------------------===//
@@ -1121,7 +1125,8 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
 
   // We don't support this yet.
   if (AI.hasSubstitutions()) {
-    return nullptr;
+    if (!EnableSILInliningOfGenerics)
+      return nullptr;
   }
 
   SILFunction *Caller = AI.getFunction();

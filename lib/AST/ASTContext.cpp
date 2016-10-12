@@ -3382,7 +3382,11 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasTypeParameter;
+  // FIXME: The specific introduction of HasTypeParameter here is due to
+  // type witness inference. See the use of mapErrorTypeToOriginal in
+  // TypeCheckProtocol.cpp.
+  if (!properties.hasTypeVariable())
+    properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -3400,7 +3404,11 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
 DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasTypeParameter;
+  // FIXME: The specific introduction of HasTypeParameter here is due to
+  // type witness inference. See the use of mapErrorTypeToOriginal in
+  // TypeCheckProtocol.cpp.
+  if (!properties.hasTypeVariable())
+    properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);

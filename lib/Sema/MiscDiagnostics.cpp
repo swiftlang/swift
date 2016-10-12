@@ -3723,28 +3723,26 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
           }
 
           // Bail out if we don't have an optional.
-          auto objectTy = segment->getType()->getOptionalObjectType();
-          if (!objectTy) {
+          if (!segment->getType()->getOptionalObjectType()) {
             continue;
           }
-          auto segmentTy = OptionalType::get(objectTy);
 
           TC.diagnose(segment->getStartLoc(),
                       diag::optional_in_string_interpolation_segment)
               .highlight(segment->getSourceRange());
 
+          // Suggest 'String(describing: <expr>)'.
+          auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
           TC.diagnose(segment->getLoc(),
                       diag::silence_optional_in_interpolation_segment_call)
             .highlight(segment->getSourceRange())
-            .fixItInsert(segment->getEndLoc(), ".debugDescription");
+            .fixItInsert(segmentStart, "String(describing: ")
+            .fixItInsert(segment->getEndLoc(), ")");
 
-          auto opts = PrintOptions::printForDiagnostics();
-          TC.diagnose(segment->getLoc(),
-                      diag::silence_optional_in_interpolation_segment_cast,
-                      segmentTy)
+          // Suggest inserting a default value. 
+          TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
             .highlight(segment->getSourceRange())
-            .fixItInsert(segment->getEndLoc(),
-                         " as " + segmentTy->getString(opts));
+            .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
         }
       }
       return { true, E };
