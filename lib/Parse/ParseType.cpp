@@ -468,8 +468,10 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
         substr(1);
       if (!TrailingContent.empty()) {
-        replacement.insert(replacement.begin(), '(');
-        replacement += ")";
+        if (Protocols.size() > 1) {
+          replacement.insert(replacement.begin(), '(');
+          replacement += ")";
+        }
         replacement += TrailingContent;
       }
 

@@ -123,9 +123,11 @@ func testConversion() {
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=(P5)=}}
+var x : protocol<P5>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated and not needed here}} {{9-22=P5=}}
+var y : protocol<P5, P7>= 17 // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{9-26=(P5 & P7)=}}
 
-typealias A = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{15-25=Any}}
+typealias A1 = protocol<> // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{16-26=Any}}
+typealias A2 = protocol<>? // expected-warning {{'protocol<>' syntax is deprecated; use 'Any' instead}} {{16-27=Any?}}
 typealias B1 = protocol<P1,P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-31=P1 & P2}}
 typealias B2 = protocol<P1, P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-32=P1 & P2}}
 typealias B3 = protocol<P1 ,P2> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}} {{16-32=P1 & P2}}
