@@ -1619,7 +1619,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   }
 }
 
-static bool isKeywordPossibleDeclStart(const Token &Tok) {
+bool swift::isKeywordPossibleDeclStart(const Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
   case tok::kw_associatedtype:
