@@ -373,44 +373,6 @@ extension CGFloat : CustomReflectable {
 }
 
 //===----------------------------------------------------------------------===//
-// Standard Operator Table
-//===----------------------------------------------------------------------===//
-
-// FIXME(integers): these overloads should not be neccesary, because Arithmetic
-// protocol already provides default implementations based on mutating ones.
-// But that blows up typechecking time in AffineTransform/hashValue.
-
-extension CGFloat {
-  @_transparent
-  public static func +(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-    var lhs = lhs
-    lhs += rhs
-    return lhs
-  }
-
-  @_transparent
-  public static func -(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-    var lhs = lhs
-    lhs -= rhs
-    return lhs
-  }
-
-  @_transparent
-  public static func *(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-    var lhs = lhs
-    lhs *= rhs
-    return lhs
-  }
-
-  @_transparent
-  public static func /(lhs: CGFloat, rhs: CGFloat) -> CGFloat {
-    var lhs = lhs
-    lhs /= rhs
-    return lhs
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
