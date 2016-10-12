@@ -66,7 +66,7 @@ template bool RefCounts<InlineRefCountBits>::tryIncrementAndPinNonAtomicSlow();
 template bool RefCounts<SideTableRefCountBits>::tryIncrementAndPinNonAtomicSlow();
 
 
-// SideTableRefCountBits specialization intentionall does not exist.
+// SideTableRefCountBits specialization intentionally does not exist.
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
   if (oldbits.hasSideTable())
@@ -77,25 +77,44 @@ bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
 template bool RefCounts<InlineRefCountBits>::tryIncrementSlow(InlineRefCountBits oldbits);
 template bool RefCounts<SideTableRefCountBits>::tryIncrementSlow(SideTableRefCountBits oldbits);
 
+
+// Return an object's side table, allocating it if necessary.
+// Returns nil if the object is deiniting.
 // SideTableRefCountBits specialization intentionally does not exist.
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
 {
+  auto oldbits = refCounts.load(relaxed);
+  
+  // Preflight failures before allocating a new side table.
+  if (oldbits.hasSideTable()) {
+    // Already have a side table. Return it.
+    return oldbits.getSideTable();
+  } 
+  else if (oldbits.getIsDeiniting()) {
+    // Already past the start of deinit. Do nothing.
+    return nil;
+  }
+
+  // Preflight passed. Allocate a side table.
+  
+  // FIXME: custom side table allocator
   HeapObjectSideTableEntry *side = new HeapObjectSideTableEntry(getHeapObject());
   
   auto newbits = InlineRefCountBits(side);
   
-  auto oldbits = refCounts.load(relaxed);
-  
   do {
     if (oldbits.hasSideTable()) {
+      // Already have a side table. Return it and delete ours.
       // Read before delete to streamline barriers.
       auto result = oldbits.getSideTable();
       delete side;
       return result;
     }
-    
-    // FIXME: assert not deiniting or something?
+    else if (oldbits.getIsDeiniting()) {
+      // Already past the start of deinit. Do nothing.
+      return nil;
+    }
     
     // FIXME: barriers?
     side->initRefCounts(oldbits);
@@ -106,19 +125,15 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable()
 }
 
 
-
 // SideTableRefCountBits specialization intentionally does not exist.
 template <>
 HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
 {
-  auto bits = refCounts.load(relaxed);
-  if (!bits.hasSideTable() && bits.getIsDeiniting()) {
-    // Already past the start of deinit. Do nothing.
-    return nil;
-  }
-  
   auto side = allocateSideTable();
-  return side->incrementWeak();
+  if (side)
+    return side->incrementWeak();
+  else
+    return nil;
 }
 
 // namespace swift

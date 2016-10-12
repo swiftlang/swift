@@ -36,12 +36,147 @@ typedef struct {
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Config.h"
 
+/*
+  An object conceptually has three refcounts. These refcounts 
+  are stored either "inline" in the field following the isa
+  or in a "side table entry" pointed to by the field following the isa.
+  
+  The strong RC counts strong references to the object. When the strong RC 
+  reaches zero the object is deinited, unowned reference reads become errors, 
+  and weak reference reads become nil.
+
+  The unowned RC counts unowned references to the object. The unowned RC 
+  also has an extra +1 on behalf of the strong references; this +1 is 
+  decremented after deinit completes. When the unowned RC reaches zero 
+  the object's allocation is freed.
+
+  The weak RC counts weak references to the object. The weak RC also has an 
+  extra +1 on behalf of the unowned references; this +1 is decremented 
+  after the object's allocation is freed. When the weak RC reaches zero 
+  the object's side table entry is freed.
+
+  Objects initially start with no side table. They can gain a side table when:
+  * a weak reference is formed 
+  and pending future implementation:
+  * strong RC or unowned RC overflows (inline RCs will be small on 32-bit)
+  * associated object storage is needed on an object
+  * etc
+  Gaining a side table entry is a one-way operation; an object with a side 
+  table entry never loses it. This prevents some thread races.
+
+  Strong and unowned variables point at the object.
+  Weak variables point at the object's side table.
+
+
+  Storage layout:
+
+  HeapObject {
+    isa
+    InlineRefCounts {
+      atomic<InlineRefCountBits> {
+        strong RC + unowned RC + flags
+        OR
+        HeapObjectSideTableEntry*
+      }
+    }
+  }
+
+  HeapObjectSideTableEntry {
+    SideTableRefCounts {
+      object pointer
+      atomic<SideTableRefCountBits> {
+        strong RC + unowned RC + weak RC + flags
+      }
+    }   
+  }
+
+  InlineRefCounts and SideTableRefCounts share some implementation
+  via RefCounts<T>.
+
+  InlineRefCountBits and SideTableRefCountBits share some implementation
+  via RefCountBitsT<bool>.
+
+  In general: The InlineRefCounts implementation tries to perform the 
+  operation inline. If the object has a side table it calls the 
+  HeapObjectSideTableEntry implementation which in turn calls the 
+  SideTableRefCounts implementation. 
+  Downside: this code is a bit twisted.
+  Upside: this code has less duplication than it might otherwise
+
+
+  Object lifecycle state machine:
+
+  LIVE without side table
+  The object is alive.
+  Object's refcounts are initialized as 1 strong, 1 unowned, 1 weak.
+  No side table. No weak RC storage.
+  Strong variable operations work normally. 
+  Unowned variable operations work normally.
+  Weak variable load can't happen.
+  Weak variable store adds the side table, becoming LIVE with side table.
+  When the strong RC reaches zero deinit() is called and the object 
+    becomes DEINITING.
+
+  LIVE with side table
+  Weak variable operations work normally.
+  Everything else is the same as LIVE.
+
+  DEINITING without side table
+  deinit() is in progress on the object.
+  Strong variable operations have no effect.
+  Unowned variable load halts in swift_abortRetainUnowned().
+  Unowned variable store works normally.
+  Weak variable load can't happen.
+  Weak variable store stores nil.
+  When deinit() completes, the generated code calls swift_deallocObject. 
+    swift_deallocObject calls canBeFreedNow() checking for the fast path 
+    of no weak or unowned references. 
+    If canBeFreedNow() the object is freed and it becomes DEAD. 
+    Otherwise, it decrements the unowned RC and the object becomes DEINITED.
+
+  DEINITING with side table
+  Weak variable load returns nil. 
+  Weak variable store stores nil.
+  canBeFreedNow() is always false, so it never transitions directly to DEAD.
+  Everything else is the same as DEINITING.
+
+  DEINITED without side table
+  deinit() has completed but there are unowned references outstanding.
+  Strong variable operations can't happen.
+  Unowned variable store can't happen.
+  Unowned variable load halts in swift_abortRetainUnowned().
+  Weak variable operations can't happen.
+  When the unowned RC reaches zero, the object is freed and it becomes DEAD.
+
+  DEINITED with side table
+  Weak variable load returns nil.
+  Weak variable store can't happen.
+  When the unowned RC reaches zero, the object is freed, the weak RC is 
+    decremented, and the object becomes FREED.
+  Everything else is the same as DEINITED.
+
+  FREED without side table
+  This state never happens.
+
+  FREED with side table
+  The object is freed but there are weak refs to the side table outstanding.
+  Strong variable operations can't happen.
+  Unowned variable operations can't happen.
+  Weak variable load returns nil.
+  Weak variable store can't happen.
+  When the weak RC reaches zero, the side table entry is freed and 
+    the object becomes DEAD.
+
+  DEAD
+  The object and its side table are gone.
+*/
+
 namespace swift {
   struct HeapObject;
   class HeapObjectSideTableEntry;
 }
 
-// FIXME: HACK copied from HeapObject.cpp
+// FIXME: HACK: copied from HeapObject.cpp
 extern "C" LLVM_LIBRARY_VISIBILITY void
 _swift_release_dealloc(swift::HeapObject *object)
   SWIFT_CC(RegisterPreservingCC_IMPL)
@@ -90,7 +225,6 @@ class RefCountBitsT {
 # define ShiftAfterField(name) (name##Shift + name##BitCount)
 
   enum : uint64_t {
-    // FIXME: isFreeing bit
     UnownedRefCountShift = 0,
     UnownedRefCountBitCount = 32,
     UnownedRefCountMask = MaskForField(UnownedRefCount),
@@ -347,7 +481,8 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
   constexpr
   SideTableRefCountBits(uint32_t strongExtraCount, uint32_t unownedCount)
     : RefCountBitsT<RefCountNotInline>(strongExtraCount, unownedCount)
-    , weakBits(0)
+    // weak refcount starts at 1 on behalf of the unowned count
+    , weakBits(1)
   { }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -355,7 +490,7 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SideTableRefCountBits(InlineRefCountBits newbits)
-    : RefCountBitsT<RefCountNotInline>(newbits), weakBits(0)
+    : RefCountBitsT<RefCountNotInline>(newbits), weakBits(1)
   { }
 
   
@@ -369,6 +504,11 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
     assert(weakBits > 0);
     weakBits--;
     return weakBits == 0;
+  }
+
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  uint32_t getWeakRefCount() {
+    return weakBits;
   }
 
   // Side table ref count never has a side table of its own.
@@ -425,8 +565,10 @@ class RefCounts {
     refCounts.store(RefCountBits(0, 1), relaxed);
   }
 
-  /// Initialize for a stack promoted object. This prevents that the final
-  /// release frees the memory of the object.
+  // Initialize for a stack promoted object. This prevents that the final
+  // release frees the memory of the object.
+  // FIXME: need to mark these and assert they never get a side table,
+  // because the extra unowned ref will keep the side table alive forever
   void initForNotFreeing() {
     refCounts.store(RefCountBits(0, 2), relaxed);
   }
@@ -620,6 +762,7 @@ class RefCounts {
   }
 
   /// Return true if the object can be freed directly right now.
+  /// (transition DEINITING -> DEAD)
   /// This is used in swift_deallocObject().
   /// Can be freed now means:  
   ///   no side table
@@ -660,6 +803,7 @@ class RefCounts {
       }
       else {
         // Decrement underflowed. Begin deinit.
+        // LIVE -> DEINITING
         deinitNow = true;
         assert(!oldbits.getIsDeiniting());
         newbits = oldbits;  // Undo failed decrement of newbits.
@@ -720,6 +864,7 @@ class RefCounts {
         return oldbits.getSideTable()->incrementUnowned(inc);
 
       newbits = oldbits;
+      assert(newbits.getUnownedRefCount() != 0);
       newbits.incrementUnownedRefCount(inc);
       // FIXME: overflow check?
     } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
@@ -738,7 +883,15 @@ class RefCounts {
 
       newbits = oldbits;
       newbits.decrementUnownedRefCount(dec);
-      performFree = (newbits.getUnownedRefCount() == 0);
+      if (newbits.getUnownedRefCount() == 0) {
+        // DEINITED -> FREED  or  DEINITED -> DEAD
+        // Caller will free the object. Weak decrement is handled by
+        // HeapObjectSideTableEntry::decrementUnownedShouldFree.
+        assert(newbits.getIsDeiniting());
+        performFree = true;
+      } else {
+        performFree = false;
+      }
       // FIXME: underflow check?
     } while (! refCounts.compare_exchange_weak(oldbits, newbits,
                                                release, relaxed));
@@ -767,21 +920,40 @@ class RefCounts {
 
   // Increment the weak reference count.
   void incrementWeak() {
-    // FIXME
+    auto oldbits = refCounts.load(relaxed);
+    RefCountBits newbits;
+    do {
+      newbits = oldbits;
+      assert(newbits.getWeakRefCount() != 0);
+      newbits.incrementWeakRefCount();
+      // FIXME: overflow check
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
   }
+  
   bool decrementWeakShouldCleanUp() {
-    // FIXME
-    return false;
+    auto oldbits = refCounts.load(relaxed);
+    RefCountBits newbits;
+
+    bool performFree;
+    do {
+      newbits = oldbits;
+      performFree = newbits.decrementWeakRefCount();      
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits, relaxed));
+
+    return performFree;
   }
   
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const {
     auto bits = refCounts.load(relaxed);
-    if (bits.hasSideTable())
+    if (bits.hasSideTable()) {
       return bits.getSideTable()->getWeakCount();
-    else 
-      return 0;
+    } else {
+      // No weak refcount storage. Return only the weak increment held
+      // on behalf of the unowned count.
+      return bits.getUnownedRefCount() ? 1 : 0;
+    }
   }
 
 
@@ -827,6 +999,8 @@ class HeapObjectSideTableEntry {
   HeapObject *unsafeGetObject() const {
     return object.load(relaxed);
   }
+
+  // STRONG
   
   void incrementStrong(uint32_t inc) {
     refCounts.increment(inc);
@@ -854,7 +1028,9 @@ class HeapObjectSideTableEntry {
   bool decrementUnownedShouldFree(uint32_t dec) {
     bool shouldFree = refCounts.decrementUnownedShouldFree(dec);
     if (shouldFree) {
-      // FIXME: Delete the side table if the weak count is zero.
+      // DEINITED -> FREED
+      // Caller will free the object.
+      decrementWeak();
     }
 
     return shouldFree;
@@ -887,8 +1063,10 @@ class HeapObjectSideTableEntry {
     if (!cleanup)
       return;
 
-    // Weak ref count is now zero. Maybe delete the side table entry.
-    abort();
+    // Weak ref count is now zero. Delete the side table entry.
+    // FREED -> DEAD
+    assert(refCounts.getUnownedCount() == 0);
+    delete this;
   }
 
   uint32_t getWeakCount() const {

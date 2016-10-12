@@ -708,10 +708,12 @@ void swift::swift_deallocObject(HeapObject *object,
   // FIXME: reexamine and repair this optimization
 
   if (object->refCounts.canBeFreedNow()) {
+    // object state DEINITING -> DEAD
     SWIFT_RT_ENTRY_CALL(swift_slowDealloc)
          (object, allocatedSize,
           allocatedAlignMask);
   } else {
+    // object state DEINITING -> DEINITED
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
   }
 }
