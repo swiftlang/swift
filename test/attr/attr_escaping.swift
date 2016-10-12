@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-parse-verify-swift -swift-version 4
 
 @escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}
@@ -140,10 +140,7 @@ func takesVarargsOfFunctions(fns: () -> ()...) {
   }
 }
 
-// This is allowed, in order to keep source compat with Swift version 3.0.
-//
-// FIXME: version-gate on Swift version 3
-func takesVarargsOfFunctionsExplicitEscaping(fns: @escaping () -> ()...) {}
+func takesVarargsOfFunctionsExplicitEscaping(fns: @escaping () -> ()...) {} // expected-error{{@escaping attribute may only be used in function parameter position}}
 
 func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
   takesVarargsOfFunctions(fns: fn) // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}

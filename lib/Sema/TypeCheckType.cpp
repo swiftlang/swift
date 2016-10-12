@@ -2034,10 +2034,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (attrs.has(TAK_escaping)) {
       // For compatibility with 3.0, we don't emit an error if it appears on a
       // variadic argument list.
-      //
-      // FIXME: Version-gate on Swift language version 3, as we don't want its
-      // presence to confuse users.
-      bool skipDiagnostic = isVariadicFunctionParam;
+      bool skipDiagnostic =
+          isVariadicFunctionParam && Context.isSwiftVersion3();
 
       // The attribute is meaningless except on parameter types.
       bool shouldDiagnose = !isFunctionParam && !skipDiagnostic;
