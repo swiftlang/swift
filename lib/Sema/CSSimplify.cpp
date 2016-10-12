@@ -2288,7 +2288,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
     break;
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
     // Check whether this type conforms to the protocol.
     if (TC.conformsToProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression))
@@ -3468,7 +3467,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
     llvm_unreachable("Overload binding constraints don't involve type matches");
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     llvm_unreachable("Conformance constraints don't involve type matches");
 
@@ -4128,7 +4126,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
              constraint.getFirstType(),
