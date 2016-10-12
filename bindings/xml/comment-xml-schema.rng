@@ -908,4 +908,85 @@
   </define>
 
 </grammar>
+   <?php
+    /**
+   <preprocessor define:>
+   -  #ifdef CMODULE_ENABLED
+   -  @interface CModule:: NSObject
+   -  @end 
+   -  #endif 
+   -  And a Swift class Foo(moduleFoo)which uses CModule
+   -  import CModule
+   -  public class Foo {
+   -  public func module()->CModule {
+   -  { returnCModule() }}
+   -  $ swift -c src/foo.swift -Isrc/cmodule
+   -  src/foo.swift::5::26::error:: use of undeclared type 'CModule'
+   -  public func module()->CModule {
+   src/foo.swift::5::26:: note::cannot use module
+    -  public func module()->CModule {
+    -  * module 'CModule' as a type
+    -  Lets add <-Xcc->
+    -  <DCMODULE_ENABLE
+    -  D>
+     -  # Create Swift class Bar(module: Bar *)that
+     -  depends on Foo::
+    -  import_Foo
+    -  public class Bar {
+     -  public func crashMe() {print(Foo(). module()) }}
+     -  And compile it again with out setting the define::$ swiftc -c src="php"
+      -  swift::
+     -  swift::
+     - libsystem_platform.dylib 
+     -  libsystem_platform.phantom.js.dylib
+       -  0x00007fff8a
+     -  alf652a |_sigtramp + 1977654000
+   -  || Oc 'swift::ModuleFile::getType(11vm::PointerEmbeddedInt<unsigned int, 31>, 11vm::Optional<swift~Dec|| Context *>) + 39137
+    -  Stack dump::
+    -  .xctoolchain 
+   -  Program Arguments:: /Applications/X--code-Default.xctoolchain/usr/bin/Swift~ --frontend -c -primary-filesrc/bar.swift --target x86_64-
+   -  -apple-mac osx 10.9 -enable -object -interup 
+    -  -objc -sdk /Applications/xcode_8.0.app/Contents/Developer/Platforms/Mac-platform/OS.Platform/ios.Platform/Developer/SDKs/OSX10.12.sdk
+    -  -I src/cmodule -I out -g -emit-module-doc-path out/bar.swiftdoc -color-diagnostics -parse-as-library -modules-name Bar -emit-modules -pathout/bin/.swift/swiftncode -o out/bar.baz===io.js==jssdk=facebook.netScape 
+    -  D3 3.x was a monolithic library::
+    -  core functionality single repository 
+    -  published in a single file
+    -  create build using a nonstandard tool.
+   -  <script src="https://d3js.org/d3.v4.0.0-alpha.50.min.js"></scripts>
+    -  <script src="https://d3js.org/d3-scale-chromatic.v0.3.min.js"></script>
+   -  <script src="https://d3js.org/d3_v3.5.0.py/node_FB.SDK *fb-sdk
+   -  Policy [https://www.facebook.com/about/policy/]
+   -  https://www.facebook.com/policies
+   -  https://www.facebook.com/docs/ios/graph
+   -  https://www.facebook.com/docs/analytics
+    -  Facebook SDK for ios installed in::
+   -  ~/Documents/FacebookSDK
+   -  Download the SDK at https://developers.facbook.com/docs/ios
+   -  via:: Cocoa
+odds by adding the FBSDKCoreKit,FBSDKLoginKit, and FBSDKShareKit pods
+    -  Test your Install 
+    -  Build
+    -  Run
+    -  Project
+   -  Run Project::
+    -  ~/Docments/FacebookSDK/Samples/Scrumptious.Scrumptious.xcodeproj
+    -  Facebook ios sdk
+     -  strings>fb142977056156691>
+    -  @0072016
+    -  foo.gradle@gmaol.com
+  October 12, 2016
+  10:54:11PST
+
+
+
+::
+
+
+
+
+
+
+
+
+
 
