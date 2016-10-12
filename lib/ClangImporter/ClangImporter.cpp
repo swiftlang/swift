@@ -1137,8 +1137,9 @@ void ClangImporter::collectSubModuleNames(
   }
   auto submoduleNameLength = submodule->getFullModuleName().length();
   for (auto sub : submodule->submodules()) {
-    StringRef full = sub->getFullModuleName();
-    names.push_back(full.substr(submoduleNameLength + 1).str());
+    std::string full = sub->getFullModuleName();
+    full.erase(0, submoduleNameLength + 1);
+    names.push_back(std::move(full));
   }
 }
 
