@@ -1491,8 +1491,9 @@ public:
       if (auto dynamicSelf = dyn_cast<DynamicSelfType>(formalObjectType)) {
         formalObjectType = dynamicSelf->getSelfType()->getCanonicalType();
       }
-      return ((loweredOptionalKind == formalOptionalKind) &&
-              loweredObjectType == formalObjectType);
+      return loweredOptionalKind == formalOptionalKind &&
+             isLoweringOf(SILType::getPrimitiveAddressType(loweredObjectType),
+                          formalObjectType);
     }
 
     // Metatypes preserve their instance type through lowering.

@@ -2753,22 +2753,25 @@ namespace {
       OS << ")";
     }
 
+    void printMetatypeRepresentation(MetatypeRepresentation representation) {
+      OS << " ";
+      switch (representation) {
+      case MetatypeRepresentation::Thin:
+        OS << "@thin";
+        break;
+      case MetatypeRepresentation::Thick:
+        OS << "@thick";
+        break;
+      case MetatypeRepresentation::ObjC:
+        OS << "@objc";
+        break;
+      }
+    }
+
     void visitMetatypeType(MetatypeType *T, StringRef label) {
       printCommon(T, label, "metatype_type");
-      if (T->hasRepresentation()) {
-        OS << " ";
-        switch (T->getRepresentation()) {
-        case MetatypeRepresentation::Thin:
-          OS << "@thin";
-          break;
-        case MetatypeRepresentation::Thick:
-          OS << "@thick";
-          break;
-        case MetatypeRepresentation::ObjC:
-          OS << "@objc";
-          break;
-        }
-      }
+      if (T->hasRepresentation())
+        printMetatypeRepresentation(T->getRepresentation());
       printRec(T->getInstanceType());
       OS << ")";
     }
@@ -2776,6 +2779,8 @@ namespace {
     void visitExistentialMetatypeType(ExistentialMetatypeType *T,
                                       StringRef label) {
       printCommon(T, label, "existential_metatype_type");
+      if (T->hasRepresentation())
+        printMetatypeRepresentation(T->getRepresentation());
       printRec(T->getInstanceType());
       OS << ")";
     }
