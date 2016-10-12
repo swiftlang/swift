@@ -1390,10 +1390,15 @@ public func _setDownCastConditionalIndirect<SourceValue, TargetValue>(
 public func _setDownCastConditional<BaseValue, DerivedValue>(
   _ source: Set<BaseValue>
 ) -> Set<DerivedValue>? {
-  return try? Set(
-    source.lazy.map {
-      try ($0 as? DerivedValue).unwrappedOrError()
-    })
+  var result = Set<DerivedValue>(minimumCapacity: source.count)
+  for member in source {
+    if let derivedMember = member as? DerivedValue {
+      result.insert(derivedMember)
+      continue
+    }
+    return nil
+  }
+  return result
 }
 
 #if _runtime(_ObjC)
