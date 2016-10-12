@@ -34,29 +34,29 @@ class struct(object):
 
 binaryArithmetic = {
   'Arithmetic' : [
-    struct(operator='+', name='adding',      mutatingName='add',      firstArg='_',  llvmName='add', kind='+'),
-    struct(operator='-', name='subtracting', mutatingName='subtract', firstArg='_',  llvmName='sub', kind='-'),
-    struct(operator='*', name='multiplied',  mutatingName='multiply', firstArg='by', llvmName='mul', kind='*'),
-    struct(operator='/', name='divided',     mutatingName='divide',   firstArg='by', llvmName='div', kind='/'),
+    struct(operator='+', name='adding',      firstArg='_',  llvmName='add', kind='+'),
+    struct(operator='-', name='subtracting', firstArg='_',  llvmName='sub', kind='-'),
+    struct(operator='*', name='multiplied',  firstArg='by', llvmName='mul', kind='*'),
+    struct(operator='/', name='divided',     firstArg='by', llvmName='div', kind='/'),
   ],
   'BinaryInteger' : [
-    struct(operator='%', name='remainder',   mutatingName='formRemainder', firstArg='dividingBy', llvmName='rem', kind='/'),
+    struct(operator='%', name='remainder',   firstArg='dividingBy', llvmName='rem', kind='/'),
   ],
 }
 
 binaryBitwise = [
-    struct(operator='&', name='bitwiseAnd', llvmName='and'),
-    struct(operator='|', name='bitwiseOr', llvmName='or'),
-    struct(operator='^', name='bitwiseXor', llvmName='xor'),
+    struct(operator='&', llvmName='and'),
+    struct(operator='|', llvmName='or'),
+    struct(operator='^', llvmName='xor'),
 ]
 
 maskingShifts = [
     struct(
       operator='&>>', nonMaskingOperator='>>', description='right shift',
-      name='maskingShiftRight', llvmName=lambda s:['lshr','ashr'][s]),
+      llvmName=lambda s:['lshr','ashr'][s]),
     struct(
       operator='&<<', nonMaskingOperator='<<', description='left shift',
-      name='maskingShiftLeft', llvmName=lambda _: 'shl'),
+      llvmName=lambda _: 'shl'),
 ]
 
 IntMax = 'Int%s' % int_max_bits
@@ -1983,11 +1983,11 @@ ${operatorComment(x.nonMaskingOperator)}
       if _fastPath(rhs < Self.bitWidth) {
         return lhs ${x.operator} Self(extendingOrTruncating: rhs)
       }
-      return overshift${'LR'['R' in x.name]}
+      return overshift${'LR'['R' in x.nonMaskingOperator]}
     }
 
     if _slowPath(rhs <= -Self.bitWidth) {
-      return overshift${'RL'['R' in x.name]}
+      return overshift${'RL'['R' in x.nonMaskingOperator]}
     }
     return lhs ${x.operator.translate(maketrans('<>', '><'))} -rhs
   }
@@ -2022,7 +2022,7 @@ extension FixedWidthInteger {
   @_transparent
   public static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self) {
     let (result, overflow) = lhs.${x.name}WithOverflow(${callLabel}rhs)
-    _precondition(overflow != .none, "Overflow in ${x.mutatingName}")
+    _precondition(overflow != .none, "Overflow in ${x.operator}=")
     lhs = result
   }
 
