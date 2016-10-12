@@ -2032,8 +2032,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Handle @escaping
   if (hasFunctionAttr && ty->is<FunctionType>()) {
     if (attrs.has(TAK_escaping)) {
+      // For compatibility with 3.0, we don't emit an error if it appears on a
+      // variadic argument list.
+      bool skipDiagnostic =
+          isVariadicFunctionParam && Context.isSwiftVersion3();
+
       // The attribute is meaningless except on parameter types.
-      if (!isFunctionParam) {
+      bool shouldDiagnose = !isFunctionParam && !skipDiagnostic;
+      if (shouldDiagnose) {
         auto &SM = TC.Context.SourceMgr;
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = SourceRange(

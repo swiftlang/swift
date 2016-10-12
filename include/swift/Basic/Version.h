@@ -95,6 +95,9 @@ public:
   /// are attempting to maintain backward-compatibility support for.
   bool isValidEffectiveLanguageVersion() const;
 
+  /// Whether this version is in the Swift 3 family
+  bool isVersion3() const { return !empty() && Components[0] == 3; }
+
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(StringRef VersionString,
                                             SourceLoc Loc,
