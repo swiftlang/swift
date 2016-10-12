@@ -133,15 +133,16 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // See if Continue has a release on self as the instruction right after the
   // apply. If it exists, move it into position in the diamond.
-  if (auto *Release =
-          dyn_cast<StrongReleaseInst>(std::next(Continue->begin()))) {
-    if (Release->getOperand() == CMI->getOperand()) {
-      VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
-                                      Atomicity::Atomic);
-      IdenBuilder.createStrongRelease(
-          Release->getLoc(), DownCastedClassInstance, Atomicity::Atomic);
-      Release->eraseFromParent();
-    }
+  SILBasicBlock::iterator next =
+      next_or_end(Continue->begin(), Continue->end());
+  auto *Release =
+      (next == Continue->end()) ? nullptr : dyn_cast<StrongReleaseInst>(next);
+  if (Release && Release->getOperand() == CMI->getOperand()) {
+    VirtBuilder.createStrongRelease(Release->getLoc(), CMI->getOperand(),
+                                    Atomicity::Atomic);
+    IdenBuilder.createStrongRelease(Release->getLoc(), DownCastedClassInstance,
+                                    Atomicity::Atomic);
+    Release->eraseFromParent();
   }
 
   // Create a PHInode for returning the return value from both apply
