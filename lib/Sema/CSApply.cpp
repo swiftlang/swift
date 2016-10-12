@@ -5111,6 +5111,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
 
 static CollectionUpcastConversionExpr::ConversionPair
 buildElementConversion(ExprRewriter &rewriter,
+                       SourceLoc srcLoc,
                        Type srcCollectionType,
                        Type destCollectionType,
                        ConstraintLocatorBuilder locator,
@@ -5123,7 +5124,7 @@ buildElementConversion(ExprRewriter &rewriter,
 
   // Build the conversion.
   ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
-  auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
+  auto opaque = new (ctx) OpaqueValueExpr(srcLoc, srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
            locator.withPathElement(
@@ -5283,8 +5284,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       // Form the upcast.
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
@@ -5325,10 +5326,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the key and value conversions.
-      auto keyConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
-      auto valueConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 1);
+      auto keyConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 0);
+      auto valueConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 1);
 
       // If the source key and value types are object types, this is an upcast.
       // Otherwise, it's bridged.
@@ -5348,8 +5349,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
                                                              {}, conv);
