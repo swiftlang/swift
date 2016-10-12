@@ -743,7 +743,7 @@ namespace {
   void favorMatchingUnaryOperators(ApplyExpr *expr,
                                    ConstraintSystem &CS) {
     // Find the argument type.
-    auto argTy = getInnerParenType(expr->getArg()->getType());
+    auto argTy = expr->getArg()->getType()->getWithoutParens();
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
