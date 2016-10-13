@@ -1,0 +1,66 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "children": [
+    {
+      "kind": "TypeDecl",
+      "name": "S1",
+      "printedName": "S1",
+      "declKind": "Struct",
+      "usr": "s:V4cake2S1",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo1",
+          "printedName": "foo1()",
+          "declKind": "Func",
+          "usr": "s:FV4cake2S14foo1FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "foo2",
+          "printedName": "foo2()",
+          "declKind": "Func",
+          "usr": "s:FV4cake2S14foo2FT_T_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "s:FV4cake2S1cFT_S0_",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "S1",
+              "printedName": "S1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

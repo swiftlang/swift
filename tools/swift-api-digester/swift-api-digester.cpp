@@ -98,6 +98,9 @@ ResourceDir("resource-dir",
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
+static llvm::cl::list<std::string>
+ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
+
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
                         llvm::cl::desc("Abort if a module failed to load"));
@@ -3303,6 +3306,7 @@ static int prepareForDump(const char *Main,
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
+  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
 
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
