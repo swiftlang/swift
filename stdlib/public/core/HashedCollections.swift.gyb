@@ -12,32 +12,8 @@
 
 import SwiftShims
 
-// TODO: swift-3-indexing-model: rewrite this description to reflect new indexing model
 // General Mutable, Value-Type Collections
 // =================================================
-//
-// Basic copy-on-write (COW) requires a container's data to be copied
-// into new storage before it is modified, to avoid changing the data
-// of other containers that may share the data.  There is one
-// exception: when we know the container has the only reference to the
-// data, we can elide the copy.  This COW optimization is crucial for
-// the performance of mutating algorithms.
-//
-// Some container elements (Characters in a String, key/value pairs in
-// an open-addressing hash table) are not traversable with a fixed
-// size offset, so incrementing/decrementing indices requires looking
-// at the contents of the container.  The current interface for
-// incrementing/decrementing indices of a Collection is the usual ++i,
-// --i. Therefore, for memory safety, the indices need to keep a
-// reference to the container's underlying data so that it can be
-// inspected.  But having multiple outstanding references to the
-// underlying data defeats the COW optimization.
-//
-// The way out is to count containers referencing the data separately
-// from indices that reference the data.  When deciding to elide the
-// copy and modify the data directly---as long as we don't violate
-// memory safety of any outstanding indices---we only need to be
-// sure that no other containers are referencing the data.
 //
 // Implementation notes
 // ====================
@@ -65,50 +41,20 @@ import SwiftShims
 //   +---|------------------------------------------+
 //      /
 //     |
-//     V  _NativeDictionaryStorageOwner<K,V> (a class)
+//     V  _NativeDictionaryStorage<K,V> (a class)
 //   +-----------------------------------------------------------+
-//   | [refcount#1] [ _NativeDictionaryStorage<K,V> (a struct) ] |
-//   +----------------|------------------------------------------+
-//                    |
-//     +--------------+
-//     |
-//     V  _NativeDictionaryStorageImpl<K,V> (a class)
-//   +-----------------------------------------+
-//   | [refcount#2]    [...element storage...] |
-//   +-----------------------------------------+
-//     ^
-//     +---+
-//         |              Dictionary<K,V>.Index (an enum)
-//   +-----|--------------------------------------------+
-//   |     |     _NativeDictionaryIndex<K,V> (a struct) |
-//   | +---|------------------------------------------+ |
-//   | | [ _NativeDictionaryStorage<K,V> (a struct) ] | |
-//   | +----------------------------------------------+ |
-//   +--------------------------------------------------+
-//
-// We would like to optimize by allocating the `_NativeDictionaryStorageOwner`
-// /inside/ the `_NativeDictionaryStorageImpl`, and override the `dealloc`
-// method of `_NativeDictionaryStorageOwner` to do nothing but release its
-// reference.
-//
-//     Dictionary<K,V> (a struct)
-//     +----------------------------------------------+
-//     | [ _VariantDictionaryStorage<K,V> (an enum) ] |
-//     +---|------------------------------------------+
-//        /
-//       |          +---+
-//       |          V   |  _NativeDictionaryStorageImpl<K,V> (a class)
-//   +---|--------------|----------------------------------------------+
-//   |   |              |                                              |
-//   |   | [refcount#2] |                                              |
-//   |   |              |                                              |
-//   |   V              | _NativeDictionaryStorageOwner<K,V> (a class) |
-//   | +----------------|------------------------------------------+   |
-//   | | [refcount#1] [ _NativeDictionaryStorage<K,V> (a struct) ] |   |
-//   | +-----------------------------------------------------------+   |
-//   |                                                                 |
-//   | [...element storage...]                                         |
-//   +-----------------------------------------------------------------+
+//   | +-------------------------------------------------------+ |
+//   | |_DictionaryStorageHeader<K,V> (a struct)               | |
+//   | | capacity                                              | |
+//   | | count                                                 | |
+//   | | ptrToBits                                             | |
+//   | | ptrToKeys                                             | |
+//   | | ptrToValues                                           | |
+//   | +-------------------------------------------------------+ |
+//   | [inline array of bits indicating whether bucket is set ]  |
+//   | [inline array of keys                                  ]  |
+//   | [inline array of values                                ]  |
+//   +-----------------------------------------------------------+
 //
 //
 // Cocoa storage uses a data structure like this::
@@ -137,19 +83,17 @@ import SwiftShims
 //   | +-------------------------------+     |
 //   +---------------------------------------+
 //
-// `_NativeDictionaryStorageOwner` is an `NSDictionary` subclass.  It can
-// be returned to Objective-C during bridging if both `Key` and `Value`
-// bridge verbatim.
 //
 // Index Invalidation
 // ------------------
 //
+// FIXME? not sure if this guarantee is worth making, as it restricts
+// collision resolution to first-come-first-serve.
+//
 // Indexing a container, `c[i]`, uses the integral offset stored in the index
-// to access the elements referenced by the container.  The buffer referenced
-// by the index is only used to increment and decrement the index.  Most of the
-// time, these two buffers will be identical, but they need not always be.  For
-// example, if one ensures that a `Dictionary` has sufficient capacity to avoid
-// reallocation on the next element insertion, the following works ::
+// to access the elements referenced by the container. Generally, an index into
+// one container has no meaning for another. However copy-on-write currently
+// preserves indices under insertion, as long as reallocation doesn't occur:
 //
 //   var (i, found) = d.find(k) // i is associated with d's buffer
 //   if found {
@@ -176,17 +120,18 @@ import SwiftShims
 // ---------------------------------------
 //
 // `Dictionary<K, V>` bridges to `NSDictionary` iff both `K` and `V` are
-// bridged.  Otherwise, a runtime error is raised.
+// bridged.  Otherwise, a runtime error is raised. Because 
+// _NativeDictionaryStorage inherits from ManagedBuffer, it can't also
+// inherit from NSDictionary (_NSDictionaryCore). To have a value that does,
+// we wrap the _NativeDictionaryStorage in another class, 
+// _NativeDictionaryBridgingStorage, which incurs an allocation, but is O(1).
 //
-// * if both `K` and `V` are bridged verbatim, then `Dictionary<K, V>` bridges
-//   to `NSDictionary` in `O(1)`, without memory allocation.  Access to
-//   elements does not cause memory allocation.
+// * if both `K` and `V` are bridged verbatim, then access to elements 
+//   does not cause memory allocation.
 //
 // * otherwise, `K` and/or `V` are unconditionally or conditionally bridged.
-//   In this case, `Dictionary<K, V>` is bridged to `NSDictionary` in `O(1)`,
-//   without memory allocation.  Complete bridging is performed when the first
-//   access to elements happens.  The bridged `NSDictionary` has a cache of
-//   pointers it returned, so that:
+//   Complete bridging is performed when the first access to elements happens. 
+//   The bridged `NSDictionary` has a cache of pointers it returned, so that:
 //   - Every time keys or values are accessed on the bridged `NSDictionary`,
 //     new objects are not created.
 //   - Accessing the same element (key or value) multiple times will return
