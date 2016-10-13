@@ -878,7 +878,7 @@ The following characteristics of deinits are important to the optimizer:
 3. If the optimizer takes advantage of the lack of sequencing it must do so in a
    way that preserves memory safety.
 
-Consider the following psuedo-Swift example::
+Consider the following pseudo-Swift example::
 
   class D {}
   class D1 : D {}
