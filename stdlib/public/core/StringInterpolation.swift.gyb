@@ -10,30 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-
-from SwiftIntTypes import all_integer_types
-
-# Number of bits in the Builtin.Word type
-word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-StreamableTypes = [
-    'String',
-    'Character',
-    'UnicodeScalar',
-  ]
-
-PrintableTypes = [
-    'Bool',
-    'Float32',
-    'Float64'
-  ]
-
-for int_ty in all_integer_types(word_bits):
-    PrintableTypes.append(int_ty.stdlib_name)
-
-}%
-
 extension String : _ExpressibleByStringInterpolation {
   /// Creates a new string by concatenating the given interpolations.
   ///
@@ -67,30 +43,6 @@ extension String : _ExpressibleByStringInterpolation {
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(describing: expr)
   }
-
-% for Type in StreamableTypes:
-  /// Creates a string containing the given value's textual representation.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
-    self = _toStringReadOnlyStreamable(expr)
-  }
-% end
-
-% for Type in PrintableTypes:
-  /// Creates a string containing the given value's textual representation.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment expr: ${Type}) {
-    self = _toStringReadOnlyPrintable(expr)
-  }
-% end
 }
 
 // ${'Local Variables'}:
