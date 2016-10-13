@@ -103,6 +103,9 @@ public:
   /// Whether this version is in the Swift 3 family
   bool isVersion3() const { return !empty() && Components[0] == 3; }
 
+  /// Return this Version struct with minor and sub-minor components stripped
+  Version asMajorVersion() const;
+
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Version parseCompilerVersionString(StringRef VersionString,
                                             SourceLoc Loc,

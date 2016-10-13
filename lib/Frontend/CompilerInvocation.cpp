@@ -773,8 +773,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         vers.getValue().isValidEffectiveLanguageVersion()) {
       Opts.EffectiveLanguageVersion = vers.getValue();
     } else {
+      // General invalid version error
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
+
+      // Check for an unneeded minor version
+      if (vers.hasValue() && !vers.getValue().empty() &&
+          vers.getValue().asMajorVersion().isValidEffectiveLanguageVersion()) {
+        Diags.diagnose(SourceLoc(), diag::note_swift_version_major,
+                       vers.getValue()[0]);
+      }
     }
   }
 
