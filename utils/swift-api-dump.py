@@ -93,6 +93,8 @@ def create_parser():
                         help='Print extra information.')
     parser.add_argument('-F', '--framework-dir', action='append',
                         help='Add additional framework directories')
+    parser.add_argument('-iframework', '--system-framework-dir', action='append',
+                        help='Add additional system framework directories')
     parser.add_argument('-I', '--include-dir', action='append',
                         help='Add additional include directories')
     parser.add_argument('--enable-infer-import-as-member', action='store_true',
@@ -282,10 +284,13 @@ def main():
         '-skip-overrides'
     ]
 
-    # Add -F / -I arguments.
+    # Add -F / -iframework / -I arguments.
     if args.framework_dir:
         for path in args.framework_dir:
             cmd_common = cmd_common + ['-F', path]
+    if args.system_framework_dir:
+        for path in args.system_framework_dir:
+            cmd_common = cmd_common + ['-iframework', path]
     if args.include_dir:
         for path in args.include_dir:
             cmd_common = cmd_common + ['-I', path]
