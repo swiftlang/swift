@@ -129,10 +129,22 @@ class WeakReference {
     if (oldSide)
       oldSide->decrementWeak();
   }
+  
   HeapObject *nativeLoadStrongFromBits(WeakReferenceBits bits) {
     auto side = bits.getNativeOrNull();
     return side ? side->tryRetain() : nullptr;
   }
+  
+  HeapObject *nativeTakeStrongFromBits(WeakReferenceBits bits) {
+    auto side = bits.getNativeOrNull();
+    if (side) {
+      side->decrementWeak();
+      return side->tryRetain();
+    } else {
+      return nullptr;
+    }
+  }
+  
   void nativeCopyInitFromBits(WeakReferenceBits srcBits) {
     auto side = srcBits.getNativeOrNull();
     if (side)
@@ -188,7 +200,7 @@ class WeakReference {
   HeapObject *nativeTakeStrong() {
     auto bits = nativeValue.load(std::memory_order_relaxed);
     nativeValue.store(nullptr, std::memory_order_relaxed);
-    return nativeLoadStrongFromBits(bits);
+    return nativeTakeStrongFromBits(bits);
   }
 
   void nativeCopyInit(WeakReference *src) {
@@ -293,9 +305,7 @@ class WeakReference {
     auto bits = nativeValue.load(std::memory_order_relaxed);
     if (bits.isNativeOrNull()) {
       nativeValue.store(nullptr, std::memory_order_relaxed);
-      auto result = nativeLoadStrongFromBits(bits);
-      destroyOldNativeBits(bits);
-      return result;
+      return nativeTakeStrongFromBits(bits);
     }
     else {
       id result = objc_loadWeakRetained(&nonnativeValue);
