@@ -342,7 +342,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     CCArgs.push_back(Entry);
   }
 
-  if (!ClangInvok->getLangOpts()->CompilingModule) {
+  if (!ClangInvok->getLangOpts()->isCompilingModule()) {
     CCArgs.push_back("-Xclang");
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
