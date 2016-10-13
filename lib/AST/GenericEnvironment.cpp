@@ -20,9 +20,13 @@
 using namespace swift;
 
 GenericEnvironment::GenericEnvironment(
+    ArrayRef<GenericTypeParamType *> genericParamTypes,
     TypeSubstitutionMap interfaceToArchetypeMap) {
 
   assert(!interfaceToArchetypeMap.empty());
+
+  for (auto *paramTy : genericParamTypes)
+    GenericParams.push_back(paramTy);
 
   // Build a mapping in both directions, making sure to canonicalize the
   // interface type where it is used as a key, so that substitution can
@@ -72,6 +76,15 @@ Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
   assert(found != InterfaceToArchetypeMap.end() &&
          "missing generic parameter");
   return found->second;
+}
+
+GenericTypeParamType *GenericEnvironment::getSugaredType(
+    GenericTypeParamType *type) const {
+  for (auto *sugaredType : GenericParams)
+    if (sugaredType->isEqual(type))
+      return sugaredType;
+
+  llvm_unreachable("missing generic parameter");
 }
 
 ArrayRef<Substitution>

@@ -254,21 +254,11 @@ public:
                            GenericEnvironment *genericEnv,
                            bool treatRequirementsAsExplicit = false);
 
-  /// \brief Get a generic signature based on the provided complete list
-  /// of generic parameter types.
-  ///
-  /// \returns a generic signature built from the provided list of
-  ///          generic parameter types.
-  GenericSignature *
-  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+  /// \brief Build the generic signature.
+  GenericSignature *getGenericSignature();
 
-  /// \brief Get a generic context based on the complete list of generic
-  /// parameter types.
-  ///
-  /// \returns a generic context built from the provided list of
-  ///          generic parameter types.
-  GenericEnvironment *getGenericEnvironment(
-      ArrayRef<GenericTypeParamType *> genericParamsTypes);
+  /// \brief Build the generic environment.
+  GenericEnvironment *getGenericEnvironment();
 
   /// Infer requirements from the given type, recursively.
   ///

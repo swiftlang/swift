@@ -10,16 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI)#35 (Concrete Same Type Requirements): This protocol exists to identify
-// `AnyHashable` in conditional extensions.  Replace this protocol
-// with conditional extensions on `Set` and `Dictionary` "where Key ==
-// AnyHashable".
-public protocol _AnyHashableProtocol {
-  var base: Any { get }
-}
-
-extension AnyHashable : _AnyHashableProtocol {}
-
 //===----------------------------------------------------------------------===//
 // Convenience APIs for Set<AnyHashable>
 //===----------------------------------------------------------------------===//
@@ -49,8 +39,7 @@ extension Set {
   }
 }
 
-// FIXME(ABI)#37 (Concrete Same Type Requirements): replace with `where Element == AnyHashable`.
-extension Set where Element : _AnyHashableProtocol {
+extension Set where Element == AnyHashable {
   public mutating func insert<ConcreteElement : Hashable>(
     _ newMember: ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
@@ -65,7 +54,7 @@ extension Set where Element : _AnyHashableProtocol {
   public mutating func update<ConcreteElement : Hashable>(
     with newMember: ConcreteElement
   ) -> ConcreteElement? {
-    return _concreteElement_update(with: AnyHashable(newMember) as! Element)
+    return _concreteElement_update(with: AnyHashable(newMember))
       .map { $0.base as! ConcreteElement }
   }
 
@@ -73,7 +62,7 @@ extension Set where Element : _AnyHashableProtocol {
   public mutating func remove<ConcreteElement : Hashable>(
     _ member: ConcreteElement
   ) -> ConcreteElement? {
-    return _concreteElement_remove(AnyHashable(member) as! Element)
+    return _concreteElement_remove(AnyHashable(member))
       .map { $0.base as! ConcreteElement }
   }
 }
@@ -109,16 +98,15 @@ extension Dictionary {
   }
 }
 
-// FIXME(ABI)#39 (Concrete Same Type Requirements): replace with `where Element == AnyHashable`.
-extension Dictionary where Key : _AnyHashableProtocol {
+extension Dictionary where Key == AnyHashable {
   public subscript(_ key: _Hashable) -> Value? {
     // FIXME(ABI)#40 (Generic subscripts): replace this API with a
     // generic subscript.
     get {
-      return self[_concreteKey: key._toAnyHashable() as! Key]
+      return self[_concreteKey: key._toAnyHashable()]
     }
     set {
-      self[_concreteKey: key._toAnyHashable() as! Key] = newValue
+      self[_concreteKey: key._toAnyHashable()] = newValue
     }
   }
 
@@ -126,14 +114,14 @@ extension Dictionary where Key : _AnyHashableProtocol {
   public mutating func updateValue<ConcreteKey : Hashable>(
     _ value: Value, forKey key: ConcreteKey
   ) -> Value? {
-    return _concreteKey_updateValue(value, forKey: AnyHashable(key) as! Key)
+    return _concreteKey_updateValue(value, forKey: AnyHashable(key))
   }
 
   @discardableResult
   public mutating func removeValue<ConcreteKey : Hashable>(
     forKey key: ConcreteKey
   ) -> Value? {
-    return _concreteKey_removeValue(forKey: AnyHashable(key) as! Key)
+    return _concreteKey_removeValue(forKey: AnyHashable(key))
   }
 }
 

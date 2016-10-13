@@ -1445,7 +1445,7 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityContext &info,
                                       info.getOSVersion().getLowerEndpoint(),
                                       /*deprecated=*/noVersion,
                                       /*obsoleted=*/noVersion,
-                                      UnconditionalAvailabilityKind::None,
+                                      PlatformAgnosticAvailabilityKind::None,
                                       /*implicit=*/false);
 
   decl->getAttrs().add(AvAttr);
@@ -1838,9 +1838,10 @@ namespace {
                             os);
       }
 
-      auto attr = AvailableAttr::createUnconditional(
+      auto attr = AvailableAttr::createPlatformAgnostic(
                     ctx, StringRef(), ctx.AllocateCopy(renamed.str()),
-                    UnconditionalAvailabilityKind::UnavailableInCurrentSwift);
+                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
+                    clang::VersionTuple(3));
       decl->getAttrs().add(attr);
       decl->setImplicit();
     }
@@ -2026,10 +2027,10 @@ namespace {
       // Make Objective-C's 'id' unavailable.
       ASTContext &ctx = DC->getASTContext();
       if (ctx.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
-        auto attr = AvailableAttr::createUnconditional(
+        auto attr = AvailableAttr::createPlatformAgnostic(
                       ctx,
                       "'id' is not available in Swift; use 'Any'", "",
-                      UnconditionalAvailabilityKind::UnavailableInSwift);
+                      PlatformAgnosticAvailabilityKind::UnavailableInSwift);
         Result->getAttrs().add(attr);
       }
 
@@ -3595,7 +3596,7 @@ namespace {
             typeResolver->resolveDeclSignature(singleResult);
 
           // Skip Swift 2 variants.
-          if (singleResult->getAttrs().isUnavailableInCurrentSwift())
+          if (singleResult->getAttrs().isUnavailableInSwiftVersion())
             continue;
 
           if (found)
@@ -3651,7 +3652,7 @@ namespace {
         message = "cannot find Swift declaration for this protocol";
       else
         llvm_unreachable("unknown bridged decl kind");
-      auto attr = AvailableAttr::createUnconditional(Impl.SwiftContext,
+      auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
                                                         message);
       VD->getAttrs().add(attr);
     }
@@ -3810,7 +3811,7 @@ namespace {
           // Fake it by making an unavailable opaque @objc root class.
           auto result = createRootClass();
           result->setImplicit();
-          auto attr = AvailableAttr::createUnconditional(Impl.SwiftContext,
+          auto attr = AvailableAttr::createPlatformAgnostic(Impl.SwiftContext,
               "This Objective-C class has only been forward-declared; "
               "import its owning module to use it");
           result->getAttrs().add(attr);
@@ -4580,7 +4581,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
       !CD->getAttrs().isUnavailable(Impl.SwiftContext)) {
     /// Create an AvailableAttr that indicates specific availability
     /// for all platforms.
-    auto attr = AvailableAttr::createUnconditional(
+    auto attr = AvailableAttr::createPlatformAgnostic(
         Impl.SwiftContext, "use [] to construct an empty option set");
     CD->getAttrs().add(attr);
   }
@@ -5016,7 +5017,7 @@ SwiftDeclConverter::importFactoryMethodAsConstructor(
       os << arg << ":";
     }
     os << ")'";
-    member->getAttrs().add(AvailableAttr::createUnconditional(
+    member->getAttrs().add(AvailableAttr::createPlatformAgnostic(
         Impl.SwiftContext, Impl.SwiftContext.AllocateCopy(os.str())));
   }
 
@@ -5316,7 +5317,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       errorStr += objcMethod->getSelector().getAsString();
       errorStr += ']';
 
-      auto attr = AvailableAttr::createUnconditional(
+      auto attr = AvailableAttr::createPlatformAgnostic(
           Impl.SwiftContext, Impl.SwiftContext.AllocateCopy(errorStr.str()));
       ctor->getAttrs().add(attr);
       continue;
@@ -6000,7 +6001,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
     for (auto member : proto->getMembers()) {
       // Skip Swift 2 stubs; there's no reason to mirror them.
-      if (member->getAttrs().isUnavailableInCurrentSwift())
+      if (member->getAttrs().isUnavailableInSwiftVersion())
         continue;
 
       if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -6097,7 +6098,7 @@ void SwiftDeclConverter::importInheritedConstructors(
         continue;
 
       // Don't inherit Swift 2 stubs.
-      if (ctor->getAttrs().isUnavailableInCurrentSwift())
+      if (ctor->getAttrs().isUnavailableInSwiftVersion())
         continue;
 
       // Don't inherit (non-convenience) factory initializers.
@@ -6307,7 +6308,7 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
       auto Message = unavailable->getMessage();
-      auto attr = AvailableAttr::createUnconditional(C, Message);
+      auto attr = AvailableAttr::createPlatformAgnostic(C, Message);
       MappedDecl->getAttrs().add(attr);
       AnyUnavailable = true;
       continue;
@@ -6320,8 +6321,8 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto unavailable_annot = dyn_cast<clang::AnnotateAttr>(*AI))
       if (unavailable_annot->getAnnotation() == "swift1_unavailable") {
-        auto attr = AvailableAttr::createUnconditional(
-            C, "", "", UnconditionalAvailabilityKind::UnavailableInSwift);
+        auto attr = AvailableAttr::createPlatformAgnostic(
+            C, "", "", PlatformAgnosticAvailabilityKind::UnavailableInSwift);
         MappedDecl->getAttrs().add(attr);
         AnyUnavailable = true;
         continue;
@@ -6334,8 +6335,8 @@ void ClangImporter::Implementation::importAttributes(
     //
     if (auto deprecated = dyn_cast<clang::DeprecatedAttr>(*AI)) {
       auto Message = deprecated->getMessage();
-      auto attr = AvailableAttr::createUnconditional(C, Message, "",
-                    UnconditionalAvailabilityKind::Deprecated);
+      auto attr = AvailableAttr::createPlatformAgnostic(C, Message, "",
+                    PlatformAgnosticAvailabilityKind::Deprecated);
       MappedDecl->getAttrs().add(attr);
       continue;
     }
@@ -6352,9 +6353,9 @@ void ClangImporter::Implementation::importAttributes(
         if (!replacement.empty())
           swiftReplacement = getSwiftNameFromClangName(replacement);
 
-        auto attr = AvailableAttr::createUnconditional(
+        auto attr = AvailableAttr::createPlatformAgnostic(
             C, avail->getMessage(), swiftReplacement,
-            UnconditionalAvailabilityKind::UnavailableInSwift);
+            PlatformAgnosticAvailabilityKind::UnavailableInSwift);
         MappedDecl->getAttrs().add(attr);
         AnyUnavailable = true;
         continue;
@@ -6383,10 +6384,10 @@ void ClangImporter::Implementation::importAttributes(
       if (!platformK)
         continue;
 
-      // Is this declaration marked unconditionally unavailable?
-      auto Unconditional = UnconditionalAvailabilityKind::None;
+      // Is this declaration marked platform-agnostically unavailable?
+      auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
       if (avail->getUnavailable()) {
-        Unconditional = UnconditionalAvailabilityKind::Unavailable;
+        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
         AnyUnavailable = true;
       }
 
@@ -6398,7 +6399,7 @@ void ClangImporter::Implementation::importAttributes(
             platformAvailability.deprecatedAsUnavailableFilter(
                 deprecated.getMajor(), deprecated.getMinor())) {
           AnyUnavailable = true;
-          Unconditional = UnconditionalAvailabilityKind::Unavailable;
+          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty())
             message = platformAvailability.deprecatedAsUnavailableMessage;
         }
@@ -6416,7 +6417,7 @@ void ClangImporter::Implementation::importAttributes(
                                           platformK.getValue(),
                                           message, swiftReplacement,
                                           introduced, deprecated, obsoleted,
-                                          Unconditional, /*implicit=*/false);
+                                          PlatformAgnostic, /*implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
@@ -6429,7 +6430,7 @@ void ClangImporter::Implementation::importAttributes(
   // Ban NSInvocation.
   if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {
     if (ID->getName() == "NSInvocation") {
-      auto attr = AvailableAttr::createUnconditional(C, "");
+      auto attr = AvailableAttr::createPlatformAgnostic(C, "");
       MappedDecl->getAttrs().add(attr);
       return;
     }
@@ -6444,7 +6445,7 @@ void ClangImporter::Implementation::importAttributes(
           FD->getName().endswith("Autorelease")))
       if (auto t = FD->getParamDecl(0)->getType()->getAs<clang::TypedefType>())
         if (isCFTypeDecl(t->getDecl())) {
-          auto attr = AvailableAttr::createUnconditional(C,
+          auto attr = AvailableAttr::createPlatformAgnostic(C,
             "Core Foundation objects are automatically memory managed");
           MappedDecl->getAttrs().add(attr);
           return;
@@ -6860,8 +6861,8 @@ buildGenericSignature(GenericParamList *genericParams,
         param->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
-  auto *sig = builder.getGenericSignature(genericParamTypes);
-  auto *env = builder.getGenericEnvironment(genericParamTypes);
+  auto *sig = builder.getGenericSignature();
+  auto *env = builder.getGenericEnvironment();
 
   return std::make_pair(sig, env);
 }
@@ -7147,7 +7148,7 @@ void ClangImporter::Implementation::
 markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
 
   unavailabilityMsgRef = SwiftContext.AllocateCopy(unavailabilityMsgRef);
-  auto ua = AvailableAttr::createUnconditional(SwiftContext,
+  auto ua = AvailableAttr::createPlatformAgnostic(SwiftContext,
                                                   unavailabilityMsgRef);
   decl->getAttrs().add(ua);
 }

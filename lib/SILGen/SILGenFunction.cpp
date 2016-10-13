@@ -34,12 +34,9 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-  : SGM(SGM), F(F),
-    B(*this, createBasicBlock()),
-    OpenedArchetypesTracker(F),
-    CurrentSILLoc(F.getLocation()),
-    Cleanups(*this)
-{
+    : SGM(SGM), F(F), StartOfPostmatter(F.end()), B(*this, createBasicBlock()),
+      OpenedArchetypesTracker(F), CurrentSILLoc(F.getLocation()),
+      Cleanups(*this) {
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
@@ -875,8 +872,8 @@ SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
   : SILBuilder(insertBB, insertedInsts), SGM(gen.SGM) {}
 SILGenBuilder::SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
-                             SILInstruction *insertInst)
-    : SILBuilder(insertBB, insertInst->getIterator()), SGM(gen.SGM) {}
+                             SILBasicBlock::iterator insertInst)
+    : SILBuilder(insertBB, insertInst), SGM(gen.SGM) {}
 
 MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   auto theMetatype = metatype.castTo<MetatypeType>();

@@ -121,6 +121,10 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
         return CaptureKind::Constant;
 
+      if (var->getType()->is<InOutType>()) {
+        return CaptureKind::StorageAddress;
+      }
+
       // If we're capturing into a non-escaping closure, we can generally just
       // capture the address of the value as no-escape.
       return capture.isNoEscape() ?
