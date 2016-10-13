@@ -2719,7 +2719,7 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == ActionType::DumpCompletionCache) {
     if (options::InputFilenames.empty()) {
-      llvm::errs() << "-dump-completin-cache requires an input file\n";
+      llvm::errs() << "-dump-completion-cache requires an input file\n";
       return 1;
     }
 
