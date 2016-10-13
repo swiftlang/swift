@@ -287,8 +287,22 @@ public struct URLResourceValues {
     /// The quarantine properties as defined in LSQuarantine.h. To remove quarantine information from a file, pass `nil` as the value when setting this property.
     @available(OSX 10.10, *)
     public var quarantineProperties: [String : Any]? {
-        get { return _get(.quarantinePropertiesKey) }
-        set { _set(.quarantinePropertiesKey, newValue: newValue as NSObject?) }
+        get {
+            // If a caller has caused us to stash NSNull in the dictionary (via set), make sure to return nil instead of NSNull
+            if let isNull = _values[.quarantinePropertiesKey] as? NSNull {
+                return nil
+            } else {
+                return _values[.quarantinePropertiesKey] as? [String : Any]
+            }
+        }
+        set {
+            if let v = newValue {
+                _set(.quarantinePropertiesKey, newValue: newValue as NSObject?)
+            } else {
+                // Set to NSNull, a special case for deleting quarantine properties
+                _set(.quarantinePropertiesKey, newValue: NSNull())
+            }
+        }
     }
 #endif
     
