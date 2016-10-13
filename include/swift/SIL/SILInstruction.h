@@ -1667,11 +1667,17 @@ static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
   return llvm::hash_value(size_t(E));
 }
 
+enum class LoadOwnershipQualifier {
+  Unqualified, Take, Copy, Trivial
+};
+
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
   : public UnaryInstructionBase<ValueKind::LoadInst>
 {
   friend class SILBuilder;
+
+  LoadOwnershipQualifier OwnershipQualifier;
 
   /// Constructs a LoadInst.
   ///
@@ -1679,9 +1685,20 @@ class LoadInst
   ///
   /// \param LValue The SILValue representing the lvalue (address) to
   ///        use for the load.
-  LoadInst(SILDebugLocation DebugLoc, SILValue LValue)
+  LoadInst(SILDebugLocation DebugLoc, SILValue LValue,
+           LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified)
       : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+                             LValue->getType().getObjectType()),
+        OwnershipQualifier(Q) {}
+
+public:
+  LoadOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
+  }
+};
+
+enum class StoreOwnershipQualifier {
+  Unqualified, Init, Assign, Trivial
 };
 
 /// StoreInst - Represents a store from a memory location.
@@ -1690,8 +1707,10 @@ class StoreInst : public SILInstruction {
 
 private:
   FixedOperandList<2> Operands;
+  StoreOwnershipQualifier OwnershipQualifier;
 
-  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest);
+  StoreInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+            StoreOwnershipQualifier Qualifier);
 
 public:
   enum {
