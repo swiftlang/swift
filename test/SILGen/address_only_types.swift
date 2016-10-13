@@ -157,34 +157,24 @@ func address_only_materialize() -> Int {
 // CHECK-LABEL: sil hidden @_TF18address_only_types33address_only_assignment_from_temp
 func address_only_assignment_from_temp(_ dest: inout Unloadable) {
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable):
-  // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
-  // CHECK: [[PB:%.*]] = project_box [[DEST_LOCAL]]
-  // CHECK: copy_addr [[DEST]] to [initialization] [[PB]]
   dest = some_address_only_function_1()
   // CHECK: [[TEMP:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: copy_addr [take] [[TEMP]] to [[PB]] :
+  // CHECK: copy_addr [take] [[TEMP]] to %0 :
   // CHECK-NOT: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
-  // CHECK: copy_addr [[PB]] to [[DEST]]
-  // CHECK: release [[DEST_LOCAL]]
 }
 
 // CHECK-LABEL: sil hidden @_TF18address_only_types31address_only_assignment_from_lv
 func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   var v = v
   // CHECK: bb0([[DEST:%[0-9]+]] : $*Unloadable, [[VARG:%[0-9]+]] : $*Unloadable):
-  // CHECK: [[DEST_LOCAL:%.*]] = alloc_box $Unloadable
-  // CHECK: [[PB:%.*]] = project_box [[DEST_LOCAL]]
-  // CHECK: copy_addr [[DEST]] to [initialization] [[PB]]
   // CHECK: [[VBOX:%.*]] = alloc_box $Unloadable
   // CHECK: [[PBOX:%[0-9]+]] = project_box [[VBOX]]
   // CHECK: copy_addr [[VARG]] to [initialization] [[PBOX]] : $*Unloadable
   dest = v
   // FIXME: emit into?
-  // CHECK: copy_addr [[PBOX]] to [[PB]] :
+  // CHECK: copy_addr [[PBOX]] to %0 :
   // CHECK: release [[VBOX]]
-  // CHECK: copy_addr [[PB]] to [[DEST]]
-  // CHECK: release [[DEST_LOCAL]]
 }
 
 var global_prop : Unloadable {

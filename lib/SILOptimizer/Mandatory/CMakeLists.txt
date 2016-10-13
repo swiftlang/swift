@@ -6,5 +6,4 @@ set(MANDATORY_SOURCES
   Mandatory/DiagnoseUnreachable.cpp
   Mandatory/PredictableMemOpt.cpp
   Mandatory/ConstantPropagation.cpp
-  Mandatory/InOutDeshadowing.cpp
   PARENT_SCOPE)
