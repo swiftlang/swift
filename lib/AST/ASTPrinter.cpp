@@ -3418,14 +3418,6 @@ public:
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
-    // If we have an alternate name for this type, use it.
-    if (Options.AlternativeTypeNames) {
-      auto found = Options.AlternativeTypeNames->find(T.getCanonicalTypeOrNull());
-      if (found != Options.AlternativeTypeNames->end()) {
-        Printer << found->second.str();
-        return;
-      }
-    }
     super::visit(T);
   }
 
@@ -3992,6 +3984,14 @@ public:
         Printer << ".";
       }
 
+      if (Options.AlternativeTypeNames) {
+        auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
+        if (found != Options.AlternativeTypeNames->end()) {
+          Printer << found->second.str();
+          return;
+        }
+      }
+
       if (T->getName().empty())
         Printer << "<anonymous>";
       else {
@@ -4012,9 +4012,21 @@ public:
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
-    // Substitute a context archetype if we have context generic params.
-    if (Options.GenericEnv)
-      return visit(Options.GenericEnv->mapTypeIntoContext(T));
+    if (T->getDecl() == nullptr) {
+      // If we have an alternate name for this type, use it.
+      if (Options.AlternativeTypeNames) {
+        auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
+        if (found != Options.AlternativeTypeNames->end()) {
+          Printer << found->second.str();
+          return;
+        }
+      }
+
+      // When printing SIL types, use a generic environment to map them from
+      // canonical types to sugared types.
+      if (Options.GenericEnv)
+        T = Options.GenericEnv->getSugaredType(T);
+    }
 
     auto Name = T->getName();
     if (Name.empty())

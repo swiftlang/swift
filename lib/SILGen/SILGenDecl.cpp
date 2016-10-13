@@ -1780,7 +1780,7 @@ substSelfTypeIntoProtocolRequirementType(SILModule &M,
   if (!allParams.empty()) {
     builder.finalize(SourceLoc());
 
-    auto *sig = builder.getGenericSignature(allParams);
+    auto *sig = builder.getGenericSignature();
 
     return cast<GenericFunctionType>(
       GenericFunctionType::get(sig, input, result, reqtTy->getExtInfo())
@@ -1800,6 +1800,7 @@ getSubstitutedGenericEnvironment(SILModule &M,
     return reqtEnv;
   }
 
+  SmallVector<GenericTypeParamType *, 4> genericParamTypes;
   TypeSubstitutionMap witnessContextParams;
 
   auto selfTy = conformance->getProtocol()->getSelfInterfaceType()
@@ -1809,8 +1810,14 @@ getSubstitutedGenericEnvironment(SILModule &M,
   // the conformance (which might not be the same as the generic
   // context of the witness, if the witness is defined in a
   // superclass, concrete extension or protocol extension).
-  if (auto *outerEnv = conformance->getGenericEnvironment())
+  if (auto *outerEnv = conformance->getGenericEnvironment()) {
     witnessContextParams = outerEnv->getInterfaceToArchetypeMap();
+    for (auto *paramTy : outerEnv->getGenericParams())
+      genericParamTypes.push_back(paramTy);
+  }
+
+  for (auto *paramTy : reqtEnv->getGenericParams().slice(1))
+    genericParamTypes.push_back(paramTy);
 
   // Inner generic parameters come from the requirement and
   // also map to the archetypes of the requirement.
@@ -1824,7 +1831,8 @@ getSubstitutedGenericEnvironment(SILModule &M,
   }
 
   if (!witnessContextParams.empty())
-    return GenericEnvironment::get(M.getASTContext(), witnessContextParams);
+    return GenericEnvironment::get(M.getASTContext(), genericParamTypes,
+                                   witnessContextParams);
 
   return nullptr;
 }

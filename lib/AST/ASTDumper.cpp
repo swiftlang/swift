@@ -3090,4 +3090,7 @@ void GenericEnvironment::dump() const {
     pair.first->dump();
     pair.second->dump();
   }
+  llvm::errs() << "Generic parameters:\n";
+  for (auto paramTy : getGenericParams())
+    paramTy->dump();
 }

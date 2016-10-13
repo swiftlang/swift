@@ -361,27 +361,6 @@ void TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
   }
 }
 
-/// Collect all of the generic parameter types at every level in the generic
-/// parameter list.
-static void collectGenericParamTypes(
-              GenericParamList *genericParams,
-              GenericSignature *parentSig,
-              SmallVectorImpl<GenericTypeParamType *> &allParams) {
-  // If the parent context has a generic signature, add its generic parameters.
-  if (parentSig) {
-    allParams.append(parentSig->getGenericParams().begin(),
-                     parentSig->getGenericParams().end());
-  }
-
-  if (genericParams) {
-    // Add our parameters.
-    for (auto param : *genericParams) {
-      allParams.push_back(param->getDeclaredType()
-                            ->castTo<GenericTypeParamType>());
-    }
-  }
-}
-
 /// Check the signature of a generic function.
 static bool checkGenericFuncSignature(TypeChecker &tc,
                                       ArchetypeBuilder *builder,
@@ -508,14 +487,7 @@ void TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // The generic function signature is complete and well-formed. Determine
   // the type of the generic function.
-
-  // Collect the complete set of generic parameter types.
-  SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(func->getGenericParams(),
-                           func->getDeclContext()->getGenericSignatureOfContext(),
-                           allGenericParams);
-
-  auto sig = builder.getGenericSignature(allGenericParams);
+  auto sig = builder.getGenericSignature();
 
   // Debugging of the archetype builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -712,13 +684,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   checkGenericParamList(nullptr, genericParams, nullptr,
                         nullptr, &completeResolver);
 
-  // The generic signature is complete and well-formed. Gather the
-  // generic parameter types at all levels.
-  SmallVector<GenericTypeParamType *, 4> allGenericParams;
-  collectGenericParamTypes(genericParams, parentSig, allGenericParams);
-
   // Record the generic type parameter types and the requirements.
-  auto sig = builder.getGenericSignature(allGenericParams);
+  auto sig = builder.getGenericSignature();
 
   // Debugging of the archetype builder and generic signature generation.
   if (Context.LangOpts.DebugGenericSignatures) {
@@ -885,7 +852,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   auto *parentEnv = dc->getGenericEnvironmentOfContext();
   checkGenericParamList(&builder, gp, parentSig, parentEnv, nullptr);
 
-  auto *env = builder.getGenericEnvironment(sig->getGenericParams());
+  auto *env = builder.getGenericEnvironment();
   typeDecl->setGenericEnvironment(env);
 
   finalizeGenericParamList(gp, sig, env, typeDecl);

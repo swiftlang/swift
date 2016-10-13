@@ -6861,8 +6861,8 @@ buildGenericSignature(GenericParamList *genericParams,
         param->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
-  auto *sig = builder.getGenericSignature(genericParamTypes);
-  auto *env = builder.getGenericEnvironment(genericParamTypes);
+  auto *sig = builder.getGenericSignature();
+  auto *env = builder.getGenericEnvironment();
 
   return std::make_pair(sig, env);
 }
