@@ -36,6 +36,7 @@
           "usr": "s:FV4cake2S14foo2FT_T_",
           "location": "",
           "moduleName": "cake",
+          "mutating": true,
           "children": [
             {
               "kind": "TypeNominal",
