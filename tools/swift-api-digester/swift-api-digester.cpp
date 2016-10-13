@@ -98,6 +98,9 @@ ResourceDir("resource-dir",
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
+static llvm::cl::list<std::string>
+ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
+
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
                         llvm::cl::desc("Abort if a module failed to load"));
@@ -258,6 +261,7 @@ struct SDKNodeInitInfo {
   StringRef Location;
   StringRef ModuleName;
   bool IsThrowing = false;
+  bool IsMutating = false;
   Optional<uint8_t> SelfIndex;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
@@ -680,15 +684,18 @@ public:
 
 class SDKNodeAbstractFunc : public SDKNodeDecl {
   const bool IsThrowing;
+  const bool IsMutating;
   const Optional<uint8_t> SelfIndex;
 
 protected:
   SDKNodeAbstractFunc(SDKNodeInitInfo Info, SDKNodeKind Kind) :
                                                     SDKNodeDecl(Info, Kind),
                                                     IsThrowing(Info.IsThrowing),
+                                                    IsMutating(Info.IsMutating),
                                                     SelfIndex(Info.SelfIndex){}
 public:
   bool isThrowing() const { return IsThrowing; }
+  bool isMutating() const { return IsMutating; }
   uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
@@ -797,6 +804,8 @@ NodeUniquePtr SDKNode::constructSDKNode(llvm::yaml::MappingNode *Node) {
       Info.ModuleName = GetScalarString(Pair.getValue());
     } else if (Key == Key_throwing) {
       Info.IsThrowing = true;
+    } else if (Key == Key_mutating) {
+      Info.IsMutating = true;
     } else if (Key == Key_typeAttributes) {
       auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
       for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
@@ -943,6 +952,13 @@ static bool isFuncThrowing(ValueDecl *VD) {
   return false;
 }
 
+static bool isFuncMutating(ValueDecl *VD) {
+  if (auto AF = dyn_cast<FuncDecl>(VD)) {
+    return AF->isMutating();
+  }
+  return false;
+}
+
 static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AF->isImportAsInstanceMember())
@@ -962,7 +978,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(ValueDecl *VD) :
     PrintedName(getPrintedName(VD)), DKind(VD->getKind()),
     USR(calculateUsr(VD)), Location(calculateLocation(VD)),
     ModuleName(VD->getModuleContext()->getName().str()),
-    IsThrowing(isFuncThrowing(VD)), SelfIndex(getSelfIndex(VD)) {
+    IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
+    SelfIndex(getSelfIndex(VD)) {
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
 }
@@ -1293,6 +1310,8 @@ namespace swift {
           if (auto F = dyn_cast<SDKNodeAbstractFunc>(value.get())) {
             if (bool isThrowing = F->isThrowing())
               out.mapRequired(Key_throwing, isThrowing);
+            if (bool isMutating = F->isMutating())
+              out.mapRequired(Key_mutating, isMutating);
             if (F->hasSelfIndex()) {
               auto Index = F->getSelfIndex();
               out.mapRequired(Key_selfIndex, Index);
@@ -3303,6 +3322,7 @@ static int prepareForDump(const char *Main,
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
+  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
 
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
