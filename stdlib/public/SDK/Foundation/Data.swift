@@ -22,7 +22,7 @@ internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ l
 internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) -> Void
 
 @_silgen_name("_NSWriteDataToFile_Swift")
-internal func _NSWriteDataToFile_Swift(url: URL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
+internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
 
 internal final class _SwiftNSData : _SwiftNativeNSData, _SwiftNativeFoundationType {
     internal typealias ImmutableType = NSData
@@ -385,7 +385,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         try _mapUnmanaged {
             if _shouldUseNonAtomicWriteReimplementation(options: options) {
                 var error : NSError?
-                if !_NSWriteDataToFile_Swift(url: url, data: $0, options: options.rawValue, error: &error) {
+                if !_NSWriteDataToFile_Swift(url: url as NSURL, data: $0, options: options.rawValue, error: &error) {
                     throw error!
                 }
             } else {
