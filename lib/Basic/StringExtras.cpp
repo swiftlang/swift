@@ -28,7 +28,8 @@ using namespace swift;
 using namespace camel_case;
 
 bool swift::canBeArgumentLabel(StringRef identifier) {
-  if (identifier == "var" || identifier == "let" || identifier == "inout")
+  if (identifier == "var" || identifier == "let" || identifier == "inout" ||
+      identifier == "$")
     return false;
 
   return true;
