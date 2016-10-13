@@ -184,8 +184,6 @@ _swift_release_dealloc(swift::HeapObject *object)
 
 namespace swift {
 
-// FIXME: There are lots of asserts here which hurts Assert performance a lot.
-
 // FIXME: many `relaxed` in this file should be `consume`,
 // but (1) the compiler doesn't support `consume` directly,
 // and (2) the compiler promotes `consume` to `acquire` instead which
@@ -512,6 +510,7 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
   }
 
   // Side table ref count never has a side table of its own.
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool hasSideTable() {
     return false;
   }
@@ -805,7 +804,7 @@ class RefCounts {
         // Decrement underflowed. Begin deinit.
         // LIVE -> DEINITING
         deinitNow = true;
-        assert(!oldbits.getIsDeiniting());
+        assert(!oldbits.getIsDeiniting());  // FIXME: make this an error?
         newbits = oldbits;  // Undo failed decrement of newbits.
         newbits.setStrongExtraRefCount(0);
         newbits.setIsDeiniting(true);
