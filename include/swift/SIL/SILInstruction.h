@@ -1729,6 +1729,10 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::StoreInst;
   }
+
+  StoreOwnershipQualifier getOwnershipQualifier() const {
+    return OwnershipQualifier;
+  }
 };
 
 /// AssignInst - Represents an abstract assignment to a memory location, which

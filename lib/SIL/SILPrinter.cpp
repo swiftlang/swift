@@ -1006,14 +1006,55 @@ public:
     }
     llvm_unreachable("bad string literal encoding");
   }
+
   void visitStringLiteralInst(StringLiteralInst *SLI) {
     *this << getStringEncodingName(SLI->getEncoding())
           << QuotedString(SLI->getValue());
   }
-  void visitLoadInst(LoadInst *LI) { *this << getIDAndType(LI->getOperand()); }
-  void visitStoreInst(StoreInst *SI) {
-    *this << getID(SI->getSrc()) << " to " << getIDAndType(SI->getDest());
+
+  void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
+    switch (Qualifier) {
+    case LoadOwnershipQualifier::Unqualified:
+      return;
+    case LoadOwnershipQualifier::Take:
+      *this << "[take] ";
+      return;
+    case LoadOwnershipQualifier::Copy:
+      *this << "[copy] ";
+      return;
+    case LoadOwnershipQualifier::Trivial:
+      *this << "[trivial] ";
+      return;
+    }
   }
+
+  void visitLoadInst(LoadInst *LI) {
+    printLoadOwnershipQualifier(LI->getOwnershipQualifier());
+    *this << getIDAndType(LI->getOperand());
+  }
+
+  void printStoreOwnershipQualifier(StoreOwnershipQualifier Qualifier) {
+    switch (Qualifier) {
+    case StoreOwnershipQualifier::Unqualified:
+      return;
+    case StoreOwnershipQualifier::Init:
+      *this << "[init] ";
+      return;
+    case StoreOwnershipQualifier::Assign:
+      *this << "[assign] ";
+      return;
+    case StoreOwnershipQualifier::Trivial:
+      *this << "[trivial] ";
+      return;
+    }
+  }
+
+  void visitStoreInst(StoreInst *SI) {
+    *this << getID(SI->getSrc()) << " to ";
+    printStoreOwnershipQualifier(SI->getOwnershipQualifier());
+    *this << getIDAndType(SI->getDest());
+  }
+
   void visitAssignInst(AssignInst *AI) {
     *this << getID(AI->getSrc()) << " to " << getIDAndType(AI->getDest());
   }
