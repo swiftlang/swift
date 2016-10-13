@@ -270,7 +270,7 @@ extension TimeZone : _ObjectiveCBridgeable {
     }
     
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSTimeZone?) -> TimeZone {
-        var result: TimeZone? = nil
+        var result: TimeZone?
         _forceBridgeFromObjectiveC(source!, result: &result)
         return result!
     }

@@ -317,7 +317,7 @@ void swift::convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, nullptr, nullptr, VD->getLoc());
+  VD->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -820,7 +820,10 @@ void TypeChecker::synthesizeAccessorsForStorage(AbstractStorageDecl *storage,
   // If the decl is stored, convert it to StoredWithTrivialAccessors
   // by synthesizing the full set of accessors.
   if (!storage->hasAccessorFunctions()) {
-    addTrivialAccessorsToStorage(storage, *this);
+    if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+      maybeAddAccessorsToVariable(cast<VarDecl>(storage), *this);
+    else
+      addTrivialAccessorsToStorage(storage, *this);
     return;
   }
 
@@ -983,7 +986,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   if (VD->hasAccessorFunctions()) return;
 
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, Set, nullptr, VD->getLoc());
+  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
 
   TC.validateDecl(Get);
   TC.validateDecl(Set);
@@ -1736,7 +1739,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         setter->setAccessibility(var->getFormalAccess());
       }
       
-      var->makeComputed(var->getLoc(), getter, setter, nullptr, var->getLoc());
+      var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
       
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
@@ -1841,8 +1844,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     ParamDecl *newValueParam = nullptr;
     auto *setter = createSetterPrototype(var, newValueParam, TC);
-    var->makeComputed(var->getLoc(), getter, setter, nullptr,
-                      var->getLoc());
+    var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
     var->setIsBeingTypeChecked(false);
 
     TC.validateDecl(getter);

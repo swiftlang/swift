@@ -34,7 +34,7 @@ public extension DispatchQueue {
 		public static let initiallyInactive = Attributes(rawValue: 1<<2)
 
 		fileprivate func _attr() -> __OS_dispatch_queue_attr? {
-			var attr: __OS_dispatch_queue_attr? = nil
+			var attr: __OS_dispatch_queue_attr?
 
 			if self.contains(.concurrent) {
 				attr = _swift_dispatch_queue_concurrent()

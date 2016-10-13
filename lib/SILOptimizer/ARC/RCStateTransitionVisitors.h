@@ -116,17 +116,16 @@ class BottomUpDataflowRCStateVisitor
 
 public:
   RCIdentityFunctionInfo *RCFI;
+  EpilogueARCFunctionInfo *EAFI;
   ARCState &DataflowState;
   bool FreezeOwnedArgEpilogueReleases;
-  ConsumedArgToEpilogueReleaseMatcher &EpilogueReleaseMatcher;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
   ImmutablePointerSetFactory<SILInstruction> &SetFactory;
 
 public:
   BottomUpDataflowRCStateVisitor(
-      RCIdentityFunctionInfo *RCFI, ARCState &DataflowState,
-      bool FreezeOwnedArgEpilogueReleases,
-      ConsumedArgToEpilogueReleaseMatcher &ERM,
+      RCIdentityFunctionInfo *RCFI, EpilogueARCFunctionInfo *EAFI,
+      ARCState &DataflowState, bool FreezeOwnedArgEpilogueReleases,
       IncToDecStateMapTy &IncToDecStateMap,
       ImmutablePointerSetFactory<SILInstruction> &SetFactory);
   DataflowResult visitAutoreleasePoolCall(ValueBase *V);

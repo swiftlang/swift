@@ -341,6 +341,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
     case ValueKind::IndexAddrInst:
+    case ValueKind::TailAddrInst:
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
@@ -358,6 +359,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefTailAddrInst:
     case ValueKind::RefToUnmanagedInst:
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:

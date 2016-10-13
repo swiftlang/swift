@@ -161,7 +161,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   
   // Local function to perform name lookup for the current index.
   auto performLookup = [&](unsigned idx, Identifier componentName,
-                           SourceLoc componentNameLoc) -> LookupResult {
+                           SourceLoc componentNameLoc,
+                           Type &lookupType) -> LookupResult {
     if (state == Beginning)
       return lookupUnqualified(dc, componentName, componentNameLoc);
 
@@ -170,7 +171,6 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // Determine the type in which the lookup should occur. If we have
     // a bridged value type, this will be the Objective-C class to
     // which it is bridged.
-    Type lookupType;
     if (auto bridgedClass = Context.getBridgedToObjC(dc, currentType))
       lookupType = bridgedClass;
     else
@@ -210,15 +210,17 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     }
 
     // Look for this component.
-    LookupResult lookup = performLookup(idx, componentName, componentNameLoc);
+    Type lookupType;
+    LookupResult lookup = performLookup(idx, componentName, componentNameLoc,
+                                        lookupType);
 
     // If we didn't find anything, try to apply typo-correction.
     bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
-      performTypoCorrection(dc, DeclRefKind::Ordinary, currentType,
+      performTypoCorrection(dc, DeclRefKind::Ordinary, lookupType,
                             componentName, componentNameLoc,
-                            (currentType ? defaultMemberTypeLookupOptions
-                                         : defaultUnqualifiedLookupOptions),
+                            (lookupType ? defaultMemberTypeLookupOptions
+                                        : defaultUnqualifiedLookupOptions),
                             lookup);
 
       if (currentType)
@@ -263,7 +265,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       if (resultsAreFromTypoCorrection)
         break;
 
-      if (currentType)
+      if (lookupType)
         diagnose(componentNameLoc, diag::ambiguous_member_overload_set,
                  componentName);
       else
@@ -325,9 +327,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       }
 
       Type newType;
-      if (currentType && !currentType->isAnyObject()) {
-        newType = currentType->getTypeOfMember(dc->getParentModule(), type,
-                                               this);
+      if (lookupType && !lookupType->isAnyObject()) {
+        newType = lookupType->getTypeOfMember(dc->getParentModule(), type,
+                                              this);
       } else {
         newType = type->getDeclaredInterfaceType();
       }

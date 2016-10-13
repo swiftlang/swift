@@ -721,6 +721,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                      TyID, TyCategory, ValID,
                                      TyID2, TyCategory2, ValID2);
     break;
+  case SIL_TAIL_ADDR:
+    SILTailAddrLayout::readRecord(scratch, OpCode,
+                                  TyID, ValID,
+                                  TyID2, ValID2,
+                                  TyID3);
+    break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
     SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
@@ -764,6 +770,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
     llvm_unreachable("not an instruction");
+
+  case ValueKind::DebugValueInst:
+  case ValueKind::DebugValueAddrInst:
+    llvm_unreachable("not supported");
 
 #define ONETYPE_INST(ID)                      \
   case ValueKind::ID##Inst:                   \
@@ -923,28 +933,41 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
-  case ValueKind::AllocRefInst: {
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
-    assert(ListOfValues.size() >= 1 && "Not enough values");
-    unsigned Value = ListOfValues[0];
-    ResultVal = Builder.createAllocRef(
-                  Loc,
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-                  (bool)(Value & 1), (bool)((Value >> 1) & 1));
-    break;
-  }
-  case ValueKind::AllocRefDynamicInst: {
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
-           "Layout should be OneTypeOneOperand.");
-    bool isObjC = Attr & 0x01;
-    ResultVal = Builder.createAllocRefDynamic(
-                  Loc,
-                  getLocalValue(ValID,
-                                getSILType(MF->getType(TyID2),
-                                           (SILValueCategory)TyCategory2)),
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-                  isObjC);
+    unsigned NumVals = ListOfValues.size();
+    assert(NumVals >= 1 && "Not enough values");
+    unsigned Flags = ListOfValues[0];
+    bool isObjC = (bool)(Flags & 1);
+    bool canAllocOnStack = (bool)((Flags >> 1) & 1);
+    SILType ClassTy = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    SmallVector<SILValue, 4> Counts;
+    SmallVector<SILType, 4> TailTypes;
+    unsigned i = 1;
+    for (; i + 2 < NumVals; i += 3) {
+      SILType TailType = getSILType(MF->getType(ListOfValues[i]),
+                                    SILValueCategory::Object);
+      TailTypes.push_back(TailType);
+      SILType CountType = getSILType(MF->getType(ListOfValues[i+2]),
+                                     SILValueCategory::Object);
+      SILValue CountVal = getLocalValue(ListOfValues[i+1], CountType);
+      Counts.push_back(CountVal);
+    }
+    if ((ValueKind)OpCode == ValueKind::AllocRefDynamicInst) {
+      assert(i + 2 == NumVals);
+      assert(!canAllocOnStack);
+      SILType MetadataType = getSILType(MF->getType(ListOfValues[i+1]),
+                                        SILValueCategory::Object);
+      SILValue MetadataOp = getLocalValue(ListOfValues[i], MetadataType);
+      ResultVal = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
+                                                isObjC, TailTypes, Counts);
+    } else {
+      assert(i == NumVals);
+      ResultVal = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack,
+                                         TailTypes, Counts);
+    }
     break;
   }
   case ValueKind::ApplyInst: {
@@ -1016,7 +1039,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
-    SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object);
+    SILType closureTy = getSILType(Ty2, SILValueCategory::Object);
+
+    unsigned NumSub = NumSubs;
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
+    auto SubstFnTy = SILType::getPrimitiveObjectType(
+      FnTy.castTo<SILFunctionType>()
+        ->substGenericArgs(Builder.getModule(),
+                         Builder.getModule().getSwiftModule(), Substitutions));
     SILFunctionType *FTI = SubstFnTy.castTo<SILFunctionType>();
     auto ArgTys = FTI->getParameterSILTypes();
 
@@ -1028,22 +1064,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     unsigned unappliedArgs = ArgTys.size() - ListOfValues.size();
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(ListOfValues[I], ArgTys[I + unappliedArgs]));
-
-    // Compute the result type of the partial_apply, based on which arguments
-    // are getting applied.
-    SILType closureTy
-      = SILBuilder::getPartialApplyResultType(SubstFnTy,
-                                              Args.size(),
-                                              Fn->getModule(),
-                                              {});
-
-    unsigned NumSub = NumSubs;
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
@@ -1154,6 +1174,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
+  case ValueKind::TailAddrInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    auto ResultTy = MF->getType(TyID3);
+    ResultVal = Builder.createTailAddr(Loc,
+        getLocalValue(ValID, getSILType(Ty, SILValueCategory::Address)),
+        getLocalValue(ValID2, getSILType(Ty2, SILValueCategory::Object)),
+        getSILType(ResultTy, SILValueCategory::Address));
+    break;
+  }
   case ValueKind::IndexRawPointerInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
@@ -1262,8 +1292,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
-  UNARY_INSTRUCTION(DebugValue)
-  UNARY_INSTRUCTION(DebugValueAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -1654,6 +1682,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto ResultTy = Val->getType().getFieldType(Field, SILMod);
     ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
                                              ResultTy);
+    break;
+  }
+  case ValueKind::RefTailAddrInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    assert(Attr == 0);
+    assert((SILValueCategory)TyCategory == SILValueCategory::Address);
+    ResultVal = Builder.createRefTailAddr(
+      Loc,
+      getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                      (SILValueCategory)TyCategory2)),
+      getSILType(MF->getType(TyID), SILValueCategory::Address));
     break;
   }
   case ValueKind::ClassMethodInst:

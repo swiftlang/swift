@@ -192,6 +192,33 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(expected, union)
     }
 
+    func test_subtracting() {
+        let difference = CharacterSet(charactersIn: "abc").subtracting(CharacterSet(charactersIn: "b"))
+        let expected = CharacterSet(charactersIn: "ac")
+        expectEqual(expected, difference)
+    }
+
+    func test_subtractEmptySet() {
+        var mutableSet = CharacterSet(charactersIn: "abc")
+        let emptySet = CharacterSet()
+        mutableSet.subtract(emptySet)
+        let expected = CharacterSet(charactersIn: "abc")
+        expectEqual(expected, mutableSet)
+    }
+
+    func test_subtractNonEmptySet() {
+        var mutableSet = CharacterSet()
+        let nonEmptySet = CharacterSet(charactersIn: "abc")
+        mutableSet.subtract(nonEmptySet)
+        expectTrue(mutableSet.isEmpty)
+    }
+
+    func test_symmetricDifference() {
+        let symmetricDifference = CharacterSet(charactersIn: "ac").symmetricDifference(CharacterSet(charactersIn: "b"))
+        let expected = CharacterSet(charactersIn: "abc")
+        expectEqual(expected, symmetricDifference)
+    }
+
     func test_hasMember() {
         let contains = CharacterSet.letters.hasMember(inPlane: 1)
         expectTrue(contains)
@@ -219,6 +246,10 @@ CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacter
 CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 CharacterSetTests.test("test_superSet") { TestCharacterSet().test_superSet() }
 CharacterSetTests.test("test_union") { TestCharacterSet().test_union() }
+CharacterSetTests.test("test_subtracting") { TestCharacterSet().test_subtracting() }
+CharacterSetTests.test("test_subtractEmptySet") { TestCharacterSet().test_subtractEmptySet() }
+CharacterSetTests.test("test_subtractNonEmptySet") { TestCharacterSet().test_subtractNonEmptySet() }
+CharacterSetTests.test("test_symmetricDifference") { TestCharacterSet().test_symmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
 runAllTests()

@@ -285,6 +285,54 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
+Version::operator clang::VersionTuple() const
+{
+  switch (Components.size()) {
+ case 0:
+   return clang::VersionTuple();
+ case 1:
+   return clang::VersionTuple((unsigned)Components[0]);
+ case 2:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1]);
+ case 3:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1],
+                              (unsigned)Components[2]);
+ case 4:
+ case 5:
+   return clang::VersionTuple((unsigned)Components[0],
+                              (unsigned)Components[1],
+                              (unsigned)Components[2],
+                              (unsigned)Components[3]);
+ default:
+   llvm_unreachable("swift::version::Version with 6 or more components");
+  }
+}
+
+bool
+Version::isValidEffectiveLanguageVersion() const
+{
+  // Whitelist of backward-compatibility versions that we permit passing as
+  // -swift-version <vers>
+  char const *whitelist[] = {
+    // Swift 3 family
+    "3",
+    "3.0",
+
+    // Swift 4 family
+    "4",
+    "4.0",
+  };
+  for (auto const i : whitelist) {
+    auto v = parseVersionString(i, SourceLoc(), nullptr);
+    assert(v.hasValue());
+    if (v == *this)
+      return true;
+  }
+  return false;
+}
+
 bool operator>=(const class Version &lhs,
                 const class Version &rhs) {
 
@@ -304,11 +352,22 @@ bool operator>=(const class Version &lhs,
   return lhs.size() >= rhs.size();
 }
 
+bool operator==(const class Version &lhs,
+                const class Version &rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    if (lhs[i] != rhs[i])
+      return false;
+  }
+  return true;
+}
+
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
 
-std::string getSwiftFullVersion() {
+std::string getSwiftFullVersion(Version effectiveVersion) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 
@@ -320,6 +379,10 @@ std::string getSwiftFullVersion() {
 #ifndef SWIFT_COMPILER_VERSION
   OS << "-dev";
 #endif
+
+  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
+    OS << " effective-" << effectiveVersion;
+  }
 
 #if defined(SWIFT_COMPILER_VERSION)
   OS << " (swiftlang-" SWIFT_COMPILER_VERSION;

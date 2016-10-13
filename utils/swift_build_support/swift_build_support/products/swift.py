@@ -27,6 +27,12 @@ class Swift(product.Product):
         # Add any swift version related cmake flags.
         self.cmake_options.extend(self._version_flags)
 
+        # Add benchmark specific flags.
+        self.cmake_options.extend(self._benchmark_flags)
+
+        # Add any sil ownership flags.
+        self.cmake_options.extend(self._sil_ownership_flags)
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
@@ -77,3 +83,21 @@ updated without updating swift.py?")
                 "-DCLANG_COMPILER_VERSION={}".format(clang_compiler_version)
             )
         return r
+
+    @property
+    def _benchmark_flags(self):
+        if not self.args.benchmark:
+            return []
+
+        onone_iters = self.args.benchmark_num_onone_iterations
+        o_iters = self.args.benchmark_num_o_iterations
+        return [
+            "-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS={}".format(onone_iters),
+            "-DSWIFT_BENCHMARK_NUM_O_ITERATIONS={}".format(o_iters)
+        ]
+
+    @property
+    def _sil_ownership_flags(self):
+        if not self.args.enable_sil_ownership:
+            return []
+        return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]

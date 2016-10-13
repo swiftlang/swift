@@ -121,6 +121,12 @@ public:
 /// This generic type resolver replaces generic type parameter types with their
 /// corresponding archetypes, eliminating all dependent types in the process.
 class GenericTypeToArchetypeResolver : public GenericTypeResolver {
+  GenericEnvironment *GenericEnv;
+
+public:
+  explicit GenericTypeToArchetypeResolver(GenericEnvironment *env)
+      : GenericEnv(env) { }
+
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,
@@ -147,11 +153,7 @@ class GenericTypeToArchetypeResolver : public GenericTypeResolver {
 ///
 /// FIXME: This is not a long-term solution.
 class PartialGenericTypeToArchetypeResolver : public GenericTypeResolver {
-  TypeChecker &TC;
-
 public:
-  PartialGenericTypeToArchetypeResolver(TypeChecker &tc) : TC(tc) { }
-
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
   virtual Type resolveDependentMemberType(Type baseTy,

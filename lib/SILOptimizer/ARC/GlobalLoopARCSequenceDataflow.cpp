@@ -217,8 +217,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap, RegionStateInfo, SetFactory);
+        AA, RCFI, EAFI, LRFI, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
+        RegionStateInfo, SetFactory);
     --End;
   }
 
@@ -236,8 +236,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap, RegionStateInfo, SetFactory);
+        AA, RCFI, EAFI, LRFI, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
+        RegionStateInfo, SetFactory);
   }
 
   return NestingDetected;
@@ -250,12 +250,13 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 LoopARCSequenceDataflowEvaluator::LoopARCSequenceDataflowEvaluator(
     SILFunction &F, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
     SILLoopInfo *SLI, RCIdentityFunctionInfo *RCFI,
+    EpilogueARCFunctionInfo *EAFI,
     ProgramTerminationFunctionInfo *PTFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
     : Allocator(), SetFactory(Allocator), F(F), AA(AA), LRFI(LRFI), SLI(SLI),
-      RCFI(RCFI), DecToIncStateMap(DecToIncStateMap),
-      IncToDecStateMap(IncToDecStateMap), ConsumedArgToReleaseMap(RCFI, &F) {
+      RCFI(RCFI), EAFI(EAFI), DecToIncStateMap(DecToIncStateMap),
+      IncToDecStateMap(IncToDecStateMap) {
   for (auto *R : LRFI->getRegions()) {
     bool AllowsLeaks = false;
     if (R->isBlock())
@@ -273,8 +274,6 @@ LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases,
     bool RecomputePostDomReleases) {
-  if (RecomputePostDomReleases)
-    ConsumedArgToReleaseMap.recompute();
   bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
   NestingDetected |= processLoopTopDown(R);
   return NestingDetected;

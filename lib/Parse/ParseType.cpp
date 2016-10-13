@@ -410,30 +410,20 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
     SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
     SourceLoc LAngleLoc = consumeStartingLess();
     
-    // Check for empty protocol composition.
-    if (startsWithGreater(Tok)) {
-      SourceLoc RAngleLoc = consumeStartingGreater();
-      auto AnyRange = SourceRange(ProtocolLoc, RAngleLoc);
-      
-      // Warn that 'protocol<>' is deprecated and offer to
-      // replace with the 'Any' keyword
-      diagnose(LAngleLoc, diag::deprecated_any_composition)
-        .fixItReplace(AnyRange, "Any");
-      
-      return makeParserResult(
-        ProtocolCompositionTypeRepr::createEmptyComposition(Context, ProtocolLoc));
-    }
-    
     // Parse the type-composition-list.
     ParserStatus Status;
     SmallVector<IdentTypeRepr *, 4> Protocols;
-    do {
-      // Parse the type-identifier.
-      ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
-      Status |= Protocol;
-      if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(Protocol.getPtrOrNull()))
-        Protocols.push_back(ident);
-    } while (consumeIf(tok::comma));
+    bool IsEmpty = startsWithGreater(Tok);
+    if (!IsEmpty) {
+      do {
+        // Parse the type-identifier.
+        ParserResult<TypeRepr> Protocol = parseTypeIdentifier();
+        Status |= Protocol;
+        if (auto *ident = dyn_cast_or_null<IdentTypeRepr>(
+                                                       Protocol.getPtrOrNull()))
+          Protocols.push_back(ident);
+      } while (consumeIf(tok::comma));
+    }
 
     // Check for the terminating '>'.
     SourceLoc RAngleLoc = PreviousLoc;
@@ -456,17 +446,21 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
     if (Status.isSuccess()) {
       // Only if we have complete protocol<...> construct, diagnose deprecated.
 
-      auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
-        auto SourceRange = Ty->getSourceRange();
-        return SourceMgr.extractText(
-          Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
-      };
       SmallString<32> replacement;
-      auto Begin = Protocols.begin();
-      replacement += extractText(*Begin);
-      while(++Begin != Protocols.end()) {
-        replacement += " & ";
+      if (Protocols.empty()) {
+        replacement = "Any";
+      } else {
+        auto extractText = [&](IdentTypeRepr *Ty) -> StringRef {
+          auto SourceRange = Ty->getSourceRange();
+          return SourceMgr.extractText(
+            Lexer::getCharSourceRangeFromSourceRange(SourceMgr, SourceRange));
+        };
+        auto Begin = Protocols.begin();
         replacement += extractText(*Begin);
+        while (++Begin != Protocols.end()) {
+          replacement += " & ";
+          replacement += extractText(*Begin);
+        }
       }
 
       // Copy trailing content after '>' to the replacement string.
@@ -474,15 +468,18 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierOrTypeComposition() {
       StringRef TrailingContent = L->getTokenAt(RAngleLoc).getRange().str().
         substr(1);
       if (!TrailingContent.empty()) {
-        replacement.insert(replacement.begin(), '(');
-        replacement += ")";
+        if (Protocols.size() > 1) {
+          replacement.insert(replacement.begin(), '(');
+          replacement += ")";
+        }
         replacement += TrailingContent;
       }
 
       // Replace 'protocol<T1, T2>' with 'T1 & T2'
       diagnose(ProtocolLoc,
-        Protocols.size() > 1 ? diag::deprecated_protocol_composition
-                             : diag::deprecated_protocol_composition_single)
+        IsEmpty              ? diag::deprecated_any_composition :
+        Protocols.size() > 1 ? diag::deprecated_protocol_composition :
+                               diag::deprecated_protocol_composition_single)
         .highlight(composition->getSourceRange())
         .fixItReplace(composition->getSourceRange(), replacement);
     }
@@ -1105,26 +1102,6 @@ bool Parser::canParseOldStyleProtocolComposition() {
   return true;
 }
 
-bool Parser::canParseAttributes() {
-  while (consumeIf(tok::at_sign)) {
-    if (!consumeIf(tok::identifier)) return false;
-    
-    if (consumeIf(tok::equal)) {
-      if (Tok.isNot(tok::identifier) &&
-          Tok.isNot(tok::integer_literal) &&
-          Tok.isNot(tok::floating_literal))
-        return false;
-      consumeToken();
-    } else if (Tok.is(tok::l_paren)) {
-      // Attributes like cc(x,y,z)
-      skipSingle();
-    }
-    
-    consumeIf(tok::comma);
-  }
-  return true;
-}
-
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNotEllipsis() && !isStartOfDecl()) {
@@ -1143,9 +1120,8 @@ bool Parser::canParseTypeTupleBody() {
         }
         consumeToken(tok::colon);
 
-        // Parse attributes then a type.
-        if (!canParseAttributes() ||
-            !canParseType())
+        // Parse a type.
+        if (!canParseType())
           return false;
 
         // Parse default values. This aren't actually allowed, but we recover
@@ -1163,11 +1139,6 @@ bool Parser::canParseTypeTupleBody() {
       }
       
       // Otherwise, this has to be a type.
-
-      // Parse attributes.
-      if (!canParseAttributes())
-        return false;
- 
       if (!canParseType())
         return false;
 
@@ -1179,6 +1150,3 @@ bool Parser::canParseTypeTupleBody() {
   
   return consumeIf(tok::r_paren);
 }
-
-
-

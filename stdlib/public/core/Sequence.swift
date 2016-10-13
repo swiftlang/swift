@@ -334,7 +334,8 @@ public protocol Sequence {
 
   /// A type that represents a subsequence of some of the sequence's elements.
   associatedtype SubSequence
-  // FIXME(compiler limitation):
+  // FIXME(ABI)#104 (Recursive Protocol Constraints):
+  // FIXME(ABI)#105 (Associated Types with where clauses):
   // associatedtype SubSequence : Sequence
   //   where
   //   Iterator.Element == SubSequence.Iterator.Element,
@@ -879,13 +880,15 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = ringBuffer.index(after: i) % maxLength
+        i += 1
+        i %= maxLength
       }
     }
 
     if i != ringBuffer.startIndex {
-      return AnySequence(
-        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].joined())
+      let s0 = ringBuffer[i..<ringBuffer.endIndex]
+      let s1 = ringBuffer[0..<i]
+      return AnySequence([s0, s1].joined())
     }
     return AnySequence(ringBuffer)
   }
@@ -1057,7 +1060,7 @@ extension Sequence {
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element? = nil
+    var foundElement: Iterator.Element?
     do {
       try self.forEach {
         if try predicate($0) {

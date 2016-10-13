@@ -145,7 +145,8 @@ func checkStringComparison(
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
-    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
+    expectedEqual: expected.isEQ(),
+    lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
@@ -167,7 +168,8 @@ func checkStringComparison(
     !expectedEqualUnicodeScalars, lhsNSString != rhsNSString,
     stackTrace: stackTrace)
   checkHashable(
-    expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
+    expectedEqual: expectedEqualUnicodeScalars,
+    lhsNSString, rhsNSString,
     stackTrace: stackTrace.withCurrentLoc())
 #endif
 }
@@ -215,7 +217,8 @@ func checkCharacterComparison(
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
-    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
+    expectedEqual: expected.isEQ(),
+    lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
@@ -465,7 +468,7 @@ CStringTests.test("String.init(validatingUTF8:)") {
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectEmpty(String(validatingUTF8: bindAsCChar(s)))
+    expectNil(String(validatingUTF8: bindAsCChar(s)))
     dealloc()
   }
 }
@@ -501,7 +504,7 @@ CStringTests.test("String.decodeCString") {
   do {
     let s = getNullUTF8()
     let result = String.decodeCString(s, as: UTF8.self)
-    expectEmpty(result)
+    expectNil(result)
   }
   do { // repairing
     let (s, dealloc) = getIllFormedUTF8String1()
@@ -518,7 +521,7 @@ CStringTests.test("String.decodeCString") {
     let (s, dealloc) = getIllFormedUTF8String1()
     let result = String.decodeCString(
       s, as: UTF8.self, repairingInvalidCodeUnits: false)
-    expectEmpty(result)
+    expectNil(result)
     dealloc()
   }
 }

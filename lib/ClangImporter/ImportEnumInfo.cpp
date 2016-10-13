@@ -15,13 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ClangAdapter.h"
 #include "ImportEnumInfo.h"
+#include "ImporterImpl.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+
+#include "llvm/ADT/Statistic.h"
+#define DEBUG_TYPE "Enum Info"
+STATISTIC(EnumInfoNumCacheHits, "# of times the enum info cache was hit");
+STATISTIC(EnumInfoNumCacheMisses, "# of times the enum info cache was missed");
 
 using namespace swift;
 using namespace importer;
@@ -284,4 +291,15 @@ void EnumInfo::determineConstantNamePrefix(ASTContext &ctx,
   }
 
   constantNamePrefix = ctx.AllocateCopy(commonPrefix);
+}
+
+EnumInfo EnumInfoCache::getEnumInfo(const clang::EnumDecl *decl) {
+  if (enumInfos.count(decl)) {
+    ++EnumInfoNumCacheHits;
+    return enumInfos[decl];
+  }
+  ++EnumInfoNumCacheMisses;
+  EnumInfo enumInfo(swiftCtx, decl, clangPP);
+  enumInfos[decl] = enumInfo;
+  return enumInfo;
 }

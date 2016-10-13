@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
+@_versioned
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
     RandomAccessCollection
@@ -121,6 +122,7 @@ internal struct _SliceBuffer<Element>
   internal var owner: AnyObject
   internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
+  @_versioned
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
   }
@@ -245,8 +247,8 @@ internal struct _SliceBuffer<Element>
 
   @_versioned
   internal func getElement(_ i: Int) -> Element {
-    _sanityCheck(i >= startIndex, "negative slice index is out of range")
-    _sanityCheck(i < endIndex, "slice index out of range")
+    _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
+    _sanityCheck(i < endIndex, "slice index is out of range")
     return subscriptBaseAddress[i]
   }
 
@@ -259,8 +261,8 @@ internal struct _SliceBuffer<Element>
       return getElement(position)
     }
     nonmutating set {
-      _sanityCheck(position >= startIndex, "negative slice index is out of range")
-      _sanityCheck(position < endIndex, "slice index out of range")
+      _sanityCheck(position >= startIndex, "slice index is out of range (before startIndex)")
+      _sanityCheck(position < endIndex, "slice index is out of range")
       subscriptBaseAddress[position] = newValue
     }
   }

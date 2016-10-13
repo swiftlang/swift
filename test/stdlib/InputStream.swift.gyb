@@ -77,14 +77,14 @@ ReadLineTestSuite.test("Unicode/strippingNewline=${strip_newline}")
 ReadLineTestSuite.test("EOF/1/strippingNewline=${strip_newline}")
   .stdin("", eof: true)
   .code {
-  expectEmpty(readLine(strippingNewline: ${strip_newline}))
+  expectNil(readLine(strippingNewline: ${strip_newline}))
 }
 
 ReadLineTestSuite.test("EOF/2/strippingNewline=${strip_newline}")
   .stdin("abcd 123\n", eof: true)
   .code {
   expectOptionalEqual("abcd 123${newline}", readLine(strippingNewline: ${strip_newline}))
-  expectEmpty(readLine(strippingNewline: ${strip_newline}))
+  expectNil(readLine(strippingNewline: ${strip_newline}))
 }
 
 ReadLineTestSuite.test("MissingNewlineAtEOF/1/strippingNewline=${strip_newline}")

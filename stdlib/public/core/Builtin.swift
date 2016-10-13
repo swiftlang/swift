@@ -175,18 +175,18 @@ func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 @_versioned
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
-  let tmp = _canBeClass(x)
 
+  switch _canBeClass(x) {
   // Is not a class.
-  if tmp == 0 {
+  case 0:
     return false
   // Is a class.
-  } else if tmp == 1 {
+  case 1:
     return true
-  }
-
   // Maybe a class.
-  return _swift_isClassOrObjCExistentialType(x)
+  default:
+    return _swift_isClassOrObjCExistentialType(x)
+  }
 }
 
 /// Returns an `UnsafePointer` to the storage used for `object`.  There's
@@ -283,6 +283,7 @@ public func _onFastPath() {
 // Declare it here instead of RuntimeShims.h, because we need to specify
 // the type of argument to be AnyClass. This is currently not possible
 // when using RuntimeShims.h
+@_versioned
 @_silgen_name("swift_objc_class_usesNativeSwiftReferenceCounting")
 func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
@@ -480,6 +481,7 @@ internal func _makeBridgeObject(
   )
 }
 
+@_versioned
 @_silgen_name("_swift_class_getSuperclass")
 internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 

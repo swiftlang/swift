@@ -76,8 +76,8 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
   target.write(bullet)
   target.write(" ")
 
-  if let nam = name {
-    target.write(nam)
+  if let name = name {
+    target.write(name)
     target.write(": ")
   }
   // This takes the place of the old mirror API's 'summary' property

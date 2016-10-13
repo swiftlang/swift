@@ -188,13 +188,6 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
 
-  if (auto *env = GenericFunc->getGenericEnvironment()) {
-    auto sig = GenericFunc->getLoweredFunctionType()->getGenericSignature();
-
-    env->getSubstitutionMap(M.getSwiftModule(), sig,
-                            ParamSubs, ContextSubs);
-  }
-
   Mangle::Mangler Mangler;
   GenericSpecializationMangler GenericMangler(Mangler, GenericFunc,
                                               ParamSubs, Fragile);
@@ -234,7 +227,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
 
   // Create a new function.
   SILFunction * SpecializedF =
-    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo, ContextSubs,
+    GenericCloner::cloneFunction(GenericFunc, Fragile, ReInfo,
                                  ParamSubs, ClonedName);
 
   // Check if this specialization should be linked for prespecialization.
@@ -635,37 +628,37 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
+// The whitelist of classes and functions from the stdlib,
+// whose specializations we want to preserve.
+static const char *const WhitelistedSpecializations[] = {
+    "Array",
+    "_ArrayBuffer",
+    "_ContiguousArrayBuffer",
+    "Range",
+    "RangeIterator",
+    "CountableRange",
+    "CountableRangeIterator",
+    "ClosedRange",
+    "ClosedRangeIterator",
+    "CountableClosedRange",
+    "CountableClosedRangeIterator",
+    "IndexingIterator",
+    "Collection",
+    "MutableCollection",
+    "BidirectionalCollection",
+    "RandomAccessCollection",
+    "RangeReplaceableCollection",
+    "_allocateUninitializedArray",
+    "UTF8",
+    "UTF16",
+    "String",
+    "_StringBuffer",
+    "_toStringReadOnlyPrintable",
+};
+
 /// Check of a given name could be a name of a white-listed
 /// specialization.
 bool swift::isWhitelistedSpecialization(StringRef SpecName) {
-  // The whitelist of classes and functions from the stdlib,
-  // whose specializations we want to preserve.
-  ArrayRef<StringRef> Whitelist = {
-      "Array",
-      "_ArrayBuffer",
-      "_ContiguousArrayBuffer",
-      "Range",
-      "RangeIterator",
-      "CountableRange",
-      "CountableRangeIterator",
-      "ClosedRange",
-      "ClosedRangeIterator",
-      "CountableClosedRange",
-      "CountableClosedRangeIterator",
-      "IndexingIterator",
-      "Collection",
-      "MutableCollection",
-      "BidirectionalCollection",
-      "RandomAccessCollection",
-      "RangeReplaceableCollection",
-      "_allocateUninitializedArray",
-      "UTF8",
-      "UTF16",
-      "String",
-      "_StringBuffer",
-      "_toStringReadOnlyPrintable",
-  };
-
   // TODO: Once there is an efficient API to check if
   // a given symbol is a specialization of a specific type,
   // use it instead. Doing demangling just for this check
@@ -708,7 +701,8 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
 
   pos += OfStr.size();
 
-  for (auto Name: Whitelist) {
+  for (auto NameStr: WhitelistedSpecializations) {
+    StringRef Name = NameStr;
     auto pos1 = DemangledName.find(Name, pos);
     if (pos1 == pos && !isalpha(DemangledName[pos1+Name.size()])) {
       return true;

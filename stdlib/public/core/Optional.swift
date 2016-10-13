@@ -487,3 +487,81 @@ extension Optional {
   }
 
 }
+
+//===----------------------------------------------------------------------===//
+// Bridging
+//===----------------------------------------------------------------------===//
+
+#if _runtime(_ObjC)
+extension Optional : _ObjectiveCBridgeable {
+  // The object that represents `none` for an Optional of this type.
+  internal static var _nilSentinel : AnyObject {
+    @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
+    get
+  }
+
+  public func _bridgeToObjectiveC() -> AnyObject {
+    // Bridge a wrapped value by unwrapping.
+    if let value = self {
+      return _bridgeAnythingToObjectiveC(value)
+    }
+    // Bridge nil using a sentinel.
+    return type(of: self)._nilSentinel
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ source: AnyObject,
+    result: inout Optional<Wrapped>?
+  ) {
+    // Map the nil sentinel back to .none.
+    // NB that the signature of _forceBridgeFromObjectiveC adds another level
+    // of optionality, so we need to wrap the immediate result of the conversion
+    // in `.some`.
+    if source === _nilSentinel {
+      result = .some(.none)
+      return
+    }
+    // Otherwise, force-bridge the underlying value.
+    let unwrappedResult = source as! Wrapped
+    result = .some(.some(unwrappedResult))
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: AnyObject,
+    result: inout Optional<Wrapped>?
+  ) -> Bool {
+    // Map the nil sentinel back to .none.
+    // NB that the signature of _forceBridgeFromObjectiveC adds another level
+    // of optionality, so we need to wrap the immediate result of the conversion
+    // in `.some` to indicate success of the bridging operation, with a nil
+    // result.
+    if source === _nilSentinel {
+      result = .some(.none)
+      return true
+    }
+    // Otherwise, try to bridge the underlying value.
+    if let unwrappedResult = source as? Wrapped {
+      result = .some(.some(unwrappedResult))
+      return true
+    } else {
+      result = .none
+      return false
+    }
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
+      -> Optional<Wrapped> {
+    if let nonnullSource = source {
+      // Map the nil sentinel back to none.
+      if nonnullSource === _nilSentinel {
+        return .none
+      } else {
+        return .some(nonnullSource as! Wrapped)
+      }
+    } else {
+      // If we unexpectedly got nil, just map it to `none` too.
+      return .none
+    }
+  }
+}
+#endif

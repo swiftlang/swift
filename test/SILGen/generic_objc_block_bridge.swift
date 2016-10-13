@@ -14,4 +14,4 @@ class Tubb<GenericParamName>: Butt {
   }
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGrXFdCb_dSi_dSi_XFo_dSi_dSi_ : $@convention(thin) <GenericParamName> (Int, @owned @convention(block) (Int) -> Int) -> Int {
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_ : $@convention(thin) (Int, @owned @convention(block) (Int) -> Int) -> Int {

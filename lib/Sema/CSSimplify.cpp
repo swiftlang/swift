@@ -28,6 +28,8 @@ void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
 
 void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
 
+void MatchCallArgumentListener::missingLabel(unsigned paramIdx) {}
+
 void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
 }
@@ -95,7 +97,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
     paramInfos.push_back(CallArgParam());
     paramInfos.back().Label = param->getArgumentName();
     paramInfos.back().HasDefaultArgument = param->isDefaultArgument();
-    paramInfos.back().Variadic = param->isVariadic();
+    paramInfos.back().parameterFlags = ParameterTypeFlags::fromParameterType(
+        param->getType(), param->isVariadic());
   }
 
   MatchCallArgumentListener listener;
@@ -262,7 +265,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.Variadic) {
+    if (param.isVariadic()) {
       // Claim the next argument with the name of this parameter.
       auto claimed = claimNextNamed(param.Label, ignoreNameMismatch);
 
@@ -417,7 +420,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       const auto &param = params[paramIdx];
 
       // Variadic parameters can be unfulfilled.
-      if (param.Variadic)
+      if (param.isVariadic())
         continue;
 
       // Parameters with defaults can be unfulfilled.
@@ -453,6 +456,27 @@ matchCallArguments(ArrayRef<CallArgParam> args,
       }
 
       unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
+
+      // First let's double check if out-of-order argument is nothing
+      // more than a simple label mismatch, because in situation where
+      // one argument requires label and another one doesn't, but caller
+      // doesn't provide either, problem is going to be identified as
+      // out-of-order argument instead of label mismatch.
+      auto &parameter = params[prevArgIdx];
+      if (parameter.hasLabel()) {
+        auto expectedLabel = parameter.Label;
+        auto argumentLabel = args[argIdx].Label;
+
+        // If there is a label but it's incorrect it can only mean
+        // situation like this: expected (x, _ y) got (y, _ x).
+        if (argumentLabel.empty() ||
+            (expectedLabel.compare(argumentLabel) != 0 &&
+             args[prevArgIdx].Label.empty())) {
+          listener.missingLabel(prevArgIdx);
+          return true;
+        }
+      }
+
       listener.outOfOrderArgument(argIdx, prevArgIdx);
       return true;
     }
@@ -1145,20 +1169,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              ConstraintLocatorBuilder locator) {
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
-  TypeVariableType *typeVar1;
   bool isArgumentTupleConversion
           = kind == TypeMatchKind::ArgumentTupleConversion ||
             kind == TypeMatchKind::OperatorArgumentTupleConversion;
-  type1 = getFixedTypeRecursive(type1, typeVar1,
-                                kind == TypeMatchKind::SameType,
+  type1 = getFixedTypeRecursive(type1, kind == TypeMatchKind::SameType,
                                 isArgumentTupleConversion);
   auto desugar1 = type1->getDesugaredType();
+  TypeVariableType *typeVar1 = desugar1->getAs<TypeVariableType>();
 
-  TypeVariableType *typeVar2;
-  type2 = getFixedTypeRecursive(type2, typeVar2,
-                                kind == TypeMatchKind::SameType,
+  type2 = getFixedTypeRecursive(type2, kind == TypeMatchKind::SameType,
                                 isArgumentTupleConversion);
   auto desugar2 = type2->getDesugaredType();
+  TypeVariableType *typeVar2 = desugar2->getAs<TypeVariableType>();
 
   // If the types are obviously equivalent, we're done.
   if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
@@ -1759,19 +1781,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           // scalar or array.
           if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
             auto inoutBaseType = inoutType1->getInOutObjectType();
-            
-            auto isWrappedArray = isArrayType(inoutBaseType);
-            
-            if (auto baseTyVar1 = dyn_cast<TypeVariableType>(inoutBaseType.
-                                                                getPointer())) {
-              TypeVariableType *tv1;
-              auto bt1 = getFixedTypeRecursive(baseTyVar1, tv1,
+
+            Type simplifiedInoutBaseType =
+              getFixedTypeRecursive(inoutBaseType,
                                     kind == TypeMatchKind::SameType,
                                     isArgumentTupleConversion);
-              
-              isWrappedArray = isArrayType(bt1);
-            }
-            
+
+            // FIXME: If the base is still a type variable, we can't tell
+            // what to do here. Might have to try \c ArrayToPointer and make it
+            // more robust.
+            bool isWrappedArray = isArrayType(simplifiedInoutBaseType);
+
             if (isWrappedArray) {
               conversionsOrFixes.push_back(
                                      ConversionRestrictionKind::ArrayToPointer);
@@ -1834,11 +1854,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
               // The pointer can be converted from a string, if the element type
               // is compatible.
               if (type1->isEqual(TC.getStringType(DC))) {
-                TypeVariableType *tv = nullptr;
-                auto baseTy = getFixedTypeRecursive(pointeeTy, tv, false,
-                                                    false);
+                auto baseTy = getFixedTypeRecursive(pointeeTy, false);
                 
-                if (tv || isStringCompatiblePointerBaseType(TC, DC, baseTy))
+                if (baseTy->isTypeVariableOrMember() ||
+                    isStringCompatiblePointerBaseType(TC, DC, baseTy))
                   conversionsOrFixes.push_back(
                                     ConversionRestrictionKind::StringToPointer);
               }
@@ -1955,10 +1974,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
   
-  // If the types disagree, but we're comparing a non-void, single-expression
-  // closure result type to a void function result type, allow the conversion.
+  // Allow '() -> T' to '() -> ()' and '() -> Never' to '() -> T' for closure
+  // literals.
   {
-    if (concrete && kind >= TypeMatchKind::Subtype && type2->isVoid()) {
+    if (concrete && kind >= TypeMatchKind::Subtype &&
+        (type1->isUninhabited() || type2->isVoid())) {
       SmallVector<LocatorPathElt, 2> parts;
       locator.getLocatorParts(parts);
       
@@ -2124,18 +2144,8 @@ ConstraintSystem::simplifyConstructionConstraint(
     Type valueType, FunctionType *fnType, unsigned flags,
     FunctionRefKind functionRefKind, ConstraintLocator *locator) {
   // Desugar the value type.
-  auto desugarValueType = valueType->getDesugaredType();
-
-  // If we have a type variable that has been bound to a fixed type,
-  // look through to that fixed type.
-  auto desugarValueTypeVar = dyn_cast<TypeVariableType>(desugarValueType);
-  if (desugarValueTypeVar) {
-    if (auto fixed = getFixedType(desugarValueTypeVar)) {
-      valueType = fixed;
-      desugarValueType = fixed->getDesugaredType();
-      desugarValueTypeVar = nullptr;
-    }
-  }
+  auto desugarValueType = getFixedTypeRecursive(valueType, true)
+                            ->getDesugaredType();
 
   Type argType = fnType->getInput();
   Type resultType = fnType->getResult();
@@ -2261,12 +2271,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintLocatorBuilder locator,
                                  unsigned flags) {
   // Dig out the fixed type to which this type refers.
-  TypeVariableType *typeVar;
-  type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/true);
+  type = getFixedTypeRecursive(type, /*wantRValue=*/true);
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
-  if (typeVar)
+  if (type->isTypeVariableOrMember())
     return SolutionKind::Unsolved;
 
   // For purposes of argument type matching, existential types don't need to
@@ -2351,21 +2360,19 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                     ConstraintLocatorBuilder locator) {
   do {
     // Dig out the fixed type to which this type refers.
-    TypeVariableType *typeVar1;
-    fromType = getFixedTypeRecursive(fromType, typeVar1, /*wantRValue=*/true);
+    fromType = getFixedTypeRecursive(fromType, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
-    if (typeVar1)
+    if (fromType->isTypeVariableOrMember())
       return SolutionKind::Unsolved;
 
     // Dig out the fixed type to which this type refers.
-    TypeVariableType *typeVar2;
-    toType = getFixedTypeRecursive(toType, typeVar2, /*wantRValue=*/true);
+    toType = getFixedTypeRecursive(toType, /*wantRValue=*/true);
 
     // If we hit a type variable without a fixed type, we can't
     // solve this yet.
-    if (typeVar2)
+    if (toType->isTypeVariableOrMember())
       return SolutionKind::Unsolved;
 
     Type origFromType = fromType;
@@ -2533,7 +2540,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
   Type optLValueTy = simplifyType(constraint.getFirstType());
   Type optTy = optLValueTy->getRValueType();
   
-  if (optTy->is<TypeVariableType>()) {
+  if (optTy->isTypeVariableOrMember()) {
     return SolutionKind::Unsolved;
   }
   
@@ -2667,7 +2674,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   bool isExistential = instanceTy->isExistentialType();
   
-  if (instanceTy->is<TypeVariableType>() ||
+  if (instanceTy->isTypeVariableOrMember() ||
       instanceTy->is<UnresolvedType>()) {
     MemberLookupResult result;
     result.OverallResult = MemberLookupResult::Unsolved;
@@ -2831,13 +2838,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
           if (auto fnType =
                   fnTypeWithSelf->getResult()->getAs<FunctionType>()) {
           
-            auto argType = fnType->getInput();
-            
-            if (auto parenType =
-                dyn_cast<ParenType>(argType.getPointer())) {
-              argType = parenType->getUnderlyingType();
-            }
-            
+            auto argType = fnType->getInput()->getWithoutParens();
             if (argType->isEqual(favoredType))
               result.FavoredChoice = result.ViableCandidates.size();
           }
@@ -3243,15 +3244,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
-  Type baseTy = constraint.getFirstType()->getRValueType();
-  if (auto tv = dyn_cast<TypeVariableType>(baseTy.getPointer())) {
-    auto fixed = getFixedType(tv);
-    if (!fixed)
-      return SolutionKind::Unsolved;
-
-    // Continue with the fixed type.
-    baseTy = fixed->getRValueType();
-  }
+  Type baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
+  if (baseTy->isTypeVariableOrMember())
+    return SolutionKind::Unsolved;
 
   if (baseTy->is<ArchetypeType>())
     return SolutionKind::Solved;
@@ -3259,29 +3254,10 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
   return SolutionKind::Error;
 }
 
-/// Simplify the given type for use in a type property constraint.
-static Type simplifyForTypePropertyConstraint(ConstraintSystem &cs, Type type) {
-  if (auto tv = type->getAs<TypeVariableType>()) {
-    auto fixed = cs.getFixedType(tv);
-    if (!fixed)
-      return Type();
-
-    // Continue with the fixed type.
-    type = fixed;
-
-    // Look through parentheses.
-    while (auto paren = dyn_cast<ParenType>(type.getPointer()))
-      type = paren->getUnderlyingType();
-  }
-
-  return type;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
-  auto baseTy = simplifyForTypePropertyConstraint(*this,
-                                                  constraint.getFirstType());
-  if (!baseTy)
+  auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
+  if (baseTy->isTypeVariableOrMember())
     return SolutionKind::Unsolved;
 
   if (baseTy->getClassOrBoundGenericClass())
@@ -3296,10 +3272,9 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
-  // Leave the constraint around if the first variable is still opaque.
-  auto baseTy = simplifyForTypePropertyConstraint(*this,
-                                                  constraint.getFirstType());
-  if (!baseTy)
+  auto baseTy = getFixedTypeRecursive(constraint.getFirstType(), true);
+
+  if (baseTy->isTypeVariableOrMember())
     return SolutionKind::Unsolved;
 
   // Otherwise, any type is fine.
@@ -3310,10 +3285,9 @@ ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
   // Solve forward.
-  TypeVariableType *typeVar2;
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(), typeVar2,
+  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
                                      /*wantRValue=*/ true);
-  if (!typeVar2) {
+  if (!type2->isTypeVariableOrMember()) {
     Type dynamicType2;
     if (type2->isAnyExistentialType()) {
       dynamicType2 = ExistentialMetatypeType::get(type2);
@@ -3326,8 +3300,10 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
   }
 
   // Okay, can't solve forward.  See what we can do backwards.
-  TypeVariableType *typeVar1;
-  Type type1 = getFixedTypeRecursive(constraint.getFirstType(), typeVar1, true);
+  Type type1 = getFixedTypeRecursive(constraint.getFirstType(), true);
+
+  if (type1->isTypeVariableOrMember())
+    return SolutionKind::Unsolved;
 
   // If we have an existential metatype, that's good enough to solve
   // the constraint.
@@ -3339,22 +3315,18 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
   // If we have a normal metatype, we can't solve backwards unless we
   // know what kind of object it is.
   if (auto metatype1 = type1->getAs<MetatypeType>()) {
-    TypeVariableType *instanceTypeVar1;
     Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
-                                               instanceTypeVar1, true);
-    if (!instanceTypeVar1) {
+                                               true);
+    if (!instanceType1->isTypeVariableOrMember()) {
       return matchTypes(instanceType1, type2,
                         TypeMatchKind::BindType,
                         TMF_GenerateConstraints, constraint.getLocator());
     }
-
-  // If it's definitely not either kind of metatype, then we can
-  // report failure right away.
-  } else if (!typeVar1) {
-    return SolutionKind::Error;
   }
 
-  return SolutionKind::Unsolved;
+  // It's definitely not either kind of metatype, so we can
+  // report failure right away.
+  return SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
@@ -3366,8 +3338,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   assert(type1->is<FunctionType>());
 
   // Drill down to the concrete type on the right hand side.
-  TypeVariableType *typeVar2;
-  Type type2 = getFixedTypeRecursive(constraint.getSecondType(), typeVar2, 
+  Type type2 = getFixedTypeRecursive(constraint.getSecondType(),
                                      /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
@@ -3386,7 +3357,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   // If right-hand side is a type variable, the constraint is unsolved.
-  if (typeVar2)
+  if (desugar2->isTypeVariableOrMember())
     return SolutionKind::Unsolved;
 
   // Strip the 'ApplyFunction' off the locator.
@@ -3710,8 +3681,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       obj1 = inout1->getObjectType();
     }
     
-    TypeVariableType *tv1;
-    obj1 = getFixedTypeRecursive(obj1, tv1, false, false);
+    obj1 = getFixedTypeRecursive(obj1, false, false);
     
     auto t1 = obj1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
@@ -3734,23 +3704,22 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     // TODO: Handle different encodings based on pointer element type, such as
     // UTF16 for [U]Int16 or UTF32 for [U]Int32. For now we only interop with
     // Int8 pointers using UTF8 encoding.
-    TypeVariableType *btv2 = nullptr;
-    baseType2 = getFixedTypeRecursive(baseType2, btv2, false, false);
+    baseType2 = getFixedTypeRecursive(baseType2, false, false);
     // If we haven't resolved the element type, generate constraints.
-    if (btv2) {
+    if (baseType2->isTypeVariableOrMember()) {
       if (flags & TMF_GenerateConstraints) {
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                       btv2, TC.getInt8Type(DC),
+                                       baseType2, TC.getInt8Type(DC),
                                        DeclName(),
                                        FunctionRefKind::Compound,
                                        getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
-                                        btv2, TC.getUInt8Type(DC),
+                                        baseType2, TC.getUInt8Type(DC),
                                         DeclName(),
                                         FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
-                                        btv2, TC.Context.TheEmptyTupleType,
+                                        baseType2, TC.Context.TheEmptyTupleType,
                                         DeclName(),
                                         FunctionRefKind::Compound,
                                         getConstraintLocator(locator));
@@ -3938,7 +3907,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     }
 
     // If the bridged value type is generic, the generic arguments
-    // must match the 
+    // must either match or be bridged.
     // FIXME: This should be an associated type of the protocol.
     if (auto bgt1 = type2->getAs<BoundGenericType>()) {
       if (bgt1->getDecl() == TC.Context.getArrayDecl()) {
@@ -3981,7 +3950,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                         locator.withPathElement(
                           LocatorPathElt::getGenericArgument(0))));
       } else {
-        llvm_unreachable("unhandled generic bridged type");
+        // Nothing special to do; matchTypes will match generic arguments.
       }
     }
 

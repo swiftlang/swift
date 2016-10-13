@@ -185,10 +185,6 @@ parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary_spaced:
     case tok::oper_binary_unspaced: {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        goto done;
-
       // If this is an "&& #available()" expression (or related things that
       // show up in a stmt-condition production), then don't eat it.
       //
@@ -862,8 +858,11 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   P.consumeToken(tok::l_brace);
 
   // Eat attributes, if present.
-  if (!P.canParseAttributes())
-    return false;
+  while (P.consumeIf(tok::at_sign)) {
+    if (!P.consumeIf(tok::identifier)) return false;
+    // Eat paren after attribute name; e.g. @foo(x)
+    if (P.Tok.is(tok::l_paren)) P.skipSingle();
+  }
 
   // Check if we have 'didSet'/'willSet' after attributes.
   return P.Tok.isContextualKeyword("didSet") ||
@@ -1589,10 +1588,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a postfix-operator suffix.
     if (Tok.is(tok::oper_postfix)) {
-      // If '>' is not an operator and this token starts with a '>', we're done.
-      if (!GreaterThanIsOperator && startsWithGreater(Tok))
-        return Result;
-
       Expr *oper = parseExprOperator();
       Result = makeParserResult(
           new (Context) PostfixUnaryExpr(oper, Result.get()));
@@ -2469,7 +2464,7 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       rightLoc,
                                       trailingClosure);
 
-  // A tuple with a single, unlabelled element is just parentheses.
+  // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
       (subExprNames.empty() || subExprNames[0].empty())) {
     return makeParserResult(
@@ -2974,7 +2969,8 @@ void Parser::addParametersToScope(ParameterList *PL) {
 ///
 ///  availability-spec:
 ///     '*'
-///     version-constraint-spec
+///     language-version-constraint-spec
+///     platform-version-constraint-spec
 ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
   if (Tok.isBinaryOperator() && Tok.getText() == "*") {
     SourceLoc StarLoc = Tok.getLoc();
@@ -2982,15 +2978,42 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 
     return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
   }
-  return parseVersionConstraintSpec();
+  if (Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift") {
+    return parseLanguageVersionConstraintSpec();
+  }
+
+  return parsePlatformVersionConstraintSpec();
 }
 
-/// Parse version constraint specification.
+/// Parse language-version constraint specification.
 ///
-///  version-constraint-spec:
+///  language-version-constraint-spec:
+///     "swift" version-tuple
+ParserResult<LanguageVersionConstraintAvailabilitySpec>
+Parser::parseLanguageVersionConstraintSpec() {
+  SourceLoc SwiftLoc;
+  clang::VersionTuple Version;
+  SourceRange VersionRange;
+  if (!(Tok.isIdentifierOrUnderscore() && Tok.getText() == "swift"))
+    return nullptr;
+
+  SwiftLoc = Tok.getLoc();
+  consumeToken();
+  if (parseVersionTuple(Version, VersionRange,
+                        diag::avail_query_expected_version_number)) {
+    return nullptr;
+  }
+  return makeParserResult(new (Context)
+                          LanguageVersionConstraintAvailabilitySpec(
+                            SwiftLoc, Version, VersionRange));
+}
+
+/// Parse platform-version constraint specification.
+///
+///  platform-version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<VersionConstraintAvailabilitySpec>
-Parser::parseVersionConstraintSpec() {
+ParserResult<PlatformVersionConstraintAvailabilitySpec>
+Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3029,7 +3052,7 @@ Parser::parseVersionConstraintSpec() {
     return nullptr;
   }
 
-  return makeParserResult(new (Context) VersionConstraintAvailabilitySpec(
+  return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
       Platform.getValue(), PlatformLoc, Version, VersionRange));
 }
 

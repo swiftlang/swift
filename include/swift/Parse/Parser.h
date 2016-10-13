@@ -121,12 +121,6 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  bool GreaterThanIsOperator = true;
-
-  /// FIXME: Temporary hack to keep the selector-style declaration
-  /// syntax working.
-  bool ArgumentIsParameter = false;
-
   bool InPoundLineEnvironment = false;
 
   LocalContext *CurLocalContext = nullptr;
@@ -219,24 +213,6 @@ public:
 
     void pop() {
       CC.pop();
-    }
-  };
-
-  /// A RAII object for temporarily changing whether an operator starting with
-  /// '>' is an operator.
-  class GreaterThanIsOperatorRAII {
-    Parser &P;
-    bool OldValue;
-
-  public:
-    GreaterThanIsOperatorRAII(Parser &p, bool newValue)
-      : P(p), OldValue(p.GreaterThanIsOperator)
-    {
-      P.GreaterThanIsOperator = newValue;
-    }
-
-    ~GreaterThanIsOperatorRAII() {
-      P.GreaterThanIsOperator = OldValue;
     }
   };
 
@@ -448,7 +424,7 @@ public:
   /// \brief Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1, tok T2 = tok::unknown);
+  void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
   /// \brief Skip until a token that starts with '>', and consume it if found.
@@ -462,12 +438,7 @@ public:
 
   void skipUntilDeclStmtRBrace(tok T1);
 
-  /// \brief Skip to the next decl, statement or '}'.
-  void skipUntilDeclStmtRBrace() {
-    skipUntilDeclStmtRBrace(tok::unknown);
-  }
-
-  void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
+  void skipUntilDeclRBrace(tok T1, tok T2);
   
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
@@ -718,9 +689,7 @@ public:
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
-                              bool &FoundCodeCompletionToken,
-                              bool StopAtTypeAttributes = false,
-                              bool InParam = false);
+                              bool &FoundCodeCompletionToken);
 
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1077,7 +1046,6 @@ public:
   /// followed by one of the above tokens, then this function returns false,
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
-  bool canParseAttributes();
 
   bool canParseType();
   bool canParseTypeIdentifier();
@@ -1277,7 +1245,10 @@ public:
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
+  ParserResult<PlatformVersionConstraintAvailabilitySpec>
+  parsePlatformVersionConstraintSpec();
+  ParserResult<LanguageVersionConstraintAvailabilitySpec>
+  parseLanguageVersionConstraintSpec();
 };
 
 /// Describes a parsed declaration name.
@@ -1346,6 +1317,9 @@ DeclName formDeclName(ASTContext &ctx,
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);
+
+/// Whether a given token can be the start of a decl.
+bool isKeywordPossibleDeclStart(const Token &Tok);
 
 } // end namespace swift
 

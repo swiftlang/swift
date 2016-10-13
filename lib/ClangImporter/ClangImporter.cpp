@@ -55,6 +55,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -315,7 +316,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
-  auto languageVersion = swift::version::Version::getCurrentLanguageVersion();
+  auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
@@ -474,9 +475,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
 
-  // Set the module cache path.
+  // Set the module and API notes cache paths to the same location.
   if (!moduleCachePath.empty()) {
     invocationArgStrs.push_back("-fmodules-cache-path=");
+    invocationArgStrs.back().append(moduleCachePath);
+
+    invocationArgStrs.push_back("-fapinotes-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
 
@@ -562,6 +566,9 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(extraArg);
   }
 
+  // Enable API notes alongside headers/in frameworks.
+  invocationArgStrs.push_back("-fapinotes-modules");
+
   // Add API notes paths.
   for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
     invocationArgStrs.push_back("-iapinotes-modules");
@@ -569,6 +576,12 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
   }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
+
+  // Map the Swift major version into the API notes version for Swift. This
+  // has the effect of allowing API notes to effect changes only on Swift
+  // major versions, not minor versions.
+  invocationArgStrs.push_back("-fapinotes-swift-version=" +
+    llvm::itostr(ctx.LangOpts.EffectiveLanguageVersion[0]));
 }
 
 std::unique_ptr<ClangImporter>
@@ -648,7 +661,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Install a Clang module file extension to build Swift name lookup tables.
   invocation->getFrontendOpts().ModuleFileExtensions.push_back(
-    new Implementation::SwiftNameLookupExtension(importer->Impl));
+      new SwiftNameLookupExtension(importer->Impl.LookupTables,
+                                   importer->Impl.SwiftContext,
+                                   importer->Impl.platformAvailability,
+                                   importer->Impl.InferImportAsMember));
 
   // Create a compiler instance.
   auto PCHContainerOperations =
@@ -714,6 +730,10 @@ ClangImporter::create(ASTContext &ctx,
   clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
 
+  importer->Impl.nameImporter.reset(new NameImporter(
+      importer->Impl.SwiftContext, importer->Impl.platformAvailability,
+      importer->Impl.getClangSema(), importer->Impl.InferImportAsMember));
+
   // Prefer frameworks over plain headers.
   // We add search paths here instead of when building the initial invocation
   // so that (a) we use the same code as search paths for imported modules,
@@ -733,10 +753,8 @@ ClangImporter::create(ASTContext &ctx,
       importer->Impl.addBridgeHeaderTopLevelDecls(D);
 
       if (auto named = dyn_cast<clang::NamedDecl>(D)) {
-        importer->Impl.addEntryToLookupTable(
-          instance.getSema(),
-          importer->Impl.BridgingHeaderLookupTable,
-          named);
+        addEntryToLookupTable(importer->Impl.BridgingHeaderLookupTable, named,
+                              *importer->Impl.nameImporter);
       }
     }
   }
@@ -794,11 +812,9 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   return false;
 }
 
-void ClangImporter::Implementation::addEntryToLookupTable(
-       clang::Sema &clangSema,
-       SwiftLookupTable &table,
-       clang::NamedDecl *named)
-{
+void importer::addEntryToLookupTable(SwiftLookupTable &table,
+                                     clang::NamedDecl *named,
+                                     NameImporter &nameImporter) {
   // Determine whether this declaration is suppressed in Swift.
   if (shouldSuppressDeclImport(named)) return;
 
@@ -821,19 +837,20 @@ void ClangImporter::Implementation::addEntryToLookupTable(
   }
 
   // If we have a name to import as, add this entry to the table.
-  if (auto importedName = importFullName(named, None, &clangSema)) {
+  if (auto importedName = nameImporter.importName(named, None)) {
     table.addEntry(importedName.Imported, named, importedName.EffectiveContext);
 
     // Also add the subscript entry, if needed.
     if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(SwiftContext, SwiftContext.Id_subscript,
+      table.addEntry(DeclName(nameImporter.getContext(),
+                              nameImporter.getContext().Id_subscript,
                               ArrayRef<Identifier>()),
                      named, importedName.EffectiveContext);
 
     // Import the Swift 2 name of this entity, and record it as well if it is
     // different.
-    if (auto swift2Name = importFullName(named, ImportNameFlags::Swift2Name,
-                                         &clangSema)) {
+    if (auto swift2Name =
+            nameImporter.importName(named, ImportNameFlags::Swift2Name)) {
       if (swift2Name.Imported != importedName.Imported)
         table.addEntry(swift2Name.Imported, named, swift2Name.EffectiveContext);
     }
@@ -852,15 +869,15 @@ void ClangImporter::Implementation::addEntryToLookupTable(
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
-        addEntryToLookupTable(clangSema, table, namedMember);
+        addEntryToLookupTable(table, namedMember, nameImporter);
     }
   }
 }
 
-void ClangImporter::Implementation::addMacrosToLookupTable(
-       clang::ASTContext &clangCtx,
-       clang::Preprocessor &pp,
-       SwiftLookupTable &table) {
+void importer::addMacrosToLookupTable(clang::ASTContext &clangCtx,
+                                      clang::Preprocessor &pp,
+                                      SwiftLookupTable &table,
+                                      ASTContext &SwiftContext) {
   for (const auto &macro : pp.macros(false)) {
     // Find the local history of this macro directive.
     clang::MacroDirective *MD = pp.getLocalMacroDirectiveHistory(macro.first);
@@ -894,17 +911,17 @@ void ClangImporter::Implementation::addMacrosToLookupTable(
         break;
 
       // Add this entry.
-      auto name = importMacroName(macro.first, info, clangCtx);
+      auto name = importMacroName(macro.first, info, clangCtx, SwiftContext);
       if (name.empty()) continue;
       table.addEntry(name, info, clangCtx.getTranslationUnitDecl(), &pp);
     }
   }
 }
 
-void ClangImporter::Implementation::finalizeLookupTable(
-       clang::ASTContext &clangCtx,
-       clang::Preprocessor &pp,
-       SwiftLookupTable &table) {
+void importer::finalizeLookupTable(clang::ASTContext &clangCtx,
+                                   clang::Preprocessor &pp,
+                                   SwiftLookupTable &table,
+                                   ASTContext &SwiftContext) {
   // Resolve any unresolved entries.
   SmallVector<SwiftLookupTable::SingleEntry, 4> unresolved;
   if (table.resolveUnresolvedEntries(unresolved)) {
@@ -980,14 +997,14 @@ bool ClangImporter::Implementation::importHeader(
   for (auto group : allParsedDecls)
     for (auto *D : group)
       if (auto named = dyn_cast<clang::NamedDecl>(D))
-        addEntryToLookupTable(getClangSema(), BridgingHeaderLookupTable, named);
+        addEntryToLookupTable(BridgingHeaderLookupTable, named, *nameImporter);
 
   pp.EndSourceFile();
   bumpGeneration();
 
   // Add any defined macros to the bridging header lookup table.
   addMacrosToLookupTable(getClangASTContext(), getClangPreprocessor(),
-                         BridgingHeaderLookupTable);
+                         BridgingHeaderLookupTable, SwiftContext);
 
   // Wrap all Clang imports under a Swift import decl.
   for (auto &Import : BridgeHeaderTopLevelImports) {
@@ -998,7 +1015,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // Finalize the lookup table, which may fail.
   finalizeLookupTable(getClangASTContext(), getClangPreprocessor(),
-                      BridgingHeaderLookupTable);
+                      BridgingHeaderLookupTable, SwiftContext);
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -1258,84 +1275,76 @@ Module *ClangImporter::getImportedHeaderModule() const {
   return Impl.ImportedHeaderUnit->getParentModule();
 }
 
-ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts)
-  : SwiftContext(ctx),
-    ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    InferImportAsMember(opts.InferImportAsMember),
-    DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
-    BridgingHeaderLookupTable(nullptr)
-{
+PlatformAvailability::PlatformAvailability(LangOptions &langOpts) {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
 
-  if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "ios"; };
+  if (langOpts.Target.isiOS() && !langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "ios"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "ios" ||
-                 Platform == "ios_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "ios" || Platform == "ios_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isTvOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "tvos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isTvOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "tvos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "tvos" ||
-                 Platform == "tvos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "tvos" || Platform == "tvos_app_extension";
+      };
     }
     // Anything deprecated in iOS 7.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
-  } else if (ctx.LangOpts.Target.isWatchOS()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) { return Platform == "watchos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  } else if (langOpts.Target.isWatchOS()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "watchos"; };
     } else {
-      PlatformAvailabilityFilter =
-        [](StringRef Platform) {
-          return Platform == "watchos" ||
-                 Platform == "watchos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "watchos" || Platform == "watchos_app_extension";
+      };
     }
     // No deprecation filter on watchOS
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) { return false; };
-    DeprecatedAsUnavailableMessage = "";
-  }
-  else if (ctx.LangOpts.Target.isMacOSX()) {
-    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) { return Platform == "macos"; };
+    deprecatedAsUnavailableFilter = [](
+        unsigned major, llvm::Optional<unsigned> minor) { return false; };
+    deprecatedAsUnavailableMessage = "";
+  } else if (langOpts.Target.isMacOSX()) {
+    if (!langOpts.EnableAppExtensionRestrictions) {
+      filter = [](StringRef Platform) { return Platform == "macos"; };
     } else {
-      PlatformAvailabilityFilter =
-      [](StringRef Platform) {
-        return Platform == "macos" ||
-               Platform == "macos_app_extension"; };
+      filter = [](StringRef Platform) {
+        return Platform == "macos" || Platform == "macos_app_extension";
+      };
     }
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
-    DeprecatedAsUnavailableFilter =
-      [](unsigned major, llvm::Optional<unsigned> minor) {
-        return major < 10 ||
-               (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
+    deprecatedAsUnavailableFilter = [](unsigned major,
+                                       llvm::Optional<unsigned> minor) {
+      return major < 10 ||
+             (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
     };
-    DeprecatedAsUnavailableMessage =
-      "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
+    deprecatedAsUnavailableMessage =
+        "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift";
   }
 }
 
+ClangImporter::Implementation::Implementation(ASTContext &ctx,
+                                              const ClangImporterOptions &opts)
+    : SwiftContext(ctx),
+      ImportForwardDeclarations(opts.ImportForwardDeclarations),
+      InferImportAsMember(opts.InferImportAsMember),
+      DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
+      BridgingHeaderLookupTable(nullptr), platformAvailability(ctx.LangOpts),
+      nameImporter() {}
 
 ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
@@ -1363,41 +1372,6 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   cacheEntry.setPointer(file);
 
   return file;
-}
-
-Optional<const clang::Decl *>
-ClangImporter::Implementation::getDefinitionForClangTypeDecl(
-    const clang::Decl *D) {
-  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
-    return OID->getDefinition();
-
-  if (auto TD = dyn_cast<clang::TagDecl>(D))
-    return TD->getDefinition();
-
-  if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
-    return OPD->getDefinition();
-
-  return None;
-}
-
-Optional<clang::Module *>
-ClangImporter::Implementation::getClangSubmoduleForDecl(
-    const clang::Decl *D,
-    bool allowForwardDeclaration) {
-  const clang::Decl *actual = nullptr;
-
-  // Put an Objective-C class into the module that contains the @interface
-  // definition, not just some @class forward declaration.
-  if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
-    actual = maybeDefinition.getValue();
-    if (!actual && !allowForwardDeclaration)
-      return None;
-  }
-
-  if (!actual)
-    actual = D->getCanonicalDecl();
-
-  return actual->getImportedOwningModule();
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
@@ -1439,12 +1413,6 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 
 #pragma mark Importing names
 
-/// \brief Determine whether the given name is reserved for Swift.
-bool ClangImporter::Implementation::isSwiftReservedName(StringRef name) {
-  tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
-  return (kind != tok::identifier);
-}
-
 clang::DeclarationName
 ClangImporter::Implementation::exportName(Identifier name) {
   // FIXME: When we start dealing with C++, we can map over some operator
@@ -1458,51 +1426,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
     return clang::DeclarationName();
 
   return ident;
-}
-
-/// Returns true if it is expected that the macro is ignored.
-static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
-  // Ignore include guards.
-  if (macro->isUsedForHeaderGuard())
-    return true;
-
-  // If there are no tokens, there is nothing to convert.
-  if (macro->tokens_empty())
-    return true;
-
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
-    return true;
-
-  // Consult the blacklist of macros to suppress.
-  auto suppressMacro =
-    llvm::StringSwitch<bool>(name)
-#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
-#include "MacroTable.def"
-    .Default(false);
-
-  if (suppressMacro)
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::shouldIgnoreMacro(StringRef Name,
-                                      const clang::MacroInfo *Macro) {
-  return ::shouldIgnoreMacro(Name, Macro);
-}
-
-Identifier ClangImporter::Implementation::importMacroName(
-             const clang::IdentifierInfo *clangIdentifier,
-             const clang::MacroInfo *macro,
-             clang::ASTContext &clangCtx) {
-  // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
-    return Identifier();
-
-  // No transformation is applied to the name.
-  StringRef name = clangIdentifier->getName();
-  return SwiftContext.getIdentifier(name);
 }
 
 namespace llvm {
@@ -1597,93 +1520,6 @@ ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
                                                     pieces.data());
 }
 
-/// Translate the "nullability" notion from API notes into an optional type
-/// kind.
-OptionalTypeKind ClangImporter::Implementation::translateNullability(
-                   clang::NullabilityKind kind) {
-  switch (kind) {
-  case clang::NullabilityKind::NonNull:
-    return OptionalTypeKind::OTK_None;
-
-  case clang::NullabilityKind::Nullable:
-    return OptionalTypeKind::OTK_Optional;
-
-  case clang::NullabilityKind::Unspecified:
-    return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
-  }
-}
-
-bool ClangImporter::Implementation::hasDesignatedInitializers(
-       const clang::ObjCInterfaceDecl *classDecl) {
-  if (classDecl->hasDesignatedInitializers())
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isDesignatedInitializer(
-       const clang::ObjCInterfaceDecl *classDecl,
-       const clang::ObjCMethodDecl *method) {
-  // If the information is on the AST, use it.
-  if (classDecl->hasDesignatedInitializers()) {
-    auto *methodParent = method->getClassInterface();
-    if (!methodParent ||
-        methodParent->getCanonicalDecl() == classDecl->getCanonicalDecl()) {
-      return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
-    }
-  }
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isRequiredInitializer(
-       const clang::ObjCMethodDecl *method) {
-  // FIXME: No way to express this in Objective-C.
-  return false;
-}
-
-FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
-                    const clang::ObjCInterfaceDecl *classDecl,
-                    const clang::ObjCMethodDecl *method) {
-  if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
-    if (customNameAttr->getName().startswith("init("))
-      return FactoryAsInitKind::AsInitializer;
-    else
-      return FactoryAsInitKind::AsClassMethod;
-  }
-
-  if (method->hasAttr<clang::SwiftSuppressFactoryAsInitAttr>()) {
-    return FactoryAsInitKind::AsClassMethod;
-  }
-
-  return FactoryAsInitKind::Infer;
-}
-
-/// Check if this method is declared in the context that conforms to
-/// NSAccessibility.
-static bool
-isAccessibilityConformingContext(const clang::DeclContext *ctx) {
-  const clang::ObjCProtocolList *protocols = nullptr;
-
-  if (auto protocol = dyn_cast<clang::ObjCProtocolDecl>(ctx)) {
-    if (protocol->getName() == "NSAccessibility")
-      return true;
-    return false;
-  } else if (auto interface = dyn_cast<clang::ObjCInterfaceDecl>(ctx))
-    protocols = &interface->getReferencedProtocols();
-  else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(ctx))
-    protocols = &category->getReferencedProtocols();
-  else
-    return false;
-
-  for (auto pi : *protocols) {
-    if (pi->getName() == "NSAccessibility")
-      return true;
-  }
-  return false;
-
-}
-
 /// Determine whether the given method potentially conflicts with the
 /// setter for a property in the given protocol.
 static bool
@@ -1705,41 +1541,7 @@ isPotentiallyConflictingSetter(const clang::ObjCProtocolDecl *proto,
   return false;
 }
 
-bool
-ClangImporter::Implementation::hasNativeSwiftDecl(const clang::Decl *decl) {
-  for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
-    if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
-      return true;
-    }
-  }
-
-  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(decl)) {
-    clang::SourceLocation categoryNameLoc = category->getCategoryNameLoc();
-    if (categoryNameLoc.isMacroID()) {
-      // Climb up to the top-most macro invocation.
-      clang::ASTContext &clangCtx = category->getASTContext();
-      clang::SourceManager &SM = clangCtx.getSourceManager();
-
-      clang::SourceLocation macroCaller =
-          SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      while (macroCaller.isMacroID()) {
-        categoryNameLoc = macroCaller;
-        macroCaller = SM.getImmediateMacroCallerLoc(categoryNameLoc);
-      }
-
-      StringRef macroName =
-          clang::Lexer::getImmediateMacroName(categoryNameLoc, SM,
-                                              clangCtx.getLangOpts());
-      if (macroName == "SWIFT_EXTENSION")
-        return true;
-    }
-  }
-
-  return false;
-}
-
-bool ClangImporter::Implementation::shouldSuppressDeclImport(
-       const clang::Decl *decl) {
+bool importer::shouldSuppressDeclImport(const clang::Decl *decl) {
   if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     // First check if we're actually in a Swift class.
     auto dc = decl->getDeclContext();
@@ -1806,60 +1608,6 @@ bool ClangImporter::Implementation::shouldSuppressDeclImport(
   }
 
   return false;
-}
-
-bool
-ClangImporter::Implementation::shouldSuppressGenericParamsImport(
-    const clang::ObjCInterfaceDecl *decl) {
-  while (decl) {
-    StringRef name = decl->getName();
-    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator" ||
-        name == "NSMeasurement") {
-      return true;
-    }
-    decl = decl->getSuperClass();
-  }
-  return false;
-}
-
-bool
-ClangImporter::Implementation::isAccessibilityDecl(const clang::Decl *decl) {
-
-  if (auto objCMethod = dyn_cast<clang::ObjCMethodDecl>(decl)) {
-    StringRef name = objCMethod->getSelector().getNameForSlot(0);
-    if (!(objCMethod->getSelector().getNumArgs() <= 1 &&
-          (name.startswith("accessibility") ||
-           name.startswith("setAccessibility") ||
-           name.startswith("isAccessibility")))) {
-      return false;
-    }
-
-  } else if (auto objCProperty = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
-    if (!objCProperty->getName().startswith("accessibility"))
-      return false;
-
-  } else {
-    llvm_unreachable("The declaration is not an ObjC property or method.");
-  }
-
-  if (isAccessibilityConformingContext(decl->getDeclContext()))
-    return true;
-
-  return false;
-}
-
-bool ClangImporter::Implementation::isInitMethod(
-       const clang::ObjCMethodDecl *method) {
-  // init methods are always instance methods.
-  if (!method->isInstanceMethod()) return false;
-
-  // init methods must be classified as such by Clang.
-  if (method->getMethodFamily() != clang::OMF_init) return false;
-
-  // Swift restriction: init methods must start with the word "init".
-  auto selector = method->getSelector();
-  return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
 }
 
 #pragma mark Name lookup
@@ -2111,7 +1859,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
     if (auto *MI = ClangPP.getMacroInfo(II)) {
       if (filter(MI)) {
-        Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
+        Identifier Name = importMacroName(II, MI, ClangCtx, Impl.SwiftContext);
         if (Decl *imported = Impl.importMacro(Name, MI))
           receiver(imported);
       }
@@ -2188,7 +1936,8 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
             if (filter(MI)) {
-              Identifier Name = Impl.importMacroName(II, MI, ClangCtx);
+              Identifier Name =
+                  importMacroName(II, MI, ClangCtx, Impl.SwiftContext);
               if (Decl *imported = Impl.importMacro(Name, MI))
                 receiver(imported);
             }
@@ -2886,90 +2635,6 @@ void ClangImporter::getMangledName(raw_ostream &os,
 // ---------------------------------------------------------------------------
 // Swift lookup tables
 // ---------------------------------------------------------------------------
-
-clang::ModuleFileExtensionMetadata
-ClangImporter::Implementation::SwiftNameLookupExtension::
-getExtensionMetadata() const {
-  clang::ModuleFileExtensionMetadata metadata;
-  metadata.BlockName = "swift.lookup";
-  metadata.MajorVersion = SWIFT_LOOKUP_TABLE_VERSION_MAJOR;
-  metadata.MinorVersion = SWIFT_LOOKUP_TABLE_VERSION_MINOR;
-  metadata.UserInfo = version::getSwiftFullVersion();
-  return metadata;
-}
-
-llvm::hash_code
-ClangImporter::Implementation::SwiftNameLookupExtension::hashExtension(
-   llvm::hash_code code) const {
-  return llvm::hash_combine(code, StringRef("swift.lookup"),
-                            SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
-                            SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            Impl.InferImportAsMember);
-}
-
-std::unique_ptr<clang::ModuleFileExtensionWriter>
-ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionWriter(
-    clang::ASTWriter &writer) {
-    // Local function to populate the lookup table.
-  auto populateTable = [this](clang::Sema &sema, SwiftLookupTable &table) {
-    for (auto decl
-           : sema.Context.getTranslationUnitDecl()->noload_decls()) {
-      // Skip anything from an AST file.
-      if (decl->isFromASTFile()) continue;
-
-      // Skip non-named declarations.
-      auto named = dyn_cast<clang::NamedDecl>(decl);
-      if (!named) continue;
-
-      // Add this entry to the lookup table.
-      Impl.addEntryToLookupTable(sema, table, named);
-    }
-
-    // Add macros to the lookup table.
-    Impl.addMacrosToLookupTable(sema.Context, sema.getPreprocessor(), table);
-
-    // Finalize the lookup table, which may fail.
-    Impl.finalizeLookupTable(sema.Context, sema.getPreprocessor(), table);
-  };
-
-  return std::unique_ptr<clang::ModuleFileExtensionWriter>(
-           new SwiftLookupTableWriter(this, populateTable, writer));
-}
-
-std::unique_ptr<clang::ModuleFileExtensionReader>
-ClangImporter::Implementation::SwiftNameLookupExtension::createExtensionReader(
-  const clang::ModuleFileExtensionMetadata &metadata,
-  clang::ASTReader &reader,
-  clang::serialization::ModuleFile &mod,
-  const llvm::BitstreamCursor &stream)
-{
-  // Make sure we have a compatible block. Since these values are part
-  // of the hash, it should never be wrong.
-  assert(metadata.BlockName == "swift.lookup");
-  assert(metadata.MajorVersion == SWIFT_LOOKUP_TABLE_VERSION_MAJOR);
-  assert(metadata.MinorVersion == SWIFT_LOOKUP_TABLE_VERSION_MINOR);
-
-  // Check whether we already have an entry in the set of lookup tables.
-  auto &entry = Impl.LookupTables[mod.ModuleName];
-  if (entry) return nullptr;
-
-  // Local function used to remove this entry when the reader goes away.
-  std::string moduleName = mod.ModuleName;
-  auto onRemove = [this, moduleName]() {
-    Impl.LookupTables.erase(moduleName);
-  };
-
-  // Create the reader.
-  auto tableReader = SwiftLookupTableReader::create(this, reader, mod, onRemove,
-                                                    stream);
-  if (!tableReader) return nullptr;
-
-  // Create the lookup table.
-  entry.reset(new SwiftLookupTable(tableReader.get()));
-
-  // Return the new reader.
-  return std::move(tableReader);
-}
 
 SwiftLookupTable *ClangImporter::Implementation::findLookupTable(
                     const clang::Module *clangModule) {

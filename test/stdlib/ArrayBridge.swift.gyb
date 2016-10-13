@@ -104,7 +104,7 @@ struct BridgeableValue : _ObjectiveCBridgeable, Equatable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: Subclass?)
       -> BridgeableValue {
-    var result: BridgeableValue? = nil
+    var result: BridgeableValue?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -134,7 +134,7 @@ class Thunks : NSObject {
   @objc func acceptSubclassArray(
     _ x: [Subclass],
     expecting expected: NSArray
-  )  {
+  ) {
     expectEqualSequence(
       expected.lazy.map { ObjectIdentifier($0 as AnyObject) },
       x.lazy.map { ObjectIdentifier($0 as AnyObject) }
@@ -259,32 +259,32 @@ tests.test("Another/${Any}") {
   let subclass2 = subclassInBaseBuffer
   
   // Explicit downcast-ability is based on element type, not buffer type
-  expectNotEmpty(subclassInBaseBuffer as? [Subclass])
+  expectNotNil(subclassInBaseBuffer as? [Subclass])
 
   // We can up-cast to array of Any
   let subclassAsAnyArray: [${Any}] = subclassInBaseBuffer
   expectEqual(subclass2, subclassAsAnyArray.map { $0 as! Base })
 
   let downcastBackToBase = subclassAsAnyArray as? [Base]
-  expectNotEmpty(downcastBackToBase)
+  expectNotNil(downcastBackToBase)
 
-  if let downcastBackToSubclass = expectNotEmpty(subclassAsAnyArray as? [Subclass]) {
+  if let downcastBackToSubclass = expectNotNil(subclassAsAnyArray as? [Subclass]) {
     expectEqual(subclass2, downcastBackToSubclass)
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Fooable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Barable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  if let downcastToProtocols = expectNotEmpty(subclassAsAnyArray as? [Barable & Fooable]) {
+  if let downcastToProtocols = expectNotNil(subclassAsAnyArray as? [Barable & Fooable]) {
     expectEqual(subclass2, downcastToProtocols.map { $0 as! Subclass })
   }
 
-  expectEmpty(subclassAsAnyArray as? [Barable & Bazable])
+  expectNil(subclassAsAnyArray as? [Barable & Bazable])
 }
 
 //===--- Explicitly Bridged -----------------------------------------------===//
@@ -364,7 +364,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   }
 
   // Downcasts of up-casted arrays.
-  if let downcasted = expectNotEmpty(
+  if let downcasted = expectNotNil(
     bridgeableValuesAsAnys as? [Subclass]
   ) {
     expectEqualSequence(expectedSubclasses, downcasted)
@@ -393,7 +393,7 @@ tests.test("testExplicitlyBridged/${Any}") {
   }
 
   // Downcast of Cocoa array to an array of strings (which should fail)
-  expectEmpty(wrappedCocoaBridgeableValues as? [String])
+  expectNil(wrappedCocoaBridgeableValues as? [String])
 
   // Downcast from an implicitly unwrapped optional array of Anys.
   var wrappedCocoaBridgeableValuesIUO: [${Any}]! = wrappedCocoaBridgeableValues
@@ -403,7 +403,7 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   // Downcast from a nil implicitly unwrapped optional array of Anys.
   wrappedCocoaBridgeableValuesIUO = nil
-  expectEmpty(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
+  expectNil(wrappedCocoaBridgeableValuesIUO as? [BridgeableValue])
 
   // Downcast from an optional array of Anys.
   var wrappedCocoaBridgeableValuesOpt: [${Any}]? = wrappedCocoaBridgeableValues
@@ -413,7 +413,7 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   // Downcast from a nil optional array of Anys.
   wrappedCocoaBridgeableValuesOpt = nil
-  expectEmpty(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
+  expectNil(wrappedCocoaBridgeableValuesOpt as? [BridgeableValue])
 }
 % end
 

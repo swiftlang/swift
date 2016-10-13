@@ -55,7 +55,7 @@ DeclContext::getAsGenericTypeOrGenericTypeExtensionContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
-    if (type.isNull() || type->is<ErrorType>())
+    if (type.isNull() || type->hasError())
       return nullptr;
 
     if (auto ND = type->getNominalOrBoundGenericNominal())
@@ -114,10 +114,17 @@ GenericTypeParamDecl *DeclContext::getProtocolSelf() const {
   // (which is not allowed in the first place).
   //
   // Handle this more systematically elsewhere.
-  if (!proto->getGenericParams() || !isInnermostContextGeneric())
+  if (!isInnermostContextGeneric())
     return nullptr;
 
   return getGenericParamsOfContext()->getParams().front();
+}
+
+GenericTypeParamType *DeclContext::getProtocolSelfType() const {
+  auto *param = getProtocolSelf();
+  if (!param)
+    return nullptr;
+  return param->getDeclaredType()->castTo<GenericTypeParamType>();
 }
 
 enum class DeclTypeKind : unsigned {
@@ -140,7 +147,7 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     type = ED->getExtendedType();
   }
 
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return type;
 
   switch (kind) {
@@ -455,6 +462,35 @@ bool DeclContext::isGenericContext() const {
       if (cast<ExtensionDecl>(dc)->getGenericParams())
         return true;
       continue;
+    }
+    llvm_unreachable("bad decl context kind");
+  }
+  llvm_unreachable("illegal declcontext hierarchy");
+}
+
+bool DeclContext::isValidGenericContext() const {
+  for (const DeclContext *dc = this; ; dc = dc->getParent()) {
+    switch (dc->getContextKind()) {
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit:
+    case DeclContextKind::TopLevelCodeDecl:
+      return false;
+
+    case DeclContextKind::Initializer:
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::SubscriptDecl:
+      // Check parent context.
+      continue;
+
+    case DeclContextKind::AbstractFunctionDecl:
+      return cast<AbstractFunctionDecl>(dc)->getGenericEnvironment();
+
+    case DeclContextKind::GenericTypeDecl:
+      return cast<GenericTypeDecl>(dc)->getGenericEnvironment();
+
+    case DeclContextKind::ExtensionDecl:
+      return cast<ExtensionDecl>(dc)->getGenericEnvironment();
     }
     llvm_unreachable("bad decl context kind");
   }

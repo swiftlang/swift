@@ -765,6 +765,18 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
 
+  if (auto A = Args.getLastArg(OPT_swift_version)) {
+    auto vers = version::Version::parseVersionString(
+      A->getValue(), SourceLoc(), &Diags);
+    if (vers.hasValue() &&
+        vers.getValue().isValidEffectiveLanguageVersion()) {
+      Opts.EffectiveLanguageVersion = vers.getValue();
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   Opts.AttachCommentsToDecls |= Args.hasArg(OPT_dump_api_path);
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
@@ -774,6 +786,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalNestedGenericTypes |=
     Args.hasArg(OPT_enable_experimental_nested_generic_types);
+
+  Opts.EnableClassResilience |=
+    Args.hasArg(OPT_enable_class_resilience);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
@@ -981,7 +996,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   using namespace options;
 
-  Opts.VerifyDiagnostics |= Args.hasArg(OPT_verify);
+  if (Args.hasArg(OPT_verify))
+    Opts.VerifyMode = DiagnosticOptions::Verify;
+  if (Args.hasArg(OPT_verify_apply_fixes))
+    Opts.VerifyMode = DiagnosticOptions::VerifyAndApplyFixes;
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
@@ -1112,6 +1130,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.EnableGuaranteedClosureContexts |=
     Args.hasArg(OPT_enable_guaranteed_closure_contexts);
+  Opts.DisableSILPartialApply |=
+    Args.hasArg(OPT_disable_sil_partial_apply);
+  Opts.EnableSILOwnership |= Args.hasArg(OPT_enable_sil_ownership);
 
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from

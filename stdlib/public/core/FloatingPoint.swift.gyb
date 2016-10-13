@@ -183,7 +183,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x == 0.375
   ///
   /// This initializer is equivalent to the following calculation, where `**`
-  /// is exponentation, computed as if by a single, correctly rounded,
+  /// is exponentiation, computed as if by a single, correctly rounded,
   /// floating-point operation:
   ///
   ///     let sign: FloatingPointSign = .plus
@@ -240,7 +240,7 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   init(signOf: Self, magnitudeOf: Self)
 
 % for src_ty in all_integer_types(word_bits):
-  /// Creates a new value, rounded to the closest possible representatation.
+  /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
   /// with more trailing zeros in its significand bit pattern.
@@ -775,9 +775,9 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `other` and is strictly smaller in
-  /// magnitude. The `truncatingRemainder(dividingBy:)` method is always
-  /// exact.
+  /// remainder has the same sign as `self` and is strictly smaller in
+  /// magnitude than `other`. The `truncatingRemainder(dividingBy:)` method
+  /// is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
@@ -811,9 +811,9 @@ public protocol FloatingPoint: Comparable, Arithmetic,
   ///     // x1 == 8.625
   ///
   /// If this value and `other` are both finite numbers, the truncating
-  /// remainder has the same sign as `other` and is strictly smaller in
-  /// magnitude. The `formtruncatingRemainder(dividingBy:)` method is always
-  /// exact.
+  /// remainder has the same sign as `self` and is strictly smaller in
+  /// magnitude than `other`. The `formTruncatingRemainder(dividingBy:)`
+  /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   ///
@@ -1607,7 +1607,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// A binary floating-point type's `exponentBitCount` imposes a limit on the
   /// range of the exponent for normal, finite values. The *exponent bias* of
   /// a type `F` can be calculated as the following, where `**` is
-  /// exponentation:
+  /// exponentiation:
   ///
   ///     let bias = 2 ** (F.exponentBitCount - 1) - 1
   ///
@@ -1911,10 +1911,6 @@ extension BinaryFloatingPoint {
     return true
   }
   
-  @available(*, unavailable, renamed: "isSignalingNaN")
-  public var isSignaling: Bool {
-    return isSignalingNaN
-  }
 
   /*  TODO: uncomment these default implementations when it becomes possible
       to use them.
@@ -1958,6 +1954,34 @@ extension BinaryFloatingPoint {
 @_transparent
 public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
   return x.magnitude
+}
+
+extension FloatingPoint {
+  @available(*, unavailable, message: "Use bitPattern property instead")
+  public func _toBitPattern() -> UInt {
+    fatalError("unavailable")
+  }
+
+  @available(*, unavailable, message: "Use init(bitPattern:) instead")
+  public static func _fromBitPattern(_ bits: UInt) -> Self {
+    fatalError("unavailable")
+  }
+}
+
+extension BinaryFloatingPoint {
+  @available(*, unavailable, renamed: "isSignalingNaN")
+  public var isSignaling: Bool {
+    fatalError("unavailable")
+  }
+
+  @available(*, unavailable, renamed: "nan")
+  public var NaN: Bool {
+    fatalError("unavailable")
+  }
+  @available(*, unavailable, renamed: "nan")
+  public var quietNaN: Bool {
+    fatalError("unavailable")
+  }
 }
 
 @available(*, unavailable, renamed: "FloatingPoint")

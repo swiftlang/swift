@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
@@ -682,12 +683,14 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   return performTypeLocChecking(Ctx, T,
                                 /*isSILMode=*/false,
                                 /*isSILType=*/false,
+                                /*GenericEnv=*/nullptr,
                                 DC, ProduceDiagnostics);
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILMode,
                                    bool isSILType,
+                                   GenericEnvironment *GenericEnv,
                                    DeclContext *DC,
                                    bool ProduceDiagnostics) {
   TypeResolutionOptions options;
@@ -699,12 +702,20 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TR_SILType;
 
+  // FIXME: Get rid of PartialGenericTypeToArchetypeResolver
+  GenericTypeToArchetypeResolver contextResolver(GenericEnv);
+  PartialGenericTypeToArchetypeResolver defaultResolver;
+
+  GenericTypeResolver *resolver =
+      (GenericEnv ? (GenericTypeResolver *) &contextResolver
+                  : (GenericTypeResolver *) &defaultResolver);
+
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options);
+    return TypeChecker(Ctx).validateType(T, DC, options, resolver);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options, resolver);
   }
 }
 
@@ -725,39 +736,6 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
 
   TC.typeCheckDecl(D, true);
   return true;
-}
-
-bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext &DC) {
-  auto &Ctx = DC.getASTContext();
-
-  // We try to reuse the type checker associated with the ast context first.
-  if (Ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
-    return TC->isConvertibleTo(Ty1, Ty2, &DC);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    return (new TypeChecker(Ctx, Diags))->isConvertibleTo(Ty1, Ty2, &DC);
-  }
-}
-
-Type swift::lookUpTypeInContext(DeclContext *DC, StringRef Name) {
-  auto &Ctx = DC->getASTContext();
-  auto ReturnResult = [](UnqualifiedLookup &Lookup) {
-    if (auto Result = Lookup.getSingleTypeResult())
-      return Result->getDeclaredType();
-    return Type();
-  };
-  if (Ctx.getLazyResolver()) {
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Ctx.getLazyResolver(), false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  } else {
-    DiagnosticEngine Diags(Ctx.SourceMgr);
-    LazyResolver *Resolver = new TypeChecker(Ctx, Diags);
-    UnqualifiedLookup Lookup(DeclName(Ctx.getIdentifier(Name)), DC,
-                             Resolver, false, SourceLoc(), true);
-    return ReturnResult(Lookup);
-  }
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -786,7 +764,7 @@ static Optional<Type> getTypeOfCompletionContextExpr(
 
   // Try to recover if we've made any progress.
   if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
-      !parsedExpr->getType()->is<ErrorType>() &&
+      !parsedExpr->getType()->hasError() &&
       parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
     return parsedExpr->getType();
   }
@@ -1405,7 +1383,7 @@ private:
         continue;
       }
 
-      auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+      auto *VersionSpec = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
       if (!VersionSpec)
         continue;
 
@@ -1429,7 +1407,7 @@ private:
       return AvailabilityContext::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     return AvailabilityContext(VersionRange::allGTE(VersionSpec->getVersion()));
   }
 

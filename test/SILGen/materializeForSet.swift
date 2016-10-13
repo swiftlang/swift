@@ -273,7 +273,7 @@ class HasStoredDidSet {
 // CHECK: }
 
 class HasWeak {
-  weak var weakvar: HasWeak? = nil
+  weak var weakvar: HasWeak?
 }
 // CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet7HasWeakm7weakvarXwGSqS0__ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasWeak) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasWeak):
@@ -499,6 +499,23 @@ func inoutAccessOfLazyFinalClassProperty(l: inout LazyFinalClassProperty) {
   increment(&l.cat)
 }
 
+// Make sure the below doesn't crash SILGen
+struct FooClosure {
+ var computed: (((Int) -> Int) -> Int)? {
+   get { return stored }
+   set {}
+ }
+ var stored: (((Int) -> Int) -> Int)? = nil
+}
+
+// CHECK-LABEL: _TF17materializeForSet22testMaterializedSetterFT_T_
+func testMaterializedSetter() {
+  // CHECK: function_ref @_TFV17materializeForSet10FooClosureCfT_S0_
+  var f = FooClosure()
+  // CHECK: function_ref @_TFV17materializeForSet10FooClosureg8computedGSqFFSiSiSi_
+  // CHECK: function_ref @_TFV17materializeForSet10FooClosures8computedGSqFFSiSiSi_
+  f.computed = f.computed
+}
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
 // CHECK:   method #Totalled.total!getter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_g5totalSi

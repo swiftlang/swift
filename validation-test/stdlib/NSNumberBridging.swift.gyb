@@ -107,7 +107,7 @@ NSNumberTests.test("isTypePreservingNSNumber(_:)") {
 }
 
 NSNumberTests.test("_SwiftTypePreservingNSNumber.classForCoder") {
-  // Check that internal subclass is not achived.
+  // Check that internal subclass is not archived.
   let n: NSNumber = (42 as Int)._bridgeToObjectiveC()
   expectTrue(isTypePreservingNSNumber(n))
   expectEqual("NSNumber", String(describing: n.classForCoder))
@@ -258,7 +258,7 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
 %   else:
   expectTrue(isTypePreservingNSNumber(bridgedNSNumber))
 %   end
-  expectNotEmpty(bridgedNSNumber._toCustomAnyHashable())
+  expectNotNil(bridgedNSNumber._toCustomAnyHashable())
 
   // Explicitly constructed NSNumbers don't have a special AnyHashable
   // representation.
@@ -271,7 +271,7 @@ NSNumberTests.test("${Self} bridges to NSNumber (actually _SwiftTypePreservingNS
   let explicitNSNumber = NSNumber(value: input)
 %   end
   expectFalse(isTypePreservingNSNumber(explicitNSNumber))
-  expectEmpty(explicitNSNumber._toCustomAnyHashable())
+  expectNil(explicitNSNumber._toCustomAnyHashable())
   expectTrue(
     Set(["__NSCFNumber", "__NSCFBoolean"]).contains(
       String(describing: type(of: AnyHashable(explicitNSNumber).base))))

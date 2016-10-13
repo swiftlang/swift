@@ -89,13 +89,13 @@ public protocol SignedInteger : _SignedInteger, Integer {
 }
 
 extension SignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#29 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#30 : using Int as the argument is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))
@@ -125,13 +125,13 @@ public protocol UnsignedInteger : _DisallowMixedSignArithmetic, Integer {
 }
 
 extension UnsignedInteger {
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#31 : using Int as the return value is wrong.
   @_transparent
   public func distance(to other: Self) -> Int {
     return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
 
-  // FIXME(ABI): using Int as the return value is wrong.
+  // FIXME(ABI)#32 : using Int as the return value is wrong.
   @_transparent
   public func advanced(by n: Int) -> Self {
     return numericCast((numericCast(self) as IntMax) + numericCast(n))

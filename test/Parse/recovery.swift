@@ -558,7 +558,7 @@ func f1() {
 
 // <rdar://problem/20489838> QoI: Nonsensical error and fixit if "let" is missing between 'if let ... where' clauses
 func testMultiPatternConditionRecovery(x: Int?) {
-  // expected-error@+1 {{expected ',' joining parts of a multi-clause condition}} {{16-21=,}}
+  // expected-error@+1 {{expected ',' joining parts of a multi-clause condition}} {{15-21=,}}
   if let y = x where y == 0, let z = x {
     _ = y
     _ = z

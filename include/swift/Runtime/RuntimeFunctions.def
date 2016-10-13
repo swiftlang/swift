@@ -1037,6 +1037,8 @@ FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, DefaultCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
+FUNCTION(ObjCAllocWithZone, objc_allocWithZone, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCClassPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,

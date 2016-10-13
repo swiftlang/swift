@@ -252,8 +252,22 @@ BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
-/// GetElementPtr has type (Builtin.RawPointer, T) -> Builtin.RawPointer
+/// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+///
+/// Adds index bytes to a base pointer.
+BUILTIN_SIL_OPERATION(GepRaw, "gepRaw", Integer)
+
+/// Gep (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like the GepRaw-builtin, but multiplies the index by stride-of type 'T'.
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
+
+/// getTailAddr(Builtin.RawPointer,
+///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer
+///
+/// Like the Gep-builtin, but rounds up the resulting address to a tail-
+/// allocated element type 'E'.
+BUILTIN_SIL_OPERATION(GetTailAddr, "getTailAddr", Integer)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
@@ -314,6 +328,18 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
 /// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
 
+/// allocWithTailElems_<n>(C.Type,
+///                    Builtin.Word, E1.Type, ... , Builtin.Word, En.Type) -> C\
+///
+/// The integer suffix <n> specifies the number of tail-allocated arrays.
+/// Each tail-allocated array adds a counter and an element meta-type parameter.
+BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
+
+/// projectTailElems : <C,E> (C) -> Builtin.RawPointer
+///
+/// Projects the first tail-allocated element of type E from a class C.
+BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -357,11 +383,6 @@ BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
-
-/// Strideof has type T.Type -> Int.
-/// Note that this version will never return 0.  It instead always returns
-/// at least 1
-BUILTIN_MISC_OPERATION(StrideofNonZero, "strideof_nonzero", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
@@ -451,6 +472,9 @@ BUILTIN_MISC_OPERATION(UnsafeGuaranteed, "unsafeGuaranteed", "", Special)
 
 // unsafeGuaranteedEnd has type (Builtin.Int8) -> ()
 BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
+
+// getObjCTypeEncoding has type <T> T.Type -> RawPointer
+BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

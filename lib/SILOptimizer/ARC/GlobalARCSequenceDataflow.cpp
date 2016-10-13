@@ -245,8 +245,8 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
   bool NestingDetected = false;
 
   BottomUpDataflowRCStateVisitor<ARCBBState> DataflowVisitor(
-      RCIA, BBState, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-      IncToDecStateMap, SetFactory);
+      RCIA, EAFI, BBState, FreezeOwnedArgEpilogueReleases, IncToDecStateMap,
+      SetFactory);
 
   // For each terminator instruction I in BB visited in reverse...
   for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
@@ -395,15 +395,16 @@ bool ARCSequenceDataflowEvaluator::processBottomUp(
 
 ARCSequenceDataflowEvaluator::ARCSequenceDataflowEvaluator(
     SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POA,
-    RCIdentityFunctionInfo *RCIA, ProgramTerminationFunctionInfo *PTFI,
+    RCIdentityFunctionInfo *RCIA, EpilogueARCFunctionInfo *EAFI,
+    ProgramTerminationFunctionInfo *PTFI,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
-    : F(F), AA(AA), POA(POA), RCIA(RCIA), DecToIncStateMap(DecToIncStateMap),
-      IncToDecStateMap(IncToDecStateMap), Allocator(), SetFactory(Allocator),
+    : F(F), AA(AA), POA(POA), RCIA(RCIA), EAFI(EAFI),
+      DecToIncStateMap(DecToIncStateMap), IncToDecStateMap(IncToDecStateMap),
+      Allocator(), SetFactory(Allocator),
       // We use a malloced pointer here so we don't need to expose
       // ARCBBStateInfo in the header.
-      BBStateInfo(new ARCBBStateInfo(&F, POA, PTFI)),
-      ConsumedArgToReleaseMap(RCIA, &F) {}
+      BBStateInfo(new ARCBBStateInfo(&F, POA, PTFI)) {}
 
 bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
   bool NestingDetected = processBottomUp(FreezeOwnedReleases);

@@ -3,6 +3,7 @@
 protocol Protocol1 {
   func foo(arg1: Int, arg2: String) -> String // expected-note{{protocol requires function 'foo(arg1:arg2:)' with type '(Int, String) -> String'; do you want to add a stub?}} {{27-27=\n    func foo(arg1: Int, arg2: String) -> String {\n        <#code#>\n    \}\n}}
   func bar() throws -> String // expected-note{{protocol requires function 'bar()' with type '() throws -> String'; do you want to add a stub?}} {{27-27=\n    func bar() throws -> String {\n        <#code#>\n    \}\n}}
+  func generic<T>(t: T) // expected-note{{protocol requires function 'generic(t:)' with type '<T> (t: T) -> ()'; do you want to add a stub?}} {{27-27=\n    func generic<T>(t: T) {\n        <#code#>\n    \}\n}}
   init(arg: Int) // expected-note{{protocol requires initializer 'init(arg:)' with type '(arg: Int)'; do you want to add a stub?}} {{27-27=\n    required init(arg: Int) {\n        <#code#>\n    \}\n}}
   var baz: Int { get } // expected-note{{protocol requires property 'baz' with type 'Int'; do you want to add a stub?}} {{27-27=\n    var baz: Int\n}}
   var baz2: Int { get set } // expected-note{{protocol requires property 'baz2' with type 'Int'; do you want to add a stub?}} {{27-27=\n    var baz2: Int\n}}

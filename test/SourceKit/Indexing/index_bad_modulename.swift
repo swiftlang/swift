@@ -4,6 +4,6 @@
 // RUN: diff -u %s.response %t.response2
 
 import ObjectiveC
-let v: NSObject? = nil
+let v: NSObject?
 
 // REQUIRES: objc_interop

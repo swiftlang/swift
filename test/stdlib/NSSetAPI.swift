@@ -43,6 +43,30 @@ NSSetAPI.test("CustomStringConvertible") {
   expectEqual(expect, result)
 }
 
+NSSetAPI.test("AnyHashable containing NSSet") {
+  let values: [NSSet] = [
+    NSSet(),
+    NSSet(objects: 1, 2, 3),
+    NSSet(objects: 1, 2, 3),
+  ]
+  let anyHashables = values.map(AnyHashable.init)
+  expectEqual(Set<AnyHashable>.self, type(of: anyHashables[0].base))
+  expectEqual(Set<AnyHashable>.self, type(of: anyHashables[1].base))
+  expectEqual(Set<AnyHashable>.self, type(of: anyHashables[2].base))
+  expectNotEqual(anyHashables[0], anyHashables[1])
+  expectEqual(anyHashables[1], anyHashables[2])
+}
+
+NSSetAPI.test("AnyHashable containing NSSet that contains an NSSet") {
+  let anyHashable = AnyHashable(NSSet(objects: NSSet(objects: 1,2,3)))
+  expectEqual(Set<AnyHashable>.self, type(of: anyHashable.base))
+
+  if let firstNested
+    = expectNotNil((anyHashable.base as! Set<AnyHashable>).first!) {
+    expectEqual(Set<AnyHashable>.self, type(of: firstNested.base))
+  }
+}
+
 var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("Sequence") {
@@ -85,10 +109,10 @@ NSIndexSetAPI.test("Sequence") {
   // expectEqual(Optional<Int>.some(1), iter.next())
   // expectEqual(Optional<Int>.none, iter.next())
   expectOptionalEqual(1, iter.next())
-  expectEmpty(iter.next())
+  expectNil(iter.next())
   let empty = NSIndexSet(indexesIn: NSMakeRange(1, 0))
   var emptyGen = empty.makeIterator()
-  expectEmpty(emptyGen.next())
+  expectNil(emptyGen.next())
 }
 
 runAllTests()

@@ -287,7 +287,7 @@ void PoundAvailableInfo::
 getPlatformKeywordLocs(SmallVectorImpl<SourceLoc> &PlatformLocs) {
   for (unsigned i = 0; i < NumQueries; i++) {
     auto *VersionSpec =
-      dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
+      dyn_cast<PlatformVersionConstraintAvailabilitySpec>(getQueries()[i]);
     if (!VersionSpec)
       continue;
     

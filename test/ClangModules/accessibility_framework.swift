@@ -26,4 +26,4 @@ class AA: NSView {
 }
 
 let a = A()
-print(a.accessibilityLabel(), terminator: "")
+print(a.accessibilityLabel() as Any, terminator: "")

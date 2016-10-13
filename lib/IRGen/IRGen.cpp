@@ -88,12 +88,6 @@ static void addSwiftContractPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCContractPass());
 }
 
-static void addSwiftStackPromotionPass(const PassManagerBuilder &Builder,
-                                       PassManagerBase &PM) {
-  if (Builder.OptLevel > 0)
-    PM.add(createSwiftStackPromotionPass());
-}
-
 static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
                                        PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
@@ -161,9 +155,6 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
       PMBuilder.Inliner =
         llvm::createAlwaysInlinerPass(/*insertlifetime*/false);
   }
-
-  PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
-                         addSwiftStackPromotionPass);
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
   // and the Contract pass as late as possible.
@@ -257,6 +248,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
   ModulePasses.run(*Module);
 }
 
+namespace {
 /// An output stream which calculates the MD5 hash of the streamed data.
 class MD5Stream : public llvm::raw_ostream {
 private:
@@ -278,19 +270,21 @@ public:
     Hash.final(Result);
   }
 };
+} // end anonymous namespace
 
 /// Computes the MD5 hash of the llvm \p Module including the compiler version
 /// and options which influence the compilation.
 static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
                             llvm::Module *Module,
-                            llvm::TargetMachine *TargetMachine) {
+                            llvm::TargetMachine *TargetMachine,
+                            version::Version const& effectiveLanguageVersion) {
   // Calculate the hash of the whole llvm module.
   MD5Stream HashStream;
   llvm::WriteBitcodeToFile(Module, HashStream);
 
   // Update the hash with the compiler version. We want to recompile if the
   // llvm pipeline of the compiler changed.
-  HashStream << version::getSwiftFullVersion();
+  HashStream << version::getSwiftFullVersion(effectiveLanguageVersion);
 
   // Add all options which influence the llvm compilation but are not yet
   // reflected in the llvm module itself.
@@ -356,12 +350,14 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::GlobalVariable *HashGlobal,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
+                        version::Version const& effectiveLanguageVersion,
                         StringRef OutputFilename) {
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
     MD5::MD5Result Result;
-    getHashOfModule(Result, Opts, Module, TargetMachine);
+    getHashOfModule(Result, Opts, Module, TargetMachine,
+                    effectiveLanguageVersion);
 
     DEBUG(
       if (DiagMutex) DiagMutex->lock();
@@ -521,6 +517,22 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   if (Opts.EmbedMode == IRGenEmbedMode::None)
     return;
 
+  // Save llvm.compiler.used and remove it.
+  SmallVector<llvm::Constant*, 2> UsedArray;
+  SmallSet<llvm::GlobalValue*, 4> UsedGlobals;
+  auto *UsedElementType =
+    llvm::Type::getInt8Ty(M->getContext())->getPointerTo(0);
+  llvm::GlobalVariable *Used =
+    collectUsedGlobalVariables(*M, UsedGlobals, true);
+  for (auto *GV : UsedGlobals) {
+    if (GV->getName() != "llvm.embedded.module" &&
+        GV->getName() != "llvm.cmdline")
+      UsedArray.push_back(
+          ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
+  }
+  if (Used)
+    Used->eraseFromParent();
+
   // Embed the bitcode for the llvm module.
   std::string Data;
   llvm::raw_string_ostream OS(Data);
@@ -530,14 +542,15 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   ArrayRef<uint8_t> ModuleData((uint8_t*)OS.str().data(), OS.str().size());
   llvm::Constant *ModuleConstant =
     llvm::ConstantDataArray::get(M->getContext(), ModuleData);
-  // Use Appending linkage so it doesn't get optimized out.
   llvm::GlobalVariable *GV = new llvm::GlobalVariable(*M,
                                        ModuleConstant->getType(), true,
-                                       llvm::GlobalValue::AppendingLinkage,
+                                       llvm::GlobalValue::PrivateLinkage,
                                        ModuleConstant);
+  UsedArray.push_back(
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
   GV->setSection("__LLVM,__bitcode");
   if (llvm::GlobalVariable *Old =
-      M->getGlobalVariable("llvm.embedded.module")) {
+      M->getGlobalVariable("llvm.embedded.module", true)) {
     GV->takeName(Old);
     Old->replaceAllUsesWith(GV);
     delete Old;
@@ -551,16 +564,28 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   llvm::Constant *CmdConstant =
     llvm::ConstantDataArray::get(M->getContext(), CmdData);
   GV = new llvm::GlobalVariable(*M, CmdConstant->getType(), true,
-                                llvm::GlobalValue::AppendingLinkage,
+                                llvm::GlobalValue::PrivateLinkage,
                                 CmdConstant);
   GV->setSection("__LLVM,__swift_cmdline");
-  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline")) {
+  UsedArray.push_back(
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, UsedElementType));
+  if (llvm::GlobalVariable *Old = M->getGlobalVariable("llvm.cmdline", true)) {
     GV->takeName(Old);
     Old->replaceAllUsesWith(GV);
     delete Old;
   } else {
     GV->setName("llvm.cmdline");
   }
+
+  if (UsedArray.empty())
+    return;
+
+  // Recreate llvm.compiler.used.
+  auto *ATy = llvm::ArrayType::get(UsedElementType, UsedArray.size());
+  auto *NewUsed = new GlobalVariable(
+           *M, ATy, false, llvm::GlobalValue::AppendingLinkage,
+           llvm::ConstantArray::get(ATy, UsedArray), "llvm.compiler.used");
+  NewUsed->setSection("llvm.metadata");
 }
 
 static void initLLVMModule(const IRGenModule &IGM) {
@@ -672,7 +697,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   embedBitcode(IGM.getModule(), Opts);
 
   if (performLLVM(Opts, IGM.Context.Diags, nullptr, IGM.ModuleHash,
-                  IGM.getModule(), IGM.TargetMachine.get(), IGM.OutputFilename))
+                  IGM.getModule(), IGM.TargetMachine.get(),
+                  IGM.Context.LangOpts.EffectiveLanguageVersion,
+                  IGM.OutputFilename))
     return nullptr;
   return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
@@ -688,7 +715,9 @@ static void ThreadEntryPoint(IRGenerator *irgen,
     );
     embedBitcode(IGM->getModule(), irgen->Opts);
     performLLVM(irgen->Opts, IGM->Context.Diags, DiagMutex, IGM->ModuleHash,
-                IGM->getModule(), IGM->TargetMachine.get(), IGM->OutputFilename);
+                IGM->getModule(), IGM->TargetMachine.get(),
+                IGM->Context.LangOpts.EffectiveLanguageVersion,
+                IGM->OutputFilename);
     if (IGM->Context.Diags.hadAnyError())
       return;
   }
@@ -781,6 +810,11 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
 
   irgen.emitProtocolConformances();
 
+  irgen.emitReflectionMetadataVersion();
+
+  // Emit reflection metadata for builtin and imported types.
+  irgen.emitBuiltinReflectionMetadata();
+
   // Okay, emit any definitions that we suddenly need.
   irgen.emitLazyDefinitions();
   
@@ -817,9 +851,10 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   for (auto it = irgen.begin(); it != irgen.end(); ++it) {
     IRGenModule *IGM = it->second;
     llvm::Module *M = IGM->getModule();
-    auto collectReference = [&](llvm::GlobalObject &G) {
+    auto collectReference = [&](llvm::GlobalValue &G) {
       if (G.isDeclaration()
-          && G.getLinkage() == GlobalValue::LinkOnceODRLinkage) {
+          && (G.getLinkage() == GlobalValue::LinkOnceODRLinkage ||
+              G.getLinkage() == GlobalValue::ExternalLinkage)) {
         referencedGlobals.insert(G.getName());
         G.setLinkage(GlobalValue::ExternalLinkage);
       }
@@ -829,6 +864,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
     for (llvm::Function &F : M->getFunctionList()) {
       collectReference(F);
+    }
+    for (llvm::GlobalAlias &A : M->getAliasList()) {
+      collectReference(A);
     }
   }
 
@@ -840,7 +878,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     // If a shared function/global is referenced from another file it must have
     // weak instead of linkonce linkage. Otherwise LLVM would remove the
     // definition (if it's not referenced in the same file).
-    auto updateLinkage = [&](llvm::GlobalObject &G) {
+    auto updateLinkage = [&](llvm::GlobalValue &G) {
       if (!G.isDeclaration()
           && G.getLinkage() == GlobalValue::LinkOnceODRLinkage
           && referencedGlobals.count(G.getName()) != 0) {
@@ -852,6 +890,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
     for (llvm::Function &F : M->getFunctionList()) {
       updateLinkage(F);
+    }
+    for (llvm::GlobalAlias &A : M->getAliasList()) {
+      updateLinkage(A);
     }
 
     if (!IGM->finalize())
@@ -944,7 +985,9 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   ASTSym->setSection(Section);
   ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, IGM.getModule(),
-                IGM.TargetMachine.get(), OutputPath);
+                IGM.TargetMachine.get(),
+                Ctx.LangOpts.EffectiveLanguageVersion,
+                OutputPath);
 }
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
@@ -956,7 +999,9 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
-                    TargetMachine.get(), Opts.getSingleOutputFilename()))
+                    TargetMachine.get(),
+                    Ctx.LangOpts.EffectiveLanguageVersion,
+                    Opts.getSingleOutputFilename()))
     return true;
   return false;
 }

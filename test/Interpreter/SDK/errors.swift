@@ -40,13 +40,13 @@ ErrorHandlingTests.test("succeedIgnoringError") {
 ErrorHandlingTests.test("fail") {
   let obj = ErrorImpl()
   let result = testFail(obj)
-  expectEmpty(result)
+  expectNil(result)
 }
 
 ErrorHandlingTests.test("failIgnoringError") {
   let obj = ErrorImpl()
   let result = testFailIgnoringError(obj)
-  expectEmpty(result)
+  expectNil(result)
 }
 
 runAllTests()

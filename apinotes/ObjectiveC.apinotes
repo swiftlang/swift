@@ -101,7 +101,7 @@ Protocols:
   - Selector: class
     MethodKind: Instance
     Availability: nonswift
-    AvailabilityMsg: use 'dynamicType' instead
+    AvailabilityMsg: use 'type(of:)' instead
   - Selector: 'conformsToProtocol:'
     MethodKind: Instance
     Nullability:

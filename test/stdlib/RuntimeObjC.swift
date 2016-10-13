@@ -83,7 +83,7 @@ struct BridgedValueType : _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
       -> BridgedValueType {
-    var result: BridgedValueType? = nil
+    var result: BridgedValueType?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -132,7 +132,7 @@ struct BridgedLargeValueType : _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: ClassA?)
       -> BridgedLargeValueType {
-    var result: BridgedLargeValueType? = nil
+    var result: BridgedLargeValueType?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -253,7 +253,7 @@ Runtime.test("bridgeToObjectiveC/NoLeak") {
 Runtime.test("forceBridgeFromObjectiveC") {
 
   // Bridge back using BridgedValueType.
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       ClassA(value: 21), BridgedValueType.self))
 
   expectEqual(42, _forceBridgeFromObjectiveC(
@@ -261,11 +261,11 @@ Runtime.test("forceBridgeFromObjectiveC") {
   expectEqual(42, _conditionallyBridgeFromObjectiveC(
       ClassA(value: 42), BridgedValueType.self)!.value)
 
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       BridgedVerbatimRefType(), BridgedValueType.self))
 
   // Bridge back using BridgedLargeValueType.
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       ClassA(value: 21), BridgedLargeValueType.self))
 
   expectEqual(42, _forceBridgeFromObjectiveC(
@@ -273,14 +273,14 @@ Runtime.test("forceBridgeFromObjectiveC") {
   expectEqual(42, _conditionallyBridgeFromObjectiveC(
       ClassA(value: 42), BridgedLargeValueType.self)!.value)
 
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       BridgedVerbatimRefType(), BridgedLargeValueType.self))
 
   // Bridge back using BridgedVerbatimRefType.
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       ClassA(value: 21), BridgedVerbatimRefType.self))
 
-  expectEmpty(_conditionallyBridgeFromObjectiveC(
+  expectNil(_conditionallyBridgeFromObjectiveC(
       ClassA(value: 42), BridgedVerbatimRefType.self))
 
   var bridgedVerbatimRef = BridgedVerbatimRefType()
@@ -736,7 +736,7 @@ Reflection.test("CGRect") {
 
 Reflection.test("Unmanaged/nil") {
   var output = ""
-  var optionalURL: Unmanaged<CFURL>? = nil
+  var optionalURL: Unmanaged<CFURL>?
   dump(optionalURL, to: &output)
 
   let expected = "- nil\n"

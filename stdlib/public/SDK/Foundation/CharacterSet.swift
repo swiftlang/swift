@@ -74,7 +74,7 @@ internal final class _SwiftNSCharacterSet : _SwiftNativeNSCharacterSet, _SwiftNa
 */
 public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgebra, _MutablePairBoxing {
     public typealias ReferenceType = NSCharacterSet
-    
+
     internal typealias SwiftNSWrapping = _SwiftNSCharacterSet
     internal typealias ImmutableType = SwiftNSWrapping.ImmutableType
     internal typealias MutableType = SwiftNSWrapping.MutableType
@@ -134,17 +134,9 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
             return nil
         }
     }
-    
+
     public var hashValue: Int {
         return _mapUnmanaged { $0.hashValue }
-    }
-    
-    public var description: String {
-        return _mapUnmanaged { $0.description }
-    }
-    
-    public var debugDescription: String {
-        return _mapUnmanaged { $0.debugDescription }
     }
     
     private init(reference: NSCharacterSet) {
@@ -414,19 +406,29 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         return result
     }
     
-    /// Sets the value to the intersection of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an intersection of the `CharacterSet` with another `CharacterSet`.
     public mutating func formIntersection(_ other: CharacterSet) {
         _applyUnmanagedMutation {
             $0.formIntersection(with: other)
         }
     }
-    
-    /// Returns the exclusive or of the `CharacterSet` with another `CharacterSet`.
+
+    /// Returns a `CharacterSet` created by removing elements in `other` from `self`.
+    public func subtracting(_ other: CharacterSet) -> CharacterSet {
+        return intersection(other.inverted)
+    }
+
+    /// Sets the value to a `CharacterSet` created by removing elements in `other` from `self`.
+    public mutating func subtract(_ other: CharacterSet) {
+        self = subtracting(other)
+    }
+
+    /// Returns an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public func symmetricDifference(_ other: CharacterSet) -> CharacterSet {
         return union(other).subtracting(intersection(other))
     }
     
-    /// Sets the value to the exclusive or of the `CharacterSet` with another `CharacterSet`.
+    /// Sets the value to an exclusive or of the `CharacterSet` with another `CharacterSet`.
     public mutating func formSymmetricDifference(_ other: CharacterSet) {
         self = symmetricDifference(other)
     }
@@ -467,6 +469,16 @@ extension CharacterSet : _ObjectiveCBridgeable {
         return CharacterSet(_bridged: source!)
     }
     
+}
+
+extension CharacterSet : CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String {
+        return _mapUnmanaged { $0.description }
+    }
+
+    public var debugDescription: String {
+        return _mapUnmanaged { $0.debugDescription }
+    }
 }
 
 extension NSCharacterSet : _HasCustomAnyHashableRepresentation {

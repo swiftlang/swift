@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
@@ -93,7 +93,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!updateState)
     return;
 
-  if (!type->is<TypeVariableType>()) {
+  if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
     ProtocolDecl *literalProtocol = nullptr;
@@ -136,9 +136,8 @@ void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
   assert(type->isMaterializable() &&
          "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
-  TypeVariableType *typeVar = nullptr;
-  type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/false);
-  if (typeVar) {
+  type = getFixedTypeRecursive(type, /*wantRValue=*/false);
+  if (auto typeVar = type->getAs<TypeVariableType>()) {
     typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
   } else if (auto *tupleTy = type->getAs<TupleType>()) {
     for (auto elt : tupleTy->getElementTypes()) {
@@ -249,6 +248,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
   }
+  static_assert(NumAlternativeLiteralTypes == 13, "Wrong # of literal types");
 
   // If we already looked for alternative literal types, return those results.
   if (AlternativeLiteralTypes[index])
@@ -446,10 +446,8 @@ namespace {
         if (implArchetype->hasNestedType(member->getName())) {
           nestedType = implArchetype->getNestedType(member->getName());
           archetype = nestedType.getValue()->getAs<ArchetypeType>();
-        } else if (implArchetype->isSelfDerived()) {
-          archetype = implArchetype;
         }
-                                
+
         ConstraintLocator *locator;
         if (archetype) {
           locator = CS.getConstraintLocator(
@@ -484,7 +482,7 @@ namespace {
                            superclass, locator);
         }
 
-        for (auto proto : member->getArchetype()->getConformsTo()) {
+        for (auto proto : member->getConformingProtocols()) {
           CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
                            proto->getDeclaredType(), locator);
         }
@@ -563,7 +561,7 @@ namespace {
         // dependency that isn't being diagnosed properly.
         if (!unboundDecl->getGenericSignature()) {
           cs.TC.diagnose(unboundDecl, diag::circular_reference);
-          return ErrorType::get(cs.getASTContext());
+          return ErrorType::get(type);
         }
         
         
@@ -624,8 +622,7 @@ static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
     SmallVector<TupleTypeElt, 4> elements;
     elements.reserve(tupleTy->getNumElements());
     for (const auto &elt : tupleTy->getElements()) {
-      elements.push_back(TupleTypeElt(elt.getType(), Identifier(),
-                                      elt.isVararg()));
+      elements.push_back(elt.getWithoutName());
     }
     inputType = TupleType::get(elements, type->getASTContext());
   }
@@ -738,22 +735,7 @@ Type ConstraintSystem::openBindingType(Type type,
   return result;
 }
 
-static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
-                                        TypeVariableType *typeVar,
-                                        bool wantRValue) {
-  while (auto fixed = cs.getFixedType(typeVar)) {
-    if (wantRValue)
-      fixed = fixed->getRValueType();
-
-    typeVar = fixed->getAs<TypeVariableType>();
-    if (!typeVar)
-      return fixed;
-  }
-  return nullptr;
-}
-
-Type ConstraintSystem::getFixedTypeRecursive(Type type, 
-                                             TypeVariableType *&typeVar,
+Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              bool wantRValue,
                                              bool retainParens) {
   if (wantRValue)
@@ -761,19 +743,22 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
 
   if (retainParens) {
     if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), typeVar,
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(),
                                    wantRValue, retainParens);
       return ParenType::get(getASTContext(), type);
     }
   }
 
-  auto desugar = type->getDesugaredType();
-  typeVar = desugar->getAs<TypeVariableType>();
-  if (typeVar) {
-    if (auto fixed = getFixedTypeRecursiveHelper(*this, typeVar, wantRValue)) {
+  while (auto typeVar = type->getAs<TypeVariableType>()) {
+    if (auto fixed = getFixedType(typeVar)) {
+      if (wantRValue)
+        fixed = fixed->getRValueType();
+
       type = fixed;
-      typeVar = nullptr;
+      continue;
     }
+
+    break;
   }
   return type;
 }
@@ -837,7 +822,7 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // If this is a curried reference to an instance method, where 'self' is
     // being applied, e.g., "ClassName.instanceMethod(self)", remove the
     // argument labels from the resulting function type. The 'self' parameter is
-    // always unlabled, so this operation is a no-op for the actual application.
+    // always unlabeled, so this operation is a no-op for the actual application.
     return isCurriedInstanceReference ? func->getNumParameterLists() : 1;
 
   case FunctionRefKind::DoubleApply:
@@ -1003,34 +988,38 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
 
-  bool inTypeContext = true;
+  auto *genericEnv = outerDC->getGenericEnvironmentOfContext();
+
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
-    if (!parentDC->isTypeContext())
-      inTypeContext = false;
+    if (parentDC->isTypeContext() &&
+        (parentDC == outerDC ||
+         !parentDC->getAsProtocolOrProtocolExtensionContext()))
+      continue;
 
-    if ((!inTypeContext && parentDC->isInnermostContextGeneric()) ||
-        (parentDC->getAsProtocolOrProtocolExtensionContext() &&
-         parentDC != outerDC)) {
-      for (auto gpDecl : *parentDC->getGenericParamsOfContext()) {
-        auto gp = gpDecl->getDeclaredType();
-        auto *archetype = ArchetypeBuilder::mapTypeIntoContext(parentDC, gp)
-            ->castTo<ArchetypeType>();
-        auto found = replacements.find(gp->getCanonicalType());
+    auto *genericSig = parentDC->getGenericSignatureOfContext();
+    if (!genericSig)
+      break;
 
-        // When opening up an UnboundGenericType, we only pass in the
-        // innermost generic parameters as 'params' above -- outer
-        // parameters are not opened, so we must skip them here.
-        if (found != replacements.end()) {
-          auto typeVar = found->second;
-          cs.addConstraint(ConstraintKind::Bind, typeVar, archetype,
-                           locatorPtr);
-        }
+    for (auto *paramTy : genericSig->getGenericParams()) {
+      auto found = replacements.find(paramTy->getCanonicalType());
+
+      // We might not have a type variable for this generic parameter
+      // because either we're opening up an UnboundGenericType,
+      // in which case we only want to infer the innermost generic
+      // parameters, or because this generic parameter was constrained
+      // away into a concrete type.
+      if (found != replacements.end()) {
+        auto typeVar = found->second;
+        auto contextTy = genericEnv->mapTypeIntoContext(paramTy);
+        cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
+                         locatorPtr);
       }
     }
-  }
 
+    break;
+  }
 }
 
 void ConstraintSystem::openGeneric(
@@ -1042,14 +1031,16 @@ void ConstraintSystem::openGeneric(
        ConstraintLocatorBuilder locator,
        llvm::DenseMap<CanType, TypeVariableType *> &replacements) {
   auto locatorPtr = getConstraintLocator(locator);
+  auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : params) {
-    auto *archetype = ArchetypeBuilder::mapTypeIntoContext(innerDC, gp)
-        ->castTo<ArchetypeType>();
-    auto typeVar = createTypeVariable(getConstraintLocator(
-                                        locator.withPathElement(
-                                          LocatorPathElt(archetype))),
+    auto contextTy = genericEnv->mapTypeIntoContext(gp);
+    if (auto *archetype = contextTy->getAs<ArchetypeType>())
+      locatorPtr = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt(archetype)));
+
+    auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_PrefersSubtypeBinding |
                                       TVO_MustBeMaterializable);
     replacements[gp->getCanonicalType()] = typeVar;
@@ -1177,9 +1168,7 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     llvm::DenseMap<CanType, TypeVariableType *> *replacementsPtr) {
   // Figure out the instance type used for the base.
-  TypeVariableType *baseTypeVar = nullptr;
-  Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
-                                         /*wantRValue=*/true);
+  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
   bool isInstance = true;
   if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
@@ -1322,7 +1311,7 @@ ConstraintSystem::getTypeOfMemberReference(
       if (!isClassBoundExistential &&
           !selfTy->hasReferenceSemantics() &&
           baseTy->is<LValueType>() &&
-          !selfTy->is<ErrorType>())
+          !selfTy->hasError())
         selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);

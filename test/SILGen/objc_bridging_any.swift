@@ -126,27 +126,29 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(knownUnbridged)
 
+  // These cases bridge using Optional's _ObjectiveCBridgeable conformance.
+
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<String>
   // CHECK: store [[OPT_STRING]] to [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<String>>([[TMP]])
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<String>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalA)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<NSString>
   // CHECK: store [[OPT_NSSTRING]] to [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<NSString>>([[TMP]])
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<NSString>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalB)
 
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $NSIdLover,
   // CHECK: [[TMP:%.*]] = alloc_stack $Optional<Any>
   // CHECK: copy_addr [[OPT_ANY]] to [initialization] [[TMP]]
-  // CHECK: [[BRIDGE_ANYTHING:%.*]] = function_ref @_TFs27_bridgeAnythingToObjectiveC
-  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_ANYTHING]]<Optional<Any>>([[TMP]])
+  // CHECK: [[BRIDGE_OPTIONAL:%.*]] = function_ref @_TFSq19_bridgeToObjectiveCfT_Ps9AnyObject_
+  // CHECK: [[ANYOBJECT:%.*]] = apply [[BRIDGE_OPTIONAL]]<Any>([[TMP]])
   // CHECK: apply [[METHOD]]([[ANYOBJECT]], [[SELF]])
   receiver.takesId(optionalC)
 
@@ -422,7 +424,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  strong_release [[RESULT]]
   // CHECK-NEXT:  return [[BLOCK]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP___XFdCb_dPs9AnyObject___ : $@convention(c) @pseudogeneric (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iP___XFdCb_dPs9AnyObject___ : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
   // CHECK:     bb0(%0 : $*@block_storage @callee_owned (@in Any) -> (), %1 : $AnyObject):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage %0
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [[BLOCK_STORAGE_ADDR]]
@@ -493,7 +495,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  strong_release [[FUNCTION]]
   // CHECK-NEXT:  return [[BLOCK]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__iP__XFdCb__aPs9AnyObject__ : $@convention(c) @pseudogeneric (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__iP__XFdCb__aPs9AnyObject__ : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject
   // CHECK:     bb0(%0 : $*@block_storage @callee_owned () -> @out Any):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage %0
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [[BLOCK_STORAGE_ADDR]]

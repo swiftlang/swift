@@ -120,7 +120,7 @@ ErrorTests.test("try?") {
   expectType(Optional<Int>.self, &value)
   expectEqual(Optional(1), value)
 
-  expectEmpty(try? { () throws -> Int in throw SillyError.JazzHands }())
+  expectNil(try? { () throws -> Int in throw SillyError.JazzHands }())
 }
 
 enum LifetimeError : Error {
@@ -130,7 +130,7 @@ enum LifetimeError : Error {
 ErrorTests.test("existential in lvalue") {
   expectEqual(0, LifetimeTracked.instances)
   do {
-    var e: Error? = nil
+    var e: Error?
     do {
       throw LifetimeError.MistakeOfALifetime(LifetimeTracked(0),
                                              yearsIncarcerated: 25)

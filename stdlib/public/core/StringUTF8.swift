@@ -16,10 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME(ABI): The UTF-8 string view should conform to
+// FIXME(ABI)#72 : The UTF-8 string view should conform to
 // `BidirectionalCollection`.
 
-// FIXME(ABI): The UTF-8 string view should have a custom iterator type to
+// FIXME(ABI)#73 : The UTF-8 string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
 extension _StringCore {

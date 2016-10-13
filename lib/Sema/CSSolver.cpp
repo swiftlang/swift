@@ -20,8 +20,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include <memory>
 #include <tuple>
-#include <stack>
-#include <queue>
 using namespace swift;
 using namespace constraints;
 
@@ -202,8 +200,8 @@ Solution ConstraintSystem::finalize(
   }
 
   // Remember the defaulted type variables.
-  solution.DefaultedTypeVariables.insert(DefaultedTypeVariables.begin(),
-                                         DefaultedTypeVariables.end());
+  solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
+                                       DefaultedConstraints.end());
 
   return solution;
 }
@@ -262,8 +260,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedTypeVariables.append(solution.DefaultedTypeVariables.begin(),
-                                solution.DefaultedTypeVariables.end());
+  DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
+                              solution.DefaultedConstraints.end());
 
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
@@ -449,7 +447,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
-  numDefaultedTypeVariables = cs.DefaultedTypeVariables.size();
+  numDefaultedConstraints = cs.DefaultedConstraints.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -507,7 +505,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
 
   // Remove any defaulted type variables.
-  truncate(cs.DefaultedTypeVariables, numDefaultedTypeVariables);
+  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
   
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -548,14 +546,17 @@ namespace {
     /// The defaulted protocol associated with this binding.
     Optional<ProtocolDecl *> DefaultedProtocol;
 
-    /// Whether this is a binding that comes from a 'Defaultable' constraint.
-    bool IsDefaultableBinding = false;
+    /// If this is a binding that comes from a \c Defaultable constraint,
+    /// the locator of that constraint.
+    ConstraintLocator *DefaultableBinding = nullptr;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      Optional<ProtocolDecl *> defaultedProtocol = None,
-                     bool isDefaultableBinding = false)
+                     ConstraintLocator *defaultableBinding = nullptr)
       : BindingType(type), Kind(kind), DefaultedProtocol(defaultedProtocol),
-        IsDefaultableBinding(isDefaultableBinding) { }
+        DefaultableBinding(defaultableBinding) { }
+
+    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
   };
 
   struct PotentialBindings {
@@ -712,7 +713,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     if (binding.Kind == AllowedBindingKind::Supertypes &&
         !binding.BindingType->hasTypeVariable() &&
         !binding.DefaultedProtocol &&
-        !binding.IsDefaultableBinding &&
+        !binding.isDefaultableBinding() &&
         allowJoinMeet) {
       if (lastSupertypeIndex) {
         // Can we compute a join?
@@ -783,14 +784,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     case ConstraintKind::ConformsTo: 
     case ConstraintKind::SelfObjectOfProtocol: {
-      // FIXME: Can we always assume that the type variable is the lower bound?
-      TypeVariableType *lowerTypeVar = nullptr;
-      cs.getFixedTypeRecursive(constraint->getFirstType(), lowerTypeVar,
-                               /*wantRValue=*/false);
-      if (lowerTypeVar != typeVar) {
-        continue;
-      }
-
       // If there is a default literal type for this protocol, it's a
       // potential binding.
       auto defaultType = tc.getDefaultType(constraint->getProtocol(), cs.DC);
@@ -1062,7 +1055,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       continue;
 
     ++result.NumDefaultableBindings;
-    addPotentialBinding({type, AllowedBindingKind::Exact, None, true});
+    addPotentialBinding({type, AllowedBindingKind::Exact, None,
+                         constraint->getLocator()});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -1156,7 +1150,7 @@ static bool tryTypeVariableBindings(
     for (const auto &binding : bindings) {
       // If this is a defaultable binding and we have found any solutions,
       // don't explore the default binding.
-      if (binding.IsDefaultableBinding && anySolved)
+      if (binding.isDefaultableBinding() && anySolved)
         continue;
 
       auto type = binding.BindingType;
@@ -1224,8 +1218,8 @@ static bool tryTypeVariableBindings(
                        typeVar->getImpl().getLocator());
 
       // If this was from a defaultable binding note that.
-      if (binding.IsDefaultableBinding) {
-        cs.DefaultedTypeVariables.push_back(typeVar);
+      if (binding.isDefaultableBinding()) {
+        cs.DefaultedConstraints.push_back(binding.DefaultableBinding);
       }
 
       if (!cs.solveRec(solutions, allowFreeTypeVariables))
@@ -1248,7 +1242,7 @@ static bool tryTypeVariableBindings(
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       const auto type = binding.BindingType;
-      if (type->is<ErrorType>())
+      if (type->hasError())
         continue;
 
       // After our first pass, note that we've explored these
@@ -1344,13 +1338,6 @@ bool ConstraintSystem::Candidate::solve() {
   // Allocate new constraint system for sub-expression.
   ConstraintSystem cs(TC, DC, None);
 
-  // Set contextual type if present. This is done before constraint generation
-  // to give a "hint" to that operation about possible optimizations.
-  auto CT = IsPrimary ? CS.getContextualType() : CS.getContextualType(E);
-  if (!CT.isNull())
-    cs.setContextualType(E, CS.getContextualTypeLoc(),
-                         CS.getContextualTypePurpose());
-
   // Generate constraints for the new system.
   if (auto generatedExpr = cs.generateConstraints(E)) {
     E = generatedExpr;
@@ -1364,7 +1351,7 @@ bool ConstraintSystem::Candidate::solve() {
   // constraint to the system.
   if (!CT.isNull()) {
     auto constraintKind = ConstraintKind::Conversion;
-    if (CS.getContextualTypePurpose() == CTP_CallArgument)
+    if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
     cs.addConstraint(constraintKind, E->getType(), CT,
@@ -1459,73 +1446,41 @@ void ConstraintSystem::shrink(Expr *expr) {
     // The primary constraint system.
     ConstraintSystem &CS;
 
-    // All of the sub-expressions of certain type (binary/unary/calls) in
-    // depth-first order.
-    std::queue<Candidate> &SubExprs;
+    // All of the sub-expressions which are suitable to be solved
+    // separately from the main system e.g. binary expressions, collections,
+    // function calls, coercions etc.
+    llvm::SmallVector<Candidate, 4> Candidates;
 
     // Counts the number of overload sets present in the tree so far.
     // Note that the traversal is depth-first.
-    std::stack<std::pair<ApplyExpr *, unsigned>,
-               llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4>>
-      ApplyExprs;
+    llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4> ApplyExprs;
 
     // A collection of original domains of all of the expressions,
     // so they can be restored in case of failure.
     DomainMap &Domains;
 
-    ExprCollector(Expr *expr, ConstraintSystem &cs,
-                  std::queue<Candidate> &container, DomainMap &domains)
-        : PrimaryExpr(expr), CS(cs), SubExprs(container), Domains(domains) {}
+    ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
+        : PrimaryExpr(expr), CS(cs), Domains(domains) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // A dictionary expression is just a set of tuples; try to solve ones
       // that have overload sets.
-      if (auto dictionaryExpr = dyn_cast<DictionaryExpr>(expr)) {
-        bool isPrimaryExpr = expr == PrimaryExpr;
-        for (auto element : dictionaryExpr->getElements()) {
-          unsigned numOverloads = 0;
-          element->walk(OverloadSetCounter(numOverloads));
-
-          // There are no overload sets in the element; skip it.
-          if (numOverloads == 0)
-            continue;
-
-          // FIXME: Could we avoid creating a separate dictionary expression
-          // here by introducing a contextual type on the element?
-          auto dict = DictionaryExpr::create(CS.getASTContext(),
-                                             dictionaryExpr->getLBracketLoc(),
-                                             { element },
-                                             dictionaryExpr->getRBracketLoc(),
-                                             dictionaryExpr->getType());
-
-          // Make each of the dictionary elements an independent dictionary,
-          // such makes it easy to type-check everything separately.
-          SubExprs.push(Candidate(CS, dict, isPrimaryExpr));
-        }
-
+      if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
+        visitCollectionExpr(collectionExpr, CS.getContextualType(expr),
+                            CS.getContextualTypePurpose());
         // Don't try to walk into the dictionary.
-        return { false, expr };
-      }
-
-      // Consider all of the collections to be candidates,
-      // FIXME: try to split collections into parts for simplified solving.
-      if (isa<CollectionExpr>(expr)) {
-        SubExprs.push(Candidate(CS, expr, false));
         return {false, expr};
       }
 
-      // Let's not attempt to type-check closures or default values,
-      // which has already been type checked anyway.
-      if (isa<ClosureExpr>(expr) || isa<DefaultValueExpr>(expr)) {
-        return { false, expr };
+      // Let's not attempt to type-check closures, which has already been
+      // type checked anyway.
+      if (isa<ClosureExpr>(expr)) {
+        return {false, expr};
       }
 
-      // Coerce to type expressions are only viable if they have
-      // a single child expression.
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
-        if (!coerceExpr->getSubExpr()) {
-          return { false, expr };
-        }
+        visitCoerceExpr(coerceExpr);
+        return {false, expr};
       }
 
       if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {
@@ -1536,19 +1491,31 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto func = applyExpr->getFn();
         // Let's record this function application for post-processing
         // as well as if it contains overload set, see walkToExprPost.
-        ApplyExprs.push({ applyExpr, isa<OverloadSetRefExpr>(func) });
+        ApplyExprs.push_back({applyExpr, isa<OverloadSetRefExpr>(func)});
       }
 
       return { true, expr };
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      // If there are sub-expressions to consider and
-      // contextual type is involved, let's add top-most expression
-      // to the queue just to make sure that we didn't miss any solutions.
-      if (expr == PrimaryExpr && !SubExprs.empty()) {
-        if (!CS.getContextualType().isNull()) {
-          SubExprs.push(Candidate(CS, expr, true));
+      if (expr == PrimaryExpr) {
+        // If this is primary expression and there are no candidates
+        // to be solved, let's not record it, because it's going to be
+        // solved regardless.
+        if (Candidates.empty())
+          return expr;
+
+        auto contextualType = CS.getContextualType();
+        // If there is a contextual type set for this expression.
+        if (!contextualType.isNull()) {
+          Candidates.push_back(Candidate(CS, expr, contextualType,
+                                         CS.getContextualTypePurpose()));
+          return expr;
+        }
+
+        // Or it's a function application with other candidates present.
+        if (isa<ApplyExpr>(expr)) {
+          Candidates.push_back(Candidate(CS, expr));
           return expr;
         }
       }
@@ -1559,17 +1526,17 @@ void ConstraintSystem::shrink(Expr *expr) {
       unsigned numOverloadSets = 0;
       // Let's count how many overload sets do we have.
       while (!ApplyExprs.empty()) {
-        auto application = ApplyExprs.top();
+        auto &application = ApplyExprs.back();
         auto applyExpr = application.first;
 
         // Add overload sets tracked by current expression.
         numOverloadSets += application.second;
-        ApplyExprs.pop();
+        ApplyExprs.pop_back();
 
         // We've found the current expression, so record the number of
         // overloads.
         if (expr == applyExpr) {
-          ApplyExprs.push({ applyExpr, numOverloadSets });
+          ApplyExprs.push_back({applyExpr, numOverloadSets});
           break;
         }
       }
@@ -1578,22 +1545,166 @@ void ConstraintSystem::shrink(Expr *expr) {
       // there is no point of solving this expression,
       // because we won't be able to reduce its domain.
       if (numOverloadSets > 1)
-        SubExprs.push(Candidate(CS, expr, expr == PrimaryExpr));
+        Candidates.push_back(Candidate(CS, expr));
 
       return expr;
     }
+
+  private:
+    /// \brief Extract type of the element from given collection type.
+    ///
+    /// \param collection The type of the collection container.
+    ///
+    /// \returns ErrorType on failure, properly constructed type otherwise.
+    Type extractElementType(Type collection) {
+      auto &ctx = CS.getASTContext();
+      if (collection.isNull() || collection->hasError())
+        return ErrorType::get(ctx);
+
+      auto base = collection.getPointer();
+      auto isInvalidType = [](Type type) -> bool {
+        return type.isNull() || type->hasUnresolvedType() ||
+               type->hasError();
+      };
+
+      // Array type.
+      if (auto array = dyn_cast<ArraySliceType>(base)) {
+        auto elementType = array->getBaseType();
+        // If base type is invalid let's return error type.
+        return isInvalidType(elementType) ? ErrorType::get(ctx) : elementType;
+      }
+
+      // Map or Set or any other associated collection type.
+      if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
+        if (boundGeneric->hasUnresolvedType())
+          return ErrorType::get(ctx);
+
+        llvm::SmallVector<TupleTypeElt, 2> params;
+        for (auto &type : boundGeneric->getGenericArgs()) {
+          // One of the generic arguments in invalid or unresolved.
+          if (isInvalidType(type))
+            return ErrorType::get(ctx);
+
+          params.push_back(type);
+        }
+
+        // If there is just one parameter, let's return it directly.
+        if (params.size() == 1)
+          return params[0].getType();
+
+        return TupleType::get(params, ctx);
+      }
+
+      return ErrorType::get(ctx);
+    }
+
+    bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
+      // Only generic identifier, array or dictionary.
+      switch (collectionTypeRepr->getKind()) {
+      case TypeReprKind::GenericIdent:
+      case TypeReprKind::Array:
+      case TypeReprKind::Dictionary:
+        return true;
+
+      default:
+        return false;
+      }
+    }
+
+    void visitCoerceExpr(CoerceExpr *coerceExpr) {
+      auto subExpr = coerceExpr->getSubExpr();
+      // Coerce expression is valid only if it has sub-expression.
+      if (!subExpr) return;
+
+      unsigned numOverloadSets = 0;
+      subExpr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        if (isa<OverloadSetRefExpr>(childExpr)) {
+          ++numOverloadSets;
+          return childExpr;
+        }
+
+        if (auto nestedCoerceExpr = dyn_cast<CoerceExpr>(childExpr)) {
+          visitCoerceExpr(nestedCoerceExpr);
+          // Don't walk inside of nested coercion expression directly,
+          // that is be done by recursive call to visitCoerceExpr.
+          return nullptr;
+        }
+
+        // If sub-expression we are trying to coerce to type is a collection,
+        // let's allow collector discover it with assigned contextual type
+        // of coercion, which allows collections to be solved in parts.
+        if (auto collectionExpr = dyn_cast<CollectionExpr>(childExpr)) {
+          auto castTypeLoc = coerceExpr->getCastTypeLoc();
+          auto typeRepr = castTypeLoc.getTypeRepr();
+
+          if (typeRepr && isSuitableCollection(typeRepr)) {
+            // Clone representative to avoid modifying in-place,
+            // FIXME: We should try and silently resolve the type here,
+            // instead of cloning representative.
+            auto coercionRepr = typeRepr->clone(CS.getASTContext());
+            // Let's try to resolve coercion type from cloned representative.
+            auto coercionType = CS.TC.resolveType(coercionRepr, CS.DC,
+                                                  TypeResolutionOptions());
+
+            // Looks like coercion type is invalid, let's skip this sub-tree.
+            if (coercionType->hasError())
+              return nullptr;
+
+            // Visit collection expression inline.
+            visitCollectionExpr(collectionExpr, coercionType,
+                                CTP_CoerceOperand);
+          }
+        }
+
+        return childExpr;
+      });
+
+      // It's going to be inefficient to try and solve
+      // coercion in parts, so let's just make it a candidate directly,
+      // if it contains at least a single overload set.
+
+      if (numOverloadSets > 0)
+        Candidates.push_back(Candidate(CS, coerceExpr));
+    }
+
+    void visitCollectionExpr(CollectionExpr *collectionExpr,
+                             Type contextualType = Type(),
+                             ContextualTypePurpose CTP = CTP_Unused) {
+      // If there is a contextual type set for this collection,
+      // let's propagate it to the candidate.
+      if (!contextualType.isNull()) {
+        auto elementType = extractElementType(contextualType);
+        // If we couldn't deduce element type for the collection, let's
+        // not attempt to solve it.
+        if (elementType->hasError())
+          return;
+
+        contextualType = elementType;
+      }
+
+      for (auto element : collectionExpr->getElements()) {
+        unsigned numOverloads = 0;
+        element->walk(OverloadSetCounter(numOverloads));
+
+        // There are no overload sets in the element; skip it.
+        if (numOverloads == 0)
+          continue;
+
+        // Record each of the collection elements, which passed
+        // number of overload sets rule, as a candidate for solving
+        // with contextual type of the collection.
+        Candidates.push_back(Candidate(CS, element, contextualType, CTP));
+      }
+    }
   };
 
-  std::queue<Candidate> expressions;
-  ExprCollector collector(expr, *this, expressions, domains);
+  ExprCollector collector(expr, *this, domains);
 
   // Collect all of the binary/unary and call sub-expressions
   // so we can start solving them separately.
   expr->walk(collector);
 
-  while (!expressions.empty()) {
-    auto &candidate = expressions.front();
-
+  for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
     // might require manual salvaging.
@@ -1613,8 +1724,6 @@ void ConstraintSystem::shrink(Expr *expr) {
         return childExpr;
       });
     }
-
-    expressions.pop();
   }
 }
 

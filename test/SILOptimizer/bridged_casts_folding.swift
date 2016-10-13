@@ -2,6 +2,9 @@
 
 // REQUIRES: objc_interop
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 // Check that casts between bridged types are replaced by more 
 // efficient code sequences.
 // 
@@ -197,8 +200,8 @@ var nsDictString: NSDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Fo
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_26_forceBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__T_
 // CHECK: return
 @inline(never)
-public func testForcedCastNStoSwiftDictInt() -> [Int:Int] {
-  var dict: [Int:Int] = forcedCast(nsDictInt)
+public func testForcedCastNStoSwiftDictInt() -> [Int: Int] {
+  var dict: [Int: Int] = forcedCast(nsDictInt)
   return dict
 }
 
@@ -207,8 +210,8 @@ public func testForcedCastNStoSwiftDictInt() -> [Int:Int] {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_34_conditionallyBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__Sb
 // CHECK: return
 @inline(never)
-public func testCondCastNStoSwiftDictInt() -> [Int:Int]? {
-  var dictOpt: [Int:Int]? = condCast(nsDictInt)
+public func testCondCastNStoSwiftDictInt() -> [Int: Int]? {
+  var dictOpt: [Int: Int]? = condCast(nsDictInt)
   return dictOpt
 }
 
@@ -217,8 +220,8 @@ public func testCondCastNStoSwiftDictInt() -> [Int:Int]? {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_26_forceBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__T_
 // CHECK: return
 @inline(never)
-public func testForcedCastNStoSwiftDictDouble() -> [Double:Double] {
-  var dict: [Double:Double] = forcedCast(nsDictDouble)
+public func testForcedCastNStoSwiftDictDouble() -> [Double: Double] {
+  var dict: [Double: Double] = forcedCast(nsDictDouble)
   return dict
 }
 
@@ -227,8 +230,8 @@ public func testForcedCastNStoSwiftDictDouble() -> [Double:Double] {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_34_conditionallyBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__Sb
 // CHECK: return
 @inline(never)
-public func testCondCastNStoSwiftDictDouble() -> [Double:Double]? {
-  var dictOpt: [Double:Double]? = condCast(nsDictDouble)
+public func testCondCastNStoSwiftDictDouble() -> [Double: Double]? {
+  var dictOpt: [Double: Double]? = condCast(nsDictDouble)
   return dictOpt
 }
 
@@ -238,8 +241,8 @@ public func testCondCastNStoSwiftDictDouble() -> [Double:Double]? {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_26_forceBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__T_
 // CHECK: return
 @inline(never)
-public func testForcedCastNStoSwiftDictString() -> [String:String] {
-  var dict: [String:String] = forcedCast(nsDictString)
+public func testForcedCastNStoSwiftDictString() -> [String: String] {
+  var dict: [String: String] = forcedCast(nsDictString)
   return dict
 }
 
@@ -248,8 +251,8 @@ public func testForcedCastNStoSwiftDictString() -> [String:String] {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_34_conditionallyBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__Sb
 // CHECK: return
 @inline(never)
-public func testCondCastNStoSwiftDictString() -> [String:String]? {
-  var dictOpt: [String:String]? = condCast(nsDictString)
+public func testCondCastNStoSwiftDictString() -> [String: String]? {
+  var dictOpt: [String: String]? = condCast(nsDictString)
   return dictOpt
 }
 
@@ -258,8 +261,8 @@ public func testCondCastNStoSwiftDictString() -> [String:String]? {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_26_forceBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__T_
 // CHECK: return
 @inline(never)
-public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int:Int] {
-  var dictOpt: [Int:Int] = forcedCast(nsDictString)
+public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int: Int] {
+  var dictOpt: [Int: Int] = forcedCast(nsDictString)
   return dictOpt
 }
 
@@ -269,8 +272,8 @@ public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int:Int] {
 // CHECK: function_ref @_TTWu0_Rxs8HashablerGVs10Dictionaryxq__s21_ObjectiveCBridgeable10FoundationZFS1_34_conditionallyBridgeFromObjectiveCfTwx15_ObjectiveCType6resultRGSqx__Sb
 // CHECK: return
 @inline(never)
-public func testCondCastNSDictStringtoSwiftDictInt() -> [Int:Int]? {
-  var dictOpt: [Int:Int]? = condCast(nsDictString)
+public func testCondCastNSDictStringtoSwiftDictInt() -> [Int: Int]? {
+  var dictOpt: [Int: Int]? = condCast(nsDictString)
   return dictOpt
 }
 
@@ -345,7 +348,7 @@ public func testCondCastNStoSwiftSetString() -> Set<String>? {
 
 // Check optimizations of casts from String to NSString
 
-var swiftString:String = "string"
+var swiftString: String = "string"
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding29testForcedCastSwiftToNSStringFT_CSo8NSString
 // CHECK-NOT: unconditional_checked
@@ -487,9 +490,9 @@ public func testCondCastSwiftToNSArrayString() -> NSArray? {
 
 // Check optimization of casts from  Swift Dict to NSDict
 
-var dictInt: [Int:Int] = [1:1, 2:2, 3:3, 4:4]
-var dictDouble: [Double:Double] = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
-var dictString: [String:String] = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
+var dictInt: [Int: Int] = [1:1, 2:2, 3:3, 4:4]
+var dictDouble: [Double: Double] = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
+var dictString: [String: String] = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
 
 // CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testForcedCastSwiftToNSDictIntFT_CSo12NSDictionary
 // CHECK-NOT: unconditional_checked

@@ -102,7 +102,8 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
-  vwtable->stride = llvm::alignTo(size, align);
+  auto rawStride = llvm::alignTo(size, align);
+  vwtable->stride = rawStride == 0 ? 1 : rawStride;
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -310,7 +311,8 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
     ;
-  vwtable->stride = (totalSize + alignMask) & ~alignMask;
+  auto rawStride = (totalSize + alignMask) & ~alignMask;
+  vwtable->stride = rawStride == 0 ? 1 : rawStride;
   
   installCommonValueWitnesses(vwtable);
 }

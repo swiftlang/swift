@@ -27,7 +27,7 @@ import SwiftShims
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
 public func readLine(strippingNewline: Bool = true) -> String? {
-  var linePtrVar: UnsafeMutablePointer<UInt8>? = nil
+  var linePtrVar: UnsafeMutablePointer<UInt8>?
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
   if readBytes == -1 {
     return nil

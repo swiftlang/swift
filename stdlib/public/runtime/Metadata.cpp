@@ -286,6 +286,11 @@ static SimpleGlobalCache<ObjCClassCacheEntry> ObjCClassWrappers;
 
 const Metadata *
 swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
+  // Make calls resilient against receiving a null Objective-C class. This can
+  // happen when classes are weakly linked and not available.
+  if (theClass == nullptr)
+    return nullptr;
+
   // If the class pointer is valid as metadata, no translation is required.
   if (theClass->isTypeMetadata()) {
     return theClass;
@@ -982,7 +987,7 @@ void performBasicLayout(BasicLayout &layout,
                                     .withPOD(isPOD)
                                     .withBitwiseTakable(isBitwiseTakable)
                                     .withInlineStorage(isInline);
-  layout.stride = roundUpToAlignMask(size, alignMask);
+  layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 } // end anonymous namespace
 

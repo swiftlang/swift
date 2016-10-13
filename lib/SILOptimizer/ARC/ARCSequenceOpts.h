@@ -58,9 +58,10 @@ struct BlockARCPairingContext {
 
   BlockARCPairingContext(SILFunction &F, AliasAnalysis *AA,
                          PostOrderAnalysis *POTA, RCIdentityFunctionInfo *RCFI,
+                         EpilogueARCFunctionInfo *EAFI,
                          ProgramTerminationFunctionInfo *PTFI)
       : Context(F, RCFI),
-        Evaluator(F, AA, POTA, RCFI, PTFI, Context.DecToIncStateMap,
+        Evaluator(F, AA, POTA, RCFI, EAFI, PTFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap) {}
 
   bool run(bool FreezePostDomReleases) {
@@ -92,9 +93,10 @@ struct LoopARCPairingContext : SILLoopVisitor {
   LoopARCPairingContext(SILFunction &F, AliasAnalysis *AA,
                         LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
                         RCIdentityFunctionInfo *RCFI,
+                        EpilogueARCFunctionInfo *EAFI,
                         ProgramTerminationFunctionInfo *PTFI)
       : SILLoopVisitor(&F, SLI), Context(F, RCFI),
-        Evaluator(F, AA, LRFI, SLI, RCFI, PTFI, Context.DecToIncStateMap,
+        Evaluator(F, AA, LRFI, SLI, RCFI, EAFI, PTFI, Context.DecToIncStateMap,
                   Context.IncToDecStateMap),
         LRFI(LRFI), SLI(SLI) {}
 

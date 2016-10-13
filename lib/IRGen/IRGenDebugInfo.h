@@ -188,14 +188,14 @@ public:
                                ArtificialKind = RealValue);
 
   /// Emit a dbg.declare or dbg.value intrinsic, depending on Storage.
-  void emitDbgIntrinsic(llvm::BasicBlock *BB, llvm::Value *Storage,
+  void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::Constant *Storage, StringRef Name,
-                                     StringRef LinkageName,
+  void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
+                                     StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
                                      Optional<SILLocation> Loc);

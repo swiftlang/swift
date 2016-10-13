@@ -173,8 +173,9 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   that is layout compatible with `T`.
   /// - Postcondition: The memory is bound to 'T' starting at `self` continuing
   ///   through `self` + `count` * `MemoryLayout<T>.stride`
-  /// - Warning: Binding memory to a type is potentially undefined if the
-  ///   memory is ever accessed as an unrelated type.
+  /// - Warning: A memory location may only be bound to one type at a time.
+  ///   The behavior of accessing memory as type `U` while it is bound to an
+  ///   unrelated type `T` is undefined.
   @_transparent
   @discardableResult
   public func bindMemory<T>(to type: T.Type, capacity count: Int)
@@ -190,7 +191,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///   unspecified capacity.
   ///
   /// - Warning: Accessing memory via the returned pointer is undefined if the
-  ///   if the memory has not been bound to `T`.
+  ///   memory has not been bound to `T`.
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
@@ -468,7 +469,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
 
   /// Returns `self + n`.
   public func advanced(by n: Int) -> ${Self} {
-    return ${Self}(Builtin.gep_Word(_rawValue, n._builtinWordValue))
+    return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
 }
 

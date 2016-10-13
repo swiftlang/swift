@@ -440,8 +440,8 @@ private:
   /// order of the given function.
   PostOrderFunctionInfo *PO;
 
-  /// The epilogue release matcher we are using.
-  ConsumedArgToEpilogueReleaseMatcher& ERM;
+  /// Epilogue release analysis.
+  EpilogueARCFunctionInfo *EAFI;
 
   /// Keeps all the locations for the current function. The BitVector in each
   /// BlockState is then laid on top of it to keep track of which LSLocation
@@ -480,7 +480,7 @@ private:
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             ConsumedArgToEpilogueReleaseMatcher &ERM);
+             EpilogueARCFunctionInfo *EAFI);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
@@ -488,8 +488,6 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
-
-  ConsumedArgToEpilogueReleaseMatcher &getERM() const { return ERM; };
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -516,6 +514,9 @@ public:
 
   /// Returns the current type expansion analysis we are .
   TypeExpansionAnalysis *getTE() const { return TE; }
+
+  /// Returns current epilogue release function info we are using.
+  EpilogueARCFunctionInfo *getEAFI() const { return EAFI; }
 
   /// Returns the SILValue base to bit index.
   LSLocationBaseMap &getBM() { return BaseToLocIndex; }
@@ -968,7 +969,7 @@ void BlockState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I,
                                          RLEKind Kind) {
   // If this is a release on a guaranteed parameter, it can not call deinit,
   // which might read or write memory.
-  if (isIntermediateRelease(I, Ctx.getERM()))
+  if (isIntermediateRelease(I, Ctx.getEAFI()))
     return;
 
   // Are we computing the genset and killset ?
@@ -1126,8 +1127,8 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
 
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), ERM(ERM) {
+                       EpilogueARCFunctionInfo *EAFI)
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI) {
 }
 
 LSLocation &RLEContext::getLocation(const unsigned index) {
@@ -1543,11 +1544,9 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
-    auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
+    auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 
-    ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F);
-
-    RLEContext RLE(F, PM, AA, TE, PO, ERM);
+    RLEContext RLE(F, PM, AA, TE, PO, EAFI);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

@@ -18,16 +18,16 @@ enum E {
 
 // Check if the == comparison can be compiled to a simple icmp instruction.
 
-// CHECK-NORMAL-LABEL:define hidden i1 @_TZFO12enum_derived1Eoi2eefTS0_S0__Sb(i2, i2)
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} i1 @_TZFO12enum_derived1Eoi2eefTS0_S0__Sb(i2, i2)
-// CHECK: %2 = icmp eq i2 %0, %1
+// CHECK-NORMAL-LABEL:define hidden i1 @_TZFO12enum_derived1Eoi2eefTS0_S0__Sb(i8, i8)
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} i1 @_TZFO12enum_derived1Eoi2eefTS0_S0__Sb(i8, i8)
+// CHECK: %2 = icmp eq i8 %0, %1
 // CHECK: ret i1 %2
 
 // Check if the hashValue getter can be compiled to a simple zext instruction.
 
-// CHECK-NORMAL-LABEL:define hidden i{{.*}} @_TFO12enum_derived1Eg9hashValueSi(i2)
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} i{{.*}} @_TFO12enum_derived1Eg9hashValueSi(i2)
-// CHECK: %1 = zext i2 %0 to i{{.*}}
+// CHECK-NORMAL-LABEL:define hidden i{{.*}} @_TFO12enum_derived1Eg9hashValueSi(i8)
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} i{{.*}} @_TFO12enum_derived1Eg9hashValueSi(i8)
+// CHECK: %1 = zext i8 %0 to i{{.*}}
 // CHECK: ret i{{.*}} %1
 
 // Derived conformances from extensions

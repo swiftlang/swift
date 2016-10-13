@@ -254,21 +254,11 @@ public:
                            GenericEnvironment *genericEnv,
                            bool treatRequirementsAsExplicit = false);
 
-  /// \brief Get a generic signature based on the provided complete list
-  /// of generic parameter types.
-  ///
-  /// \returns a generic signature built from the provided list of
-  ///          generic parameter types.
-  GenericSignature *
-  getGenericSignature(ArrayRef<GenericTypeParamType *> genericParamsTypes);
+  /// \brief Build the generic signature.
+  GenericSignature *getGenericSignature();
 
-  /// \brief Get a generic context based on the complete list of generic
-  /// parameter types.
-  ///
-  /// \returns a generic context built from the provided list of
-  ///          generic parameter types.
-  GenericEnvironment *getGenericEnvironment(
-      ArrayRef<GenericTypeParamType *> genericParamsTypes);
+  /// \brief Build the generic environment.
+  GenericEnvironment *getGenericEnvironment();
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -282,9 +272,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(TypeLoc type, GenericParamList *genericParams);
+  void inferRequirements(TypeLoc type, GenericParamList *genericParams);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -298,15 +286,14 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
   ///
-  /// \returns true if an error occurs, false otherwise.
-  bool finalize(SourceLoc loc);
+  /// \param allowConcreteGenericParams If true, allow generic parameters to
+  /// be made concrete.
+  void finalize(SourceLoc loc, bool allowConcreteGenericParams=false);
 
   /// \brief Resolve the given type to the potential archetype it names.
   ///
@@ -325,10 +312,6 @@ public:
   /// structurally with their corresponding archetypes and resolve dependent
   /// member types to the appropriate associated types.
   Type substDependentType(Type type);
-  
-  /// \brief Retrieve the archetype that corresponds to the given generic
-  /// parameter.
-  ArchetypeType *getArchetype(GenericTypeParamDecl *GenericParam);
 
   /// Map an interface type to a contextual type.
   static Type mapTypeIntoContext(const DeclContext *dc, Type type);
@@ -345,10 +328,6 @@ public:
   static Type mapTypeOutOfContext(ModuleDecl *M,
                                   GenericEnvironment *genericEnv,
                                   Type type);
-
-  using SameTypeRequirement
-    = std::pair<PotentialArchetype *,
-                PointerUnion<Type, PotentialArchetype*>>;
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -547,7 +526,8 @@ public:
   /// Add a conformance to this potential archetype.
   ///
   /// \returns true if the conformance was new, false if it already existed.
-  bool addConformance(ProtocolDecl *proto, const RequirementSource &source,
+  bool addConformance(ProtocolDecl *proto, bool updateExistingSource,
+                      const RequirementSource &source,
                       ArchetypeBuilder &builder);
 
   /// Retrieve the superclass of this archetype.

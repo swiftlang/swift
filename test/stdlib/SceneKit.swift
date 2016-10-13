@@ -5,6 +5,7 @@
 // UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
+import StdlibUnittestFoundationExtras
 
 
 import SceneKit
@@ -209,6 +210,32 @@ if #available(iOS 8.0, OSX 10.10, *) {
     let mat4_from_scn_mat4 = double4x4(scn_mat4_ref)
     let scn_vec4_from_mat4 = SCNMatrix4(mat4_from_scn_mat4)
     expectTrue(SCNMatrix4EqualToMatrix4(scn_vec4_from_mat4, scn_mat4_ref))
+  }
+
+  func equalVector3s(_ x: SCNVector3, _ y: SCNVector3) -> Bool {
+    return x.x == y.x && x.y == y.y && x.z == y.z
+  }
+  func equalVector4s(_ x: SCNVector4, _ y: SCNVector4) -> Bool {
+    return x.x == y.x && x.y == y.y && x.z == y.z && x.w == y.w
+  }
+  func equalMatrix4s(_ x: SCNMatrix4, _ y: SCNMatrix4) -> Bool {
+    var xx = x, yy = y
+    return memcmp(&xx, &yy, MemoryLayout<SCNMatrix4>.size) == 0
+  }
+
+  SceneKitTests.test("NSValue bridging") {
+    expectBridgeToNSValue(scn_vec3_ref,
+                          nsValueInitializer: { NSValue(scnVector3: $0) },
+                          nsValueGetter: { $0.scnVector3Value },
+                          equal: equalVector3s)
+    expectBridgeToNSValue(scn_vec4_ref,
+                          nsValueInitializer: { NSValue(scnVector4: $0) },
+                          nsValueGetter: { $0.scnVector4Value },
+                          equal: equalVector4s)
+    expectBridgeToNSValue(scn_mat4_ref,
+                          nsValueInitializer: { NSValue(scnMatrix4: $0) },
+                          nsValueGetter: { $0.scnMatrix4Value },
+                          equal: equalMatrix4s)
   }
 }
 

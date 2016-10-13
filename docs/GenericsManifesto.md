@@ -72,6 +72,8 @@ There are a number of Swift declarations that currently cannot have generic para
 
 ### Generic typealiases
 
+*Accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/master/proposals/0048-generic-typealias.md), implemented in Swift 3*
+
 Typealiases could be allowed to carry generic parameters. They would still be aliases (i.e., they would not introduce new types). For example:
 
 ```Swift
@@ -440,6 +442,8 @@ extension Bag {
 
 ### Moving the `where` clause outside of the angle brackets (*)
 
+*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md), implemented in Swift 3*
+
 The `where` clause of generic functions comes very early in the declaration, although it is generally of much less concern to the client than the function parameters and result type that follow it. This is one of the things that contributes to "angle bracket blindness". For example, consider the `containsAll` signature above:
 
 ```Swift
@@ -454,6 +458,8 @@ func containsAll<S: Sequence>(elements: S) -> Bool
 ```
 
 ### Renaming `protocol<...>` to `Any<...>` (*)
+
+*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax", implemented in Swift 3*
 
 The `protocol<...>` syntax is a bit of an oddity in Swift. It is used to compose protocols together, mostly to create values of existential type, e.g.,
 
@@ -687,7 +693,7 @@ Associated type inference is a useful feature. It's used throughout the standard
 
 ## Existentials
 
-Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutable dependence on protocols.
+Existentials aren't really generics per se, but the two systems are closely intertwined due to their mutual dependence on protocols.
 
 ### Generalized existentials
 

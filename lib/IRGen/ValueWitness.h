@@ -228,7 +228,8 @@ enum class ValueWitness : unsigned {
 
   ///   size_t stride;
   ///
-  /// The required size per element of an array of this type.
+  /// The required size per element of an array of this type. It is at least
+  /// one, even for zero-sized types, like the empty tuple.
   Stride,
   
   Last_RequiredValueWitness = Stride,

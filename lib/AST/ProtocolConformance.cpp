@@ -384,13 +384,14 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
   // but we have no way to force inherited conformances to be filled in
   // through that mechanism.
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : assocType->getConformingProtocols(resolver)) {
+  for (auto proto : assocType->getConformingProtocols()) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
     assert((conforms ||
-            specializedType->is<TypeVariableType>() ||
+            specializedType->isTypeVariableOrMember() ||
             specializedType->isTypeParameter() ||
-            specializedType->is<ErrorType>()) &&
+            specializedType->hasError() ||
+            specializedType->getCanonicalType()->hasError()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms ? *conforms 
                                     : ProtocolConformanceRef(proto));

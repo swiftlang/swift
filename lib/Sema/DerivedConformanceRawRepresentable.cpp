@@ -86,7 +86,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
-		"Enum element has no literal - missing a call to checkEnumRawValues()");
+           "Enum element has no literal - missing a call to checkEnumRawValues()");
     assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
   }
 
@@ -188,7 +188,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   
   for (auto elt : enumDecl->getAllElements()) {
     assert(elt->getTypeCheckedRawValueExpr() &&
-		"Enum element has no literal - missing a call to checkEnumRawValues()");
+           "Enum element has no literal - missing a call to checkEnumRawValues()");
     assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
   }
 

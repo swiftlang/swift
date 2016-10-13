@@ -345,18 +345,62 @@ func existential_from_raw_pointer(_ p: Builtin.RawPointer) -> AnyObject {
   return Builtin.bridgeFromRawPointer(p)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins5gep64
-func gep64(_ p: Builtin.RawPointer, i: Builtin.Int64) -> Builtin.RawPointer {
+// CHECK-LABEL: sil hidden @_TF8builtins9gep_raw64
+func gep_raw64(_ p: Builtin.RawPointer, i: Builtin.Int64) -> Builtin.RawPointer {
   // CHECK: [[GEP:%.*]] = index_raw_pointer
   // CHECK: return [[GEP]]
-  return Builtin.gep_Int64(p, i)
+  return Builtin.gepRaw_Int64(p, i)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins5gep32
-func gep32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer {
+// CHECK-LABEL: sil hidden @_TF8builtins9gep_raw32
+func gep_raw32(_ p: Builtin.RawPointer, i: Builtin.Int32) -> Builtin.RawPointer {
   // CHECK: [[GEP:%.*]] = index_raw_pointer
   // CHECK: return [[GEP]]
-  return Builtin.gep_Int32(p, i)
+  return Builtin.gepRaw_Int32(p, i)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins3gep
+func gep<Elem>(_ p: Builtin.RawPointer, i: Builtin.Word, e: Elem.Type) -> Builtin.RawPointer {
+  // CHECK: [[P2A:%.*]] = pointer_to_address %0
+  // CHECK: [[GEP:%.*]] = index_addr [[P2A]] : $*Elem, %1 : $Builtin.Word
+  // CHECK: [[A2P:%.*]] = address_to_pointer [[GEP]]
+  // CHECK: return [[A2P]]
+  return Builtin.gep_Word(p, i, e)
+}
+
+public final class Header { }
+
+// CHECK-LABEL: sil hidden @_TF8builtins20allocWithTailElems_1
+func allocWithTailElems_1<T>(n: Builtin.Word, ty: T.Type) -> Header {
+  // CHECK: [[M:%.*]] = metatype $@thick Header.Type
+  // CHECK: [[A:%.*]] = alloc_ref [tail_elems $T * %0 : $Builtin.Word] $Header
+  // CHECK: return [[A]]
+  return Builtin.allocWithTailElems_1(Header.self, n, ty)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins20allocWithTailElems_3
+func allocWithTailElems_3<T1, T2, T3>(n1: Builtin.Word, ty1: T1.Type, n2: Builtin.Word, ty2: T2.Type, n3: Builtin.Word, ty3: T3.Type) -> Header {
+  // CHECK: [[M:%.*]] = metatype $@thick Header.Type
+  // CHECK: [[A:%.*]] = alloc_ref [tail_elems $T1 * %0 : $Builtin.Word] [tail_elems $T2 * %2 : $Builtin.Word] [tail_elems $T3 * %4 : $Builtin.Word] $Header
+  // CHECK: return [[A]]
+  return Builtin.allocWithTailElems_3(Header.self, n1, ty1, n2, ty2, n3, ty3)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins16projectTailElems
+func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
+  // CHECK: [[TA:%.*]] = ref_tail_addr %0 : $Header
+  // CHECK: [[A2P:%.*]] = address_to_pointer [[TA]]
+  // CHECK: return [[A2P]]
+  return Builtin.projectTailElems(h, ty)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins11getTailAddr
+func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Type, ty2: T2.Type) -> Builtin.RawPointer {
+  // CHECK: [[P2A:%.*]] = pointer_to_address %0
+  // CHECK: [[TA:%.*]] = tail_addr [[P2A]] : $*T1, %1 : $Builtin.Word, $T2
+  // CHECK: [[A2P:%.*]] = address_to_pointer [[TA]]
+  // CHECK: return [[A2P]]
+  return Builtin.getTailAddr_Word(start, i, ty1, ty2)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins8condfail

@@ -67,7 +67,7 @@ infix operator &>>= : AssignmentPrecedence
 //===----------------------------------------------------------------------===//
 
 
-//FIXME(integers): This should go in the stdlib separately, probably.
+// FIXME(integers): This should go in the stdlib separately, probably.
 extension ExpressibleByIntegerLiteral
   where Self : _ExpressibleByBuiltinIntegerLiteral {
   /// Create an instance initialized to `value`.
@@ -105,7 +105,7 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
   // FIXME(integers): implement
   //init?<T : BinaryInteger>(exactly source: T)
 
-  // FIXME(ABI): should be just Arithmetic
+  // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just Arithmetic
   associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
 
   var magnitude: Magnitude { get }

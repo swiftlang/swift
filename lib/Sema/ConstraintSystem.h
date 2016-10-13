@@ -598,8 +598,8 @@ public:
   llvm::SmallDenseMap<ConstraintLocator *, ArchetypeType *>
     OpenedExistentialTypes;
 
-  /// The type variables that were bound via a Defaultable constraint.
-  llvm::SmallPtrSet<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -925,7 +925,8 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  Optional<ArrayRef<Type>> AlternativeLiteralTypes[12];
+  static const unsigned NumAlternativeLiteralTypes = 13;
+  Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
 
   /// \brief Folding set containing all of the locators used in this
   /// constraint system.
@@ -1000,45 +1001,44 @@ private:
     OpenedExistentialTypes;
 
 public:
-  /// The type variables that were bound via a Defaultable constraint.
-  SmallVector<TypeVariableType *, 8> DefaultedTypeVariables;
+  /// The locators of \c Defaultable constraints whose defaults were used.
+  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
 
-  /// The type variable used to describe the element type of the given array
+  /// The types used to describe the element type of the given array
   /// literal.
-  llvm::SmallDenseMap<ArrayExpr *, TypeVariableType *>
-    ArrayElementTypeVariables;
+  llvm::SmallDenseMap<ArrayExpr *, Type> ArrayElementTypes;
 
-
-  /// The type variables used to describe the key and value types of the given
+  /// The types used to describe the key and value types of the given
   /// dictionary literal.
-  llvm::SmallDenseMap<DictionaryExpr *,
-                      std::pair<TypeVariableType *, TypeVariableType *>>
-    DictionaryElementTypeVariables;
+  llvm::SmallDenseMap<DictionaryExpr *, std::pair<Type, Type>>
+    DictionaryElementTypes;
 
 private:
   /// \brief Describe the candidate expression for partial solving.
-  /// This class used used by shrink & solve methods which apply
+  /// This class used by shrink & solve methods which apply
   /// variation of directional path consistency algorithm in attempt
   /// to reduce scopes of the overload sets (disjunctions) in the system.
   class Candidate {
     Expr *E;
-    bool IsPrimary;
-
-    ConstraintSystem &CS;
     TypeChecker &TC;
     DeclContext *DC;
 
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, bool primaryExpr)
-        : E(expr), IsPrimary(primaryExpr), CS(cs), TC(cs.TC), DC(cs.DC) {}
+    // Contextual Information.
+    Type CT;
+    ContextualTypePurpose CTP;
 
-    /// \brief Return underlaying expression.
+  public:
+    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
+              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
+        : E(expr), TC(cs.TC), DC(cs.DC), CT(ct), CTP(ctp) {}
+
+    /// \brief Return underlying expression.
     Expr *getExpr() const { return E; }
 
     /// \brief Try to solve this candidate sub-expression
     /// and re-write it's OSR domains afterwards.
     ///
-    /// \returs true on solver failure, false otherwise.
+    /// \returns true on solver failure, false otherwise.
     bool solve();
 
     /// \brief Apply solutions found by solver as reduced OSR sets for
@@ -1174,8 +1174,8 @@ public:
     /// The length of \c OpenedExistentialTypes.
     unsigned numOpenedExistentialTypes;
 
-    /// The length of \c DefaultedTypeVariables.
-    unsigned numDefaultedTypeVariables;
+    /// The length of \c DefaultedConstraints.
+    unsigned numDefaultedConstraints;
 
     /// The previous score.
     Score PreviousScore;
@@ -1516,15 +1516,11 @@ public:
   ///
   /// \param type The type to simplify.
   ///
-  /// \param typeVar Will receive the type variable at which simplification 
-  /// stopped, which has no fixed type.
-  ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
   ///
   /// param retainParens Whether to retain parentheses.
-  Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
-                             bool wantRValue,
+  Type getFixedTypeRecursive(Type type, bool wantRValue,
                              bool retainParens = false);
 
   /// \brief Assign a fixed type to the given type variable.
@@ -2031,7 +2027,7 @@ private:
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
-  /// expression, this is achived to solving individual sub-expressions
+  /// expression, this is achieved to solving individual sub-expressions
   /// and combining resolving types. Such algorithm is called directional
   /// path consistency because it goes from children to parents for all
   /// related sub-expressions taking union of their domains.
@@ -2050,7 +2046,7 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns Error is an error occured, Solved is system is consistent
+  /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
   SolutionKind solve(Expr *&expr,
                      Type convertType,
@@ -2240,6 +2236,11 @@ public:
   /// \param paramIdx The index of the parameter that is missing an argument.
   virtual void missingArgument(unsigned paramIdx);
 
+  /// Indicate that there was no label given when one was expected by parameter.
+  ///
+  /// \param paramIndex The index of the parameter that is missing a label.
+  virtual void missingLabel(unsigned paramIndex);
+
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.
   ///
@@ -2395,10 +2396,8 @@ public:
   }
 };
 
-/**
- * Count the number of overload sets present
- * in the expression and all of the children.
- */
+// Count the number of overload sets present
+// in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
   unsigned &NumOverloads;
 

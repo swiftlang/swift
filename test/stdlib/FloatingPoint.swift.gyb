@@ -3,6 +3,9 @@
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
+// FIXME: https://bugs.swift.org/browse/SR-2808
+// XFAIL: resilient_stdlib
+
 %{
 from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 }%
@@ -518,7 +521,9 @@ func checkFloatingPointComparison_${FloatSelf}(
   let message = { "expected: lhs=\(lhs) \(expected) rhs=\(rhs)" }
   expectEqual(expected.isEQ(), lhs == rhs, message(), stackTrace: newTrace)
   expectEqual(expected.isNE(), lhs != rhs, message(), stackTrace: newTrace)
-  checkHashable(expected.isEQ(), lhs, rhs, message(), stackTrace: newTrace)
+  checkHashable(
+    expectedEqual: expected.isEQ(),
+    lhs, rhs, message(), stackTrace: newTrace)
 
   expectEqual(expected.isLT(), lhs < rhs, message(), stackTrace: newTrace)
   expectEqual(expected.isLE(), lhs <= rhs, message(), stackTrace: newTrace)

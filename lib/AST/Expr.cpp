@@ -178,9 +178,6 @@ Expr *Expr::getSemanticsProvidingExpr() {
   if (TryExpr *TE = dyn_cast<TryExpr>(this))
     return TE->getSubExpr()->getSemanticsProvidingExpr();
 
-  if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
-    return DE->getSubExpr()->getSemanticsProvidingExpr();
-  
   return this;
 }
 
@@ -343,7 +340,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(OptionalEvaluation)
     NON_LVALUE_EXPR(If)
     NON_LVALUE_EXPR(Assign)
-    NON_LVALUE_EXPR(DefaultValue)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
@@ -485,7 +481,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(If);
   NO_REFERENCE(EnumIsCase);
   NO_REFERENCE(Assign);
-  NO_REFERENCE(DefaultValue);
   NO_REFERENCE(CodeCompletion);
   NO_REFERENCE(UnresolvedPattern);
   NO_REFERENCE(EditorPlaceholder);
@@ -768,7 +763,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Arrow:
   case ExprKind::If:
   case ExprKind::Assign:
-  case ExprKind::DefaultValue:
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
     return false;
@@ -956,7 +950,7 @@ APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth) {
 
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
   return getIntegerLiteralValue(
       isNegative(), getDigitsText(),
       getType()->castTo<BuiltinIntegerType>()->getGreatestWidth());
@@ -986,7 +980,7 @@ APFloat FloatLiteralExpr::getValue(StringRef Text,
 
 llvm::APFloat FloatLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
-  assert(!getType()->is<ErrorType>() && "Should have a valid type");
+  assert(!getType()->hasError() && "Should have a valid type");
 
   return getFloatLiteralValue(isNegative(), getDigitsText(),
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
@@ -1779,14 +1773,14 @@ void AbstractClosureExpr::setParameterList(ParameterList *P) {
 
 
 Type AbstractClosureExpr::getResultType() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return getType();
 
   return getType()->castTo<FunctionType>()->getResult();
 }
 
 bool AbstractClosureExpr::isBodyThrowing() const {
-  if (getType()->is<ErrorType>())
+  if (getType()->hasError())
     return false;
 
   return getType()->castTo<FunctionType>()->getExtInfo().throws();
@@ -1817,22 +1811,20 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  if (!isVoidConversionClosure()) {
-    return cast<ReturnStmt>(getBody()->getElement(0).get<Stmt *>())
-             ->getResult();
-  } else {
-    return getBody()->getElement(0).get<Expr *>();
-  }
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>())
+    return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
+  return body.get<Expr *>();
 }
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  if (!isVoidConversionClosure()) {
-    cast<ReturnStmt>(getBody()->getElement(0).get<Stmt *>())
-      ->setResult(NewBody);
-  } else {
-    return getBody()->setElement(0, NewBody);
+  auto body = getBody()->getElement(0);
+  if (body.is<Stmt *>()) {
+    cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
+    return;
   }
+  getBody()->setElement(0, NewBody);
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -1865,10 +1857,13 @@ TypeExpr::TypeExpr(Type Ty)
 // The type of a TypeExpr is always a metatype type.  Return the instance
 // type or null if not set yet.
 Type TypeExpr::getInstanceType() const {
-  if (!getType() || getType()->is<ErrorType>())
+  if (!getType())
     return Type();
-  
-  return getType()->castTo<MetatypeType>()->getInstanceType();
+
+  if (auto metaType = getType()->getAs<MetatypeType>())
+    return metaType->getInstanceType();
+
+  return ErrorType::get(getType()->getASTContext());
 }
 
 

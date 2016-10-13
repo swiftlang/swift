@@ -22,6 +22,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include <algorithm>
 

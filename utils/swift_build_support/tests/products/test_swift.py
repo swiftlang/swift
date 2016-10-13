@@ -51,7 +51,11 @@ class SwiftTestCase(unittest.TestCase):
             swift_compiler_version=None,
             clang_compiler_version=None,
             swift_user_visible_version=None,
-            darwin_deployment_version_osx="10.9")
+            darwin_deployment_version_osx="10.9",
+            benchmark=False,
+            benchmark_num_onone_iterations=3,
+            benchmark_num_o_iterations=3,
+            enable_sil_ownership=False)
 
         # Setup shell
         shell.dry_run = True
@@ -71,6 +75,14 @@ class SwiftTestCase(unittest.TestCase):
         self.workspace = None
         self.toolchain = None
         self.args = None
+
+    def test_by_default_no_cmake_options(self):
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(swift.cmake_options, [])
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -204,3 +216,63 @@ class SwiftTestCase(unittest.TestCase):
         )
         self.args.swift_compiler_version = None
         self.args.clang_compiler_version = None
+
+    def test_benchmark_flags(self):
+        self.args.benchmark = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        # By default, we should get an argument of 3 for both -Onone and -O
+        self.assertEqual(
+            ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=3',
+             '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=3'],
+            swift.cmake_options)
+
+        self.args.benchmark_num_onone_iterations = 20
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=20',
+             '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=3'],
+            swift.cmake_options)
+        self.args.benchmark_num_onone_iterations = 3
+
+        self.args.benchmark_num_o_iterations = 30
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=3',
+             '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=30'],
+            swift.cmake_options)
+        self.args.benchmark_num_onone_iterations = 3
+
+        self.args.benchmark_num_onone_iterations = 10
+        self.args.benchmark_num_o_iterations = 25
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_BENCHMARK_NUM_ONONE_ITERATIONS=10',
+             '-DSWIFT_BENCHMARK_NUM_O_ITERATIONS=25'],
+            swift.cmake_options)
+
+    def test_sil_ownership_flags(self):
+        self.args.enable_sil_ownership = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE'],
+            swift.cmake_options)

@@ -206,7 +206,7 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   }
 }
 
-// FIXME(ABI): don't mark this type versioned, or any of its APIs inlineable.
+// FIXME(ABI)#74 : don't mark this type versioned, or any of its APIs inlineable.
 // Grapheme cluster segmentation uses a completely different algorithm in
 // Unicode 9.0.
 internal struct _UnicodeExtendedGraphemeClusterSegmenter {

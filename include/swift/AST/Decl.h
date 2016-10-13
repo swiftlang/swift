@@ -1025,20 +1025,6 @@ public:
     return SeparatorLoc;
   }
 
-  /// Set during deserialization; used to print out the requirements accurately
-  /// for the generated interface.
-  StringRef getAsWrittenString() const {
-    return AsWrittenString;
-  }
-  void setAsWrittenString(StringRef Str) {
-    AsWrittenString = Str;
-  }
-
-  /// Further analyze the written string, if it's not empty, to collect the first
-  /// type, the second type and the requirement kind.
-  Optional<std::tuple<StringRef, StringRef, RequirementReprKind>>
-  getAsAnalyzedWrittenString() const;
-
   SourceRange getSourceRange() const {
     return SourceRange(Types[0].getSourceRange().Start,
                        Types[1].getSourceRange().End);
@@ -1048,7 +1034,6 @@ public:
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
-  void printAsWritten(raw_ostream &OS) const;
 };
   
 /// GenericParamList - A list of generic parameters that is part of a generic
@@ -1702,14 +1687,17 @@ public:
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
 
-  // Retrieve the declaration context for the intializer.
+  // Retrieve the declaration context for the initializer.
   DeclContext *getInitContext() const { return InitContext; }
 
   /// Override the initializer context.
   void setInitContext(DeclContext *dc) { InitContext = dc; }
 
   /// Retrieve the source range covered by this pattern binding.
-  SourceRange getSourceRange() const;
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceRange getSourceRange(bool omitAccessors = false) const;
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -2417,29 +2405,18 @@ public:
 /// whose common purpose is to anchor the abstract type parameter and specify
 /// requirements for any corresponding type argument.
 class AbstractTypeParamDecl : public TypeDecl {
-  /// The archetype describing this abstract type parameter within its scope.
-  ArchetypeType *Archetype;
-
 protected:
   AbstractTypeParamDecl(DeclKind kind, DeclContext *dc, Identifier name,
                         SourceLoc NameLoc)
-    : TypeDecl(kind, dc, name, NameLoc, { }), Archetype(nullptr) { }
+    : TypeDecl(kind, dc, name, NameLoc, { }) { }
 
 public:
   /// Return the superclass of the generic parameter.
   Type getSuperclass() const;
 
-  /// Retrieve the archetype that describes this abstract type parameter
-  /// within its scope.
-  ArchetypeType *getArchetype() const { return Archetype; }
-
-  /// Set the archetype used to describe this abstract type parameter within
-  /// its scope.
-  void setArchetype(ArchetypeType *archetype) { Archetype = archetype; }
-
   /// Retrieve the set of protocols to which this abstract type
   /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols(LazyResolver *resolver) const;
+  ArrayRef<ProtocolDecl *> getConformingProtocols() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
@@ -3290,6 +3267,11 @@ public:
   /// This is true of imported Objective-C classes.
   bool usesObjCGenericsModel() const {
     return isObjC() && hasClangNode() && isGenericContext();
+  }
+  
+  /// True if the class is known to be implemented in Swift.
+  bool hasKnownSwiftImplementation() const {
+    return !hasClangNode();
   }
 };
 

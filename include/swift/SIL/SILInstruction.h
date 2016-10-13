@@ -198,7 +198,7 @@ public:
   /// Return the array of mutable operands for this instruction.
   MutableArrayRef<Operand> getAllOperands();
 
-  /// Return the array of mutable type depedent operands for this instruction.
+  /// Return the array of mutable type dependent operands for this instruction.
   MutableArrayRef<Operand> getTypeDependentOperands();
 
   unsigned getNumOperands() const { return getAllOperands().size(); }
@@ -673,51 +673,99 @@ public:
   }
 };
 
-/// AllocRefInst - This represents the primitive allocation of an instance
-/// of a reference type. Aside from the reference count, the instance is
-/// returned uninitialized.
-class AllocRefInst final
+/// The base class for AllocRefInst and AllocRefDynamicInst.
+class AllocRefInstBase
     : public AllocationInst,
-      public StackPromotable,
-      private llvm::TrailingObjects<AllocRefInst, Operand> {
-  friend TrailingObjects;
-  friend class SILBuilder;
-  unsigned NumOperands : 31;
-  bool ObjC : 1;
+      public StackPromotable {
+protected:
 
-  AllocRefInst(SILDebugLocation Loc, SILType type, SILFunction &F, bool objc,
-               bool canBeOnStack, ArrayRef<SILValue> TypeDependentOperands);
+  AllocRefInstBase(ValueKind Kind,
+                   SILDebugLocation DebugLoc,
+                   SILType ObjectType,
+                   bool objc, bool canBeOnStack,
+                   ArrayRef<SILType> ElementTypes,
+                   ArrayRef<SILValue> AllOperands);
 
-  static AllocRefInst *create(SILDebugLocation Loc, SILType type,
-                              SILFunction &F, bool objc, bool canBeOnStack,
-                              SILOpenedArchetypesState &OpenedArchetypes);
+  // Number of tail-allocated arrays.
+  unsigned short NumTailTypes;
+
+  bool ObjC;
+
+  /// The first NumTailTypes operands are counts for the tail allocated
+  /// elements, the remaining operands are opened archetype operands.
+  TailAllocatedOperandList<0> Operands;
+
+  SILType *getTypeStorage() {
+    return reinterpret_cast<SILType*>(Operands.asArray().end());
+  }
+
+  const SILType *getTypeStorage() const {
+    return reinterpret_cast<const SILType*>(Operands.asArray().end());
+  }
 
 public:
-  ~AllocRefInst() {
-    Operand *Operands = getTrailingObjects<Operand>();
-    for (unsigned i = 0, end = NumOperands; i < end; ++i) {
-      Operands[i].~Operand();
-    }
+  ArrayRef<SILType> getTailAllocatedTypes() const {
+    return {getTypeStorage(), NumTailTypes};
+  }
+
+  MutableArrayRef<SILType> getTailAllocatedTypes() {
+    return {getTypeStorage(), NumTailTypes};
+  }
+  
+  ArrayRef<Operand> getTailAllocatedCounts() const {
+    return getAllOperands().slice(0, NumTailTypes);
+  }
+
+  MutableArrayRef<Operand> getTailAllocatedCounts() {
+    return getAllOperands().slice(0, NumTailTypes);
   }
 
   ArrayRef<Operand> getAllOperands() const {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return Operands.asArray();
   }
 
   MutableArrayRef<Operand> getAllOperands() {
-    return { getTrailingObjects<Operand>(), NumOperands };
+    return Operands.asArray();
+  }
+  
+  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
+  bool isObjC() const { return ObjC; }
+};
+
+/// AllocRefInst - This represents the primitive allocation of an instance
+/// of a reference type. Aside from the reference count, the instance is
+/// returned uninitialized.
+/// Optionally, the allocated instance contains space for one or more tail-
+/// allocated arrays.
+class AllocRefInst final : public AllocRefInstBase {
+  friend class SILBuilder;
+
+  AllocRefInst(SILDebugLocation DebugLoc, SILFunction &F,
+               SILType ObjectType,
+               bool objc, bool canBeOnStack,
+               ArrayRef<SILType> ElementTypes,
+               ArrayRef<SILValue> AllOperands)
+      : AllocRefInstBase(ValueKind::AllocRefInst, DebugLoc, ObjectType, objc,
+                         canBeOnStack, ElementTypes, AllOperands) {
+    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
+                  "subclass has extra storage");
   }
 
+  static AllocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                              SILType ObjectType,
+                              bool objc, bool canBeOnStack,
+                              ArrayRef<SILType> ElementTypes,
+                              ArrayRef<SILValue> ElementCountOperands,
+                              SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
   ArrayRef<Operand> getTypeDependentOperands() const {
-    return getAllOperands();
+    return getAllOperands().slice(NumTailTypes);
   }
 
   MutableArrayRef<Operand> getTypeDependentOperands() {
-    return getAllOperands();
+    return getAllOperands().slice(NumTailTypes);
   }
-
-  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::AllocRefInst;
@@ -728,27 +776,46 @@ public:
 /// an instance of a reference type whose runtime type is provided by
 /// the given metatype value. Aside from the reference count, the
 /// instance is returned uninitialized.
-class AllocRefDynamicInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-                                  ValueKind::AllocRefDynamicInst,
-                                  AllocRefDynamicInst,
-                                  AllocationInst,
-                                  true> {
+/// Optionally, the allocated instance contains space for one or more tail-
+/// allocated arrays.
+class AllocRefDynamicInst final : public AllocRefInstBase {
   friend class SILBuilder;
 
-  bool ObjC;
-
-  AllocRefDynamicInst(SILDebugLocation DebugLoc, SILValue operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType ty,
-                      bool objc);
+  AllocRefDynamicInst(SILDebugLocation DebugLoc,
+                      SILType ty,
+                      bool objc,
+                      ArrayRef<SILType> ElementTypes,
+                      ArrayRef<SILValue> AllOperands)
+      : AllocRefInstBase(ValueKind::AllocRefDynamicInst, DebugLoc,
+                         ty, objc, false,
+                         ElementTypes, AllOperands) {
+    static_assert(sizeof(AllocRefInst) == sizeof(AllocRefInstBase),
+                  "subclass has extra storage");
+  }
 
   static AllocRefDynamicInst *
-  create(SILDebugLocation DebugLoc, SILValue operand, SILType ty, bool objc,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, SILFunction &F,
+         SILValue metatypeOperand, SILType ty, bool objc,
+         ArrayRef<SILType> ElementTypes,
+         ArrayRef<SILValue> ElementCountOperands,
+         SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
-  bool isObjC() const { return ObjC; }
+  SILValue getMetatypeOperand() const {
+    return getAllOperands()[NumTailTypes].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(NumTailTypes + 1);
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(NumTailTypes + 1);
+  }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::AllocRefDynamicInst;
+  }
 };
 
 /// AllocValueBufferInst - Allocate memory in a value buffer.
@@ -1262,7 +1329,7 @@ class PartialApplyInst
                                   SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Return the ast level function type of this partial apply.
+  /// Return the result function type of this partial apply.
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
   }
@@ -3494,6 +3561,26 @@ public:
   }
 };
 
+/// RefTailAddrInst - Derive the address of the first element of the first
+/// tail-allocated array in a reference type instance.
+class RefTailAddrInst
+  : public UnaryInstructionBase<ValueKind::RefTailAddrInst>
+{
+  friend class SILBuilder;
+
+  RefTailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType ResultTy)
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy) {}
+
+public:
+  ClassDecl *getClassDecl() const {
+    auto s = getOperand()->getType().getClassOrBoundGenericClass();
+    assert(s);
+    return s;
+  }
+
+  SILType getTailType() const { return getType().getObjectType(); }
+};
+
 /// MethodInst - Abstract base for instructions that implement dynamic
 /// method lookup.
 class MethodInst : public SILInstruction {
@@ -4279,6 +4366,11 @@ public:
       : SILInstruction(Kind, DebugLoc, Operand->getType()),
         Operands{this, Operand, Index} {}
 
+  IndexingInst(ValueKind Kind, SILDebugLocation DebugLoc, SILValue Operand,
+               SILValue Index, SILType ResultTy)
+      : SILInstruction(Kind, DebugLoc, ResultTy),
+        Operands{this, Operand, Index} {}
+
   SILValue getBase() const { return Operands[Base].get(); }
   SILValue getIndex() const { return Operands[Index].get(); }
 
@@ -4306,6 +4398,24 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::IndexAddrInst;
   }
+};
+
+/// TailAddrInst - like IndexingInst, but aligns-up the resulting address to a
+/// tail-allocated element type.
+class TailAddrInst : public IndexingInst {
+  friend class SILBuilder;
+
+  TailAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILValue Count,
+               SILType ResultTy)
+      : IndexingInst(ValueKind::TailAddrInst, DebugLoc, Operand, Count,
+                     ResultTy) {}
+
+public:
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::TailAddrInst;
+  }
+
+  SILType getTailType() const { return getType().getObjectType(); }
 };
 
 /// IndexRawPointerInst

@@ -53,7 +53,7 @@ struct X : _ObjectiveCBridgeable {
 
   static func _unconditionallyBridgeFromObjectiveC(_ source: LifetimeTracked?)
       -> X {
-    var result: X? = nil
+    var result: X?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }

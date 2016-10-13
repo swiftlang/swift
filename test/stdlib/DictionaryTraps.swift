@@ -86,7 +86,7 @@ DictionaryTraps.test("RemoveInvalidIndex4")
   var d = [ 10: 1010 ]
   let index = d.index(forKey: 10)!
   d.remove(at: index)
-  expectEmpty(d[10])
+  expectNil(d[10])
   expectCrashLater()
   d.remove(at: index)
 }

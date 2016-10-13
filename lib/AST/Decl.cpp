@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ParameterList.h"
@@ -470,7 +471,7 @@ bool Decl::isWeakImported(Module *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailableAttr::getMinVersionAvailability().
+  // FIXME: Implement using AvailableAttr::getVersionAvailability().
   return false;
 }
 
@@ -918,26 +919,20 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-SourceRange PatternBindingEntry::getSourceRange() const {
-  ASTContext *ctx = nullptr;
+SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
+  // Patterns end at the initializer, if present.
+  SourceLoc endLoc = getOrigInitRange().End;
 
-  SourceLoc endLoc;
-  getPattern()->forEachVariable([&](VarDecl *var) {
-    auto accessorsEndLoc = var->getBracesRange().End;
-    if (accessorsEndLoc.isValid()) {
-      endLoc = accessorsEndLoc;
-      if (!ctx) ctx = &var->getASTContext();
-    }
-  });
+  // If we're not banned from handling accessors, they follow the initializer.
+  if (!omitAccessors) {
+    getPattern()->forEachVariable([&](VarDecl *var) {
+      auto accessorsEndLoc = var->getBracesRange().End;
+      if (accessorsEndLoc.isValid())
+        endLoc = accessorsEndLoc;
+    });
+  }
 
-  // Check the initializer.
-  SourceLoc initEndLoc = getOrigInitRange().End;
-  if (initEndLoc.isValid() &&
-      (endLoc.isInvalid() ||
-       (ctx && ctx->SourceMgr.isBeforeInBuffer(endLoc, initEndLoc))))
-    endLoc = initEndLoc;
-
-  // Check the pattern.
+  // If we didn't find an end yet, check the pattern.
   if (endLoc.isInvalid())
     endLoc = getPattern()->getEndLoc();
 
@@ -1214,7 +1209,7 @@ bool AbstractStorageDecl::hasFixedLayout() const {
 
   if (dc->isTypeContext()) {
     auto declaredType = dc->getDeclaredTypeOfContext();
-    if (declaredType->is<ErrorType>())
+    if (declaredType->hasError())
       return true;
     return declaredType->getAnyNominal()->hasFixedLayout();
   }
@@ -1473,25 +1468,28 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     SmallVector<TupleTypeElt, 4> elements;
     bool anyChanged = false;
     unsigned idx = 0;
+    // Remap our parameters, and make sure to strip off @escaping
     for (const auto &elt : tupleTy->getElements()) {
-      Type eltTy = mapSignatureParamType(ctx, elt.getType());
-      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer()) {
-        if (!anyChanged) {
-          elements.reserve(tupleTy->getNumElements());
-          for (unsigned i = 0; i != idx; ++i) {
-            const TupleTypeElt &elt = tupleTy->getElement(i);
-            elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
-                                            elt.isVararg()));
-          }
-          anyChanged = true;
-        }
+      auto newEltTy = mapSignatureParamType(ctx, elt.getType());
+      auto newParamFlags = elt.getParameterFlags().withEscaping(false);
+      bool exactlyTheSame = newParamFlags == elt.getParameterFlags() &&
+                            newEltTy.getPointer() == elt.getType().getPointer();
 
-        elements.push_back(TupleTypeElt(eltTy, elt.getName(),
-                                        elt.isVararg()));
+      // Don't build up anything if we never see any difference
+      if (!anyChanged && exactlyTheSame) {
+        ++idx;
+        continue;
       }
-      ++idx;
+
+      // First time we see a diff, copy over all the prior
+      if (!anyChanged && !exactlyTheSame) {
+        elements.append(tupleTy->getElements().begin(),
+                        tupleTy->getElements().begin() + idx);
+        anyChanged = true;
+      }
+
+      elements.emplace_back(newEltTy, elt.getName(), newParamFlags);
     }
-    
     if (anyChanged) {
       argTy = TupleType::get(elements, ctx);
     }
@@ -1655,7 +1653,7 @@ void ValueDecl::setType(Type T) {
 
 void ValueDecl::overwriteType(Type T) {
   TypeAndAccess.setPointer(T);
-  if (!T.isNull() && T->is<ErrorType>())
+  if (!T.isNull() && T->hasError())
     setInvalid();
 }
 
@@ -1674,8 +1672,7 @@ Type ValueDecl::getInterfaceType() const {
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
-                    const_cast<AssociatedTypeDecl *>(assocType),
-                    ctx);
+                    const_cast<AssociatedTypeDecl *>(assocType));
     InterfaceTy = MetatypeType::get(InterfaceTy, ctx);
     return InterfaceTy;
   }
@@ -1929,14 +1926,14 @@ ValueDecl::getFormalAccessScope(const DeclContext *useDC) const {
 
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
-    if (TAD->hasType() && TAD->getType()->is<ErrorType>())
+    if (TAD->hasType() && TAD->getType()->hasError())
       return TAD->getType();
 
     return TAD->getAliasType();
   }
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
     auto type = typeParam->getType();
-    if (type->is<ErrorType>())
+    if (type->hasError())
       return type;
 
     return type->castTo<MetatypeType>()->getInstanceType();
@@ -1949,7 +1946,7 @@ Type TypeDecl::getDeclaredType() const {
 
 Type TypeDecl::getDeclaredInterfaceType() const {
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
+  if (interfaceType.isNull() || interfaceType->hasError())
     return interfaceType;
 
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
@@ -2042,7 +2039,7 @@ void NominalTypeDecl::computeType() {
   // If we still don't have a declared type, don't crash -- there's a weird
   // circular declaration issue in the code.
   Type declaredTy = getDeclaredType();
-  if (!declaredTy || declaredTy->is<ErrorType>()) {
+  if (!declaredTy || declaredTy->hasError()) {
     setType(ErrorType::get(ctx));
     return;
   }
@@ -2074,27 +2071,40 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
       Ty = dc->getDeclaredInterfaceType();
       break;
     }
-    if (!Ty || Ty->is<ErrorType>())
+    if (!Ty || Ty->hasError())
       return Ty;
   }
 
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     return ProtocolType::get(proto, ctx);
-  } else if (auto params = decl->getGenericParams()) {
-    if (kind == DeclTypeKind::DeclaredType)
+  } else if (decl->getGenericParams()) {
+    switch (kind) {
+    case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
-
-    SmallVector<Type, 4> args;
-    for (auto param : *params) {
-      auto paramTy = (kind == DeclTypeKind::DeclaredTypeInContext
-                      ? param->getArchetype()
-                      : param->getDeclaredType());
-      if (!paramTy)
+    case DeclTypeKind::DeclaredTypeInContext: {
+      auto *genericEnv = decl->getGenericEnvironment();
+      auto *genericSig = decl->getGenericSignature();
+      if (genericEnv == nullptr)
         return ErrorType::get(ctx);
 
-      args.push_back(paramTy);
+      SmallVector<Type, 4> args;
+      for (auto param : genericSig->getInnermostGenericParams())
+        args.push_back(genericEnv->mapTypeIntoContext(param));
+
+      return BoundGenericType::get(decl, Ty, args);
     }
-    return BoundGenericType::get(decl, Ty, args);
+    case DeclTypeKind::DeclaredInterfaceType: {
+      // Note that here, we need to be able to produce a type
+      // before the decl has been validated, so we rely on
+      // the generic parameter list directly instead of looking
+      // at the signature.
+      SmallVector<Type, 4> args;
+      for (auto param : decl->getGenericParams()->getParams())
+        args.push_back(param->getDeclaredType());
+
+      return BoundGenericType::get(decl, Ty, args);
+    }
+    }
   } else {
     return NominalType::get(decl, Ty, ctx);
   }
@@ -2185,7 +2195,7 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
 
 
 void GenericTypeDecl::setGenericParams(GenericParamList *params) {
-  // Set the specified generic parameters onto this type alias, setting
+  // Set the specified generic parameters onto this type declaration, setting
   // the parameters' context along the way.
   GenericParams = params;
   if (params)
@@ -2218,17 +2228,29 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
-  if (Archetype)
-    return Archetype->getSuperclass();
+  auto *dc = getDeclContext();
+  if (!dc->isValidGenericContext())
+    return nullptr;
+
+  auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
+      dc, getDeclaredInterfaceType());
+  if (auto *archetype = contextTy->getAs<ArchetypeType>())
+    return archetype->getSuperclass();
 
   // FIXME: Assert that this is never queried.
   return nullptr;
 }
 
 ArrayRef<ProtocolDecl *>
-AbstractTypeParamDecl::getConformingProtocols(LazyResolver *resolver) const {
-  if (Archetype)
-    return Archetype->getConformsTo();
+AbstractTypeParamDecl::getConformingProtocols() const {
+  auto *dc = getDeclContext();
+  if (!dc->isValidGenericContext())
+    return nullptr;
+
+  auto contextTy = ArchetypeBuilder::mapTypeIntoContext(
+      dc, getDeclaredInterfaceType());
+  if (auto *archetype = contextTy->getAs<ArchetypeType>())
+    return archetype->getConformsTo();
 
   // FIXME: Assert that this is never queried.
   return { };
@@ -2309,7 +2331,6 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
 
 void AssociatedTypeDecl::setIsRecursive() {
   AssociatedTypeDeclBits.Recursive = true;
-  overwriteType(ErrorType::get(this->getASTContext()));
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -2693,12 +2714,6 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   return true;
 }
 
-/// Determine whether the given type is the 'Self' generic parameter
-/// of a protocol.
-static bool isProtocolSelf(const ProtocolDecl *proto, Type type) {
-  return proto->getSelfInterfaceType()->isEqual(type);
-}
-
 /// Classify usages of Self in the given type.
 static SelfReferenceKind
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
@@ -2765,7 +2780,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // A direct reference to 'Self' is covariant.
-  if (isProtocolSelf(proto, type))
+  if (proto->getProtocolSelfType()->isEqual(type))
     return SelfReferenceKind::Result();
 
   // Special handling for associated types.
@@ -2774,7 +2789,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
       type = depMemTy->getBase();
     }
 
-    if (isProtocolSelf(proto, type))
+    if (proto->getProtocolSelfType()->isEqual(type))
       return SelfReferenceKind::Other();
   }
 
@@ -2797,7 +2812,7 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     return SelfReferenceKind::None();
 
   // Skip invalid declarations.
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return SelfReferenceKind::None();
 
   if (isa<AbstractFunctionDecl>(value)) {
@@ -2916,12 +2931,6 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 }
 
 GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  SourceLoc loc;
-  if (auto ext = dyn_cast<ExtensionDecl>(dc))
-    loc = ext->getLoc();
-  else
-    loc = getLoc();
-
   // Find the depth of the 'Self' parameter. This is zero in all valid
   // code; however, we compute it nonetheless to maintain the AST
   // invariants around generic parameter depths.
@@ -2934,11 +2943,10 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
-  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId, loc, depth, 0);
-  auto protoRef = new (ctx) SimpleIdentTypeRepr(loc, getName());
-  protoRef->setValue(this);
-  TypeLoc selfInherited[1] = { TypeLoc(protoRef) };
-  selfInherited[0].setType(ProtocolType::get(this, ctx));
+  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId,
+                                                 SourceLoc(), depth, 0);
+  auto protoType = ProtocolType::get(this, ctx);
+  TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
   selfDecl->setImplicit();
 
@@ -3723,9 +3731,11 @@ Type DeclContext::getSelfTypeInContext() const {
   if (getAsProtocolOrProtocolExtensionContext()) {
     // In the parser, generic parameters won't be wired up yet, just give up on
     // producing a type.
-    if (!isInnermostContextGeneric())
+    if (!isValidGenericContext())
       return Type();
-    return getProtocolSelf()->getArchetype();
+
+    auto *genericEnv = getGenericEnvironmentOfContext();
+    return genericEnv->mapTypeIntoContext(getProtocolSelfType());
   }
   return getDeclaredTypeInContext();
 }
@@ -3735,30 +3745,25 @@ Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getAsProtocolOrProtocolExtensionContext()) {
-    // In the parser, generic parameters won't be wired up yet, just give up on
-    // producing a type.
-    if (!isInnermostContextGeneric())
-      return Type();
-    return getProtocolSelf()->getDeclaredType();
-  }
+  if (getAsProtocolOrProtocolExtensionContext())
+    return getProtocolSelfType();
   return getDeclaredInterfaceType();
 }
 
 /// \brief Retrieve the type of 'self' for the given context.
-/// FIXME: Can this be integrated with getSelfTypeInContext above?
-static Type getSelfTypeOfContext(DeclContext *dc) {
+Type DeclContext::getSelfTypeOfContext() const {
   // For a protocol or extension thereof, the type is 'Self'.
-  // FIXME: Weird that we're producing an archetype for protocol Self,
-  // but the declared type of the context in non-protocol cases.
-  if (dc->getAsProtocolOrProtocolExtensionContext()) {
+  if (auto *proto = getAsProtocolOrProtocolExtensionContext()) {
+    auto *genericEnv = proto->getGenericEnvironment();
+
     // In the parser, generic parameters won't be wired up yet, just give up on
     // producing a type.
-    if (!dc->isInnermostContextGeneric())
+    if (genericEnv == nullptr)
       return Type();
-    return dc->getProtocolSelf()->getArchetype();
+
+    return genericEnv->mapTypeIntoContext(getProtocolSelfType());
   }
-  return dc->getDeclaredTypeOfContext();
+  return getDeclaredTypeOfContext();
 }
 
 /// Create an implicit 'self' decl for a method in the specified decl context.
@@ -3773,12 +3778,12 @@ static Type getSelfTypeOfContext(DeclContext *dc) {
 ParamDecl *ParamDecl::createUnboundSelf(SourceLoc loc, DeclContext *DC,
                                         bool isStaticMethod, bool isInOut) {
   ASTContext &C = DC->getASTContext();
-  auto selfType = getSelfTypeOfContext(DC);
+  auto selfType = DC->getSelfTypeOfContext();
 
   // If we have a valid selfType (i.e. we're not in the parser before we
   // know such things, or we're nested inside an invalid extension),
   // configure it.
-  if (selfType && !selfType->is<ErrorType>()) {
+  if (selfType && !selfType->hasError()) {
     if (isStaticMethod)
       selfType = MetatypeType::get(selfType);
     
@@ -3877,7 +3882,7 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }
-  assert(isa<ErrorType>(T));
+  assert(T->hasError());
   return T;
 }
 
@@ -3952,7 +3957,7 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 
 Type SubscriptDecl::getIndicesType() const {
   const auto type = getType();
-  if (type->is<ErrorType>())
+  if (type->hasError())
     return type;
   return type->castTo<AnyFunctionType>()->getInput();
 }
@@ -4047,7 +4052,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
 
   // If the self type couldn't be computed, or is the result of an
   // upstream error, return an error type.
-  if (!selfTy || selfTy->is<ErrorType>())
+  if (!selfTy || selfTy->hasError())
     return ErrorType::get(dc->getASTContext());
 
   // 'static' functions have 'self' of type metatype<T>.
@@ -4468,7 +4473,7 @@ Type FuncDecl::getResultType() const {
     return nullptr;
 
   Type resultTy = getType();
-  if (resultTy->is<ErrorType>())
+  if (resultTy->hasError())
     return resultTy;
 
   for (unsigned i = 0, e = getNumParameterLists(); i != e; ++i)
@@ -4623,7 +4628,7 @@ bool EnumElementDecl::computeType() {
   EnumDecl *ED = getParentEnum();
   Type resultTy = ED->getDeclaredTypeInContext();
 
-  if (resultTy->is<ErrorType>()) {
+  if (resultTy->hasError()) {
     setType(resultTy);
     return false;
   }
@@ -4649,7 +4654,7 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     return nullptr;
 
   auto interfaceType = getInterfaceType();
-  if (interfaceType->is<ErrorType>()) {
+  if (interfaceType->hasError()) {
     return interfaceType;
   }
 

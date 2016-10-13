@@ -508,12 +508,12 @@ class Deprecated2 : Deprecated1 {
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
 class EscapingBase {
-  func method(_ x: @escaping (@escaping ()->()) -> (@escaping ()->())) -> (@escaping (@escaping ()->() )->()) { }
+  func method(_ x: @escaping (@escaping ()->()) -> (()->())) -> (@escaping (@escaping ()->() )->()) { }
 }
 class Escaping : EscapingBase {
   override func #^ESCAPING_1^#
 }
-// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (@escaping () -> ())) -> ((@escaping () -> ()) -> ()) {|};
+// ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
 
 class OverrideBase {
   init(x: Int) {}

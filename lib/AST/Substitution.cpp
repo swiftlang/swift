@@ -43,15 +43,6 @@ Substitution::Substitution(Type Replacement,
 }
 
 Substitution Substitution::subst(Module *module,
-                                 GenericSignature *sig,
-                                 GenericEnvironment *env,
-                                 ArrayRef<Substitution> subs) const {
-  assert(sig && env);
-  auto subMap = env->getSubstitutionMap(module, sig, subs);
-  return subst(module, subMap);
-}
-
-Substitution Substitution::subst(Module *module,
                                  const SubstitutionMap &subMap) const {
   // Substitute the replacement.
   Type substReplacement = Replacement.subst(subMap, None);

@@ -359,7 +359,7 @@ ArrayTestSuite.test("${Kind}/popLast") {
   do {
     var a = ${Kind}<Int>()
     let popped = a.popLast()
-    expectEmpty(popped)
+    expectNil(popped)
     expectTrue(a.isEmpty)
   }
 
@@ -490,6 +490,21 @@ ArrayTestSuite.test("${array_type}/_withUnsafeMutableBufferPointerIfSupported/Re
     // expectCrashLater()
     return OpaqueValue(42)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// withUnsafeMutableBytes
+//===----------------------------------------------------------------------===//
+
+// Test the uniqueness of the raw buffer.
+ArrayTestSuite.test("${array_type}/withUnsafeMutableBytes") {
+  var a = getFresh${array_type}([UInt8](repeating: 10, count: 1))
+  let b = a
+  a.withUnsafeMutableBytes { bytes in
+    bytes[0] = 42
+  }
+  expectEqual(42, a[0])
+  expectEqual(10, b[0])
 }
 
 //===---

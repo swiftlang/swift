@@ -125,6 +125,9 @@ class LinkEntity {
     /// The pointer is a Decl*.
     Other,
 
+    /// A reflection metadata descriptor for the superclass of a class.
+    ReflectionSuperclassDescriptor,
+
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
     
@@ -160,6 +163,10 @@ class LinkEntity {
     /// The index of the associated type declaration is stored in the data.
     AssociatedTypeWitnessTableAccessFunction,
 
+    /// A reflection metadata descriptor for the associated type witnesses of a
+    /// nominal type in a protocol conformance.
+    ReflectionAssociatedTypeDescriptor,
+
     // These are both type kinds and protocol-conformance kinds.
 
     /// A lazy protocol witness accessor function. The pointer is a
@@ -171,7 +178,7 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-        
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -201,6 +208,12 @@ class LinkEntity {
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
     TypeMangling,
+
+    /// A reflection metadata descriptor for a builtin or imported type.
+    ReflectionBuiltinDescriptor,
+
+    /// A reflection metadata descriptor for a struct, enum, class or protocol.
+    ReflectionFieldDescriptor,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -218,20 +231,20 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::Other;
+    return k <= Kind::ReflectionSuperclassDescriptor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
   
   static bool isProtocolConformanceKind(Kind k) {
-    return k >= Kind::DirectProtocolWitnessTable
-      && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
+    return (k >= Kind::DirectProtocolWitnessTable &&
+            k <= Kind::ProtocolWitnessTableLazyCacheVariable);
   }
 
-  void setForDecl(Kind kind, ValueDecl *decl, unsigned uncurryLevel) {
+  void setForDecl(Kind kind, const ValueDecl *decl, unsigned uncurryLevel) {
     assert(isDeclKind(kind));
-    Pointer = decl;
+    Pointer = const_cast<void*>(static_cast<const void*>(decl));
     SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
@@ -495,6 +508,33 @@ public:
     return entity;
   }
 
+  static LinkEntity forReflectionBuiltinDescriptor(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::ReflectionBuiltinDescriptor, type);
+    return entity;
+  }
+
+  static LinkEntity forReflectionFieldDescriptor(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::ReflectionFieldDescriptor, type);
+    return entity;
+  }
+
+  static LinkEntity
+  forReflectionAssociatedTypeDescriptor(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(
+        Kind::ReflectionAssociatedTypeDescriptor, C);
+    return entity;
+  }
+
+  static LinkEntity
+  forReflectionSuperclassDescriptor(const ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ReflectionSuperclassDescriptor, decl, 0);
+    return entity;
+  }
+
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
@@ -511,7 +551,7 @@ public:
   ///
   bool isFragile(IRGenModule &IGM) const;
 
-  ValueDecl *getDecl() const {
+  const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
     return reinterpret_cast<ValueDecl*>(Pointer);
   }

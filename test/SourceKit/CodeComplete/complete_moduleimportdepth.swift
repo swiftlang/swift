@@ -11,9 +11,9 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
-// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: T##T#>)",
-// CHECK-NEXT:   key.description: "abs(x: T)",
-// CHECK-NEXT:   key.typename: "T",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: FloatingPoint##FloatingPoint#>)",
+// CHECK-NEXT:   key.description: "abs(x: FloatingPoint)",
+// CHECK-NEXT:   key.typename: "FloatingPoint",
 // CHECK-NEXT:   key.doc.brief: "Returns the absolute value of x.",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,

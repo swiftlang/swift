@@ -171,7 +171,7 @@ dump(String.self)
 dump(stride(from: 1.0, through: 12.15, by: 3.14))
 
 // CHECK-NEXT: nil
-var nilUnsafeMutablePointerString: UnsafeMutablePointer<String>? = nil
+var nilUnsafeMutablePointerString: UnsafeMutablePointer<String>?
 dump(nilUnsafeMutablePointerString)
 
 // CHECK-NEXT: 123456

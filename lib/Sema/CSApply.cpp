@@ -94,16 +94,7 @@ Type Solution::computeSubstitutions(
   }
 
   // Produce the concrete form of the opened type.
-  auto type = openedType.transform([&](Type type) -> Type {
-    if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-      auto archetype = tv->getImpl().getArchetype();
-      auto simplified = getFixedType(tv);
-      return SubstitutedType::get(archetype, simplified,
-                                  tc.Context);
-    }
-
-    return type;
-  });
+  Type type = simplifyType(tc, openedType);
 
   auto mod = getConstraintSystem().DC->getParentModule();
   GenericSignature *sig;
@@ -127,14 +118,14 @@ Type Solution::computeSubstitutions(
                       &conformance);
     (void)isOpenedAnyObject;
     assert((conforms ||
-            replacement->is<ErrorType>() ||
+            replacement->hasError() ||
             isOpenedAnyObject(replacement) ||
             replacement->is<GenericTypeParamType>()) &&
            "Constraint system missed a conformance?");
     (void)conforms;
 
     assert(conformance ||
-           replacement->is<ErrorType>() ||
+           replacement->hasError() ||
            replacement->hasDependentProtocolConformances());
 
     return ProtocolConformanceRef(protoType->getDecl(), conformance);
@@ -1144,10 +1135,10 @@ namespace {
     }
 
   public:
-    
-    
-    /// \brief Coerce a closure expression with a non-void return type to a
-    /// contextual function type with a void return type.
+
+
+    /// \brief Coerce a closure expression with a non-Void return type to a
+    /// contextual function type with a Void return type.
     ///
     /// This operation cannot fail.
     ///
@@ -1156,6 +1147,17 @@ namespace {
     /// \returns The coerced closure expression.
     ///
     ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
+
+    /// \brief Coerce a closure expression with a Never return type to a
+    /// contextual function type with some other return type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param expr The closure expression to coerce.
+    ///
+    /// \returns The coerced closure expression.
+    ///
+    ClosureExpr *coerceClosureExprFromNever(ClosureExpr *expr);
     
     /// \brief Coerce the given expression to the given type.
     ///
@@ -1311,9 +1313,9 @@ namespace {
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        base = coerceObjectArgumentToType(base, containerTy, subscript,
-                                          AccessSemantics::Ordinary, locator);
-                 locator.withPathElement(ConstraintLocator::MemberRefBase);
+        base = coerceObjectArgumentToType(
+            base, containerTy, subscript, AccessSemantics::Ordinary,
+            locator.withPathElement(ConstraintLocator::MemberRefBase));
         if (!base)
           return nullptr;
 
@@ -2658,11 +2660,8 @@ namespace {
       expr->setType(arrayTy);
 
       // If the array element type was defaulted, note that in the expression.
-      auto elementTypeVariable = cs.ArrayElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.ArrayElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(elementTypeVariable->second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }
@@ -2736,14 +2735,8 @@ namespace {
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
-      auto elementTypeVariable = cs.DictionaryElementTypeVariables.find(expr);
-      if (elementTypeVariable != cs.DictionaryElementTypeVariables.end()) {
-        if (solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.first) ||
-            solution.DefaultedTypeVariables.count(
-              elementTypeVariable->second.second))
-          expr->setIsTypeDefaulted();
-      }
+      if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
+        expr->setIsTypeDefaulted();
 
       return expr;
     }
@@ -2811,10 +2804,6 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
-    Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -2889,7 +2878,7 @@ namespace {
         = solution.convertBooleanTypeToBuiltinI1(expr->getCondExpr(),
                                                  cs.getConstraintLocator(expr));
       if (!cond) {
-        expr->getCondExpr()->setType(ErrorType::get(cs.getASTContext()));
+        expr->getCondExpr()->setType(ErrorType::get(resultTy));
       } else {
         expr->setCondExpr(cond);
       }
@@ -3152,9 +3141,8 @@ namespace {
         return nullptr;
 
       // Convert the subexpression.
-      bool failed = tc.convertToType(sub, toType, cs.DC);
-      (void)failed;
-      assert(!failed && "Not convertible?");
+      if (tc.convertToType(sub, toType, cs.DC))
+        return nullptr;
 
       expr->setSubExpr(sub);
       expr->setType(toType);
@@ -4218,9 +4206,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
       if (fromTupleExpr)
         fromEltType = fromTupleExpr->getElement(sources[i])->getType();
 
-      toSugarFields.push_back(TupleTypeElt(fromEltType,
-                                           toElt.getName(),
-                                           toElt.isVararg()));
+      toSugarFields.push_back(toElt.getWithType(fromEltType));
       fromTupleExprFields[sources[i]] = fromElt;
       continue;
     }
@@ -4228,7 +4214,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     // We need to convert the source element to the destination type.
     if (!fromTupleExpr) {
       // FIXME: Lame! We can't express this in the AST.
-      InFlightDiagnostic diag = tc.diagnose(expr->getLoc(),
+      auto anchorExpr = locator.getBaseLocator()->getAnchor();
+      InFlightDiagnostic diag = tc.diagnose(anchorExpr->getLoc(),
                                         diag::tuple_conversion_not_expressible,
                                             fromTuple, toTuple);
       if (typeFromPattern) {
@@ -4255,12 +4242,9 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setElement(sources[i], convertedElt);
 
     // Record the sugared field name.
-    toSugarFields.push_back(TupleTypeElt(convertedElt->getType(),
-                                         toElt.getName(),
-                                         toElt.isVararg()));
-    fromTupleExprFields[sources[i]] = TupleTypeElt(convertedElt->getType(),
-                                                   fromElt.getName(),
-                                                   fromElt.isVararg());
+    toSugarFields.push_back(toElt.getWithType(convertedElt->getType()));
+    fromTupleExprFields[sources[i]] =
+        fromElt.getWithType(convertedElt->getType());
   }
 
   // Convert all of the variadic arguments to the destination type.
@@ -4297,10 +4281,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
       fromTupleExpr->setElement(fromFieldIdx, convertedElt);
 
-      fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
-                                            convertedElt->getType(),
-                                            fromElt.getName(),
-                                            fromElt.isVararg());
+      fromTupleExprFields[fromFieldIdx] =
+          fromElt.getWithType(convertedElt->getType());
     }
 
     // Find the appropriate injection function.
@@ -4393,15 +4375,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
         assert(expr->getType()->isEqual(field.getVarargBaseTy()) &&
                "scalar field is not equivalent to dest vararg field?!");
 
-        sugarFields.push_back(TupleTypeElt(field.getType(),
-                                           field.getName(),
-                                           true));
+        sugarFields.push_back(field);
       }
       else {
         assert(expr->getType()->isEqual(field.getType()) &&
                "scalar field is not equivalent to dest tuple field?!");
-        sugarFields.push_back(TupleTypeElt(expr->getType(),
-                                           field.getName()));
+        sugarFields.push_back(field.getWithType(expr->getType()));
       }
 
       // Record the
@@ -4765,7 +4744,7 @@ Expr *ExprRewriter::coerceCallArguments(
     const auto &param = params[paramIdx];
 
     // Handle variadic parameters.
-    if (param.Variadic) {
+    if (param.isVariadic()) {
       // Find the appropriate injection function.
       if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
         return nullptr;
@@ -4774,7 +4753,8 @@ Expr *ExprRewriter::coerceCallArguments(
       auto paramBaseType = param.Ty;
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
-      toSugarFields.push_back(TupleTypeElt(sliceType, param.Label, true));
+      toSugarFields.push_back(
+          TupleTypeElt(sliceType, param.Label, param.parameterFlags));
       anythingShuffled = true;
       sources.push_back(TupleShuffleExpr::Variadic);
 
@@ -4818,12 +4798,12 @@ Expr *ExprRewriter::coerceCallArguments(
       // Note that we'll be doing a shuffle involving default arguments.
       anythingShuffled = true;
       toSugarFields.push_back(TupleTypeElt(
-                                param.Variadic
+                                param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
                                                          param.Ty)
                                   : param.Ty,
                                 param.Label,
-                                param.Variadic));
+                                param.parameterFlags));
 
       if (defArg) {
         callerDefaultArgs.push_back(defArg);
@@ -4850,8 +4830,10 @@ Expr *ExprRewriter::coerceCallArguments(
     // If the types exactly match, this is easy.
     auto paramType = param.Ty;
     if (argType->isEqual(paramType)) {
-      toSugarFields.push_back(TupleTypeElt(argType, param.Label));
-      fromTupleExprFields[argIdx] = TupleTypeElt(paramType, param.Label);
+      toSugarFields.push_back(
+          TupleTypeElt(argType, param.Label, param.parameterFlags));
+      fromTupleExprFields[argIdx] =
+          TupleTypeElt(paramType, param.Label, param.parameterFlags);
       fromTupleExpr[argIdx] = arg;
       continue;
     }
@@ -4864,9 +4846,10 @@ Expr *ExprRewriter::coerceCallArguments(
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;
-    fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
-                                               getArgLabel(argIdx));
-    toSugarFields.push_back(TupleTypeElt(argType, param.Label));
+    fromTupleExprFields[argIdx] = TupleTypeElt(
+        convertedArg->getType(), getArgLabel(argIdx), param.parameterFlags);
+    toSugarFields.push_back(
+        TupleTypeElt(argType, param.Label, param.parameterFlags));
   }
 
   // Compute a new 'arg', from the bits we have.  We have three cases: the
@@ -4964,14 +4947,12 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
 
   // Re-write the single-expression closure to return '()'
   assert(closureExpr->hasSingleExpressionBody());
-  
-  // Transform the ClosureExpr representation into the "expr + return ()" rep
-  // if it isn't already.
-  if (!closureExpr->isVoidConversionClosure()) {
-    
-    auto member = closureExpr->getBody()->getElement(0);
-    
-    // A single-expression body contains a single return statement.
+
+  // A single-expression body contains a single return statement
+  // prior to this transformation.
+  auto member = closureExpr->getBody()->getElement(0);
+ 
+  if (member.is<Stmt *>()) {
     auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
     auto singleExpr = returnStmt->getResult();
     auto voidExpr = TupleExpr::createEmpty(tc.Context,
@@ -4998,7 +4979,6 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                        /*implicit*/true);
     
     closureExpr->setImplicit();
-    closureExpr->setIsVoidConversionClosure();
     closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
   }
   
@@ -5009,6 +4989,38 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                           tc.Context.TheEmptyTupleType,
                                           fnType->getExtInfo());
   closureExpr->setType(newClosureType);
+  return closureExpr;
+}
+
+ClosureExpr *ExprRewriter::coerceClosureExprFromNever(ClosureExpr *closureExpr) {
+  auto &tc = cs.getTypeChecker();
+
+  // Re-write the single-expression closure to drop the 'return'.
+  assert(closureExpr->hasSingleExpressionBody());
+
+  // A single-expression body contains a single return statement
+  // prior to this transformation.
+  auto member = closureExpr->getBody()->getElement(0);
+
+  if (member.is<Stmt *>()) {
+    auto returnStmt = cast<ReturnStmt>(member.get<Stmt *>());
+    auto singleExpr = returnStmt->getResult();
+
+    tc.checkIgnoredExpr(singleExpr);
+
+    SmallVector<ASTNode, 1> elements;
+    elements.push_back(singleExpr);
+
+    auto braceStmt = BraceStmt::create(tc.Context,
+                                       closureExpr->getStartLoc(),
+                                       elements,
+                                       closureExpr->getEndLoc(),
+                                       /*implicit*/true);
+
+    closureExpr->setImplicit();
+    closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
+  }
+
   return closureExpr;
 }
 
@@ -5081,6 +5093,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
 
 static CollectionUpcastConversionExpr::ConversionPair
 buildElementConversion(ExprRewriter &rewriter,
+                       SourceLoc srcLoc,
                        Type srcCollectionType,
                        Type destCollectionType,
                        ConstraintLocatorBuilder locator,
@@ -5093,7 +5106,7 @@ buildElementConversion(ExprRewriter &rewriter,
 
   // Build the conversion.
   ASTContext &ctx = rewriter.getConstraintSystem().getASTContext();
-  auto opaque = new (ctx) OpaqueValueExpr(SourceLoc(), srcType);
+  auto opaque = new (ctx) OpaqueValueExpr(srcLoc, srcType);
   auto conversion =
     rewriter.coerceToType(opaque, destType,
            locator.withPathElement(
@@ -5253,8 +5266,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       // Form the upcast.
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
@@ -5295,10 +5308,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the key and value conversions.
-      auto keyConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
-      auto valueConv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 1);
+      auto keyConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 0);
+      auto valueConv = buildElementConversion(
+          *this, expr->getLoc(), expr->getType(), toType, locator, 1);
 
       // If the source key and value types are object types, this is an upcast.
       // Otherwise, it's bridged.
@@ -5318,8 +5331,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
 
       // Build the value conversion.
-      auto conv =
-        buildElementConversion(*this, expr->getType(), toType, locator, 0);
+      auto conv = buildElementConversion(*this, expr->getLoc(), expr->getType(),
+                                         toType, locator, 0);
 
       return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
                                                              {}, conv);
@@ -5810,7 +5823,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       return nullptr;
 
     // If the argument type is in error, we're done.
-    if (argType->is<ErrorType>())
+    if (argType->hasError() || argType->getCanonicalType()->hasError())
       return nullptr;
 
     // Convert the literal to the non-builtin argument type via the
@@ -6113,12 +6126,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     ArrayRef<Expr *> arguments;
     ArrayRef<TypeBase *> types;
 
+    SmallVector<Expr *, 1> Scratch;
     if (auto *TE = dyn_cast<TupleExpr>(CEA))
       arguments = TE->getElements();
-    else if (auto *PE = dyn_cast<ParenExpr>(CEA))
-      arguments = PE->getSubExpr();
-    else
-      arguments = apply->getArg();
+    else if (auto *PE = dyn_cast<ParenExpr>(CEA)) {
+      Scratch.push_back(PE->getSubExpr());
+      arguments = makeArrayRef(Scratch);
+    }
+    else {
+      Scratch.push_back(apply->getArg());
+      arguments = makeArrayRef(Scratch);
+    }
 
     for (auto arg: arguments) {
       bool isNoEscape = false;
@@ -6382,10 +6400,6 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For a default-value expression, do nothing.
-      if (isa<DefaultValueExpr>(expr))
-        return { false, expr };
-
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         Rewriter.simplifyExprType(expr);
@@ -6411,9 +6425,15 @@ namespace {
             closure->setSingleExpressionBody(body);
           
           if (body) {
-            
+            // A single-expression closure with a non-Void expression type
+            // coerces to a Void-returning function type.
             if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
               closure = Rewriter.coerceClosureExprToVoid(closure);
+            // A single-expression closure with a Never expression type
+            // coerces to any other function type.
+            } else if (!fnType->getResult()->isUninhabited() &&
+                       body->getType()->isUninhabited()) {
+              closure = Rewriter.coerceClosureExprFromNever(closure);
             } else {
             
               body = Rewriter.coerceToType(body,

@@ -1022,7 +1022,7 @@ extension String {
     orthography: NSOrthography? = nil,
     tokenRanges: UnsafeMutablePointer<[Range<Index>]>? = nil // FIXME:Can this be nil?
   ) -> [String] {
-    var nsTokenRanges: NSArray? = nil
+    var nsTokenRanges: NSArray?
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
         in: _toNSRange(range), scheme: tagScheme, options: opts,

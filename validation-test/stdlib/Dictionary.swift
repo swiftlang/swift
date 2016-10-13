@@ -261,7 +261,7 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate") {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
-    expectEmpty(d2[MinimalHashableValue(42)])
+    expectNil(d2[MinimalHashableValue(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
@@ -316,7 +316,7 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate") {
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
 
-    expectEmpty(d2[MinimalHashableClass(42)])
+    expectNil(d2[MinimalHashableClass(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
@@ -507,7 +507,7 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
-    expectEmpty(d2.index(forKey: MinimalHashableValue(42)))
+    expectNil(d2.index(forKey: MinimalHashableValue(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
@@ -544,7 +544,7 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
     MinimalHashableClass.timesHashValueWasCalled = 0
-    expectEmpty(d2.index(forKey: MinimalHashableClass(42)))
+    expectNil(d2.index(forKey: MinimalHashableClass(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
@@ -2586,12 +2586,12 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
   expectEqual(1030, (v as! TestObjCValueTy).value)
   let idValue30 = unsafeBitCast(v, to: UInt.self)
 
-  expectEmpty(d.object(forKey: TestObjCKeyTy(40)))
+  expectNil(d.object(forKey: TestObjCKeyTy(40)))
 
   // NSDictionary can store mixed key types.  Swift's Dictionary is typed, but
   // when bridged to NSDictionary, it should behave like one, and allow queries
   // for mismatched key types.
-  expectEmpty(d.object(forKey: TestObjCInvalidKeyTy()))
+  expectNil(d.object(forKey: TestObjCInvalidKeyTy()))
 
   for i in 0..<3 {
     expectEqual(idValue10, unsafeBitCast(
@@ -3806,14 +3806,14 @@ DictionaryTestSuite.test("misc") {
     expectOptionalEqual(1, dict["Hello"])
     expectOptionalEqual(2, dict["World"])
     expectOptionalEqual(3, dict["Swift"])
-    expectEmpty(dict["Universe"])
+    expectNil(dict["Universe"])
 
     // Overwriting existing value
     dict["Hello"] = 0
     expectOptionalEqual(0, dict["Hello"])
     expectOptionalEqual(2, dict["World"])
     expectOptionalEqual(3, dict["Swift"])
-    expectEmpty(dict["Universe"])
+    expectNil(dict["Universe"])
   }
 
   do {
@@ -3853,8 +3853,8 @@ DictionaryTestSuite.test("misc") {
     expectEqual(3, d.values[d.keys.index(of: "three")!])
     expectEqual(4, d.values[d.keys.index(of: "four")!])
 
-    expectEqual(3, d3.values[d.keys.index(of: "three")!])
-    expectEqual(4, d3.values[d.keys.index(of: "four")!])
+    expectEqual(3, d3.values[d3.keys.index(of: "three")!])
+    expectEqual(4, d3.values[d3.keys.index(of: "four")!])
   }
 }
 
@@ -3885,7 +3885,7 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     start: UnsafeMutablePointer<NSString>.allocate(capacity: 2), count: 2)
   var kp = AutoreleasingUnsafeMutablePointer<AnyObject?>(keys.baseAddress!)
   var vp = AutoreleasingUnsafeMutablePointer<AnyObject?>(values.baseAddress!)
-  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>? = nil
+  var null: AutoreleasingUnsafeMutablePointer<AnyObject?>?
 
   d.available_getObjects(null, andKeys: null) // don't segfault
 
@@ -3906,7 +3906,7 @@ DictionaryTestSuite.test("popFirst") {
   do {
     var d = [Int: Int]()
     let popped = d.popFirst()
-    expectEmpty(popped)
+    expectNil(popped)
   }
 
   do {
@@ -3940,7 +3940,7 @@ DictionaryTestSuite.test("removeAt") {
     expectEqual(i*10, removed.0)
     expectEqual(i*1010, removed.1)
     expectEqual(2, d.count)
-    expectEmpty(d.index(forKey: i))
+    expectNil(d.index(forKey: i))
     let origKeys: [Int] = [10, 20, 30]
     expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sorted())
   }

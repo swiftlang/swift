@@ -54,10 +54,10 @@ _ = Foo() // expected-error {{'Foo' initializer is inaccessible due to 'internal
 // <rdar://problem/27982012> QoI: Poor diagnostic for inaccessible initializer
 struct rdar27982012 {
   var x: Int
-  private init(_ x: Int) { self.x = x }
+  private init(_ x: Int) { self.x = x } // expected-note {{'init' declared here}}
 }
 
-_ = { rdar27982012($0.0) }((1, 2)) // expected-error {{type of expression is ambiguous without more context}}
+_ = { rdar27982012($0.0) }((1, 2)) // expected-error {{initializer is inaccessible due to 'private' protection level}}
 
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
@@ -75,7 +75,7 @@ class Sub : Base {
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 
-    method() // expected-error {{use of unresolved identifier 'method'}}
+    method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     self.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     super.method() // expected-error {{'method' is inaccessible due to 'internal' protection level}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:

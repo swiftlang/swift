@@ -46,7 +46,7 @@ extension ${Self} : LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
-  /// hexadecimal format or special floating-point values for infinty and NaN
+  /// hexadecimal format or special floating-point values for infinity and NaN
   /// ("not a number").
   ///
   /// The given string may begin with a plus or minus sign character (`+` or

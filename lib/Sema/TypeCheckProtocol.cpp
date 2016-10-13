@@ -1569,7 +1569,7 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
 
   // Replace generic type parameters and associated types with their
   // witnesses, when we have them.
-  auto selfTy = GenericTypeParamType::get(0, 0, tc.Context);
+  auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
   type = type.transform([&](Type type) -> Type {
     // If a dependent member refers to an associated type, replace it.
     if (auto member = type->getAs<DependentMemberType>()) {
@@ -1826,7 +1826,8 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
   assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformanceRef, 4> conformances;
 
-  bool isError = replacement->is<ErrorType>();
+  bool isError =
+    replacement->hasError() || replacement->getCanonicalType()->hasError();
   assert((archetype != nullptr || isError) &&
          "Should have built archetypes already");
 
@@ -1954,7 +1955,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     // happen when type-checking a different conformance deduces a
     // different type witness with the same name. For non-error cases,
     // the caller handles this.
-    if (performRedeclarationCheck && type->is<ErrorType>()) {
+    if (performRedeclarationCheck && type->hasError()) {
       switch (resolveTypeWitnessViaLookup(assocType)) {
       case ResolveWitnessResult::Success:
       case ResolveWitnessResult::ExplicitFailed:
@@ -1976,9 +1977,13 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->computeType();
     aliasDecl->setImplicit();
-    if (type->is<ErrorType>())
+    if (type->hasError()) {
       aliasDecl->setInvalid();
-    if (type->hasArchetype()) {
+
+      // If we're recording a failed type witness, keep the sugar around for
+      // code completion.
+      type = aliasDecl->getDeclaredType();
+    } else if (type->hasArchetype()) {
       Type metaType = MetatypeType::get(type);
       aliasDecl->setInterfaceType(
         ArchetypeBuilder::mapTypeOutOfContext(DC, metaType));
@@ -2013,10 +2018,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  Conformance->setTypeWitness(
-    assocType,
-    getArchetypeSubstitution(TC, DC, assocType->getArchetype(), type),
-    typeDecl);
+  auto *archetype = ArchetypeBuilder::mapTypeIntoContext(
+      Conformance->getProtocol(), assocType->getDeclaredInterfaceType())
+          ->getAs<ArchetypeType>();
+  if (archetype)
+    Conformance->setTypeWitness(
+        assocType,
+        getArchetypeSubstitution(TC, DC, archetype, type),
+        typeDecl);
 }
 
 /// Generates a note for a protocol requirement for which no witness was found
@@ -2075,7 +2084,7 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
         if (!CD->isFinal() && Adopter->isExtensionContext()) {
           // In this case, user should mark class as 'final' or define 
-          // 'required' intializer directly in the class definition.
+          // 'required' initializer directly in the class definition.
           AddFixit = false;
         } else if (!CD->isFinal()) {
           Printer << "required ";
@@ -2097,9 +2106,9 @@ static void diagnoseNoWitness(ValueDecl *Requirement, Type RequirementType,
       Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
       Type SelfType = Adopter->getSelfTypeInContext();
       if (Adopter->getAsClassOrClassExtensionContext())
-        Options.setArchetypeSelfTransform(SelfType, Adopter);
+        Options.setArchetypeSelfTransform(SelfType);
       else
-        Options.setArchetypeAndDynamicSelfTransform(SelfType, Adopter);
+        Options.setArchetypeAndDynamicSelfTransform(SelfType);
       Options.CurrentModule = Adopter->getParentModule();
       if (!Adopter->isExtensionContext()) {
         // Create a variable declaration instead of a computed property in
@@ -2125,7 +2134,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
     if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->is<ErrorType>()) {
+          ->hasError()) {
       return ResolveWitnessResult::ExplicitFailed;
     }
   }
@@ -2533,7 +2542,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   }
 
   // Check protocol conformances.
-  for (auto reqProto : assocType->getConformingProtocols(&tc)) {
+  for (auto reqProto : assocType->getConformingProtocols()) {
     if (!tc.conformsToProtocol(type, reqProto, dc, None))
       return reqProto;
   }
@@ -2600,7 +2609,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       tc.diagnose(assocType, diag::no_witnesses_type, assocType->getName());
 
       for (auto candidate : nonViable) {
-        if (candidate.first->getDeclaredType()->is<ErrorType>())
+        if (candidate.first->getDeclaredType()->hasError())
           continue;
 
         tc.diagnose(candidate.first,
@@ -2630,7 +2639,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
                      witnessResult.Inferred.end(),
                      [&](const std::pair<AssociatedTypeDecl *, Type> &result) {
                        // Filter out errors.
-                       if (result.second->is<ErrorType>())
+                       if (result.second->hasError())
                          return true;
 
                        // Filter out duplicates.
@@ -2722,6 +2731,16 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
   return result;
 }
 
+/// Map error types back to their original types.
+static Type mapErrorTypeToOriginal(Type type) {
+  if (auto errorType = type->getAs<ErrorType>()) {
+    if (auto originalType = errorType->getOriginalType())
+      return originalType.transform(mapErrorTypeToOriginal);
+  }
+
+  return type;
+}
+
 /// Produce the type when matching a witness.
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
@@ -2764,7 +2783,11 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   Module *module = conformance->getDeclContext()->getParentModule();
-  return type.subst(module, substitutions, SubstFlags::IgnoreMissing);
+  auto resultType = type.subst(module, substitutions, SubstFlags::UseErrorType);
+  if (!resultType->hasError()) return resultType;
+
+  // Map error types with original types *back* to the original, dependent type.
+  return resultType.transform(mapErrorTypeToOriginal);
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2816,6 +2839,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     /// Structural mismatches imply that the witness cannot match.
     bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+      // If either type hit an error, don't stop yet.
+      if (firstType->hasError() || secondType->hasError())
+        return true;
+
       // FIXME: Check whether one of the types is dependent?
       return false;
     }
@@ -2823,6 +2850,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     /// Deduce associated types from dependent member types in the witness.
     bool mismatch(DependentMemberType *firstDepMember,
                   TypeBase *secondType) {
+      // If the second type is an error, don't look at it further.
+      if (secondType->hasError())
+        return true;
+
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
@@ -3004,21 +3035,29 @@ void ConformanceChecker::resolveTypeWitnesses() {
     if (assocType->getDefaultDefinitionLoc().isNull())
       return Type();
 
+    auto selfType = Proto->getSelfInterfaceType();
+
     // Create a set of type substitutions for all known associated type.
     // FIXME: Base this on dependent types rather than archetypes?
     TypeSubstitutionMap substitutions;
-    substitutions[Proto->getSelfTypeInContext().getPointer()] = Adoptee;
+    substitutions[ArchetypeBuilder::mapTypeIntoContext(Proto, selfType)
+        ->getCanonicalType().getPointer()] = Adoptee;
     for (auto member : Proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        auto archetype = ArchetypeBuilder::mapTypeIntoContext(
+            Proto, assocType->getDeclaredInterfaceType())
+                ->getAs<ArchetypeType>();
+        if (!archetype)
+          continue;
         if (Conformance->hasTypeWitness(assocType)) {
-          substitutions[assocType->getArchetype()]
+          substitutions[archetype]
             = Conformance->getTypeWitness(assocType, nullptr).getReplacement();
         } else {
           auto known = typeWitnesses.begin(assocType);
           if (known != typeWitnesses.end())
-            substitutions[assocType->getArchetype()] = known->first;
+            substitutions[archetype] = known->first;
           else
-            substitutions[assocType->getArchetype()] = ErrorType::get(TC.Context);
+            substitutions[archetype] = ErrorType::get(TC.Context);
         }
       }
     }
@@ -3026,8 +3065,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     TC.validateDecl(assocType);
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
                          DC->getParentModule(),
-                         substitutions,
-                         SubstFlags::IgnoreMissing);
+                         substitutions);
     if (!defaultType)
       return Type();
 
@@ -3048,7 +3086,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function to compute the derived type of an associated type,
   // for protocols known to the compiler.
   auto computeDerivedTypeWitness = [&](AssociatedTypeDecl *assocType) -> Type {
-    if (Adoptee->is<ErrorType>())
+    if (Adoptee->hasError())
       return Type();
 
     // UnresolvedTypes propagated their unresolvedness to any witnesses.
@@ -3176,7 +3214,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
         auto typeWitness = typeWitnesses.begin(assocType);
         if (typeWitness != typeWitnesses.end()) {
           // The solution contains an error.
-          if (typeWitness->first->is<ErrorType>()) {
+          if (typeWitness->first->hasError()) {
             recordMissing();
             return;
           }
@@ -3188,7 +3226,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         // If we can form a default type, do so.
         if (Type defaultType = computeDefaultTypeWitness(assocType)) {
-          if (defaultType->is<ErrorType>()) {
+          if (defaultType->hasError()) {
             recordMissing();
             return;
           }
@@ -3199,7 +3237,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         // If we can derive a type witness, do so.
         if (Type derivedType = computeDerivedTypeWitness(assocType)) {
-          if (derivedType->is<ErrorType>()) {
+          if (derivedType->hasError()) {
             recordMissing();
             return;
           }
@@ -3675,7 +3713,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
     if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->is<ErrorType>()) {
+          ->hasError()) {
       Conformance->setInvalid();
       return;
     }
@@ -3974,7 +4012,7 @@ void ConformanceChecker::checkConformance() {
   // between an imported Objective-C module and its overlay.
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
     if (auto nominal = Adoptee->getAnyNominal()) {
-      if (!TC.Context.isStandardLibraryTypeBridgedInFoundation(nominal)) {
+      if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
         auto nominalModule = nominal->getParentModule();
         auto conformanceModule = DC->getParentModule();
         if (nominalModule->getName() != conformanceModule->getName()) {
@@ -3990,7 +4028,7 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
                                        ProtocolDecl *Proto,
                                        DeclContext *DC,
                                        SourceLoc ComplainLoc) {
-  if (T->is<ErrorType>())
+  if (T->hasError() || T->getCanonicalType()->hasError())
     return;
 
   // If we're checking conformance of an existential type to a protocol,
@@ -4019,8 +4057,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // Special case: for enums with a raw type, explain that the failing
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
-	if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-		enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
+    if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
+        enumDecl->derivesProtocolConformance(Proto) && enumDecl->hasRawType()) {
 
       TC.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                   diag::enum_raw_type_nonconforming_and_nonsynthable,

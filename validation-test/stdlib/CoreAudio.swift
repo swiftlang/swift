@@ -172,7 +172,7 @@ CoreAudioTestSuite.test(
   "UnsafeMutableAudioBufferListPointer.unsafeMutablePointer") {
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(nil)
-    expectEmpty(ablPtrWrapper)
+    expectNil(ablPtrWrapper)
   }
 
   do {
@@ -189,7 +189,7 @@ CoreAudioTestSuite.test(
   do {
     let ablPtrWrapper = UnsafeMutableAudioBufferListPointer(
       UnsafeMutablePointer<AudioBufferList>(bitPattern: 0x1234_5678))
-    expectNotEmpty(ablPtrWrapper)
+    expectNotNil(ablPtrWrapper)
     expectEqual(
       UnsafePointer<AudioBufferList>(bitPattern: 0x1234_5678),
       ablPtrWrapper!.unsafePointer)

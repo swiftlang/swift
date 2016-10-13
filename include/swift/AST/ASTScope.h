@@ -51,6 +51,7 @@ class Stmt;
 class StmtConditionElement;
 class SwitchStmt;
 class TopLevelCodeDecl;
+class TypeDecl;
 class WhileStmt;
 
 /// Describes kind of scope that occurs within the AST.
@@ -61,6 +62,8 @@ enum class ASTScopeKind : uint8_t {
   Preexpanded,
   /// A source file, which is the root of a scope.
   SourceFile,
+  /// The declaration of a type.
+  TypeDecl,
   /// The generic parameters of an extension declaration.
   ExtensionGenericParams,
   /// The body of a type or extension thereof.
@@ -85,8 +88,6 @@ enum class ASTScopeKind : uint8_t {
   AfterPatternBinding,
   /// The scope introduced by a brace statement.
   BraceStmt,
-  /// The scope introduced by a local declaration.
-  LocalDeclaration,
   /// Node describing an "if" statement.
   IfStmt,
   /// The scope introduced by a conditional clause in an if/guard/while
@@ -155,8 +156,27 @@ class ASTScope {
   /// whether the children of this node have already been expanded.
   mutable llvm::PointerIntPair<const ASTScope *, 1, bool> parentAndExpanded;
 
-  /// The cached source range.
-  mutable SourceRange CachedSourceRange;
+  /// Describes the kind of continuation stored in the continuation field.
+  enum class ContinuationKind {
+    /// The continuation is historical: if the continuation is non-null, we
+    /// preserve it so we know which scope to look at to compute the end of the
+    /// source range.
+    Historical = 0,
+    /// The continuation is active.
+    Active = 1,
+    /// The continuation stored in the pointer field is active, and replaced a
+    /// \c SourceFile continuation.
+    ActiveThenSourceFile = 2,
+  };
+
+  /// The scope from which the continuation child nodes will be populated.
+  ///
+  /// The enumeration bits indicate whether the continuation pointer represents
+  /// an active continuation (vs. a historical one) and whether the former
+  /// continuation was for a \c SourceFile (which can be stacked behind another
+  /// continuation).
+  mutable llvm::PointerIntPair<const ASTScope *, 2, ContinuationKind>
+    continuation = { nullptr, ContinuationKind::Historical };
 
   /// Union describing the various kinds of AST nodes that can introduce
   /// scopes.
@@ -168,9 +188,12 @@ class ASTScope {
 
       /// The next element that should be considered in the source file.
       ///
-      /// This accomodates the expansion of source files.
+      /// This accommodates the expansion of source files.
       mutable unsigned nextElement;
     } sourceFile;
+
+    /// A type declaration, for \c kind == ASTScopeKind::TypeDecl.
+    TypeDecl *typeDecl;
 
     /// An extension declaration, for
     /// \c kind == ASTScopeKind::ExtensionGenericParams.
@@ -198,7 +221,7 @@ class ASTScope {
     /// or \c kind == ASTScopeKind::AbstractFunctionBody.
     AbstractFunctionDecl *abstractFunction;
 
-    /// An parameter for an abstract function (init/func/deinit).
+    /// A parameter for an abstract function (init/func/deinit).
     ///
     /// For \c kind == ASTScopeKind::AbstractFunctionParams.
     struct {
@@ -231,11 +254,6 @@ class ASTScope {
       /// The next element in the brace statement that should be expanded.
       mutable unsigned nextElement;
     } braceStmt;
-
-    /// The declaration introduced within a local scope.
-    ///
-    /// For \c kind == ASTScopeKind::LocalDeclaration.
-    Decl *localDeclaration;
 
     /// The 'if' statement, for \c kind == ASTScopeKind::IfStmt.
     IfStmt *ifStmt;
@@ -296,6 +314,26 @@ class ASTScope {
   /// Child scopes, sorted by source range.
   mutable SmallVector<ASTScope *, 4> storedChildren;
 
+  /// Retrieve the active continuation.
+  const ASTScope *getActiveContinuation() const;
+
+  /// Retrieve the historical continuation (which might also be active).
+  ///
+  /// This is the oldest historical continuation, so a \c SourceFile
+  /// continuation will be returned even if it's been replaced by a more local
+  /// continuation.
+  const ASTScope *getHistoricalContinuation() const;
+
+  /// Set the active continuation.
+  void addActiveContinuation(const ASTScope *newContinuation) const;
+
+  /// Remove the active continuation.
+  void removeActiveContinuation() const;
+
+  /// Clear out the continuation, because it has been stolen been transferred to
+  /// a child node.
+  void clearActiveContinuation() const;
+
   /// Constructor that only initializes the kind and parent, leaving the
   /// pieces to be initialized by the caller.
   ASTScope(ASTScopeKind kind, const ASTScope *parent)
@@ -309,6 +347,11 @@ class ASTScope {
 
   /// Constructor that initializes a preexpanded node.
   ASTScope(const ASTScope *parent, ArrayRef<ASTScope *> children);
+
+  ASTScope(const ASTScope *parent, TypeDecl *typeDecl)
+      : ASTScope(ASTScopeKind::TypeDecl, parent) {
+    this->typeDecl = typeDecl;
+  }
 
   ASTScope(const ASTScope *parent, ExtensionDecl *extension)
       : ASTScope(ASTScopeKind::ExtensionGenericParams, parent) {
@@ -447,7 +490,8 @@ class ASTScope {
   /// Expand the children of this AST scope so they can be queried.
   void expand() const;
 
-  /// Determine whether the given scope has already been expanded.
+  /// Determine whether the given scope has already been completely expanded,
+  /// and cannot create any new children.
   bool isExpanded() const;
 
   /// Create a new AST scope if one is needed for the given declaration.
@@ -474,24 +518,27 @@ class ASTScope {
   /// introduced by this AST node.
   static ASTScope *createIfNeeded(const ASTScope *parent, ASTNode node);
 
-  /// Determine whether this is a scope from which we can perform a
-  /// continuation.
-  bool isContinuationScope() const;
+  /// Determine whether this scope can steal a continuation from its parent,
+  /// because (e.g.) it introduces some name binding that should be visible
+  /// in the continuation.
+  bool canStealContinuation() const;
 
-  /// Enumerate the continuation scopes for the given parent,
+  /// Enumerate the continuation child scopes for the given scope.
   ///
-  /// Statements, such as 'guard' and local declarations, introduce scopes
-  /// that extend to the end of an enclosing brace-stmt. This
-  /// operation finds each of the "continuation" scopes in the nearest
-  /// enclosing brace statement.
+  /// \param addChild Function that will be invoked to add the continuation
+  /// child. This function should return true if the child steals the
+  /// continuation, which terminates the enumeration.
   void enumerateContinuationScopes(
-         llvm::function_ref<void(ASTScope *)> fn) const;
+         llvm::function_ref<bool(ASTScope *)> addChild) const;
 
   /// Compute the source range of this scope.
   SourceRange getSourceRangeImpl() const;
 
   /// Retrieve the ASTContext in which this scope exists.
   ASTContext &getASTContext() const;
+
+  /// Retrieve the source file scope, which is the root of the tree.
+  const ASTScope *getSourceFileScope() const;
 
   /// Retrieve the source file in which this scope exists.
   SourceFile &getSourceFile() const;
@@ -515,18 +562,21 @@ public:
 
   /// Determine the source range covered by this scope.
   SourceRange getSourceRange() const {
-    if (CachedSourceRange.isInvalid() ||
-        getKind() == ASTScopeKind::SourceFile) {
-      CachedSourceRange = getSourceRangeImpl();
+    SourceRange range = getSourceRangeImpl();
+
+    // If there was ever a continuation, use it's end range.
+    if (auto historical = getHistoricalContinuation()) {
+      if (historical != this)
+        range.End = historical->getSourceRange().End;
     }
-    return CachedSourceRange;
+
+    return range;
   }
 
-  /// Retrieve the local declatation when
-  /// \c getKind() == ASTScopeKind::LocalDeclaration.
-  Decl *getLocalDeclaration() const {
-    assert(getKind() == ASTScopeKind::LocalDeclaration);
-    return localDeclaration;
+  /// Retrieve the type declaration when \c getKind() == ASTScopeKind::TypeDecl.
+  TypeDecl *getTypeDecl() const {
+    assert(getKind() == ASTScopeKind::TypeDecl);
+    return typeDecl;
   }
 
   /// Retrieve the abstract function declaration when
@@ -563,7 +613,7 @@ public:
   /// \seealso getDeclContext().
   DeclContext *getInnermostEnclosingDeclContext() const;
 
-  /// Retrueve the declarations whose names are directly bound by this scope.
+  /// Retrieve the declarations whose names are directly bound by this scope.
   ///
   /// The declarations bound in this scope aren't available in the immediate
   /// parent of this scope, but will still be visible in child scopes (unless

@@ -34,7 +34,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   }
 }
 
-// FIXME(ABI)(compiler limitation): we should have just one type,
+// FIXME(ABI)#59 (Conditional Conformance): we should have just one type,
 // `ReversedCollection`, that has conditional conformances to
 // `RandomAccessCollection`, and possibly `MutableCollection` and
 // `RangeReplaceableCollection`.

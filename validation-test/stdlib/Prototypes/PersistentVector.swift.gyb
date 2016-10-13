@@ -1919,7 +1919,7 @@ func expectContents(
       ${trace})
   }
   for key in unexpectedKeys {
-    expectEmpty(storage.maybeGet(key: key), ${trace})
+    expectNil(storage.maybeGet(key: key), ${trace})
   }
   expectEqual(contents.count, storage.count, ${trace})
 }
@@ -2120,7 +2120,7 @@ func testDictionary(
       let expectedKeys = shadow.keys
       let unexpectedKeys = allKeys.filter { !expectedKeys.contains($0) }
       for key in unexpectedKeys {
-        expectEmpty(dictionary.maybeGet(key: key), ${trace})
+        expectNil(dictionary.maybeGet(key: key), ${trace})
       }
       expectContents(
         shadow._elements,
