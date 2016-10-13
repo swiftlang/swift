@@ -1,22 +1,22 @@
 #!/usr/bin/env python
 
-# This tool dumps imported Swift APIs to help validate changes in the
-# Clang importer and its heuristics. One can execute it to dump the
-# API of a given module within a particular SDK, e.g., UIKit from the
-# iOS SDK as seen in Swift 3 after the "grand renaming":
+# This tool dumps imported Swift APIs to help validate changes in the projection
+# of (Objective-)C APIs into Swift, which is a function of the (Objective-)C
+# APIs, any API notes added on top of those APIs, and the Clang importer
+# itself. One can execute it to dump the API of a given module within a
+# particular SDK, e.g., UIKit from the iOS SDK as seen in Swift 3 compatibility
+# mode:
 #
-#   /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -m UIKit -s iphoneos
+#   /path/to/bin/dir/swift-api-dump.py -swift-version 3 -o output-dir -m UIKit -s iphoneos
 #
-# The -3 argument indicates that we're using the Swift 3 Clang
-# importer rules. The "-m" argument can be omitted, in which case the
-# script will collect all of the frameworks in the named SDK(s) and
-# dump their APIs.
+# The "-m" argument can be omitted, in which case the script will collect all of
+# the frameworks in the named SDK(s) and dump their APIs.
 #
 # One can supply multiple SDKs, written as a list. For example, to
-# dump the API for all frameworks across OS X, iOS, watchOS, and tvOS,
-# with the Swift 3 rules, use:
+# dump the API for all frameworks across macOS, iOS, watchOS, and tvOS,
+# in Swift 4, use:
 #
-#  /path/to/bin/dir/swift-api-dump.py -3 -o output-dir -s macosx iphoneos \
+#  /path/to/bin/dir/swift-api-dump.py -swift-version 4 -o output-dir -s macosx iphoneos \
 #      watchos appletvos
 #
 
@@ -98,6 +98,8 @@ def create_parser():
     parser.add_argument('--enable-infer-import-as-member', action='store_true',
                         help='Infer when a global could be imported as a ' +
                         'member.')
+    parser.add_argument('-swift-version', type=int, metavar='N',
+                        help='the Swift version to use')
     return parser
 
 
@@ -187,7 +189,7 @@ def dump_module_api((cmd, extra_dump_args, output_dir, module, quiet,
 
 def pretty_sdk_name(sdk):
     if sdk.find("macosx") == 0:
-        return 'OSX'
+        return 'macOS'
     if sdk.find("iphoneos") == 0:
         return 'iOS'
     if sdk.find("watchos") == 0:
@@ -277,7 +279,6 @@ def main():
         '-module-print-skip-overlay',
         '-skip-unavailable',
         '-skip-print-doc-comments',
-        '-always-argument-labels',
         '-skip-overrides'
     ]
 
@@ -293,6 +294,9 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_infer_import_as_member:
         extra_args = extra_args + ['-enable-infer-import-as-member']
+    if args.swift_version:
+        extra_args = extra_args + ['-swift-version', '%d' % args.swift_version]
+
     # Create a .swift file we can feed into swift-ide-test
     subprocess.call(['touch', source_filename])
 
