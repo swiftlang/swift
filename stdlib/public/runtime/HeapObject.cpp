@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Errors.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
@@ -486,7 +487,7 @@ void swift::swift_unownedRetainStrong(HeapObject *object)
          "object is not currently unowned-retained");
 
   if (! object->refCounts.tryIncrement())
-    _swift_abortRetainUnowned(object);
+    swift::swift_abortRetainUnowned(object);
 }
 
 SWIFT_RT_ENTRY_VISIBILITY
@@ -499,7 +500,7 @@ swift::swift_unownedRetainStrongAndRelease(HeapObject *object)
          "object is not currently unowned-retained");
 
   if (! object->refCounts.tryIncrement())
-    _swift_abortRetainUnowned(object);
+    swift::swift_abortRetainUnowned(object);
 
   // This should never cause a deallocation.
   bool dealloc = object->refCounts.decrementUnownedShouldFree(1);
@@ -513,7 +514,7 @@ void swift::swift_unownedCheck(HeapObject *object) {
          "object is not currently unowned-retained");
 
   if (object->refCounts.isDeiniting())
-    _swift_abortRetainUnowned(object);
+    swift::swift_abortRetainUnowned(object);
 }
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY in RefCount.h
@@ -716,11 +717,6 @@ void swift::swift_deallocObject(HeapObject *object,
     // object state DEINITING -> DEINITED
     SWIFT_RT_ENTRY_CALL(swift_unownedRelease)(object);
   }
-}
-
-void swift::_swift_abortRetainUnowned(const void *object) {
-  (void)object;
-  swift::crash("attempted to retain deallocated object");
 }
 
 

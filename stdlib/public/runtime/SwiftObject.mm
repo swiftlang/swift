@@ -26,6 +26,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Errors.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -848,7 +849,7 @@ void *swift::swift_unknownUnownedLoadStrong(UnownedReference *ref) {
   } else if (auto objcRef = dyn_cast<ObjCUnownedReference>(ref)) {
     auto result = (void*) objc_loadWeakRetained(&objcRef->storage()->WeakRef);
     if (result == nullptr) {
-      _swift_abortRetainUnowned(nullptr);
+      swift::swift_abortRetainUnowned(nullptr);
     }
     return result;
   } else {
@@ -863,7 +864,7 @@ void *swift::swift_unknownUnownedTakeStrong(UnownedReference *ref) {
     auto storage = objcRef->storage();
     auto result = (void*) objc_loadWeakRetained(&objcRef->storage()->WeakRef);
     if (result == nullptr) {
-      _swift_abortRetainUnowned(nullptr);
+      swift::swift_abortRetainUnowned(nullptr);
     }
     delete storage;
     return result;

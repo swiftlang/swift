@@ -1,4 +1,4 @@
-//===--- Errors.n - Error reporting utilities -------------------*- C++ -*-===//
+//===--- Errors.h - Error reporting utilities -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -20,5 +20,8 @@ namespace swift {
 
 LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
 void swift_abortRetainOverflow();
+
+LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+void swift_abortRetainUnowned(const void *object);
 
 }

@@ -42,9 +42,6 @@ namespace swift {
                                     const ProtocolDescriptor *theProtocol);
 #endif
 
-  extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NORETURN
-  void _swift_abortRetainUnowned(const void *object);
-
   /// Is the given value a valid alignment mask?
   static inline bool isAlignmentMask(size_t mask) {
     // mask          == xyz01111...
