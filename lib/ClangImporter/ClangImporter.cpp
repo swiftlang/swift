@@ -1007,10 +1007,10 @@ void ClangImporter::collectSubModuleNamesAndVisibility(
   }
   auto submoduleNameLength = submodule->getFullModuleName().length();
   for (auto sub : submodule->submodules()) {
-    StringRef full = sub->getFullModuleName();
+    std::string full = sub->getFullModuleName();
+    full.erase(0, submoduleNameLength + 1);
     namesVisiblePairs.push_back(
-      std::make_pair(full.substr(submoduleNameLength + 1).str(),
-      isModuleImported(sub)));
+      std::make_pair(full, isModuleImported(sub)));
   }
 }
 
