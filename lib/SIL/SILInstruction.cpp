@@ -673,12 +673,12 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
-      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
-                        ArrayRef<Operand>() const);                     \
-      return I->getAllOperands();                                       \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  ArrayRef<Operand> visit##CLASS(const CLASS *I) {                             \
+    ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,                   \
+                      ArrayRef<Operand>() const);                              \
+    return I->getAllOperands();                                                \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -690,12 +690,12 @@ namespace {
     MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-    MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                   \
-      ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,          \
-                        MutableArrayRef<Operand>());                    \
-      return I->getAllOperands();                                       \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                            \
+    ASSERT_IMPLEMENTS(CLASS, SILInstruction, getAllOperands,                   \
+                      MutableArrayRef<Operand>());                             \
+    return I->getAllOperands();                                                \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -711,13 +711,13 @@ namespace {
     ArrayRef<Operand> visit##CLASS(const CLASS *I) {                    \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
-    ArrayRef<Operand> visit##CLASS(const CLASS *I) {                           \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
-                             ArrayRef<Operand>() const))                       \
-        return {};                                                             \
-      return I->getTypeDependentOperands();                                 \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  ArrayRef<Operand> visit##CLASS(const CLASS *I) {                             \
+    if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands,    \
+                           ArrayRef<Operand>() const))                         \
+      return {};                                                               \
+    return I->getTypeDependentOperands();                                      \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 
@@ -729,13 +729,13 @@ namespace {
     MutableArrayRef<Operand> visit##CLASS(const CLASS *I) {             \
       llvm_unreachable("accessing non-instruction " #CLASS);            \
     }
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)                    \
-    MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                          \
-      if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands, \
-                             MutableArrayRef<Operand>()))                      \
-        return {};                                                             \
-      return I->getTypeDependentOperands();                                 \
-    }
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  MutableArrayRef<Operand> visit##CLASS(CLASS *I) {                            \
+    if (!IMPLEMENTS_METHOD(CLASS, SILInstruction, getTypeDependentOperands,    \
+                           MutableArrayRef<Operand>()))                        \
+      return {};                                                               \
+    return I->getTypeDependentOperands();                                      \
+  }
 #include "swift/SIL/SILNodes.def"
   };
 } // end anonymous namespace
@@ -799,8 +799,9 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
   }
 
   switch (getKind()) {
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-  case ValueKind::CLASS: return MemoryBehavior::MEMBEHAVIOR;
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  case ValueKind::CLASS:                                                       \
+    return MemoryBehavior::MEMBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
   case ValueKind::SILArgument:
   case ValueKind::SILUndef:
@@ -811,8 +812,9 @@ SILInstruction::MemoryBehavior SILInstruction::getMemoryBehavior() const {
 
 SILInstruction::ReleasingBehavior SILInstruction::getReleasingBehavior() const {
   switch (getKind()) {
-#define INST(CLASS, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR) \
-  case ValueKind::CLASS: return ReleasingBehavior::RELEASINGBEHAVIOR;
+#define INST(CLASS, PARENT, TEXTUALNAME, MEMBEHAVIOR, RELEASINGBEHAVIOR)       \
+  case ValueKind::CLASS:                                                       \
+    return ReleasingBehavior::RELEASINGBEHAVIOR;
 #include "swift/SIL/SILNodes.def"
  case ValueKind::SILArgument:
  case ValueKind::SILUndef:
