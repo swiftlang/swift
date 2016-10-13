@@ -501,7 +501,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
-  BLOCK_RECORD(sil_block, SIL_GENERIC_OUTER_PARAMS);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
 
@@ -2213,18 +2212,13 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(genericParam->getDeclContext());
 
-    SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : genericParam->getInherited())
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
-
     unsigned abbrCode = DeclTypeAbbrCodes[GenericTypeParamDeclLayout::Code];
     GenericTypeParamDeclLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addIdentifierRef(genericParam->getName()),
                                 contextID,
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
-                                genericParam->getIndex(),
-                                inheritedTypes);
+                                genericParam->getIndex());
     break;
   }
 

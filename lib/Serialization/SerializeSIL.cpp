@@ -1860,7 +1860,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableEntryLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
-  registerSILAbbr<SILGenericOuterParamsLayout>();
 
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();

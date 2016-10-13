@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 274; // Last change: SIL generic environment sugar
+const uint16_t VERSION_MINOR = 275; // Last change: remove some unused bits
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -769,12 +769,11 @@ namespace decls_block {
 
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
-    IdentifierIDField, // name
-    DeclContextIDField,// context decl
-    BCFixed<1>,  // implicit flag
-    BCVBR<4>,    // depth
-    BCVBR<4>,    // index
-    BCArray<TypeIDField> // inherited types
+    IdentifierIDField,  // name
+    DeclContextIDField, // context decl
+    BCFixed<1>,         // implicit flag
+    BCVBR<4>,           // depth
+    BCVBR<4>            // index
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<

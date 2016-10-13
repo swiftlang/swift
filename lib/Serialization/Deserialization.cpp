@@ -2240,14 +2240,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     unsigned depth;
     unsigned index;
-    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
                                                         contextID,
                                                         isImplicit,
                                                         depth,
-                                                        index,
-                                                        rawInheritedIDs);
+                                                        index);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -2264,12 +2262,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       genericParam->setImplicit();
 
-    auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-    for_each(inherited, rawInheritedIDs, [this](TypeLoc &loc, uint64_t rawID) {
-      loc.setType(getType(rawID));
-    });
-    genericParam->setInherited(inherited);
-    genericParam->setCheckedInheritanceClause();
     break;
   }
 
