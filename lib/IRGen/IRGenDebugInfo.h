@@ -63,7 +63,7 @@ class IRGenDebugInfo {
 
   // Various caches.
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
-  llvm::DenseMap<const char *, llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
@@ -243,7 +243,7 @@ private:
   llvm::MDNode *createInlinedAt(const SILDebugScope *CallSite);
 
   /// Translate filenames into DIFiles.
-  llvm::DIFile *getOrCreateFile(const char *Filename);
+  llvm::DIFile *getOrCreateFile(StringRef Filename);
   /// Return a DIType for Ty reusing any DeclContext found in DbgTy.
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy);
 

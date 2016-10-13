@@ -1038,7 +1038,7 @@ int ConformanceLookupTable::compareProtocolConformances(
         }
 
         // Otherwise, order by buffer identifier.
-        return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+        return ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer)
                  .compare(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
       }
     }

@@ -137,7 +137,7 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
   return It->second;
 }
 
-const char *SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
+StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
   assert(buffer && "invalid buffer ID");
   return buffer->getBufferIdentifier();

@@ -150,8 +150,8 @@ FileUnit *SerializedModuleLoader::loadAST(
     bool isFramework) {
   assert(moduleInputBuffer);
 
-  const char *moduleBufferID = moduleInputBuffer->getBufferIdentifier();
-  const char *moduleDocBufferID = nullptr;
+  StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
+  StringRef moduleDocBufferID;
   if (moduleDocInputBuffer)
     moduleDocBufferID = moduleDocInputBuffer->getBufferIdentifier();
 
@@ -236,9 +236,9 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
 
   case serialization::Status::MalformedDocumentation:
-    assert(moduleDocBufferID);
+    assert(!moduleDocBufferID.empty());
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
-                       moduleDocBufferID ? moduleDocBufferID : "");
+                       moduleDocBufferID);
     break;
 
   case serialization::Status::MissingDependency: {

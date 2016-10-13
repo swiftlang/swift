@@ -87,11 +87,11 @@ public:
   struct DebugLoc {
     unsigned Line;
     unsigned Column;
-    const char *Filename;
+    StringRef Filename;
 
     DebugLoc(unsigned Line = 0, unsigned Column = 0,
-             const char *Filename = nullptr) : Line(Line), Column(Column),
-                                               Filename(Filename) { }
+             StringRef Filename = StringRef()) : Line(Line), Column(Column),
+                                                 Filename(Filename) { }
   };
 
 protected:
@@ -260,7 +260,7 @@ public:
   bool isNull() const {
     switch (getStorageKind()) {
     case ASTNodeKind:   return Loc.ASTNode.Primary.isNull();
-    case DebugInfoKind: return Loc.DebugInfoLoc.Filename;
+    case DebugInfoKind: return Loc.DebugInfoLoc.Filename.empty();
     case SILFileKind:   return Loc.SILFileLoc.isInvalid();
     default:            return true;
     }
@@ -405,7 +405,7 @@ public:
   }
 
   /// Fingerprint a DebugLoc for use in a DenseMap.
-  typedef std::pair<std::pair<unsigned, unsigned>, const void *> DebugLocKey;
+  typedef std::pair<std::pair<unsigned, unsigned>, StringRef> DebugLocKey;
   struct DebugLocHash : public DebugLocKey {
     DebugLocHash(DebugLoc L) : DebugLocKey({{L.Line, L.Column}, L.Filename}) {}
   };

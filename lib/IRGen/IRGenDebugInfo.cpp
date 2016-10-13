@@ -139,7 +139,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
       Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables
           ? llvm::DICompileUnit::FullDebug
           : llvm::DICompileUnit::LineTablesOnly);
-  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
+  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile));
 
   // Because the swift compiler relies on Clang to setup the Module,
   // the clang CU is always created first.  Several dwarf-reading
@@ -161,22 +161,15 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   DBuilder.createImportedModule(MainFile, MainModule, 1);
 }
 
-static const char *getFilenameFromDC(const DeclContext *DC) {
-  if (auto LF = dyn_cast<LoadedFile>(DC)) {
-    // FIXME: Today, the subclasses of LoadedFile happen to return StringRefs
-    // that are backed by null-terminated strings, but that's certainly not
-    // guaranteed in the future.
-    StringRef Fn = LF->getFilename();
-    assert(((Fn.size() == 0) ||
-            (Fn.data()[Fn.size()] == '\0')) && "not a C string");
-    return Fn.data();
-  }
+static StringRef getFilenameFromDC(const DeclContext *DC) {
+  if (auto LF = dyn_cast<LoadedFile>(DC))
+    return LF->getFilename();
   if (auto SF = dyn_cast<SourceFile>(DC))
-    return SF->getFilename().data();
+    return SF->getFilename();
   else if (auto M = dyn_cast<Module>(DC))
-    return M->getModuleFilename().data();
+    return M->getModuleFilename();
   else
-    return nullptr;
+    return StringRef();
 }
 
 SILLocation::DebugLoc getDeserializedLoc(Pattern *) { return {}; }
@@ -185,7 +178,8 @@ SILLocation::DebugLoc getDeserializedLoc(Stmt *) { return {}; }
 SILLocation::DebugLoc getDeserializedLoc(Decl *D) {
   SILLocation::DebugLoc L;
   const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (const char *Filename = getFilenameFromDC(DC))
+  StringRef Filename = getFilenameFromDC(DC);
+  if (!Filename.empty())
     L.Filename = Filename;
   return L;
 }
@@ -412,8 +406,8 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(const SILDebugScope *DS) {
   return DScope;
 }
 
-llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
-  if (!Filename)
+llvm::DIFile *IRGenDebugInfo::getOrCreateFile(StringRef Filename) {
+  if (Filename.empty())
     return MainFile;
 
   if (MainFile) {
@@ -676,7 +670,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
 
   // We know that main always comes from MainFile.
   if (LinkageName == SWIFT_ENTRY_POINT_FUNCTION) {
-    if (!L.Filename)
+    if (L.Filename.empty())
       File = MainFile;
     Line = 1;
     Name = LinkageName;
@@ -759,8 +753,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 
 llvm::DIModule *
 IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
-  const char *fn = getFilenameFromDC(M.second);
-  StringRef Path(fn ? fn : "");
+  StringRef Path = getFilenameFromDC(M.second);
   if (M.first.empty()) {
     StringRef Name = M.second->getName().str();
     return getOrCreateModule(Name, TheCU, Name, Path);

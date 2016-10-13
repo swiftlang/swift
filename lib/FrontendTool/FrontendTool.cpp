@@ -663,8 +663,7 @@ private:
     unsigned BufID = SM.findBufferContainingLoc(Loc);
     unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufID);
     unsigned Length = Range.getByteLength();
-    SmallString<200> Path =
-      StringRef(SM.getIdentifierForBuffer(BufID));
+    SmallString<200> Path = SM.getIdentifierForBuffer(BufID);
 
     OS << " {\n";
     OS << "  \"file\": \"";
