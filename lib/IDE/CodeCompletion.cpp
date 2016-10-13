@@ -3313,6 +3313,12 @@ public:
         }
       }
 
+      // If the right-hand side and result type are both type parameters, we're
+      // not providing a useful completion.
+      if (expr->getType()->isTypeParameter() &&
+          CCE.getType()->isTypeParameter())
+        return;
+
       addInfixOperatorCompletion(op, expr->getType(), CCE.getType());
     }
   }
