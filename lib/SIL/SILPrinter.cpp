@@ -30,6 +30,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Types.h"
@@ -1835,21 +1836,25 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     llvm::SmallString<16> disambiguatedNameBuf;
     unsigned disambiguatedNameCounter = 1;
     for (auto *paramTy : sig->getGenericParams()) {
-      auto *archetypeTy = mapTypeIntoContext(paramTy)->getAs<ArchetypeType>();
-      if (!archetypeTy)
-        continue;
-
-      Identifier name = archetypeTy->getName();
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
       while (!UsedNames.insert(name).second) {
         disambiguatedNameBuf.clear();
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
-          names << archetypeTy->getName() << disambiguatedNameCounter++;
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }
-      if (name != archetypeTy->getName())
-        Aliases[CanType(archetypeTy)] = name;
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
     }
   }
 

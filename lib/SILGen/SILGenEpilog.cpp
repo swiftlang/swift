@@ -130,8 +130,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     B.setInsertionPoint(pred);
   } else {
     // Move the epilog block to the end of the ordinary section.
-    auto endOfOrdinarySection =
-      (StartOfPostmatter ? SILFunction::iterator(StartOfPostmatter) : F.end());
+    auto endOfOrdinarySection = StartOfPostmatter;
     B.moveBlockTo(epilogBB, endOfOrdinarySection);
 
     // Emit the epilog into the epilog bb. Its arguments are the

@@ -374,10 +374,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
-    if (auto genericEnv = F.getGenericEnvironment()) {
-      auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
-      S.writeGenericEnvironment(genericSig, genericEnv, SILAbbrCodes);
-    }
+    if (auto genericEnv = F.getGenericEnvironment())
+      S.writeGenericEnvironment(genericEnv, SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1862,7 +1860,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableEntryLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
-  registerSILAbbr<SILGenericOuterParamsLayout>();
 
   registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
@@ -1881,6 +1878,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::ProtocolConformanceXrefLayout>();
   registerSILAbbr<decls_block::GenericRequirementLayout>();
   registerSILAbbr<decls_block::GenericEnvironmentLayout>();
+  registerSILAbbr<decls_block::SILGenericEnvironmentLayout>();
 
   for (const SILGlobalVariable &g : SILMod->getSILGlobals())
     writeSILGlobalVar(g);

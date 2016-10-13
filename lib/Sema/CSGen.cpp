@@ -500,47 +500,49 @@ namespace {
     return false;
   }
   
-  /// Determine whether the given parameter type and argument should be
+  /// Determine whether the given parameter and argument type should be
   /// "favored" because they match exactly.
   bool isFavoredParamAndArg(ConstraintSystem &CS,
                             Type paramTy,
-                            Expr *arg,
                             Type argTy,
-                            Expr *otherArg = nullptr,
-                            Type otherArgTy = Type()) {
-    // Determine the argument type.
-    argTy = argTy->getLValueOrInOutObjectType();
-
+                            Type otherArgTy) {
+    if (argTy->getAs<LValueType>())
+      argTy = argTy->getLValueOrInOutObjectType();
+    
+    if (!otherArgTy.isNull() &&
+        otherArgTy->getAs<LValueType>())
+      otherArgTy = otherArgTy->getLValueOrInOutObjectType();
+    
     // Do the types match exactly?
     if (paramTy->isEqual(argTy))
       return true;
-
-    // If the argument is a literal, this is a favored param/arg pair if
-    // the parameter is of that default type.
-    auto &tc = CS.getTypeChecker();
-    auto literalProto = tc.getLiteralProtocol(arg->getSemanticsProvidingExpr());
-    if (!literalProto) return false;
-
-    // Dig out the second argument type.
-    if (otherArgTy)
-      otherArgTy = otherArgTy->getLValueOrInOutObjectType();
-
-    // If there is another, concrete argument, check whether it's type
-    // conforms to the literal protocol and test against it directly.
-    // This helps to avoid 'widening' the favored type to the default type for
-    // the literal.
-    if (otherArgTy && otherArgTy->getAnyNominal()) {
-      return otherArgTy->isEqual(paramTy) &&
-             tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                   ConformanceCheckFlags::InExpression);
+    
+    // If the argument is a type variable created for a literal that has a
+    // default type, this is a favored param/arg pair if the parameter is of
+    // that default type.
+    // Is the argument a type variable...
+    if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
+      if (auto proto = argTypeVar->getImpl().literalConformanceProto) {
+        // If it's a struct type associated with the literal conformance,
+        // test against it directly. This helps to avoid 'widening' the
+        // favored type to the default type for the literal.
+        if (!otherArgTy.isNull() &&
+            otherArgTy->getAs<StructType>()) {
+          
+          if (CS.TC.conformsToProtocol(otherArgTy,
+                                       proto,
+                                       CS.DC,
+                                       ConformanceCheckFlags::InExpression)) {
+            return otherArgTy->isEqual(paramTy);
+          }
+        } else if (auto defaultTy = CS.TC.getDefaultType(proto, CS.DC)) {
+          if (paramTy->isEqual(defaultTy)) {
+            return true;
+          }
+        }
+      }
     }
-
-    // If there is a default type for the literal protocol, check whether
-    // it is the same as the parameter type.
-    // Check whether there is a default type to compare against.
-    if (Type defaultType = tc.getDefaultType(literalProto, CS.DC))
-      return paramTy->isEqual(defaultType);
-
+    
     return false;
   }
   
@@ -699,14 +701,6 @@ namespace {
     return NTD->getHasFailableInits();
   }
   
-  Type getInnerParenType(const Type &t) {
-    if (auto parenType = dyn_cast<ParenType>(t.getPointer())) {
-      return getInnerParenType(parenType->getUnderlyingType());
-    }
-    
-    return t;
-  }
-  
   size_t getOperandCount(Type t) {
     size_t nOperands = 0;
     
@@ -748,6 +742,9 @@ namespace {
   /// for the operand and contextual type.
   void favorMatchingUnaryOperators(ApplyExpr *expr,
                                    ConstraintSystem &CS) {
+    // Find the argument type.
+    auto argTy = expr->getArg()->getType()->getWithoutParens();
+    
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
       auto valueTy = value->getType();
@@ -765,8 +762,7 @@ namespace {
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
       
-      return isFavoredParamAndArg(CS, paramTy, expr->getArg(),
-                                  expr->getArg()->getType()) &&
+      return isFavoredParamAndArg(CS, paramTy, argTy, Type()) &&
           (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
@@ -874,8 +870,8 @@ namespace {
     auto argTy = expr->getArg()->getType();
     auto argTupleTy = argTy->castTo<TupleType>();
     auto argTupleExpr = dyn_cast<TupleExpr>(expr->getArg());
-    Type firstArgTy = getInnerParenType(argTupleTy->getElement(0).getType());
-    Type secondArgTy = getInnerParenType(argTupleTy->getElement(1).getType());
+    Type firstArgTy = argTupleTy->getElement(0).getType()->getWithoutParens();
+    Type secondArgTy = argTupleTy->getElement(1).getType()->getWithoutParens();
     
     // Determine whether the given declaration is favored.
     auto isFavoredDecl = [&](ValueDecl *value) -> bool {
@@ -885,10 +881,8 @@ namespace {
       if (!fnTy)
         return false;
 
-      Expr *firstArg = argTupleExpr->getElement(0);
-      auto firstFavoredTy = CS.getFavoredType(firstArg);
-      Expr *secondArg = argTupleExpr->getElement(1);
-      auto secondFavoredTy = CS.getFavoredType(secondArg);
+      auto firstFavoredTy = CS.getFavoredType(argTupleExpr->getElement(0));
+      auto secondFavoredTy = CS.getFavoredType(argTupleExpr->getElement(1));
       
       auto favoredExprTy = CS.getFavoredType(expr);
       
@@ -932,10 +926,8 @@ namespace {
       auto contextualTy = CS.getContextualType(expr);
       
       return
-        (isFavoredParamAndArg(CS, firstParamTy, firstArg, firstArgTy,
-                              secondArg, secondArgTy) ||
-         isFavoredParamAndArg(CS, secondParamTy, secondArg, secondArgTy,
-                              firstArg, firstArgTy)) &&
+        (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
+         isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
          firstParamTy->isEqual(secondParamTy) &&
         (!contextualTy || contextualTy->isEqual(resultTy));
     };
@@ -1091,7 +1083,7 @@ namespace {
           auto keyTy = dictTy->first;
           auto valueTy = dictTy->second;
           
-          if (isFavoredParamAndArg(CS, keyTy, index, index->getType())) {
+          if (isFavoredParamAndArg(CS, keyTy, index->getType(), Type())) {
             outputTy = OptionalType::get(valueTy);
             
             if (isLValueBase)
@@ -1172,7 +1164,10 @@ namespace {
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
+      
+      tv->getImpl().literalConformanceProto = protocol;
+      
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
       return tv;
@@ -1195,7 +1190,8 @@ namespace {
       // ExpressibleByStringInterpolation protocol.
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
+      tv->getImpl().literalConformanceProto = interpolationProto;
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
 
@@ -1268,7 +1264,9 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
+      tv->getImpl().literalConformanceProto = protocol;
+      
+      CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType(),
                        CS.getConstraintLocator(expr));
 
@@ -1685,7 +1683,7 @@ namespace {
         contextualArrayElementType =
             CS.getBaseTypeForArrayType(contextualType.getPointer());
         
-        CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
+        CS.addConstraint(ConstraintKind::ConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
         
@@ -1705,7 +1703,7 @@ namespace {
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
 
       // The array must be an array literal type.
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, arrayTy,
+      CS.addConstraint(ConstraintKind::ConformsTo, arrayTy,
                        arrayProto->getDeclaredType(),
                        locator);
       
@@ -1771,8 +1769,8 @@ namespace {
       auto dictionaryTy = CS.createTypeVariable(locator,
                                                 TVO_PrefersSubtypeBinding);
 
-      // The dictionary must be a dictionary literal type.
-      CS.addConstraint(ConstraintKind::LiteralConformsTo, dictionaryTy,
+      // The array must be a dictionary literal type.
+      CS.addConstraint(ConstraintKind::ConformsTo, dictionaryTy,
                        dictionaryProto->getDeclaredType(),
                        locator);
 

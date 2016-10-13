@@ -93,6 +93,17 @@ void fixItEncloseTrailingClosure(TypeChecker &TC,
                                  InFlightDiagnostic &diag,
                                  const CallExpr *call,
                                  Identifier closureLabel);
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool diagnoseDeclAvailability(const ValueDecl *Decl,
+                              TypeChecker &TC,
+                              DeclContext *DC,
+                              SourceRange R,
+                              bool AllowPotentiallyUnavailableProtocol,
+                              bool SignalOnPotentialUnavailability);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

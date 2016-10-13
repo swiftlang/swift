@@ -1842,16 +1842,16 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   auto Name = D->getFullName();
 
-  switch (Attr->getUnconditionalAvailability()) {
-  case UnconditionalAvailabilityKind::Deprecated:
+  switch (Attr->getPlatformAgnosticAvailability()) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
     break;
 
-  case UnconditionalAvailabilityKind::None:
-  case UnconditionalAvailabilityKind::Unavailable:
-  case UnconditionalAvailabilityKind::UnavailableInCurrentSwift:
-  case UnconditionalAvailabilityKind::UnavailableInSwift: {
-    bool inSwift = (Attr->getUnconditionalAvailability() ==
-                    UnconditionalAvailabilityKind::UnavailableInSwift);
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift: {
+    bool inSwift = (Attr->getPlatformAgnosticAvailability() ==
+                    PlatformAgnosticAvailabilityKind::UnavailableInSwift);
 
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
@@ -1867,9 +1867,10 @@ bool TypeChecker::diagnoseExplicitUnavailability(
                              newName);
         attachRenameFixIts(diag);
       } else {
+        EncodedDiagnosticMessage EncodedMessage(Attr->Message);
         auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
                              Name, replaceKind.hasValue(), rawReplaceKind,
-                             newName, Attr->Message);
+                             newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
     } else if (Attr->Message.empty()) {
@@ -1887,22 +1888,27 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   }
   }
 
-  auto MinVersion = Context.LangOpts.getMinPlatformVersion();
-  switch (Attr->getMinVersionAvailability(MinVersion)) {
-  case MinVersionComparison::Available:
-  case MinVersionComparison::PotentiallyUnavailable:
+  switch (Attr->getVersionAvailability(Context)) {
+  case AvailableVersionComparison::Available:
+  case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
-  case MinVersionComparison::Unavailable:
-    diagnose(D, diag::availability_marked_unavailable, Name)
+  case AvailableVersionComparison::Unavailable:
+    if (Attr->isLanguageVersionSpecific()
+        && Attr->Introduced.hasValue())
+      diagnose(D, diag::availability_introduced_in_swift, Name,
+               *Attr->Introduced).highlight(Attr->getRange());
+    else
+      diagnose(D, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
     break;
 
-  case MinVersionComparison::Obsoleted:
+  case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
     diagnose(D, diag::availability_obsoleted, Name,
-             Attr->prettyPlatformString(),
+             (Attr->isLanguageVersionSpecific() ?
+              "Swift" : Attr->prettyPlatformString()),
              *Attr->Obsoleted).highlight(Attr->getRange());
     break;
   }
@@ -1986,9 +1992,12 @@ public:
     return E;
   }
 
-private:
   bool diagAvailability(const ValueDecl *D, SourceRange R,
-                        const ApplyExpr *call = nullptr);
+                        const ApplyExpr *call = nullptr,
+                        bool AllowPotentiallyUnavailableProtocol = false,
+                        bool SignalOnPotentialUnavailability = true);
+
+private:
   bool diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
                              const AvailableAttr *Attr);
   bool diagnoseMemoryLayoutMigration(const ValueDecl *D, SourceRange R,
@@ -2124,11 +2133,12 @@ private:
 };
 }
 
-
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
-                                          const ApplyExpr *call) {
+                                          const ApplyExpr *call,
+                                          bool AllowPotentiallyUnavailableProtocol,
+                                          bool SignalOnPotentialUnavailability) {
   if (!D)
     return false;
 
@@ -2145,11 +2155,15 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   // Diagnose for deprecation
   TC.diagnoseIfDeprecated(R, DC, D, call);
 
-  // Diagnose for potential unavailability
+  if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(D))
+    return false;
+
+  // Diagnose (and possibly signal) for potential unavailability
   auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
-    return true;
+    if (SignalOnPotentialUnavailability)
+      return true;
   }
   return false;
 }
@@ -3924,10 +3938,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     }
 
     // Look through parentheses.
-    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
-      type = parenTy->getUnderlyingType();
-      continue;
-    }
+    type = type->getWithoutParens();
 
     // Look through optionals.
     if (auto optObjectTy = type->getAnyOptionalObjectType()) {
@@ -4126,4 +4137,21 @@ Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return None;
+}
+
+
+/// Run the Availability-diagnostics algorithm otherwise used in an expr
+/// context, but for non-expr contexts such as TypeDecls referenced from
+/// TypeReprs.
+bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
+                                     TypeChecker &TC,
+                                     DeclContext *DC,
+                                     SourceRange R,
+                                     bool AllowPotentiallyUnavailableProtocol,
+                                     bool SignalOnPotentialUnavailability)
+{
+  AvailabilityWalker AW(TC, DC);
+  return AW.diagAvailability(Decl, R, nullptr,
+                             AllowPotentiallyUnavailableProtocol,
+                             SignalOnPotentialUnavailability);
 }

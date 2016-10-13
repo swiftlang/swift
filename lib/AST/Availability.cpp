@@ -27,8 +27,8 @@ namespace {
 /// The inferred availability required to access a group of declarations
 /// on a single platform.
 struct InferredAvailability {
-  UnconditionalAvailabilityKind Unconditional
-    = UnconditionalAvailabilityKind::None;
+  PlatformAgnosticAvailabilityKind PlatformAgnostic
+    = PlatformAgnosticAvailabilityKind::None;
   
   Optional<clang::VersionTuple> Introduced;
   Optional<clang::VersionTuple> Deprecated;
@@ -61,10 +61,10 @@ mergeIntoInferredVersion(const Optional<clang::VersionTuple> &Version,
 /// the attribute requires.
 static void mergeWithInferredAvailability(const AvailableAttr *Attr,
                                           InferredAvailability &Inferred) {
-  Inferred.Unconditional
-    = static_cast<UnconditionalAvailabilityKind>(
-      std::max(static_cast<unsigned>(Inferred.Unconditional),
-               static_cast<unsigned>(Attr->getUnconditionalAvailability())));
+  Inferred.PlatformAgnostic
+    = static_cast<PlatformAgnosticAvailabilityKind>(
+      std::max(static_cast<unsigned>(Inferred.PlatformAgnostic),
+               static_cast<unsigned>(Attr->getPlatformAgnosticAvailability())));
 
   // The merge of two introduction versions is the maximum of the two versions.
   mergeIntoInferredVersion(Attr->Introduced, Inferred.Introduced, std::max);
@@ -92,7 +92,7 @@ createAvailableAttr(PlatformKind Platform,
       SourceLoc(), SourceRange(), Platform,
       /*Message=*/StringRef(),
       /*Rename=*/StringRef(), Introduced, Deprecated, Obsoleted,
-      Inferred.Unconditional, /*Implicit=*/true);
+      Inferred.PlatformAgnostic, /*Implicit=*/true);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
@@ -128,7 +128,8 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
   for (auto Attr : D->getAttrs()) {
     auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
     if (AvailAttr == nullptr || !AvailAttr->Introduced.hasValue() ||
-        !AvailAttr->isActivePlatform(Ctx)) {
+        !AvailAttr->isActivePlatform(Ctx) ||
+        AvailAttr->isLanguageVersionSpecific()) {
       continue;
     }
 
